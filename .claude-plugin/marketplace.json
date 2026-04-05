@@ -1,0 +1,18 @@
+{
+  "name": "peakflames-plugins",
+  "owner": {
+    "name": "Todd Schavey",
+    "email": "schaveyt@gmail.com"
+  },
+  "metadata": {
+    "description": "Claude Code plugins by PeakFlames",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "epic-workflow",
+      "description": "Structured project management workflow organized around Epics with acceptance criteria, verification needs, and documentation currency. Covers the full lifecycle: discovery, planning, implementation, verification, and documentation refresh.",
+      "source": "./plugins/epic-workflow"
+    }
+  ]
+}
