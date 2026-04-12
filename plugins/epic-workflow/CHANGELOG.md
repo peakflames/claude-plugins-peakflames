@@ -6,6 +6,29 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] — 2026-04-12
+
+### Changed
+
+- **Branch naming convention: `feat/epic-N` → `feature/epic-N-<short-name>`** — feature
+  branches now derive a descriptive short name from the epic spec filename. For example,
+  `epic-3-user-auth.md` produces branch `feature/epic-3-user-auth`. If the spec filename
+  has no suffix after `epic-N`, the branch falls back to `feature/epic-N`.
+- **`start`: Step 1 extracts branch short name (new item 5)** — the short name is derived
+  from the spec filename during context loading and used in Step 3 for branch creation.
+- **`start`: Step 3 uses new branch format** — creates `feature/epic-N-<short-name>`
+  instead of `feat/epic-N`.
+- **`wrapup`: Step 1.1 uses new branch format with backwards compatibility** — checks out
+  `feature/epic-N-<short-name>` first, falls back to legacy `feat/epic-N` for sessions
+  started before v1.3.0.
+- **`wrapup`: Step 5 uses actual branch name** — merge and cleanup reference the branch
+  checked out in Step 1.1, supporting both new and legacy naming.
+- **`setup`: Git Workflow audit and questions include branch naming convention** — the
+  Step 2 audit checks for `feature/epic-N-<short-name>` documentation, and Step 3
+  instructs the agent to include it when populating the Git Workflow section in CLAUDE.md.
+
+---
+
 ## [1.2.0] — 2026-04-12
 
 ### Added

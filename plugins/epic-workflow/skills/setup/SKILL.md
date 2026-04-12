@@ -28,7 +28,7 @@ Check for the presence and completeness of each section below. Report a status f
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
-| **Git Workflow** | Documents branch strategy, merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, `appsettings*.json`) |
+| **Git Workflow** | Documents branch strategy (including epic branch naming convention `feature/epic-N-<short-name>`), merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, `appsettings*.json`) |
 | **Verification Before Commit Rule** | Prescribes the implement → lint → build → verify → commit sequence; explains why compiled code ≠ correct behavior |
 | **Release Protocol** | Documents the full release flow: changelog finalization, merge to main, tagging convention, post-release version bump, and where the version lives in the codebase |
 
@@ -78,6 +78,7 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 
 **Git Workflow** (if missing):
 - What is the branch strategy? (e.g., `develop` for active work, `main` for releases)
+- Epic feature branches use the naming convention `feature/epic-N-<short-name>` where the short name is derived from the epic spec filename (e.g., `epic-3-user-auth.md` → `feature/epic-3-user-auth`). Include this convention in the Git Workflow section.
 - Should merges use `--no-ff` to preserve commit history?
 - Should Claude ask before pushing to origin?
 - Are there files that must NEVER be committed? (e.g., `.env`, `appsettings*.json`, credentials)

@@ -19,10 +19,11 @@ Follow these steps exactly:
 2. Read the implementation plan index: `docs/implementation-plan/index.md`
 3. Identify which phase and file corresponds to Epic $ARGUMENTS
 4. Read the epic spec file (e.g., `docs/implementation-plan/phase-N-*/epic-$ARGUMENTS-*.md`)
-5. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously)
-6. Read `docs/architecture.md` for system context
-7. Read `docs/design-notes.md` for technical decisions
-8. Read all files in `docs/reference/` for implementation patterns and reference material from similar projects
+5. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-N-` prefix, and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-N` (e.g., `epic-3.md`), omit it.
+6. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously)
+7. Read `docs/architecture.md` for system context
+8. Read `docs/design-notes.md` for technical decisions
+9. Read all files in `docs/reference/` for implementation patterns and reference material from similar projects
 
 ### Recovery Check
 
@@ -38,17 +39,17 @@ Check the epic's Dependencies section. Verify that prerequisite epics are marked
 
 ## Step 3: Create Feature Branch
 
-Before entering plan mode, ensure work is isolated on a feature branch:
+Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-N-<short-name>` where `<short-name>` was extracted in Step 1 (e.g., `feature/epic-3-user-auth`). If no short name was available, use `feature/epic-N`.
 
 1. Run `git branch --show-current` to check the current branch
-2. If already on `feat/epic-N` (where N is the epic number), confirm to the user:
-   > Resuming on existing branch: `feat/epic-N`
-3. If NOT on `feat/epic-N`:
+2. If already on `feature/epic-N-<short-name>`, confirm to the user:
+   > Resuming on existing branch: `feature/epic-N-<short-name>`
+3. If NOT on `feature/epic-N-<short-name>`:
    a. Detect the main branch name: check for `main` first, then `master`
    b. Switch to the main branch: `git checkout main` (or `master`)
-   c. Create and checkout the feature branch: `git checkout -b feat/epic-N`
+   c. Create and checkout the feature branch: `git checkout -b feature/epic-N-<short-name>`
    d. Confirm to the user:
-   > Created and switched to branch: `feat/epic-N`
+   > Created and switched to branch: `feature/epic-N-<short-name>`
 
 ## Step 4: Enter Plan Mode
 
