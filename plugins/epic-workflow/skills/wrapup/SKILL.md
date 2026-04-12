@@ -185,16 +185,6 @@ Based on the dependency graph and project state, recommend which epic to start n
 
 If the verification found any non-blocking issues (PASS WITH EXCEPTIONS, CANNOT VERIFY items, tech debt), list them here as items to address before the final QA epic or during CI/CD setup.
 
-### Step 3.5: Documentation Currency Check
-
-Check whether the architecture and design documentation may need a refresh:
-
-1. Read `docs/architecture.md` — check the `Status:` field and `Document Version:`. If it still says "Draft" or the version is < 1.0, it has never been refreshed since setup.
-2. Count how many complete epic handoffs exist in `docs/implementation-plan/session-handoffs/` that have a **Key Decisions** section. These are decisions that may not yet be reflected in `docs/design-notes.md`.
-3. Compare the epic count in the implementation plan against the document's last-updated date — if multiple epics have completed since the docs were last refreshed, flag it.
-
-If any of these checks suggest the docs are stale, include a documentation nudge in the output (see template below). This is informational — the user decides when to run it.
-
 Present this as a clear summary the user can act on:
 
 ```
@@ -209,17 +199,29 @@ Present this as a clear summary the user can act on:
 
 ### Outstanding Items (non-blocking)
 - [Items to address later]
-
-### Documentation Refresh
-[If stale:] N epic handoffs contain Key Decisions not yet reflected in the architecture
-and design docs. Consider running `/epic-workflow:refresh-docs` to bring them in sync with the
-as-built codebase — especially before a release.
-[If current:] Architecture and design docs are up to date.
 ```
 
 ---
 
-## Step 4: Merge to Main
+## Step 4: Refresh Documentation
+
+After presenting the orientation summary, automatically refresh `docs/architecture.md` and
+`docs/design-notes.md` to reflect the as-built codebase. Delegate this to a subagent using
+the Haiku model so the main session stays focused.
+
+Use the Agent tool with model `claude-haiku-4-5-20251001`. Brief the subagent with:
+
+> Execute the `/epic-workflow:refresh-docs` skill (no arguments — refresh both documents).
+> When you reach Step 8 (Commit), auto-commit without asking the user for permission.
+> Commit message format: `docs: refresh architecture and design notes — <brief summary of changes>`
+> Do NOT push to the remote.
+
+**Wait for the subagent to complete before proceeding.** The refreshed documents must be
+committed on the feature branch before it is merged into main.
+
+---
+
+## Step 5: Merge to Main
 
 After Phase 3 orientation is complete, merge the feature branch into main and clean up:
 

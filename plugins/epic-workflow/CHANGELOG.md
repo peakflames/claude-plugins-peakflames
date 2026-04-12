@@ -6,6 +6,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] — 2026-04-12
+
+### Added
+
+- **`wrapup`: Automatic doc refresh via Haiku subagent (Step 4)** — after Phase 3
+  orientation, always spawns a `claude-haiku-4-5-20251001` subagent to execute
+  `/epic-workflow:refresh-docs` and auto-commit the results. Runs on the feature branch
+  before the final merge so refreshed docs are included in the merge commit.
+
+### Changed
+
+- **`wrapup`: Removed optional documentation nudge (Step 3.5)** — the manual currency
+  check and "consider running refresh-docs" prompt are replaced by the automatic Step 4
+  refresh. The Next Steps template no longer includes a Documentation Refresh section.
+- **`wrapup`: Merge step renumbered** — "Step 4: Merge to Main" is now "Step 5" to
+  accommodate the new doc refresh step.
+
+---
+
 ## [1.1.0] — 2026-04-12
 
 ### Added
