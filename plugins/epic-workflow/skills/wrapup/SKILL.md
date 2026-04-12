@@ -30,6 +30,9 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 4. Read the epic spec file for Epic $ARGUMENTS
 5. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists)
 6. Read `docs/architecture.md` for system context
+7. Check out the feature branch for this epic: `git checkout feat/epic-N`
+   - If the branch does not exist, inform the user and proceed on the current branch
+     (the work may have been done directly on main in an older session)
 
 ### Step 1.2: Verify Acceptance Criteria
 
@@ -148,12 +151,14 @@ Update `docs/implementation-plan/index.md`:
 
 ### Step 2.3: Commit
 
-**Ask the user if they'd like to commit** all changes made during verification and completion. If the user confirms:
+Automatically commit all changes made during verification and completion without
+asking the user for permission:
 
-1. Stage the handoff file, updated `index.md`, and any other files modified during verification (use specific file paths, not `git add -A`)
-2. Use the commit message format: `chore(epic-N): verify and complete — <brief summary>`
+1. Stage the handoff file, updated `index.md`, and any other files modified during
+   verification (specific file paths, not `git add -A`)
+2. Commit message format: `chore(epic-N): verify and complete — <brief summary>`
 
-Do NOT push to the remote — leave that for the user to decide.
+Do NOT push to the remote yet.
 
 ---
 
@@ -211,3 +216,20 @@ and design docs. Consider running `/epic-workflow:refresh-docs` to bring them in
 as-built codebase — especially before a release.
 [If current:] Architecture and design docs are up to date.
 ```
+
+---
+
+## Step 4: Merge to Main
+
+After Phase 3 orientation is complete, merge the feature branch into main and clean up:
+
+1. Note the current feature branch name (`feat/epic-N`)
+2. Detect the main branch name: check for `main` first, then `master`
+3. Switch to main: `git checkout main`
+4. Merge with a no-fast-forward merge:
+   `git merge feat/epic-N --no-ff -m "epic(N): merge feat/epic-N — <brief summary>"`
+5. Delete the feature branch: `git branch -d feat/epic-N`
+6. Confirm with `git log --oneline -5`
+7. Report to the user:
+   > Branch `feat/epic-N` has been merged into `main` and deleted.
+   > Changes have not been pushed — run `git push` when ready.
