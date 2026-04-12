@@ -10,12 +10,15 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 
 ## Installation
 
-```bash
-# Add the marketplace
-/plugin marketplace add peakflames/claude-plugins-peakflames
+1. Start Claude Code CLI
+2. Run the following command
 
+```bash
+/plugin marketplace add https://github.com/peakflames/claude-plugins-peakflames.git
+```
+3. 
 # Install a plugin
-/plugin install peakflames-plugins@epic-workflow
+/plugin install epic-workflow
 ```
 
 ## Epic Workflow Skills
