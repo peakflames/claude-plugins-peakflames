@@ -30,8 +30,10 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 4. Read the epic spec file for Epic $ARGUMENTS
 5. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists)
 6. Read `docs/architecture.md` for system context
-7. Check out the feature branch for this epic: `git checkout feat/epic-N`
-   - If the branch does not exist, inform the user and proceed on the current branch
+7. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-N-` prefix, and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`. If there is no suffix after `epic-N`, omit it.
+8. Check out the feature branch for this epic: `git checkout feature/epic-N-<short-name>`
+   - If the branch does not exist, try the legacy name `feat/epic-N` (for sessions started before v1.3.0)
+   - If neither branch exists, inform the user and proceed on the current branch
      (the work may have been done directly on main in an older session)
 
 ### Step 1.2: Verify Acceptance Criteria
@@ -225,13 +227,13 @@ committed on the feature branch before it is merged into main.
 
 After Phase 3 orientation is complete, merge the feature branch into main and clean up:
 
-1. Note the current feature branch name (`feat/epic-N`)
+1. Note the current feature branch name (`feature/epic-N-<short-name>` or legacy `feat/epic-N`)
 2. Detect the main branch name: check for `main` first, then `master`
 3. Switch to main: `git checkout main`
 4. Merge with a no-fast-forward merge:
-   `git merge feat/epic-N --no-ff -m "epic(N): merge feat/epic-N — <brief summary>"`
-5. Delete the feature branch: `git branch -d feat/epic-N`
+   `git merge <branch> --no-ff -m "epic(N): merge <branch> — <brief summary>"`
+5. Delete the feature branch: `git branch -d <branch>`
 6. Confirm with `git log --oneline -5`
 7. Report to the user:
-   > Branch `feat/epic-N` has been merged into `main` and deleted.
+   > Branch `<branch>` has been merged into `main` and deleted.
    > Changes have not been pushed — run `git push` when ready.
