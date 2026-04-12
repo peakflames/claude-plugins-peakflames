@@ -36,7 +36,21 @@ Proceed with the implementation, using git history and the current codebase to d
 
 Check the epic's Dependencies section. Verify that prerequisite epics are marked as "Implemented" or "Complete" in `index.md` (both mean the code exists). If dependencies are not met, inform the user and suggest which epic to start instead.
 
-## Step 3: Enter Plan Mode
+## Step 3: Create Feature Branch
+
+Before entering plan mode, ensure work is isolated on a feature branch:
+
+1. Run `git branch --show-current` to check the current branch
+2. If already on `feat/epic-N` (where N is the epic number), confirm to the user:
+   > Resuming on existing branch: `feat/epic-N`
+3. If NOT on `feat/epic-N`:
+   a. Detect the main branch name: check for `main` first, then `master`
+   b. Switch to the main branch: `git checkout main` (or `master`)
+   c. Create and checkout the feature branch: `git checkout -b feat/epic-N`
+   d. Confirm to the user:
+   > Created and switched to branch: `feat/epic-N`
+
+## Step 4: Enter Plan Mode
 
 Enter plan mode and create a detailed implementation plan based on:
 - The epic's acceptance criteria (these become your plan items)
@@ -47,15 +61,15 @@ Enter plan mode and create a detailed implementation plan based on:
 
 The plan should be specific enough to execute without re-reading the epic spec.
 
-## Step 4: Create Tasks
+## Step 5: Create Tasks
 
 After plan approval, create a task for each acceptance criteria item from the epic spec. These tasks will track your progress through the session.
 
-## Step 5: Update Status
+## Step 6: Update Status
 
 Update `docs/implementation-plan/index.md` — change Epic $ARGUMENTS status from "Not Started" (or "Paused") to **"In Progress"**. Leave the Implemented and Completed date columns as `—` for now — they will be set at the end.
 
-## Step 6: Begin Work
+## Step 7: Begin Work
 
 Start executing the plan, working through tasks one at a time. Mark each task as completed as you finish it.
 
@@ -65,7 +79,7 @@ Start executing the plan, working through tasks one at a time. Mark each task as
 
 > **If interrupted:** If you need to stop before the epic is complete, run `/epic-workflow:pause` to save your progress. Do not simply close the session — the pause handoff file is what allows the next session to pick up where you left off.
 
-## Step 7: Satisfy Verification
+## Step 8: Satisfy Verification
 
 After all acceptance criteria tasks are complete, read the epic spec's **Verification** section. Treat each verification item as additional implementation work — write the code, tests, or configuration needed to satisfy each one. Create tasks for verification items that require implementation effort.
 
@@ -78,7 +92,7 @@ Report results to the user:
 - **FAIL** — item could not be satisfied (describe what went wrong and what was attempted)
 - **CANNOT VERIFY** — only use when the backend is genuinely unavailable after attempting to start it, or when the check requires an environment that doesn't exist locally (e.g., Kubernetes, CI/CD)
 
-## Step 8: Reconcile Spec with Implementation
+## Step 9: Reconcile Spec with Implementation
 
 Re-read the epic spec file. Compare the original acceptance criteria and verification items against what was actually implemented during this session. Implementation often diverges from the original spec — data volumes differ, additional work is discovered, items are descoped, or approaches change.
 
@@ -97,20 +111,35 @@ If there are no deviations (spec matched reality exactly), note that in the hand
 
 **Important:** Git history preserves the original spec, so in-place updates are safe. The handoff file provides the narrative bridge between "what was planned" and "what was delivered."
 
-## Step 9: Mark as Implemented
+## Step 10: Mark as Implemented
 
 Update `docs/implementation-plan/index.md`:
 1. Change Epic $ARGUMENTS status from "In Progress" to **"Implemented"**
 2. Set the **Implemented** date column to today's date (YYYY-MM-DD)
 3. Leave the **Completed** date column as `—` — this will be set by `/epic-workflow:wrapup`
 
-## Step 10: Commit
+## Step 11: Commit
 
-After all implementation and verification work is complete, **ask the user if they'd like to commit the changes.** If the user confirms:
+After all implementation and verification work is complete, automatically commit the
+changes without asking the user for permission:
 
-1. Stage all files created or modified during this epic (use specific file paths, not `git add -A`)
-2. Include the epic's handoff file if one was written
-3. Use the commit message format: `feat(epic-N): <short summary of what was built>`
-4. The commit body should be 1-2 sentences summarizing the key deliverables
+1. Stage all files created or modified during this epic (specific file paths, not `git add -A`)
+2. Include the epic's handoff file
+3. Commit message format: `feat(epic-N): <short summary of what was built>`
+4. Commit body: 1-2 sentences summarizing the key deliverables
 
-Do NOT push to the remote — leave that for the user to decide.
+Do NOT push to the remote.
+
+## Step 12: Suggest Next Steps
+
+After committing, always present a brief, terse next-steps block — this is the user's
+cue for what to do in their next session:
+
+> ---
+> **Next steps**
+> - Open a new session and run `/epic-workflow:wrapup N` to independently verify
+>   and close out this epic
+> - Or run `/epic-workflow:status` to review overall project progress
+> - If something needs fixing before wrapup, make the changes and re-run
+>   `/epic-workflow:start N` to continue on the same branch
+> ---
