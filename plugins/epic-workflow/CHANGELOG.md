@@ -11,9 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **`wrapup`: Automatic doc refresh via Haiku subagent (Step 4)** — after Phase 3
-  orientation, always spawns a `claude-haiku-4-5-20251001` subagent to execute
-  `/epic-workflow:refresh-docs` and auto-commit the results. Runs on the feature branch
-  before the final merge so refreshed docs are included in the merge commit.
+  orientation, always spawns a Haiku subagent (model shorthand `haiku`, resolves to
+  current version) to execute `/epic-workflow:refresh-docs` and auto-commit the results.
+  Runs on the feature branch before the final merge so refreshed docs are included in
+  the merge commit.
 
 ### Changed
 

@@ -209,7 +209,7 @@ After presenting the orientation summary, automatically refresh `docs/architectu
 `docs/design-notes.md` to reflect the as-built codebase. Delegate this to a subagent using
 the Haiku model so the main session stays focused.
 
-Use the Agent tool with model `claude-haiku-4-5-20251001`. Brief the subagent with:
+Use the Agent tool with model `haiku` (the shorthand resolves to the current Haiku version automatically). Brief the subagent with:
 
 > Execute the `/epic-workflow:refresh-docs` skill (no arguments — refresh both documents).
 > When you reach Step 8 (Commit), auto-commit without asking the user for permission.
