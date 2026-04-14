@@ -6,6 +6,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] — 2026-04-14
+
+### Changed
+
+- **`start`: Step 3 prefers `develop` as base branch** — branch detection now runs
+  `git branch --list develop main master` and prefers `develop` if it exists, then
+  `main`, then `master`. The confirmation message reports which base branch was used.
+- **`start`: Step 11 adds branch guard before committing** — a `git branch --show-current`
+  check is now the first action in the commit step. If Claude is not on the feature branch,
+  it stops and switches before staging any files, preventing accidental commits to
+  `develop`, `main`, or `master`.
+
+---
+
 ## [1.3.0] — 2026-04-12
 
 ### Changed

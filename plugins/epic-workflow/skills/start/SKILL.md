@@ -45,11 +45,11 @@ Before entering plan mode, ensure work is isolated on a feature branch. The bran
 2. If already on `feature/epic-N-<short-name>`, confirm to the user:
    > Resuming on existing branch: `feature/epic-N-<short-name>`
 3. If NOT on `feature/epic-N-<short-name>`:
-   a. Detect the main branch name: check for `main` first, then `master`
-   b. Switch to the main branch: `git checkout main` (or `master`)
+   a. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`
+   b. Switch to the base branch: `git checkout <base-branch>`
    c. Create and checkout the feature branch: `git checkout -b feature/epic-N-<short-name>`
    d. Confirm to the user:
-   > Created and switched to branch: `feature/epic-N-<short-name>`
+   > Created and switched to branch: `feature/epic-N-<short-name>` (from `<base-branch>`)
 
 ## Step 4: Enter Plan Mode
 
@@ -124,10 +124,12 @@ Update `docs/implementation-plan/index.md`:
 After all implementation and verification work is complete, automatically commit the
 changes without asking the user for permission:
 
-1. Stage all files created or modified during this epic (specific file paths, not `git add -A`)
-2. Include the epic's handoff file
-3. Commit message format: `feat(epic-N): <short summary of what was built>`
-4. Commit body: 1-2 sentences summarizing the key deliverables
+1. Run `git branch --show-current` and confirm you are on `feature/epic-N-<short-name>`. If you are on any other branch (`develop`, `main`,
+`master`, etc.), stop and switch to the feature branch before staging anything.
+2. Stage all files created or modified during this epic (specific file paths, not `git add -A`)
+3. Include the epic's handoff file
+4. Commit message format: `feat(epic-N): <short summary of what was built>`
+5. Commit body: 1-2 sentences summarizing the key deliverables
 
 Do NOT push to the remote.
 
