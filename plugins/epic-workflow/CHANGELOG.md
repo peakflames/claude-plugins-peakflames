@@ -6,6 +6,29 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] — 2026-04-14
+
+### Changed
+
+- **`start`: Plan is now the complete and authoritative execution script** — Step 4 now
+  mandates that the generated plan must be fully executable in isolation. If the session's
+  context is cleared after plan approval and only the plan text survives, the plan alone
+  is sufficient to drive the entire implementation to completion.
+- **`start`: Plan opening steps embedded (branch, status, tasks)** — the plan's first three
+  items are always: (1) create/verify the feature branch, (2) update `index.md` to "In
+  Progress", (3) create tasks for each acceptance criteria item.
+- **`start`: Plan closing steps embedded (verify, reconcile, mark, commit, next steps)** —
+  the plan's last five items are always: satisfy verification (with PASS/FAIL/CANNOT VERIFY
+  protocol and `playwright-cli` guidance), reconcile spec and write handoff file, mark epic
+  as Implemented in `index.md`, commit (with branch guard), and present the next-steps block.
+- **`start`: Steps 5–12 collapsed into Step 5 "Execute the Plan"** — all post-approval
+  workflow logic now lives in the plan body. Step 5 simply instructs Claude to execute the
+  plan in order without adding, skipping, or reordering items. Eliminates the duplication
+  that would have occurred if both the skill steps and the plan's embedded lifecycle steps
+  ran in the same session.
+
+---
+
 ## [1.4.1] — 2026-04-14
 
 ### Changed
