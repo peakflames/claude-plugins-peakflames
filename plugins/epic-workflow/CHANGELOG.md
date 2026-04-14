@@ -6,6 +6,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.1] — 2026-04-14
+
+### Changed
+
+- **`wrapup`: Step 5 prefers `develop` as merge target** — base branch detection now runs
+  `git branch --list develop main master` and prefers `develop` if it exists, then `main`,
+  then `master`. The heading and confirmation message updated from "Merge to Main" to
+  "Merge to Base Branch" to reflect the dynamic target. Consistent with the `start` v1.4.0
+  base branch detection fix.
+
+---
+
 ## [1.4.0] — 2026-04-14
 
 ### Changed

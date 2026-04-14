@@ -223,17 +223,17 @@ committed on the feature branch before it is merged into main.
 
 ---
 
-## Step 5: Merge to Main
+## Step 5: Merge to Base Branch
 
-After Phase 3 orientation is complete, merge the feature branch into main and clean up:
+After Phase 3 orientation is complete, merge the feature branch into the base branch and clean up:
 
 1. Note the current feature branch name (`feature/epic-N-<short-name>` or legacy `feat/epic-N`)
-2. Detect the main branch name: check for `main` first, then `master`
-3. Switch to main: `git checkout main`
+2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`
+3. Switch to the base branch: `git checkout <base-branch>`
 4. Merge with a no-fast-forward merge:
    `git merge <branch> --no-ff -m "epic(N): merge <branch> — <brief summary>"`
 5. Delete the feature branch: `git branch -d <branch>`
 6. Confirm with `git log --oneline -5`
 7. Report to the user:
-   > Branch `<branch>` has been merged into `main` and deleted.
+   > Branch `<branch>` has been merged into `<base-branch>` and deleted.
    > Changes have not been pushed — run `git push` when ready.
