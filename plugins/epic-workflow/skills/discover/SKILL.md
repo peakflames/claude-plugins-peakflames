@@ -174,7 +174,7 @@ After all phases are complete, write the documents.
 
 1. Update `docs/product-vision-planning/product-vision.md` in place — increment the document version, update the date, and modify only the sections that changed.
 2. Update `docs/product-vision-planning/concept-of-operations.md` in place — same approach.
-3. Write `.discovery-changelog.md` at the repo root:
+3. Write `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` with content:
 
 ```markdown
 # Discovery Changelog
@@ -225,7 +225,7 @@ Show the user what was created:
 ### Documents Written
 - `docs/product-vision-planning/product-vision.md` — [Created / Updated to v{N}]
 - `docs/product-vision-planning/concept-of-operations.md` — [Created / Updated to v{N}]
-[Brownfield only:] - `.discovery-changelog.md` — Delta summary for implementation planning
+[Brownfield only:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` — Delta summary for implementation planning
 
 ### By the Numbers
 - [N] target user groups identified
