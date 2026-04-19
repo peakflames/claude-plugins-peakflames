@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
+## [1.6.0] — 2026-04-19
+
+### Changed
+
+- **`discover`**: now placing the `discover-changelog.md` into the
+  `docs/product-vision-planning/changelog/` directory
 
 ## [1.5.0] — 2026-04-14
 
