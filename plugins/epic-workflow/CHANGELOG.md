@@ -5,12 +5,73 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
+
+## [2.0.0] — 2026-04-22
+
+### Added
+
+- **New skill: `triage`** — advisory routing for incoming GitHub issues or ad-hoc
+  requests. Sizes the request against product vision and ConOps, then presents one of
+  three verdicts (HEAVY / EPIC / TRIVIAL). For EPIC and TRIVIAL, offers ask-and-dispatch
+  via the Skill tool (invokes `/add` or `/quick-fix` directly on user confirm). For
+  HEAVY, prints the commands to run in a fresh session. Accepts a GitHub issue number
+  (loaded via `gh issue view`) or free-text description. Writes no state files.
+- **New skill: `quick-fix`** — lightweight path for trivial items (bugs, copy changes,
+  small enhancements). Creates a `hotfix/issue-<N>-<slug>` branch, runs a plan-mode
+  implementation with applicable quality gates, and ships via prompted solo/team mode.
+  Does not update `implementation-plan/index.md`; quick-fixes are commit-level records.
+- **Issue-number persistence across the epic chain** — when `/triage` loads a GitHub
+  issue and routes to the EPIC path, the issue number now flows through to the epic
+  spec (as a `**Source:** Issue #<N>` header line), `/start` commit trailers
+  (`Closes #<N>`), `/pause` commit trailers (`Refs #<N>`), and `/wrapup` team-mode PR
+  body (`Closes #<N>`). Existing integer-IDed epics without a `Source:` line are
+  unaffected.
+- **Verification narrative in `/wrapup` and `/quick-fix`** — team-mode PR bodies and
+  the wrapup handoff now include a Highlights list (✅ pass / ⚠️ pass-with-exceptions /
+  ❌ fail), a Conclusion paragraph explaining why the verification is sufficient, and
+  a Manual verification disclosure (Yes/No with user-authored description) prompted
+  via `AskUserQuestion` during wrapup Phase 2 and quick-fix before ship. The counter
+  strip (`Acceptance Criteria: X/Y PASS`, etc.) is preserved at the top for quick
+  skim.
+
+### Changed
+
+- **BREAKING — Epic ID format.** New epics created from v2.0.0 onward use a 7-character
+  random alphanumeric ID (generated via `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7`,
+  regenerated if all-digit) instead of a monotonically incrementing integer. This
+  eliminates collisions when multiple developers run `/add` in parallel. All skills now
+  parse both formats: existing integer-IDed epics (e.g. `Epic 7`, `Epic 6.5`) are
+  preserved as-is. Affected surfaces:
+  - Spec filenames: `epic-<id>-<short-name>.md`
+  - Branch names: `feature/epic-<id>-<short-name>`
+  - Handoff filenames: `epic-<id>-*.md`
+  - Commit message prefixes: `feat(epic-<id>): …`, `wip(epic-<id>): pause — …`,
+    `chore(epic-<id>): verify and complete — …`
+  - `/start`, `/pause`, `/wrapup` arguments accept either format.
+  - Index.md "Epic" column: new epics show alphanumeric ID; existing rows unchanged.
+  - `/add` no longer accepts a user-specified number; IDs are always auto-generated.
+- **BREAKING — `wrapup`: Step 5 now prompts for ship mode** (solo vs. team). Previously,
+  Step 5 silently auto-merged the feature branch locally with `git merge --no-ff` and
+  deleted it. Now:
+  - **Solo mode** preserves the previous behavior.
+  - **Team mode** pushes the branch with `git push -u origin` and opens a pull request
+    via `gh pr create` with a templated body. Does NOT run `gh pr merge`. Does NOT delete
+    the feature branch.
+  - The prompt is presented neutrally with no default and no recommendation — there is
+    no reliable signal to auto-determine the right mode for the user's context, so the
+    choice must be made explicitly every invocation. `/quick-fix` follows the same rule.
+- **`wrapup` Step 5 heading** renamed from "Merge to Base Branch" to "Ship to Base Branch".
+
+---
+
 ## [1.6.0] — 2026-04-19
 
 ### Changed
 
 - **`discover`**: now placing the `discover-changelog.md` into the
   `docs/product-vision-planning/changelog/` directory
+
+---
 
 ## [1.5.0] — 2026-04-14
 

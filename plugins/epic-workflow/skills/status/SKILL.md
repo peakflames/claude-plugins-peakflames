@@ -26,7 +26,7 @@ Stop here if the file is missing.
 
 Extract all rows from the status table in `index.md`. For each epic, capture:
 - Phase number and name
-- Epic number and name
+- **Epic ID** (verbatim — may be a legacy integer like `7` or `6.5`, or a 7-character alphanumeric ID like `a3f2K7p`) and epic name
 - Status (Not Started, In Progress, Paused, Implemented, Complete)
 - Handoff file link (if any)
 - Implemented date (if any)
@@ -46,7 +46,7 @@ Calculate:
 ## Step 5: Flag Stale Paused Epics
 
 For each epic with status "Paused":
-1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-N-paused.md`
+1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID as it appears in `index.md` — legacy integer or 7-char alphanumeric)
 2. Check the **Paused** date
 3. If the pause date is more than 7 days ago, flag it as stale
 
@@ -99,10 +99,10 @@ Using the dependency graph from Step 3, find epics that are "Not Started" but wh
 
 ## Suggested Next Action
 
-[Based on the current state, recommend what to do next:
- - If there's an "In Progress" epic: "Continue working on Epic N with `/epic-workflow:start N`"
- - If there's an "Implemented" epic awaiting review: "Review Epic N with `/epic-workflow:wrapup N`"
- - If there's a stale paused epic: "Resume or close paused Epic N — it's been [X] days"
- - If there are ready-to-start epics: "Start Epic N with `/epic-workflow:start N`"
+[Based on the current state, recommend what to do next (use the epic's ID verbatim — legacy integer or 7-char alphanumeric):
+ - If there's an "In Progress" epic: "Continue working on Epic <id> with `/epic-workflow:start <id>`"
+ - If there's an "Implemented" epic awaiting review: "Review Epic <id> with `/epic-workflow:wrapup <id>`"
+ - If there's a stale paused epic: "Resume or close paused Epic <id> — it's been [X] days"
+ - If there are ready-to-start epics: "Start Epic <id> with `/epic-workflow:start <id>`"
  - If all epics are complete: "All epics complete! Consider `/epic-workflow:refresh-docs` before release."]
 ```

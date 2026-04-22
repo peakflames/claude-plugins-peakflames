@@ -23,13 +23,39 @@ Follow these steps exactly:
 
 ## Step 2: Resolve the Request
 
-Interpret the user's description. It may be:
+### 2.0: Check for an issue-number prefix
+
+If `$ARGUMENTS` starts with the pattern `[issue #<N>]` (e.g. `[issue #42] Add CSV export — …`), extract the integer `<N>` and strip the prefix from the remaining description:
+
+1. Capture the number: this is the **source issue number** and must be remembered for Step 6 (spec `Source:` line).
+2. Run `gh issue view <N> --json title,body,labels` to fetch the canonical title and body, and use them to augment the stripped description — the prefix-bearing description from `/triage` is a summary, not the full issue.
+3. If `gh` is unavailable or the issue cannot be fetched, fall back to the stripped description alone and still record the number for the `Source:` line.
+
+If no `[issue #<N>]` prefix is present, the source issue number is unknown — skip the fetch and leave the `Source:` line out of the spec in Step 6.
+
+### 2.1: Interpret the description
+
+Interpret the (now prefix-free) description. It may be:
 - A full description of what the epic should accomplish
 - A reference to something discussed earlier in the conversation (e.g., "the outstanding items", "what we just talked about") — scan conversation history to expand these into concrete requirements
-- A request for multiple epics — detect plural intent ("split into 6.6 and 6.7", "add both as separate epics")
+- A request for multiple epics — detect plural intent ("add both as separate epics", "split this into two")
 - Minimal or ambiguous — ask one round of clarifying questions before proceeding
 
-If the user specified an epic number (e.g., "as Epic 6.6"), use it. Otherwise, determine the next available number from the index. Use decimal numbering (6.5, 6.6) when inserting within an existing phase, or whole numbers when adding to a new phase.
+**Assign the epic ID:** generate a fresh **7-character random alphanumeric ID** for each new epic via:
+
+```bash
+LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7
+```
+
+The `LC_ALL=C` prefix is required for portability — without it, BSD `tr` (macOS) can emit "Illegal byte sequence" on non-UTF8 bytes from `/dev/urandom`.
+
+Validate each ID: if the 7-char string contains only digits, regenerate (this prevents ambiguity with the legacy integer format). If adding multiple epics in a single invocation, ensure uniqueness across the batch.
+
+If the user tried to specify an ID or number up front (e.g., "as Epic 6.6"), politely override:
+
+> Epic IDs are now auto-generated random 7-character strings; this new epic will be `<generated-id>`. The phase you chose will be honored.
+
+Do not attempt to slot new epics into the old decimal scheme (e.g., `6.7`, `6.8`). With random IDs, there's no "insert between X and Y" concept — epics are appended at the bottom of their phase block in the index.
 
 ## Step 3: Determine Dependencies
 
@@ -61,22 +87,21 @@ Create the epic spec file(s) following the **required structure** below. The oth
 
 ### File Location
 
-`docs/implementation-plan/{phase-directory}/epic-{number}-{kebab-case-name}.md`
+`docs/implementation-plan/{phase-directory}/epic-{id}-{kebab-case-name}.md` (where `{id}` is the 7-char alphanumeric ID generated in Step 2)
 
 The phase directory must match an existing `phase-N-name/` directory in the implementation plan. If the epic belongs to a new phase, ask the user to confirm before creating it.
 
 ### Required File Structure
 
 ```markdown
-# Epic {number}: {Name}
+# Epic {id}: {Name}
 
 **Phase:** {N} — {Phase Name}
 **Status:** Not Started
-**Dependencies:** Epic {N} ({short description}), Epic {M} ({short description})
+**Dependencies:** Epic {id1} ({short description}), Epic {id2} ({short description})
+**Source:** Issue #{N}
 
 > **Brand:** Use the project's brand guidelines skill for {relevant UI elements} if one is configured.
-
-(Include the Brand note only if the epic involves UI work.)
 
 ---
 
@@ -109,6 +134,11 @@ Always include:
 {List of file paths that will be created or modified, with a brief description of each. Use the project's actual directory structure. Separate into ### Backend and ### Frontend subheadings if both are involved.}
 ```
 
+**Conditional lines in the header template above** — do not carry this guidance into the written spec:
+
+- Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
+- Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise; existing specs without it continue to work.
+
 ### Quality Checks Before Writing
 
 Before writing each spec, verify:
@@ -122,9 +152,9 @@ Before writing each spec, verify:
 
 Update `docs/implementation-plan/index.md`:
 
-1. **Status table** — add a row for each new epic in the correct position (sorted by epic number within its phase). Use the format:
+1. **Status table** — add a row for each new epic at the **bottom of its phase block** (random IDs have no meaningful sort order — use insertion order within each phase). Use the format:
    ```
-   | {Phase} | {Number} | [{Name}]({phase-dir}/epic-{number}-{name}.md) | Not Started | — |
+   | {Phase} | {id} | [{Name}]({phase-dir}/epic-{id}-{name}.md) | Not Started | — |
    ```
 
 2. **Dependency graph** — add the new epic(s) to the ASCII dependency tree in the correct position, showing what they depend on. Follow the existing indentation and formatting style exactly.
@@ -136,7 +166,7 @@ Show the user what was created:
 ```
 ## Added Epic(s)
 
-### Epic {N}: {Name}
+### Epic {id}: {Name}
 - **File:** `docs/implementation-plan/{path}`
 - **Phase:** {N} — {Name}
 - **Dependencies:** {list}
@@ -149,7 +179,7 @@ Show the user what was created:
 - Dependency graph updated
 
 ### Ready to implement
-Run `/epic-workflow:start {N}` when ready to begin.
+Run `/epic-workflow:start {id}` when ready to begin (in a fresh session for clean context).
 ```
 
 Do NOT commit — leave that for the user to decide.
