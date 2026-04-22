@@ -6,10 +6,10 @@ description: |
   Triggers on: "start epic", "implement epic", "begin epic", "work on epic",
   "let's work on epic N", "pick up epic N", "resume epic N",
   "continue where I left off", "let's build epic N".
-argument-hint: "<epic-number>"
+argument-hint: "<epic-id>"
 ---
 
-You are starting an implementation session for Epic $ARGUMENTS.
+You are starting an implementation session for Epic $ARGUMENTS. The epic ID may be a legacy integer (e.g., `7`, `6.5`) or a 7-character alphanumeric ID (e.g., `a3f2K7p`) — both formats are accepted throughout this skill. Use `$ARGUMENTS` verbatim wherever `<id>` appears below.
 
 Follow these steps exactly:
 
@@ -19,15 +19,16 @@ Follow these steps exactly:
 2. Read the implementation plan index: `docs/implementation-plan/index.md`
 3. Identify which phase and file corresponds to Epic $ARGUMENTS
 4. Read the epic spec file (e.g., `docs/implementation-plan/phase-N-*/epic-$ARGUMENTS-*.md`)
-5. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-N-` prefix, and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-N` (e.g., `epic-3.md`), omit it.
-6. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously)
-7. Read `docs/architecture.md` for system context
-8. Read `docs/design-notes.md` for technical decisions
-9. Read all files in `docs/reference/` for implementation patterns and reference material from similar projects
+5. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
+6. Parse the epic spec header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 4 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
+7. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously)
+8. Read `docs/architecture.md` for system context
+9. Read `docs/design-notes.md` for technical decisions
+10. Read all files in `docs/reference/` for implementation patterns and reference material from similar projects
 
 ### Recovery Check
 
-If Epic $ARGUMENTS is already marked **"In Progress"** in `index.md` but there is no pause handoff file (`session-handoffs/epic-N-paused.md`), a previous session was likely interrupted without running `/epic-workflow:pause`. Inform the user:
+If Epic $ARGUMENTS is already marked **"In Progress"** in `index.md` but there is no pause handoff file (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/epic-workflow:pause`. Inform the user:
 
 > Epic $ARGUMENTS is marked "In Progress" but has no pause handoff — a previous session may have been interrupted. I'll scan the codebase for any partial implementation and pick up from the current state.
 
@@ -39,17 +40,17 @@ Check the epic's Dependencies section. Verify that prerequisite epics are marked
 
 ## Step 3: Create Feature Branch
 
-Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-N-<short-name>` where `<short-name>` was extracted in Step 1 (e.g., `feature/epic-3-user-auth`). If no short name was available, use `feature/epic-N`.
+Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric) and `<short-name>` was extracted in Step 1 (e.g., `feature/epic-3-user-auth`, `feature/epic-a3f2K7p-user-auth`). If no short name was available, use `feature/epic-<id>`.
 
 1. Run `git branch --show-current` to check the current branch
-2. If already on `feature/epic-N-<short-name>`, confirm to the user:
-   > Resuming on existing branch: `feature/epic-N-<short-name>`
-3. If NOT on `feature/epic-N-<short-name>`:
+2. If already on `feature/epic-<id>-<short-name>`, confirm to the user:
+   > Resuming on existing branch: `feature/epic-<id>-<short-name>`
+3. If NOT on `feature/epic-<id>-<short-name>`:
    a. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`
    b. Switch to the base branch: `git checkout <base-branch>`
-   c. Create and checkout the feature branch: `git checkout -b feature/epic-N-<short-name>`
+   c. Create and checkout the feature branch: `git checkout -b feature/epic-<id>-<short-name>`
    d. Confirm to the user:
-   > Created and switched to branch: `feature/epic-N-<short-name>` (from `<base-branch>`)
+   > Created and switched to branch: `feature/epic-<id>-<short-name>` (from `<base-branch>`)
 
 ## Step 4: Enter Plan Mode
 
@@ -66,8 +67,8 @@ Build the plan from:
 
 ### Opening steps (always the first three plan items):
 
-1. **Create (or verify) feature branch** — run `git branch --show-current`. If already on `feature/epic-N-<short-name>`, confirm and continue. If not, detect base branch (`develop` > `main` > `master`), switch to it, and run `git checkout -b feature/epic-N-<short-name>`. Use the exact branch name derived from the spec filename.
-2. **Update status to "In Progress"** — edit `docs/implementation-plan/index.md`: change Epic N status from "Not Started" (or "Paused") to "In Progress". Leave Implemented and Completed dates as `—`.
+1. **Create (or verify) feature branch** — run `git branch --show-current`. If already on `feature/epic-<id>-<short-name>`, confirm and continue. If not, detect base branch (`develop` > `main` > `master`), switch to it, and run `git checkout -b feature/epic-<id>-<short-name>`. Use the exact branch name derived from the spec filename (`<id>` is `$ARGUMENTS` verbatim).
+2. **Update status to "In Progress"** — edit `docs/implementation-plan/index.md`: change Epic $ARGUMENTS status from "Not Started" (or "Paused") to "In Progress". Leave Implemented and Completed dates as `—`.
 3. **Create tasks** — create one task per acceptance criteria item from the epic spec for progress tracking.
 
 ### Middle steps (implementation work):
@@ -77,15 +78,23 @@ Derive these from the epic's acceptance criteria and key components. Each step s
 ### Closing steps (always the last five plan items, in this order):
 
 - **Satisfy verification** — re-read the epic spec's Verification section. For each item, write any code, tests, or configuration needed to satisfy it. Also run the Verification & Quality Gates from `CLAUDE.md` that apply to this epic. Check the "Local Environment" section in `CLAUDE.md`: when the backend is live, verify against real data using `playwright-cli` — do not mock. Report each item as: PASS (with evidence), FAIL (describe what went wrong), or CANNOT VERIFY (only if the environment is genuinely unavailable after attempting to start it).
-- **Reconcile spec** — re-read the epic spec file. Compare original acceptance criteria and verification items against what was actually implemented. Ask user permission to: (1) update the spec in-place to reflect actual delivery, checking off completed items; and (2) create (or update) `docs/implementation-plan/session-handoffs/epic-N-implemented.md` with a Spec Deviations table (Original Spec | As-Implemented | Reason), an Implementation Notes section (key files changed, additional work), and a Verification Results section. If no deviations, note that in the handoff file and skip spec edits.
-- **Mark as Implemented** — edit `docs/implementation-plan/index.md`: change Epic N status from "In Progress" to "Implemented". Set the Implemented date to today (YYYY-MM-DD). Leave the Completed date as `—`.
-- **Commit** — run `git branch --show-current` and confirm you are on `feature/epic-N-<short-name>`; if not, switch before staging anything. Stage all files created or modified during this epic by specific path (not `git add -A`), including the handoff file. Commit without asking for permission. Message format: `feat(epic-N): <short summary>` with a 1–2 sentence body summarizing key deliverables. Do not push.
+- **Reconcile spec** — re-read the epic spec file. Compare original acceptance criteria and verification items against what was actually implemented. Ask user permission to: (1) update the spec in-place to reflect actual delivery, checking off completed items; and (2) create (or update) `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` with a Spec Deviations table (Original Spec | As-Implemented | Reason), an Implementation Notes section (key files changed, additional work), and a Verification Results section. If no deviations, note that in the handoff file and skip spec edits.
+- **Mark as Implemented** — edit `docs/implementation-plan/index.md`: change Epic $ARGUMENTS status from "In Progress" to "Implemented". Set the Implemented date to today (YYYY-MM-DD). Leave the Completed date as `—`.
+- **Commit** — run `git branch --show-current` and confirm you are on `feature/epic-<id>-<short-name>`; if not, switch before staging anything. Stage all files created or modified during this epic by specific path (not `git add -A`), including the handoff file. Commit without asking for permission. Message format: `feat(epic-<id>): <short summary>` (where `<id>` is `$ARGUMENTS` verbatim) with a 1–2 sentence body summarizing key deliverables. When a **source issue number** was captured in Step 1 item 6, append a blank line then `Closes #<N>` as a trailer to the commit body so GitHub auto-closes the issue when the epic merges:
+  ```
+  feat(epic-<id>): <short summary>
+
+  <1–2 sentence body summarizing key deliverables>
+
+  Closes #<N>
+  ```
+  If no source issue is known, omit the trailer. Do not push.
 - **Present next steps** — output this block:
   > ---
   > **Next steps**
-  > - Open a new session and run `/epic-workflow:wrapup N` to independently verify and close out this epic
+  > - Open a new session and run `/epic-workflow:wrapup $ARGUMENTS` to independently verify and close out this epic
   > - Or run `/epic-workflow:status` to review overall project progress
-  > - If something needs fixing before wrapup, make the changes and re-run `/epic-workflow:start N` to continue on the same branch
+  > - If something needs fixing before wrapup, make the changes and re-run `/epic-workflow:start $ARGUMENTS` to continue on the same branch
   > ---
 
 ## Step 5: Execute the Plan

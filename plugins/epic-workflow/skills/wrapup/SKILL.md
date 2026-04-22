@@ -7,10 +7,12 @@ description: |
   "is epic N done?", "check my work on epic N", "review what I built",
   "sign off on epic N", "close out epic N".
   Note: If the user says "I'm done with epic N", check whether the epic is "Implemented" (use wrapup) or "In Progress" (suggest /epic-workflow:pause instead).
-argument-hint: "<epic-number>"
+argument-hint: "<epic-id>"
 ---
 
-You are performing an independent verification and completion of Epic $ARGUMENTS. You are acting as an independent reviewer — you did NOT implement this epic. Your job is to verify the implementation against the spec, close out the epic if it passes, and orient the team toward what's next.
+You are performing an independent verification and completion of Epic $ARGUMENTS. The epic ID may be a legacy integer (e.g., `7`, `6.5`) or a 7-character alphanumeric ID (e.g., `a3f2K7p`) — both formats are accepted throughout this skill.
+
+You are acting as an independent reviewer — you did NOT implement this epic. Your job is to verify the implementation against the spec, close out the epic if it passes, and orient the team toward what's next.
 
 This command has three phases: **Verify**, **Complete**, and **Orient**. Do not skip ahead — each phase gates the next.
 
@@ -27,12 +29,12 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 1. Read `CLAUDE.md` at the repo root for project context and quality gates
 2. Read the implementation plan index: `docs/implementation-plan/index.md`
 3. Verify Epic $ARGUMENTS is in **"Implemented"** status. If it is still "In Progress" or "Not Started", inform the user that `/epic-workflow:start` must finish first. If it is already "Complete", inform the user it has already been wrapped up.
-4. Read the epic spec file for Epic $ARGUMENTS
+4. Read the epic spec file for Epic $ARGUMENTS. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip the `Closes` line later.
 5. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists)
 6. Read `docs/architecture.md` for system context
-7. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-N-` prefix, and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`. If there is no suffix after `epic-N`, omit it.
-8. Check out the feature branch for this epic: `git checkout feature/epic-N-<short-name>`
-   - If the branch does not exist, try the legacy name `feat/epic-N` (for sessions started before v1.3.0)
+7. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it.
+8. Check out the feature branch for this epic: `git checkout feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric).
+   - If the branch does not exist, try the legacy name `feat/epic-N` (for sessions started before v1.3.0 — applies to integer IDs only)
    - If neither branch exists, inform the user and proceed on the current branch
      (the work may have been done directly on main in an older session)
 
@@ -76,27 +78,39 @@ Review the implementation for:
 
 ### Step 1.6: Present Verification Report
 
-Present a consolidated report to the user:
+Present a consolidated report to the user. The report has two jobs: a fast skim at the top (counters) and a reviewer-friendly narrative below (Highlights + Conclusion).
 
 ```
-# Epic N: [Name] — Verification Report
+# Epic <id>: [Name] — Verification Report
 
-## Acceptance Criteria: X/Y PASS
-- [PASS] criterion 1 — file:line evidence
-- [FAIL] criterion 2 — description of gap
+## Counts
+- Acceptance Criteria: X/Y PASS
+- Verification Items: X/Y PASS, Z CANNOT VERIFY
+- Quality Gates: X/Y PASS
 
-## Verification Items: X/Y PASS
-- [PASS] item 1 — evidence
-- [CANNOT VERIFY] item 2 — reason
+## Verification Narrative
 
-## Quality Gates: X/Y PASS
-- [PASS] Build check — zero errors
+### Highlights
+- ✅ <Check name> was run and it passed.
+- ✅ <Check name> was run and it passed.
+- ⚠️ <Check name> mostly passed — <one-sentence exception>.
+- ❌ <Check name> failed — <one-sentence reason>.
+
+### Conclusion
+<2–3 sentences explaining why this verification is sufficient for the epic's
+acceptance criteria, or — if FAIL — what needs to be addressed before re-run>
 
 ## Code Review Findings
 - [list any concerns, or "No issues found"]
 
 ## Verdict: PASS / FAIL / PASS WITH EXCEPTIONS
 ```
+
+**Authoring the Highlights list:**
+
+- Highlights are **selective**, not comprehensive — 3–6 bullets is typical, not one bullet per item. Lead the reviewer to the substantive checks; skip trivialities.
+- Author them from what was actually run in Steps 1.2–1.4.
+- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for pass-with-exception, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
 
 **If the verdict is FAIL:** Stop here. List the specific items that need to be fixed. Do NOT proceed to Phase 2. The implementer needs to address the failures, then this command should be run again.
 
@@ -108,15 +122,30 @@ Present a consolidated report to the user:
 
 Your goal is to close out the epic by writing the permanent record and updating project tracking.
 
+### Step 2.0: Capture Manual Verification
+
+Before writing the handoff or PR body, ask the user whether they performed any manual verification beyond the automated gates from Phase 1. Claude cannot infer this — it must come from the human.
+
+Use `AskUserQuestion`:
+
+- Question: `"Did you perform any manual verification beyond the automated gates I ran?"`
+- Options: `["Yes — I performed manual verification", "No — only automated gates were run"]`
+
+**If Yes:** follow up with a free-text request — "Briefly describe what you manually checked (one or two sentences)." Store the user's verbatim answer for use in Step 2.1 and Step 5b.
+
+**If No:** store the literal string `No` as the manual-verification value.
+
+This is a disclosure, not a gate — `No` is a perfectly acceptable answer. The point is the disclosure, not ceremony.
+
 ### Step 2.1: Write the Handoff File
 
-Create (or update) the handoff file at `docs/implementation-plan/session-handoffs/epic-N-complete.md` with this structure:
+Create (or update) the handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim — legacy integer or 7-char alphanumeric) with this structure:
 
 ```markdown
-# Epic N: [Name] — Complete
+# Epic <id>: [Name] — Complete
 
 **Completed:** [today's date]
-**Verified by:** Independent review via `/epic-workflow:wrapup N`
+**Verified by:** Independent review via `/epic-workflow:wrapup <id>`
 
 ## What Was Built
 
@@ -134,10 +163,21 @@ Create (or update) the handoff file at `docs/implementation-plan/session-handoff
 
 ## Verification Summary
 
+### Counts
 - Acceptance Criteria: X/Y PASS
 - Verification Items: X/Y PASS, Z CANNOT VERIFY (requires live environment)
 - Quality Gates: X/Y PASS
 - Tests: X passed, Y skipped, Z failed
+
+### Highlights
+- ✅ <highlight 1>
+- ⚠️ <highlight 2>
+
+### Conclusion
+<2–3 sentences>
+
+### Manual verification performed: <Yes | No>
+<if Yes: user-provided description from Step 2.0>
 
 ## Known Issues / Follow-ups
 
@@ -148,7 +188,7 @@ Create (or update) the handoff file at `docs/implementation-plan/session-handoff
 
 Update `docs/implementation-plan/index.md`:
 1. Change Epic $ARGUMENTS status from "Implemented" to **"Complete"**
-2. Add the handoff link: `[handoff](session-handoffs/epic-N-complete.md)`
+2. Add the handoff link: `[handoff](session-handoffs/epic-<id>-complete.md)` (where `<id>` is `$ARGUMENTS` verbatim)
 3. Set the **Completed** date column to today's date (YYYY-MM-DD)
 
 ### Step 2.3: Commit
@@ -158,7 +198,7 @@ asking the user for permission:
 
 1. Stage the handoff file, updated `index.md`, and any other files modified during
    verification (specific file paths, not `git add -A`)
-2. Commit message format: `chore(epic-N): verify and complete — <brief summary>`
+2. Commit message format: `chore(epic-<id>): verify and complete — <brief summary>` (where `<id>` is `$ARGUMENTS` verbatim)
 
 Do NOT push to the remote yet.
 
@@ -171,7 +211,7 @@ Your goal is to help the user decide what to work on next. Read the implementati
 ### Step 3.1: What's Now Unblocked
 
 List any epics whose dependencies are now fully satisfied thanks to this epic's completion. For each, include:
-- Epic number and name
+- Epic ID (legacy integer or 7-char alphanumeric) and name
 - Its dependencies (and whether they're all met)
 - A one-line summary of what it involves
 
@@ -223,17 +263,77 @@ committed on the feature branch before it is merged into main.
 
 ---
 
-## Step 5: Merge to Base Branch
+## Step 5: Ship to Base Branch
 
-After Phase 3 orientation is complete, merge the feature branch into the base branch and clean up:
+After Phase 3 orientation is complete and the Step 4 doc refresh subagent has
+committed on the feature branch, ship the branch. Ask the user which mode to use
+via `AskUserQuestion`. Present both options neutrally — do **not** auto-detect a
+default, do **not** recommend one mode over the other. There is no reliable signal
+to determine which mode is correct for the user's context (repo permissions, team
+conventions, project phase, and personal preference all vary), so this choice must
+be made by the user every invocation.
 
-1. Note the current feature branch name (`feature/epic-N-<short-name>` or legacy `feat/epic-N`)
-2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`
-3. Switch to the base branch: `git checkout <base-branch>`
-4. Merge with a no-fast-forward merge:
-   `git merge <branch> --no-ff -m "epic(N): merge <branch> — <brief summary>"`
-5. Delete the feature branch: `git branch -d <branch>`
+- Question: `"Ship mode — solo (merge locally to the base branch) or team (push the branch and open a pull request)?"`
+- Options: `["Team — push and open PR", "Solo — local merge only"]`
+
+### Step 5a: Solo mode
+
+1. Note the current feature branch name (`feature/epic-<id>-<short-name>` or legacy `feat/epic-N`).
+2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
+3. `git checkout <base-branch>`
+4. `git merge <branch> --no-ff -m "epic(<id>): merge <branch> — <brief summary>"`
+5. `git branch -d <branch>`
 6. Confirm with `git log --oneline -5`
 7. Report to the user:
    > Branch `<branch>` has been merged into `<base-branch>` and deleted.
    > Changes have not been pushed — run `git push` when ready.
+
+### Step 5b: Team mode
+
+1. Note the current feature branch name.
+2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
+3. `git push -u origin <branch>`
+4. `gh pr create --base <base-branch> --title "epic(<id>): <epic name>" --body "<body>"`
+
+   Body template (populate from `epic-<id>-complete.md`):
+
+   ```
+   ## Summary
+   <lift "What Was Built" from the completion handoff>
+
+   <if the spec has a Source: line (source issue number captured in Step 1.1 item 4):>
+   Closes #<N>
+
+   ## Spec
+   - Epic <id>: [Name] — `docs/implementation-plan/phase-*/epic-<id>-*.md`
+   - Handoff — `docs/implementation-plan/session-handoffs/epic-<id>-complete.md`
+
+   ## Verification
+
+   **Counts**
+   - Acceptance Criteria: X/Y PASS
+   - Verification Items: X/Y PASS, Z CANNOT VERIFY
+   - Quality Gates: X/Y PASS
+
+   **Highlights**
+   - ✅ <check> was run and it passed.
+   - ✅ <check> was run and it passed.
+   - ⚠️ <check> passed with <exception>.
+
+   **Conclusion:** <2–3 sentences>
+
+   **Manual verification performed:** <Yes | No>
+   <if Yes: user-provided description from Step 2.0 on the next line>
+
+   ## Review Notes
+   <anything from Phase 1 Code Review worth flagging>
+
+   🤖 Generated via /epic-workflow:wrapup
+   ```
+
+   The `Closes #<N>` line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 — if the spec has no `Source:` line, omit the `Closes` line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way). Use literal Unicode ✅ ⚠️ ❌ in the Highlights list — not shortcodes.
+
+5. Do **NOT** run `gh pr merge`. Merging is the reviewer's responsibility.
+6. Do **NOT** delete the feature branch. GitHub auto-delete (if enabled) or manual cleanup handles it after merge.
+7. Report to the user:
+   > PR opened: `<url>`. Feature branch `<branch>` pushed. Await review; do not merge locally.

@@ -69,7 +69,19 @@ Cluster related capabilities within each layer into session-sized epics. Each ep
 - Be independently implementable once its dependencies are met
 - Have a clear "done" state that can be verified
 
-Assign epic numbers: whole numbers (1, 2, 3...) for the primary sequence. Reserve decimal numbers (6.5, 6.6) for epics that are added later to an existing phase.
+**Assign epic IDs:** for each new epic, generate a fresh **7-character random alphanumeric ID** via:
+
+```bash
+LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7
+```
+
+The `LC_ALL=C` prefix is required for portability — without it, BSD `tr` (macOS) can emit "Illegal byte sequence" on non-UTF8 bytes from `/dev/urandom`.
+
+Validate each ID: if the 7-char string contains only digits, regenerate (this prevents the rare case where a random ID would be ambiguous with the legacy integer format). Also ensure uniqueness across the batch — extremely unlikely, but check.
+
+Example IDs: `a3f2K7p`, `B9xQr2z`, `m4Ljf0T`.
+
+**Do not** use incrementing integers or decimals for new epics. Random IDs eliminate collisions when multiple developers run `/add` or `/plan-project` concurrently, so the concept of "insertion order" no longer applies — ordering within a phase is by insertion time in the index.
 
 ### 3A.4: Phase Structure
 
@@ -102,7 +114,7 @@ Check for `.discovery-changelog.md` at the repo root (written by `/epic-workflow
 ### 3B.2: Map Against Existing Plan
 
 Read all existing epic specs (glob `docs/implementation-plan/phase-*/epic-*.md`). For each new capability from the changelog:
-- Does an existing epic already cover it? → Skip (note as "already covered by Epic N").
+- Does an existing epic already cover it? → Skip (note as "already covered by Epic <id>").
 - Does it extend an existing epic's scope? → Flag for discussion with the user (modifying completed epics is risky).
 - Is it genuinely new? → Add to the new epic list.
 
@@ -110,7 +122,7 @@ Read all existing epic specs (glob `docs/implementation-plan/phase-*/epic-*.md`)
 
 Apply the same epic formation rules as greenfield (5–15 acceptance criteria, session-sized, independently implementable). New epics are added to existing phases where they fit, or to new phases if the work doesn't belong anywhere.
 
-Use decimal numbering (e.g., 6.7, 6.8) when inserting into an existing phase. Use the next whole number when starting a new phase.
+**Assign IDs** using the same generation command as Step 3A.3 — a fresh 7-character random alphanumeric ID per new epic, regenerated if all-digit, unique across the batch. Do not reuse existing integer IDs; do not attempt to slot new epics into the old decimal scheme (e.g., `6.7`). Existing integer-IDed epics in the index remain untouched; new epics always get alphanumeric IDs.
 
 Proceed to Step 4.
 
@@ -134,8 +146,8 @@ Present the full epic breakdown for approval. Do NOT write any files yet.
 
 | Phase | Epic | Name | Dependencies | Acceptance Criteria | Traces To |
 |-------|------|------|--------------|--------------------:|-----------|
-| 1 | 1 | [Name] | — | [N] | ConOps S1.3, S5.1 |
-| 1 | 2 | [Name] | Epic 1 | [N] | ConOps S6.1, PV 10 |
+| 1 | a3f2K7p | [Name] | — | [N] | ConOps S1.3, S5.1 |
+| 1 | B9xQr2z | [Name] | Epic a3f2K7p | [N] | ConOps S6.1, PV 10 |
 | ... | ... | ... | ... | ... | ... |
 
 ### Dependency Graph
@@ -150,7 +162,7 @@ Present the full epic breakdown for approval. Do NOT write any files yet.
 
 - Total epics: [N]
 - Total acceptance criteria: [N]
-- Recommended session order: [list epic numbers in order]
+- Recommended session order: [list epic IDs in order]
 ```
 
 ### Iterate
@@ -171,18 +183,17 @@ Create `docs/implementation-plan/session-handoffs/` if it doesn't exist.
 
 For each epic, write the spec file following the exact format required by `/epic-workflow:start` and `/epic-workflow:wrapup`. Use the same structure defined in `/epic-workflow:add`:
 
-**File:** `docs/implementation-plan/phase-{N}-{name}/epic-{number}-{kebab-case-name}.md`
+**File:** `docs/implementation-plan/phase-{N}-{name}/epic-{id}-{kebab-case-name}.md` (where `{id}` is the 7-char alphanumeric ID for new epics, or a preserved legacy integer for brownfield rows that already exist)
 
 ```markdown
-# Epic {number}: {Name}
+# Epic {id}: {Name}
 
 **Phase:** {N} — {Phase Name}
 **Status:** Not Started
-**Dependencies:** Epic {N} ({short description}), Epic {M} ({short description})
+**Dependencies:** Epic {id1} ({short description}), Epic {id2} ({short description})
+**Source:** Issue #{N}
 
 > **Brand:** Use the project's brand guidelines skill for {relevant UI elements} if one is configured.
-
-(Include the Brand note only if the epic involves UI work.)
 
 ---
 
@@ -211,6 +222,11 @@ For each epic, write the spec file following the exact format required by `/epic
 {List of file paths to create or modify, with brief descriptions.}
 ```
 
+**Conditional lines in the header template above** — do not carry this guidance into the written spec:
+
+- Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
+- Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise; the line is optional and all downstream skills treat its absence as "no source issue known".
+
 ### Quality Checks Before Writing Each Spec
 
 - [ ] Every acceptance criterion is specific enough to verify without ambiguity
@@ -230,9 +246,9 @@ For each epic, write the spec file following the exact format required by `/epic
 ## Quick Start for New Session
 
 1. Check the status table below for the current epic
-2. Run `/epic-workflow:start N` (where N is the epic number)
+2. Run `/epic-workflow:start <id>` (where `<id>` is the epic's ID from the Epic column — a 7-character alphanumeric ID for new epics, or a legacy integer for pre-v2.0.0 epics)
 3. Claude Code will read the spec, load context, enter plan mode, and create tasks
-4. When implementation is done, open a new session: `/epic-workflow:wrapup N`
+4. When implementation is done, open a new session: `/epic-workflow:wrapup <id>`
 5. If stopping early: `/epic-workflow:pause`
 
 ### Epic Lifecycle
@@ -256,9 +272,11 @@ Not Started → In Progress → Implemented → Complete
 ```
 
 **Brownfield:** Update the existing `docs/implementation-plan/index.md`:
-- Add new epic rows to the status table in the correct position
+- Add new epic rows to the status table, inserting them at the **bottom of their phase block** (random IDs have no meaningful sort order — use insertion order within each phase)
 - Update the dependency graph to include new epics
-- Preserve all existing epic rows and their statuses
+- Preserve all existing epic rows and their statuses — legacy integer IDs stay exactly as they are
+
+The "Epic" column in the status table holds the ID string verbatim (e.g., `a3f2K7p` for new epics, `7` or `6.5` for preserved legacy rows).
 
 ### 5.4: Brownfield Changelog Archival
 
@@ -307,8 +325,8 @@ Do NOT perform a full CLAUDE.md audit — that is `/epic-workflow:setup`'s job. 
 
 ### Recommended Next Steps
 1. Run `/epic-workflow:setup` to audit CLAUDE.md for all required sections
-2. Run `/epic-workflow:start 1` to begin the first epic
-[Brownfield:] 1. Run `/epic-workflow:start {N}` to begin the first new epic
+2. Run `/epic-workflow:start <id>` to begin the first epic (use the ID from the Epic column)
+[Brownfield:] 1. Run `/epic-workflow:start <id>` to begin the first new epic
 ```
 
 Do NOT commit — leave that for the user to decide.

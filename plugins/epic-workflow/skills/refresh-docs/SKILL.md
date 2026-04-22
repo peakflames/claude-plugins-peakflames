@@ -50,6 +50,8 @@ These become the **claims to verify** in Step 4.
 
 Read all files in `docs/implementation-plan/session-handoffs/` that correspond to Complete or Implemented epics. Skip Paused handoffs — their decisions may not be final.
 
+> **Epic ID formats:** handoff filenames are `epic-<id>-complete.md` or `epic-<id>-implemented.md`, where `<id>` may be a legacy integer (e.g., `7`, `6.5`) or a 7-character alphanumeric ID (e.g., `a3f2K7p`). The `epic-*-complete.md` and `epic-*-implemented.md` glob patterns match both formats — no special handling needed.
+
 For each handoff, collect:
 - **Key Files** — every file path listed in the Key Files table
 - **Key Decisions** — every design choice recorded in the Key Decisions section

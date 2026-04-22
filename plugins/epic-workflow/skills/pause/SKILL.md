@@ -17,12 +17,14 @@ Follow these steps exactly:
 
 Read `docs/implementation-plan/index.md` and find the epic currently marked as "In Progress". This is the epic you are pausing.
 
+Open the epic spec file and parse its header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 5 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
+
 ### Disambiguation Check
 
 Before proceeding with the pause, read the epic spec file and check its **Acceptance Criteria** section. If ALL acceptance criteria are checked (`[x]`), the epic may actually be done — suggest running `/epic-workflow:wrapup N` instead:
 
-> All acceptance criteria for Epic N are checked off. This looks like it might be ready for independent review rather than a pause.
-> Would you like to run `/epic-workflow:wrapup N` instead, or do you still want to pause?
+> All acceptance criteria for Epic <id> are checked off. This looks like it might be ready for independent review rather than a pause.
+> Would you like to run `/epic-workflow:wrapup <id>` instead, or do you still want to pause?
 
 If the user confirms they want to pause anyway, proceed with Step 2.
 
@@ -32,10 +34,10 @@ List all tasks from this session with their current status (completed, in_progre
 
 ## Step 3: Write Handoff File
 
-Create a handoff file at `docs/implementation-plan/session-handoffs/epic-N-paused.md` (where N is the epic number) with this structure:
+Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID as it appears in `index.md` — either a legacy integer like `7` or `6.5`, or a 7-char alphanumeric ID like `a3f2K7p`) with this structure:
 
 ```markdown
-# Epic N: [Name] — Session Handoff (Paused)
+# Epic <id>: [Name] — Session Handoff (Paused)
 
 **Paused:** [today's date]
 **Reason:** [user-provided or "end of session"]
@@ -63,7 +65,7 @@ Create a handoff file at `docs/implementation-plan/session-handoffs/epic-N-pause
 
 When resuming this epic, start by:
 1. Reading this handoff file
-2. Reading the epic spec: `docs/implementation-plan/phase-N-*/epic-N-*.md`
+2. Reading the epic spec: `docs/implementation-plan/phase-*/epic-<id>-*.md`
 3. The next task to work on is: **[specific task description]**
 4. [Any specific context needed to pick up where you left off]
 
@@ -76,21 +78,28 @@ When resuming this epic, start by:
 
 Update `docs/implementation-plan/index.md`:
 1. Change the epic's status to **"Paused"**
-2. Add a link to the handoff file in the Handoff column: `[paused](session-handoffs/epic-N-paused.md)`
+2. Add a link to the handoff file in the Handoff column: `[paused](session-handoffs/epic-<id>-paused.md)` (use the epic's actual ID — legacy integer or 7-char alphanumeric)
 
 ## Step 5: Commit
 
 **Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + index update). If the user confirms:
 
 1. Stage all files created or modified during this epic session (use specific file paths, not `git add -A`)
-2. Use the commit message format: `wip(epic-N): pause — <brief summary of progress so far>`
+2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>` (use the epic's actual ID — legacy integer or 7-char alphanumeric)
+3. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
+   ```
+   wip(epic-<id>): pause — <brief summary of progress so far>
+
+   Refs #<N>
+   ```
+   If no source issue is known, omit the trailer.
 
 Do NOT push to the remote — leave that for the user to decide.
 
 ## Step 6: Confirm to User
 
 Tell the user:
-> Epic N has been paused and committed. To resume, start a new session and run:
-> `/epic-workflow:start N`
+> Epic <id> has been paused and committed. To resume, start a new session and run:
+> `/epic-workflow:start <id>`
 > 
 > The start command will automatically read the pause handoff and pick up where you left off.

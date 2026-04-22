@@ -24,11 +24,11 @@ Check for the presence and completeness of each section below. Report a status f
 |---------|---------------|
 | **Tech Stack** | Lists the languages, frameworks, package manager, and key libraries used |
 | **Local Environment** | Documents how to run the backend and frontend locally, whether the API is live and functional, and the preference for live data over mocking during verification |
-| **Epic Workflow** | References the epic commands (`/epic-workflow:start`, `/epic-workflow:wrapup`, `/epic-workflow:pause`, `/epic-workflow:refresh-docs`) and points to the implementation plan |
+| **Epic Workflow** | References the epic commands (`/epic-workflow:triage`, `/epic-workflow:start`, `/epic-workflow:wrapup`, `/epic-workflow:pause`, `/epic-workflow:quick-fix`, `/epic-workflow:refresh-docs`) and points to the implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
-| **Git Workflow** | Documents branch strategy (including epic branch naming convention `feature/epic-N-<short-name>`), merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, `appsettings*.json`) |
+| **Git Workflow** | Documents branch strategy (including epic branch naming convention `feature/epic-<id>-<short-name>` where `<id>` is a legacy integer or 7-character alphanumeric, and quick-fix convention `hotfix/issue-<N>-<slug>` or `hotfix/<slug>`), merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, `appsettings*.json`) |
 | **Verification Before Commit Rule** | Prescribes the implement → lint → build → verify → commit sequence; explains why compiled code ≠ correct behavior |
 | **Release Protocol** | Documents the full release flow: changelog finalization, merge to main, tagging convention, post-release version bump, and where the version lives in the codebase |
 
@@ -56,7 +56,7 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 
 **Epic Workflow** (if missing):
 - Where does the implementation plan live? (default: `docs/implementation-plan/index.md`)
-- Confirm the epic commands should be listed: `/epic-workflow:start N`, `/epic-workflow:wrapup N`, `/epic-workflow:pause`, `/epic-workflow:refresh-docs`, `/epic-workflow:setup`
+- Confirm the epic commands should be listed: `/epic-workflow:triage <issue|description>`, `/epic-workflow:start <id>`, `/epic-workflow:wrapup <id>`, `/epic-workflow:pause`, `/epic-workflow:quick-fix <issue|description>`, `/epic-workflow:refresh-docs`, `/epic-workflow:setup`
 
 **Verification & Quality Gates** (if missing):
 - What checks should run before an epic is marked complete? Ask about each:
@@ -78,7 +78,8 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 
 **Git Workflow** (if missing):
 - What is the branch strategy? (e.g., `develop` for active work, `main` for releases)
-- Epic feature branches use the naming convention `feature/epic-N-<short-name>` where the short name is derived from the epic spec filename (e.g., `epic-3-user-auth.md` → `feature/epic-3-user-auth`). Include this convention in the Git Workflow section.
+- Epic feature branches use the naming convention `feature/epic-<id>-<short-name>` where `<id>` is either a legacy integer (pre-v2.0.0 epics, e.g., `7` or `6.5`) or a 7-character alphanumeric ID (v2.0.0+ epics, e.g., `a3f2K7p`), and `<short-name>` is derived from the epic spec filename (e.g., `epic-a3f2K7p-user-auth.md` → `feature/epic-a3f2K7p-user-auth`). Include this convention in the Git Workflow section.
+- Quick-fix branches use the naming convention `hotfix/issue-<N>-<slug>` when tied to a GitHub issue, or `hotfix/<slug>` otherwise. Include this convention too.
 - Should merges use `--no-ff` to preserve commit history?
 - Should Claude ask before pushing to origin?
 - Are there files that must NEVER be committed? (e.g., `.env`, `appsettings*.json`, credentials)
