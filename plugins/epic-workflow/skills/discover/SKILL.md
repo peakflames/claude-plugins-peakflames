@@ -174,7 +174,13 @@ After all phases are complete, write the documents.
 
 1. Update `docs/product-vision-planning/product-vision.md` in place — increment the document version, update the date, and modify only the sections that changed.
 2. Update `docs/product-vision-planning/concept-of-operations.md` in place — same approach.
-3. Write `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` with content:
+3. Write `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` with content. `{TIMESTAMP}` is a second-granularity UTC timestamp — second granularity is required because parallel discovery sessions on different machines may produce changelogs within the same minute, and day-granularity would collide. Generate it with:
+
+   ```bash
+   date -u +%Y-%m-%d-%H%M%S
+   ```
+
+   Example filename: `discovery-changelog-2026-04-23-174205.md`. Do not substitute local time — UTC keeps filenames sortable and unambiguous across timezones.
 
 ```markdown
 # Discovery Changelog

@@ -6,6 +6,61 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.1.0] — 2026-04-23
+
+### Added
+
+- **Vision & Scenario Anchors section in epic specs** — `/add` and `/plan-project` now
+  write a `## Vision & Scenario Anchors` section into every new epic spec (after
+  Description, before "At Completion, a User Can"). It cites specific
+  `product-vision.md` sections and `concept-of-operations.md` scenario steps with a
+  1–2 sentence paraphrase of intent per bullet. `/start` (new Step 1 item 5) and
+  `/wrapup` (new Step 1.1 item 5) read the section first and reconcile each paraphrase
+  against its source. If a paraphrase conflicts with the source, neither text is
+  privileged — the skill surfaces the discrepancy to the user and asks which represents
+  current intent. Wrapup records the reconciliation outcome in a new "Anchor
+  Reconciliation" section of the Phase 1 Verification Report. Legacy specs without an
+  Anchors section are grandfathered.
+- **Self-Check step in `/add`** (new Step 8) and **`/plan-project`** (new Step 6) — a
+  post-write trace pass that enumerates every input requirement (user description,
+  GitHub issue body, vision/ConOps touchpoints, brownfield changelog entries,
+  negotiation adjustments) and maps each to the output spec sections that capture it.
+  Produces a visible `Input → Output Trace` table with Explicit (Y/N) and Ambiguous
+  (Y/N) columns; any gap triggers a remediation edit and re-run. Final passing table
+  is printed as part of the step's summary so users and future reviewers can audit
+  input coverage.
+- **GitHub issue comments on work start and PR open** — when an epic or quick-fix has
+  a linked GitHub issue (`**Source:** Issue #<N>` on epics, resolved issue number on
+  quick-fixes):
+  - `/start` posts a "work has started on branch X" comment when status transitions
+    from Not Started / Paused → In Progress (skipped on resumption of an already
+    In Progress epic).
+  - `/wrapup` team mode posts the PR URL to the issue after `gh pr create` succeeds.
+  - `/quick-fix` team mode does the same after its `gh pr create`.
+
+  All three are gated on `gh auth status` succeeding; failures print a warning and
+  continue (the comment is a courtesy, not a blocker). Solo mode skips the PR-open
+  comment on wrapup and quick-fix since there is no external URL to link to; `/start`
+  still fires its announcement regardless of ship mode.
+
+### Changed
+
+- **Discovery changelog filename and location.** `{TIMESTAMP}` in the brownfield
+  `/discover` output is now defined as a second-granularity UTC timestamp
+  (`date -u +%Y-%m-%d-%H%M%S`), e.g. `discovery-changelog-2026-04-23-174205.md`.
+  Day granularity was not sufficient when two developers ran `/discover` on different
+  machines the same day. `/plan-project` is updated to match:
+  - Reads from `docs/product-vision-planning/changelogs/` (was the stale
+    `.discovery-changelog.md` at the repo root, a leftover from v1.6.0's move).
+  - Globs `discovery-changelog-*.md` and filters out anything ending in `.processed`.
+  - If it finds two or more unprocessed changelogs it **refuses to plan**, lists them,
+    and asks the user to reconcile. Silent merging is not attempted — losing intent
+    that way is worse than pausing for a human.
+  - Archival appends `.processed` to the consumed file instead of re-timestamping —
+    the original discovery timestamp is preserved.
+
+---
+
 ## [2.0.0] — 2026-04-22
 
 ### Added

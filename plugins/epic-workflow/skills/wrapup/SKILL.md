@@ -30,10 +30,18 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 2. Read the implementation plan index: `docs/implementation-plan/index.md`
 3. Verify Epic $ARGUMENTS is in **"Implemented"** status. If it is still "In Progress" or "Not Started", inform the user that `/epic-workflow:start` must finish first. If it is already "Complete", inform the user it has already been wrapped up.
 4. Read the epic spec file for Epic $ARGUMENTS. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip the `Closes` line later.
-5. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists)
-6. Read `docs/architecture.md` for system context
-7. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it.
-8. Check out the feature branch for this epic: `git checkout feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric).
+5. **Verify the Vision & Scenario Anchors.** The epic spec should contain a `## Vision & Scenario Anchors` section. An independent reviewer reads these first so the rest of the verification is judged against the right notion of user intent:
+   1. For each **vision anchor** bullet, open `docs/product-vision-planning/product-vision.md` and read the specific section cited. Compare paraphrase to source.
+   2. For each **scenario anchor** bullet, open `docs/product-vision-planning/concept-of-operations.md` and read the specific scenario step cited. Compare paraphrase to source.
+   3. If any paraphrase conflicts with its source — meaning a reasonable reader would draw different acceptance conclusions from the two texts — **stop**. Neither source is automatically authoritative: the paraphrase may be the post-discovery refinement the implementer worked against, or the vision doc may have been updated mid-epic. Surface the discrepancy to the user with both texts side by side and ask which represents current intent. The user's answer then drives two downstream behaviors:
+       - **Verification baseline** — Steps 1.2 and 1.3 (Verify Acceptance Criteria, Verify Verification) judge the implementation against the **confirmed intent**, not against whichever text is literally in the spec. If the implementation was built against the paraphrase but the user confirms the source doc reflects current intent (or vice versa), any resulting divergence is a verification **FAIL** and must be listed in the Step 1.6 report — do not silently accept it on the grounds that the implementation "matched the spec."
+       - **Anchor Reconciliation note** — Record the discrepancy, the user's answer, and which text was used as the verification baseline in the new "Anchor Reconciliation" section of the Step 1.6 Verification Report so the reviewer (and future readers of the handoff) can see what the epic was ultimately verified against.
+   4. If the spec has a placeholder line noting vision docs do not yet exist, note this and continue — the absence of vision docs is a known greenfield condition, not a conflict.
+   5. If the spec pre-dates v2.1.0 and has no Anchors section at all, note this in the verification report and continue — legacy specs are grandfathered.
+6. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists)
+7. Read `docs/architecture.md` for system context
+8. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it.
+9. Check out the feature branch for this epic: `git checkout feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric).
    - If the branch does not exist, try the legacy name `feat/epic-N` (for sessions started before v1.3.0 — applies to integer IDs only)
    - If neither branch exists, inform the user and proceed on the current branch
      (the work may have been done directly on main in an older session)
@@ -87,6 +95,9 @@ Present a consolidated report to the user. The report has two jobs: a fast skim 
 - Acceptance Criteria: X/Y PASS
 - Verification Items: X/Y PASS, Z CANNOT VERIFY
 - Quality Gates: X/Y PASS
+
+## Anchor Reconciliation
+- [One of: "All vision and scenario anchors matched their source sections" / "Anchors grandfathered — spec pre-dates v2.1.0" / "Vision docs not yet present (greenfield placeholder)" / specific conflicts resolved, each with a one-line note on what intent was confirmed]
 
 ## Verification Narrative
 
@@ -333,7 +344,12 @@ be made by the user every invocation.
 
    The `Closes #<N>` line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 — if the spec has no `Source:` line, omit the `Closes` line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way). Use literal Unicode ✅ ⚠️ ❌ in the Highlights list — not shortcodes.
 
-5. Do **NOT** run `gh pr merge`. Merging is the reviewer's responsibility.
-6. Do **NOT** delete the feature branch. GitHub auto-delete (if enabled) or manual cleanup handles it after merge.
-7. Report to the user:
+5. **Announce PR on the GitHub issue** (conditional) — run only if a source issue number was captured in Step 1.1 item 4 **and** `gh auth status` succeeds:
+   ```bash
+   gh issue comment <N> --body "PR opened for Epic <id>: <PR url>. Awaiting review."
+   ```
+   Capture the PR URL from the `gh pr create` output in item 4. If `gh auth status` fails or the comment command errors, print a warning (`gh issue comment failed — PR is still open, manual issue update may be desired`) and continue; the PR itself is the essential deliverable, the comment is a courtesy. Skip this step entirely in solo mode (Step 5a) — nothing external to link to.
+6. Do **NOT** run `gh pr merge`. Merging is the reviewer's responsibility.
+7. Do **NOT** delete the feature branch. GitHub auto-delete (if enabled) or manual cleanup handles it after merge.
+8. Report to the user:
    > PR opened: `<url>`. Feature branch `<branch>` pushed. Await review; do not merge locally.

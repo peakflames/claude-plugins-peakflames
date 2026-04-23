@@ -108,6 +108,11 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
 
      If no GitHub issue number was provided (free-text `$ARGUMENTS`, no triage handoff), omit the `Closes #<N>` line entirely — do not leave a bare `Closes #` in the rendered body.
 
+   - **Announce PR on the GitHub issue** (conditional) — run only if an issue number was resolved in Step 1 **and** `gh auth status` succeeds:
+     ```bash
+     gh issue comment <N> --body "PR opened for this fix: <PR url>. Awaiting review."
+     ```
+     Capture the PR URL from the `gh pr create` output. If `gh auth status` fails or the comment command errors, print a warning (`gh issue comment failed — PR is still open, manual issue update may be desired`) and continue. Skip entirely in solo mode — nothing external to link to.
    - Stay on the hotfix branch. Do **NOT** run `gh pr merge` — merging is the reviewer's responsibility.
    - Do **NOT** delete the hotfix branch. GitHub auto-delete (if enabled) or manual cleanup handles it after the PR is merged.
    - Report: `PR opened: <url>. Feature branch <hotfix-branch> pushed. Await review; do not merge locally.`

@@ -1,5 +1,5 @@
 {
   "name": "epic-workflow",
   "description": "Structured project management workflow organized around Epics with acceptance criteria, verification needs, and documentation currency. Covers the full lifecycle: discovery, planning, implementation, verification, and documentation refresh.",
-  "version": "2.0.0"
+  "version": "2.1.0"
 }

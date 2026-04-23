@@ -102,14 +102,30 @@ Proceed to Step 4.
 
 ### 3B.1: Load the Handoff
 
-Check for `.discovery-changelog.md` at the repo root (written by `/epic-workflow:discover` in brownfield mode).
+Look in `docs/product-vision-planning/changelogs/` for unprocessed discovery changelogs. An unprocessed changelog is any file matching `discovery-changelog-*.md` that does **not** end in `.processed` — once `/plan-project` consumes a changelog in Step 5.4 it appends a `.processed` suffix, so the glob naturally filters them out:
 
-**If it exists:** Read it. The "New Capabilities Identified" section is your primary input. The "Priority Signal" section guides epic ordering.
+```bash
+ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null | grep -v '\.processed$'
+```
 
-**If it does not exist:** Fall back to full-document delta analysis:
-1. Read the current product-vision.md and concept-of-operations.md.
-2. Use `git diff` or `git log` to identify what changed in these files since the last implementation plan update.
-3. Extract new or modified capabilities from the changed sections.
+Interpret the result:
+
+- **Exactly one unprocessed changelog:** Read it. The "New Capabilities Identified" section is your primary input. The "Priority Signal" section guides epic ordering. Remember this path for Step 5.4.
+- **Two or more unprocessed changelogs:** STOP. Do not attempt to merge them silently. Inform the user:
+  > Found {N} unprocessed discovery changelogs:
+  > {list the filenames}
+  >
+  > This can happen when two `/epic-workflow:discover` sessions ran on different machines between planning cycles. Silent merging could lose intent, so I need you to reconcile them before planning continues. Options: (1) delete the ones that are superseded, (2) merge their "New Capabilities Identified" and "Priority Signal" sections into a single changelog and delete the others, or (3) tell me which single file to treat as authoritative.
+  >
+  > Once only one unprocessed changelog remains in the directory, re-run `/epic-workflow:plan-project`.
+
+  Do not proceed until the user has reconciled.
+- **Zero unprocessed changelogs:** Fall back to full-document delta analysis:
+  1. Read the current product-vision.md and concept-of-operations.md.
+  2. Use `git diff` or `git log` to identify what changed in these files since the last implementation plan update.
+  3. Extract new or modified capabilities from the changed sections.
+
+  Note in the Step 7 summary that no changelog handoff was found and delta analysis was used instead.
 
 ### 3B.2: Map Against Existing Plan
 
@@ -201,6 +217,18 @@ For each epic, write the spec file following the exact format required by `/epic
 
 {2-4 sentences. What is being built and why.}
 
+## Vision & Scenario Anchors
+
+> Readers of this epic (`/epic-workflow:start`, `/epic-workflow:wrapup`, and the independent reviewer) will read the paraphrases below first, then spot-check them against the cited source sections. If a paraphrase conflicts with its source, neither text is automatically authoritative — stop and ask the user which reflects current intent.
+
+### Vision anchors
+- `docs/product-vision-planning/product-vision.md` § {section number/title} — {1–2 sentence paraphrase of why this epic serves the vision}
+- {repeat for each cited vision section}
+
+### Scenario anchors
+- `docs/product-vision-planning/concept-of-operations.md` § {scenario id or section, e.g. "S1 step 3"} — {1–2 sentence paraphrase of the user intent this epic serves}
+- {repeat for each cited scenario step}
+
 ## At Completion, a User Can
 
 {3-6 bullet points from the end-user's perspective. Each starts with a verb.}
@@ -227,10 +255,22 @@ For each epic, write the spec file following the exact format required by `/epic
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise; the line is optional and all downstream skills treat its absence as "no source issue known".
 
+**Populating the Vision & Scenario Anchors section:**
+
+`/plan-project` has a natural advantage here — Step 3A.1 (scenario decomposition) already traces every capability back to a scenario step, and Step 3A.3/3B.3 (epic formation) groups those capabilities. Use that linkage directly:
+
+- The scenarios each epic's capabilities came from become the **scenario anchors**. Cite each by scenario id and step number (e.g. `S1 step 3`).
+- The vision sections whose scope items those capabilities satisfy become the **vision anchors**. Cite each by section number and title.
+- Paraphrase in your own words — do not copy-paste source text. The paraphrase expresses *why this epic serves that part of the vision/scenario* in plain language. Two sentences max per bullet.
+- The note at the top of the section must be written verbatim into every spec — it drives conflict-surfacing behavior in `/start` and `/wrapup`.
+
+If a given epic cannot be anchored to any vision section or scenario step, that is a signal — either the epic is premature (not justified by current scope) or the vision docs have a gap. Raise it to the user rather than skipping the anchors.
+
 ### Quality Checks Before Writing Each Spec
 
 - [ ] Every acceptance criterion is specific enough to verify without ambiguity
 - [ ] Every acceptance criterion has a traceability note (ConOps scenario step or PV scope item)
+- [ ] Vision & Scenario Anchors cite specific sections/steps (not whole docs) with paraphrased intent
 - [ ] Verification items describe observable outcomes, not implementation steps
 - [ ] Key Components reference realistic directories and follow the project's naming conventions
 - [ ] The Description explains *why*, not just *what*
@@ -280,15 +320,67 @@ The "Epic" column in the status table holds the ID string verbatim (e.g., `a3f2K
 
 ### 5.4: Brownfield Changelog Archival
 
-If `.discovery-changelog.md` exists, rename it to prevent re-processing:
+If Step 3B.1 consumed a changelog (the "exactly one unprocessed" path), mark it processed by appending a `.processed` suffix to the filename. This prevents the next `/plan-project` run from re-consuming it, while preserving the original discovery timestamp embedded in the filename:
 
 ```
-.discovery-changelog.md → .discovery-changelog-{YYYY-MM-DD}.md
+docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md
+  → docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md.processed
 ```
 
-This archived file serves as a historical record of the discovery session.
+Do **not** re-timestamp the file — the original timestamp is the discovery time and carries historical meaning. The `.processed` suffix is the "consumed" marker. If Step 3B.1 fell through to delta analysis (zero unprocessed changelogs), skip this step — there is nothing to archive.
 
-## Step 6: Update CLAUDE.md References
+## Step 6: Self-Check — Trace Inputs to Outputs
+
+Before touching CLAUDE.md or presenting the summary, run an explicit post-write self-check. The pre-write "Quality Checks Before Writing Each Spec" in 5.2 ask whether each individual spec looks reasonable on its own. This step asks the different and more important cross-cutting question: **did every input capability actually land in at least one epic, explicitly and unambiguously?**
+
+### 6.1: Enumerate Inputs
+
+Build a flat list of every driving requirement. Sources:
+
+- **ConOps scenario steps** — every numbered step in every scenario in Section 5 of `concept-of-operations.md`. Each step is an input row, keyed as `ConOps S{scenario}.{step}`.
+- **Product vision scope items** — every MVP goal, in-scope capability, success criterion, and explicit user-facing commitment from `product-vision.md`. Keyed as `PV §{section-number}: {short-label}`.
+- **Brownfield changelog entries** (if Step 3B.1 consumed a changelog) — every bullet under "New Capabilities Identified" and every explicit signal under "Priority Signal" / "Deferred Items". Keyed as `Changelog: {short-label}`.
+- **User adjustments from Step 4 negotiation** — any merge/split/add/remove the user asked for during plan negotiation. Keyed as `Negotiation: {short-label}`.
+
+One input per row. Be granular: a scenario step that says "the map loads clustered pins and the user clicks a cluster to zoom in" is two inputs, not one.
+
+### 6.2: Build the Trace Table
+
+Print the table to the user verbatim — it is part of the Step 8 summary, not internal scratch. For a project with many inputs, the table will be long; that is expected and correct. Do not summarize rows away.
+
+```
+## Self-Check: Input → Epic Trace
+
+| # | Input (source:reference) | Captured in Epic(s) | Captured at (spec section) | Explicit? (Y/N) | Ambiguous? (Y/N) |
+|---|--------------------------|---------------------|----------------------------|-----------------|-------------------|
+| 1 | ConOps S1.3: "map loads ~3,000 suppliers as clustered pins" | Epic a3f2K7p | Acceptance Criteria § Frontend, item 2 | Y | N |
+| 2 | ConOps S1.4: "user clicks cluster to zoom in" | Epic a3f2K7p | Acceptance Criteria § Frontend, item 5 | Y | N |
+| 3 | PV §6: "supports offline mode" | (not captured) | — | N | Y |
+| 4 | Changelog: "CSV export on supplier list" | Epic B9xQr2z | Acceptance Criteria § Frontend, item 1 | Y | N |
+```
+
+Rules:
+
+- An input may map to **more than one epic** — list all of them in the "Captured in Epic(s)" column. This is expected when a capability spans layers (e.g. a user action that needs backend + frontend work). It is **not** a gap as long as each captured location is explicit and unambiguous.
+- **Explicit? N** — the input is not captured in any epic. Gap.
+- **Ambiguous? Y** — the input is captured but in vague language that two engineers could reasonably implement differently. Gap.
+- An input may be legitimately out of scope for this plan (e.g. MVP vs. future scope). Strike the row with `Explicit? N/A — deferred to future cycle` and a one-line rationale in the "Captured at" column. Do not hide deferred items; list them explicitly.
+
+### 6.3: Remediate and Re-Run
+
+For every gap:
+
+1. Edit the relevant epic spec(s) in place — add missing acceptance criteria, tighten vague wording with specific thresholds, or (for genuinely out-of-scope items) explicitly strike the row with deferral rationale.
+2. If a gap requires a capability that belongs in a **new epic**, create one — generate a fresh 7-char ID, drop it in the appropriate phase directory, and update `index.md`. Then re-run Step 4 negotiation for that one epic before continuing. Do not silently absorb new scope.
+3. Re-run the table. Iterate until every row shows `Explicit? Y` and `Ambiguous? N`, or has an explicit deferral.
+
+Do not proceed to Step 7 with unresolved gaps.
+
+### 6.4: Keep the Final Table
+
+The final passing table is printed as part of Step 8 summary — so the user can audit coverage, and so future `/start` and `/wrapup` sessions can see which inputs each epic is responsible for.
+
+## Step 7: Update CLAUDE.md References
 
 Check whether `CLAUDE.md` has a "Design & Planning Documents" section (or similar) that references the vision and ConOps files.
 
@@ -303,7 +395,7 @@ Check whether `CLAUDE.md` has a "Design & Planning Documents" section (or simila
 
 Do NOT perform a full CLAUDE.md audit — that is `/epic-workflow:setup`'s job. Only add the document references.
 
-## Step 7: Present Summary & Next Steps
+## Step 8: Present Summary & Next Steps
 
 ```
 ## Implementation Plan Complete
@@ -312,13 +404,17 @@ Do NOT perform a full CLAUDE.md audit — that is `/epic-workflow:setup`'s job. 
 - `docs/implementation-plan/index.md` — [Created / Updated]
 - [N] epic spec files across [M] phases
 - CLAUDE.md — [Updated with document references / Already up to date]
-[Brownfield only:] - `.discovery-changelog.md` archived to `.discovery-changelog-{date}.md`
+[Brownfield only, if a changelog was consumed:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` marked processed (`.processed` suffix appended)
 
 ### By the Numbers
 - Phases: [N]
 - Epics: [N]
 - Total acceptance criteria: [N]
 - Total verification items: [N]
+
+### Self-Check
+- [N] inputs traced to epics, all Explicit=Y and Ambiguous=N (see Step 6 trace table above)
+- [N] items explicitly deferred to a future cycle: [list, or "none"]
 
 ### Dependency Quick Reference
 [Compact version of the dependency graph — just the critical path]

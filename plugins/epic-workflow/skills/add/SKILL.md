@@ -109,6 +109,18 @@ The phase directory must match an existing `phase-N-name/` directory in the impl
 
 {2-4 sentences. What is being built and why. Reference the motivation if it came from a verification finding, user request, or architectural need.}
 
+## Vision & Scenario Anchors
+
+> Readers of this epic (`/epic-workflow:start`, `/epic-workflow:wrapup`, and the independent reviewer) will read the paraphrases below first, then spot-check them against the cited source sections. If a paraphrase conflicts with its source, neither text is automatically authoritative — stop and ask the user which reflects current intent.
+
+### Vision anchors
+- `docs/product-vision-planning/product-vision.md` § {section number/title} — {1–2 sentence paraphrase of why this epic serves the vision}
+- {repeat for each cited vision section}
+
+### Scenario anchors
+- `docs/product-vision-planning/concept-of-operations.md` § {scenario id or section, e.g. "S1 step 3"} — {1–2 sentence paraphrase of the user intent this epic serves}
+- {repeat for each cited scenario step}
+
 ## At Completion, a User Can
 
 {3-6 bullet points written from the end-user's perspective. Each starts with a verb. These describe observable behaviors, not implementation details.}
@@ -139,6 +151,14 @@ Always include:
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise; existing specs without it continue to work.
 
+**Populating the Vision & Scenario Anchors section:**
+
+- Open `docs/product-vision-planning/product-vision.md` and `docs/product-vision-planning/concept-of-operations.md` (if they exist — greenfield projects may not have them yet). For each anchor you add:
+  - Cite the **specific** section or scenario step, not the whole document. Use the section heading text or scenario step number so a reader can jump directly there.
+  - Write the paraphrase in your own words — do not copy-paste the source. The paraphrase should express *why this epic serves that part of the vision/scenario* in plain language. Two sentences max per bullet.
+- If the project has no vision or ConOps docs (greenfield without `/discover`), write a single note in each subsection: `_No vision document exists yet — anchors will be populated when_ `/epic-workflow:discover` _is run._` Do not omit the section; a future reader should still see it.
+- The note at the top of the section is part of the template and must be written into every spec verbatim — it is what drives `/start` and `/wrapup`'s conflict-surfacing behavior when the paraphrase and source drift.
+
 ### Quality Checks Before Writing
 
 Before writing each spec, verify:
@@ -159,7 +179,57 @@ Update `docs/implementation-plan/index.md`:
 
 2. **Dependency graph** — add the new epic(s) to the ASCII dependency tree in the correct position, showing what they depend on. Follow the existing indentation and formatting style exactly.
 
-## Step 8: Present Summary
+## Step 8: Self-Check — Trace Inputs to Outputs
+
+Before presenting the summary, run an explicit post-write self-check. The pre-write "Quality Checks" in Step 6 ask "does the spec look reasonable on its own." This self-check asks the different and more important question: **did every input requirement actually land in the output, explicitly and unambiguously?**
+
+### 8.1: Enumerate Inputs
+
+List every discrete requirement or intent signal that drove this invocation. Sources and examples:
+
+- **User description** (`$ARGUMENTS` after Step 2.0 prefix stripping) — each distinct behavior, constraint, or deliverable the user named. Include follow-up clarifications from Step 2.1's clarifying round if any were asked.
+- **GitHub issue body** (if Step 2.0 fetched one) — each acceptance hint, reproduction step, constraint, or explicit user story in the issue body and its top-level comments. Do not skip items merely because they weren't phrased as requirements; an issue reporter's "and also the header is wrong" is an input.
+- **Vision/ConOps touchpoints** — the specific vision section(s) and ConOps scenario step(s) this epic serves (these feed the Anchors section from Step 6 and must be consistent with it).
+- **Dependency signals** — prerequisite epics identified in Step 3.
+
+One input per row. Be granular: if the user said "CSV export with filter awareness, and a spinner while it runs," that's two inputs, not one.
+
+### 8.2: Build the Trace Table
+
+Print the table to the user verbatim — it is part of the Step 9 summary, not internal scratch:
+
+```
+## Self-Check: Input → Output Trace
+
+| # | Input (source:reference) | Captured in Output (spec section:line) | Explicit? (Y/N) | Ambiguous? (Y/N) |
+|---|--------------------------|----------------------------------------|-----------------|-------------------|
+| 1 | User description: "CSV export respects current filters" | Acceptance Criteria § Frontend, item 2 | Y | N |
+| 2 | Issue #42 body: "show a spinner during export" | Acceptance Criteria § Frontend, item 4 | Y | N |
+| 3 | ConOps S3.4: "procurement receives the list within 10 seconds" | Verification, item 3 | Y | N |
+| 4 | User description: "works for big lists" | (not captured) | N | Y |
+```
+
+Rules for the last two columns:
+
+- **Explicit? N** — the input is not captured in any output section. Gap.
+- **Ambiguous? Y** — the input is captured but in language so vague a different engineer could reasonably interpret it multiple ways ("works for big lists," "handles errors gracefully," "is fast"). Gap.
+
+Both columns must be `Y` / `N` respectively for the row to pass. Anything else is a gap.
+
+### 8.3: Remediate and Re-Run
+
+For every gap (row with `Explicit? N` or `Ambiguous? Y`):
+
+1. Edit the epic spec in place — add a new acceptance criterion, tighten vague wording with specific thresholds/values/behaviors, or (if the input is genuinely out of scope) strike the row from the table and note "Out of scope for this epic — tracked separately" in the `Captured in Output` column with a one-line rationale.
+2. Re-run the table. Iterate until every row shows `Explicit? Y` and `Ambiguous? N`, or has an explicit out-of-scope justification.
+
+Do not present the summary with unresolved gaps.
+
+### 8.4: Keep the Final Table
+
+The final passing table is printed as part of Step 9 summary — both so the user can audit, and so future sessions (and reviewers) can see what this epic was intended to cover.
+
+## Step 9: Present Summary
 
 Show the user what was created:
 
@@ -177,6 +247,10 @@ Show the user what was created:
 ### Index Updated
 - {count} row(s) added to status table
 - Dependency graph updated
+
+### Self-Check
+- {count} inputs traced to outputs, all Explicit=Y and Ambiguous=N (see Step 8 trace table above)
+- Out-of-scope items explicitly struck: {list, or "none"}
 
 ### Ready to implement
 Run `/epic-workflow:start {id}` when ready to begin (in a fresh session for clean context).
