@@ -19,12 +19,21 @@ Follow these steps exactly:
 2. Read the implementation plan index: `docs/implementation-plan/index.md`
 3. Identify which phase and file corresponds to Epic $ARGUMENTS
 4. Read the epic spec file (e.g., `docs/implementation-plan/phase-N-*/epic-$ARGUMENTS-*.md`)
-5. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
-6. Parse the epic spec header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 4 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
-7. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously)
-8. Read `docs/architecture.md` for system context
-9. Read `docs/design-notes.md` for technical decisions
-10. Read all files in `docs/reference/` for implementation patterns and reference material from similar projects
+5. **Verify the Vision & Scenario Anchors.** The epic spec should contain a `## Vision & Scenario Anchors` section (written by `/epic-workflow:add` or `/epic-workflow:plan-project`). Before planning or implementation, perform this reconciliation:
+   1. For each **vision anchor** bullet, open `docs/product-vision-planning/product-vision.md` and read the specific section the anchor cites. Compare the anchor's paraphrase against what the source actually says.
+   2. For each **scenario anchor** bullet, open `docs/product-vision-planning/concept-of-operations.md` and read the specific scenario step the anchor cites. Compare the anchor's paraphrase against what the source actually says.
+   3. If any paraphrase conflicts with its source — meaning a reasonable reader would draw different implementation conclusions from the two texts — **stop**. Neither source is automatically authoritative: the paraphrase may be the deliberate post-discovery refinement, or the vision doc may have been updated since the epic was written. Surface the discrepancy to the user with both texts side by side and ask which represents current intent. Wait for an answer, then:
+       - If the user says the **source doc** reflects current intent, update the anchor paraphrase in the spec to match (in-place edit); do not change the source.
+       - If the user says the **paraphrase** reflects current intent, leave the spec alone and offer to update the source doc yourself once implementation lands, or flag it for a future `/epic-workflow:discover` run. Do not silently edit the vision docs.
+       - If the user says neither fully captures intent, capture the new statement from them and update the anchor paraphrase accordingly.
+   4. If the spec has a placeholder line like `_No vision document exists yet — anchors will be populated when_ /epic-workflow:discover _is run._`, note this and continue — the absence of vision docs is a known greenfield condition, not a conflict.
+   5. If the spec pre-dates v2.1.0 and has no Anchors section at all, note this to the user and continue — legacy specs are grandfathered. Offer to add anchors during the epic work (`/epic-workflow:start` can populate them as part of the spec reconciliation in the closing plan steps).
+6. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
+7. Parse the epic spec header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 4 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
+8. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously)
+9. Read `docs/architecture.md` for system context
+10. Read `docs/design-notes.md` for technical decisions
+11. Read all files in `docs/reference/` for implementation patterns and reference material from similar projects
 
 ### Recovery Check
 
@@ -65,11 +74,16 @@ Build the plan from:
 
 **The plan must follow this exact structure.** All lifecycle steps must appear as explicit numbered items in the plan body — not as footnotes or asides.
 
-### Opening steps (always the first three plan items):
+### Opening steps (always the first four plan items):
 
 1. **Create (or verify) feature branch** — run `git branch --show-current`. If already on `feature/epic-<id>-<short-name>`, confirm and continue. If not, detect base branch (`develop` > `main` > `master`), switch to it, and run `git checkout -b feature/epic-<id>-<short-name>`. Use the exact branch name derived from the spec filename (`<id>` is `$ARGUMENTS` verbatim).
-2. **Update status to "In Progress"** — edit `docs/implementation-plan/index.md`: change Epic $ARGUMENTS status from "Not Started" (or "Paused") to "In Progress". Leave Implemented and Completed dates as `—`.
-3. **Create tasks** — create one task per acceptance criteria item from the epic spec for progress tracking.
+2. **Update status to "In Progress"** — edit `docs/implementation-plan/index.md`: change Epic $ARGUMENTS status from "Not Started" (or "Paused") to "In Progress". Leave Implemented and Completed dates as `—`. Capture whether this is a **fresh transition** (prior status was "Not Started" or "Paused") or a **resumption** (prior status was already "In Progress"). Step 3 uses this.
+3. **Announce work-started on the GitHub issue** (conditional) — run only if (a) a source issue number was captured in Step 1 item 7, (b) this is a fresh transition (not a resumption — do not re-announce an already-in-progress epic), and (c) `gh auth status` succeeds. Then:
+   ```bash
+   gh issue comment <N> --body "Epic <id> work has started on branch \`feature/epic-<id>-<short-name>\`. I'll follow up here when the PR opens."
+   ```
+   If `gh auth status` fails or the command errors, print a warning (`gh unavailable — skipping issue announcement`) and continue; this is a nice-to-have, not a blocker. Do not prompt the user for permission — the user already opted in by attaching an issue number to the epic source.
+4. **Create tasks** — create one task per acceptance criteria item from the epic spec for progress tracking.
 
 ### Middle steps (implementation work):
 
@@ -80,7 +94,7 @@ Derive these from the epic's acceptance criteria and key components. Each step s
 - **Satisfy verification** — re-read the epic spec's Verification section. For each item, write any code, tests, or configuration needed to satisfy it. Also run the Verification & Quality Gates from `CLAUDE.md` that apply to this epic. Check the "Local Environment" section in `CLAUDE.md`: when the backend is live, verify against real data using `playwright-cli` — do not mock. Report each item as: PASS (with evidence), FAIL (describe what went wrong), or CANNOT VERIFY (only if the environment is genuinely unavailable after attempting to start it).
 - **Reconcile spec** — re-read the epic spec file. Compare original acceptance criteria and verification items against what was actually implemented. Ask user permission to: (1) update the spec in-place to reflect actual delivery, checking off completed items; and (2) create (or update) `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` with a Spec Deviations table (Original Spec | As-Implemented | Reason), an Implementation Notes section (key files changed, additional work), and a Verification Results section. If no deviations, note that in the handoff file and skip spec edits.
 - **Mark as Implemented** — edit `docs/implementation-plan/index.md`: change Epic $ARGUMENTS status from "In Progress" to "Implemented". Set the Implemented date to today (YYYY-MM-DD). Leave the Completed date as `—`.
-- **Commit** — run `git branch --show-current` and confirm you are on `feature/epic-<id>-<short-name>`; if not, switch before staging anything. Stage all files created or modified during this epic by specific path (not `git add -A`), including the handoff file. Commit without asking for permission. Message format: `feat(epic-<id>): <short summary>` (where `<id>` is `$ARGUMENTS` verbatim) with a 1–2 sentence body summarizing key deliverables. When a **source issue number** was captured in Step 1 item 6, append a blank line then `Closes #<N>` as a trailer to the commit body so GitHub auto-closes the issue when the epic merges:
+- **Commit** — run `git branch --show-current` and confirm you are on `feature/epic-<id>-<short-name>`; if not, switch before staging anything. Stage all files created or modified during this epic by specific path (not `git add -A`), including the handoff file. Commit without asking for permission. Message format: `feat(epic-<id>): <short summary>` (where `<id>` is `$ARGUMENTS` verbatim) with a 1–2 sentence body summarizing key deliverables. When a **source issue number** was captured in Step 1 item 7, append a blank line then `Closes #<N>` as a trailer to the commit body so GitHub auto-closes the issue when the epic merges:
   ```
   feat(epic-<id>): <short summary>
 
