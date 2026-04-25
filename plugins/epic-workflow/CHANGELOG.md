@@ -6,6 +6,81 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.2.0] — 2026-04-25
+
+### Changed
+
+- **`start`: efficiency pass on context loading.** Three independent field runs
+  (one Opus, two Sonnet) converged on inefficiencies in Step 1's unconditional
+  reads. This release targets the high-consensus wins:
+  - **Drop the `CLAUDE.md` re-read** — `CLAUDE.md` is already injected into
+    every conversation turn via system context. Step 1 item 1 now points at the
+    in-context copy instead of issuing a `Read` call.
+  - **Narrow the `index.md` read** — Step 1 item 2 now `grep`s for the epic's
+    row and reads only that line plus dependency rows via `offset` / `limit`,
+    rather than reading the full ~650-line index.
+  - **Scope `docs/reference/` reads** — Step 1 item 12 now scans the spec for
+    explicit `docs/reference/...md` links and reads only those. Bulk-reading
+    the directory is removed; many reference files are dense (e.g., 1,300-line
+    algorithm specs) and most epics touch only a slice.
+  - **Conditional `architecture.md` and `design-notes.md` reads** — Step 1
+    items 10–11 are now conditional on whether the epic touches cross-cutting
+    concerns (IPC, schema, etc.) or raises a decision the design notes might
+    have addressed. Localized UI / copy changes skip both.
+- **`start`: forward-looking anchor fast-path.** Step 1 item 6 now opens with a
+  pre-check: anchors whose paraphrase explicitly describes future state ("will
+  be …", "after this epic", "needs updating when this epic ships") are
+  recorded as "no conflict, source updates pending at close-out" without
+  opening source docs. Full source-vs-paraphrase comparison runs only on
+  anchors that make a substantive claim about *current* product behavior.
+- **`start`: reliable branch existence check.** Step 3 and the lifecycle
+  template now prescribe `git show-ref --verify --quiet
+  refs/heads/feature/epic-<id>-<short-name>` (exit 0 = exists). The previous
+  ad-hoc `git branch --list … && echo "exists"` pattern always exited 0 and
+  produced false positives on missing branches.
+- **`start`: lifecycle template extracted to `PLAN_TEMPLATE.md`.** Step 4 used
+  to embed ~50 lines of opening / closing prose inline; the LLM transcribed
+  those verbatim into every plan. The opening and closing steps now live in
+  `plugins/epic-workflow/skills/start/PLAN_TEMPLATE.md`. The skill body is
+  shorter, and future template tweaks happen in one place.
+- **`start`: task granularity guidance.** Plan opening item 4 now creates one
+  task per **logical work block** (typically 5–10 tasks), grouping fine-grained
+  acceptance criteria, and issues a single batched `TaskCreate` call. The
+  prior "one task per acceptance criteria item" rule produced noisy task lists
+  without improving execution.
+- **`start`: closing-step permission and deviation cleanup.** The "Reconcile
+  spec" closing step no longer re-prompts for permission to write the handoff
+  or edit the spec — plan approval already authorizes both. When the
+  implementation tracks the spec 1:1 with no deviations, the in-place
+  checkbox edits are skipped (the index "Implemented" status is the source of
+  truth) and only the handoff file is written.
+- **`start`: GitHub announce short-circuit.** When Step 1 captures no source
+  issue, the plan's announce item collapses to the single line `GitHub
+  announce: SKIP — no source issue` rather than transcribing the full
+  conditional block.
+
+### Added
+
+- **`start`: pre-flight scan for new artifacts.** New Step 1 item 5 greps the
+  spec for the literal strings `NEW component` and `NEW spec`, surfacing
+  matches as explicit "create file X" plan items so new files are named
+  upfront rather than discovered mid-implementation.
+- **`start`: pre-flight E2E regression audit.** New Step 1 item 13 — when the
+  project has an E2E test directory and the epic's key components include UI
+  modules likely referenced there, `grep -rl` for each component captures
+  matching specs. The plan's middle section gets an explicit "update
+  regression specs: …" item so they ship alongside the implementation rather
+  than break at the verification gate. No-ops on projects without an E2E
+  directory.
+- **`start`: IPC / dev-server verification caveat.** The closing "Satisfy
+  verification" step now warns that `playwright-cli` against a dev-server-only
+  render harness (e.g., Vite for an Electron app) cannot exercise the data
+  path on IPC- or backend-dependent surfaces — the project's E2E suite must be
+  used for those, with `playwright-cli` reserved for pure render / style
+  verification. Phrased conditionally so it no-ops on non-Electron consumers.
+
+---
+
 ## [2.1.0] — 2026-04-23
 
 ### Added
