@@ -40,7 +40,6 @@ Read each target document in full. As you read, extract and note every **verifia
 - **Counts** — any "11 endpoints", "3-stage build", "4 filters", "12 columns" etc.
 - **File and directory paths** — any source paths the doc references or implies
 - **Technology names and stated roles** — libraries, services, patterns described
-- **Status line** — note the current `Status:` field (Draft vs. As-Built)
 
 These become the **claims to verify** in Step 4.
 
@@ -120,7 +119,6 @@ Rewrite only the documents where gaps were found.
 - Derive the frontend pages table from the router/App entrypoint file — every route should appear
 - Derive Docker stage details from the actual `Dockerfile` — stage names, base images, `ARG` names
 - Add any missing components, services, patterns, or infrastructure details found in handoffs
-- Update `Document Version` (increment minor version), change `Status: Draft` → `Status: As-Built`, set date to today
 
 ### Rewriting `docs/design-notes.md`
 
@@ -128,7 +126,6 @@ Rewrite only the documents where gaps were found.
 - Correct any sections that describe intended behavior that diverged from what was built — use Spec Deviations from handoffs as the source of corrections
 - For each entry in the design-notes gap table: add a new numbered section. Lead with the decision, follow with **Rationale:**, draw from the handoff's Key Decisions entry and any supporting evidence in source code
 - Add or update a **"Known Issues and Deferred Work"** section at the end — pull from handoff "Known Issues / Follow-ups" entries and any `CANNOT VERIFY` items from wrapup handoffs
-- Update `Document Version`, `Status`, and date
 
 ---
 
