@@ -6,6 +6,48 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.3.0] — 2026-04-25
+
+### Changed
+
+- **`wrapup`: efficiency pass parallel to v2.2.0 `start`.** Same categories of
+  redundant context loads carried over from `start` reviews:
+  - **Drop the `CLAUDE.md` re-read** — Step 1.1 item 1 now points at the
+    in-context copy instead of issuing a `Read` call.
+  - **Narrow the Step 1.1 `index.md` read** — item 2 now `grep`s for the epic's
+    row and reads only that line via `offset` / `limit`. The full index is
+    read once in Phase 3 where the dependency-graph walk actually needs it,
+    eliminating the prior duplicate read.
+  - **Conditional `architecture.md` and `design-notes.md` reads** — Step 1.1
+    item 7 now loads each only when the epic touches a relevant surface (IPC,
+    schema, cross-cutting decisions). Localized UI / copy changes skip both.
+    Step 1.5 code review consistency check is now scoped to whichever doc was
+    loaded; if neither was, it records "no architectural surface affected"
+    instead of citing files it never opened.
+  - **Reliable branch-existence check** — Step 1.1 item 9 now prescribes
+    `git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>`
+    (exit 0 = exists), with the legacy `feat/epic-N` fallback gated on the
+    same test. Replaces the prior reliance on `git checkout` failing silently
+    or `git branch --list … && echo` (which always exits 0).
+- **`wrapup`: forward-looking anchor fast-path.** Step 1.1 item 5 now opens
+  with the same pre-check as `start` v2.2.0 — anchors whose paraphrase
+  describes future state are recorded as "no conflict, source updates pending
+  at close-out" without opening source docs. Full source-vs-paraphrase
+  comparison runs only on anchors that make a substantive claim about
+  *current* product behavior.
+- **`wrapup`: handoff and PR body templates extracted.** The completion
+  handoff template (Step 2.1, ~40 lines) and team-mode PR body template
+  (Step 5b, ~30 lines) used to be embedded inline and re-transcribed verbatim
+  every run. They now live in
+  `plugins/epic-workflow/skills/wrapup/HANDOFF_TEMPLATE.md` and
+  `plugins/epic-workflow/skills/wrapup/PR_BODY_TEMPLATE.md`. The skill body
+  references them; future template tweaks happen in one place. The PR body
+  template also notes that "What Was Built" content is already in memory from
+  Step 2.1's handoff write — reuse it rather than re-reading the handoff file
+  from disk.
+
+---
+
 ## [2.2.0] — 2026-04-25
 
 ### Changed

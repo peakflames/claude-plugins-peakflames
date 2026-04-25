@@ -26,25 +26,33 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 
 ### Step 1.1: Load Context
 
-1. Read `CLAUDE.md` at the repo root for project context and quality gates
-2. Read the implementation plan index: `docs/implementation-plan/index.md`
+1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
+2. From `docs/implementation-plan/index.md`, locate the row for Epic $ARGUMENTS to confirm its current status. Use `grep -n "epic-$ARGUMENTS"` to find the row's line number, then `Read` with a tight `offset` / `limit` window covering it. Phase 3 (Orient) reads the broader index when it walks the dependency graph — Step 1.1 only needs this epic's row.
 3. Verify Epic $ARGUMENTS is in **"Implemented"** status. If it is still "In Progress" or "Not Started", inform the user that `/epic-workflow:start` must finish first. If it is already "Complete", inform the user it has already been wrapped up.
 4. Read the epic spec file for Epic $ARGUMENTS. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip the `Closes` line later.
 5. **Verify the Vision & Scenario Anchors.** The epic spec should contain a `## Vision & Scenario Anchors` section. An independent reviewer reads these first so the rest of the verification is judged against the right notion of user intent:
-   1. For each **vision anchor** bullet, open `docs/product-vision-planning/product-vision.md` and read the specific section cited. Compare paraphrase to source.
-   2. For each **scenario anchor** bullet, open `docs/product-vision-planning/concept-of-operations.md` and read the specific scenario step cited. Compare paraphrase to source.
-   3. If any paraphrase conflicts with its source — meaning a reasonable reader would draw different acceptance conclusions from the two texts — **stop**. Neither source is automatically authoritative: the paraphrase may be the post-discovery refinement the implementer worked against, or the vision doc may have been updated mid-epic. Surface the discrepancy to the user with both texts side by side and ask which represents current intent. The user's answer then drives two downstream behaviors:
+   1. **Forward-looking fast-path.** Before opening source docs, scan each anchor's paraphrase for forward-looking phrasing: "needs updating when this epic ships", "will be …", "after this epic", or similar. Anchors that explicitly describe future state cannot conflict with current source docs by definition — record them as "no conflict, source updates pending at close-out" in the Step 1.6 Anchor Reconciliation section and move on. Apply the full source-vs-paraphrase comparison only to anchors that make a substantive claim about *current* product behavior or scenario flow.
+   2. For each remaining **vision anchor** bullet, open `docs/product-vision-planning/product-vision.md` and read the specific section cited. Compare paraphrase to source.
+   3. For each remaining **scenario anchor** bullet, open `docs/product-vision-planning/concept-of-operations.md` and read the specific scenario step cited. Compare paraphrase to source.
+   4. If any paraphrase conflicts with its source — meaning a reasonable reader would draw different acceptance conclusions from the two texts — **stop**. Neither source is automatically authoritative: the paraphrase may be the post-discovery refinement the implementer worked against, or the vision doc may have been updated mid-epic. Surface the discrepancy to the user with both texts side by side and ask which represents current intent. The user's answer then drives two downstream behaviors:
        - **Verification baseline** — Steps 1.2 and 1.3 (Verify Acceptance Criteria, Verify Verification) judge the implementation against the **confirmed intent**, not against whichever text is literally in the spec. If the implementation was built against the paraphrase but the user confirms the source doc reflects current intent (or vice versa), any resulting divergence is a verification **FAIL** and must be listed in the Step 1.6 report — do not silently accept it on the grounds that the implementation "matched the spec."
        - **Anchor Reconciliation note** — Record the discrepancy, the user's answer, and which text was used as the verification baseline in the new "Anchor Reconciliation" section of the Step 1.6 Verification Report so the reviewer (and future readers of the handoff) can see what the epic was ultimately verified against.
-   4. If the spec has a placeholder line noting vision docs do not yet exist, note this and continue — the absence of vision docs is a known greenfield condition, not a conflict.
-   5. If the spec pre-dates v2.1.0 and has no Anchors section at all, note this in the verification report and continue — legacy specs are grandfathered.
-6. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists)
-7. Read `docs/architecture.md` for system context
+   5. If the spec has a placeholder line noting vision docs do not yet exist, note this and continue — the absence of vision docs is a known greenfield condition, not a conflict.
+   6. If the spec pre-dates v2.1.0 and has no Anchors section at all, note this in the verification report and continue — legacy specs are grandfathered.
+6. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists).
+7. **Conditional architecture / design-notes reads.** The Step 1.5 code review checks consistency with `docs/architecture.md` and `docs/design-notes.md` — load only what is relevant to this epic:
+   - If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section.
+   - If the epic raises a decision the design notes might already have addressed, read `docs/design-notes.md`.
+   - If the epic is a localized UI / copy change with no cross-cutting impact, skip both — there is no consistency surface to check, and Step 1.5 simply records "no architectural surface affected".
 8. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it.
-9. Check out the feature branch for this epic: `git checkout feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric).
-   - If the branch does not exist, try the legacy name `feat/epic-N` (for sessions started before v1.3.0 — applies to integer IDs only)
-   - If neither branch exists, inform the user and proceed on the current branch
-     (the work may have been done directly on main in an older session)
+9. Check out the feature branch for this epic. Detect existence with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
+   ```bash
+   git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
+   ```
+   Exit 0 = branch exists; nonzero = missing. Then:
+   - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
+   - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
+   - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
 
 ### Step 1.2: Verify Acceptance Criteria
 
@@ -82,7 +90,7 @@ Review the implementation for:
 - Security concerns (input validation, injection, secrets handling)
 - Error handling completeness
 - Logging adequacy
-- Consistency with `docs/architecture.md` and `docs/design-notes.md`
+- Consistency with whichever of `docs/architecture.md` and `docs/design-notes.md` were loaded conditionally in Step 1.1 item 7. If neither was loaded (the epic had no cross-cutting surface), record "no architectural surface affected" and move on.
 
 ### Step 1.6: Present Verification Report
 
@@ -150,50 +158,9 @@ This is a disclosure, not a gate — `No` is a perfectly acceptable answer. The 
 
 ### Step 2.1: Write the Handoff File
 
-Create (or update) the handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim — legacy integer or 7-char alphanumeric) with this structure:
+Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim — legacy integer or 7-char alphanumeric).
 
-```markdown
-# Epic <id>: [Name] — Complete
-
-**Completed:** [today's date]
-**Verified by:** Independent review via `/epic-workflow:wrapup <id>`
-
-## What Was Built
-
-[2-3 sentence summary of what this epic delivered]
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `path/to/file.cs` | Brief description |
-
-## Key Decisions
-
-- [Design choices made during implementation that future epics should know about]
-
-## Verification Summary
-
-### Counts
-- Acceptance Criteria: X/Y PASS
-- Verification Items: X/Y PASS, Z CANNOT VERIFY (requires live environment)
-- Quality Gates: X/Y PASS
-- Tests: X passed, Y skipped, Z failed
-
-### Highlights
-- ✅ <highlight 1>
-- ⚠️ <highlight 2>
-
-### Conclusion
-<2–3 sentences>
-
-### Manual verification performed: <Yes | No>
-<if Yes: user-provided description from Step 2.0>
-
-## Known Issues / Follow-ups
-
-- [Any non-blocking issues, tech debt, or items deferred to later epics]
-```
+Use the template at `plugins/epic-workflow/skills/wrapup/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.6 verification report and the Step 2.0 manual-verification disclosure.
 
 ### Step 2.2: Update the Implementation Plan Index
 
@@ -217,7 +184,7 @@ Do NOT push to the remote yet.
 
 ## Phase 3: Orient
 
-Your goal is to help the user decide what to work on next. Read the implementation plan index and dependency graph, then present:
+Your goal is to help the user decide what to work on next. Read `docs/implementation-plan/index.md` in full now (Step 1.1 item 2 only loaded this epic's row) so you have the dependency graph for every remaining epic, then present:
 
 ### Step 3.1: What's Now Unblocked
 
@@ -306,43 +273,9 @@ be made by the user every invocation.
 3. `git push -u origin <branch>`
 4. `gh pr create --base <base-branch> --title "epic(<id>): <epic name>" --body "<body>"`
 
-   Body template (populate from `epic-<id>-complete.md`):
+   The body follows the template at `plugins/epic-workflow/skills/wrapup/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.6 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
 
-   ```
-   ## Summary
-   <lift "What Was Built" from the completion handoff>
-
-   <if the spec has a Source: line (source issue number captured in Step 1.1 item 4):>
-   Closes #<N>
-
-   ## Spec
-   - Epic <id>: [Name] — `docs/implementation-plan/phase-*/epic-<id>-*.md`
-   - Handoff — `docs/implementation-plan/session-handoffs/epic-<id>-complete.md`
-
-   ## Verification
-
-   **Counts**
-   - Acceptance Criteria: X/Y PASS
-   - Verification Items: X/Y PASS, Z CANNOT VERIFY
-   - Quality Gates: X/Y PASS
-
-   **Highlights**
-   - ✅ <check> was run and it passed.
-   - ✅ <check> was run and it passed.
-   - ⚠️ <check> passed with <exception>.
-
-   **Conclusion:** <2–3 sentences>
-
-   **Manual verification performed:** <Yes | No>
-   <if Yes: user-provided description from Step 2.0 on the next line>
-
-   ## Review Notes
-   <anything from Phase 1 Code Review worth flagging>
-
-   🤖 Generated via /epic-workflow:wrapup
-   ```
-
-   The `Closes #<N>` line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 — if the spec has no `Source:` line, omit the `Closes` line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way). Use literal Unicode ✅ ⚠️ ❌ in the Highlights list — not shortcodes.
+   The `Closes #<N>` line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 — if no source issue is known, omit the `Closes` line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way).
 
 5. **Announce PR on the GitHub issue** (conditional) — run only if a source issue number was captured in Step 1.1 item 4 **and** `gh auth status` succeeds:
    ```bash
