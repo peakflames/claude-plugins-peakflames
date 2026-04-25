@@ -6,6 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.4.0] — 2026-04-25
+
+### Changed
+
+- **`setup` + `refresh-docs`: removed `Document Version` / `Date` / `Status` header block from `architecture.md` and `design-notes.md`.** These three fields were the primary cause of merge conflicts when multiple feature branches tried to merge back to `develop` — every `refresh-docs` run bumped them, creating a conflict on every merge. Git history already tracks when a file changed and by whom, making the fields redundant. Removed from both the stubs that `setup` writes and from the rewrite instructions in `refresh-docs`. Existing projects can delete the header block from their docs manually and will see no further conflicts from that source.
+
+---
+
 ## [2.3.0] — 2026-04-25
 
 ### Changed
