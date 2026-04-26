@@ -11,50 +11,64 @@ You are generating a read-only project status dashboard from the implementation 
 
 **This command is strictly read-only — do NOT modify any files.**
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 Follow these steps exactly:
 
-## Step 1: Load Implementation Plan
+## Step 1: Load Phase Indexes
 
-Read `docs/implementation-plan/index.md`. If it does not exist, inform the user:
+Glob `docs/implementation-plan/phase-*/index.md`. If no phase index files exist, inform the user:
 
-> No implementation plan found at `docs/implementation-plan/index.md`.
-> Run `/epic-workflow:discover` and `/epic-workflow:plan-project` first to create the plan.
+> No implementation plan found. Run `/epic-workflow:discover` and `/epic-workflow:plan-project` first to create the plan.
 
-Stop here if the file is missing.
+Stop here if no phase indexes are found.
 
-## Step 2: Parse Status Table
+Read every phase index file. For each, capture:
+- Phase number and name (from the `# Phase N: Name` heading)
+- Each epic row: **Epic ID** (verbatim — may be a legacy integer like `7` or `6.5`, or a 7-character alphanumeric ID like `a3f2K7p`), epic name, and the dependency IDs listed in the Dependencies column
 
-Extract all rows from the status table in `index.md`. For each epic, capture:
-- Phase number and name
-- **Epic ID** (verbatim — may be a legacy integer like `7` or `6.5`, or a 7-character alphanumeric ID like `a3f2K7p`) and epic name
-- Status (Not Started, In Progress, Paused, Implemented, Complete)
-- Handoff file link (if any)
-- Implemented date (if any)
-- Completed date (if any)
+## Step 2: Load Status Sidecars
 
-## Step 3: Parse Dependency Graph
+Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For each, capture:
+- Epic ID (from the filename: `epic-<id>.md` → `<id>`)
+- `status:` value (Not Started, In Progress, Paused, Implemented, Complete)
+- `implemented:` date (if set)
+- `completed:` date (if set)
+- `handoff:` link (if set)
 
-Read the dependency graph section from `index.md`. Build an internal map of which epics depend on which other epics.
+## Step 3: Build Dependency Graph
+
+Using the Dependencies column values from all phase indexes (Step 1), build an internal map of which epics depend on which other epics.
 
 ## Step 4: Compute Summary Statistics
 
-Calculate:
+Using the epic IDs, statuses, and dates loaded from the sidecars (Step 2), calculate:
 - **Total epics** and count by status (Not Started, In Progress, Paused, Implemented, Complete)
-- **Phase progress** — for each phase, show X/Y epics complete (count both "Implemented" and "Complete" as done)
+- **Phase progress** — for each phase (from Step 1), show X/Y epics complete (count both "Implemented" and "Complete" as done)
 - **Overall progress** — percentage of epics that are "Implemented" or "Complete"
 
 ## Step 5: Flag Stale Paused Epics
 
-For each epic with status "Paused":
-1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID as it appears in `index.md` — legacy integer or 7-char alphanumeric)
+For each epic whose sidecar (Step 2) has `status: Paused`:
+1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID — legacy integer or 7-char alphanumeric)
 2. Check the **Paused** date
 3. If the pause date is more than 7 days ago, flag it as stale
 
 ## Step 6: Identify Ready-to-Start Epics
 
-Using the dependency graph from Step 3, find epics that are "Not Started" but whose dependencies are ALL satisfied (status "Implemented" or "Complete"). These are unblocked and ready to begin.
+Using the dependency graph from Step 3 and statuses from Step 2, find epics that are "Not Started" but whose dependencies are ALL satisfied (status "Implemented" or "Complete"). These are unblocked and ready to begin.
 
 ## Step 7: Present Dashboard
+
+Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2), render:
 
 ```
 # Project Status Dashboard
@@ -95,7 +109,7 @@ Using the dependency graph from Step 3, find epics that are "Not Started" but wh
 
 ## Recently Completed
 
-[List the last 3 epics that reached "Implemented" or "Complete" status, with dates]
+[List the last 3 epics that reached "Implemented" or "Complete" status, with dates from their sidecars]
 
 ## Suggested Next Action
 

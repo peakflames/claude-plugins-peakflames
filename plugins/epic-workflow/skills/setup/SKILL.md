@@ -55,7 +55,7 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 - Should verification always use live data instead of mocking API responses?
 
 **Epic Workflow** (if missing):
-- Where does the implementation plan live? (default: `docs/implementation-plan/index.md`)
+- Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/epic-workflow:status` for the dashboard, or check `docs/implementation-plan/phase-*/index.md` for phase contents)
 - Confirm the epic commands should be listed: `/epic-workflow:triage <issue|description>`, `/epic-workflow:start <id>`, `/epic-workflow:wrapup <id>`, `/epic-workflow:pause`, `/epic-workflow:quick-fix <issue|description>`, `/epic-workflow:refresh-docs`, `/epic-workflow:setup`
 
 **Verification & Quality Gates** (if missing):
@@ -304,3 +304,7 @@ Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work
 - `docs/architecture.md` and `docs/design-notes.md` are read by every `/epic-workflow:start` and `/epic-workflow:wrapup` for context
 - After implementing epics, run `/epic-workflow:refresh-docs` to bring the docs in sync with the as-built codebase
+
+**Legacy layout check:** After completing the above, check whether `docs/implementation-plan/index.md` exists and contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column. If found, add a one-line reminder at the end of your summary:
+
+> Your implementation plan uses the pre-v2.5.0 layout. Run `/epic-workflow:migrate-2.5` to upgrade to per-phase indexes + status sidecars and eliminate implementation-plan merge conflicts.

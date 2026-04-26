@@ -23,7 +23,7 @@ Placeholder reference:
    - If the branch does not exist, detect the base branch (`develop` > `main` > `master`), switch to it, and run `git checkout -b feature/epic-<id>-<short-name>`.
 
    Use the exact branch name derived from the spec filename (`<id>` is `$ARGUMENTS` verbatim).
-2. **Update status to "In Progress"** — edit `docs/implementation-plan/index.md`: change Epic $ARGUMENTS status from "Not Started" (or "Paused") to "In Progress". Leave Implemented and Completed dates as `—`. Capture whether this is a **fresh transition** (prior status was "Not Started" or "Paused") or a **resumption** (prior status was already "In Progress"). Item 3 uses this.
+2. **Update status to "In Progress"** — edit `docs/implementation-plan/status/epic-$ARGUMENTS.md`: change `status: Not Started` (or `status: Paused`) to `status: In Progress`. Leave `implemented:` and `completed:` as `—`. Capture whether this is a **fresh transition** (prior status was `Not Started` or `Paused`) or a **resumption** (prior status was already `In Progress`). Item 3 uses this.
 3. **Announce work-started on GitHub** — if Step 1 item 8 captured no source issue, replace this plan item with the single line `GitHub announce: SKIP — no source issue`. Otherwise, run only if (a) this is a fresh transition (not a resumption — do not re-announce an already-in-progress epic) and (b) `gh auth status` succeeds. Then:
    ```bash
    gh issue comment <N> --body "Epic <id> work has started on branch \`feature/epic-<id>-<short-name>\`. I'll follow up here when the PR opens."
@@ -47,7 +47,7 @@ Authored per-epic. Derive these from the epic's acceptance criteria and key comp
   - **If there are deviations to record**, also edit the spec in-place to reflect actual delivery, checking off completed items and annotating any items that should remain unchecked or carry as-implemented divergence notes.
   - **If the implementation tracks the spec's acceptance criteria 1:1 with no deviations**, skip the in-place spec checkbox edits — the index status change to "Implemented" is the source of truth for completion. Note "no deviations" in the handoff file.
   - Plan approval already authorizes both the handoff write and any spec edits — proceed without re-prompting.
-- **Mark as Implemented** — edit `docs/implementation-plan/index.md`: change Epic $ARGUMENTS status from "In Progress" to "Implemented". Set the Implemented date to today (YYYY-MM-DD). Leave the Completed date as `—`.
+- **Mark as Implemented** — edit `docs/implementation-plan/status/epic-$ARGUMENTS.md`: change `status: In Progress` to `status: Implemented`. Set `implemented: <today>` (YYYY-MM-DD). Leave `completed:` as `—`.
 - **Commit** — run `git branch --show-current` and confirm you are on `feature/epic-<id>-<short-name>`; if not, switch before staging anything. Stage all files created or modified during this epic by specific path (not `git add -A`), including the handoff file. Commit without asking for permission. Message format: `feat(epic-<id>): <short summary>` (where `<id>` is `$ARGUMENTS` verbatim) with a 1–2 sentence body summarizing key deliverables. When a **source issue number** was captured in Step 1 item 8, append a blank line then `Closes #<N>` as a trailer to the commit body so GitHub auto-closes the issue when the epic merges:
   ```
   feat(epic-<id>): <short summary>

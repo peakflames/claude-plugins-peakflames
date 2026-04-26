@@ -13,12 +13,22 @@ You are adding one or more new epics to the implementation plan based on the use
 
 The user's request: $ARGUMENTS
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 Follow these steps exactly:
 
 ## Step 1: Load Context
 
 1. Read `CLAUDE.md` at the repo root for project context
-2. Read the implementation plan index: `docs/implementation-plan/index.md`
+2. Read the phase indexes: glob `docs/implementation-plan/phase-*/index.md` and read each file to understand the existing epic structure, phase names, and existing epic IDs.
 3. Read `docs/architecture.md` for system context
 
 ## Step 2: Resolve the Request
@@ -59,7 +69,7 @@ Do not attempt to slot new epics into the old decimal scheme (e.g., `6.7`, `6.8`
 
 ## Step 3: Determine Dependencies
 
-From the user's description and the existing dependency graph in the index, determine:
+From the user's description and the existing phase indexes, determine:
 - Which existing epics this new epic depends on
 - Whether any existing epics should be noted as depending on this one (update the graph if so)
 
@@ -68,7 +78,7 @@ If dependencies are ambiguous, ask the user.
 ## Step 4: Read Existing Epics for Context
 
 1. Read 1-2 completed or well-defined epic specs from the same phase to match the level of detail, tone, and specificity. These are the quality bar — the new epic must be at least as detailed.
-2. Identify which phase directory the new epic belongs in based on the dependency and the existing phase structure in the index.
+2. Identify which phase directory the new epic belongs in based on the dependency and the existing phase structure in the phase indexes.
 
 ## Step 5: Explore Relevant Codebase
 
@@ -168,16 +178,22 @@ Before writing each spec, verify:
 - [ ] The Description explains *why*, not just *what*
 - [ ] Dependencies are accurate — the epic's prereqs are correct and nothing circular is introduced
 
-## Step 7: Update the Implementation Plan Index
+## Step 7: Update Phase Index and Create Status Sidecar
 
-Update `docs/implementation-plan/index.md`:
-
-1. **Status table** — add a row for each new epic at the **bottom of its phase block** (random IDs have no meaningful sort order — use insertion order within each phase). Use the format:
+1. **Phase index** — append a row for the new epic at the **bottom** of `docs/implementation-plan/{phase-dir}/index.md`. Use the format:
    ```
-   | {Phase} | {id} | [{Name}]({phase-dir}/epic-{id}-{name}.md) | Not Started | — |
+   | {id} | [{Name}](epic-{id}-{kebab-name}.md) | {dep-id-1}, {dep-id-2} |
    ```
+   Use `—` in the Dependencies column if the epic has no dependencies. Use the epic ID verbatim (7-char alphanumeric or legacy integer).
 
-2. **Dependency graph** — add the new epic(s) to the ASCII dependency tree in the correct position, showing what they depend on. Follow the existing indentation and formatting style exactly.
+2. **Status sidecar** — create `docs/implementation-plan/status/epic-{id}.md` with exactly these four lines:
+   ```
+   status: Not Started
+   implemented: —
+   completed: —
+   handoff: —
+   ```
+   Create the `docs/implementation-plan/status/` directory if it does not already exist.
 
 ## Step 8: Self-Check — Trace Inputs to Outputs
 
@@ -244,9 +260,9 @@ Show the user what was created:
 
 {Repeat for each epic if multiple were created}
 
-### Index Updated
-- {count} row(s) added to status table
-- Dependency graph updated
+### Plan Updated
+- 1 row appended to `docs/implementation-plan/{phase-dir}/index.md`
+- `docs/implementation-plan/status/epic-{id}.md` created (status: Not Started)
 
 ### Self-Check
 - {count} inputs traced to outputs, all Explicit=Y and Ambiguous=N (see Step 8 trace table above)

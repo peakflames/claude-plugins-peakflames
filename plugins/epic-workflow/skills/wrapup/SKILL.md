@@ -16,6 +16,14 @@ You are acting as an independent reviewer — you did NOT implement this epic. Y
 
 This command has three phases: **Verify**, **Complete**, and **Orient**. Do not skip ahead — each phase gates the next.
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
 ---
 
 ## Phase 1: Verify
@@ -27,8 +35,8 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 ### Step 1.1: Load Context
 
 1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
-2. From `docs/implementation-plan/index.md`, locate the row for Epic $ARGUMENTS to confirm its current status. Use `grep -n "epic-$ARGUMENTS"` to find the row's line number, then `Read` with a tight `offset` / `limit` window covering it. Phase 3 (Orient) reads the broader index when it walks the dependency graph — Step 1.1 only needs this epic's row.
-3. Verify Epic $ARGUMENTS is in **"Implemented"** status. If it is still "In Progress" or "Not Started", inform the user that `/epic-workflow:start` must finish first. If it is already "Complete", inform the user it has already been wrapped up.
+2. Read `docs/implementation-plan/status/epic-$ARGUMENTS.md` to get the epic's current status. Phase 3 (Orient) loads all phase indexes and sidecars when it walks the dependency graph — Step 1.1 only needs this epic's sidecar.
+3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress` or `status: Not Started`, inform the user that `/epic-workflow:start` must finish first. If `status: Complete`, inform the user it has already been wrapped up.
 4. Read the epic spec file for Epic $ARGUMENTS. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip the `Closes` line later.
 5. **Verify the Vision & Scenario Anchors.** The epic spec should contain a `## Vision & Scenario Anchors` section. An independent reviewer reads these first so the rest of the verification is judged against the right notion of user intent:
    1. **Forward-looking fast-path.** Before opening source docs, scan each anchor's paraphrase for forward-looking phrasing: "needs updating when this epic ships", "will be …", "after this epic", or similar. Anchors that explicitly describe future state cannot conflict with current source docs by definition — record them as "no conflict, source updates pending at close-out" in the Step 1.6 Anchor Reconciliation section and move on. Apply the full source-vs-paraphrase comparison only to anchors that make a substantive claim about *current* product behavior or scenario flow.
@@ -162,20 +170,19 @@ Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-
 
 Use the template at `plugins/epic-workflow/skills/wrapup/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.6 verification report and the Step 2.0 manual-verification disclosure.
 
-### Step 2.2: Update the Implementation Plan Index
+### Step 2.2: Update Status Sidecar
 
-Update `docs/implementation-plan/index.md`:
-1. Change Epic $ARGUMENTS status from "Implemented" to **"Complete"**
-2. Add the handoff link: `[handoff](session-handoffs/epic-<id>-complete.md)` (where `<id>` is `$ARGUMENTS` verbatim)
-3. Set the **Completed** date column to today's date (YYYY-MM-DD)
+Update `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
+1. Change `status: Implemented` to `status: Complete`
+2. Set `completed: <today>` (YYYY-MM-DD)
+3. Set `handoff: session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim)
 
 ### Step 2.3: Commit
 
 Automatically commit all changes made during verification and completion without
 asking the user for permission:
 
-1. Stage the handoff file, updated `index.md`, and any other files modified during
-   verification (specific file paths, not `git add -A`)
+1. Stage the handoff file, updated `docs/implementation-plan/status/epic-$ARGUMENTS.md`, and any other files modified during verification (specific file paths, not `git add -A`)
 2. Commit message format: `chore(epic-<id>): verify and complete — <brief summary>` (where `<id>` is `$ARGUMENTS` verbatim)
 
 Do NOT push to the remote yet.
@@ -184,7 +191,7 @@ Do NOT push to the remote yet.
 
 ## Phase 3: Orient
 
-Your goal is to help the user decide what to work on next. Read `docs/implementation-plan/index.md` in full now (Step 1.1 item 2 only loaded this epic's row) so you have the dependency graph for every remaining epic, then present:
+Your goal is to help the user decide what to work on next. Glob `docs/implementation-plan/phase-*/index.md` and read all phase indexes; glob `docs/implementation-plan/status/epic-*.md` and read all sidecars. (Step 1.1 item 2 only loaded this epic's sidecar.) Assemble the full dependency graph from the phase indexes and look up all epic statuses from the sidecars. Then present:
 
 ### Step 3.1: What's Now Unblocked
 

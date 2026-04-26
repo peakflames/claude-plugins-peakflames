@@ -12,6 +12,16 @@ You are deriving a full implementation plan — phases, epics, and epic specs �
 
 The user's request: $ARGUMENTS
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 Follow these steps exactly:
 
 ## Step 1: Load Context
@@ -22,11 +32,11 @@ Follow these steps exactly:
 
 ## Step 2: Detect Greenfield vs Brownfield
 
-1. Read `docs/implementation-plan/index.md` — check whether it exists and contains at least one epic.
+1. Check whether any `docs/implementation-plan/phase-*/index.md` files exist and contain epic rows (data rows beyond the header that follow the `| Epic | Name | Dependencies |` schema).
 
-**Greenfield** = index.md does not exist or has no epics. Proceed to Step 3A.
+**Greenfield** = no phase index files exist, or all phase index files are empty or contain only the header row. Proceed to Step 3A.
 
-**Brownfield** = index.md exists with at least one epic. Proceed to Step 3B.
+**Brownfield** = at least one phase index file exists with one or more epic rows. Proceed to Step 3B.
 
 Report the detection result:
 ```
@@ -276,22 +286,47 @@ If a given epic cannot be anchored to any vision section or scenario step, that 
 - [ ] The Description explains *why*, not just *what*
 - [ ] Dependencies are accurate — no circular references
 
-### 5.3: Write the Index
+### 5.3: Write the Phase Indexes, Sidecars, and Stubs
 
-**Greenfield:** Create `docs/implementation-plan/index.md` with:
+**Greenfield:**
+
+a. **Phase indexes** — for each phase, write `docs/implementation-plan/phase-{N}-{name}/index.md`:
+
+```markdown
+# Phase {N}: {Phase Name}
+
+| Epic | Name | Dependencies |
+|------|------|--------------|
+| {id} | [{Epic Name}](epic-{id}-{slug}.md) | {dep1}, {dep2} |
+```
+
+   - Dependencies column: comma-separated epic IDs of direct dependencies. Use `—` when there are none.
+   - One row per epic in this phase, in the order they appear in the Step 4 breakdown.
+   - Epic IDs are verbatim (7-char alphanumeric for new epics).
+
+b. **Status sidecars** — create `docs/implementation-plan/status/` and write `epic-{id}.md` for every epic:
+
+```
+status: Not Started
+implemented: —
+completed: —
+handoff: —
+```
+
+c. **README.md** — create `docs/implementation-plan/README.md` with the project lifecycle prose:
 
 ```markdown
 # [Project Name] — Implementation Plan
 
 ## Quick Start for New Session
 
-1. Check the status table below for the current epic
-2. Run `/epic-workflow:start <id>` (where `<id>` is the epic's ID from the Epic column — a 7-character alphanumeric ID for new epics, or a legacy integer for pre-v2.0.0 epics)
+1. Run `/epic-workflow:status` for the live cross-phase dashboard
+2. Run `/epic-workflow:start <id>` to begin an epic (use the ID from the phase index — a 7-character alphanumeric for new epics, or a legacy integer for pre-v2.0.0 epics)
 3. Claude Code will read the spec, load context, enter plan mode, and create tasks
 4. When implementation is done, open a new session: `/epic-workflow:wrapup <id>`
 5. If stopping early: `/epic-workflow:pause`
 
-### Epic Lifecycle
+## Epic Lifecycle
 
 ```
 Not Started → In Progress → Implemented → Complete
@@ -299,24 +334,24 @@ Not Started → In Progress → Implemented → Complete
      /epic-workflow:start  /epic-workflow:start  /epic-workflow:wrapup
            (begins)           (finishes)      (independent review)
 ```
-
-## Status
-
-| Phase | Epic | Name | Status | Handoff | Implemented | Completed |
-|-------|------|------|--------|---------|-------------|-----------|
-[One row per epic, all "Not Started", dates as "—"]
-
-## Dependency Graph
-
-[ASCII tree — same format as presented in Step 4]
 ```
 
-**Brownfield:** Update the existing `docs/implementation-plan/index.md`:
-- Add new epic rows to the status table, inserting them at the **bottom of their phase block** (random IDs have no meaningful sort order — use insertion order within each phase)
-- Update the dependency graph to include new epics
-- Preserve all existing epic rows and their statuses — legacy integer IDs stay exactly as they are
+d. **Stub index** — create `docs/implementation-plan/index.md` as a thin pointer:
 
-The "Epic" column in the status table holds the ID string verbatim (e.g., `a3f2K7p` for new epics, `7` or `6.5` for preserved legacy rows).
+```markdown
+# Implementation Plan
+
+This project uses the v2.5.0 layout. See:
+
+- `README.md` — project overview and lifecycle
+- `phase-*/index.md` — per-phase epic registries (epic ID, name, dependencies)
+- `status/epic-<id>.md` — per-epic status sidecars
+- Run `/epic-workflow:status` for the live cross-phase dashboard
+```
+
+Skills do not read or write this stub after initial creation — it is a human-readable pointer only.
+
+**Brownfield:** For each new epic, append a row to the relevant `docs/implementation-plan/phase-{N}-{name}/index.md` at the **bottom** of the file (use insertion order — random IDs have no meaningful sort order). Create `docs/implementation-plan/status/epic-{id}.md` for each new epic. Preserve all existing phase index rows and their sidecar files — legacy integer IDs stay exactly as they are.
 
 ### 5.4: Brownfield Changelog Archival
 
@@ -401,7 +436,10 @@ Do NOT perform a full CLAUDE.md audit — that is `/epic-workflow:setup`'s job. 
 ## Implementation Plan Complete
 
 ### What Was Written
-- `docs/implementation-plan/index.md` — [Created / Updated]
+- [N] phase index files across [M] phases — [Created / Updated]
+- [K] status sidecars written to `docs/implementation-plan/status/`
+[Greenfield only:] - `docs/implementation-plan/README.md` — Created
+[Greenfield only:] - `docs/implementation-plan/index.md` — Stub created
 - [N] epic spec files across [M] phases
 - CLAUDE.md — [Updated with document references / Already up to date]
 [Brownfield only, if a changelog was consumed:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` marked processed (`.processed` suffix appended)

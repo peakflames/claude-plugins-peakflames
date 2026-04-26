@@ -16,6 +16,16 @@ You are triaging a request to decide which workflow path it belongs on. This is 
 
 The user's request: $ARGUMENTS
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 Follow these steps exactly:
 
 ## Step 1: Load Context
@@ -25,7 +35,7 @@ Read the following to build a picture of the project's current direction:
 1. `CLAUDE.md` at the repo root — for project context and tech stack
 2. `docs/product-vision-planning/product-vision.md` — the vision statement and in-scope/out-of-scope boundaries
 3. `docs/product-vision-planning/concept-of-operations.md` — operational scenarios the product supports
-4. `docs/implementation-plan/index.md` — to see what's already been planned or built
+4. The phase indexes under `docs/implementation-plan/phase-*/index.md` — read them to see what phases and epics exist in the plan. Supplement with spot-checks of `docs/implementation-plan/status/epic-*.md` sidecars if you need status counts.
 
 If any of these are missing or placeholders, note it and continue — the triage rubric below can still be applied on whatever context you have.
 
