@@ -25,10 +25,20 @@ You are refreshing the project's architecture and design documentation to reflec
 
 ---
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 ## Step 1: Load Epic Workflow Context
 
 1. Read `CLAUDE.md` — extract the Tech Stack table, Key Architecture Decisions, Important Reminders, and note any custom paths to architecture or design docs (if different from `docs/architecture.md` / `docs/design-notes.md`)
-2. Read `docs/implementation-plan/index.md` — identify which epics are "Complete" or "Implemented"
+2. Glob `docs/implementation-plan/status/epic-*.md` and grep for `status: Complete` or `status: Implemented` to identify which epics have finished. These are the epics whose handoffs are relevant to the documentation refresh.
 
 ---
 

@@ -11,13 +11,23 @@ description: |
 
 You are pausing the current epic implementation session. This preserves context so the next session can resume exactly where you left off.
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 Follow these steps exactly:
 
 ## Step 1: Identify Current Epic
 
-Read `docs/implementation-plan/index.md` and find the epic currently marked as "In Progress". This is the epic you are pausing.
+Glob `docs/implementation-plan/status/epic-*.md` and read each sidecar to find the one with `status: In Progress`. This is the epic you are pausing. The epic ID is the filename stem after stripping `epic-` and `.md` (e.g., `status/epic-a3f2K7p.md` → ID `a3f2K7p`).
 
-Open the epic spec file and parse its header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 5 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
+Open the epic spec file (`docs/implementation-plan/phase-*/epic-<id>-*.md`) and parse its header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 5 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
 
 ### Disambiguation Check
 
@@ -34,7 +44,7 @@ List all tasks from this session with their current status (completed, in_progre
 
 ## Step 3: Write Handoff File
 
-Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID as it appears in `index.md` — either a legacy integer like `7` or `6.5`, or a 7-char alphanumeric ID like `a3f2K7p`) with this structure:
+Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID — either a legacy integer like `7` or `6.5`, or a 7-char alphanumeric ID like `a3f2K7p`) with this structure:
 
 ```markdown
 # Epic <id>: [Name] — Session Handoff (Paused)
@@ -74,11 +84,11 @@ When resuming this epic, start by:
 [Any unresolved issues that may need attention before resuming]
 ```
 
-## Step 4: Update Index
+## Step 4: Update Status Sidecar
 
-Update `docs/implementation-plan/index.md`:
-1. Change the epic's status to **"Paused"**
-2. Add a link to the handoff file in the Handoff column: `[paused](session-handoffs/epic-<id>-paused.md)` (use the epic's actual ID — legacy integer or 7-char alphanumeric)
+Update `docs/implementation-plan/status/epic-<id>.md` (use the epic's actual ID — legacy integer or 7-char alphanumeric):
+1. Change `status: In Progress` to `status: Paused`
+2. Change `handoff: —` to `handoff: session-handoffs/epic-<id>-paused.md`
 
 ## Step 5: Commit
 

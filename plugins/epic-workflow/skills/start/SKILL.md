@@ -11,12 +11,22 @@ argument-hint: "<epic-id>"
 
 You are starting an implementation session for Epic $ARGUMENTS. The epic ID may be a legacy integer (e.g., `7`, `6.5`) or a 7-character alphanumeric ID (e.g., `a3f2K7p`) — both formats are accepted throughout this skill. Use `$ARGUMENTS` verbatim wherever `<id>` appears below.
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 Follow these steps exactly:
 
 ## Step 1: Load Context
 
 1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
-2. From `docs/implementation-plan/index.md`, locate the row for Epic $ARGUMENTS and the rows for any dependencies. The prose at the top (phase summaries, dependency graphs) is not load-bearing for `start`. Use `grep -n "epic-$ARGUMENTS"` to find the row's line number, then `Read` with a tight `offset` / `limit` window covering it and the dependency rows.
+2. Locate the epic's phase index: run `grep -rl "epic-$ARGUMENTS" docs/implementation-plan/phase-*/index.md` to find which phase index contains this epic. Read that phase index to get the epic's row (name, dependencies). For each dependency ID listed, read `docs/implementation-plan/status/epic-<dep-id>.md` to capture the dependency's status.
 3. Identify which phase and file corresponds to Epic $ARGUMENTS
 4. Read the epic spec file (e.g., `docs/implementation-plan/phase-N-*/epic-$ARGUMENTS-*.md`)
 5. **Pre-flight scan for new artifacts.** After reading the spec, grep its body for the literal strings `NEW component` and `NEW spec`. Surface any matches in your plan as explicit "create file X" steps so the plan names every new file upfront, rather than discovering them mid-implementation.
@@ -40,7 +50,7 @@ Follow these steps exactly:
 
 ### Recovery Check
 
-If Epic $ARGUMENTS is already marked **"In Progress"** in `index.md` but there is no pause handoff file (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/epic-workflow:pause`. Inform the user:
+If `docs/implementation-plan/status/epic-$ARGUMENTS.md` has `status: In Progress` but there is no pause handoff file (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/epic-workflow:pause`. Inform the user:
 
 > Epic $ARGUMENTS is marked "In Progress" but has no pause handoff — a previous session may have been interrupted. I'll scan the codebase for any partial implementation and pick up from the current state.
 
@@ -48,7 +58,7 @@ Proceed with the implementation, using git history and the current codebase to d
 
 ## Step 2: Verify Prerequisites
 
-Check the epic's Dependencies section. Verify that prerequisite epics are marked as "Implemented" or "Complete" in `index.md` (both mean the code exists). If dependencies are not met, inform the user and suggest which epic to start instead.
+Check the epic's Dependencies section (from the phase index row loaded in Step 1). For each prerequisite epic, verify that `docs/implementation-plan/status/epic-<dep-id>.md` has `status: Implemented` or `status: Complete` (both mean the code exists). If any dependency is not met, inform the user and suggest which epic to start instead.
 
 ## Step 3: Create Feature Branch
 

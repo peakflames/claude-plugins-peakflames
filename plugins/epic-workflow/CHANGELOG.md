@@ -6,6 +6,52 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.5.0] — 2026-04-25
+
+**BREAKING — requires `/epic-workflow:migrate-2.5` on existing projects.**
+
+### Added
+
+- **New skill: `migrate-2.5`** — one-shot migration from the legacy single `index.md` layout to the v2.5.0 per-phase indexes + status sidecars layout. Parses the legacy status table, writes one `phase-*/index.md` per phase, writes one `status/epic-<id>.md` sidecar per epic, extracts prose to `README.md`, and replaces `index.md` with a thin stub. Single commit for atomic rollback via `git revert`. Idempotent — safe to re-run.
+
+### Changed
+
+- **BREAKING — Implementation plan layout.** The single `docs/implementation-plan/index.md` that all skills read and wrote is the primary source of merge conflicts on multi-branch projects. v2.5.0 eliminates this by splitting it into:
+  - `docs/implementation-plan/phase-N-*/index.md` — one append-only file per phase, containing only `| Epic | Name | Dependencies |`. Never written during status transitions.
+  - `docs/implementation-plan/status/epic-<id>.md` — one per-epic sidecar with four key:value lines (`status`, `implemented`, `completed`, `handoff`). Each branch owns only its own sidecar, so status transitions never produce merge conflicts.
+  - `docs/implementation-plan/README.md` — human prose (lifecycle diagram, Quick Start). Skills never write to it.
+  - `docs/implementation-plan/index.md` — replaced with a thin stub pointing at the above. Skills do not read or write it after migration.
+  
+  The hand-maintained dependency graph is discarded; `/epic-workflow:status` regenerates it on demand from phase indexes.
+
+- **Layout guard added to every skill (except `migrate-2.5`).** Each skill now checks for the legacy status table header at startup and stops with a "run `/epic-workflow:migrate-2.5` first" message if found. Skills do not dual-read old and new layouts.
+
+- **`add`**: Step 7 rewritten — appends row to `phase-N-*/index.md`, creates `status/epic-<id>.md` with `status: Not Started`. No dependency graph maintenance.
+- **`discover`**: Step 1.3 rewritten — globs `status/epic-*.md` sidecars to detect brownfield state instead of reading `index.md`. Step 2B reads phase indexes for "what has been built" context.
+- **`pause`**: Step 1 rewritten — globs sidecars to find the In Progress epic. Step 4 rewritten — writes `status: Paused` + `handoff:` link to the sidecar instead of editing `index.md`.
+- **`plan-project`**: Step 2 detection rewritten — checks for phase index files instead of `index.md`. Step 5.3 rewritten — greenfield creates phase indexes + sidecars + `README.md` + stub `index.md`; brownfield appends to existing phase indexes + creates new sidecars.
+- **`quick-fix`**: Layout guard only (already didn't touch `index.md`).
+- **`refresh-docs`**: Step 1.2 rewritten — globs `status/epic-*.md` and greps for Complete/Implemented status instead of reading `index.md`.
+- **`setup`**: Layout guard added at Step 7 — detects legacy layout and prints a one-line "run migrate-2.5" hint when found.
+- **`start`**: Step 1.2 rewritten — finds the epic's phase index via grep, reads dependency IDs from the phase index, reads dependency sidecars for status verification. Step 2 verifies deps against sidecars. Recovery check reads the sidecar instead of `index.md`.
+- **`start/PLAN_TEMPLATE.md`**: Opening item 2 ("Update status to In Progress") and closing "Mark as Implemented" step rewritten to edit the `status/epic-<id>.md` sidecar instead of `index.md`.
+- **`status`**: Steps 1–3 rewritten — globs all phase indexes and all sidecars, assembles the dependency graph and status counts on the fly. No longer reads `index.md` at all.
+- **`triage`**: Step 1.4 rewritten — reads phase indexes instead of `index.md` for project context.
+- **`wrapup`**: Step 1.1.2 rewritten — reads epic's sidecar for status gate instead of `index.md`. Step 2.2 rewritten — writes `status: Complete`, `completed:`, and `handoff:` to the sidecar. Phase 3 rewritten — globs all phase indexes + sidecars to assemble dependency graph.
+
+### Migration
+
+Run `/epic-workflow:migrate-2.5` once per project after updating to v2.5.0. The migration:
+- Reads the legacy `index.md` status table
+- Writes one `phase-*/index.md` per phase + one `status/epic-*.md` per epic
+- Extracts the preamble prose to `docs/implementation-plan/README.md`
+- Replaces `index.md` with the thin stub
+- Commits everything atomically (`git revert <hash>` rolls back)
+
+To roll back: `git revert <migration-commit-hash>`, then downgrade to v2.4.0.
+
+---
+
 ## [2.4.0] — 2026-04-25
 
 ### Changed

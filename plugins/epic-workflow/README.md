@@ -48,11 +48,11 @@ flowchart TD
                               /status — read-only dashboard at any point
 ```
 
-The status table in `index.md` has two date columns:
+Each epic's status sidecar (`docs/implementation-plan/status/epic-<id>.md`) has two date fields:
 - **Implemented** — set by `/start` when implementation + self-verification is done
 - **Completed** — set by `/wrapup` when independent review passes
 
-An epic with an Implemented date but no Completed date is waiting for independent review.
+An epic with an `implemented:` date but no `completed:` date is waiting for independent review.
 
 ## Starting a Brand New Project (Greenfield)
 
@@ -87,7 +87,10 @@ Run `/plan-project`. Claude reads the vision and ConOps documents and derives th
 4. **Negotiation** — presents the full plan (phases, epics, dependency graph) for your approval before writing any files
 
 **Output:**
-- `docs/implementation-plan/index.md` (status table + dependency graph)
+- `docs/implementation-plan/phase-N-*/index.md` (one per phase — epic ID, name, dependencies)
+- `docs/implementation-plan/status/epic-<id>.md` (one per epic — status sidecar)
+- `docs/implementation-plan/README.md` (lifecycle prose and Quick Start)
+- `docs/implementation-plan/index.md` (thin stub — human-readable pointer)
 - Epic spec files in `docs/implementation-plan/phase-N-*/`
 
 ### Step 3: Setup — `/setup`
@@ -133,7 +136,8 @@ In brownfield mode, Claude:
 - Archives the changelog to `.discovery-changelog-{date}.md` to prevent re-processing
 
 **Output:**
-- Updated `docs/implementation-plan/index.md` (new rows added)
+- New rows appended to existing `docs/implementation-plan/phase-N-*/index.md` files
+- New `docs/implementation-plan/status/epic-<id>.md` sidecars for each new epic
 - New epic spec files in existing or new phase directories
 
 ### Step 3: Build — `/start <id>`
@@ -243,12 +247,16 @@ The epic workflow maintains architecture and design documentation through a clos
 | `CLAUDE.md` | Auto-loaded every session — project context, tech stack, reminders |
 | `docs/product-vision-planning/product-vision.md` | Product vision & brief — written by `/discover` |
 | `docs/product-vision-planning/concept-of-operations.md` | Concept of operations — written by `/discover` |
-| `docs/implementation-plan/index.md` | Status dashboard — check here first |
+| `docs/implementation-plan/README.md` | Human prose — lifecycle diagram, Quick Start. Skills never write to it. |
+| `docs/implementation-plan/index.md` | Thin stub pointing at phase indexes + sidecars. Skills do not read/write it. |
+| `docs/implementation-plan/phase-N-*/index.md` | Per-phase epic registry — epic ID, name, dependencies. Append-only; written by `/add` and `/plan-project`. |
+| `docs/implementation-plan/status/epic-<id>.md` | Per-epic status sidecar — `status`, `implemented`, `completed`, `handoff`. Each branch owns only its own sidecar. |
 | `docs/implementation-plan/phase-N-*/epic-<id>-*.md` | Epic specs (acceptance criteria + verification). `<id>` is a 7-char alphanumeric for new epics, or a legacy integer for pre-v2.0.0 epics. |
 | `docs/implementation-plan/session-handoffs/` | Handoff files written by `/start`, `/wrapup`, and `/pause` |
 | `docs/architecture.md` | System architecture — stubbed by `/setup`, refreshed by `/refresh-docs` |
 | `docs/design-notes.md` | Design decisions — stubbed by `/setup`, refreshed by `/refresh-docs` |
-| `.discovery-changelog.md` | Brownfield handoff from `/discover` to `/plan-project` (temporary, archived after use) |
+
+> **Migrating from v2.4.0?** Run `/epic-workflow:migrate-2.5` once per project. It converts the legacy `index.md` status table into per-phase indexes + status sidecars in a single atomic commit.
 
 ## Triage & Collaboration Modes
 

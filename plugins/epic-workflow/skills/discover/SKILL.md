@@ -13,13 +13,23 @@ You are conducting an adaptive discovery interview to produce (or refine) the pr
 
 The user's request: $ARGUMENTS
 
+## Layout Guard
+
+**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
+
+> This project uses the pre-v2.5.0 implementation-plan layout. Run `/epic-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
+
+Do not attempt the skill's normal flow on a legacy layout.
+
+---
+
 Follow these steps exactly:
 
 ## Step 1: Detect Greenfield vs Brownfield
 
 1. Read `docs/product-vision-planning/product-vision.md`. Check whether it exists and has substantive content (a `## 2. Problem Statement` section with at least one paragraph of real content — not a placeholder).
 2. Read `docs/product-vision-planning/concept-of-operations.md`. Check whether it exists and has substantive content.
-3. Read `docs/implementation-plan/index.md` and check whether any epics exist with status "Complete" or "Implemented".
+3. Glob `docs/implementation-plan/status/epic-*.md`. A project with no `status/` directory or no sidecar files has no completed epics. To check completion counts, run: `grep -rl 'status: Complete\|status: Implemented' docs/implementation-plan/status/ 2>/dev/null | wc -l`
 
 **Greenfield** = product-vision.md does not exist, has no Problem Statement content, or is a skeleton/placeholder. Proceed to Step 2A.
 
@@ -98,7 +108,7 @@ Produce draft content for Product Vision sections 9–11 and ConOps sections 7�
 ## Step 2B: Brownfield — Delta Discovery Interview
 
 1. Read the existing `docs/product-vision-planning/product-vision.md` and `docs/product-vision-planning/concept-of-operations.md` in full.
-2. Read `docs/implementation-plan/index.md` to understand what has been built.
+2. Read the phase indexes (`docs/implementation-plan/phase-*/index.md`) and spot-check sidecars in `docs/implementation-plan/status/` to understand what phases and epics have been planned and built.
 3. Read `docs/architecture.md` and `docs/design-notes.md` for current system context.
 
 Present a summary to the user:
