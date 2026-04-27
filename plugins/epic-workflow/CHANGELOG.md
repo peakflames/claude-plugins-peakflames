@@ -6,6 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.5.1] — 2026-04-27
+
+### Fixed
+
+- **`start` skill: plan mode override in auto mode** — Step 4 now explicitly states it is mandatory regardless of any active auto mode, continuous execution, or "prefer action" instruction. Added rationale (the plan gate catches architectural errors before wrong code is written). Step 5 now requires explicit user approval before exiting plan mode, eliminating the ambiguous "exit plan mode and execute" phrasing that could be read as skipping the gate entirely.
+
+---
+
 ## [2.5.0] — 2026-04-25
 
 **BREAKING — requires `/epic-workflow:migrate-2.5` on existing projects.**
