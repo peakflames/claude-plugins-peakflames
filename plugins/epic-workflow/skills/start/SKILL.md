@@ -82,7 +82,7 @@ Before entering plan mode, ensure work is isolated on a feature branch. The bran
 
 ## Step 4: Enter Plan Mode
 
-Enter plan mode. **The plan you produce here is the complete and authoritative execution script for this epic.** It must be fully executable in isolation — if this session's context is cleared and only the plan text survives, the plan alone must be sufficient to drive the entire implementation to completion. Every step that follows plan approval must be represented in the plan as an explicit numbered item. Do not rely on any post-plan skill instructions to cover branch setup, status tracking, task creation, verification, spec reconciliation, or committing. Those responsibilities belong to the plan.
+Enter plan mode now. **This step is mandatory regardless of any active auto mode, continuous execution, or "prefer action" instruction — invoking this skill IS the explicit request for plan mode. Do not write code, edit files, or run implementation commands until the user approves the plan.** The plan you produce here is the complete and authoritative execution script for this epic. It must be fully executable in isolation — if this session's context is cleared and only the plan text survives, the plan alone must be sufficient to drive the entire implementation to completion. The plan gate exists to catch wrong architectural choices before they become wrong code — skipping it defeats the primary purpose of this skill. Every step that follows plan approval must be represented in the plan as an explicit numbered item. Do not rely on any post-plan skill instructions to cover branch setup, status tracking, task creation, verification, spec reconciliation, or committing. Those responsibilities belong to the plan.
 
 Build the plan from:
 
@@ -96,6 +96,6 @@ Build the plan from:
 
 ## Step 5: Execute the Plan
 
-Exit plan mode and execute every item in the plan you created in Step 4, in order. The plan is the complete execution script for this session — it contains every remaining step, from branch setup through the final next-steps block. Do not add, skip, or reorder items.
+After the user explicitly approves the plan, exit plan mode and execute every item in order. The plan is the complete execution script for this session — it contains every remaining step, from branch setup through the final next-steps block. Do not add, skip, or reorder items.
 
 > **If interrupted mid-execution:** Run `/epic-workflow:pause` to save your progress. Do not simply close the session — the pause handoff file is what allows the next session to pick up where you left off.
