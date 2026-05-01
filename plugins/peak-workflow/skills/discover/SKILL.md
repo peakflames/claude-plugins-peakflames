@@ -257,7 +257,7 @@ After all phases are complete, write the documents.
 
 ## New Capabilities Identified
 
-[Bulleted list of new capabilities that emerged from this discovery, each with a brief description. These are the inputs for `/epic-workflow:plan-project`.]
+[Bulleted list of new capabilities that emerged from this discovery, each with a brief description. These are the inputs for `/peak-workflow:plan-project`.]
 
 ## Priority Signal
 

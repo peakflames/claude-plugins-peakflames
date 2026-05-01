@@ -8,8 +8,8 @@ list — not shortcodes (`:white_check_mark:` etc.) which don't render in many m
 Placeholder reference:
 
 - `<id>`, `<Name>` — epic ID and epic name from the spec
-- TOR Counts, Highlights, Conclusion — lifted from the Step 1.6 verification report
-- Requirements Implemented table — lifted from the Step 1.6 report verbatim
+- TOR Counts, Highlights, Conclusion — lifted from the Step 1.5 verification report
+- Requirements Implemented table — lifted from the Step 1.5 report verbatim
 - Manual verification — from the Step 2.0 disclosure prompt (literal `Yes` / `No` plus
   user-authored description if `Yes`)
 

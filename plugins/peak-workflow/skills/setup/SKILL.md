@@ -124,7 +124,7 @@ A successful build (compile) does NOT equal working code. The workflow MUST be:
 
 1. **Implement** — Make the code changes
 2. **Lint** — Run `[lint command]` to verify formatting and static analysis
-3. **Build** — Run `[build command]` to build and start the full stack
+3. **Build** — Run `[build command]` to build *(omit or replace with a no-op note for projects with no explicit build step)*
 4. **Verify** — Use curl, playwright, or manual testing to confirm functionality
 5. **Commit** — ONLY after verification passed
 
