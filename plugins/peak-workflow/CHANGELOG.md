@@ -6,6 +6,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.3] — 2026-04-30
+
+### Fixed
+- wrapup: HANDOFF_TEMPLATE step ref
+- setup: CLI build step wording
+- discover: stale epic-workflow ref
+
+---
+
 ## [1.0.2] — 2026-04-30
 
 ### Fixed
