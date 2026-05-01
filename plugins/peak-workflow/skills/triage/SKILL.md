@@ -138,15 +138,20 @@ Do **not** offer auto-dispatch. HEAVY skills run multi-step interviews and opera
 `docs/` branch; they benefit from a clean context window. Instead, print:
 
 ```
-Run the following in a fresh session on a docs/{task-short-name} branch:
+Run the following in a fresh session from your base branch (develop / main / master).
+/peak-workflow:discover creates the docs/ branch automatically — do not create it manually first.
 
-1. /peak-workflow:discover      — update vision and ConOps if scope has changed
-2. /peak-workflow:capture-requirements  — derive new TOR IDs from the updated vision/ConOps
-3. /peak-workflow:plan-project  — derive new epics from the new TOR requirements
+1. /peak-workflow:discover "<request summary>"  — update vision and ConOps; creates docs/ branch
+2. /peak-workflow:capture-requirements          — derive new TOR IDs from updated vision/ConOps
+3. /peak-workflow:plan-project                  — derive new epics from the new TOR requirements
 
-These skills operate on a docs/ branch. The branch merge (solo or team PR) is the approval
-gate for the new requirements and plan baseline. A fresh session keeps their context clean.
+The branch merge (solo or team PR) is the approval gate for the new requirements and plan
+baseline. A fresh session keeps their context clean.
 ```
+
+Substitute `<request summary>` with a 1-sentence description of the triaged request (derived
+from `$ARGUMENTS` or the GitHub issue title). Passing it as an argument to `/peak-workflow:discover`
+lets the brownfield interview pre-seed its delta analysis rather than starting from a blank slate.
 
 ## Step 6: Do Nothing Else
 

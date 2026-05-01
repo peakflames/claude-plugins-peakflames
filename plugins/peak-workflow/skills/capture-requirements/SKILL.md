@@ -273,6 +273,30 @@ Read all existing `.feature.md` files. For each new capability from the delta:
 - Append new `Scenario:` blocks at the **bottom** of the relevant feature file, after a
   horizontal rule separator (`---`). Never reorder or modify existing scenarios.
 
+### 3B.3b: Brownfield Grouping Review Gate
+
+Before writing any files, show the planned changes and ask for confirmation. Feature numbers
+are stable once assigned and TOR IDs are immutable once merged — a wrong grouping decision
+is expensive to reverse.
+
+Present:
+```
+## Planned Requirements Changes
+
+[For each existing file being extended:]
+- Append {N} new TOR IDs to `docs/requirements/{NN}-{name}.feature.md`
+
+[For each new file being created:]
+- Create `docs/requirements/{NN}-{name}.feature.md` with {N} new TOR IDs
+```
+
+Use `AskUserQuestion`:
+- Question: `"Approve this requirements grouping, or tell me what to adjust?"`
+- Options: `["Approve — write the requirements", "Adjust — I'll describe the change"]`
+
+If the user chooses Adjust, incorporate the change, re-present once, and proceed.
+One adjustment round maximum.
+
 ### 3B.4: Invoke Haiku Sub-Agent
 
 Same as 3A.5, but instruct it to **update only the affected `.feature.tracing.json` files**,

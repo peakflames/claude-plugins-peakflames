@@ -6,6 +6,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.4] — 2026-04-30
+
+### Fixed
+- triage: HEAVY branch note clarified
+- triage: HEAVY passes args to discover
+- capture-requirements: brownfield gate
+
+---
+
 ## [1.0.3] — 2026-04-30
 
 ### Fixed
