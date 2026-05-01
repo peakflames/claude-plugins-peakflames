@@ -8,92 +8,27 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [1.0.2] — 2026-04-30
 
-**Second dry-run pass — 4 additional gaps fixed, no behavioral changes.**
-
 ### Fixed
-
-- **Gap 2 — setup Local Environment interview is web-app-centric**: `setup` Step 3 now
-  detects project type from Tech Stack answers (CLI/tool vs. web/server) before asking
-  Local Environment questions. CLI projects get CLI-appropriate questions (how to invoke the
-  tool, how to run tests) instead of backend/frontend/live-data questions. The Verification
-  Before Commit template generation also adapts: CLI projects get a tool-invocation verify
-  step instead of curl/playwright.
-
-- **Gap 3 — wrapup step numbering skips 1.3**: Steps renumbered from 1.4 / 1.5 / 1.6 →
-  1.3 / 1.4 / 1.5. Step 1.3 was removed in v1.0.0 (it was the prose "Verify Verification
-  Section" from epic-workflow, replaced by TOR-driven Step 1.2) but the numbering was not
-  collapsed. All internal cross-references updated.
-
-- **Gap 4 — `[Brownfield:]` tag leaked into greenfield plan-project output**: The
-  `[Brownfield:]` next-step line was inside the fenced summary template in `plan-project`
-  Step 8, causing it to render as literal text for greenfield users. Removed from inside
-  the template block; brownfield adaptation instructions moved outside the block as a
-  clearly-labeled conditional note for the LLM.
-
-- **Gap 5 — discover Design Direction / "UI elements" language is web-centric**: Phase 4
-  Section 9 Design Direction and Phase 3 scenario step guidance now include parenthetical
-  notes for CLI/terminal projects: design direction covers output formatting and flag
-  naming (not GUI design); "UI elements" means flags, arguments, stdin/stdout, and exit
-  codes.
+- setup: CLI-aware env interview
+- wrapup: renumber steps 1.3–1.5
+- plan-project: brownfield tag leak
+- discover: CLI design notes
 
 ---
 
 ## [1.0.1] — 2026-04-30
 
-**UX clarity pass — 10 rough edges identified in dry-run simulation, no behavioral changes.**
-
 ### Fixed
-
-- **Gap 1 — Setup sequencing**: `README.md` Greenfield Quick Start now shows `/setup` as Step 0
-  (before `/discover`). Skills table reordered to put setup first. `discover` adds a non-blocking
-  advisory check at startup: if `CLAUDE.md` lacks a Verification & Quality Gates section, it
-  warns the user to run setup before or after discovery. `plan-project` Step 8 Recommended Next
-  Steps removes the "run setup" instruction (it should already be done) and clarifies startup order.
-
-- **Gap 2 — Missing merge instruction in plan-project**: `plan-project` Step 8 Recommended
-  Next Steps now shows the exact `git merge` / `gh pr create` commands needed to approve the
-  docs/ branch. `start` Step 1 item 4a now checks each cited feature file for existence before
-  opening it — if any file is missing, it stops with a specific message explaining that the
-  docs/ branch must be merged to the base branch first, with the exact commands to do so.
-
-- **Gap 3 — Branch name prompt has no format guidance**: `discover` Step 0 now shows a format
-  example in the AskUserQuestion prompt (e.g., `'fibcalc-mvp'` or `'q2-backend-api'`). After
-  receiving the user's answer, the skill slugifies it (lowercase, hyphens, ≤ 40 chars) and
-  confirms with the user if the slug differs from the raw input.
-
-- **Gap 4 — capture-requirements has no grouping review gate**: New Step 3A.1b presents the
-  proposed feature file list (number, filename, functional area, estimated requirement count)
-  before writing any files. User can approve or request adjustments (merge, split, rename,
-  reorder) — maximum 2 adjustment rounds before proceeding.
-
-- **Gap 5 — Ship-or-continue options after discover are confusing**: `discover` Step 6 options
-  renamed: "Continue planning" now explicitly says "recommended for greenfield — do not merge
-  yet"; solo/team merge options clarify they are only appropriate for vision-only sessions
-  where no requirements derivation is needed.
-
-- **Gap 6 — Small-project ceremony overhead needs context**: `README.md` Greenfield Quick
-  Start now includes a brief note explaining why setup must precede discover and how the
-  ceremony amortizes across the project lifetime. `plan-project` Step 8 includes the same
-  amortization note.
-
-- **Gap 7 — Quality Gates answers not validated**: `setup` Step 3 Verification & Quality Gates
-  interview now validates each command answer: if the answer looks like a description rather
-  than a runnable shell command, it prompts once for the exact command. If the second answer is
-  still ambiguous, it accepts it with an inline note to refine before the first epic.
-
-- **Gap 8 — Wrapup missing handoff fallback**: `wrapup` Step 1.2 item 2 now falls back to
-  `grep -rl "<TOR-ID>" <test-directory>` when no implemented handoff file exists (session was
-  interrupted). Test directory is derived from CLAUDE.md's Verification & Quality Gates section.
-
-- **Gap 9 — /peak-workflow:status never suggested at checkpoints**: `plan-project` Step 8 and
-  `wrapup` Phase 3 now both prompt the user to run `/peak-workflow:status` to see the
-  Requirements Coverage dashboard.
-
-- **Gap 10 — TOR title mismatch is a warning, not a confirmed choice**: Both `start` Step 1
-  item 6.3 and `wrapup` Step 1.1 item 5.3 now use `AskUserQuestion` with three explicit options
-  (feature file authoritative, spec intentional override, stop and reconcile) instead of the
-  previous passive warning. Implementation or verification does not proceed until the user makes
-  a deliberate choice.
+- setup runs before discover
+- docs/ merge commands added
+- branch name format guidance
+- grouping review gate
+- clearer ship-or-continue
+- ceremony overhead note
+- quality gate cmd check
+- wrapup: handoff fallback
+- status prompts added
+- TOR mismatch → prompt
 
 ---
 
