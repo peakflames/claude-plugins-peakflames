@@ -140,14 +140,14 @@ This is the heart of the discovery. Produce draft content for Product Vision sec
 
   **Outcome:** [What the actor walks away with]
   ```
-  Each scenario should have 4–12 steps that are specific enough to derive acceptance criteria from. Name UI elements, data fields, and user actions explicitly.
+  Each scenario should have 4–12 steps that are specific enough to derive acceptance criteria from. Name UI elements, data fields, and user actions explicitly. *(For CLI projects, "UI elements" means flags, arguments, stdin/stdout, and exit codes — e.g., "user runs `fibcalc 10`, tool prints `55` to stdout and exits 0".)*
 - **ConOps Section 6 — System Interfaces & Data Flows:** Draft data source tables and a data flow diagram (ASCII or description).
 
 ### Phase 4: Constraints, Data & Future
 
 Produce draft content for Product Vision sections 9–11 and ConOps sections 7–9:
 
-- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction.
+- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction. *(For CLI/terminal projects, "design direction" means output formatting conventions, flag naming style, error message tone, and exit code behavior — not visual/GUI design.)*
 - **Product Vision Section 10 — Data Strategy:** Draft the data architecture description (sources, freshness, any background processes).
 - **Product Vision Section 11 — Backlog / Future Vision:** Draft a bulleted list of 5–10 deferred items representing the product's growth trajectory.
 - **ConOps Section 7 — Functional Summary:** Draft tables summarizing features by view/area.

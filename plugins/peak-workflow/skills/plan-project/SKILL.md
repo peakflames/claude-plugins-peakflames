@@ -501,13 +501,13 @@ Do NOT perform a full CLAUDE.md audit — that is `/peak-workflow:setup`'s job. 
 3. Run `/peak-workflow:status` at any time to see the live Requirements Coverage dashboard
    (which TOR IDs are covered, which epics are in progress, and what's next).
 
-[Brownfield:] 1. Merge the `docs/` branch to approve (same commands above), then run `/peak-workflow:start <id>`
-
 > **On ceremony overhead:** The discover → requirements → planning sequence amortizes across
 > the project's lifetime. Once the TOR baseline is established, every new request routes
 > through `/triage` to determine whether it needs new TOR IDs (HEAVY), implements existing
 > ones (EPIC), or is a trivial bug (TRIVIAL) — preventing both over-engineering and
 > under-speccing. For a one-off script, `epic-workflow` may be a better fit.
 ```
+
+**[Brownfield mode only — adapt the Recommended Next Steps before presenting:]** The three steps above (merge → start → status) apply to brownfield too. Shorten the merge instruction to "Merge the `docs/` branch to approve the delta requirements and new epics" and omit the setup note in step 2 (setup was already done).
 
 Do NOT commit — leave that for the user to decide.

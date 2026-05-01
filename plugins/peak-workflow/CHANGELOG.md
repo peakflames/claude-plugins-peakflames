@@ -6,6 +6,38 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.2] — 2026-04-30
+
+**Second dry-run pass — 4 additional gaps fixed, no behavioral changes.**
+
+### Fixed
+
+- **Gap 2 — setup Local Environment interview is web-app-centric**: `setup` Step 3 now
+  detects project type from Tech Stack answers (CLI/tool vs. web/server) before asking
+  Local Environment questions. CLI projects get CLI-appropriate questions (how to invoke the
+  tool, how to run tests) instead of backend/frontend/live-data questions. The Verification
+  Before Commit template generation also adapts: CLI projects get a tool-invocation verify
+  step instead of curl/playwright.
+
+- **Gap 3 — wrapup step numbering skips 1.3**: Steps renumbered from 1.4 / 1.5 / 1.6 →
+  1.3 / 1.4 / 1.5. Step 1.3 was removed in v1.0.0 (it was the prose "Verify Verification
+  Section" from epic-workflow, replaced by TOR-driven Step 1.2) but the numbering was not
+  collapsed. All internal cross-references updated.
+
+- **Gap 4 — `[Brownfield:]` tag leaked into greenfield plan-project output**: The
+  `[Brownfield:]` next-step line was inside the fenced summary template in `plan-project`
+  Step 8, causing it to render as literal text for greenfield users. Removed from inside
+  the template block; brownfield adaptation instructions moved outside the block as a
+  clearly-labeled conditional note for the LLM.
+
+- **Gap 5 — discover Design Direction / "UI elements" language is web-centric**: Phase 4
+  Section 9 Design Direction and Phase 3 scenario step guidance now include parenthetical
+  notes for CLI/terminal projects: design direction covers output formatting and flag
+  naming (not GUI design); "UI elements" means flags, arguments, stdin/stdout, and exit
+  codes.
+
+---
+
 ## [1.0.1] — 2026-04-30
 
 **UX clarity pass — 10 rough edges identified in dry-run simulation, no behavioral changes.**

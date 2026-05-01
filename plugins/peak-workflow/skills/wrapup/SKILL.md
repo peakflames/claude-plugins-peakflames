@@ -48,7 +48,7 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    subsequent verification is judged against the requirements baseline, not the implementer's
    self-assessment. For each row in the Requirements Anchors table:
    1. Confirm the TOR ID exists in the cited feature file with an exact ID match.
-   2. **TOR ID not found:** record as a Requirements Anchor gap in the Step 1.6 report. This is
+   2. **TOR ID not found:** record as a Requirements Anchor gap in the Step 1.5 report. This is
       a FAIL for that TOR — the epic spec referenced a requirement that no longer exists or was
       never in the cited file. Surface to the user:
       > TOR ID `{TOR-NN-XXXXXXX}` from the Requirements Anchors table was not found in
@@ -69,15 +69,15 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
         - `"Epic spec (intentional override) — verify against '{spec-title}'"`
         - `"Stop — I'll reconcile the requirements baseline first"`
       Proceed only after the user selects an option. If Stop, end here and do not proceed to
-      Step 1.2. Note in the Step 1.6 Anchor Reconciliation section which text was used.
+      Step 1.2. Note in the Step 1.5 Anchor Reconciliation section which text was used.
    4. **TOR ID found and titles match:** record "Requirements Anchor verified: TOR-NN-XXXXXXX".
    5. **Spec has no Requirements Anchors section** (legacy spec from before peak-workflow v1.0.0):
       note this in the verification report and continue — legacy specs are grandfathered.
 6. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists).
-7. **Conditional architecture / design-notes reads.** The Step 1.5 code review checks consistency with `docs/architecture.md` and `docs/design-notes.md` — load only what is relevant to this epic:
+7. **Conditional architecture / design-notes reads.** The Step 1.4 code review checks consistency with `docs/architecture.md` and `docs/design-notes.md` — load only what is relevant to this epic:
    - If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section.
    - If the epic raises a decision the design notes might already have addressed, read `docs/design-notes.md`.
-   - If the epic is a localized UI / copy change with no cross-cutting impact, skip both — there is no consistency surface to check, and Step 1.5 simply records "no architectural surface affected".
+   - If the epic is a localized UI / copy change with no cross-cutting impact, skip both — there is no consistency surface to check, and Step 1.4 simply records "no architectural surface affected".
 8. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it.
 9. Check out the feature branch for this epic. Detect existence with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
    ```bash
@@ -129,7 +129,7 @@ Report each TOR ID:
   when the check requires an environment that does not exist locally (e.g., Kubernetes, CI/CD).
   Never use this for checks that can be run against the live local API.
 
-### Step 1.4: Run Quality Gates
+### Step 1.3: Run Quality Gates
 
 Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently:
 - Build check
@@ -137,7 +137,7 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
 - Console check via `playwright-cli` (if UI was changed)
 
-### Step 1.5: Code Review
+### Step 1.4: Code Review
 
 Review the implementation for:
 - Adherence to patterns established in previous epics and documented in `docs/reference/`
@@ -146,7 +146,7 @@ Review the implementation for:
 - Logging adequacy
 - Consistency with whichever of `docs/architecture.md` and `docs/design-notes.md` were loaded conditionally in Step 1.1 item 7. If neither was loaded (the epic had no cross-cutting surface), record "no architectural surface affected" and move on.
 
-### Step 1.6: Present Verification Report
+### Step 1.5: Present Verification Report
 
 Present a consolidated report to the user. The report has two jobs: a fast skim at the top (counters) and a reviewer-friendly narrative below (Highlights + Conclusion).
 
@@ -229,7 +229,7 @@ This is a disclosure, not a gate — `No` is a perfectly acceptable answer. The 
 
 Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim — legacy integer or 7-char alphanumeric).
 
-Use the template at `plugins/peak-workflow/skills/wrapup/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.6 verification report and the Step 2.0 manual-verification disclosure.
+Use the template at `plugins/peak-workflow/skills/wrapup/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure.
 
 ### Step 2.2: Update Status Sidecar
 
@@ -347,7 +347,7 @@ be made by the user every invocation.
 3. `git push -u origin <branch>`
 4. `gh pr create --base <base-branch> --title "epic(<id>): <epic name>" --body "<body>"`
 
-   The body follows the template at `plugins/peak-workflow/skills/wrapup/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.6 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
+   The body follows the template at `plugins/peak-workflow/skills/wrapup/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
 
    The `Closes #<N>` line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 — if no source issue is known, omit the `Closes` line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way).
 

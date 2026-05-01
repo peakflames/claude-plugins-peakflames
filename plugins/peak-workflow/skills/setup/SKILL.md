@@ -50,6 +50,15 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 - Any key libraries or tools? (CSS framework, ORM, test runner, etc.)
 
 **Local Environment** (if missing):
+
+First, determine the project type from the Tech Stack answers already captured. If the tech stack includes a web framework, HTTP server, REST API library, or mentions "frontend" / "backend", treat it as a **web/server project**. Otherwise (CLI tool, library, script, desktop app with no server component), treat it as a **CLI/tool project**.
+
+*For CLI/tool projects:*
+- How do you invoke the tool locally? (e.g., `python -m fibcalc 10`, `./mytool --help`, `go run . 5`)
+- How do you run the test suite? (e.g., `pytest tests/`, `go test ./...`, `cargo test`)
+- Skip the frontend/backend/live-data questions — they don't apply.
+
+*For web/server projects:*
 - How do you run the backend locally? (e.g., `dotnet run`, `npm start`, etc.)
 - How do you run the frontend locally? (e.g., `bun run dev`, `npm run dev`, etc.)
 - Is the backend API live and functional in local dev? (i.e., can it connect to real data sources like databases?)
@@ -96,10 +105,14 @@ If the second answer is still ambiguous, accept it and add a note in the written
 - Are there files that must NEVER be committed? (e.g., `.env`, `appsettings*.json`, credentials)
 
 **Verification Before Commit Rule** (if missing):
-- What command builds the project? (e.g., `python build.py up -d`, `dotnet build`, `npm run build`)
-- What command runs linting/formatting checks? (e.g., `python build.py lint`, `dotnet format --verify-no-changes`)
-- What command auto-fixes formatting? (e.g., `python build.py format`, `dotnet format`)
-- What URLs or commands verify the app is working after build? (e.g., `curl http://localhost:8080/api/health`)
+- What command builds the project? (e.g., `dotnet build`, `npm run build`, `python -m build` — or skip if no explicit build step)
+- What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
+- What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
+- How do you verify the tool/app works after build?
+  - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`)
+  - *Web/server projects:* curl a health endpoint (e.g., `curl http://localhost:8080/api/health`) or use `playwright-cli`
+
+When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers.
 - Generate the section using this template, filling in the project-specific commands:
 
 ```markdown
