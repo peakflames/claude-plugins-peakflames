@@ -6,6 +6,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.0] — 2026-05-01
+
+### Added
+
+- **New skill: `migrate-from-epic-workflow`** — one-shot migration from an epic-workflow
+  project (v2.5.0 layout) to peak-workflow format. Derives a formal TOR requirements baseline
+  using a hybrid strategy: PM-persona derivation from vision/ConOps first, then
+  oldest-to-latest reconciliation against existing epic acceptance criteria (latest epic
+  wording overrides ConOps where they conflict). Transforms Not-Started epic specs from
+  Acceptance Criteria format to Requirements Anchors table format. Updates all status sidecars
+  with the `requirements:` field. Updates CLAUDE.md and `docs/implementation-plan/README.md`
+  to reference peak-workflow commands. Creates `docs/requirements/README.md`. Falls back to
+  epic-criteria-only derivation when vision/ConOps are missing or skeleton. Non-destructive
+  (In-Progress, Paused, Implemented, and Complete epics are untouched), atomic (single
+  revertable commit via `git revert HEAD`), and idempotent (exits cleanly on already-migrated
+  projects). Invokes Haiku sub-agent for tracing sidecars with migration-specific `migration_source`
+  extension recording which epic acceptance criterion confirmed or refined each TOR ID.
+
+---
+
 ## [1.0.4] — 2026-04-30
 
 ### Fixed
