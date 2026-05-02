@@ -1,0 +1,5 @@
+{
+  "name": "peak-workflow",
+  "description": "Requirements-driven development workflow in the spirit of DO-330 TQL-5. Formal Gherkin-style TOR requirements (TOR-NN-XXXXXXX) serve as the single source of truth — epics implement requirements, tests are derived from Given/When/Then, and wrapup verifies against the requirements baseline rather than prose acceptance criteria. Covers the full lifecycle: discovery, requirements capture, planning, implementation, requirements-based verification, and documentation refresh.",
+  "version": "1.1.0"
+}
