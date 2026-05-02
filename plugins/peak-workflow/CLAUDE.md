@@ -6,7 +6,8 @@ Requirements-driven development lifecycle in the spirit of DO-330 TQL-5. Formal
 Gherkin-style TOR requirements (`TOR-NN-XXXXXXX`) are the single source of truth —
 epics implement them, tests derive from Given/When/Then, wrapup verifies against them.
 
-Forked from `epic-workflow` v2.5.1. The two plugins coexist; there is no migration path.
+Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
+`/peak-workflow:migrate-from-epic-workflow` to migrate an existing epic-workflow project.
 
 ## Skill Inventory
 
@@ -25,6 +26,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist; there is no migrati
 | `quick-fix` | Trivial bug fix on a hotfix/ branch, no TOR changes |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `migrate-2.5` | One-shot migration from legacy index.md layout |
+| `migrate-from-epic-workflow` | One-shot migration from an epic-workflow project to peak-workflow |
 
 ## Key Design Invariants
 

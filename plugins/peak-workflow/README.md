@@ -28,6 +28,7 @@ The formal requirements baseline lives in Gherkin-style `.feature.md` files with
 | `/status` | Read-only dashboard — epic progress, Requirements Coverage, active work, next actions | — (read-only) |
 | `/refresh-docs` | Refresh `architecture.md` + `design-notes.md` to match as-built codebase | — (docs only, not requirements) |
 | `/migrate-2.5` | One-shot migration from legacy `index.md` layout to per-phase indexes + status sidecars | — (migration only) |
+| `/migrate-from-epic-workflow` | One-shot migration from an epic-workflow project — derives TOR baseline, transforms Not-Started specs, updates sidecars and CLAUDE.md | — (migration only) |
 
 ## Branch Families
 
@@ -205,7 +206,21 @@ The key distinction between peak-workflow and a typical Agile workflow:
 
 ## Migration from epic-workflow
 
-There is no automated migration. Peak-workflow and epic-workflow are sibling plugins with fundamentally different artifact sets (epic-workflow epic specs have prose Acceptance Criteria; peak-workflow specs have Requirements Anchors with TOR IDs). Recommended approach:
+Run `/peak-workflow:migrate-from-epic-workflow` on a project that currently uses epic-workflow.
+The skill performs a one-shot, atomic migration:
+
+1. **Derives a TOR requirements baseline** from the project's existing vision/ConOps and epic
+   acceptance criteria (hybrid strategy — ConOps-first, then refined by epic content).
+2. **Transforms Not-Started epic specs** from Acceptance Criteria format to Requirements
+   Anchors table format.
+3. **Updates all status sidecars** with the `requirements:` field.
+4. **Updates CLAUDE.md** to reference peak-workflow commands.
+5. **Lands everything in a single commit** — `git revert HEAD` rolls the entire migration back.
+
+The migration is non-destructive: In-Progress, Paused, Implemented, and Complete epics are
+left untouched and their sidecars get `requirements: —`.
+
+**Manual approach (if you prefer step-by-step control):**
 
 1. Keep in-flight epic-workflow epics on epic-workflow until complete.
 2. Install peak-workflow alongside.
