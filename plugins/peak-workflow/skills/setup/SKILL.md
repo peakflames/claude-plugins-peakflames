@@ -24,6 +24,8 @@ Check for the presence and completeness of each section below. Report a status f
 |---------|---------------|
 | **Tech Stack** | Lists the languages, frameworks, package manager, and key libraries used |
 | **Local Environment** | Documents how to run the backend and frontend locally, whether the API is live and functional, and the preference for live data over mocking during verification |
+| **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
+| **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start` and `/peak-workflow:wrapup`, not derived as TORs. |
 | **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start`, `/peak-workflow:wrapup`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
@@ -63,6 +65,131 @@ First, determine the project type from the Tech Stack answers already captured. 
 - How do you run the frontend locally? (e.g., `bun run dev`, `npm run dev`, etc.)
 - Is the backend API live and functional in local dev? (i.e., can it connect to real data sources like databases?)
 - Should verification always use live data instead of mocking API responses?
+
+**Tool Hygiene & Operability** (if missing):
+
+This section captures the project's chosen mechanisms for the load-bearing tool-hygiene
+practices that `/peak-workflow:capture-requirements` will turn into baseline TOR
+requirements. Ask in order:
+
+1. *Project type* — pick exactly one of:
+   - **CLI tool** — primary interface is a command-line invocation
+   - **Web app** — server-rendered or SPA, primary interface is a browser UI
+   - **Service or API** — headless service exposing HTTP / gRPC / message endpoints
+   - **Library** — consumed by other code, no end-user runtime
+   - **Hybrid** — combines two or more of the above (e.g., CLI that also runs as a service)
+
+2. *Version exposure* — how does an end user observe the running tool's version? The
+   mechanism varies by project type; the requirement that *some mechanism exists* is
+   universal. Suggest defaults:
+   - CLI: `--version` flag printing `<name> v<semver>` to stdout, exit 0
+   - Web app: GET `/version` endpoint returning JSON, plus version visible in app footer
+     or About page
+   - Service/API: GET `/version` or `/health` endpoint with version field
+   - Library: `__version__` (or language-equivalent) constant exported from package root
+   - Hybrid: list each applicable mechanism
+
+3. *Version stamped at log startup* — confirm the project will emit the tool name and
+   semantic version on the first log line at process / app / request-handler startup
+   (e.g., `[INFO] myapp v1.2.0 starting`).
+
+4. *Version single source of truth* — what is the authoritative file for the version
+   number? The version is defined in exactly one place and read everywhere else. Examples:
+   `pyproject.toml [project.version]`, `package.json#version`, `Cargo.toml [package.version]`,
+   `*.csproj <Version>`, `go.mod` (with build-time injection), etc.
+
+5. *Logging convention*:
+   - Levels — what set? (default: `DEBUG / INFO / WARN / ERROR`)
+   - Format — `structured JSON` / `key=value` / `human-readable plain text`?
+   - Where is the logger configured? (file path)
+
+6. *Exit code convention* (CLI / Hybrid only — otherwise mark `N/A — not a CLI`):
+   - 0 — success
+   - 1 — operational failure (file not found, permission denied, downstream failure, etc.)
+   - 2 — invalid invocation (bad flags, missing required args)
+   - Any additional codes the project defines.
+
+7. *stdout / stderr discipline* (CLI / Hybrid only — otherwise mark `N/A`):
+   - stdout — data, parseable output, primary results
+   - stderr — diagnostics, progress, errors, log output
+
+8. *Error message standard* — confirm user-facing errors will name the problem AND the
+   next user action. Format example:
+   `Error: configuration file not found at <path>. Try --config to specify an alternate path.`
+
+Generate the section using this template, filling in the project-specific answers:
+
+```markdown
+## Tool Hygiene & Operability
+
+This section declares the project's conventions for the load-bearing tool-hygiene practices.
+Each line is a baseline TOR requirement source — `/peak-workflow:capture-requirements` will
+ensure at least one TOR exists per active line, written in the form appropriate to the
+declared mechanism. Lines marked `N/A` are skipped.
+
+**Project type:** [CLI tool / Web app / Service or API / Library / Hybrid]
+
+**Version exposure:** [Mechanism declaration. Example for a CLI: `--version` flag printing
+`myapp v<semver>` to stdout with exit code 0. Example for a Web app: GET `/version` endpoint
+returning JSON `{name, version}` AND version visible in app footer.]
+
+**Version stamped at log startup:** The first log line emitted on process / app startup
+includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting`).
+
+**Version single source of truth:** [Authoritative file path, e.g., `pyproject.toml [project.version]`]
+
+**Logging convention:**
+- Levels: [DEBUG / INFO / WARN / ERROR — adjust to project's chosen set]
+- Format: [structured JSON / key=value / human-readable plain text]
+- Configured at: [file path]
+
+**Exit code convention:** [CLI / Hybrid — list codes; otherwise: `N/A — not a CLI`]
+
+**stdout / stderr discipline:** [CLI / Hybrid — restate; otherwise: `N/A`]
+
+**Error message standard:** User-facing errors name the problem AND the next user action.
+Example: `Error: configuration file not found at <path>. Try --config to specify an
+alternate path.`
+```
+
+**Security Baseline** (if missing):
+
+This section is a static set of coding-standard reminders. They are NOT customized per
+project — write the section verbatim. The reminders are not derived as TORs because they
+are negative invariants ("do not X") that are hard to verify by Given/When/Then. They are
+reviewed by `/peak-workflow:start` (during implementation) and `/peak-workflow:wrapup`
+(during independent review).
+
+Generate the section verbatim:
+
+```markdown
+## Security Baseline
+
+These are coding-standard reminders that apply to every epic. They are NOT requirements —
+TORs verify positive observable behavior, and "do not X" invariants are hard to express as
+Given/When/Then. They MUST be respected during implementation and reviewed during
+`/peak-workflow:wrapup`.
+
+**No `shell=True` / `eval` with user input.**
+Never pass user-supplied data to a shell interpreter without escaping. In Python, prefer
+`subprocess.run([...])` with a list; never `subprocess.run(cmd, shell=True)` on user input.
+In Node.js, prefer `child_process.execFile` over `exec`. In any language, never use `eval`
+or `Function()` constructors on user input.
+
+**Do not log secrets or PII.**
+Tokens, passwords, API keys, session IDs, and personally identifiable information must
+never appear in logs. The structured logger should redact known-sensitive keys
+(`password`, `token`, `secret`, `api_key`, `authorization`, `cookie`, etc.). Review log
+output during `/peak-workflow:wrapup` for accidental leakage.
+
+**No secrets committed to the repo.**
+`.env`, credential files, private keys, and any configuration containing real secrets must
+be in `.gitignore`. Use environment variables, secret managers, or encrypted files (e.g.,
+`sops`, `age`) for sensitive configuration.
+
+`/peak-workflow:wrapup` includes these as default review items unless the project type
+makes them inapplicable.
+```
 
 **Peak Workflow** (if missing):
 - Where does the requirements baseline live? (default: `docs/requirements/`)
@@ -354,11 +481,212 @@ Inform the user:
 > Created `docs/architecture.md` and `docs/design-notes.md` as planning stubs.
 > These will be read by `/peak-workflow:start` for context and updated by `/peak-workflow:refresh-docs` after implementation.
 
-## Step 7: Final Summary
+## Step 7: Audit Repo Hygiene Files
+
+These are the load-bearing repo-root files and CI / build artifacts that mature projects
+maintain. Some are safe to stub (prose); others are detect-and-warn only (legal artifacts,
+build-system files that must come from the toolchain).
+
+For each item, check the repo root and report `[PASS]` / `[MISS]` / `[WEAK]`.
+
+### 7.1: README.md
+
+Check whether `README.md` exists at the repo root.
+
+- If **present and non-empty**: `[PASS] README.md — exists`.
+- If **missing or empty**: prompt to create a stub. If the user agrees, generate using
+  this template (substitute project name and tech stack from CLAUDE.md):
+
+```markdown
+# {Project Name}
+
+> {One-line description derived from CLAUDE.md project description.}
+
+## Install
+
+{Project-type-specific install command. Examples:
+ - Python:    `pip install {pkg}` or `uv pip install {pkg}`
+ - Node:      `npm install {pkg}` or `bun add {pkg}`
+ - Rust:      `cargo install {pkg}`
+ - Go:        `go install {module}@latest`
+ - .NET:      `dotnet tool install --global {tool}`}
+
+## Quick Start
+
+{One copy-pasteable example exercising the primary use case. For a CLI tool, show a
+common invocation and its expected output. For a web app, show how to start it locally
+and what URL to open. For a library, show a minimal `import` and call.}
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Design Notes](docs/design-notes.md)
+- [Requirements](docs/requirements/) — TOR requirements baseline
+- [Implementation Plan](docs/implementation-plan/) — epic registry; run `/peak-workflow:status` for the dashboard
+
+## Development
+
+See [CLAUDE.md](CLAUDE.md) for the project's development workflow conventions and
+[CONTRIBUTING.md](CONTRIBUTING.md) (if present) for contributor guidelines.
+
+## License
+
+See [LICENSE](LICENSE).
+```
+
+### 7.2: CHANGELOG.md
+
+Check whether `CHANGELOG.md` exists at the repo root.
+
+- If **present**: `[PASS] CHANGELOG.md — exists`.
+- If **missing**: prompt to create a [Keep a Changelog](https://keepachangelog.com/) stub.
+  If the user agrees, generate:
+
+```markdown
+# Changelog
+
+All notable changes to this project are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+This project adheres to [Semantic Versioning](https://semver.org/).
+
+---
+
+## [Unreleased]
+
+### Added
+### Changed
+### Fixed
+
+---
+
+## [0.1.0] — UNDER DEVELOPMENT
+
+Initial development.
+```
+
+### 7.3: LICENSE
+
+Check whether `LICENSE` (or `LICENSE.md`, `LICENSE.txt`) exists at the repo root.
+
+- If **present**: `[PASS] LICENSE — exists`.
+- If **missing**: do NOT auto-generate. Auto-creating legal documents is unsafe — the
+  project's license choice carries legal weight and may depend on org policy, dependency
+  licenses, or commercial intent. Print a `[MISS]` warning with this guidance:
+
+  > LICENSE is missing. Without one, others legally cannot use, copy, or modify the code.
+  > Common open-source choices: MIT (permissive, short), Apache-2.0 (permissive with
+  > patent grant), BSD-3-Clause (permissive). For internal/proprietary projects, add a
+  > `Copyright {year} {holder}. All rights reserved.` notice. Add a LICENSE file at the
+  > repo root before publishing.
+
+### 7.4: .gitignore
+
+Check whether `.gitignore` exists at the repo root.
+
+- If **missing entirely**: print `[MISS] .gitignore — file missing`. Recommend creating
+  one from a tech-stack-appropriate template (e.g., GitHub's gitignore templates at
+  `https://github.com/github/gitignore`). Do NOT auto-generate — the right template
+  depends on the full toolchain.
+- If **present**: do a lightweight content audit. Verify the following high-signal entries
+  are present (or equivalent patterns):
+  - `.env` (and variants like `.env.local`, `.env.*.local`)
+  - Build / dependency artifact directories appropriate to the tech stack:
+    - Node: `node_modules/`, `dist/`, `build/`
+    - Python: `__pycache__/`, `*.pyc`, `.venv/`, `venv/`, `dist/`, `build/`, `*.egg-info/`
+    - Rust: `target/`
+    - Go: build outputs (project-specific)
+    - .NET: `bin/`, `obj/`
+  - Editor / OS files: `.DS_Store`, `Thumbs.db`, `.vscode/` (project preference), `.idea/`
+    (project preference)
+
+  For each missing high-signal entry, report `[WEAK] .gitignore — missing entries: {list}`
+  and prompt to append. Do not auto-edit `.gitignore` without asking — projects often
+  intentionally exclude or include patterns.
+
+### 7.5: CI Configuration
+
+Check whether any of these exist:
+- `.github/workflows/*.yml` (GitHub Actions)
+- `.gitlab-ci.yml` (GitLab CI)
+- `.circleci/config.yml` (CircleCI)
+- `azure-pipelines.yml` (Azure Pipelines)
+- `bitbucket-pipelines.yml` (Bitbucket Pipelines)
+- `Jenkinsfile` (Jenkins)
+
+If **at least one is present**: `[PASS] CI configuration — detected ({which})`.
+
+If **none present**: print `[MISS] CI configuration — no pipeline detected`. Do NOT
+auto-create — CI configuration is platform-specific and depends on the team's CI provider,
+secrets, and policies. Print this guidance:
+
+> No CI pipeline detected. CI that runs tests on every PR is the highest-leverage quality
+> investment a project can make — it catches regressions before they reach `develop` /
+> `main`. Recommended baseline:
+> - Run the test suite on every pull request to `develop` and `main`
+> - Run linting / formatting checks on every pull request
+> - Cache dependencies between runs
+>
+> Add a CI pipeline using your team's CI provider before merging significant work.
+
+### 7.6: Lockfile
+
+Check for a lockfile appropriate to the tech stack declared in CLAUDE.md:
+- Node.js: `package-lock.json` | `yarn.lock` | `pnpm-lock.yaml` | `bun.lockb`
+- Python: `poetry.lock` | `uv.lock` | `Pipfile.lock` | `requirements.txt` with pinned `==` versions
+- Rust: `Cargo.lock`
+- Go: `go.sum`
+- .NET: `packages.lock.json` (NuGet locking enabled)
+- Ruby: `Gemfile.lock`
+- PHP: `composer.lock`
+
+If **lockfile present**: `[PASS] Lockfile — {filename} present`.
+
+If **lockfile missing** for the detected stack: print `[MISS] Lockfile — none found for
+{stack}`. Do NOT auto-create — lockfiles must be generated by the package manager
+(`npm install`, `poetry lock`, `cargo build`, etc.). Print this guidance:
+
+> No lockfile found. Without one, `dev`/`prod` parity is at risk — different developers and
+> CI runs may resolve different transitive dependency versions, producing flaky behavior.
+> Generate the lockfile by running the package manager's install command, then commit it.
+> For example:
+> - Node.js: `npm install` (creates `package-lock.json`) — commit it
+> - Python (Poetry): `poetry lock` — commit `poetry.lock`
+> - Python (uv): `uv lock` — commit `uv.lock`
+> - Rust: `cargo build` (creates `Cargo.lock`) — commit it for binaries (libraries omit)
+
+### 7.7: Repo Hygiene Summary
+
+Print a final checklist:
+```
+[PASS / MISS / WEAK] README.md
+[PASS / MISS / WEAK] CHANGELOG.md
+[PASS / MISS]        LICENSE
+[PASS / MISS / WEAK] .gitignore
+[PASS / MISS]        CI configuration
+[PASS / MISS]        Lockfile ({stack-specific filename})
+```
+
+For each `MISS` / `WEAK` not yet resolved, repeat the recommendation with the file path
+and the next action. The user is responsible for the legal / build-system items
+(LICENSE, CI config, lockfile); `/peak-workflow:setup` does not auto-create them.
+
+## Step 8: Final Summary
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work
+- The **Tool Hygiene & Operability** section in `CLAUDE.md` will be consumed by
+  `/peak-workflow:capture-requirements` to produce baseline TOR requirements covering
+  version exposure, log startup stamping, logging convention, exit codes (CLI),
+  stdout/stderr discipline (CLI), and error-message standards. Lines marked `N/A` are
+  skipped.
+- The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:start`
+  during implementation and by `/peak-workflow:wrapup` during independent review. These
+  reminders are not derived as TORs.
 - `docs/architecture.md` and `docs/design-notes.md` are read by every `/peak-workflow:start` and `/peak-workflow:wrapup` for context
+- For any `[MISS]` items in the Repo Hygiene audit (Step 7) that you did not resolve in
+  this session — particularly LICENSE, CI configuration, and the lockfile — address them
+  before publishing the project externally or merging significant work
 - After implementing epics, run `/peak-workflow:refresh-docs` to bring the docs in sync with the as-built codebase
 
 **Legacy layout check:** After completing the above, check whether `docs/implementation-plan/index.md` exists and contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column. If found, add a one-line reminder at the end of your summary:

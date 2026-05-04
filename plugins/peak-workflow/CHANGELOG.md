@@ -6,6 +6,135 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] — 2026-05-04
+
+### Added
+
+- **`setup` skill — `Tool Hygiene & Operability` audit and CLAUDE.md section.** Setup now
+  audits CLAUDE.md for a `Tool Hygiene & Operability` section that declares the project's
+  load-bearing tool-hygiene mechanisms — five categories driven by project type
+  (CLI tool / Web app / Service or API / Library / Hybrid):
+  - Version exposure to the user (mechanism varies: `--version` flag for CLIs,
+    `/version` endpoint + footer for web apps, `__version__` for libraries, etc.)
+  - Version stamped at log startup (universal)
+  - Version single source of truth (one authoritative file)
+  - Logging convention (levels, format, configuration location)
+  - Exit code convention (CLI / Hybrid only)
+  - stdout / stderr discipline (CLI / Hybrid only)
+  - Error-message standard (problem + next user action)
+
+  When `setup` finds the section missing, it prompts the user for each line and writes the
+  section into CLAUDE.md. The section is consumed by `/peak-workflow:capture-requirements`
+  to derive baseline TOR requirements automatically.
+
+- **`setup` skill — `Security Baseline` static section.** Setup now audits CLAUDE.md for a
+  `Security Baseline` section covering the load-bearing negative invariants that are NOT
+  derived as TORs (because "do not X" is hard to verify by Given/When/Then):
+  - No `shell=True` / `eval` with user input
+  - No logging of secrets or PII
+  - No secrets committed to the repo
+
+  The section is written verbatim — not customized per project — and is reviewed by
+  `/peak-workflow:start` and `/peak-workflow:wrapup`, not derived as TORs.
+
+- **`setup` skill — Step 7: Audit Repo Hygiene Files.** New step that audits the load-bearing
+  repo-root files and CI / build artifacts that mature projects maintain:
+  - `README.md` — detect-and-stub (offers a stub with project-type-aware install / quick-start)
+  - `CHANGELOG.md` — detect-and-stub (Keep-a-Changelog 1.1.0 format)
+  - `LICENSE` — detect-and-warn (legal artifact; not auto-generated)
+  - `.gitignore` — detect file presence; on `WEAK`, surface missing high-signal entries
+    (`.env`, build/dependency dirs by stack, editor / OS files)
+  - CI configuration — detect across GitHub Actions, GitLab CI, CircleCI, Azure Pipelines,
+    Bitbucket Pipelines, Jenkins; warn if absent
+  - Lockfile — detect by tech stack (npm/yarn/pnpm/bun for Node, poetry/uv/pipfile for
+    Python, Cargo for Rust, go.sum for Go, etc.); warn if absent
+
+  Items that carry legal weight or must come from the build toolchain (LICENSE, CI config,
+  lockfile) are detect-and-warn only; setup does not auto-create them.
+
+- **`capture-requirements` Step 3A.2.1: Baseline Tool Hygiene TORs.** New sub-step that
+  reads the `Tool Hygiene & Operability` section of CLAUDE.md and ensures at least one TOR
+  requirement covers each active (non-`N/A`) line. Default shall-statement forms are
+  provided for both CLI and web-app project types; project-specific declarations in
+  CLAUDE.md override the defaults. Baseline TORs are placed in the most appropriate
+  functional-area feature file (typically the first — `01-cli`, `01-app`, etc.) and lead
+  the file's TORs.
+
+- **`capture-requirements` Step 4: Tool Hygiene rows in the trace table.** Each active
+  Tool Hygiene line in CLAUDE.md is enumerated as a trace-table input row, ensuring it
+  maps explicitly to one or more TOR IDs.
+
+- **`capture-requirements` Step 5: Tool Hygiene coverage quality check.** New quality check
+  rejects a capture run that leaves any active Tool Hygiene line uncovered.
+
+### Changed
+
+- **`capture-requirements` Step 1: Load Context** — explicitly captures the
+  `Tool Hygiene & Operability` and `Security Baseline` sections from CLAUDE.md. If the
+  Tool Hygiene section is missing, the skill warns and asks whether to continue without
+  baseline TORs or stop and run `/peak-workflow:setup` first. Existing projects that
+  pre-date v1.3.0 are not blocked.
+
+- **`capture-requirements` Step 7: Present Summary** — adds two new lines to the
+  "By the Numbers" output: baseline tool-hygiene TOR count, and Tool Hygiene lines
+  covered out of total.
+
+### Notes
+
+- v1.3.0 is **non-breaking** for existing projects. Projects that have not yet run setup
+  with the v1.3.0 audit can continue to use `/peak-workflow:capture-requirements` without
+  baseline TORs (warn-and-continue path). Re-run `/peak-workflow:setup` to add the
+  `Tool Hygiene & Operability` and `Security Baseline` sections, then re-run capture to
+  pick up baseline TORs.
+
+- The `Security Baseline` section is universal and not customized. It is loaded into
+  every session via CLAUDE.md and is reviewed during `/peak-workflow:start` and
+  `/peak-workflow:wrapup` rather than verified by TOR Given/When/Then — TORs verify
+  positive observable behavior, and "do not X" invariants are a poor fit for that shape.
+
+---
+
+## [1.2.0] — 2026-05-04
+
+### Changed
+
+- **`capture-requirements` FEATURE_TEMPLATE.md** — restructured to make the
+  "one artifact, two roles" principle explicit. The Scenario title is now stated as the
+  formal `shall` statement (the requirement) and the Given/When/Then is stated as its
+  verification procedure (the test case). No separate `Requirement:` or `Verification:`
+  fields are introduced — the existing Gherkin shape carries both roles. Adds:
+  - A "Core Principle" section explaining the requirement-and-test-in-one-artifact discipline
+    in the spirit of DO-330 TQL-5.
+  - A "Gherkin Subset Used" table that explicitly lists encouraged features
+    (Doc Strings `"""`, Data Tables, inline `# Note:` blocks, section banner comments) and
+    excluded features (Tags, `Background:`, `Rule:`, `Scenario Outline` / `Examples:`).
+  - A worked CLI example demonstrating Doc Strings for multi-line config content and a Data
+    Table for tabular expected output.
+  - Explicit guidance that step vocabulary stays generic plain English in the template, while
+    application-specific dialect emerges over time as the project's test step library matures
+    — particularly when a structured logger is part of the application.
+
+### Added
+
+- **PM persona principle: shall-form Scenario titles** — `capture-requirements` Step 3A.2 now
+  states that the Scenario title carries the full shall statement and is the formal
+  requirement, with the Given/When/Then as the verification procedure.
+- **Quality check: shall-form titles** — Step 5 verifies that every Scenario title (after
+  the `[TOR-NN-XXXXXXX]` tag) is a full sentence containing the word `shall`. Fragments,
+  bare noun phrases, and weakened modal verbs (`should` / `will` / `may` / `must` / `can`)
+  in the normative slot are rejected.
+- **Quality check: Gherkin subset enforcement** — Step 5 rejects use of `@tags`,
+  `Background:`, `Rule:`, and `Scenario Outline` / `Examples:` in feature files.
+
+### Notes
+
+- Existing `.feature.md` files in projects that already follow the convention require no
+  migration — the change is a clarification of the convention, not a breaking change to the
+  artifact format. New feature files written by `capture-requirements` will use the richer
+  Gherkin subset (Doc Strings, Data Tables, inline `# Note:` blocks) where it adds clarity.
+
+---
+
 ## [1.1.0] — 2026-05-01
 
 ### Added
