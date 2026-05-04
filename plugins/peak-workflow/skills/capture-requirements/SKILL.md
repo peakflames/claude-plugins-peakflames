@@ -56,7 +56,27 @@ The user's request / brownfield description: $ARGUMENTS
 
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
-   already in context.
+   already in context. Specifically capture, if present:
+   - **`Tool Hygiene & Operability` section** — Project type and the active (non-`N/A`)
+     mechanism declarations. These drive the baseline TORs in Step 3A.2.1.
+   - **`Security Baseline` section** — Note its presence. Security Baseline items are NOT
+     derived as TORs (they are negative invariants); they are passed forward to `/start`
+     and `/wrapup` via CLAUDE.md, which is auto-loaded on every session.
+
+   If the `Tool Hygiene & Operability` section is missing, warn but allow continuation
+   (the project may pre-date this convention or be opting out):
+   > `Tool Hygiene & Operability` section not found in `CLAUDE.md`. Baseline tool-hygiene
+   > TORs (version exposure, log startup stamping, logging convention, exit codes,
+   > stdout/stderr discipline, error-message standards) will NOT be derived. To enable
+   > baseline TORs, run `/peak-workflow:setup` to add the section, then re-run
+   > `/peak-workflow:capture-requirements`. Continuing without baseline TORs.
+
+   Use `AskUserQuestion`:
+   - Question: `"Tool Hygiene & Operability section is missing from CLAUDE.md — continue without baseline TORs, or stop to run /setup first?"`
+   - Options: `["Continue without baseline TORs", "Stop — I'll run /peak-workflow:setup first"]`
+
+   If the user chooses Stop, end here. Otherwise, set an internal flag
+   `tool_hygiene_section_present = false` and proceed; Step 3A.2.1 will be skipped.
 2. Read `docs/product-vision-planning/product-vision.md`. If missing or skeleton (no
    substantive `## 2. Problem Statement` content), stop:
    > Run `/peak-workflow:discover` first to produce the product vision document.
@@ -160,9 +180,13 @@ changes and proceed.
 
 ### 3A.2: Requirement Derivation
 
-For each functional area, derive discrete "the system shall …" requirements. Each requirement
-must be:
+For each functional area, derive discrete "The {subject} shall …" requirements. Each
+requirement must be:
 
+- **Authored as a single Scenario where the title carries the full shall statement.** The
+  Scenario title is the formal requirement; the Given/When/Then is the verification procedure
+  that demonstrates it. There is no separate "Requirement:" or "Verification:" field — one
+  Scenario, two roles. See `FEATURE_TEMPLATE.md` "Core Principle" for the full rationale.
 - **Independently verifiable** — one Given/When/Then per requirement, testable in isolation.
 - **Observable from the outside** — black-box, testable without reading source code.
 - **Traceable** — maps to at least one of: a ConOps scenario step, a PV section/goal, or a
@@ -174,6 +198,64 @@ One ConOps scenario step often yields **multiple requirements**:
 - Edge cases (boundary values, empty states, maximum limits)
 - Error handling and user feedback (what the system communicates when things go wrong)
 - Accessibility and usability expectations (where applicable)
+
+### 3A.2.1: Baseline Tool Hygiene TORs
+
+If `tool_hygiene_section_present = false` (Step 1), skip this sub-step entirely.
+
+Otherwise, after deriving requirements from the vision and ConOps, ensure the
+`Tool Hygiene & Operability` section of `CLAUDE.md` is fully covered by TOR requirements.
+For each active line in that section (non-`N/A`), derive at least one TOR — written in
+normal Scenario form, with the Scenario title as a complete `shall` statement matching the
+mechanism declared in `CLAUDE.md`.
+
+Place baseline TORs in the **most appropriate functional-area feature file** (typically
+the first feature file — `01-cli.feature.md` for CLI tools, `01-app.feature.md` for web
+apps, `01-service.feature.md` for services, `01-api.feature.md` for libraries / SDKs).
+If the natural functional area is not the first file (e.g., logging baseline belongs in a
+dedicated `NN-logging.feature.md`), use that file instead.
+
+The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
+override them.
+
+| Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) |
+|---|---|---|
+| **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page |
+| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level |
+| **Logging convention** | The tool shall emit log records at the levels DEBUG, INFO, WARN, and ERROR, in the format declared in CLAUDE.md (structured JSON / key=value / human-readable) | (same — substitute "web application") |
+| **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A |
+| **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A |
+| **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action |
+
+For each baseline TOR, write a concrete, observable Given/When/Then. Examples:
+
+```gherkin
+Scenario: [TOR-01-{XXXXXXX}] The tool shall report its name and semantic version to standard output when invoked with --version, exiting with code 0
+    Given the user passes the commandline args '--version'
+    When the Tool is Run
+    Then the standard output should contain a line matching /^myapp v\d+\.\d+\.\d+$/
+    And the exit code should be 0
+
+Scenario: [TOR-NN-{XXXXXXX}] The tool shall emit a log line at startup containing its name and semantic version at INFO level
+    Given the tool is invoked with any valid argument
+    When the Tool is Run
+    Then the standard error log should contain an INFO record matching /^\[INFO\] myapp v\d+\.\d+\.\d+ /
+    And the log record should be the first record emitted
+
+Scenario: [TOR-NN-{XXXXXXX}] The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation
+    Given the user passes the commandline args '--bogus-flag'
+    When the Tool is Run
+    Then the exit code should be 2
+    And the standard error should contain the string "Try 'myapp --help' for usage."
+```
+
+**Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
+`CLAUDE.md` will mark `Exit code convention: N/A — not a CLI tool` and
+`stdout / stderr discipline: N/A` — those rows produce no baseline TORs.
+
+**Generate baseline TORs BEFORE non-baseline TORs in each affected feature file.** They
+should occupy the leading TOR positions in the file. Domain-specific TORs derived from
+vision / ConOps follow.
 
 ### 3A.3: TOR ID Generation
 
@@ -325,6 +407,10 @@ internal scratch.
 - Every MVP goal, in-scope feature, and success criterion from PV Sections 5–6
 - Every item under "New Capabilities Identified" in the brownfield changelog (if consumed)
 - User-stated priorities from `$ARGUMENTS` (if non-empty)
+- **Every active (non-`N/A`) line in the `Tool Hygiene & Operability` section of `CLAUDE.md`,
+  if `tool_hygiene_section_present = true`.** Cite each as `CLAUDE.md Tool Hygiene: {line label}`
+  (e.g., `CLAUDE.md Tool Hygiene: Version exposure`). Each must map to at least one
+  baseline TOR generated in Step 3A.2.1.
 
 **Rules:**
 - An input may map to multiple TOR IDs — list all.
@@ -345,10 +431,21 @@ Before presenting the summary, verify:
 - [ ] Every `{XXXXXXX}` suffix is 7 alphanumeric characters, not all-digit.
 - [ ] No TOR ID collisions across all feature files and all pre-existing IDs.
 - [ ] Every `Scenario:` has at least one `Given`, one `When`, and one `Then` line.
+- [ ] Every `Scenario:` title, after the `[TOR-NN-XXXXXXX]` tag, is a full sentence
+  containing the word `shall` (e.g., `The tool shall …`, `The system shall …`). Reject
+  fragments, bare noun phrases, and titles using `should` / `will` / `may` / `must` / `can`
+  in the normative slot.
+- [ ] No use of Gherkin features the template excludes: no `@tags`, no `Background:`,
+  no `Rule:`, no `Scenario Outline` / `Examples:`. Use Doc Strings (`"""`) and Data Tables
+  for multi-line literal content and tabular data where they aid readability.
 - [ ] Every `Feature:` has the `As a … / I want … / So that …` triad.
 - [ ] Every `.feature.tracing.json` sidecar exists for every `.feature.md` file.
 - [ ] No `coverage_gaps` with `gap_type: "orphan_requirement"` remain unaddressed.
   (Orphan requirements must either gain a source trace or be removed.)
+- [ ] If `tool_hygiene_section_present = true`: every active (non-`N/A`) line in
+  `CLAUDE.md`'s `Tool Hygiene & Operability` section is covered by at least one TOR
+  in the produced feature files. The trace appears in the Step 4 trace table with the
+  source `CLAUDE.md Tool Hygiene: {line label}` and `Explicit? = Y`.
 
 ---
 
@@ -379,8 +476,10 @@ Preserve the original timestamp. The `.processed` suffix prevents re-consumption
 ### By the Numbers
 - Functional areas (feature files): {N}
 - Total TOR requirements: {K}
+- Baseline tool-hygiene TORs: {H} [or "skipped — Tool Hygiene section absent"]
 - ConOps scenario steps covered: {X} of {Y}
 - Product Vision goals/scope items covered: {A} of {B}
+- Tool Hygiene lines covered: {T} of {U} [omit row if section absent]
 - Tracing gaps resolved: {M}
 
 ### Coverage Gaps (explicitly deferred)
