@@ -4,42 +4,33 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 
 ## Plugins
 
+> **Recommended:** `peak-workflow` is the preferred plugin for new projects. It introduces a
+> formal requirements baseline (Gherkin-style TOR requirements) that makes acceptance criteria
+> explicit, immutable, and independently verifiable — eliminating the ambiguity of prose
+> checklists. Existing `epic-workflow` projects can migrate using
+> `/peak-workflow:migrate-from-epic-workflow`.
+
 | Plugin | Description |
 |--------|-------------|
-| [epic-workflow](plugins/epic-workflow/) | Structured epic-based project lifecycle — discovery, planning, implementation, verification, and documentation refresh |
+| [peak-workflow](plugins/peak-workflow/) ⭐ | Requirements-driven development lifecycle — formal Gherkin TOR requirements serve as the single source of truth for acceptance criteria, test derivation, and verification |
+| [epic-workflow](plugins/epic-workflow/) | Structured epic-based project lifecycle — discovery, planning, implementation, and verification using prose acceptance criteria |
 
 ## Installation
 
 1. Start Claude Code CLI
-2. Run the following command
-
+2. Add the marketplace:
    ```bash
    /plugin marketplace add https://github.com/peakflames/claude-plugins-peakflames.git
    ```
-
-3. Next run the following command
-
+3. Install your plugin:
+   ```bash
+   /plugin install peak-workflow
    ```
-   /plugin install epic-workflow
-   ```
-
 4. Restart Claude Code
 
-## Epic Workflow Skills
-
-| Command | Purpose |
-|---------|---------|
-| `/epic-workflow:discover` | Adaptive interview producing product vision and ConOps docs |
-| `/epic-workflow:plan-project` | Derive implementation plan with phases, epics, and specs |
-| `/epic-workflow:setup` | Audit CLAUDE.md, stub architecture and design docs |
-| `/epic-workflow:add` | Add new epic(s) from natural language |
-| `/epic-workflow:start N` | Implement epic N with full planning and verification |
-| `/epic-workflow:wrapup N` | Independent review, close out, orient to next |
-| `/epic-workflow:pause` | Save progress mid-epic for later resumption |
-| `/epic-workflow:status` | Read-only project dashboard |
-| `/epic-workflow:refresh-docs` | Sync architecture and design docs to as-built state |
-
-See [epic-workflow/README.md](plugins/epic-workflow/README.md) for full documentation.
+For full documentation, see each plugin's README:
+- [peak-workflow/README.md](plugins/peak-workflow/README.md)
+- [epic-workflow/README.md](plugins/epic-workflow/README.md)
 
 ## License
 
