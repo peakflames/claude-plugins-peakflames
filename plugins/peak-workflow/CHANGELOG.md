@@ -6,6 +6,33 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] — 2026-05-08
+
+### Changed (BREAKING for skill names)
+
+- **Renamed `/peak-workflow:start` → `/peak-workflow:start-epic`** and **`/peak-workflow:wrapup` → `/peak-workflow:wrapup-epic`.**
+  The original names were ambiguous for newcomers — `/start` reads as "start the project" but
+  actually meant "start working on an epic." The new names are self-describing.
+  Trigger phrases ("start epic", "wrapup epic", "let's work on epic N") are unchanged.
+  Existing handoff files and CHANGELOG entries that reference the old skill names are left
+  as historical record.
+
+### Added
+
+- **`/peak-workflow:new-project` skill.** Front-door router for newcomers. Detects project
+  state (greenfield, brownfield epic-workflow project, or existing peak-workflow project) and
+  dispatches to the correct entry point via the Skill tool. Writes no state files; mirrors the
+  dispatch pattern of `/peak-workflow:triage`.
+
+### Documentation
+
+- **README rewritten with newcomer-first ordering.** Greenfield Quick Start, "Where do I
+  start?" callout, and project-state-rooted mermaid promoted to the top. Reference content
+  (artifact hierarchy, TOR format, epic spec structure) moved below the onboarding flow.
+  Skills table grouped by lifecycle phase rather than flat list.
+
+---
+
 ## [1.3.0] — 2026-05-04
 
 ### Added
