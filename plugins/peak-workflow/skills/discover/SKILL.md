@@ -63,9 +63,9 @@ Before the discovery interview, verify that `/peak-workflow:setup` has been run:
    grep -qiE "Verification.*Quality|Quality.*Gates" CLAUDE.md && echo "found" || echo "missing"
    ```
 2. If **missing**, print a non-blocking advisory and continue — discovery can proceed now, but
-   setup must be run before the first `/peak-workflow:start`:
+   setup must be run before the first `/peak-workflow:start-epic`:
    > **Setup Advisory:** `CLAUDE.md` does not have a "Verification & Quality Gates" section.
-   > `/peak-workflow:start` and `/peak-workflow:wrapup` both require this section. Consider
+   > `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` both require this section. Consider
    > running `/peak-workflow:setup` before or immediately after this discovery session — it
    > audits `CLAUDE.md` and stubs `docs/architecture.md` and `docs/design-notes.md` as well.
 3. If **found**, continue without comment.

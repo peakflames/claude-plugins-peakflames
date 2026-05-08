@@ -450,8 +450,8 @@ For each epic with `status: Not Started` in its sidecar:
 
 > The TOR requirement IDs listed below are the acceptance criteria and verification baseline
 > for this epic. Each ID maps to a Gherkin scenario in the referenced feature file.
-> `/peak-workflow:start` reads each TOR's Given/When/Then to drive implementation and tests.
-> `/peak-workflow:wrapup` independently verifies each TOR's Given/When/Then is satisfied.
+> `/peak-workflow:start-epic` reads each TOR's Given/When/Then to drive implementation and tests.
+> `/peak-workflow:wrapup-epic` independently verifies each TOR's Given/When/Then is satisfied.
 
 | TOR ID | Feature File | Scenario Title |
 |--------|--------------|----------------|
@@ -528,8 +528,8 @@ before starting discovery.
 3. `/peak-workflow:capture-requirements` — Derive TOR requirements → .feature.md + .feature.tracing.json (on docs/ branch)
 4. `/peak-workflow:plan-project` — Derive epics from TOR IDs → phase indexes + epic specs + sidecars (on docs/ branch)
 5. Merge docs/ branch — requirements and plan baseline approved
-6. `/peak-workflow:start <id>` — Implement epic (TOR-driven tasks + verification)
-7. `/peak-workflow:wrapup <id>` — Independent TOR verification, complete, ship
+6. `/peak-workflow:start-epic <id>` — Implement epic (TOR-driven tasks + verification)
+7. `/peak-workflow:wrapup-epic <id>` — Independent TOR verification, complete, ship
 
 **Other commands:**
 - `/peak-workflow:triage <issue|description>` — Route → HEAVY / EPIC / TRIVIAL
@@ -579,9 +579,9 @@ traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capt
 1. Run `/peak-workflow:discover` to establish or update the product vision and ConOps.
 2. Run `/peak-workflow:capture-requirements` to derive TOR requirements from the vision/ConOps.
 3. Run `/peak-workflow:plan-project` to derive epics that implement the TOR requirements.
-4. Run `/peak-workflow:start <id>` to implement each epic — tests are derived from
+4. Run `/peak-workflow:start-epic <id>` to implement each epic — tests are derived from
    TOR Given/When/Then.
-5. Run `/peak-workflow:wrapup <id>` to independently verify each TOR requirement is satisfied.
+5. Run `/peak-workflow:wrapup-epic <id>` to independently verify each TOR requirement is satisfied.
 
 ## Migrated from epic-workflow
 

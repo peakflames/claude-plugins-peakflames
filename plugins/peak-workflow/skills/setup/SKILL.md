@@ -25,8 +25,8 @@ Check for the presence and completeness of each section below. Report a status f
 | **Tech Stack** | Lists the languages, frameworks, package manager, and key libraries used |
 | **Local Environment** | Documents how to run the backend and frontend locally, whether the API is live and functional, and the preference for live data over mocking during verification |
 | **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
-| **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start` and `/peak-workflow:wrapup`, not derived as TORs. |
-| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start`, `/peak-workflow:wrapup`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
+| **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`, not derived as TORs. |
+| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
@@ -157,7 +157,7 @@ alternate path.`
 This section is a static set of coding-standard reminders. They are NOT customized per
 project — write the section verbatim. The reminders are not derived as TORs because they
 are negative invariants ("do not X") that are hard to verify by Given/When/Then. They are
-reviewed by `/peak-workflow:start` (during implementation) and `/peak-workflow:wrapup`
+reviewed by `/peak-workflow:start-epic` (during implementation) and `/peak-workflow:wrapup-epic`
 (during independent review).
 
 Generate the section verbatim:
@@ -168,7 +168,7 @@ Generate the section verbatim:
 These are coding-standard reminders that apply to every epic. They are NOT requirements —
 TORs verify positive observable behavior, and "do not X" invariants are hard to express as
 Given/When/Then. They MUST be respected during implementation and reviewed during
-`/peak-workflow:wrapup`.
+`/peak-workflow:wrapup-epic`.
 
 **No `shell=True` / `eval` with user input.**
 Never pass user-supplied data to a shell interpreter without escaping. In Python, prefer
@@ -180,21 +180,21 @@ or `Function()` constructors on user input.
 Tokens, passwords, API keys, session IDs, and personally identifiable information must
 never appear in logs. The structured logger should redact known-sensitive keys
 (`password`, `token`, `secret`, `api_key`, `authorization`, `cookie`, etc.). Review log
-output during `/peak-workflow:wrapup` for accidental leakage.
+output during `/peak-workflow:wrapup-epic` for accidental leakage.
 
 **No secrets committed to the repo.**
 `.env`, credential files, private keys, and any configuration containing real secrets must
 be in `.gitignore`. Use environment variables, secret managers, or encrypted files (e.g.,
 `sops`, `age`) for sensitive configuration.
 
-`/peak-workflow:wrapup` includes these as default review items unless the project type
+`/peak-workflow:wrapup-epic` includes these as default review items unless the project type
 makes them inapplicable.
 ```
 
 **Peak Workflow** (if missing):
 - Where does the requirements baseline live? (default: `docs/requirements/`)
 - Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard)
-- Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start <id>`, `/peak-workflow:wrapup <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
 
 **Verification & Quality Gates** (if missing):
 - What checks should run before an epic is marked complete? Ask about each:
@@ -212,7 +212,7 @@ like `pytest`, `npm`, `dotnet`, `make`, `cargo`, `go test`, etc.), prompt once:
 > That looks like a description rather than a shell command. What's the exact command to run?
 > For example: `pytest tests/`, `npm test`, `dotnet test`, `make check`
 If the second answer is still ambiguous, accept it and add a note in the written section:
-> *(Command may need refinement — update CLAUDE.md before the first `/peak-workflow:start`)*
+> *(Command may need refinement — update CLAUDE.md before the first `/peak-workflow:start-epic`)*
 
 **Important Reminders** (if missing):
 - Any project-specific constraints or gotchas that Claude should always know about?
@@ -354,9 +354,9 @@ traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capt
 1. Run `/peak-workflow:discover` to establish or update the product vision and ConOps.
 2. Run `/peak-workflow:capture-requirements` to derive TOR requirements from the vision/ConOps.
 3. Run `/peak-workflow:plan-project` to derive epics that implement the TOR requirements.
-4. Run `/peak-workflow:start <id>` to implement each epic — tests are derived from
+4. Run `/peak-workflow:start-epic <id>` to implement each epic — tests are derived from
    TOR Given/When/Then.
-5. Run `/peak-workflow:wrapup <id>` to independently verify each TOR requirement is satisfied.
+5. Run `/peak-workflow:wrapup-epic <id>` to independently verify each TOR requirement is satisfied.
 ```
 
   Report: `[PASS] Requirements directory — created docs/requirements/README.md stub`
@@ -479,7 +479,7 @@ After all decision sections, add:
 
 Inform the user:
 > Created `docs/architecture.md` and `docs/design-notes.md` as planning stubs.
-> These will be read by `/peak-workflow:start` for context and updated by `/peak-workflow:refresh-docs` after implementation.
+> These will be read by `/peak-workflow:start-epic` for context and updated by `/peak-workflow:refresh-docs` after implementation.
 
 ## Step 7: Audit Repo Hygiene Files
 
@@ -680,10 +680,10 @@ Remind the user:
   version exposure, log startup stamping, logging convention, exit codes (CLI),
   stdout/stderr discipline (CLI), and error-message standards. Lines marked `N/A` are
   skipped.
-- The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:start`
-  during implementation and by `/peak-workflow:wrapup` during independent review. These
+- The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:start-epic`
+  during implementation and by `/peak-workflow:wrapup-epic` during independent review. These
   reminders are not derived as TORs.
-- `docs/architecture.md` and `docs/design-notes.md` are read by every `/peak-workflow:start` and `/peak-workflow:wrapup` for context
+- `docs/architecture.md` and `docs/design-notes.md` are read by every `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` for context
 - For any `[MISS]` items in the Repo Hygiene audit (Step 7) that you did not resolve in
   this session — particularly LICENSE, CI configuration, and the lockfile — address them
   before publishing the project externally or merging significant work

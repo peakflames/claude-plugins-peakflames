@@ -1,5 +1,5 @@
 ---
-name: start
+name: start-epic
 description: |
   Implements an epic — loads spec, loads TOR requirements from feature files, plans with
   TOR-driven user story tasks, implements, and verifies each TOR's Given/When/Then.
@@ -39,7 +39,7 @@ Follow these steps exactly:
     If any cited feature file is missing, stop immediately:
     > Feature file `{path}` is not present on branch `{current-branch}`. If you ran
     > `/peak-workflow:capture-requirements` on a `docs/` branch, that branch must be merged to
-    > the base branch (`develop` / `main`) before running `/peak-workflow:start` — TOR files
+    > the base branch (`develop` / `main`) before running `/peak-workflow:start-epic` — TOR files
     > travel with the docs/ branch and are only available after the merge.
     >
     > To fix:
@@ -137,7 +137,7 @@ Build the plan from:
 - Any context from previous handoff files (decisions made, patterns established)
 - Any reference materials surfaced by Step 1 item 12
 
-**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps** and **Closing steps** sections into your plan verbatim — substituting the placeholders (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
+**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps** and **Closing steps** sections into your plan verbatim — substituting the placeholders (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
 
 ## Step 5: Execute the Plan
 

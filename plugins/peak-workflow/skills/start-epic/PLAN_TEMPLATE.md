@@ -1,4 +1,4 @@
-# Plan Template — `/peak-workflow:start`
+# Plan Template — `/peak-workflow:start-epic`
 
 This file is the lifecycle template that `start` Step 4 plans must follow. Copy the Opening
 and Closing sections verbatim into your plan, substituting placeholders with values derived
@@ -150,9 +150,9 @@ Middle step example:
 - **Present next steps** — output this block exactly:
   > ---
   > **Next steps**
-  > - Open a new session and run `/peak-workflow:wrapup $ARGUMENTS` to independently verify
+  > - Open a new session and run `/peak-workflow:wrapup-epic $ARGUMENTS` to independently verify
   >   each TOR requirement's Given/When/Then and close out this epic
   > - Or run `/peak-workflow:status` to review overall project progress and requirements coverage
   > - If something needs fixing before wrapup, make the changes and re-run
-  >   `/peak-workflow:start $ARGUMENTS` to continue on the same branch
+  >   `/peak-workflow:start-epic $ARGUMENTS` to continue on the same branch
   > ---

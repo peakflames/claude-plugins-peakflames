@@ -134,7 +134,7 @@ Skip this step only if the epic is entirely greenfield with no connection to exi
 
 ## Step 6: Write the Epic Spec(s)
 
-Create the epic spec file(s) following the **required structure** below. `/peak-workflow:start` and `/peak-workflow:wrapup` depend on this exact format — particularly the Requirements Anchors table.
+Create the epic spec file(s) following the **required structure** below. `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` depend on this exact format — particularly the Requirements Anchors table.
 
 ### File Location
 
@@ -166,8 +166,8 @@ coverage.}
 
 > The TOR requirement IDs listed below are the acceptance criteria and verification baseline for
 > this epic. Each ID maps to a Gherkin scenario in the referenced feature file.
-> `/peak-workflow:start` reads each TOR's Given/When/Then to drive implementation and tests.
-> `/peak-workflow:wrapup` independently verifies each TOR's Given/When/Then is satisfied.
+> `/peak-workflow:start-epic` reads each TOR's Given/When/Then to drive implementation and tests.
+> `/peak-workflow:wrapup-epic` independently verifies each TOR's Given/When/Then is satisfied.
 > If a feature file has been updated since this spec was written and a scenario no longer matches
 > its cited TOR ID, stop and surface the discrepancy to the user before proceeding — do not
 > silently implement against stale requirements.
@@ -313,8 +313,8 @@ Show the user what was created:
 - Out-of-scope items explicitly struck: {list, or "none"}
 
 ### Ready to implement
-Run `/peak-workflow:start {id}` when ready to begin (in a fresh session for clean context).
-Note: `/peak-workflow:start` loads TOR requirements from the feature files listed in the
+Run `/peak-workflow:start-epic {id}` when ready to begin (in a fresh session for clean context).
+Note: `/peak-workflow:start-epic` loads TOR requirements from the feature files listed in the
 Requirements Anchors table — ensure those feature files are on develop (merged) before starting.
 ```
 

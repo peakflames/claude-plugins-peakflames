@@ -60,8 +60,8 @@ The user's request / brownfield description: $ARGUMENTS
    - **`Tool Hygiene & Operability` section** — Project type and the active (non-`N/A`)
      mechanism declarations. These drive the baseline TORs in Step 3A.2.1.
    - **`Security Baseline` section** — Note its presence. Security Baseline items are NOT
-     derived as TORs (they are negative invariants); they are passed forward to `/start`
-     and `/wrapup` via CLAUDE.md, which is auto-loaded on every session.
+     derived as TORs (they are negative invariants); they are passed forward to `/start-epic`
+     and `/wrapup-epic` via CLAUDE.md, which is auto-loaded on every session.
 
    If the `Tool Hygiene & Operability` section is missing, warn but allow continuation
    (the project may pre-date this convention or be opting out):
