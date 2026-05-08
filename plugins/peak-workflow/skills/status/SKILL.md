@@ -170,11 +170,11 @@ Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2),
 ## Suggested Next Action
 
 [Based on the current state, recommend what to do next:
- - If there's an "In Progress" epic: "Continue working on Epic <id> with `/peak-workflow:start <id>`"
- - If there's an "Implemented" epic awaiting review: "Review Epic <id> with `/peak-workflow:wrapup <id>`"
+ - If there's an "In Progress" epic: "Continue working on Epic <id> with `/peak-workflow:start-epic <id>`"
+ - If there's an "Implemented" epic awaiting review: "Review Epic <id> with `/peak-workflow:wrapup-epic <id>`"
  - If there's a stale paused epic: "Resume or close paused Epic <id> — it's been [X] days"
  - If there are "Specified" TOR IDs (no epic): "Run `/peak-workflow:add` to assign [N] unplanned TOR requirements to epics"
- - If there are ready-to-start epics: "Start Epic <id> with `/peak-workflow:start <id>`"
+ - If there are ready-to-start epics: "Start Epic <id> with `/peak-workflow:start-epic <id>`"
  - If all epics are complete and all TOR IDs are Verified: "All requirements verified! Consider `/peak-workflow:refresh-docs` before release."
- - If all epics are complete but some TOR IDs still show Implemented (not Verified): "Run `/peak-workflow:wrapup <id>` to complete independent verification of remaining epics."]
+ - If all epics are complete but some TOR IDs still show Implemented (not Verified): "Run `/peak-workflow:wrapup-epic <id>` to complete independent verification of remaining epics."]
 ```

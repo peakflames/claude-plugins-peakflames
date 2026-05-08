@@ -12,7 +12,7 @@ description: |
 argument-hint: "<issue-number | free-text description>"
 ---
 
-You are implementing a small fix via the lightweight quick-fix path. Unlike `/peak-workflow:start`, this path does **not** create an epic spec, does **not** touch `docs/implementation-plan/index.md`, and does **not** write a handoff file. The commit message (and optional PR) is the permanent record.
+You are implementing a small fix via the lightweight quick-fix path. Unlike `/peak-workflow:start-epic`, this path does **not** create an epic spec, does **not** touch `docs/implementation-plan/index.md`, and does **not** write a handoff file. The commit message (and optional PR) is the permanent record.
 
 The user's request: $ARGUMENTS
 

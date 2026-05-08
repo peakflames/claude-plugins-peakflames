@@ -6,7 +6,7 @@ description: |
   Triggers on: "pause epic", "stop epic", "save progress",
   "I need to stop for today", "save my progress", "I'm done for now",
   "let's pick this up later".
-  Note: If the user says "I'm done with epic N", check whether they mean pause (stopping mid-work) or wrapup (finished implementation). If all acceptance criteria are checked, suggest /peak-workflow:wrapup instead.
+  Note: If the user says "I'm done with epic N", check whether they mean pause (stopping mid-work) or wrapup (finished implementation). If all acceptance criteria are checked, suggest /peak-workflow:wrapup-epic instead.
 ---
 
 You are pausing the current epic implementation session. This preserves context so the next session can resume exactly where you left off.
@@ -39,7 +39,7 @@ table show PASS or CANNOT VERIFY in the TOR Coverage section, the epic may be re
 > All TOR requirements for Epic <id> appear to be implemented (all show PASS or CANNOT VERIFY
 > in the implemented handoff). This looks like it might be ready for independent verification
 > rather than a pause.
-> Would you like to run `/peak-workflow:wrapup <id>` instead, or do you still want to pause?
+> Would you like to run `/peak-workflow:wrapup-epic <id>` instead, or do you still want to pause?
 
 If no implemented handoff exists yet, use test-file presence for the TOR IDs as a heuristic.
 When in doubt, defer to the user.
@@ -118,6 +118,6 @@ Do NOT push to the remote — leave that for the user to decide.
 
 Tell the user:
 > Epic <id> has been paused and committed. To resume, start a new session and run:
-> `/peak-workflow:start <id>`
+> `/peak-workflow:start-epic <id>`
 > 
 > The start command will automatically read the pause handoff and pick up where you left off.

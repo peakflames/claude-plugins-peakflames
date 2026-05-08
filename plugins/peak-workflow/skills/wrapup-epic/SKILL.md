@@ -1,5 +1,5 @@
 ---
-name: wrapup
+name: wrapup-epic
 description: |
   Independent verification review of a completed epic — verifies each TOR requirement's
   Given/When/Then, closes out, and orients to next steps.
@@ -31,13 +31,13 @@ Do not attempt the skill's normal flow on a legacy layout.
 
 Your goal is to independently confirm the implementation meets the spec. Do not trust the implementer's self-assessment — inspect the code yourself.
 
-> **Safe to re-run:** This command is safe to run multiple times. If a previous wrapup attempt was interrupted or failed, just run `/peak-workflow:wrapup N` again — it will re-verify from scratch.
+> **Safe to re-run:** This command is safe to run multiple times. If a previous wrapup attempt was interrupted or failed, just run `/peak-workflow:wrapup-epic N` again — it will re-verify from scratch.
 
 ### Step 1.1: Load Context
 
 1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
 2. Read `docs/implementation-plan/status/epic-$ARGUMENTS.md` to get the epic's current status. Phase 3 (Orient) loads all phase indexes and sidecars when it walks the dependency graph — Step 1.1 only needs this epic's sidecar.
-3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress` or `status: Not Started`, inform the user that `/peak-workflow:start` must finish first. If `status: Complete`, inform the user it has already been wrapped up.
+3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress` or `status: Not Started`, inform the user that `/peak-workflow:start-epic` must finish first. If `status: Complete`, inform the user it has already been wrapped up.
 4. Read the epic spec file for Epic $ARGUMENTS. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip the `Closes` line later.
 4a. **Load TOR Requirements.** Parse the epic spec's `## Requirements Anchors` table. For each
     row, extract the TOR ID, feature file path, and scenario title. Then, for each TOR ID, open
@@ -229,7 +229,7 @@ This is a disclosure, not a gate — `No` is a perfectly acceptable answer. The 
 
 Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim — legacy integer or 7-char alphanumeric).
 
-Use the template at `plugins/peak-workflow/skills/wrapup/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure.
+Use the template at `plugins/peak-workflow/skills/wrapup-epic/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure.
 
 ### Step 2.2: Update Status Sidecar
 
@@ -347,7 +347,7 @@ be made by the user every invocation.
 3. `git push -u origin <branch>`
 4. `gh pr create --base <base-branch> --title "epic(<id>): <epic name>" --body "<body>"`
 
-   The body follows the template at `plugins/peak-workflow/skills/wrapup/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
+   The body follows the template at `plugins/peak-workflow/skills/wrapup-epic/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
 
    The `Closes #<N>` line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 — if no source issue is known, omit the `Closes` line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way).
 

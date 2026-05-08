@@ -1,4 +1,4 @@
-# PR Body Template — `/peak-workflow:wrapup` team mode
+# PR Body Template — `/peak-workflow:wrapup-epic` team mode
 
 Used by Step 5b. Pass the populated template to `gh pr create --body`. Use literal Unicode
 ✅ ⚠️ ❌ in the Highlights list — not shortcodes, which don't render in GitHub markdown.
@@ -53,5 +53,5 @@ Closes #<N>
 ## Review Notes
 <anything from Phase 1 Code Review worth flagging to the reviewer>
 
-🤖 Generated via /peak-workflow:wrapup
+🤖 Generated via /peak-workflow:wrapup-epic
 ```
