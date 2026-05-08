@@ -13,14 +13,15 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 | Skill | Purpose |
 |-------|---------|
+| `new-project` | Front-door router — detects project state and dispatches to the right entry point |
 | `setup` | Audit CLAUDE.md, stub architecture/design-notes docs (run once before discover) |
 | `discover` | Adaptive interview → product-vision.md + concept-of-operations.md |
 | `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json |
 | `plan-project` | Derive epics from TOR IDs → phase indexes + epic specs + sidecars |
 | `add` | Add new epic(s) referencing existing TOR IDs |
 | `triage` | Route incoming request → HEAVY / EPIC / TRIVIAL |
-| `start` | Implement an epic — TOR-driven plan + tasks + verification |
-| `wrapup` | Independent TOR verification, complete, ship |
+| `start-epic` | Implement an epic — TOR-driven plan + tasks + verification |
+| `wrapup-epic` | Independent TOR verification, complete, ship |
 | `pause` | Save progress mid-epic |
 | `status` | Read-only dashboard — phase progress + Requirements Coverage |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch, no TOR changes |
@@ -61,8 +62,8 @@ trace through each skill prompt as if executing it on a fresh empty repo for a s
 ready to ship.
 
 Prompt template for the simulation agent:
-> Read each SKILL.md in greenfield order (setup → discover → capture-requirements →
-> plan-project → start → wrapup) and simulate executing it on a fresh empty repo for
+> Read each SKILL.md in greenfield order (new-project → setup → discover → capture-requirements →
+> plan-project → start-epic → wrapup-epic) and simulate executing it on a fresh empty repo for
 > [project description]. Report any step that would block, confuse, or produce wrong
 > output. For each gap: Severity (Critical / UX / Minor), Skill, Step, Problem, Fix.
 

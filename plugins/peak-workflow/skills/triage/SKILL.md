@@ -88,7 +88,7 @@ Output this block:
 **Recommended next command:** <the exact slash command to run>
 ```
 
-Do **not** recommend or hint at a ship mode (solo vs team). That choice belongs to the user at ship time and will be asked explicitly by `/peak-workflow:quick-fix` or `/peak-workflow:wrapup`.
+Do **not** recommend or hint at a ship mode (solo vs team). That choice belongs to the user at ship time and will be asked explicitly by `/peak-workflow:quick-fix` or `/peak-workflow:wrapup-epic`.
 
 ## Step 5: Ask and Dispatch
 
@@ -130,7 +130,7 @@ Constructing `<args>`:
   Example: `[issue #42] Add CSV export to supplier list — users need to hand the list to procurement; must respect current filters`
 - **Otherwise** (free-text triage), pass the description verbatim with no prefix.
 
-After `/add` completes, remind the user: the epic spec is written, but `/peak-workflow:start <id>` should be run in a **fresh session** for clean context.
+After `/add` completes, remind the user: the epic spec is written, but `/peak-workflow:start-epic <id>` should be run in a **fresh session** for clean context.
 
 ### If verdict is HEAVY
 

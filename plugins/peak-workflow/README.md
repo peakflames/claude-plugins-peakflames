@@ -1,6 +1,88 @@
 # Peak Workflow
 
-> All slash commands belong to the `peak-workflow` plugin. This README uses the short form (`/discover`, `/start`, etc.) for readability; invoke them with the full form (`/peak-workflow:discover`, `/peak-workflow:start`, etc.) or use the short form if no other plugin uses the same skill name.
+> All slash commands belong to the `peak-workflow` plugin. This README uses the short form (`/discover`, `/start-epic`, etc.) for readability; invoke them with the full form (`/peak-workflow:discover`, `/peak-workflow:start-epic`, etc.) or use the short form if no other plugin uses the same skill name.
+
+## Where do I start?
+
+```
+                Is there an existing project here?
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+              ▼                           ▼
+         No (greenfield)           Yes (brownfield)
+              │                           │
+              ▼                           ▼
+       /peak-workflow:setup    Was it built with epic-workflow?
+              │                           │
+              ▼                  ┌────────┴────────┐
+        /discover                ▼                 ▼
+              │                Yes              No (already
+              ▼                  │              peak-workflow
+   /capture-requirements         ▼              or different)
+              │      /peak-workflow:               │
+              ▼      migrate-from-                 ▼
+       /plan-project   epic-workflow         /triage  or  /status
+              │                  │                 │
+              ▼                  ▼                 ▼
+         iterate via /start-epic / /wrapup-epic / /quick-fix
+```
+
+**If unsure, run `/peak-workflow:new-project`** — it detects project state and dispatches to the right entry point automatically.
+
+## Greenfield Quick Start
+
+```
+/peak-workflow:new-project           → (optional) detect state, dispatches the rest
+/peak-workflow:setup                 → audit CLAUDE.md, stub architecture.md + design-notes.md
+/peak-workflow:discover              → creates docs/ branch, produces vision + ConOps
+/peak-workflow:capture-requirements  → derives TOR requirements on the same docs/ branch
+/peak-workflow:plan-project          → derives epics from TOR IDs on the same docs/ branch
+[merge docs/ branch]                 → requirements and plan baseline approved
+/peak-workflow:start-epic <id>       → implement first epic (tasks = user stories per TOR ID)
+/peak-workflow:wrapup-epic <id>      → independent TOR verification, ship
+```
+
+> **Why run setup first?** `/discover` reads `CLAUDE.md` for project context, and `start-epic` /
+> `wrapup-epic` depend on the Verification & Quality Gates section that `setup` populates.
+> Running discover without setup means quality gates aren't in place until after the planning
+> session — and on a small project, that gap can go unnoticed until the first wrapup fails.
+
+## Brownfield — existing project, no peak-workflow yet
+
+If your project pre-dates peak-workflow but was **not** built with epic-workflow, run the
+greenfield path in **brownfield mode**: `/discover` and `/capture-requirements` both detect
+that vision/ConOps and TOR files already exist (or don't) and adapt accordingly.
+
+```
+/peak-workflow:discover              → brownfield: creates docs/ branch, updates vision + ConOps
+/peak-workflow:capture-requirements  → brownfield: appends new TOR IDs, archives changelog
+/peak-workflow:plan-project          → brownfield: new epics for unplanned TOR IDs
+[merge docs/ branch]                 → delta requirements and new epics approved
+/peak-workflow:start-epic <id>       → implement new epics
+```
+
+## Migration from epic-workflow
+
+If your project was built with `epic-workflow` (epic specs use `## Acceptance Criteria`,
+no `docs/requirements/*.feature.md` files), run the one-shot migration:
+
+```
+/peak-workflow:migrate-from-epic-workflow
+```
+
+The skill is non-destructive, atomic (single revertable commit), and idempotent:
+
+1. **Derives a TOR requirements baseline** from existing vision/ConOps and epic acceptance
+   criteria (hybrid strategy — ConOps-first, refined by epic content).
+2. **Transforms Not-Started epic specs** from Acceptance Criteria format to Requirements
+   Anchors format.
+3. **Updates all status sidecars** with the `requirements:` field.
+4. **Updates CLAUDE.md** to reference peak-workflow commands.
+5. **Lands everything in one commit** — `git revert HEAD` rolls the migration back.
+
+In-Progress, Paused, Implemented, and Complete epics are left untouched and their sidecars
+get `requirements: —`.
 
 ## Philosophy
 
@@ -11,74 +93,98 @@ The formal requirements baseline lives in Gherkin-style `.feature.md` files with
 - The **verification procedure** for wrapup (the Given/When/Then defines exactly what a passing test must demonstrate)
 - An **immutable foreign key** once merged to develop (referenced by epic specs, tests, and handoffs)
 
+> **On ceremony overhead:** the discover → requirements → planning sequence amortizes as the
+> project grows — every new request routes through `/triage`, which tells you whether it needs
+> new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL). For a
+> one-off script, `epic-workflow` may be a better fit.
+
 ## Skills
+
+Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill inventory.
+
+### Bootstrap
+
+| Command | Purpose |
+|---|---|
+| `/new-project` | **Front door for newcomers.** Detects project state (greenfield, brownfield epic-workflow, or existing peak-workflow) and dispatches to the right entry point. Writes no state files. |
+| `/setup` | Audits `CLAUDE.md`, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`. **Run once per project, before `/discover`.** |
+
+### Plan
 
 | Command | Purpose | Branch / Status |
 |---|---|---|
-| `/setup` | Audits `CLAUDE.md`, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md` — **run once per project, before `/discover`** | — |
 | `/discover` | Adaptive interview that produces `product-vision.md` + `concept-of-operations.md` | Creates `docs/{task-short-name}` branch |
 | `/capture-requirements` | Derives TOR requirements (`.feature.md` files + `.feature.tracing.json` sidecars) from vision + ConOps | Continues on `docs/` branch |
 | `/plan-project` | Derives implementation plan (phases, epics, Requirements Anchors specs) from TOR requirements | Continues on `docs/` branch |
 | `/add <description>` | Adds new epic(s) referencing existing TOR IDs | — (writes planning docs) |
 | `/triage <issue\|description>` | Advisory routing — HEAVY (needs new TOR IDs) / EPIC (implements existing TOR IDs) / TRIVIAL (bug in already-implemented TOR) | — (writes no files) |
-| `/quick-fix <issue\|description>` | Lightweight path for trivial bugs in already-implemented TORs — creates `hotfix/` branch, implements, ships | Not tracked in implementation plan |
-| `/start <id>` | Implement the epic — loads TOR Given/When/Then, creates user-story tasks, implements, verifies | Not Started → In Progress → **Implemented** |
-| `/wrapup <id>` | Independent review — verifies each TOR's Given/When/Then is satisfied, closes out, ships | Implemented → **Complete** |
+
+### Implement
+
+| Command | Purpose | Branch / Status |
+|---|---|---|
+| `/start-epic <id>` | Implement the epic — loads TOR Given/When/Then, creates user-story tasks, implements, verifies | Not Started → In Progress → **Implemented** |
+| `/wrapup-epic <id>` | Independent review — verifies each TOR's Given/When/Then is satisfied, closes out, ships | Implemented → **Complete** |
 | `/pause` | Stop mid-epic, save progress | In Progress → **Paused** |
-| `/status` | Read-only dashboard — epic progress, Requirements Coverage, active work, next actions | — (read-only) |
-| `/refresh-docs` | Refresh `architecture.md` + `design-notes.md` to match as-built codebase | — (docs only, not requirements) |
-| `/migrate-2.5` | One-shot migration from legacy `index.md` layout to per-phase indexes + status sidecars | — (migration only) |
-| `/migrate-from-epic-workflow` | One-shot migration from an epic-workflow project — derives TOR baseline, transforms Not-Started specs, updates sidecars and CLAUDE.md | — (migration only) |
+| `/quick-fix <issue\|description>` | Lightweight path for trivial bugs in already-implemented TORs — creates `hotfix/` branch, implements, ships | Not tracked in implementation plan |
+
+### Inspect
+
+| Command | Purpose |
+|---|---|
+| `/status` | Read-only dashboard — epic progress, Requirements Coverage, active work, next actions |
+
+### Maintain
+
+| Command | Purpose |
+|---|---|
+| `/refresh-docs` | Refresh `architecture.md` + `design-notes.md` to match the as-built codebase |
+
+### Migrate
+
+| Command | Purpose |
+|---|---|
+| `/migrate-2.5` | One-shot migration from the legacy single-`index.md` layout to per-phase indexes + status sidecars |
+| `/migrate-from-epic-workflow` | One-shot migration from an epic-workflow project — derives TOR baseline, transforms Not-Started specs, updates sidecars and CLAUDE.md |
+
+## Choosing a Path
+
+The lifecycle has two stages: a one-time bootstrap to get the requirements baseline in place,
+and a recurring iteration loop for incoming work.
+
+```mermaid
+flowchart TD
+    Start[New project /<br/>first time here] --> NP["/new-project<br/>(detects state)"]
+    NP --> NPV{Verdict}
+    NPV -->|Greenfield| Setup["/setup → /discover →<br/>/capture-requirements →<br/>/plan-project"]
+    NPV -->|Brownfield<br/>epic-workflow| Mig["/migrate-from-epic-workflow"]
+    NPV -->|Existing<br/>peak-workflow| Iter
+    Setup --> Merge[merge docs/ branch<br/>= requirements approved]
+    Mig --> Iter
+    Merge --> Iter[Iteration loop]
+
+    Iter --> Req[GitHub issue<br/>or ad-hoc request]
+    Req --> Tri["/triage"]
+    Tri --> Verd{Verdict}
+    Verd -->|HEAVY<br/>new TOR IDs needed| Heavy["docs/ branch:<br/>/discover → /capture-requirements<br/>→ /plan-project"]
+    Verd -->|EPIC<br/>implements existing TOR IDs| Epic["/add → /start-epic → /wrapup-epic"]
+    Verd -->|TRIVIAL<br/>bug in already-implemented TOR| Quick["/quick-fix"]
+    Heavy --> Iter
+    Epic --> Ship{Ship mode}
+    Quick --> Ship
+    Ship -->|team| Team[push + PR<br/>reviewer merges]
+    Ship -->|solo| Solo[local merge<br/>branch deleted]
+```
 
 ## Branch Families
 
 | Branch | Pattern | Scope |
 |---|---|---|
 | Planning | `docs/{task-short-name}` | discover → capture-requirements → plan-project → add (cohesive; merge = approval) |
-| Implementation | `feature/epic-<id>-<short-name>` | start → wrapup |
+| Implementation | `feature/epic-<id>-<short-name>` | start-epic → wrapup-epic |
 | Quick fix | `hotfix/<slug>` or `hotfix/issue-<N>-<slug>` | quick-fix |
 
 **Develop-branch invariant:** anything on `develop` is approved. The merge event (solo merge or team PR) is the approval signature.
-
-## Choosing a Path
-
-```mermaid
-flowchart TD
-    A[GitHub issue<br/>or ad-hoc request] --> B["/triage"]
-    B --> C{Verdict}
-    C -->|HEAVY<br/>new TOR IDs needed| D["docs/ branch:<br/>/discover → /capture-requirements<br/>→ /plan-project"]
-    C -->|EPIC<br/>implements existing TOR IDs| E["/add → /start → /wrapup"]
-    C -->|TRIVIAL<br/>bug in already-implemented TOR| F["/quick-fix"]
-    D --> G[merge docs/ branch<br/>= requirements approved]
-    E --> H{Ship mode}
-    F --> H
-    H -->|team| I[push + PR<br/>reviewer merges]
-    H -->|solo| J[local merge<br/>branch deleted]
-```
-
-## Artifact Hierarchy
-
-```
-docs/product-vision-planning/
-  product-vision.md           ← product intent (written by /discover)
-  concept-of-operations.md    ← user scenarios (written by /discover)
-  changelogs/                 ← brownfield discovery changelogs
-
-docs/requirements/
-  NN-{name}.feature.md        ← TOR requirements (written by /capture-requirements)
-  NN-{name}.feature.tracing.json  ← TOR → vision/ConOps linkage (written by Haiku sub-agent)
-  README.md                   ← conventions (written by /setup)
-
-docs/implementation-plan/
-  phase-N-*/index.md          ← epic registry per phase (epic ID, name, dependencies)
-  phase-N-*/epic-<id>-*.md    ← epic specs with Requirements Anchors tables
-  status/epic-<id>.md         ← status sidecar (status, implemented, completed, requirements:)
-  session-handoffs/           ← implemented and complete handoff files
-  README.md                   ← lifecycle prose (never written by skills after creation)
-
-docs/architecture.md          ← system architecture (stubbed by /setup, refreshed by /refresh-docs)
-docs/design-notes.md          ← design decisions (same)
-```
 
 ## TOR Requirement IDs
 
@@ -116,8 +222,8 @@ tool installation and access usage documentation from the command line.
 
 > The TOR requirement IDs listed below are the acceptance criteria and verification baseline
 > for this epic. Each ID maps to a Gherkin scenario in the referenced feature file.
-> `/peak-workflow:start` reads each TOR's Given/When/Then to drive implementation and tests.
-> `/peak-workflow:wrapup` independently verifies each TOR's Given/When/Then is satisfied.
+> `/peak-workflow:start-epic` reads each TOR's Given/When/Then to drive implementation and tests.
+> `/peak-workflow:wrapup-epic` independently verifies each TOR's Given/When/Then is satisfied.
 
 | TOR ID | Feature File | Scenario Title |
 |--------|--------------|----------------|
@@ -142,36 +248,28 @@ requirements: TOR-01-Afs657G, TOR-01-Bcd2345
 
 The `requirements:` field is how `/peak-workflow:status` computes the Requirements Coverage dashboard.
 
-## Greenfield Project — Quick Start
+## Artifact Hierarchy
 
 ```
-/peak-workflow:setup             → audit CLAUDE.md, stub architecture.md + design-notes.md (run once, before /discover)
-/peak-workflow:discover          → creates docs/ branch, produces vision + ConOps
-/peak-workflow:capture-requirements  → derives TOR requirements on same docs/ branch
-/peak-workflow:plan-project      → derives epics from TOR IDs on same docs/ branch
-[merge docs/ branch]             → requirements and plan baseline approved
-/peak-workflow:start <id>        → implement first epic (tasks = user stories per TOR ID)
-/peak-workflow:wrapup <id>       → independent TOR verification, ship
-```
+docs/product-vision-planning/
+  product-vision.md           ← product intent (written by /discover)
+  concept-of-operations.md    ← user scenarios (written by /discover)
+  changelogs/                 ← brownfield discovery changelogs
 
-> **Why run setup first?** `/discover` reads `CLAUDE.md` for project context, and `start` /
-> `wrapup` depend on the Verification & Quality Gates section that `setup` populates. Running
-> discover without setup means quality gates aren't in place until after the planning session —
-> and on a small project, that gap can go unnoticed until the first wrapup fails.
->
-> **On ceremony overhead:** The discover → requirements → planning sequence amortizes as the
-> project grows — every new request routes through `/triage`, which tells you whether it needs
-> new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL). For a
-> one-off script, `epic-workflow` may be a better fit.
+docs/requirements/
+  NN-{name}.feature.md        ← TOR requirements (written by /capture-requirements)
+  NN-{name}.feature.tracing.json  ← TOR → vision/ConOps linkage (written by Haiku sub-agent)
+  README.md                   ← conventions (written by /setup)
 
-## Brownfield / Evolution Path
+docs/implementation-plan/
+  phase-N-*/index.md          ← epic registry per phase (epic ID, name, dependencies)
+  phase-N-*/epic-<id>-*.md    ← epic specs with Requirements Anchors tables
+  status/epic-<id>.md         ← status sidecar (status, implemented, completed, requirements:)
+  session-handoffs/           ← implemented and complete handoff files
+  README.md                   ← lifecycle prose (never written by skills after creation)
 
-```
-/peak-workflow:discover          → brownfield mode: creates docs/ branch, updates vision + ConOps
-/peak-workflow:capture-requirements  → brownfield mode: appends new TOR IDs, archives changelog
-/peak-workflow:plan-project      → brownfield: new epics for unplanned TOR IDs
-[merge docs/ branch]             → delta requirements and new epics approved
-/peak-workflow:start <id>        → implement new epics
+docs/architecture.md          ← system architecture (stubbed by /setup, refreshed by /refresh-docs)
+docs/design-notes.md          ← design decisions (same)
 ```
 
 ## Requirements & Verification
@@ -203,28 +301,3 @@ The key distinction between peak-workflow and a typical Agile workflow:
 | `docs/implementation-plan/session-handoffs/` | Implemented and complete handoff files |
 | `docs/architecture.md` | System architecture (stubbed by `/setup`, refreshed by `/refresh-docs`) |
 | `docs/design-notes.md` | Design decisions (same as above) |
-
-## Migration from epic-workflow
-
-Run `/peak-workflow:migrate-from-epic-workflow` on a project that currently uses epic-workflow.
-The skill performs a one-shot, atomic migration:
-
-1. **Derives a TOR requirements baseline** from the project's existing vision/ConOps and epic
-   acceptance criteria (hybrid strategy — ConOps-first, then refined by epic content).
-2. **Transforms Not-Started epic specs** from Acceptance Criteria format to Requirements
-   Anchors table format.
-3. **Updates all status sidecars** with the `requirements:` field.
-4. **Updates CLAUDE.md** to reference peak-workflow commands.
-5. **Lands everything in a single commit** — `git revert HEAD` rolls the entire migration back.
-
-The migration is non-destructive: In-Progress, Paused, Implemented, and Complete epics are
-left untouched and their sidecars get `requirements: —`.
-
-**Manual approach (if you prefer step-by-step control):**
-
-1. Keep in-flight epic-workflow epics on epic-workflow until complete.
-2. Install peak-workflow alongside.
-3. Run `/peak-workflow:discover` (brownfield) to refresh vision/ConOps.
-4. Run `/peak-workflow:capture-requirements` to establish the TOR baseline.
-5. New work uses `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:start`.
-6. Old epic-workflow specs and handoffs remain as historical record.

@@ -1,4 +1,4 @@
-# Completion Handoff Template — `/peak-workflow:wrapup`
+# Completion Handoff Template — `/peak-workflow:wrapup-epic`
 
 Used by Step 2.1. Write the populated template to
 `docs/implementation-plan/session-handoffs/epic-<id>-complete.md`
@@ -19,7 +19,7 @@ Placeholder reference:
 # Epic <id>: <Name> — Complete
 
 **Completed:** <today's date YYYY-MM-DD>
-**Verified by:** Independent review via `/peak-workflow:wrapup <id>`
+**Verified by:** Independent review via `/peak-workflow:wrapup-epic <id>`
 
 ## What Was Built
 

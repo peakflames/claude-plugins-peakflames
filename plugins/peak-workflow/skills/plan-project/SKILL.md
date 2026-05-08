@@ -216,7 +216,7 @@ Create `docs/implementation-plan/session-handoffs/` if it doesn't exist.
 
 ### 5.2: Write Epic Specs
 
-For each epic, write the spec file following the exact format below (the same format as `/peak-workflow:add`). This format is read by `/peak-workflow:start` and `/peak-workflow:wrapup`.
+For each epic, write the spec file following the exact format below (the same format as `/peak-workflow:add`). This format is read by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`.
 
 **File:** `docs/implementation-plan/phase-{N}-{name}/epic-{id}-{kebab-case-name}.md` (where `{id}` is the 7-char alphanumeric ID for new epics, or a preserved legacy integer for brownfield rows that already exist)
 
@@ -241,8 +241,8 @@ epic addresses, drawn from the feature files and tracing sidecars.}
 
 > The TOR requirement IDs listed below are the acceptance criteria and verification baseline for
 > this epic. Each ID maps to a Gherkin scenario in the referenced feature file.
-> `/peak-workflow:start` reads each TOR's Given/When/Then to drive implementation and tests.
-> `/peak-workflow:wrapup` independently verifies each TOR's Given/When/Then is satisfied.
+> `/peak-workflow:start-epic` reads each TOR's Given/When/Then to drive implementation and tests.
+> `/peak-workflow:wrapup-epic` independently verifies each TOR's Given/When/Then is satisfied.
 > If a feature file has been updated since this spec was written and a scenario no longer matches
 > its cited TOR ID, stop and surface the discrepancy to the user before proceeding — do not
 > silently implement against stale requirements.
@@ -323,9 +323,9 @@ c. **README.md** — create `docs/implementation-plan/README.md` with the projec
 ## Quick Start for New Session
 
 1. Run `/peak-workflow:status` for the live cross-phase dashboard (includes Requirements Coverage)
-2. Run `/peak-workflow:start <id>` to begin an epic (use the 7-character alphanumeric ID from the phase index)
+2. Run `/peak-workflow:start-epic <id>` to begin an epic (use the 7-character alphanumeric ID from the phase index)
 3. Claude Code reads the epic spec, loads TOR requirements from feature files, enters plan mode, and creates tasks (one task per TOR ID or TOR group — these are user stories)
-4. When implementation is done, open a new session: `/peak-workflow:wrapup <id>`
+4. When implementation is done, open a new session: `/peak-workflow:wrapup-epic <id>`
 5. If stopping early: `/peak-workflow:pause`
 
 ## Epic Lifecycle
@@ -333,7 +333,7 @@ c. **README.md** — create `docs/implementation-plan/README.md` with the projec
 ```
 Not Started → In Progress → Implemented → Complete
                   ^              ^             ^
-    /peak-workflow:start  /peak-workflow:start  /peak-workflow:wrapup
+    /peak-workflow:start-epic  /peak-workflow:start-epic  /peak-workflow:wrapup-epic
           (begins)           (finishes)      (independent review)
 ```
 
@@ -425,7 +425,7 @@ Do not proceed to Step 7 with unresolved gaps.
 ### 6.4: Keep the Final Table
 
 The final passing table is printed as part of Step 8 summary — so the user can audit coverage,
-and so future `/start` and `/wrapup` sessions can cross-reference which TOR IDs each epic owns.
+and so future `/start-epic` and `/wrapup-epic` sessions can cross-reference which TOR IDs each epic owns.
 
 ## Step 7: Update CLAUDE.md References
 
@@ -477,7 +477,7 @@ Do NOT perform a full CLAUDE.md audit — that is `/peak-workflow:setup`'s job. 
 ### Recommended Next Steps
 
 1. **Merge the `docs/` branch** — this is the approval gate for the requirements and plan.
-   TOR feature files and epic specs must land on the base branch before `/peak-workflow:start`
+   TOR feature files and epic specs must land on the base branch before `/peak-workflow:start-epic`
    can load them. If `start` later reports "feature file not found", the merge was skipped.
 
    **Solo** (no team review needed):
@@ -494,7 +494,7 @@ Do NOT perform a full CLAUDE.md audit — that is `/peak-workflow:setup`'s job. 
    # Await PR approval before starting epics
    ```
 
-2. **Run `/peak-workflow:start <id>`** to begin the first epic (use the 7-character ID from
+2. **Run `/peak-workflow:start-epic <id>`** to begin the first epic (use the 7-character ID from
    the Epic column above). If you have not yet run `/peak-workflow:setup`, do that first —
    setup populates the Verification & Quality Gates section that `start` and `wrapup` depend on.
 
