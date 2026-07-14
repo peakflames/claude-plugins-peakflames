@@ -6,6 +6,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.1] — 2026-07-14
+
+### Fixed
+
+- **Commit Gate added to `discover` and `plan-project` before any merge/push instructions.**
+  Both skills explicitly avoid auto-committing ("Do NOT commit — leave that for the user to
+  decide"), but `discover`'s "Solo merge"/"Team PR" paths and `plan-project`'s "Recommended Next
+  Steps" printed ready-to-paste `git merge`/`git push` commands with nothing bridging the gap —
+  those commands only act on what is committed, and the whole `discover` → `capture-requirements`
+  → `plan-project` chain can leave several stages of work uncommitted on the same `docs/` branch.
+  Both skills now run a `git status` check immediately before presenting merge/push instructions
+  and, if the tree is dirty, offer to commit (with a drafted message, editable, or declinable) via
+  `AskUserQuestion` before proceeding — modeled on the equivalent commit step `quick-fix` already
+  had. `capture-requirements` needed no change: it never prints merge instructions itself.
+
+---
+
 ## [1.4.0] — 2026-05-08
 
 ### Changed (BREAKING for skill names)
