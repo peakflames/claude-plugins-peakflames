@@ -305,7 +305,8 @@ these documents. The requirements capture will run on the same `docs/` branch as
 session. After that, `/peak-workflow:plan-project` derives the implementation plan.
 ```
 
-Do NOT commit — leave that for the user to decide.
+Do NOT commit on your own initiative while writing the documents (Steps 1–4). Committing only
+ever happens via the explicit Commit Gate in Step 6, and only with the user's confirmation.
 
 ## Step 6: Ship or Continue
 
@@ -321,6 +322,32 @@ After presenting the summary, ask the user how to proceed via `AskUserQuestion`:
 
 Do nothing further. The user will invoke `/peak-workflow:capture-requirements` to continue on
 the same `docs/` branch.
+
+### Commit Gate (required before "Solo merge" or "Team PR")
+
+Both merge paths below assume the `docs/` branch's working tree is clean — `git merge` and
+`git push` only act on what is committed. Because `discover` (and any `capture-requirements` /
+`plan-project` run already chained onto this same branch) explicitly avoids auto-committing,
+uncommitted work can silently accumulate across the whole planning sequence and then be left
+out of the merge entirely. Close that gap here, every time, before either branch below runs:
+
+1. Run `git status --short`. If the working tree is clean, skip straight to the chosen branch's
+   steps below.
+2. If there are uncommitted changes, draft a commit message summarizing what was written this
+   session (reuse the "Documents Written" / "By the Numbers" bullets from Step 5's summary).
+3. Use `AskUserQuestion`:
+   - Question: `"This docs/ branch has uncommitted changes — commit them now so the merge/push below is safe to run?"`
+   - Options: `["Commit with this message", "Let me edit the message first", "I'll commit myself — skip this"]`
+   - **Commit with this message:** stage the specific files this session wrote or modified
+     (never `git add -A`) and commit.
+   - **Let me edit the message first:** ask for the edited message, then commit with it.
+   - **I'll commit myself — skip this:** do not commit. Prefix the branch's final report (step 7
+     for Solo merge, step 7 for Team PR) with: `⚠️ Uncommitted changes remained before this
+     merge/push — verify they were committed, or they are not part of what just shipped.`
+
+Do NOT commit without this confirmation exchange — the gate exists to make committing an
+explicit, visible user decision at the one point it is actually required (immediately before
+merge or push), not to quietly commit on the skill's own initiative.
 
 ### If "Solo merge"
 
