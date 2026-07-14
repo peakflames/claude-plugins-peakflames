@@ -98,11 +98,15 @@ Update `docs/implementation-plan/status/epic-<id>.md` (use the epic's actual ID 
 1. Change `status: In Progress` to `status: Paused`
 2. Change `handoff: —` to `handoff: session-handoffs/epic-<id>-paused.md`
 
+Then locate the epic spec file (`docs/implementation-plan/phase-*/epic-<id>-*.md` — already
+opened in Step 1) and rewrite its `**Status:**` header line to `**Status:** Paused` (no date),
+so the spec stays in sync with the sidecar.
+
 ## Step 5: Commit
 
 **Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + index update). If the user confirms:
 
-1. Stage all files created or modified during this epic session (use specific file paths, not `git add -A`)
+1. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
 2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>` (use the epic's actual ID — legacy integer or 7-char alphanumeric)
 3. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
    ```
