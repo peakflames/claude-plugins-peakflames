@@ -20,6 +20,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   and, if the tree is dirty, offer to commit (with a drafted message, editable, or declinable) via
   `AskUserQuestion` before proceeding — modeled on the equivalent commit step `quick-fix` already
   had. `capture-requirements` needed no change: it never prints merge instructions itself.
+  `plan-project`'s gate only prints commands for the user to run manually, so declining to commit
+  is safe there. `discover`'s "Solo merge"/"Team PR" paths execute the merge/push themselves,
+  though, so declining to commit there now re-checks `git status` immediately before that
+  execution and requires an explicit "proceed anyway" — closing a window where the skill would
+  merge or push ahead of a shown warning and silently leave uncommitted docs out of what shipped.
 
 ---
 
