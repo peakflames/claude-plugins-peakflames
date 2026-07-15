@@ -341,9 +341,13 @@ out of the merge entirely. Close that gap here, every time, before either branch
    - **Commit with this message:** stage the specific files this session wrote or modified
      (never `git add -A`) and commit.
    - **Let me edit the message first:** ask for the edited message, then commit with it.
-   - **I'll commit myself — skip this:** do not commit. The branch's working tree is still
-     dirty — this is re-checked and re-confirmed immediately before the merge/push actually
-     runs, in the steps below (do not skip that re-check).
+   - **I'll commit myself — skip this:** do not commit.
+
+Regardless of which option above was chosen — the working tree's cleanliness is re-checked
+immediately before the merge/push actually runs, in the steps below. `"Commit with this
+message"` and `"Let me edit the message first"` only stage the specific files this session
+wrote (never `git add -A`), so pre-existing unrelated uncommitted changes can still be present
+afterward — do not assume the tree is clean just because one of those options was picked.
 
 Do NOT commit without this confirmation exchange — the gate exists to make committing an
 explicit, visible user decision at the one point it is actually required (immediately before
@@ -354,8 +358,8 @@ merge or push), not to quietly commit on the skill's own initiative.
 1. Note the current `docs/` branch name.
 2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if
    it exists, then `main`, then `master`.
-3. If "I'll commit myself — skip this" was chosen in the Commit Gate above, run
-   `git status --short` again. If it is still dirty, use `AskUserQuestion`:
+3. Run `git status --short` again, regardless of which Commit Gate option was chosen above. If
+   it is still dirty, use `AskUserQuestion`:
    - Question: `"The docs/ branch still has uncommitted changes that will NOT be part of this
      merge — proceed anyway (they'll be left behind), or stop so you can commit first?"`
    - Options: `["Proceed anyway", "Stop — let me commit first"]`
@@ -377,8 +381,8 @@ merge or push), not to quietly commit on the skill's own initiative.
 
 1. Note the current `docs/` branch name.
 2. Detect the base branch as above.
-3. If "I'll commit myself — skip this" was chosen in the Commit Gate above, run
-   `git status --short` again. If it is still dirty, use `AskUserQuestion`:
+3. Run `git status --short` again, regardless of which Commit Gate option was chosen above. If
+   it is still dirty, use `AskUserQuestion`:
    - Question: `"The docs/ branch still has uncommitted changes that will NOT be part of this
      push/PR — proceed anyway (they'll be left behind), or stop so you can commit first?"`
    - Options: `["Proceed anyway", "Stop — let me commit first"]`
