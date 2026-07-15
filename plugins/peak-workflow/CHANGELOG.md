@@ -18,6 +18,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   said "Complete"). `start-epic`, `wrapup-epic`, and `pause` now rewrite the spec header
   alongside the sidecar on every transition, and include the spec file in the paths staged
   for commit.
+- **Commit Gate added to `discover` and `plan-project` before any merge/push instructions.**
+  Both skills explicitly avoid auto-committing ("Do NOT commit — leave that for the user to
+  decide"), but `discover`'s "Solo merge"/"Team PR" paths and `plan-project`'s "Recommended Next
+  Steps" printed ready-to-paste `git merge`/`git push` commands with nothing bridging the gap —
+  those commands only act on what is committed, and the whole `discover` → `capture-requirements`
+  → `plan-project` chain can leave several stages of work uncommitted on the same `docs/` branch.
+  Both skills now run a `git status` check immediately before presenting merge/push instructions
+  and, if the tree is dirty, offer to commit (with a drafted message, editable, or declinable) via
+  `AskUserQuestion` before proceeding — modeled on the equivalent commit step `quick-fix` already
+  had. `capture-requirements` needed no change: it never prints merge instructions itself.
+  `plan-project`'s gate only prints commands for the user to run manually, so declining to commit
+  is safe there. `discover`'s "Solo merge"/"Team PR" paths execute the merge/push themselves,
+  though, so those paths now unconditionally re-check `git status` immediately before that
+  execution — regardless of which Commit Gate option was picked, since even "commit with this
+  message" only stages the files this session wrote (never `git add -A`) and can leave unrelated
+  pre-existing changes dirty — and require an explicit "proceed anyway" if still dirty, closing a
+  window where the skill would merge or push ahead of a shown warning and silently leave
+  uncommitted docs out of what shipped.
+
 
 ## [1.4.0] — 2026-05-08
 

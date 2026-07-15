@@ -305,7 +305,8 @@ these documents. The requirements capture will run on the same `docs/` branch as
 session. After that, `/peak-workflow:plan-project` derives the implementation plan.
 ```
 
-Do NOT commit — leave that for the user to decide.
+Do NOT commit on your own initiative while writing the documents (Steps 1–4). Committing only
+ever happens via the explicit Commit Gate in Step 6, and only with the user's confirmation.
 
 ## Step 6: Ship or Continue
 
@@ -322,31 +323,86 @@ After presenting the summary, ask the user how to proceed via `AskUserQuestion`:
 Do nothing further. The user will invoke `/peak-workflow:capture-requirements` to continue on
 the same `docs/` branch.
 
+### Commit Gate (required before "Solo merge" or "Team PR")
+
+Both merge paths below assume the `docs/` branch's working tree is clean — `git merge` and
+`git push` only act on what is committed. Because `discover` (and any `capture-requirements` /
+`plan-project` run already chained onto this same branch) explicitly avoids auto-committing,
+uncommitted work can silently accumulate across the whole planning sequence and then be left
+out of the merge entirely. Close that gap here, every time, before either branch below runs:
+
+1. Run `git status --short`. If the working tree is clean, skip straight to the chosen branch's
+   steps below.
+2. If there are uncommitted changes, draft a commit message summarizing what was written this
+   session (reuse the "Documents Written" / "By the Numbers" bullets from Step 5's summary).
+3. Use `AskUserQuestion`:
+   - Question: `"This docs/ branch has uncommitted changes — commit them now so the merge/push below is safe to run?"`
+   - Options: `["Commit with this message", "Let me edit the message first", "I'll commit myself — skip this"]`
+   - **Commit with this message:** stage the specific files this session wrote or modified
+     (never `git add -A`) and commit.
+   - **Let me edit the message first:** ask for the edited message, then commit with it.
+   - **I'll commit myself — skip this:** do not commit.
+
+Regardless of which option above was chosen — the working tree's cleanliness is re-checked
+immediately before the merge/push actually runs, in the steps below. `"Commit with this
+message"` and `"Let me edit the message first"` only stage the specific files this session
+wrote (never `git add -A`), so pre-existing unrelated uncommitted changes can still be present
+afterward — do not assume the tree is clean just because one of those options was picked.
+
+Do NOT commit without this confirmation exchange — the gate exists to make committing an
+explicit, visible user decision at the one point it is actually required (immediately before
+merge or push), not to quietly commit on the skill's own initiative.
+
 ### If "Solo merge"
 
 1. Note the current `docs/` branch name.
 2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if
    it exists, then `main`, then `master`.
-3. `git checkout <base-branch>`
-4. `git merge <docs-branch> --no-ff -m "docs(vision): merge <docs-branch> — vision and ConOps update"`
-5. `git branch -d <docs-branch>`
-6. Confirm: `git log --oneline -5`
-7. Report:
+3. Run `git status --short` again, regardless of which Commit Gate option was chosen above. If
+   it is still dirty, use `AskUserQuestion`:
+   - Question: `"The docs/ branch still has uncommitted changes that will NOT be part of this
+     merge commit — proceeding will run 'git checkout <base-branch>', which will either block on
+     these changes or carry them onto <base-branch>'s working tree uncommitted. Proceed anyway,
+     or stop so you can commit first?"`
+   - Options: `["Proceed anyway", "Stop — let me commit first"]`
+   - **Stop — let me commit first:** do not run any of steps 4–8 below (including the Report).
+     End here — the user can commit and re-invoke the merge, or re-run this skill, when ready.
+   - **Proceed anyway:** continue to step 4, and carry the warning into the Report in step 8.
+4. `git checkout <base-branch>`
+5. `git merge <docs-branch> --no-ff -m "docs(vision): merge <docs-branch> — vision and ConOps update"`
+6. `git branch -d <docs-branch>`
+7. Confirm: `git log --oneline -5`
+8. Report:
    > Branch `<docs-branch>` merged into `<base-branch>` and deleted. Changes not pushed —
    > run `git push` when ready.
+
+   If step 3 above ended in "Proceed anyway", prefix this report with:
+   `⚠️ Uncommitted changes remained before this merge — they are not part of what just shipped.`
 
 ### If "Team PR"
 
 1. Note the current `docs/` branch name.
 2. Detect the base branch as above.
-3. `git push -u origin <docs-branch>`
-4. Build the PR body:
+3. Run `git status --short` again, regardless of which Commit Gate option was chosen above. If
+   it is still dirty, use `AskUserQuestion`:
+   - Question: `"The docs/ branch still has uncommitted changes that will NOT be part of this
+     push/PR — proceed anyway (they'll be left behind), or stop so you can commit first?"`
+   - Options: `["Proceed anyway", "Stop — let me commit first"]`
+   - **Stop — let me commit first:** do not run any of steps 4–8 below (including the Report).
+     End here — the user can commit and re-invoke the push/PR, or re-run this skill, when ready.
+   - **Proceed anyway:** continue to step 4, and carry the warning into the Report in step 8.
+4. `git push -u origin <docs-branch>`
+5. Build the PR body:
    - **Summary:** 2–3 sentences describing what vision and ConOps sections were updated.
    - **What Changed:** bullet list of document sections added or modified.
    - **Traceability:** note that requirements capture (`/peak-workflow:capture-requirements`)
      has not run yet — this PR covers discovery only.
    - Footer: `🤖 Generated via /peak-workflow:discover`
-5. `gh pr create --base <base-branch> --title "docs: <one-line summary of discovery update>" --body "<body>"`
-6. Stay on the `docs/` branch. Do NOT run `gh pr merge`.
-7. Report:
+6. `gh pr create --base <base-branch> --title "docs: <one-line summary of discovery update>" --body "<body>"`
+7. Stay on the `docs/` branch. Do NOT run `gh pr merge`.
+8. Report:
    > PR opened: `<url>`. Branch `<docs-branch>` pushed. Await review; do not merge locally.
+
+   If step 3 above ended in "Proceed anyway", prefix this report with:
+   `⚠️ Uncommitted changes remained before this push — they are not part of what was just opened
+   for review.`
