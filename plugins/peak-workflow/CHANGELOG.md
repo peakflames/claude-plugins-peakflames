@@ -22,9 +22,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   had. `capture-requirements` needed no change: it never prints merge instructions itself.
   `plan-project`'s gate only prints commands for the user to run manually, so declining to commit
   is safe there. `discover`'s "Solo merge"/"Team PR" paths execute the merge/push themselves,
-  though, so declining to commit there now re-checks `git status` immediately before that
-  execution and requires an explicit "proceed anyway" — closing a window where the skill would
-  merge or push ahead of a shown warning and silently leave uncommitted docs out of what shipped.
+  though, so those paths now unconditionally re-check `git status` immediately before that
+  execution — regardless of which Commit Gate option was picked, since even "commit with this
+  message" only stages the files this session wrote (never `git add -A`) and can leave unrelated
+  pre-existing changes dirty — and require an explicit "proceed anyway" if still dirty, closing a
+  window where the skill would merge or push ahead of a shown warning and silently leave
+  uncommitted docs out of what shipped.
 
 ---
 
