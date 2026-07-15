@@ -361,7 +361,9 @@ merge or push), not to quietly commit on the skill's own initiative.
 3. Run `git status --short` again, regardless of which Commit Gate option was chosen above. If
    it is still dirty, use `AskUserQuestion`:
    - Question: `"The docs/ branch still has uncommitted changes that will NOT be part of this
-     merge — proceed anyway (they'll be left behind), or stop so you can commit first?"`
+     merge commit — proceeding will run 'git checkout <base-branch>', which will either block on
+     these changes or carry them onto <base-branch>'s working tree uncommitted. Proceed anyway,
+     or stop so you can commit first?"`
    - Options: `["Proceed anyway", "Stop — let me commit first"]`
    - **Stop — let me commit first:** do not run any of steps 4–8 below (including the Report).
      End here — the user can commit and re-invoke the merge, or re-run this skill, when ready.
