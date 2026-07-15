@@ -6,10 +6,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.4.1] — 2026-07-14
+## [1.5.0] — 2026-07-14
 
 ### Fixed
 
+- **Epic spec `**Status:**` header now stays in sync with the sidecar at every status
+  transition.** Previously only the sidecar (`docs/implementation-plan/status/epic-<id>.md`)
+  was updated on transitions to In Progress, Implemented, Complete, and Paused — the
+  convenience `**Status:**` header in the spec file was never written back, causing it to
+  drift out of sync over time (e.g. a spec still reading "Not Started" while its sidecar
+  said "Complete"). `start-epic`, `wrapup-epic`, and `pause` now rewrite the spec header
+  alongside the sidecar on every transition, and include the spec file in the paths staged
+  for commit.
 - **Commit Gate added to `discover` and `plan-project` before any merge/push instructions.**
   Both skills explicitly avoid auto-committing ("Do NOT commit — leave that for the user to
   decide"), but `discover`'s "Solo merge"/"Team PR" paths and `plan-project`'s "Recommended Next
@@ -29,7 +37,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   window where the skill would merge or push ahead of a shown warning and silently leave
   uncommitted docs out of what shipped.
 
----
 
 ## [1.4.0] — 2026-05-08
 
