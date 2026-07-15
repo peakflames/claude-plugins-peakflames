@@ -37,6 +37,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   window where the skill would merge or push ahead of a shown warning and silently leave
   uncommitted docs out of what shipped.
 
+---
 
 ## [1.4.0] — 2026-05-08
 
@@ -441,7 +442,7 @@ epic-workflow work:
   - `docs/implementation-plan/status/epic-<id>.md` — one per-epic sidecar with four key:value lines (`status`, `implemented`, `completed`, `handoff`). Each branch owns only its own sidecar, so status transitions never produce merge conflicts.
   - `docs/implementation-plan/README.md` — human prose (lifecycle diagram, Quick Start). Skills never write to it.
   - `docs/implementation-plan/index.md` — replaced with a thin stub pointing at the above. Skills do not read or write it after migration.
-  
+
   The hand-maintained dependency graph is discarded; `/epic-workflow:status` regenerates it on demand from phase indexes.
 
 - **Layout guard added to every skill (except `migrate-2.5`).** Each skill now checks for the legacy status table header at startup and stops with a "run `/epic-workflow:migrate-2.5` first" message if found. Skills do not dual-read old and new layouts.

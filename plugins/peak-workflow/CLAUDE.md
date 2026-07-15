@@ -75,5 +75,7 @@ Both `plugin.json` and `CHANGELOG.md` must be updated in the same commit.
 - **Patch** — wording, UX clarity, step renumbering, no behavioral change
 - **Minor** — new steps, new skills, changed skill contracts
 - **Major** — breaking changes to artifact formats or skill API
+- **Changelog entries:** one bullet per change, each ≤ 50 words, no rationale essays —
+  see "Changelog entry style" in the repo-level CLAUDE.md.
 
 Current version: see `.claude-plugin/plugin.json`.
