@@ -443,7 +443,35 @@ Check whether `CLAUDE.md` has a "Design & Planning Documents" section (or simila
 
 Do NOT perform a full CLAUDE.md audit — that is `/peak-workflow:setup`'s job. Only add or verify the document references.
 
-## Step 8: Present Summary & Next Steps
+## Step 8: Commit Gate, Then Present Summary & Next Steps
+
+### 8.1: Commit Gate
+
+`plan-project` is normally the last skill in the `discover` → `capture-requirements` →
+`plan-project` chain, and all three explicitly avoid auto-committing. That means by the time
+this step runs, the working tree can hold uncommitted output from **all three** stages — not
+just what this run wrote. The "Recommended Next Steps" merge/push commands below only act on
+what is committed, so run this gate before presenting them:
+
+1. Run `git status --short`. If the working tree is clean, skip straight to 8.2.
+2. If there are uncommitted changes, draft a commit message summarizing everything currently
+   uncommitted under `docs/` (and `CLAUDE.md` if this run updated it) — not only the files this
+   run itself wrote — so a discover/capture-requirements run that never got committed earlier in
+   the chain is captured too.
+3. Use `AskUserQuestion`:
+   - Question: `"This docs/ branch has uncommitted changes — commit them now so the merge instructions below are safe to run?"`
+   - Options: `["Commit with this message", "Let me edit the message first", "I'll commit myself — skip this"]`
+   - **Commit with this message:** stage the specific files (never `git add -A`) and commit.
+   - **Let me edit the message first:** ask for the edited message, then commit with it.
+   - **I'll commit myself — skip this:** do not commit. Prefix the "Recommended Next Steps"
+     block in 8.2 with: `⚠️ Uncommitted changes remain. The merge commands below only merge what
+     is committed — commit first, or this work will be silently left out of the base branch.`
+
+Do NOT commit without this confirmation exchange — the gate makes committing an explicit,
+visible user decision at the one point it is actually required (immediately before the merge
+instructions are printed), not a silent action taken on the skill's own initiative.
+
+### 8.2: Present Summary
 
 ```
 ## Implementation Plan Complete
@@ -510,4 +538,5 @@ Do NOT perform a full CLAUDE.md audit — that is `/peak-workflow:setup`'s job. 
 
 **[Brownfield mode only — adapt the Recommended Next Steps before presenting:]** The three steps above (merge → start → status) apply to brownfield too. Shorten the merge instruction to "Merge the `docs/` branch to approve the delta requirements and new epics" and omit the setup note in step 2 (setup was already done).
 
-Do NOT commit — leave that for the user to decide.
+Do NOT commit on your own initiative while writing the plan (Steps 1–7). Committing only ever
+happens via the explicit Commit Gate in Step 8.1, and only with the user's confirmation.
