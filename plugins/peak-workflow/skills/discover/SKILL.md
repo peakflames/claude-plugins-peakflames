@@ -363,9 +363,9 @@ merge or push), not to quietly commit on the skill's own initiative.
    - Question: `"The docs/ branch still has uncommitted changes that will NOT be part of this
      merge — proceed anyway (they'll be left behind), or stop so you can commit first?"`
    - Options: `["Proceed anyway", "Stop — let me commit first"]`
-   - **Stop — let me commit first:** do not run steps 4–7 below. End here — the user can commit
-     and re-invoke the merge, or re-run this skill, when ready.
-   - **Proceed anyway:** continue to step 4, and carry the warning into the report in step 7.
+   - **Stop — let me commit first:** do not run any of steps 4–8 below (including the Report).
+     End here — the user can commit and re-invoke the merge, or re-run this skill, when ready.
+   - **Proceed anyway:** continue to step 4, and carry the warning into the Report in step 8.
 4. `git checkout <base-branch>`
 5. `git merge <docs-branch> --no-ff -m "docs(vision): merge <docs-branch> — vision and ConOps update"`
 6. `git branch -d <docs-branch>`
@@ -386,9 +386,9 @@ merge or push), not to quietly commit on the skill's own initiative.
    - Question: `"The docs/ branch still has uncommitted changes that will NOT be part of this
      push/PR — proceed anyway (they'll be left behind), or stop so you can commit first?"`
    - Options: `["Proceed anyway", "Stop — let me commit first"]`
-   - **Stop — let me commit first:** do not run steps 4–7 below. End here — the user can commit
-     and re-invoke the push/PR, or re-run this skill, when ready.
-   - **Proceed anyway:** continue to step 4, and carry the warning into the report in step 7.
+   - **Stop — let me commit first:** do not run any of steps 4–8 below (including the Report).
+     End here — the user can commit and re-invoke the push/PR, or re-run this skill, when ready.
+   - **Proceed anyway:** continue to step 4, and carry the warning into the Report in step 8.
 4. `git push -u origin <docs-branch>`
 5. Build the PR body:
    - **Summary:** 2–3 sentences describing what vision and ConOps sections were updated.
