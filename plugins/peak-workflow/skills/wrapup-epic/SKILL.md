@@ -238,12 +238,14 @@ Update `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
 2. Set `completed: <today>` (YYYY-MM-DD)
 3. Set `handoff: session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim)
 
+Then locate the epic spec file — `grep -rl "epic-$ARGUMENTS" docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` (or the glob `docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` directly) — and rewrite its `**Status:**` header line to `**Status:** Complete — <today>` (same date just written to `completed:`), so the spec stays in sync with the sidecar.
+
 ### Step 2.3: Commit
 
 Automatically commit all changes made during verification and completion without
 asking the user for permission:
 
-1. Stage the handoff file, updated `docs/implementation-plan/status/epic-$ARGUMENTS.md`, and any other files modified during verification (specific file paths, not `git add -A`)
+1. Stage the handoff file, updated `docs/implementation-plan/status/epic-$ARGUMENTS.md`, the updated epic spec file, and any other files modified during verification (specific file paths, not `git add -A`)
 2. Commit message format: `chore(epic-<id>): verify and complete — <brief summary>` (where `<id>` is `$ARGUMENTS` verbatim)
 
 Do NOT push to the remote yet.
