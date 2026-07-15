@@ -25,6 +25,18 @@ Every plugin version lives in **two files that must always stay in sync**. When 
 
 **Never commit a version bump that touches only one of these files.**
 
+### Changelog entry style
+
+Changelog entries are a scannable record, not a design doc. Keep them tight:
+
+- **One bullet per change; each bullet ≤ 50 words.** State what changed and its
+  user-visible effect. If a bullet needs more, it's two changes — split it.
+- Lead with a bolded noun phrase (the what), then a short clause (the effect).
+- No rationale essays, no step-by-step internals, no "previously… now…" narration.
+  That detail belongs in the commit body and PR description.
+- Group bullets under Keep-a-Changelog headings (Added / Changed / Fixed /
+  Documentation).
+
 ### Version semantics
 
 Follows [Semantic Versioning](https://semver.org/):
