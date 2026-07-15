@@ -35,6 +35,10 @@ Placeholder reference:
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
    (prior status was already In Progress). Item 3 uses this.
 
+   Also update the epic spec file's `**Status:**` header line (the spec path was already
+   identified in Step 1, at `docs/implementation-plan/phase-*/epic-<id>-*.md`) to
+   `**Status:** In Progress` (no date), so the spec stays in sync with the sidecar.
+
 3. **Announce work-started on GitHub** — if Step 1 captured no source issue, replace this plan
    item with: `GitHub announce: SKIP — no source issue`. Otherwise, run only if (a) this is a
    fresh transition (not a resumption) and (b) `gh auth status` succeeds:
@@ -133,10 +137,14 @@ Middle step example:
   Leave `completed:` as `—`. The `requirements:` field is NOT changed — it stays as set by
   `plan-project` or `add`.
 
+  Also rewrite the epic spec file's `**Status:**` header line to
+  `**Status:** Implemented — <today>` (same date just written to the sidecar's `implemented:`
+  field), so the spec stays in sync with the sidecar.
+
 - **Commit** — run `git branch --show-current` and confirm you are on
   `feature/epic-<id>-<short-name>`; if not, switch before staging anything. Stage all files
   created or modified during this epic by specific path (not `git add -A`), including the
-  handoff file and updated status sidecar. Commit without asking for permission.
+  handoff file, updated status sidecar, and updated spec file. Commit without asking for permission.
   Message format:
   ```
   feat(epic-<id>): <short summary>
