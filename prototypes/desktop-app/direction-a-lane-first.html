@@ -1,0 +1,1568 @@
+<title>Multitrack Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ---------------------------------- tokens ---------------------------------- */
+:root{
+  --bg:#EBEDF2; --surface:#FFFFFF; --surface-sunken:#E1E5EC; --surface-hover:#F3F5F8;
+  --border:#D2D7E0; --border-strong:#B7BECC;
+  --text:#191D26; --text-muted:#5A6273; --text-faint:#8890A0;
+  --accent:#0E7C77; --accent-strong:#0B6560; --accent-soft:#E1F1EF; --accent-contrast:#FFFFFF;
+  --danger:#C23A2E; --danger-soft:#FBEAE7; --danger-strong:#9E2E24;
+  --warning:#9C6308; --warning-soft:#FBF0DA;
+  --success:#1F7A50; --success-soft:#E3F3E9;
+  --info:#3454B4; --info-soft:#E7EBFA;
+  --paused:#655D82; --paused-soft:#EAE8F2;
+  --shadow: 0 8px 28px -8px rgba(20,24,34,0.28), 0 2px 8px -2px rgba(20,24,34,0.14);
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161B; --surface:#1C1F26; --surface-sunken:#101216; --surface-hover:#262A33;
+    --border:#2B2F3A; --border-strong:#3C4252;
+    --text:#E7E9EE; --text-muted:#9AA2B3; --text-faint:#666E7E;
+    --accent:#3FC7BE; --accent-strong:#68D6CE; --accent-soft:rgba(63,199,190,0.14); --accent-contrast:#08211F;
+    --danger:#F0574A; --danger-soft:rgba(240,87,74,0.16); --danger-strong:#FF8A80;
+    --warning:#E3A63D; --warning-soft:rgba(227,166,61,0.16);
+    --success:#4FC08A; --success-soft:rgba(79,192,138,0.16);
+    --info:#7C9BF2; --info-soft:rgba(124,155,242,0.16);
+    --paused:#ABA2CC; --paused-soft:rgba(171,162,204,0.16);
+    --shadow: 0 10px 30px -8px rgba(0,0,0,0.55), 0 2px 10px -2px rgba(0,0,0,0.4);
+    --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14161B; --surface:#1C1F26; --surface-sunken:#101216; --surface-hover:#262A33;
+  --border:#2B2F3A; --border-strong:#3C4252;
+  --text:#E7E9EE; --text-muted:#9AA2B3; --text-faint:#666E7E;
+  --accent:#3FC7BE; --accent-strong:#68D6CE; --accent-soft:rgba(63,199,190,0.14); --accent-contrast:#08211F;
+  --danger:#F0574A; --danger-soft:rgba(240,87,74,0.16); --danger-strong:#FF8A80;
+  --warning:#E3A63D; --warning-soft:rgba(227,166,61,0.16);
+  --success:#4FC08A; --success-soft:rgba(79,192,138,0.16);
+  --info:#7C9BF2; --info-soft:rgba(124,155,242,0.16);
+  --paused:#ABA2CC; --paused-soft:rgba(171,162,204,0.16);
+  --shadow: 0 10px 30px -8px rgba(0,0,0,0.55), 0 2px 10px -2px rgba(0,0,0,0.4);
+  color-scheme: dark;
+}
+
+/* ---------------------------------- base ---------------------------------- */
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:'IBM Plex Sans', system-ui, sans-serif;
+  font-size:13px; line-height:1.45;
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'IBM Plex Mono', ui-monospace, monospace;}
+.cond{font-family:'IBM Plex Sans Condensed','IBM Plex Sans',sans-serif;}
+button{font-family:inherit;font-size:inherit;color:inherit;}
+::selection{background:var(--accent-soft);}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:5px;border:2px solid transparent;background-clip:padding-box;}
+:focus-visible{outline:none;box-shadow:var(--focus);border-radius:4px;}
+button:focus-visible{box-shadow:var(--focus);}
+a{color:var(--accent);}
+
+/* ---------------------------------- app shell ---------------------------------- */
+.app{height:100vh;display:flex;flex-direction:column;}
+
+.topbar{
+  height:46px;min-height:46px;display:flex;align-items:center;gap:14px;
+  padding:0 12px;border-bottom:1px solid var(--border);background:var(--surface);
+  position:relative;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:8px;padding-right:10px;border-right:1px solid var(--border);height:26px;}
+.brand-mark{
+  width:18px;height:18px;border-radius:3px;background:var(--accent);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.brand-mark svg{width:11px;height:11px;display:block;}
+.brand-name{font-family:'IBM Plex Sans Condensed';font-weight:700;font-size:13px;letter-spacing:0.03em;}
+.pillbar{display:flex;align-items:center;gap:6px;}
+.pill{
+  display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:5px;
+  background:var(--surface-sunken);border:1px solid var(--border);font-size:11.5px;color:var(--text-muted);
+  font-family:'IBM Plex Mono';white-space:nowrap;
+}
+.pill b{color:var(--text);font-weight:500;}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0;}
+.topbar-spacer{flex:1;}
+.topbtn{
+  display:flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:6px;
+  background:transparent;border:1px solid transparent;cursor:pointer;color:var(--text-muted);
+  font-size:12px;font-weight:500;position:relative;
+}
+.topbtn:hover{background:var(--surface-hover);border-color:var(--border);color:var(--text);}
+.topbtn svg{width:14px;height:14px;flex-shrink:0;}
+.gate-badge{
+  position:absolute;top:2px;right:2px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
+  background:var(--danger);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono';line-height:1;box-shadow:0 0 0 2px var(--surface);
+}
+.gate-badge.zero{display:none;}
+
+/* ---------------------------------- lanes ---------------------------------- */
+.lanes-row{
+  flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--border);overflow:hidden;
+}
+.lane{
+  background:var(--bg);display:flex;flex-direction:column;overflow:hidden;min-width:0;
+  border-top:3px solid transparent;
+}
+.lane.state-blocked{border-top-color:var(--danger);}
+.lane.state-running{border-top-color:var(--info);}
+.lane.state-paused{border-top-color:var(--paused);}
+.lane.state-idle{border-top-color:var(--border-strong);}
+.lane.state-empty{border-top-color:transparent;}
+
+.lane-head{padding:11px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.lane-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.lane-letter{
+  font-family:'IBM Plex Sans Condensed';font-weight:700;font-size:11px;letter-spacing:0.12em;
+  color:var(--text-faint);text-transform:uppercase;
+}
+.lane-icon-btn{
+  width:22px;height:22px;border-radius:5px;border:1px solid transparent;background:transparent;
+  color:var(--text-faint);cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.lane-icon-btn:hover{background:var(--surface-hover);border-color:var(--border);color:var(--danger);}
+.lane-icon-btn svg{width:12px;height:12px;}
+.state-chip{
+  display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:5px;
+  font-family:'IBM Plex Sans Condensed';font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;
+  margin-top:7px;
+}
+.state-chip .led{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.state-idle .state-chip{background:var(--surface-sunken);color:var(--text-muted);}
+.state-idle .state-chip .led{background:var(--text-faint);}
+.state-running .state-chip{background:var(--info-soft);color:var(--info);}
+.state-running .state-chip .led{background:var(--info);}
+.state-blocked .state-chip{background:var(--danger-soft);color:var(--danger);}
+.state-blocked .state-chip .led{background:var(--danger);}
+.state-paused .state-chip{background:var(--paused-soft);color:var(--paused);}
+.state-paused .state-chip .led{background:var(--paused);}
+@media (prefers-reduced-motion: no-preference){
+  .state-running .state-chip .led{animation:pulse 1.8s ease-in-out infinite;}
+  .state-blocked .state-chip .led{animation:pulse 1.3s ease-in-out infinite;}
+}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 currentColor;}50%{opacity:0.55;}}
+
+.lane-meta{margin-top:9px;display:flex;flex-direction:column;gap:4px;}
+.lane-meta-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted);min-width:0;}
+.lane-meta-row svg{width:11px;height:11px;flex-shrink:0;color:var(--text-faint);}
+.lane-meta-row .val{font-family:'IBM Plex Mono';color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.sync-row{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;
+  padding:6px 8px;border-radius:6px;background:var(--surface-sunken);
+}
+.sync-row.behind{background:var(--warning-soft);}
+.sync-text{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
+.sync-row.behind .sync-text{color:var(--warning);font-weight:500;}
+.sync-row.behind .sync-text b{font-family:'IBM Plex Mono';}
+.btn-sync{
+  height:20px;padding:0 8px;border-radius:4px;border:1px solid var(--border-strong);background:var(--surface);
+  color:var(--text);font-size:10.5px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Condensed';
+  letter-spacing:0.03em;text-transform:uppercase;
+}
+.btn-sync:hover{border-color:var(--accent);color:var(--accent);}
+.btn-sync:disabled{opacity:0.5;cursor:default;}
+
+.lane-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;min-height:0;}
+
+.card{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:12px;}
+.card.tone-danger{border-color:color-mix(in srgb, var(--danger) 45%, var(--border));background:var(--danger-soft);}
+.card.tone-info{border-color:color-mix(in srgb, var(--info) 40%, var(--border));background:var(--surface);}
+.card.tone-paused{background:var(--paused-soft);border-color:color-mix(in srgb, var(--paused) 40%, var(--border));}
+
+.needs-you-tag{
+  display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:4px;
+  background:var(--danger);color:#fff;font-family:'IBM Plex Sans Condensed';font-weight:700;font-size:10.5px;
+  letter-spacing:0.06em;margin-bottom:8px;
+}
+.gate-title{font-weight:600;font-size:13px;margin-bottom:3px;}
+.gate-sub{font-size:11.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.5;}
+
+.run-command{font-family:'IBM Plex Mono';font-size:12px;color:var(--accent);margin-bottom:2px;}
+.run-epicname{font-size:12.5px;font-weight:600;margin-bottom:10px;}
+.progress-track{height:6px;border-radius:3px;background:var(--surface-sunken);overflow:hidden;margin-bottom:6px;}
+.progress-fill{height:100%;background:var(--info);border-radius:3px;width:0%;}
+@media (prefers-reduced-motion: no-preference){.progress-fill{transition:width 0.6s ease;}}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:10px;}
+.progress-label .steps{font-family:'IBM Plex Mono';color:var(--text);}
+.activity-line{
+  font-size:11.5px;color:var(--text-muted);padding:7px 9px;background:var(--surface-sunken);border-radius:5px;
+  display:flex;gap:6px;align-items:flex-start;line-height:1.4;
+}
+.activity-line .aic{flex-shrink:0;margin-top:1px;color:var(--info);}
+.editing-line{font-size:10.5px;color:var(--text-faint);margin-top:8px;font-family:'IBM Plex Mono';}
+
+.empty-state{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  text-align:center;color:var(--text-faint);padding:20px;
+}
+.empty-state svg{width:26px;height:26px;opacity:0.5;}
+.empty-state .et{font-size:12.5px;color:var(--text-muted);}
+
+.btnrow{display:flex;gap:8px;margin-top:auto;padding-top:2px;flex-wrap:wrap;}
+.btn{
+  height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);
+  cursor:pointer;font-size:12px;font-weight:600;color:var(--text);display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{background:var(--surface-hover);}
+.btn svg{width:13px;height:13px;}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);}
+.btn-primary:hover{background:var(--accent-strong);border-color:var(--accent-strong);}
+.btn-danger-outline{border-color:var(--danger);color:var(--danger);background:transparent;}
+.btn-danger-outline:hover{background:var(--danger-soft);}
+.btn-full{width:100%;justify-content:center;}
+.btn-sm{height:26px;padding:0 10px;font-size:11.5px;}
+
+.lane-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+
+/* create-lane form */
+.create-lane{padding:16px;display:flex;flex-direction:column;gap:10px;flex:1;justify-content:center;}
+.create-lane label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);font-weight:600;display:block;margin-bottom:4px;font-family:'IBM Plex Sans Condensed';}
+.tf{
+  width:100%;height:32px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);
+  color:var(--text);padding:0 9px;font-family:'IBM Plex Mono';font-size:12px;
+}
+.tf:focus{outline:none;border-color:var(--accent);}
+
+/* ---------------------------------- footer / statusbar ---------------------------------- */
+.statusbar{
+  height:26px;min-height:26px;display:flex;align-items:center;gap:16px;padding:0 14px;
+  border-top:1px solid var(--border);background:var(--surface);font-size:11px;color:var(--text-faint);
+}
+.statusbar b{color:var(--text-muted);font-weight:600;}
+.statusbar .kbd{
+  font-family:'IBM Plex Mono';background:var(--surface-sunken);border:1px solid var(--border);border-radius:3px;
+  padding:0 5px;font-size:10px;color:var(--text-muted);
+}
+.statusbar-sep{width:1px;height:12px;background:var(--border);}
+.direction-caption{margin-left:auto;color:var(--text-faint);}
+
+/* ---------------------------------- backdrop + drawer ---------------------------------- */
+.backdrop{
+  position:fixed;inset:46px 0 26px 0;background:rgba(10,12,16,0.35);z-index:30;opacity:0;pointer-events:none;
+}
+@media (prefers-reduced-motion: no-preference){.backdrop{transition:opacity 0.16s ease;}}
+.backdrop.open{opacity:1;pointer-events:auto;}
+
+.drawer{
+  position:fixed;top:46px;bottom:26px;right:0;width:480px;max-width:92vw;background:var(--surface);
+  border-left:1px solid var(--border);box-shadow:var(--shadow);z-index:31;display:flex;flex-direction:column;
+  transform:translateX(100%);
+}
+@media (prefers-reduced-motion: no-preference){.drawer{transition:transform 0.2s cubic-bezier(.3,.05,.2,1);}}
+.drawer.open{transform:translateX(0);}
+.drawer.wide{width:620px;}
+.drawer-head{
+  padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;
+}
+.drawer-title{font-size:14px;font-weight:700;flex:1;min-width:0;}
+.drawer-title .sub{display:block;font-size:11px;font-weight:400;color:var(--text-faint);margin-top:1px;font-family:'IBM Plex Mono';}
+.drawer-close, .drawer-back{
+  width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.drawer-close:hover, .drawer-back:hover{background:var(--surface-hover);color:var(--text);}
+.drawer-close svg, .drawer-back svg{width:13px;height:13px;}
+.drawer-body{flex:1;overflow-y:auto;padding:16px;}
+.drawer-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
+
+/* ---------------------------------- generic bits ---------------------------------- */
+.section-label{
+  font-family:'IBM Plex Sans Condensed';font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--text-faint);margin:0 0 8px;
+}
+.hr{height:1px;background:var(--border);margin:14px 0;border:none;}
+.chip{
+  display:inline-flex;align-items:center;gap:4px;height:19px;padding:0 7px;border-radius:4px;font-size:10.5px;
+  font-family:'IBM Plex Mono';background:var(--surface-sunken);color:var(--text-muted);border:1px solid var(--border);
+}
+.chip.tor{color:var(--text);}
+.chip.file{color:var(--text-muted);}
+.status-pill{
+  display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:4px;font-size:10.5px;
+  font-weight:600;font-family:'IBM Plex Sans Condensed';letter-spacing:0.03em;text-transform:uppercase;white-space:nowrap;
+}
+.status-pill .led{width:6px;height:6px;border-radius:50%;}
+.status-notstarted{background:var(--surface-sunken);color:var(--text-muted);}
+.status-notstarted .led{background:var(--text-faint);}
+.status-inprogress{background:var(--info-soft);color:var(--info);}
+.status-inprogress .led{background:var(--info);}
+.status-implemented{background:var(--warning-soft);color:var(--warning);}
+.status-implemented .led{background:var(--warning);}
+.status-complete{background:var(--success-soft);color:var(--success);}
+.status-complete .led{background:var(--success);}
+.status-paused{background:var(--paused-soft);color:var(--paused);}
+.status-paused .led{background:var(--paused);}
+
+/* gate queue list */
+.gq-item{
+  display:flex;gap:11px;align-items:flex-start;padding:11px 10px;border-radius:8px;border:1px solid var(--border);
+  margin-bottom:8px;cursor:pointer;background:var(--surface);
+}
+.gq-item:hover{background:var(--surface-hover);border-color:var(--border-strong);}
+.gq-ico{
+  width:30px;height:30px;border-radius:7px;background:var(--danger-soft);color:var(--danger);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.gq-ico svg{width:15px;height:15px;}
+.gq-ico.baseline{background:var(--accent-soft);color:var(--accent);}
+.gq-main{flex:1;min-width:0;}
+.gq-title{font-size:12.5px;font-weight:600;margin-bottom:2px;}
+.gq-desc{font-size:11px;color:var(--text-muted);}
+.gq-age{font-size:10px;color:var(--text-faint);font-family:'IBM Plex Mono';white-space:nowrap;flex-shrink:0;padding-top:2px;}
+.gq-lane{font-family:'IBM Plex Mono';font-size:10px;color:var(--text-faint);}
+
+/* plan steps */
+.plan-step{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.plan-step:last-child{border-bottom:none;}
+.plan-step-num{
+  width:22px;height:22px;border-radius:50%;background:var(--surface-sunken);color:var(--text-muted);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:11px;font-weight:600;
+}
+.plan-step-body{flex:1;min-width:0;}
+.plan-step-desc{font-size:12px;margin-bottom:6px;}
+.plan-step-tags{display:flex;flex-wrap:wrap;gap:5px;}
+
+/* verdict table */
+.vtable{width:100%;border-collapse:collapse;}
+.vtable th{
+  text-align:left;font-family:'IBM Plex Sans Condensed';font-size:10px;text-transform:uppercase;letter-spacing:0.05em;
+  color:var(--text-faint);font-weight:700;padding:0 8px 6px 0;
+}
+.vtable td{padding:8px 8px 8px 0;border-top:1px solid var(--border);font-size:11.5px;vertical-align:top;}
+.vtable .ref{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--text-muted);display:block;}
+.pass-badge{
+  display:inline-flex;align-items:center;gap:4px;color:var(--success);font-weight:700;font-size:11px;
+  font-family:'IBM Plex Sans Condensed';letter-spacing:0.03em;
+}
+.qgate-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);font-size:12px;}
+.qgate-row:first-child{border-top:none;}
+
+textarea.disclosure{
+  width:100%;min-height:60px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);
+  color:var(--text);padding:8px 9px;font-family:'IBM Plex Sans';font-size:12px;resize:vertical;
+}
+textarea.disclosure:focus{outline:none;border-color:var(--accent);}
+.radio-opt{
+  display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid var(--border);border-radius:7px;
+  margin-bottom:7px;cursor:pointer;
+}
+.radio-opt:hover{border-color:var(--border-strong);}
+.radio-opt.checked{border-color:var(--accent);background:var(--accent-soft);}
+.radio-opt input{margin-top:2px;accent-color:var(--accent);}
+.radio-opt .rt{font-size:12.5px;font-weight:600;}
+.radio-opt .rd{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.check-row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+.check-row input{accent-color:var(--accent);}
+
+/* board */
+.phase-block{margin-bottom:20px;}
+.phase-head{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
+.phase-head h3{margin:0;font-size:12.5px;font-weight:700;}
+.phase-head .pc{font-size:11px;color:var(--text-faint);font-family:'IBM Plex Mono';}
+.epic-card{
+  border:1px solid var(--border);border-radius:8px;padding:11px;margin-bottom:8px;background:var(--surface);
+  position:relative;
+}
+.epic-card.runnable{border-color:color-mix(in srgb, var(--success) 45%, var(--border));}
+.epic-card.blocked-dep{opacity:0.72;}
+.epic-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;}
+.epic-name{font-size:12.5px;font-weight:600;}
+.epic-id{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--text-faint);}
+.epic-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.dep-tag{
+  display:inline-flex;align-items:center;gap:4px;height:19px;padding:0 7px;border-radius:4px;font-size:10.5px;
+  border:1px solid var(--border);color:var(--text-muted);
+}
+.dep-tag.met{color:var(--success);}
+.dep-tag.unmet{color:var(--warning);}
+.runnable-tag{
+  display:inline-flex;align-items:center;gap:4px;height:19px;padding:0 7px;border-radius:4px;font-size:10.5px;
+  font-weight:700;font-family:'IBM Plex Sans Condensed';letter-spacing:0.03em;color:var(--success);
+  border:1px solid color-mix(in srgb, var(--success) 45%, var(--border));text-transform:uppercase;
+}
+.overlap-warn{
+  display:flex;gap:7px;align-items:flex-start;margin-top:9px;padding:7px 8px;border-radius:6px;
+  background:var(--warning-soft);color:var(--warning);font-size:10.5px;line-height:1.4;
+}
+.overlap-warn svg{width:13px;height:13px;flex-shrink:0;margin-top:1px;}
+.epic-actions{margin-top:9px;display:flex;gap:7px;}
+.board-banner{
+  padding:9px 10px;border-radius:7px;background:var(--surface-sunken);color:var(--text-muted);font-size:11.5px;
+  margin-bottom:14px;display:flex;gap:8px;align-items:flex-start;line-height:1.4;
+}
+.board-banner svg{width:14px;height:14px;flex-shrink:0;margin-top:1px;color:var(--text-faint);}
+
+/* requirements */
+.req-summary{display:flex;gap:1px;border-radius:8px;overflow:hidden;margin-bottom:16px;border:1px solid var(--border);}
+.req-stat{flex:1;padding:10px 8px;text-align:center;background:var(--surface);}
+.req-stat .n{font-family:'IBM Plex Mono';font-size:19px;font-weight:600;display:block;}
+.req-stat .l{font-size:9.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-faint);font-family:'IBM Plex Sans Condensed';font-weight:700;margin-top:2px;}
+.req-file-block{margin-bottom:16px;}
+.req-file-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.req-file-head h4{margin:0;font-size:12px;font-weight:700;font-family:'IBM Plex Mono';}
+.req-row{
+  display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid var(--border);font-size:11.5px;
+}
+.req-row:first-child{border-top:none;}
+.req-row .rid{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--text-faint);width:96px;flex-shrink:0;}
+.req-row .rt{flex:1;min-width:0;}
+.req-row .rep{font-family:'IBM Plex Mono';font-size:10px;color:var(--text-faint);width:70px;flex-shrink:0;text-align:right;}
+
+/* transcript */
+.transcript-pane{
+  background:#0D1013;color:#C9D1D9;font-family:'IBM Plex Mono';font-size:11.5px;line-height:1.65;padding:14px;
+  border-radius:8px;white-space:pre-wrap;word-break:break-word;
+}
+:root[data-theme="light"] .transcript-pane, :root:not([data-theme="dark"]):not([data-theme="light"]) .transcript-pane{
+  background:#14161B;color:#C9D1D9;
+}
+.transcript-pane .tl-cmd{color:#7CC6FF;}
+.transcript-pane .tl-ok{color:#7CE0A6;}
+.transcript-pane .tl-warn{color:#F0C060;}
+.transcript-pane .tl-muted{color:#7C8496;}
+
+/* modal */
+.modal-wrap{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(8,10,14,0.45);opacity:0;pointer-events:none;}
+@media (prefers-reduced-motion: no-preference){.modal-wrap{transition:opacity .15s ease;}}
+.modal-wrap.open{opacity:1;pointer-events:auto;}
+.modal-box{width:420px;max-width:90vw;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:18px;}
+.modal-box h3{margin:0 0 8px;font-size:14px;}
+.modal-box p{margin:0 0 14px;font-size:12.5px;color:var(--text-muted);line-height:1.5;}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;}
+
+/* toast */
+.toast-stack{position:fixed;bottom:36px;right:16px;z-index:60;display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
+.toast{
+  background:var(--text);color:var(--bg);padding:9px 13px;border-radius:7px;font-size:12px;font-weight:500;
+  box-shadow:var(--shadow);max-width:340px;display:flex;gap:8px;align-items:center;
+}
+:root[data-theme="dark"] .toast, :root:not([data-theme="light"]) .toast{background:var(--surface);color:var(--text);border:1px solid var(--border-strong);}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .toast{background:var(--text);color:var(--bg);border:none;}}
+.toast .tdot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0;}
+@media (prefers-reduced-motion: no-preference){
+  .toast{animation:toastin .18s ease;}
+}
+@keyframes toastin{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}
+</style>
+
+<div class="app" id="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="3" height="12" rx="1" fill="var(--accent-contrast)"/><rect x="6.5" y="2" width="3" height="12" rx="1" fill="var(--accent-contrast)" opacity="0.7"/><rect x="12" y="2" width="3" height="12" rx="1" fill="var(--accent-contrast)" opacity="0.4"/></svg></span>
+      <span class="brand-name">MULTITRACK</span>
+    </div>
+    <div class="pillbar">
+      <span class="pill"><span class="dot"></span><b>acme/fieldkit</b></span>
+      <span class="pill">develop</span>
+      <span class="pill" id="lane-count-pill">3&#47;3 lanes</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <button class="topbtn" onclick="openRequirements()" title="Requirements coverage">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 2h6l3 3v9H4z"/><path d="M6 7h5M6 9.5h5M6 12h3"/></svg>
+      Requirements
+    </button>
+    <button class="topbtn" onclick="openBoard()" title="Epic board">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="3.4" height="11" rx="0.8"/><rect x="6.3" y="2.5" width="3.4" height="7" rx="0.8"/><rect x="10.6" y="2.5" width="3.4" height="9" rx="0.8"/></svg>
+      Board
+    </button>
+    <button class="topbtn" onclick="openGateQueue()" title="Gate queue" id="gate-topbtn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2a4.5 4.5 0 0 0-4.5 4.5V10L2 12.5h12L12.5 10V6.5A4.5 4.5 0 0 0 8 2Z"/><path d="M6.3 13.5a1.8 1.8 0 0 0 3.4 0"/></svg>
+      Gates
+      <span class="gate-badge" id="gate-badge">3</span>
+    </button>
+  </div>
+
+  <div class="lanes-row" id="lanes-row"></div>
+
+  <div class="statusbar">
+    <span><b>3</b> lanes &middot; <b id="sb-running">1</b> running &middot; <b id="sb-blocked">2</b> need you</span>
+    <div class="statusbar-sep"></div>
+    <span>Press <span class="kbd">G</span> &mdash; jump to next thing that needs you</span>
+    <span class="direction-caption">Direction A &mdash; Lane&#8209;first: three clones are the spatial home; board and requirements are drawers you open <em>into</em> a lane.</span>
+  </div>
+</div>
+
+<div class="backdrop" id="backdrop" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer" role="dialog" aria-modal="true">
+  <div class="drawer-head">
+    <button class="drawer-back vh" id="drawer-back" onclick="drawerBack()" aria-label="Back">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3 5 8l5 5"/></svg>
+    </button>
+    <div class="drawer-title" id="drawer-title">Title<span class="sub" id="drawer-subtitle"></span></div>
+    <button class="drawer-close" onclick="closeDrawer()" aria-label="Close">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3l10 10M13 3 3 13"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+  <div class="drawer-foot" id="drawer-foot" style="display:none;"></div>
+</div>
+
+<div class="modal-wrap" id="modal-wrap">
+  <div class="modal-box" id="modal-box"></div>
+</div>
+
+<div class="toast-stack" id="toast-stack"></div>
+
+<script>
+/* ======================================================================
+   DATA
+   ====================================================================== */
+
+const TOR = [
+  // 01-cli (7)
+  {id:"TOR-01-Nq2Zx8h", file:"01-cli", title:"`fieldkit init` scaffolds a new survey project directory"},
+  {id:"TOR-01-Rb7Ktml", file:"01-cli", title:"`fieldkit survey new` creates a survey definition from a template"},
+  {id:"TOR-01-Pw4Dsfy", file:"01-cli", title:"`fieldkit doctor` reports environment and dependency health"},
+  {id:"TOR-01-Hc9Jrqe", file:"01-cli", title:"Global `--profile` flag switches between saved device profiles"},
+  {id:"TOR-01-Tz1Mnbv", file:"01-cli", title:"`fieldkit device pair` registers a new collection device"},
+  {id:"TOR-01-Vf6Qwxa", file:"01-cli", title:"`fieldkit device list` shows all provisioned devices and sync state"},
+  {id:"TOR-01-Ly3Gplk", file:"01-cli", title:"Unknown subcommands print a usage hint instead of a stack trace"},
+  // 02-auth (6)
+  {id:"TOR-02-Bq5Xnrt", file:"02-auth", title:"Field workers sign in with a device PIN, no network required"},
+  {id:"TOR-02-Wm8Fzhc", file:"02-auth", title:"A session token is cached for 12 hours of offline use"},
+  {id:"TOR-02-Kd2Lqvy", file:"02-auth", title:"Failed PIN attempts are rate-limited after 5 tries"},
+  {id:"TOR-02-Sn7Trpb", file:"02-auth", title:"Roles (collector / reviewer / admin) gate which surveys are visible"},
+  {id:"TOR-02-Xf1Vmzc", file:"02-auth", title:"A device can be revoked remotely and is locked on next sync"},
+  {id:"TOR-02-Jh4Rwqt", file:"02-auth", title:"Expired sessions prompt re-authentication before next sync"},
+  // 03-survey-core (12)
+  {id:"TOR-03-Afs657G", file:"03-survey-core", title:"Survey schema validates against the published form version"},
+  {id:"TOR-03-Ct3Nvbx", file:"03-survey-core", title:"A new survey response is created with a stable record ID"},
+  {id:"TOR-03-Rp8Klmy", file:"03-survey-core", title:"GPS coordinates are captured with each response when available"},
+  {id:"TOR-03-Wz5Hqjf", file:"03-survey-core", title:"Photo attachments are linked to the response that captured them"},
+  {id:"TOR-03-Nb2Ftrc", file:"03-survey-core", title:"Photo attachments compress before being queued for sync"},
+  {id:"TOR-03-Yq9Mlxv", file:"03-survey-core", title:"A response can be saved as a draft and resumed later"},
+  {id:"TOR-03-Dh4Wnrb", file:"03-survey-core", title:"Multi-page surveys preserve answers across page navigation"},
+  {id:"TOR-03-Gk7Ptzs", file:"03-survey-core", title:"Skip logic hides questions that don't apply to prior answers"},
+  {id:"TOR-03-Vc1Xlqm", file:"03-survey-core", title:"Draft responses persist across app restarts while offline"},
+  {id:"TOR-03-Mj6Rbwf", file:"03-survey-core", title:"Required fields block submission until completed"},
+  {id:"TOR-03-Ft3Kzny", file:"03-survey-core", title:"Numeric fields reject out-of-range values inline"},
+  {id:"TOR-03-Lx8Qcvh", file:"03-survey-core", title:"Validation errors are announced to screen readers"},
+  // 04-sync (9)
+  {id:"TOR-04-Bp4Nswr", file:"04-sync", title:"Local edits queue when the device is offline"},
+  {id:"TOR-04-Qz7Ltmf", file:"04-sync", title:"Conflicting field edits are flagged, not silently overwritten"},
+  {id:"TOR-04-Xh1Rcvn", file:"04-sync", title:"Last-write-wins applies only to non-conflicting fields"},
+  {id:"TOR-04-Wk9Fbqy", file:"04-sync", title:"A conflict resolution log is written per survey record"},
+  {id:"TOR-04-Dm3Ptxl", file:"04-sync", title:"Manual resolution UI surfaces both versions of a field"},
+  {id:"TOR-04-Jr6Vnzc", file:"04-sync", title:"Resolved records re-enter the sync queue in order"},
+  {id:"TOR-04-Kd83Bqz", file:"04-sync", title:"Sync runs automatically on a configurable interval when online"},
+  {id:"TOR-04-Ty2Gwmf", file:"04-sync", title:"A queued item retries with exponential backoff after a failed sync"},
+  {id:"TOR-04-Sc5Hbxq", file:"04-sync", title:"The sync queue reports its depth and oldest pending item"},
+  // 05-export (7)
+  {id:"TOR-05-Rn8Vfcz", file:"05-export", title:"Survey responses export to CSV with a stable column schema"},
+  {id:"TOR-05-Bw3Lqmt", file:"05-export", title:"Photo attachments export as a manifest alongside the CSV"},
+  {id:"TOR-05-Ky6Zprx", file:"05-export", title:"Export respects the active role's field-visibility rules"},
+  {id:"TOR-05-Ft1Nhcv", file:"05-export", title:"Exports can be scheduled to run after each successful sync"},
+  {id:"TOR-05-Mq4Xswb", file:"05-export", title:"A scheduled export retries once before alerting the reviewer"},
+  {id:"TOR-05-Vd7Rlnk", file:"05-export", title:"Exported files are encrypted at rest with the project key"},
+  {id:"TOR-05-Hj2Ptzc", file:"05-export", title:"Encrypted exports require the reviewer passphrase to open"},
+];
+const torMap = Object.fromEntries(TOR.map(t=>[t.id,t]));
+
+const EPICS = [
+  {id:"Ax3Rq7L", name:"cli-bootstrap", phase:1, status:"Complete",
+    tor:["TOR-01-Nq2Zx8h","TOR-01-Rb7Ktml","TOR-01-Pw4Dsfy","TOR-01-Hc9Jrqe"], deps:[], files:["src/cli/main.py","src/cli/scaffold.py"]},
+  {id:"Bz9Ktp2", name:"device-auth", phase:1, status:"Complete",
+    tor:["TOR-02-Bq5Xnrt","TOR-02-Wm8Fzhc","TOR-02-Kd2Lqvy"], deps:["Ax3Rq7L"], files:["src/auth/pin.py"]},
+  {id:"Cw4Ndm8", name:"role-based-sessions", phase:1, status:"Complete",
+    tor:["TOR-02-Sn7Trpb","TOR-02-Xf1Vmzc","TOR-02-Jh4Rwqt","TOR-01-Tz1Mnbv","TOR-01-Vf6Qwxa","TOR-01-Ly3Gplk"],
+    deps:["Bz9Ktp2"], files:["src/auth/session.py","src/cli/device.py"]},
+  {id:"Dh2Xrf5", name:"survey-schema-baseline", phase:1, status:"Complete",
+    tor:["TOR-03-Afs657G","TOR-03-Ct3Nvbx"], deps:["Cw4Ndm8"], files:["src/models/schema.py"]},
+  {id:"Rt6Yh1v", name:"photo-attach", phase:1, status:"Paused", pausedAgo:"9 days ago",
+    tor:["TOR-03-Rp8Klmy","TOR-03-Wz5Hqjf","TOR-03-Nb2Ftrc"], deps:["Dh2Xrf5"], files:["src/media/photo.py","src/media/gps.py"]},
+
+  {id:"4tGh8Nb", name:"sync-conflict-resolution", phase:2, status:"Implemented",
+    tor:["TOR-04-Bp4Nswr","TOR-04-Qz7Ltmf","TOR-04-Xh1Rcvn","TOR-04-Wk9Fbqy","TOR-04-Dm3Ptxl","TOR-04-Jr6Vnzc"],
+    deps:["Dh2Xrf5"], files:["src/sync/queue.py","src/sync/conflict.py","src/sync/audit_log.py","src/ui/conflict_panel.py"]},
+  {id:"c7Kq2mR", name:"offline-queue", phase:2, status:"In Progress",
+    tor:["TOR-03-Yq9Mlxv","TOR-04-Kd83Bqz","TOR-04-Ty2Gwmf","TOR-04-Sc5Hbxq"],
+    deps:["4tGh8Nb"], files:["src/sync/queue.py","src/sync/offline_buffer.py","src/sync/scheduler.py"]},
+  {id:"9dLp4Xs", name:"form-validation", phase:2, status:"In Progress",
+    tor:["TOR-03-Mj6Rbwf","TOR-03-Ft3Kzny","TOR-03-Lx8Qcvh"],
+    deps:["Dh2Xrf5"], files:["src/ui/survey_form.py","src/models/field.py","src/validation/numeric.py","src/ui/a11y.py"]},
+  {id:"Ep5Vqw3", name:"multipage-nav", phase:2, status:"Not Started",
+    tor:["TOR-03-Dh4Wnrb"], deps:["Cw4Ndm8"], files:["src/ui/survey_form.py","src/ui/pager.py"]},
+  {id:"Fk8Zml6", name:"skip-logic", phase:2, status:"Not Started",
+    tor:["TOR-03-Gk7Ptzs"], deps:["Ep5Vqw3"], files:["src/ui/survey_form.py","src/logic/skip_rules.py"]},
+  {id:"Gj1Ptn9", name:"offline-persistence", phase:2, status:"Not Started",
+    tor:["TOR-03-Vc1Xlqm"], deps:["Dh2Xrf5"], files:["src/sync/queue.py","src/storage/draft_store.py"]},
+
+  {id:"Hn6Wsy4", name:"csv-export", phase:3, status:"Not Started",
+    tor:["TOR-05-Rn8Vfcz","TOR-05-Bw3Lqmt"], deps:["c7Kq2mR"], files:["src/export/csv_writer.py"]},
+  {id:"Jp3Ftv7", name:"export-scheduling", phase:3, status:"Not Started",
+    tor:["TOR-05-Ky6Zprx","TOR-05-Ft1Nhcv","TOR-05-Mq4Xswb"], deps:["Hn6Wsy4"], files:["src/sync/queue.py","src/export/scheduler.py"]},
+  {id:"Km9Blq1", name:"export-encryption", phase:3, status:"Not Started",
+    tor:["TOR-05-Vd7Rlnk","TOR-05-Hj2Ptzc"], deps:["4tGh8Nb"], files:["src/sync/queue.py","src/export/crypto.py"]},
+];
+const epicMap = Object.fromEntries(EPICS.map(e=>[e.id,e]));
+const PHASE_NAMES = {1:"Phase 1 — Foundation", 2:"Phase 2 — Field Capture", 3:"Phase 3 — Sync & Export"};
+
+const PLAN_9dLp4Xs = [
+  {desc:"Add required-field marker to the form schema", files:["src/models/field.py"], tor:["TOR-03-Mj6Rbwf"]},
+  {desc:"Block the submit handler until required fields are filled", files:["src/ui/survey_form.py"], tor:["TOR-03-Mj6Rbwf"]},
+  {desc:"Add numeric range constraints to the field schema", files:["src/models/field.py"], tor:["TOR-03-Ft3Kzny"]},
+  {desc:"Reject out-of-range numeric input inline, before submit", files:["src/ui/survey_form.py","src/validation/numeric.py"], tor:["TOR-03-Ft3Kzny"]},
+  {desc:"Wire an ARIA live region for validation errors", files:["src/ui/survey_form.py","src/ui/a11y.py"], tor:["TOR-03-Lx8Qcvh"]},
+  {desc:"Route error announcements through the screen-reader queue", files:["src/ui/a11y.py"], tor:["TOR-03-Lx8Qcvh"]},
+  {desc:"Unit tests for required-field blocking", files:["tests/ui/test_survey_form.py"], tor:["TOR-03-Mj6Rbwf"]},
+  {desc:"Unit tests for numeric range rejection", files:["tests/validation/test_numeric.py"], tor:["TOR-03-Ft3Kzny"]},
+  {desc:"Accessibility test for error announcements", files:["tests/ui/test_a11y.py"], tor:["TOR-03-Lx8Qcvh"]},
+  {desc:"Run the full quality-gate suite (lint, types, coverage)", files:[], tor:[]},
+  {desc:"Commit and update the epic sidecar to Implemented", files:[".epics/9dLp4Xs/sidecar.json"], tor:[]},
+];
+
+const VERDICT_4tGh8Nb = [
+  {tor:"TOR-04-Bp4Nswr", test:"tests/sync/test_offline_queue.py::test_queues_when_offline", src:"src/sync/queue.py"},
+  {tor:"TOR-04-Qz7Ltmf", test:"tests/sync/test_conflict.py::test_flags_conflicts", src:"src/sync/conflict.py"},
+  {tor:"TOR-04-Xh1Rcvn", test:"tests/sync/test_conflict.py::test_lww_non_conflicting", src:"src/sync/conflict.py"},
+  {tor:"TOR-04-Wk9Fbqy", test:"tests/sync/test_conflict.py::test_resolution_log", src:"src/sync/audit_log.py"},
+  {tor:"TOR-04-Dm3Ptxl", test:"tests/ui/test_conflict_panel.py::test_shows_both_versions", src:"src/ui/conflict_panel.py"},
+  {tor:"TOR-04-Jr6Vnzc", test:"tests/sync/test_conflict.py::test_requeue_order", src:"src/sync/queue.py"},
+];
+const QGATES_4tGh8Nb = [
+  {name:"Lint (ruff)", detail:"0 errors, 0 warnings"},
+  {name:"Type check (mypy)", detail:"strict mode, 0 errors"},
+  {name:"Test coverage", detail:"94% — gate requires ≥ 90%"},
+  {name:"Build (fieldkit-cli wheel)", detail:"built in 12.4s"},
+];
+
+const ACTIVITY_CYCLE = {
+  c7Kq2mR: [
+    "Writing tests for TOR-04-Kd83Bqz",
+    "Implementing exponential backoff in src/sync/scheduler.py",
+    "Running test suite for src/sync/offline_buffer.py",
+    "Updating epic sidecar progress",
+  ],
+};
+
+/* ======================================================================
+   STATE
+   ====================================================================== */
+
+let state = {
+  lanes: {
+    A: {key:"A", path:"~/code/fieldkit", branch:"feature/epic-4tGh8Nb-sync-conflict",
+        state:"blocked", epicId:"4tGh8Nb", command:"/wrapup-epic 4tGh8Nb",
+        commitsBehind:0, gateId:"g-a-verdict", pausedStep:null},
+    B: {key:"B", path:"~/code/fieldkit-2", branch:"feature/epic-c7Kq2mR-offline-queue",
+        state:"running", epicId:"c7Kq2mR", command:"/start-epic c7Kq2mR",
+        step:6, totalSteps:11, elapsedSec:14*60, activity:ACTIVITY_CYCLE.c7Kq2mR[0],
+        commitsBehind:3, gateId:null, pausedStep:null},
+    C: {key:"C", path:"~/code/fieldkit-3", branch:"feature/epic-9dLp4Xs-form-validation",
+        state:"blocked", epicId:"9dLp4Xs", command:"/start-epic 9dLp4Xs",
+        commitsBehind:3, gateId:"g-c-plan", pausedStep:null},
+  },
+  gates: [
+    {id:"g-c-plan", laneKey:"C", type:"plan", epicId:"9dLp4Xs", age:"6 min", createdOrder:0},
+    {id:"g-a-verdict", laneKey:"A", type:"verdict", epicId:"4tGh8Nb", age:"2 min", createdOrder:1},
+    {id:"g-baseline", laneKey:null, type:"baseline", age:"2 days", createdOrder:2,
+      branch:"docs/q3-offline-mode", addTor:6, addEpics:3},
+  ],
+  reqTotals: {torTotal:41, epicTotal:14},
+  drawer: {open:false, stack:[]},
+  reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+};
+
+let gateSeq = 3;
+let toastSeq = 0;
+
+/* ======================================================================
+   HELPERS
+   ====================================================================== */
+
+function epicStatusToClass(status){
+  return {"Not Started":"notstarted","In Progress":"inprogress","Implemented":"implemented","Complete":"complete","Paused":"paused"}[status];
+}
+function depsMet(epic){
+  return epic.deps.every(d => {
+    const de = epicMap[d];
+    return de && (de.status === "Complete" || de.status === "Implemented");
+  });
+}
+function isRunnable(epic){
+  return epic.status === "Not Started" && depsMet(epic);
+}
+function activeLockedFiles(excludeLaneKey){
+  const files = new Set();
+  Object.values(state.lanes).forEach(l=>{
+    if (l.key === excludeLaneKey) return;
+    if (l.state === "running" && l.epicId){
+      (epicMap[l.epicId].files||[]).forEach(f=>files.add(f));
+    }
+  });
+  return files;
+}
+function idleLaneKeys(){
+  return Object.values(state.lanes).filter(l=>l.state==="idle").map(l=>l.key);
+}
+function fmtElapsed(sec){
+  const m = Math.floor(sec/60), s = sec%60;
+  return m + "m " + (s<10?"0":"") + s + "s";
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function gateForLane(laneKey){
+  return state.gates.find(g=>g.laneKey===laneKey);
+}
+function oldestGate(){
+  return state.gates.slice().sort((a,b)=>a.createdOrder-b.createdOrder)[0];
+}
+
+/* ======================================================================
+   RENDER: TOP-LEVEL
+   ====================================================================== */
+
+function renderAll(){
+  renderLanes();
+  renderTopStats();
+}
+
+function renderTopStats(){
+  const gcount = state.gates.length;
+  const badge = document.getElementById("gate-badge");
+  badge.textContent = gcount;
+  badge.classList.toggle("zero", gcount===0);
+  const running = Object.values(state.lanes).filter(l=>l.state==="running").length;
+  const blocked = Object.values(state.lanes).filter(l=>l.state==="blocked").length;
+  document.getElementById("sb-running").textContent = running;
+  document.getElementById("sb-blocked").textContent = blocked;
+  const filled = Object.values(state.lanes).filter(l=>l.state!=="empty").length;
+  document.getElementById("lane-count-pill").textContent = filled + "/3 lanes";
+}
+
+/* ======================================================================
+   RENDER: LANES
+   ====================================================================== */
+
+function renderLanes(){
+  const row = document.getElementById("lanes-row");
+  row.innerHTML = ["A","B","C"].map(k=>laneHtml(state.lanes[k])).join("");
+}
+
+function laneHtml(l){
+  if (l.state === "empty") return laneEmptySlotHtml(l);
+
+  const stateLabel = {idle:"Idle", running:"Running", blocked:"Blocked on you", paused:"Paused"}[l.state];
+  const epic = l.epicId ? epicMap[l.epicId] : null;
+
+  return `
+  <div class="lane state-${l.state}" id="lane-${l.key}">
+    <div class="lane-head">
+      <div class="lane-head-row">
+        <span class="lane-letter">Lane ${l.key}</span>
+        <button class="lane-icon-btn" title="Remove lane" onclick="confirmRemoveLane('${l.key}')" aria-label="Remove lane ${l.key}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 4.5h9M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M6 7v4M10 7v4M4.5 4.5l.6 8a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8"/></svg>
+        </button>
+      </div>
+      <span class="state-chip"><span class="led"></span>${stateLabel}</span>
+      <div class="lane-meta">
+        <div class="lane-meta-row" title="${esc(l.path)}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.5H12.5A1.5 1.5 0 0 1 14 6v6a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12z"/></svg>
+          <span class="val">${esc(l.path)}</span>
+        </div>
+        <div class="lane-meta-row" title="${esc(l.branch)}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6.5" r="1.6"/><path d="M4 5.1V11M4 5.5c0 3 3 3.5 5 3.5h1.6"/></svg>
+          <span class="val">${esc(l.branch)}</span>
+        </div>
+      </div>
+      ${syncRowHtml(l)}
+    </div>
+    <div class="lane-body">
+      ${laneBodyHtml(l, epic)}
+    </div>
+    <div class="lane-footer">
+      <button class="btn btn-sm" style="flex:1" onclick="openTranscript('${l.key}')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1.3"/><path d="M4.5 6h7M4.5 8.5h7M4.5 11h4"/></svg>
+        Transcript
+      </button>
+      ${l.state==="running" ? `<button class="btn btn-sm btn-danger-outline" onclick="stopLane('${l.key}')">Stop</button>` : ""}
+      ${l.state==="paused" ? `<button class="btn btn-sm btn-primary" onclick="resumeLane('${l.key}')">Resume</button>` : ""}
+    </div>
+  </div>`;
+}
+
+function syncRowHtml(l){
+  const behind = l.commitsBehind > 0;
+  return `
+  <div class="sync-row ${behind?'behind':''}">
+    <span class="sync-text">
+      ${behind ? `<b>${l.commitsBehind}</b> commit${l.commitsBehind===1?'':'s'} behind develop` : `Up to date with develop`}
+    </span>
+    ${behind ? `<button class="btn-sync" id="sync-btn-${l.key}" onclick="syncLane('${l.key}')">Sync</button>` : ""}
+  </div>`;
+}
+
+function laneBodyHtml(l, epic){
+  if (l.state === "blocked"){
+    const gate = gateForLane(l.key);
+    return blockedCardHtml(gate, epic);
+  }
+  if (l.state === "running"){
+    const pct = Math.round((l.step / l.totalSteps) * 100);
+    return `
+    <div class="card tone-info">
+      <div class="run-command">${esc(l.command)}</div>
+      <div class="run-epicname">${epic.name} <span class="epic-id">${epic.id}</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-label"><span>Unattended execution</span><span class="steps">Step ${l.step} of ${l.totalSteps} &middot; ${fmtElapsed(l.elapsedSec)}</span></div>
+      <div class="activity-line"><span class="aic">&#9656;</span><span>${esc(l.activity)}</span></div>
+      ${lockedFilesLine(epic)}
+    </div>`;
+  }
+  if (l.state === "paused"){
+    return `
+    <div class="card tone-paused">
+      <div class="gate-title">${epic.name} <span class="epic-id">${epic.id}</span></div>
+      <div class="gate-sub">Paused by you at step ${l.pausedStep} of ${l.totalSteps}. Resume to continue unattended execution, or leave paused and hand this lane other work later.</div>
+    </div>`;
+  }
+  // idle
+  return `
+  <div class="empty-state">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/></svg>
+    <div class="et">Idle — ready for work</div>
+    <button class="btn btn-primary" onclick="openBoard('${l.key}')">Dispatch epic&hellip;</button>
+  </div>`;
+}
+
+function lockedFilesLine(epic){
+  if (!epic || !epic.files || !epic.files.length) return "";
+  const short = epic.files.map(f=>f.split("/").pop());
+  return `<div class="editing-line">editing: ${short.join(", ")}</div>`;
+}
+
+function blockedCardHtml(gate, epic){
+  if (!gate) return "";
+  if (gate.type === "plan"){
+    const steps = PLAN_9dLp4Xs; // only plan gate in seed
+    return `
+    <div class="card tone-danger">
+      <span class="needs-you-tag">NEEDS YOU</span>
+      <div class="gate-title">Plan approval</div>
+      <div class="gate-sub">${epic.name} <span class="mono">${epic.id}</span> &middot; ${steps.length}-step plan covering ${epic.tor.length} TOR requirements</div>
+      <button class="btn btn-primary btn-full" onclick="openGate('${gate.id}')">Review plan &rarr;</button>
+    </div>`;
+  }
+  if (gate.type === "verdict"){
+    const passCount = VERDICT_4tGh8Nb.length;
+    return `
+    <div class="card tone-danger">
+      <span class="needs-you-tag">NEEDS YOU</span>
+      <div class="gate-title">Verification verdict</div>
+      <div class="gate-sub">${epic.name} <span class="mono">${epic.id}</span> &middot; ${passCount}/${passCount} requirements PASS &middot; ${QGATES_4tGh8Nb.length}/${QGATES_4tGh8Nb.length} quality gates PASS</div>
+      <button class="btn btn-primary btn-full" onclick="openGate('${gate.id}')">Review verdict &rarr;</button>
+    </div>`;
+  }
+  return "";
+}
+
+function laneEmptySlotHtml(l){
+  return `
+  <div class="lane state-empty" id="lane-${l.key}">
+    <div class="lane-head">
+      <div class="lane-head-row"><span class="lane-letter">Lane ${l.key}</span></div>
+      <span class="state-chip"><span class="led" style="background:var(--text-faint)"></span>Empty</span>
+    </div>
+    <form class="create-lane" onsubmit="return createLane(event,'${l.key}')">
+      <div>
+        <label>Local path</label>
+        <input class="tf" name="path" placeholder="~/code/fieldkit-${l.key.toLowerCase()}" required>
+      </div>
+      <div>
+        <label>Base branch</label>
+        <input class="tf" name="branch" placeholder="develop" value="develop">
+      </div>
+      <button class="btn btn-primary btn-full" type="submit">Create lane</button>
+    </form>
+  </div>`;
+}
+
+/* ======================================================================
+   ACTIONS: lanes
+   ====================================================================== */
+
+function syncLane(key){
+  const l = state.lanes[key];
+  const btn = document.getElementById("sync-btn-"+key);
+  if (btn){ btn.disabled = true; btn.textContent = "Syncing…"; }
+  setTimeout(()=>{
+    l.commitsBehind = 0;
+    renderLanes();
+    toast(`Lane ${key} synced with develop`);
+  }, 650);
+}
+
+function stopLane(key){
+  const l = state.lanes[key];
+  if (l.state !== "running") return;
+  l.pausedStep = l.step;
+  l.state = "paused";
+  renderLanes();
+  renderTopStats();
+  toast(`Lane ${key} stopped — paused at step ${l.pausedStep} of ${l.totalSteps}`);
+}
+
+function resumeLane(key){
+  const l = state.lanes[key];
+  l.state = "running";
+  renderLanes();
+  renderTopStats();
+  toast(`Lane ${key} resumed unattended execution`);
+}
+
+function confirmRemoveLane(key){
+  const l = state.lanes[key];
+  if (l.state==="running" || l.state==="blocked"){
+    showModal({
+      title:"Can't remove a busy lane",
+      body:`Lane ${key} has an active session. Stop it (or resolve its gate) before removing the lane.`,
+      actions:[{label:"Got it", primary:true, onClick:closeModal}]
+    });
+    return;
+  }
+  showModal({
+    title:`Remove Lane ${key}?`,
+    body:`This deletes the local clone at ${l.path}. It's a permanent lane, not scratch space — this can't be undone from here.`,
+    actions:[
+      {label:"Cancel", onClick:closeModal},
+      {label:"Remove lane", danger:true, onClick:()=>{ removeLane(key); closeModal(); }},
+    ]
+  });
+}
+function removeLane(key){
+  state.lanes[key] = {key, state:"empty"};
+  renderLanes();
+  renderTopStats();
+  toast(`Lane ${key} removed`);
+}
+function createLane(evt, key){
+  evt.preventDefault();
+  const f = evt.target;
+  const path = f.path.value.trim() || `~/code/fieldkit-${key.toLowerCase()}`;
+  const branch = f.branch.value.trim() || "develop";
+  state.lanes[key] = {key, path, branch, state:"idle", epicId:null, commitsBehind:0};
+  renderLanes();
+  renderTopStats();
+  toast(`Lane ${key} created at ${path}`);
+  return false;
+}
+
+/* ======================================================================
+   DRAWER SYSTEM
+   ====================================================================== */
+
+function openDrawerRaw(view){
+  state.drawer.open = true;
+  document.getElementById("backdrop").classList.add("open");
+  document.getElementById("drawer").classList.add("open");
+  renderDrawerView(view);
+}
+function pushDrawer(view){
+  state.drawer.stack.push(view);
+  renderDrawerView(view);
+  if (!state.drawer.open) openDrawerRaw(view);
+}
+function drawerBack(){
+  state.drawer.stack.pop();
+  const prev = state.drawer.stack[state.drawer.stack.length-1];
+  if (prev) renderDrawerView(prev); else closeDrawer();
+}
+function closeDrawer(){
+  state.drawer.open = false;
+  state.drawer.stack = [];
+  document.getElementById("backdrop").classList.remove("open");
+  document.getElementById("drawer").classList.remove("open");
+}
+function setDrawerChrome(title, subtitle, showBack, wide){
+  document.getElementById("drawer-title").innerHTML = esc(title) + (subtitle ? `<span class="sub">${esc(subtitle)}</span>` : "");
+  document.getElementById("drawer-back").classList.toggle("vh", !showBack);
+  document.getElementById("drawer").classList.toggle("wide", !!wide);
+}
+function setDrawerFoot(html){
+  const foot = document.getElementById("drawer-foot");
+  foot.innerHTML = html || "";
+  foot.style.display = html ? "flex" : "none";
+}
+
+function renderDrawerView(view){
+  if (view.kind === "gatequeue") return renderGateQueueDrawer();
+  if (view.kind === "gate") return renderGateDrawer(view.gateId);
+  if (view.kind === "board") return renderBoardDrawer(view.forLane);
+  if (view.kind === "requirements") return renderRequirementsDrawer();
+  if (view.kind === "transcript") return renderTranscriptDrawer(view.laneKey);
+}
+
+/* ---- Gate queue ---- */
+function openGateQueue(){
+  state.drawer.stack = [{kind:"gatequeue"}];
+  openDrawerRaw(state.drawer.stack[0]);
+}
+function renderGateQueueDrawer(){
+  setDrawerChrome("Gate queue", state.gates.length + " pending across all lanes", false, false);
+  setDrawerFoot("");
+  const body = document.getElementById("drawer-body");
+  if (!state.gates.length){
+    body.innerHTML = `<div class="board-banner">Nothing needs you right now. All lanes are running clean.</div>`;
+    return;
+  }
+  body.innerHTML = state.gates.map(g=>{
+    const isBaseline = g.type === "baseline";
+    let title, desc, laneLabel;
+    if (g.type === "plan"){
+      const epic = epicMap[g.epicId];
+      title = "Plan approval"; laneLabel = "Lane "+g.laneKey;
+      desc = `${epic.name} · ${epic.id}`;
+    } else if (g.type === "verdict"){
+      const epic = epicMap[g.epicId];
+      title = "Verification verdict"; laneLabel = "Lane "+g.laneKey;
+      desc = `${epic.name} · ${epic.id}`;
+    } else {
+      title = "Requirements baseline approval"; laneLabel = "No lane";
+      desc = `${g.branch} · +${g.addTor} TOR, +${g.addEpics} epics`;
+    }
+    return `
+    <div class="gq-item" onclick="openGate('${g.id}')">
+      <div class="gq-ico ${isBaseline?'baseline':''}">
+        ${isBaseline
+          ? `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 2h6l3 3v9H4z"/><path d="M6 7h5M6 9.5h5"/></svg>`
+          : `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2a4.5 4.5 0 0 0-4.5 4.5V10L2 12.5h12L12.5 10V6.5A4.5 4.5 0 0 0 8 2Z"/></svg>`}
+      </div>
+      <div class="gq-main">
+        <div class="gq-title">${title}</div>
+        <div class="gq-desc">${desc}</div>
+      </div>
+      <div class="gq-age"><div class="gq-lane">${laneLabel}</div>${g.age}</div>
+    </div>`;
+  }).join("");
+}
+
+function jumpToNextGate(){
+  if (!state.gates.length){ toast("Nothing needs you right now"); return; }
+  const g = oldestGate();
+  state.drawer.stack = [{kind:"gatequeue"}, {kind:"gate", gateId:g.id}];
+  openDrawerRaw(state.drawer.stack[state.drawer.stack.length-1]);
+}
+
+function openGate(gateId){
+  pushDrawer({kind:"gate", gateId});
+}
+
+function renderGateDrawer(gateId){
+  const g = state.gates.find(x=>x.id===gateId);
+  const body = document.getElementById("drawer-body");
+  if (!g){ closeDrawer(); return; }
+  if (g.type === "plan") return renderPlanGate(g, body);
+  if (g.type === "verdict") return renderVerdictGate(g, body);
+  if (g.type === "baseline") return renderBaselineGate(g, body);
+}
+
+function renderPlanGate(g, body){
+  const epic = epicMap[g.epicId];
+  setDrawerChrome("Plan approval", "Lane "+g.laneKey+" · "+epic.id, true, false);
+  body.innerHTML = `
+    <div class="section-label">${epic.name}</div>
+    <p style="margin:0 0 14px;font-size:12px;color:var(--text-muted);line-height:1.5;">
+      /start-epic ${epic.id} produced this plan from ${epic.tor.length} TOR requirements. Approve to hand off unattended
+      execution, or send back with notes.
+    </p>
+    <div class="section-label">Requirements covered</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+      ${epic.tor.map(t=>`<span class="chip tor" title="${esc(torMap[t].title)}">${t}</span>`).join("")}
+    </div>
+    <div class="section-label">${PLAN_9dLp4Xs.length}-step plan</div>
+    <div>
+      ${PLAN_9dLp4Xs.map((s,i)=>`
+        <div class="plan-step">
+          <div class="plan-step-num">${i+1}</div>
+          <div class="plan-step-body">
+            <div class="plan-step-desc">${esc(s.desc)}</div>
+            <div class="plan-step-tags">
+              ${s.files.map(f=>`<span class="chip file">${f}</span>`).join("")}
+              ${s.tor.map(t=>`<span class="chip tor">${t}</span>`).join("")}
+            </div>
+          </div>
+        </div>`).join("")}
+    </div>
+    <div id="rc-box" style="display:none;margin-top:14px;">
+      <label class="section-label" for="rc-text">Requested changes</label>
+      <textarea class="disclosure" id="rc-text" placeholder="What should change before this plan runs unattended?"></textarea>
+    </div>
+  `;
+  setDrawerFoot(`
+    <button class="btn" onclick="toggleRequestChanges()">Request changes</button>
+    <button class="btn btn-primary" onclick="approvePlan('${g.id}')">Approve plan</button>
+  `);
+}
+function toggleRequestChanges(){
+  const box = document.getElementById("rc-box");
+  const open = box.style.display !== "none";
+  box.style.display = open ? "none" : "block";
+}
+function approvePlan(gateId){
+  const g = state.gates.find(x=>x.id===gateId);
+  const epic = epicMap[g.epicId];
+  const l = state.lanes[g.laneKey];
+  l.state = "running";
+  l.step = 1; l.totalSteps = PLAN_9dLp4Xs.length; l.elapsedSec = 0;
+  l.activity = PLAN_9dLp4Xs[0].desc;
+  l.gateId = null;
+  removeGate(gateId);
+  closeDrawer();
+  renderLanes(); renderTopStats();
+  toast(`Plan approved — Lane ${g.laneKey} is now running unattended`);
+}
+
+function renderVerdictGate(g, body){
+  const epic = epicMap[g.epicId];
+  setDrawerChrome("Verification verdict", "Lane "+g.laneKey+" · "+epic.id, true, false);
+  body.innerHTML = `
+    <div class="section-label">${epic.name} — independent re-verification</div>
+    <table class="vtable">
+      <thead><tr><th>Requirement</th><th>References</th><th>Result</th></tr></thead>
+      <tbody>
+      ${VERDICT_4tGh8Nb.map(v=>`
+        <tr>
+          <td><span class="mono" style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;">${v.tor}</span>${esc(torMap[v.tor].title)}</td>
+          <td><span class="ref">test: ${v.test}</span><span class="ref">src: ${v.src}</span></td>
+          <td><span class="pass-badge">&#10003; PASS</span></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    <div class="hr"></div>
+    <div class="section-label">Quality gates</div>
+    ${QGATES_4tGh8Nb.map(q=>`
+      <div class="qgate-row"><span>${q.name}<br><span style="font-size:10.5px;color:var(--text-faint)">${q.detail}</span></span><span class="pass-badge">&#10003; PASS</span></div>
+    `).join("")}
+    <div class="hr"></div>
+    <div class="section-label">Manual verification disclosure</div>
+    <p style="margin:0 0 8px;font-size:11.5px;color:var(--text-muted);">Did you check anything by hand? This is a disclosure, not a gate — "no" is a fine answer.</p>
+    <textarea class="disclosure" id="disclosure-text" placeholder="e.g. Ran a manual sync on a real device with airplane mode toggled mid-response. (optional)"></textarea>
+    <div class="hr"></div>
+    <div class="section-label">Ship mode</div>
+    <label class="radio-opt checked" id="opt-merge">
+      <input type="radio" name="shipmode" value="merge" checked onchange="selectShipMode('merge')">
+      <div><div class="rt">Merge locally</div><div class="rd">Fast-forward into develop on this machine. No PR.</div></div>
+    </label>
+    <label class="radio-opt" id="opt-pr">
+      <input type="radio" name="shipmode" value="pr" onchange="selectShipMode('pr')">
+      <div><div class="rt">Push and open a PR</div><div class="rd">Push feature/epic-4tGh8Nb-sync-conflict and open a pull request into develop.</div></div>
+    </label>
+    <label class="check-row"><input type="checkbox" id="remember-shipmode"> Remember this choice for acme/fieldkit</label>
+  `;
+  setDrawerFoot(`<button class="btn btn-primary btn-full" onclick="submitVerdict('${g.id}')">Approve &amp; ship</button>`);
+}
+function selectShipMode(mode){
+  document.getElementById("opt-merge").classList.toggle("checked", mode==="merge");
+  document.getElementById("opt-pr").classList.toggle("checked", mode==="pr");
+}
+function submitVerdict(gateId){
+  const g = state.gates.find(x=>x.id===gateId);
+  const epic = epicMap[g.epicId];
+  const mode = document.querySelector('input[name="shipmode"]:checked').value;
+  const l = state.lanes[g.laneKey];
+
+  epic.status = "Complete";
+  l.state = "idle"; l.epicId = null; l.gateId = null; l.commitsBehind = 0;
+  removeGate(gateId);
+  closeDrawer();
+  renderLanes(); renderTopStats();
+
+  if (mode === "merge"){
+    toast(`${epic.id} shipped — merged locally into develop. Lane ${g.laneKey} is idle.`);
+  } else {
+    toast(`${epic.id} shipped — pushed and opened PR #214 into develop. Lane ${g.laneKey} is idle.`);
+  }
+}
+
+function renderBaselineGate(g, body){
+  setDrawerChrome("Requirements baseline approval", "No lane — outlived its session", true, false);
+  body.innerHTML = `
+    <div class="board-banner">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.2"/><path d="M8 5v3.5l2.2 1.3"/></svg>
+      This gate was produced by a planning session that has since ended. Nothing about that is wrong — gates live in a
+      queue precisely so they can outlive the terminal they came from.
+    </div>
+    <div class="section-label">Branch</div>
+    <p class="mono" style="margin:0 0 14px;font-size:12.5px;">${esc(g.branch)}</p>
+    <div class="section-label">What merging this approves</div>
+    <div class="card" style="margin-bottom:10px;">
+      <div style="font-weight:600;font-size:12.5px;margin-bottom:8px;">+${g.addTor} TOR requirements</div>
+      <div style="font-size:11.5px;color:var(--text-muted);line-height:1.6;">
+        New feature file <span class="mono">06-offline-mode.feature.md</span> — background-retry ceiling, storage-quota
+        warning, cold-start recovery, stale-cache eviction, and two others.
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-weight:600;font-size:12.5px;margin-bottom:8px;">+${g.addEpics} epics</div>
+      <div style="font-size:11.5px;color:var(--text-muted);line-height:1.6;">
+        A new Phase 4 — Offline Mode Hardening, sequenced after Phase 3 completes.
+      </div>
+    </div>
+    <p style="margin-top:16px;font-size:11.5px;color:var(--text-muted);">
+      Merging <span class="mono">docs/q3-offline-mode</span> into develop <em>is</em> the approval signature for this
+      baseline addition — there is no separate sign-off step.
+    </p>
+  `;
+  setDrawerFoot(`<button class="btn btn-primary btn-full" onclick="approveBaseline('${g.id}')">Merge &amp; approve baseline</button>`);
+}
+function approveBaseline(gateId){
+  const g = state.gates.find(x=>x.id===gateId);
+  state.reqTotals.torTotal += g.addTor;
+  state.reqTotals.epicTotal += g.addEpics;
+  removeGate(gateId);
+  closeDrawer();
+  renderTopStats();
+  toast(`Baseline merged — ${g.branch} is now part of develop (+${g.addTor} TOR, +${g.addEpics} epics)`);
+}
+
+function removeGate(gateId){
+  state.gates = state.gates.filter(g=>g.id!==gateId);
+  Object.values(state.lanes).forEach(l=>{ if (l.gateId===gateId) l.gateId=null; });
+}
+
+/* ---- Board ---- */
+function openBoard(forLane){
+  state.drawer.stack = [{kind:"board", forLane: forLane || null}];
+  openDrawerRaw(state.drawer.stack[0]);
+}
+function renderBoardDrawer(forLane){
+  setDrawerChrome("Epic board", forLane ? `Dispatching to Lane ${forLane}` : "All phases", false, true);
+  setDrawerFoot("");
+  const idle = idleLaneKeys();
+  const body = document.getElementById("drawer-body");
+
+  let banner = "";
+  if (forLane){
+    banner = `<div class="board-banner"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.2"/><path d="M8 5v3.5l2.2 1.3"/></svg>Pick a runnable epic below to send straight to Lane ${forLane}.</div>`;
+  } else if (!idle.length){
+    banner = `<div class="board-banner"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2 1.5 13.5h13z"/><path d="M8 6.5v3M8 11.5h.01"/></svg>All three lanes are occupied. Free one — ship a lane's pending verdict, or stop and pause a running session — before dispatching new work.</div>`;
+  }
+
+  body.innerHTML = banner + [1,2,3].map(phase=>{
+    const epics = EPICS.filter(e=>e.phase===phase);
+    return `
+    <div class="phase-block">
+      <div class="phase-head"><h3>${PHASE_NAMES[phase]}</h3><span class="pc">${epics.length} epics</span></div>
+      ${epics.map(e=>epicCardHtml(e, forLane, idle)).join("")}
+    </div>`;
+  }).join("");
+}
+
+function epicCardHtml(epic, forLane, idle){
+  const runnable = isRunnable(epic);
+  const locked = activeLockedFiles(null);
+  const overlapFiles = (epic.files||[]).filter(f=>locked.has(f));
+  const hasOverlap = runnable && overlapFiles.length>0;
+  const overlappingLane = Object.values(state.lanes).find(l=>l.state==="running" && l.epicId && (epicMap[l.epicId].files||[]).some(f=>overlapFiles.includes(f)));
+
+  const depChips = epic.deps.map(d=>{
+    const de = epicMap[d];
+    const met = de.status==="Complete" || de.status==="Implemented";
+    return `<span class="dep-tag ${met?'met':'unmet'}">${met?'&#10003;':'&#8226;'} needs ${d}</span>`;
+  }).join("");
+
+  let actionHtml = "";
+  if (runnable){
+    if (forLane){
+      actionHtml = `<button class="btn btn-sm btn-primary" onclick="dispatchEpic('${epic.id}','${forLane}')">Send to Lane ${forLane}</button>`;
+    } else if (idle.length===1){
+      actionHtml = `<button class="btn btn-sm btn-primary" onclick="dispatchEpic('${epic.id}','${idle[0]}')">Dispatch to Lane ${idle[0]}</button>`;
+    } else if (idle.length>1){
+      actionHtml = idle.map(k=>`<button class="btn btn-sm" onclick="dispatchEpic('${epic.id}','${k}')">&rarr; Lane ${k}</button>`).join("");
+    } else {
+      actionHtml = `<button class="btn btn-sm" disabled title="No idle lane">No idle lane</button>`;
+    }
+  }
+
+  return `
+  <div class="epic-card ${runnable?'runnable':''} ${epic.status==='Not Started' && !runnable ? 'blocked-dep':''}">
+    <div class="epic-top">
+      <div><div class="epic-name">${epic.name}</div><span class="epic-id">${epic.id}</span></div>
+      <span class="status-pill status-${epicStatusToClass(epic.status)}"><span class="led"></span>${epic.status}${epic.status==='Paused'?' · '+epic.pausedAgo:''}</span>
+    </div>
+    <div class="epic-tags">
+      ${epic.tor.map(t=>`<span class="chip tor" title="${esc(torMap[t].title)}">${t}</span>`).join("")}
+      ${depChips}
+      ${runnable ? `<span class="runnable-tag">Runnable now</span>` : ""}
+    </div>
+    ${hasOverlap ? `<div class="overlap-warn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2 1.5 13.5h13z"/><path d="M8 6.5v3M8 11.5h.01"/></svg>Overlaps Lane ${overlappingLane?overlappingLane.key:'?'}: currently editing ${overlapFiles.join(", ")}</div>` : ""}
+    ${actionHtml ? `<div class="epic-actions">${actionHtml}</div>` : ""}
+  </div>`;
+}
+
+function dispatchEpic(epicId, laneKey){
+  const epic = epicMap[epicId];
+  const locked = activeLockedFiles(laneKey);
+  const overlapFiles = (epic.files||[]).filter(f=>locked.has(f));
+  if (overlapFiles.length){
+    const owner = Object.values(state.lanes).find(l=>l.state==="running" && l.epicId && (epicMap[l.epicId].files||[]).some(f=>overlapFiles.includes(f)));
+    showModal({
+      title:"Files overlap with a running lane",
+      body:`${epic.id} touches ${overlapFiles.join(", ")}, which Lane ${owner?owner.key:'?'} is editing right now. Dispatching anyway means merging one of these branches will conflict with the other. Continue?`,
+      actions:[
+        {label:"Cancel", onClick:closeModal},
+        {label:"Dispatch anyway", primary:true, onClick:()=>{ closeModal(); doDispatch(epicId, laneKey); }},
+      ]
+    });
+    return;
+  }
+  doDispatch(epicId, laneKey);
+}
+
+function doDispatch(epicId, laneKey){
+  const epic = epicMap[epicId];
+  epic.status = "In Progress";
+  const l = state.lanes[laneKey];
+  l.epicId = epicId;
+  l.branch = `feature/epic-${epicId}-${epic.name}`;
+  l.command = `/start-epic ${epicId}`;
+  l.commitsBehind = 0;
+  l.state = "blocked";
+  const gateId = "g-"+laneKey.toLowerCase()+"-plan-"+(++gateSeq);
+  l.gateId = gateId;
+  state.gates.push({id:gateId, laneKey, type:"plan", epicId, age:"just now", createdOrder: gateSeq});
+
+  // stash a generic plan template keyed to this gate for the drawer
+  window.__genericPlans = window.__genericPlans || {};
+  window.__genericPlans[gateId] = epic.tor.map(t=>({desc:`Implement ${torMap[t].title.toLowerCase()}`, files: epic.files, tor:[t]}))
+    .concat([{desc:"Run the full quality-gate suite (lint, types, coverage)", files:[], tor:[]},
+             {desc:"Commit and update the epic sidecar to Implemented", files:[`.epics/${epicId}/sidecar.json`], tor:[]}]);
+
+  renderLanes(); renderTopStats();
+  closeDrawer();
+  toast(`${epicId} dispatched to Lane ${laneKey} — plan approval pending`);
+}
+
+// patch renderPlanGate to use generic plan when available
+const _origRenderPlanGate = renderPlanGate;
+renderPlanGate = function(g, body){
+  const epic = epicMap[g.epicId];
+  const steps = (window.__genericPlans && window.__genericPlans[g.id]) || PLAN_9dLp4Xs;
+  setDrawerChrome("Plan approval", "Lane "+g.laneKey+" · "+epic.id, true, false);
+  body.innerHTML = `
+    <div class="section-label">${epic.name}</div>
+    <p style="margin:0 0 14px;font-size:12px;color:var(--text-muted);line-height:1.5;">
+      /start-epic ${epic.id} produced this plan from ${epic.tor.length} TOR requirements. Approve to hand off unattended
+      execution, or send back with notes.
+    </p>
+    <div class="section-label">Requirements covered</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+      ${epic.tor.map(t=>`<span class="chip tor" title="${esc(torMap[t].title)}">${t}</span>`).join("")}
+    </div>
+    <div class="section-label">${steps.length}-step plan</div>
+    <div>
+      ${steps.map((s,i)=>`
+        <div class="plan-step">
+          <div class="plan-step-num">${i+1}</div>
+          <div class="plan-step-body">
+            <div class="plan-step-desc">${esc(s.desc)}</div>
+            <div class="plan-step-tags">
+              ${s.files.map(f=>`<span class="chip file">${f}</span>`).join("")}
+              ${s.tor.map(t=>`<span class="chip tor">${t}</span>`).join("")}
+            </div>
+          </div>
+        </div>`).join("")}
+    </div>
+    <div id="rc-box" style="display:none;margin-top:14px;">
+      <label class="section-label" for="rc-text">Requested changes</label>
+      <textarea class="disclosure" id="rc-text" placeholder="What should change before this plan runs unattended?"></textarea>
+    </div>
+  `;
+  setDrawerFoot(`
+    <button class="btn" onclick="toggleRequestChanges()">Request changes</button>
+    <button class="btn btn-primary" onclick="approvePlanGeneric('${g.id}', ${steps.length})">Approve plan</button>
+  `);
+};
+function approvePlanGeneric(gateId, stepCount){
+  const g = state.gates.find(x=>x.id===gateId);
+  if (g.epicId === "9dLp4Xs") return approvePlan(gateId);
+  const l = state.lanes[g.laneKey];
+  l.state = "running";
+  l.step = 1; l.totalSteps = stepCount; l.elapsedSec = 0;
+  const steps = window.__genericPlans[gateId];
+  l.activity = steps[0].desc;
+  l.gateId = null;
+  removeGate(gateId);
+  closeDrawer();
+  renderLanes(); renderTopStats();
+  toast(`Plan approved — Lane ${g.laneKey} is now running unattended`);
+}
+
+/* ---- Requirements ---- */
+function openRequirements(){
+  state.drawer.stack = [{kind:"requirements"}];
+  openDrawerRaw(state.drawer.stack[0]);
+}
+function coverageStateFor(torId){
+  const owner = EPICS.find(e=>e.tor.includes(torId));
+  if (!owner) return {label:"Not started", cls:"notstarted", epic:null};
+  if (owner.status === "Complete") return {label:"Verified", cls:"complete", epic:owner};
+  if (owner.status === "Implemented") return {label:"Implemented — not verified", cls:"implemented", epic:owner};
+  if (owner.status === "In Progress") return {label:"In progress", cls:"inprogress", epic:owner};
+  if (owner.status === "Paused") return {label:"Paused", cls:"paused", epic:owner};
+  return {label:"Not started", cls:"notstarted", epic:owner};
+}
+function renderRequirementsDrawer(){
+  setDrawerChrome("Requirements coverage", state.reqTotals.torTotal + " TOR requirements · " + state.reqTotals.epicTotal + " epics", false, true);
+  setDrawerFoot("");
+  const counts = {complete:0, implemented:0, inprogress:0, paused:0, notstarted:0};
+  TOR.forEach(t=>{ counts[coverageStateFor(t.id).cls]++; });
+  const files = [...new Set(TOR.map(t=>t.file))];
+  const body = document.getElementById("drawer-body");
+  body.innerHTML = `
+    <div class="req-summary">
+      <div class="req-stat"><span class="n" style="color:var(--success)">${counts.complete}</span><span class="l">Verified</span></div>
+      <div class="req-stat"><span class="n" style="color:var(--warning)">${counts.implemented}</span><span class="l">Impl'd, not verified</span></div>
+      <div class="req-stat"><span class="n" style="color:var(--info)">${counts.inprogress}</span><span class="l">In progress</span></div>
+      <div class="req-stat"><span class="n" style="color:var(--paused)">${counts.paused}</span><span class="l">Paused</span></div>
+      <div class="req-stat"><span class="n" style="color:var(--text-faint)">${counts.notstarted}</span><span class="l">Not started</span></div>
+    </div>
+    ${files.map(f=>{
+      const rows = TOR.filter(t=>t.file===f);
+      return `
+      <div class="req-file-block">
+        <div class="req-file-head"><h4>${f}.feature.md</h4><span class="pc mono" style="color:var(--text-faint);font-size:10.5px;">${rows.length} TOR</span></div>
+        ${rows.map(t=>{
+          const cs = coverageStateFor(t.id);
+          return `
+          <div class="req-row">
+            <span class="rid">${t.id}</span>
+            <span class="rt">${esc(t.title)}</span>
+            <span class="rep">${cs.epic ? cs.epic.id : "—"}</span>
+            <span class="status-pill status-${cs.cls}"><span class="led"></span>${cs.label}</span>
+          </div>`;
+        }).join("")}
+      </div>`;
+    }).join("")}
+  `;
+}
+
+/* ---- Transcript ---- */
+function openTranscript(laneKey){
+  pushDrawer({kind:"transcript", laneKey});
+}
+function transcriptFor(laneKey){
+  const l = state.lanes[laneKey];
+  if (l.state==="idle") return [["muted","Lane "+laneKey+" is idle. No session running."]];
+  const epic = l.epicId ? epicMap[l.epicId] : null;
+  const lines = [];
+  lines.push(["cmd", "$ "+ (l.command||"")]);
+  lines.push(["muted", "── session " + (l.state==='blocked' ? 'awaiting your decision' : l.state) + " ──"]);
+  if (l.state === "blocked"){
+    const g = gateForLane(laneKey);
+    if (g && g.type==="verdict"){
+      VERDICT_4tGh8Nb.forEach(v=>lines.push(["ok", "PASS  "+v.tor+"  "+v.test]));
+      lines.push(["warn","Waiting on your ship decision…"]);
+    } else {
+      lines.push(["ok","Plan generated: "+PLAN_9dLp4Xs.length+" steps"]);
+      lines.push(["warn","Waiting on your plan approval…"]);
+    }
+  } else if (l.state === "running"){
+    lines.push(["ok", "Step "+Math.max(1,l.step-2)+"/"+l.totalSteps+" complete: schema updated"]);
+    lines.push(["ok", "Step "+Math.max(1,l.step-1)+"/"+l.totalSteps+" complete: handler wired"]);
+    lines.push(["cmd", "▸ Step "+l.step+"/"+l.totalSteps+": "+l.activity]);
+    lines.push(["muted", fmtElapsed(l.elapsedSec)+" elapsed, unattended"]);
+  } else if (l.state === "paused"){
+    lines.push(["warn", "Paused by user at step "+l.pausedStep+"/"+l.totalSteps]);
+  }
+  return lines;
+}
+function renderTranscriptDrawer(laneKey){
+  const l = state.lanes[laneKey];
+  setDrawerChrome("Transcript", "Lane "+laneKey+" · "+esc(l.path||""), true, true);
+  setDrawerFoot("");
+  const lines = transcriptFor(laneKey);
+  document.getElementById("drawer-body").innerHTML = `
+    <div class="transcript-pane">${lines.map(([cls,txt])=>`<span class="tl-${cls}">${esc(txt)}</span>`).join("\n")}</div>
+  `;
+}
+
+/* ======================================================================
+   MODAL + TOAST
+   ====================================================================== */
+
+function showModal({title, body, actions}){
+  document.getElementById("modal-box").innerHTML = `
+    <h3>${esc(title)}</h3>
+    <p>${body}</p>
+    <div class="modal-actions">
+      ${actions.map((a,i)=>`<button class="btn ${a.primary?'btn-primary':''} ${a.danger?'btn-danger-outline':''}" data-mi="${i}">${esc(a.label)}</button>`).join("")}
+    </div>
+  `;
+  actions.forEach((a,i)=>{
+    document.getElementById("modal-box").querySelector(`[data-mi="${i}"]`).onclick = a.onClick;
+  });
+  document.getElementById("modal-wrap").classList.add("open");
+}
+function closeModal(){
+  document.getElementById("modal-wrap").classList.remove("open");
+}
+
+function toast(msg){
+  const stack = document.getElementById("toast-stack");
+  const id = "t"+(++toastSeq);
+  const el = document.createElement("div");
+  el.className = "toast"; el.id = id;
+  el.innerHTML = `<span class="tdot"></span><span>${esc(msg)}</span>`;
+  stack.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 4200);
+}
+
+/* ======================================================================
+   SIMULATED PROGRESS TICKER
+   ====================================================================== */
+
+setInterval(()=>{
+  let changed = false;
+  Object.values(state.lanes).forEach(l=>{
+    if (l.state !== "running") return;
+    l.elapsedSec += 45;
+    if (Math.random() < 0.4 && l.step < l.totalSteps){
+      l.step += 1;
+      const cyc = ACTIVITY_CYCLE[l.epicId];
+      if (cyc) l.activity = cyc[l.step % cyc.length];
+      else if (window.__genericPlans && window.__genericPlans[l.gateId]) {
+        // no-op, gateId cleared once running
+      }
+    }
+    changed = true;
+  });
+  if (changed) renderLanes();
+}, 4000);
+
+/* ======================================================================
+   KEYBOARD
+   ====================================================================== */
+document.addEventListener("keydown", (e)=>{
+  if (e.key === "Escape"){
+    if (document.getElementById("modal-wrap").classList.contains("open")) closeModal();
+    else if (state.drawer.open) closeDrawer();
+    return;
+  }
+  if ((e.key === "g" || e.key === "G" || e.key === "n") && !e.metaKey && !e.ctrlKey){
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    jumpToNextGate();
+  }
+});
+
+/* ======================================================================
+   INIT
+   ====================================================================== */
+renderAll();
+</script>
