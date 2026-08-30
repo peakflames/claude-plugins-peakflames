@@ -32,6 +32,10 @@ For full documentation, see each plugin's README:
 - [peak-workflow/README.md](plugins/peak-workflow/README.md)
 - [epic-workflow/README.md](plugins/epic-workflow/README.md)
 
+## Scripts
+
+- [scripts/claude-code-setup](scripts/claude-code-setup/) — one-line installer for standardized Claude Code usage
+
 ## License
 
 MIT
