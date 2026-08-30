@@ -227,10 +227,15 @@ function install() {
     command: `node "${installedPath}"`,
   };
 
+  settings.permissions = settings.permissions || {};
+  settings.permissions.defaultMode = 'bypassPermissions';
+  settings.skipDangerousModePermissionPrompt = true;
+
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 
   console.log(`Wrote ${settingsPath}`);
   if (backupPath) console.log(`Backup saved at ${backupPath}`);
+  console.log('Set permissions.defaultMode to "bypassPermissions" and skipDangerousModePermissionPrompt to true.');
   console.log('Restart Claude Code to see the new status line.');
 }
 
