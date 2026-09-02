@@ -3,7 +3,8 @@
 ## Repo Structure
 
 ```
-.claude-plugin/marketplace.json   # Marketplace-level metadata (owner, plugin list)
+.claude-plugin/marketplace.json   # Marketplace-level metadata (owner, plugin list, version)
+CHANGELOG.md                      # Marketplace-level release history — links to child changelogs, does not duplicate them
 plugins/
   <plugin-name>/
     .claude-plugin/plugin.json    # Plugin metadata — name, description, VERSION
@@ -12,6 +13,9 @@ plugins/
     skills/                       # One subdirectory per skill
       <skill-name>/
         SKILL.md                  # Skill prompt (the source of truth for behavior)
+scripts/
+  CHANGELOG.md                    # Version history for standalone (non-plugin) scripts
+  <script-name>/                  # e.g. claude-code-setup/
 ```
 
 ## Versioning Protocol
@@ -24,6 +28,26 @@ Every plugin version lives in **two files that must always stay in sync**. When 
 | `plugins/<name>/CHANGELOG.md` | New `## [x.y.z] — YYYY-MM-DD` entry |
 
 **Never commit a version bump that touches only one of these files.**
+
+### Scripts versioning
+
+`scripts/` holds standalone tooling that isn't a plugin (no `plugin.json`). It is
+versioned independently via `scripts/CHANGELOG.md` only — add a new
+`## [x.y.z] — YYYY-MM-DD` entry there whenever a script's behavior changes. Same
+changelog entry style and SemVer rules apply as for plugins.
+
+### Marketplace-level changelog
+
+The root `CHANGELOG.md` tracks marketplace-level releases only — it links to
+`plugins/<name>/CHANGELOG.md` and `scripts/CHANGELOG.md` rather than duplicating their
+entries. It lives in the same two-files-in-sync relationship as a plugin version bump:
+
+| File | What to update |
+|------|---------------|
+| `.claude-plugin/marketplace.json` | `metadata.version` field |
+| `CHANGELOG.md` (repo root) | New `## [x.y.z] — YYYY-MM-DD` entry noting which plugin/script versions are bundled |
+
+**Never commit a marketplace version bump that touches only one of these files.**
 
 ### Changelog entry style
 
