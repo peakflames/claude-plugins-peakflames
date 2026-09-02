@@ -29,12 +29,24 @@ curl -fsSL https://raw.githubusercontent.com/peakflames/claude-plugins-peakflame
 iwr https://raw.githubusercontent.com/peakflames/claude-plugins-peakflames/main/scripts/claude-code-setup/setup.ps1 -UseBasicParsing | iex
 ```
 
-Either one downloads `statusline.js` to `~/.claude/statusline.js` and patches
-`~/.claude/settings.json` to point `statusLine` at it and to set the permission
-defaults described above, preserving every other key (`theme`, `model`, existing
-`permissions.allow`/`deny` lists, …) and taking a timestamped backup
-(`settings.json.bak.<timestamp>`) first. Restart Claude Code afterwards to see it
-take effect.
+Either one downloads `setupHelper.js` to a temp directory and runs it there — it never
+touches `~/.claude` itself. `setupHelper.js` then:
+
+1. downloads `statusline.js` and writes it to `~/.claude/statusline.js`,
+2. patches `~/.claude/settings.json` to point `statusLine` at it and to set the
+   permission defaults described above, preserving every other key (`theme`, `model`,
+   existing `permissions.allow`/`deny` lists, …) and taking a timestamped backup
+   (`settings.json.bak.<timestamp>`) first.
+
+Restart Claude Code afterwards to see it take effect.
+
+## Files
+
+| File | Role |
+|------|------|
+| `setup.sh` / `setup.ps1` | One-liner entry points. Download `setupHelper.js` to a temp dir, validate it, run it, clean up. |
+| `setupHelper.js` | Installer only. Downloads `statusline.js` and patches `settings.json`. Never itself ends up on the user's machine outside of a temp dir. |
+| `statusline.js` | The status line renderer itself — the file that ends up at `~/.claude/statusline.js` and that `settings.json` points `statusLine` at. |
 
 ## Scope caveat
 
@@ -45,5 +57,5 @@ here.
 
 ## Manual re-install / update
 
-Re-run either one-liner at any time to pull the latest `statusline.js` and re-patch
-settings (a new timestamped backup is taken each time).
+Re-run either one-liner at any time to pull the latest `setupHelper.js` and
+`statusline.js` and re-patch settings (a new timestamped backup is taken each time).
