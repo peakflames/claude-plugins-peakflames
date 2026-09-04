@@ -6,6 +6,37 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] — 2026-09-04
+
+Verification integrity (Refs #4): implementers disclose deferrals at the source; wrapup
+verifies blind and names anything undisclosed.
+
+### Added
+
+- **Deferral gate in `start-epic`** — when a TOR cannot be fully met, the implementer must
+  stop and ask (fix / defer with reason / stop) instead of silently narrowing the Then clause.
+- **Mandatory Deferrals section** in `epic-<id>-implemented.md`, placed first after What Was
+  Built; `Count: 0` + `None` when empty. Commit body records `Deferrals: N`.
+- **Session guard in `wrapup-epic`** — refuses to run in the conversation that implemented the
+  epic; prints instructions to open a fresh session.
+- **`model: opus` on `wrapup-epic`** — verification runs on a stronger model by default;
+  projects may override via a `Verifier model:` line in CLAUDE.md.
+
+### Changed
+
+- **Blind verification** — wrapup locates tests by grep only and does not open the implementer
+  handoff until every per-TOR verdict is recorded (new Step 1.2b).
+- **Undisclosed deferral = FAIL** — any non-PASS TOR absent from the implementer's Deferrals
+  section gets a named `UNDISCLOSED DEFERRAL` line in the report.
+- **`PASS WITH EXCEPTIONS` removed** — per-TOR verdicts are PASS / FAIL / CANNOT VERIFY; epic
+  passes only if every TOR passes or carries a recorded human waiver. ⚠️ now means "waived".
+- **Deferrals-first reporting** — verification report, completion handoff, and PR body all open
+  with a Deferrals table (Disclosed and waiver columns) before the summary.
+- **Closing step relabeled "Implementer self-assessment"** in the start-epic plan template;
+  handoff TOR Coverage / Verification Results sections are marked as self-assessment.
+
+---
+
 ## [1.5.1] — 2026-09-04
 
 ### Documentation
