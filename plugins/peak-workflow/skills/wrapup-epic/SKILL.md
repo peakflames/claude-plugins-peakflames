@@ -162,8 +162,8 @@ Only now, with every per-TOR verdict recorded, read
 2. **For each TOR whose verdict is FAIL or CANNOT VERIFY** (one Deferrals-table row each;
    `Count:` is the number of such TORs):
    - If the TOR ID appears as a row in the implementer's Deferrals table → `Disclosed: yes`.
-     Map the implementer's `Why` into `Unmet` (amend if your finding differs) and
-     `Decision (By, Date)` into `Implementer decision`.
+     Map the implementer's `Unmet` into `Unmet` (amend if your finding differs) and
+     `Decision — Why (By, Date)` into `Implementer decision`.
    - Else if it appears as a Spec Deviations row, or as FAIL / CANNOT VERIFY in the handoff's
      TOR Coverage → `Disclosed: yes (misfiled)`; note where it was found.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
