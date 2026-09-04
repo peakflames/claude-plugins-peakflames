@@ -54,7 +54,7 @@ Closes #<N>
 **Verified by:** `/peak-workflow:wrapup-epic <id>` (model: <model>, fresh session)
 
 **Counts**
-- TOR Requirements: X/Y PASS, Z FAIL, W CANNOT VERIFY (V waived)
+- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived)
 - Quality Gates: X/Y PASS
 
 **Highlights**

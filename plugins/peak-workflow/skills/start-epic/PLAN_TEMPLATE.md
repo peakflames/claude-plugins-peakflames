@@ -1,6 +1,6 @@
 # Plan Template — `/peak-workflow:start-epic`
 
-This file is the lifecycle template that `start` Step 4 plans must follow. Copy the Opening
+This file is the lifecycle template that `start-epic` Step 4 plans must follow. Copy the Opening
 and Closing sections verbatim into your plan, substituting placeholders with values derived
 in Step 1. The Middle section ("Implementation work") is the only place where epic-specific
 steps are authored.
@@ -73,21 +73,34 @@ Components. Each middle step must:
 - **Name the specific files to create or modify** — use actual paths from Key Components.
 - **Include a test for each TOR ID** — the test must mirror the Gherkin structure: arrange the
   Given preconditions, act on the When, assert the Then outcome. Name the test file and test
-  method/function.
+  method/function. **The TOR ID must appear literally in the test** (name, docstring, or a
+  comment on the test) — wrapup locates tests by `grep -rl "<TOR-ID>" <test-directory>` and
+  nothing else. If the Then names a quantity or boundary (e.g., 10,000 rows), the test's Given
+  must construct it; a test that only checks a flag is accepted does not mirror the Then.
 
 If Step 1 item 13 (E2E audit) surfaced regression specs likely to break, include an explicit
 "update regression specs: …" item here, committed alongside the implementation.
 
-**Deferral gate.** If at any point during the middle steps a TOR's Given/When/Then cannot be
-fully met in this session (technical constraint, missing dependency, scope larger than
-estimated, or anything else), stop implementation and use `AskUserQuestion`:
+**Deferral gate.** Copy this paragraph verbatim into the plan as a standing rule ahead of the
+first middle step; it applies to every middle step and to the self-assessment. If at any point
+a TOR's Given/When/Then cannot be fully met as written in this session (technical constraint,
+missing dependency, scope larger than estimated, a Then clause that would need adjusting, or
+anything else), stop implementation and use `AskUserQuestion`:
 - Question: `"TOR-<NN-XXXXXXX> cannot be fully met: <reason>. How to proceed?"`
 - Options: `["Fix it now", "Defer — record in Deferrals with this reason", "Stop — I'll take it from here"]`
 
-Never continue silently past an unmet TOR, and never narrow the Then clause to make the
-requirement fit what was built. Every "Defer" answer must appear as a row in the Deferrals
-section of the implemented handoff (see Closing step 2). This gate is part of the plan — plan
-approval does not pre-authorize any deferral.
+Rules:
+- Never continue silently past an unmet TOR, and never narrow the Then clause to make the
+  requirement fit what was built. A Then clause that must be adjusted is a gate event too —
+  the TOR as written is not met.
+- If the constraint is already known when the plan is authored, fire the gate immediately
+  after plan approval, before any middle step.
+- **Defer:** record a Deferrals row (see "Reconcile spec" below). `By` is `git config
+  user.name`. Keep the TOR's test but mark it skip/xfail with reason
+  `Deferred: <TOR-ID> — <why>` so the suite stays green and the ID stays greppable. Report the
+  TOR as FAIL in the self-assessment.
+- **Stop:** run `/peak-workflow:pause` so the sidecar and handoff reflect the stopping point.
+- Plan approval does not pre-authorize any deferral.
 
 Middle step example:
 ```
@@ -113,6 +126,17 @@ Middle step example:
   4. Also run the project's Verification & Quality Gates from `CLAUDE.md` (build, lint, console
      errors, brand audit if UI). Report each gate as PASS / FAIL / CANNOT VERIFY.
 
+  Before reporting, run two mechanical checks:
+  - `grep -rl "<TOR-ID>" <test-directory>` must hit for every TOR ID. A miss means the test
+     is not traceable — fix the test before continuing.
+  - `git diff <base-branch>...HEAD | grep -inE 'todo|stub|placeholder|for now|not implemented|NotImplementedError'`.
+     Any hit in a file that implements a TOR is a deferral-gate trigger for that TOR.
+
+  **Any TOR reported FAIL or CANNOT VERIFY here that has no Deferrals row fires the deferral
+  gate** before the handoff is written — the self-assessment and the Deferrals section must
+  agree. Any mention of "stub", "partial", "follow-up", or similar anywhere in the handoff
+  must correspond to a Deferrals row.
+
   This is the implementer's own assessment of its own work. It is labeled as such in the
   handoff and is not trusted by `/peak-workflow:wrapup-epic`, which re-verifies every TOR
   independently in a fresh session.
@@ -132,10 +156,11 @@ Middle step example:
 - **Reconcile spec** — re-read the epic spec's Requirements Anchors table. For each TOR ID:
   - If the TOR was implemented exactly as its Given/When/Then specifies: note "no deviation".
   - If the implementation deviated (e.g., the Then clause needed adjustment for a technical
-    constraint): record the deviation in the handoff file as a "Spec Deviation" row. Do NOT
-    silently update the feature file — deviations that require changing a TOR requirement are
-    change-control events and must go through `/peak-workflow:capture-requirements` on a `docs/`
-    branch.
+    constraint): the deferral gate must already have fired for this TOR. Record the deviation
+    in the handoff file as a "Spec Deviation" row **and** a Deferrals row (the TOR as written
+    is not met). Do NOT silently update the feature file — deviations that require changing a
+    TOR requirement are change-control events and must go through
+    `/peak-workflow:capture-requirements` on a `docs/` branch.
 
   Write (or update) `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` with
   these sections in this order:
@@ -148,8 +173,10 @@ Middle step example:
     literal line `None` — do not omit the section.
   - **Key Files** table — files created or modified
   - **Spec Deviations** table — `TOR ID | As-Written | As-Implemented | Reason`
-    (empty if no deviations). A deviation is a Then clause that was *adjusted*; a deferral is a
-    Then clause that was *not met*. They are different and both must be recorded.
+    (empty if no deviations). A deviation is a Then clause that was *adjusted*; it is also a
+    deferral of the TOR as written, so every deviated TOR appears in both tables.
+  - **Key Decisions** — design choices future epics should know about. Anything here that
+    describes partial or stubbed behavior must have a matching Deferrals row.
   - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / FAIL / CANNOT VERIFY
     verdict from the self-assessment step
   - **Verification Results (self-assessment)** — quality gate results
@@ -174,13 +201,14 @@ Middle step example:
   ```
   feat(epic-<id>): <short summary>
 
-  Implements <TOR-list> — <1 sentence describing what the user can now do>.
-  Deferrals: <N>
+  Implements <TOR-list of TORs self-assessed PASS> — <1 sentence describing what the user can now do>.
+  Deferred: <TOR-list of deferred TORs, or "none">
+  Deferrals: <deferral-count>
 
   Closes #<N>
   ```
-  `Deferrals: <N>` is the count from the handoff's Deferrals section (`0` if none). Omit the
-  `Closes #<N>` trailer if no source issue was captured. Do not push.
+  `<deferral-count>` is the `Count:` value from the handoff's Deferrals section (`0` if none).
+  Omit the `Closes #<N>` trailer if no source issue was captured. Do not push.
 
 - **Present next steps** — output this block exactly:
   > ---

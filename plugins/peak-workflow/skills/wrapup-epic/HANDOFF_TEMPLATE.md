@@ -60,7 +60,7 @@ Count: N (undisclosed: M, waived: W)
 ## Verification Summary
 
 ### Counts
-- TOR Requirements: X/Y PASS, Z FAIL, W CANNOT VERIFY (V waived)
+- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived)
 - Quality Gates: X/Y PASS
 - Tests: X passed, Y skipped, Z failed
 
