@@ -12,6 +12,9 @@ Placeholder reference:
 - `<N>` — source issue number from Step 1 (omit announce/trailer if unknown)
 - `<base-branch>` — `develop` if it exists, else `main`, else `master`
 - `<TOR-list>` — comma-separated list of TOR IDs from the Requirements Anchors table
+- `<test-directory>` — the project's test directory from CLAUDE.md's Verification & Quality
+  Gates section (e.g., `tests/`, `spec/`, `__tests__/`)
+- `<deferral-count>` — the `Count:` value from the handoff's Deferrals section
 
 ---
 
@@ -33,7 +36,8 @@ Placeholder reference:
    change `status: Not Started` (or `status: Paused`) to `status: In Progress`. Leave
    `implemented:`, `completed:`, and `requirements:` unchanged. Capture whether this is a
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
-   (prior status was already In Progress). Item 3 uses this.
+   (prior status was already In Progress, or was Implemented — rework after a wrapup FAIL).
+   Item 3 uses this.
 
    Also update the epic spec file's `**Status:**` header line (the spec path was already
    identified in Step 1, at `docs/implementation-plan/phase-*/epic-<id>-*.md`) to
@@ -95,8 +99,11 @@ Rules:
   the TOR as written is not met.
 - If the constraint is already known when the plan is authored, fire the gate immediately
   after plan approval, before any middle step.
-- **Defer:** record a Deferrals row (see "Reconcile spec" below). `By` is `git config
-  user.name`. Keep the TOR's test but mark it skip/xfail with reason
+- **Defer:** write the Deferrals row immediately to
+  `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` (create the file with
+  just a `## Deferrals` section if it does not exist yet; "Reconcile spec" fills in the rest
+  later) so the decision survives a context clear. `By` is `git config user.name`. Keep the
+  TOR's test but mark it skip/xfail with reason
   `Deferred: <TOR-ID> — <why>` so the suite stays green and the ID stays greppable. Report the
   TOR as FAIL in the self-assessment.
 - **Stop:** run `/peak-workflow:pause` so the sidecar and handoff reflect the stopping point.
@@ -126,11 +133,17 @@ Middle step example:
   4. Also run the project's Verification & Quality Gates from `CLAUDE.md` (build, lint, console
      errors, brand audit if UI). Report each gate as PASS / FAIL / CANNOT VERIFY.
 
-  Before reporting, run two mechanical checks:
+  Before reporting, run two mechanical checks against the working tree (nothing is committed
+  yet, so `git diff <base-branch>` alone would miss new files):
   - `grep -rl "<TOR-ID>" <test-directory>` must hit for every TOR ID. A miss means the test
      is not traceable — fix the test before continuing.
-  - `git diff <base-branch>...HEAD | grep -inE 'todo|stub|placeholder|for now|not implemented|NotImplementedError'`.
-     Any hit in a file that implements a TOR is a deferral-gate trigger for that TOR.
+  - ```bash
+    grep -inE 'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
+      $(git diff --name-only <base-branch>; git ls-files --others --exclude-standard)
+    ```
+     Judge each hit: a marker describing incomplete TOR behavior is a deferral-gate trigger for
+     that TOR, unless the TOR already has a Deferrals row (the xfail reason itself will match).
+     Legitimate uses (e.g., argparse `placeholder`/`metavar`) are not triggers.
 
   **Any TOR reported FAIL or CANNOT VERIFY here that has no Deferrals row fires the deferral
   gate** before the handoff is written — the self-assessment and the Deferrals section must
@@ -180,6 +193,11 @@ Middle step example:
   - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / FAIL / CANNOT VERIFY
     verdict from the self-assessment step
   - **Verification Results (self-assessment)** — quality gate results
+
+  After writing the handoff, run
+  `grep -inE 'stub|partial|for now|follow-up|todo|placeholder|not implemented' <handoff-path>`.
+  Any hit outside the Deferrals table that has no matching Deferrals row fires the deferral
+  gate for that TOR before continuing.
 
   Plan approval already authorizes both the handoff write and any spec-level notation —
   do not re-prompt.

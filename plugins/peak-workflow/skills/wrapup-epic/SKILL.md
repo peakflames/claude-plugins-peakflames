@@ -124,7 +124,8 @@ implement this epic. Do not trust the implementer's self-assessment.
    - Then → test asserts the described observable outcome
    A test that does not faithfully mirror the Gherkin is a gap regardless of whether it passes.
 4. **Run the test** yourself: `<project test command from CLAUDE.md> <specific test>`. The test
-   must pass.
+   must pass — a skipped, xfail, or xpass result is not a pass (the runner exits 0 on these;
+   read the per-test outcome).
 5. **Independently inspect source code** — read the implementation file to confirm the code
    actually realizes the Given/When/Then behavior. A passing test that exercises the wrong code
    path is a FAIL.
@@ -155,19 +156,23 @@ Only now, with every per-TOR verdict recorded, read
 
 1. **If the handoff has no `## Deferrals` section** (or no handoff exists): add a warning line
    to the Step 1.5 Deferrals section — `⚠️ implementer handoff has no Deferrals section —
-   disclosure could not be checked` — and treat every non-PASS TOR below as undisclosed. The
-   warning itself does not affect the epic verdict (legacy handoffs pre-date this section).
-2. **For each TOR whose verdict is FAIL or CANNOT VERIFY:**
-   - If the TOR ID appears as a row in the implementer's Deferrals table → `Disclosed: yes`;
-     carry the implementer's `Why` / `Decision` / `By` / `Date` into the report.
+   disclosure could not be checked` — and proceed to item 2 with an empty Deferrals table (the
+   misfiled branch still applies). The warning itself does not affect the epic verdict (legacy
+   handoffs pre-date this section).
+2. **For each TOR whose verdict is FAIL or CANNOT VERIFY** (one Deferrals-table row each;
+   `Count:` is the number of such TORs):
+   - If the TOR ID appears as a row in the implementer's Deferrals table → `Disclosed: yes`.
+     Map the implementer's `Why` into `Unmet` (amend if your finding differs) and
+     `Decision (By, Date)` into `Implementer decision`.
    - Else if it appears as a Spec Deviations row, or as FAIL / CANNOT VERIFY in the handoff's
      TOR Coverage → `Disclosed: yes (misfiled)`; note where it was found.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
      `FAIL — ❌ UNDISCLOSED DEFERRAL` (or `CANNOT VERIFY — ❌ UNDISCLOSED DEFERRAL`) in the
      Verifier finding column. A mention in Key Decisions or prose ("stub for now") does not
      count as disclosure — only a row does; quote the mention in the row so the reader sees it.
-3. **For each TOR the implementer listed as deferred but you verified as PASS:** note it in the
-   report as `disclosed but verified PASS` — no penalty, but it is worth the reader's attention.
+3. **For each TOR the implementer listed as deferred but you verified as PASS:** add a
+   Highlights bullet `✅ TOR-… — disclosed as deferred but verified PASS` — no table row, no
+   penalty, but it is worth the reader's attention.
 
 Undisclosed deferrals are the specific failure mode this step exists to catch. Never soften
 one into a Highlights bullet or a Known Issue — it gets its own row, marked as above.
