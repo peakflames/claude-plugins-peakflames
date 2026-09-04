@@ -6,6 +6,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.1] — 2026-09-04
+
+### Documentation
+
+- **README "Small epics and the context budget" section** — states the epic-sizing principle
+  and its rationale (context economy), with the operator-observable signal: ~25% context at plan
+  approval, ≤ ~35% tolerated, above that split the epic.
+- **`plan-project` Step 3A.3 defines "session-sized"** in context-budget terms and notes that
+  TOR heft (doc strings, data tables, reference dependencies) matters, not just TOR count.
+  Advisory wording only — no new gate or behavior.
+
+---
+
 ## [1.5.0] — 2026-07-14
 
 ### Fixed

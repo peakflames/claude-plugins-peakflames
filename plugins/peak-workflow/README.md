@@ -98,6 +98,16 @@ The formal requirements baseline lives in Gherkin-style `.feature.md` files with
 > new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL). For a
 > one-off script, `epic-workflow` may be a better fit.
 
+### Small epics and the context budget
+
+**An epic is one focused session.** Keep epics small so Claude works from a small context — a
+large context degrades into needle-in-a-haystack retrieval and forces the model to juggle too
+many rules at once, which is exactly what breaks faithful tests and honest verification.
+
+**The signal:** when `/start-epic` presents its plan, context usage should be around 25%. Up to
+~35% is fine. Above that, the epic is too large — split it (`/add` for the remainder). Watch the
+status line's context meter; the operator enforces this, not the skills.
+
 ## Skills
 
 Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill inventory.
