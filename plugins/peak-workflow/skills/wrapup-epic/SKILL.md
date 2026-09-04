@@ -441,11 +441,15 @@ be made by the user every invocation.
 
    The body follows the template at `plugins/peak-workflow/skills/wrapup-epic/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
 
-   The `Closes #<N>` line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 — if no source issue is known, omit the `Closes` line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way).
+   The issue-link line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 and by the Step 1.5 Deferrals `Count:`. If no source issue is known, omit the line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way). If `Count:` is 0, write `Closes #<N>`. If `Count:` is greater than 0, write `Refs #<N>` — a deferred or waived TOR means the issue's requirement is not fully delivered, so merging must not auto-close it. Only the PR body may close the issue; the start-epic and wrapup commits always use `Refs`.
 
 5. **Announce PR on the GitHub issue** (conditional) — run only if a source issue number was captured in Step 1.1 item 4 **and** `gh auth status` succeeds:
    ```bash
    gh issue comment <N> --body "PR opened for Epic <id>: <PR url>. Awaiting review."
+   ```
+   If the Deferrals `Count:` is greater than 0, use this body instead:
+   ```bash
+   gh issue comment <N> --body "PR opened for Epic <id>: <PR url>. <count> TOR(s) deferred or waived — see Deferrals in the PR body. This issue stays open until the follow-up ships."
    ```
    Capture the PR URL from the `gh pr create` output in item 4. If `gh auth status` fails or the comment command errors, print a warning (`gh issue comment failed — PR is still open, manual issue update may be desired`) and continue; the PR itself is the essential deliverable, the comment is a courtesy. Skip this step entirely in solo mode (Step 5a) — nothing external to link to.
 6. Do **NOT** run `gh pr merge`. Merging is the reviewer's responsibility.
