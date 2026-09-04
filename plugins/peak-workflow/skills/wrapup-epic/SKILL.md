@@ -47,9 +47,17 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 ### Step 1.1: Load Context
 
 1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
+1a. **Check out the feature branch before reading any sidecar or spec content.** The sidecar and spec on `develop`/`main` may still say `Not Started` or `In Progress` — only the feature branch carries the implementer's updates. Locate the spec by filename only (no content read): `ls docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md`. Extract the **branch short name** from that filename: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it. Then detect the branch with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
+   ```bash
+   git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
+   ```
+   Exit 0 = branch exists; nonzero = missing. Then:
+   - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
+   - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
+   - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
 2. Read `docs/implementation-plan/status/epic-$ARGUMENTS.md` to get the epic's current status. Phase 3 (Orient) loads all phase indexes and sidecars when it walks the dependency graph — Step 1.1 only needs this epic's sidecar.
 3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress`, `status: Paused`, or `status: Not Started`, inform the user that `/peak-workflow:start-epic $ARGUMENTS` must finish first and stop. If `status: Complete`, inform the user it has already been wrapped up.
-4. Read the epic spec file for Epic $ARGUMENTS. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip the `Closes` line later.
+4. Read the epic spec file located in item 1a. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` / `Refs #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip that line later.
 4a. **Load TOR Requirements.** Parse the epic spec's `## Requirements Anchors` table. For each
     row, extract the TOR ID, feature file path, and scenario title. Then, for each TOR ID, open
     the cited feature file and locate the `Scenario: [TOR-NN-XXXXXXX]` block with that exact ID.
@@ -89,15 +97,7 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section.
    - If the epic raises a decision the design notes might already have addressed, read `docs/design-notes.md`.
    - If the epic is a localized UI / copy change with no cross-cutting impact, skip both — there is no consistency surface to check, and Step 1.4 simply records "no architectural surface affected".
-8. From the spec filename (loaded in item 4), extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it.
-9. Check out the feature branch for this epic. Detect existence with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
-   ```bash
-   git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
-   ```
-   Exit 0 = branch exists; nonzero = missing. Then:
-   - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
-   - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
-   - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
+8. The feature branch is already checked out (item 1a) — every read above was made on it.
 
 ### Step 1.2: Verify Requirements (TOR IDs)
 
