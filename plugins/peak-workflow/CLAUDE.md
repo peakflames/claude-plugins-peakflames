@@ -47,6 +47,10 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 **Develop-branch invariant:** merge = approval. Anything on `develop` is approved.
 
+**Verification independence:** wrapup runs in a fresh session on a stronger model, blind to
+the implementer handoff until verdicts are recorded. `context: fork` is never used for
+verification.
+
 ## Skill File Rules
 
 - `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere
