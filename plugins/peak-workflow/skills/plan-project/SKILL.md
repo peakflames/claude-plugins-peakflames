@@ -84,8 +84,11 @@ clusters become epics.
 
 ### 3A.3: Epic Formation
 
-Cluster TOR IDs within each layer into session-sized epics. Each epic should:
-- Cover **5–15 TOR IDs** (enough to be meaningful, not so many that a single session can't implement and test them all)
+Cluster TOR IDs within each layer into session-sized epics. "Session-sized" means `/start-epic`
+can load the spec, its TOR Given/When/Then, and the relevant reference material and present its
+plan at roughly 25% context usage (≤ ~35% is tolerated; beyond that the epic is too large). When
+in doubt, prefer more, smaller epics. Each epic should:
+- Cover **5–15 TOR IDs** (enough to be meaningful, not so many that a single session can't implement and test them all). Weigh TOR heft, not just count — a TOR carrying doc strings, data tables, or a `docs/reference/` dependency costs far more context than a one-line flag check.
 - Have a clear "done" state: every covered TOR ID has an implementation and a passing test
 - Be independently implementable once its dependencies are met
 - Ideally draw TOR IDs from one or two related feature files (to keep the implementation focused)
