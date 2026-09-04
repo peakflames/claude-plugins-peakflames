@@ -9,13 +9,24 @@ description: |
   "sign off on epic N", "close out epic N".
   Note: If the user says "I'm done with epic N", check whether the epic is "Implemented" (use wrapup) or "In Progress" (suggest /peak-workflow:pause instead).
 argument-hint: "<epic-id>"
+model: opus
 ---
 
 You are performing an independent verification and completion of Epic $ARGUMENTS.
 
 You are acting as an independent reviewer — you did NOT implement this epic. Your job is to verify the implementation against the spec, close out the epic if it passes, and orient the team toward what's next.
 
+This skill runs on Opus by default (frontmatter `model: opus`) so verification is done by a stronger model than the one that typically implements. Projects may override this with a `Verifier model: <model>` line in their `CLAUDE.md` — if that line is present in the CLAUDE.md content already in your context, honor it; no other setup is required.
+
 This command has three phases: **Verify**, **Complete**, and **Orient**. Do not skip ahead — each phase gates the next.
+
+## Session Guard
+
+**Before any other action:** check whether this conversation has already executed `/peak-workflow:start-epic $ARGUMENTS`, or has done any implementation work on Epic $ARGUMENTS (edited its source files, written its tests, or authored its `epic-$ARGUMENTS-implemented.md` handoff). If so, stop immediately and print:
+
+> Wrapup must run in a fresh session so verification is independent of the implementer's context. Close this session and run `/peak-workflow:wrapup-epic $ARGUMENTS` in a new one.
+
+Do not proceed. A verifier that shares the implementer's context inherits the implementer's rationalizations, which defeats the purpose of independent verification.
 
 ## Layout Guard
 
@@ -73,7 +84,7 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    4. **TOR ID found and titles match:** record "Requirements Anchor verified: TOR-NN-XXXXXXX".
    5. **Spec has no Requirements Anchors section** (legacy spec from before peak-workflow v1.0.0):
       note this in the verification report and continue — legacy specs are grandfathered.
-6. Read the handoff file in `docs/implementation-plan/session-handoffs/` for this epic (if one exists).
+6. **Do NOT read the implementer handoff yet.** `docs/implementation-plan/session-handoffs/epic-$ARGUMENTS-implemented.md` is the implementer's self-assessment. Reading it before you have formed your own per-TOR verdicts contaminates the review. It is read in Step 1.2b, after every verdict is recorded. (Any `epic-$ARGUMENTS-paused.md` handoff is likewise off-limits until then.)
 7. **Conditional architecture / design-notes reads.** The Step 1.4 code review checks consistency with `docs/architecture.md` and `docs/design-notes.md` — load only what is relevant to this epic:
    - If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section.
    - If the epic raises a decision the design notes might already have addressed, read `docs/design-notes.md`.
@@ -97,15 +108,15 @@ implement this epic. Do not trust the implementer's self-assessment.
 **For each TOR ID:**
 
 1. **Read the Given/When/Then** (loaded in Step 1.1 item 4a).
-2. **Locate the test(s)** the implementer wrote for this TOR ID. Look in the implementation
-   handoff file (`session-handoffs/epic-<id>-implemented.md`) under "TOR Coverage" for which
-   test files cover this TOR, then read those test files. **If no implemented handoff exists**
-   (the session was interrupted before the handoff was written), fall back to a grep:
+2. **Locate the test(s)** for this TOR ID by grep only:
    ```bash
    grep -rl "<TOR-ID>" <test-directory>
    ```
    where `<test-directory>` is derived from CLAUDE.md's Verification & Quality Gates section
-   (e.g., `tests/`, `spec/`, `__tests__/`). Read the matching files.
+   (e.g., `tests/`, `spec/`, `__tests__/`). Read the matching files. If the grep returns
+   nothing, the TOR has no test that names it — that is a finding, not a reason to go looking
+   in the handoff. **Do not open the implementer handoff before finishing this step** for every
+   TOR; it is read only in Step 1.2b.
 3. **Verify the test mirrors the Gherkin structure:**
    - Given → test arranges the described preconditions
    - When → test performs the described action
@@ -129,6 +140,29 @@ Report each TOR ID:
   when the check requires an environment that does not exist locally (e.g., Kubernetes, CI/CD).
   Never use this for checks that can be run against the live local API.
 
+Record every verdict before moving on. These verdicts are final for the report — Step 1.2b may
+annotate them but never changes them.
+
+### Step 1.2b: Compare to Implementer's Deferrals
+
+Only now, with every per-TOR verdict recorded, read
+`docs/implementation-plan/session-handoffs/epic-$ARGUMENTS-implemented.md` and locate its
+`## Deferrals` section.
+
+1. **If the handoff has no `## Deferrals` section** (or no handoff exists): add one FAIL line to
+   the Step 1.5 Deferrals section — `❌ implementer handoff has no Deferrals section` — and treat
+   every non-PASS TOR below as undisclosed.
+2. **For each TOR whose verdict is FAIL or CANNOT VERIFY:**
+   - If the TOR ID appears as a row in the implementer's Deferrals table → annotate the verdict
+     `Disclosed: yes` and carry the implementer's `Why` / `Decision` / `By` into the report.
+   - If it does not → annotate `Disclosed: **no**` and add a named line to the Step 1.5
+     Deferrals section: `❌ UNDISCLOSED DEFERRAL — TOR-<NN-XXXXXXX>: <what is unmet>`.
+3. **For each TOR the implementer listed as deferred but you verified as PASS:** note it in the
+   report as `disclosed but verified PASS` — no penalty, but it is worth the reader's attention.
+
+Undisclosed deferrals are the specific failure mode this step exists to catch. Never soften
+one into a Highlights bullet or a Known Issue — it gets its own named line.
+
 ### Step 1.3: Run Quality Gates
 
 Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently:
@@ -148,13 +182,23 @@ Review the implementation for:
 
 ### Step 1.5: Present Verification Report
 
-Present a consolidated report to the user. The report has two jobs: a fast skim at the top (counters) and a reviewer-friendly narrative below (Highlights + Conclusion).
+Present a consolidated report to the user. The report has three jobs: deferrals first (the one thing an operator must not miss), a fast skim below that (counters), then a reviewer-friendly narrative (Highlights + Conclusion).
 
 ```
 # Epic <id>: [Name] — Verification Report
 
+## Deferrals
+Count: N (undisclosed: M)
+
+| TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding |
+|--------|-------|-----------|----------------------|------------------|
+| TOR-03-Mno9012 | pagination >10k rows | yes | defer → follow-up epic (tschavey, 2026-09-04) | FAIL — confirmed unmet |
+| TOR-04-Pqr3456 | retry on 5xx | **no** | — | FAIL — ❌ UNDISCLOSED DEFERRAL |
+
+(If Count is 0: write `None` in place of the table.)
+
 ## Counts
-- TOR Requirements: X/Y PASS, Z CANNOT VERIFY
+- TOR Requirements: X/Y PASS, Z FAIL, W CANNOT VERIFY
 - Quality Gates: X/Y PASS
 
 ## Requirements Anchor Reconciliation
@@ -168,7 +212,7 @@ Present a consolidated report to the user. The report has two jobs: a fast skim 
 ### Highlights
 - ✅ TOR-01-Afs657G — version flag implemented and tested (tests/test_cli.py:42, src/cli.py:118)
 - ✅ TOR-01-Bcd2345 — help flag implemented and tested (tests/test_cli.py:67, src/cli.py:124)
-- ⚠️ TOR-02-Xyz5678 — happy-path test passes; negative-path test (invalid token) is missing
+- ⚠️ TOR-02-Xyz5678 — waived: negative-path test (invalid token) missing (waived by tschavey, 2026-09-04)
 - ❌ TOR-03-Mno9012 — implementation returns status code 200 but the Then clause requires 201
 
 ### Conclusion
@@ -178,7 +222,7 @@ or — if FAIL — what specifically needs to be addressed before re-run>
 ## Code Review Findings
 - [list any concerns, or "No issues found"]
 
-## Verdict: PASS / FAIL / PASS WITH EXCEPTIONS
+## Verdict: PASS / FAIL
 ```
 
 **Requirements Implemented table** (always included below the Verdict):
@@ -190,19 +234,36 @@ or — if FAIL — what specifically needs to be addressed before re-run>
 |--------|--------------|---------|----------------|
 | TOR-01-Afs657G | 01-cli.feature.md | PASS | tests/test_cli.py:42 |
 | TOR-01-Bcd2345 | 01-cli.feature.md | PASS | tests/test_cli.py:67 |
-| TOR-02-Xyz5678 | 02-auth.feature.md | PASS WITH EXCEPTIONS | tests/test_auth.py:91 |
+| TOR-02-Xyz5678 | 02-auth.feature.md | WAIVED | tests/test_auth.py:91 |
 | TOR-03-Mno9012 | 03-parts.feature.md | FAIL | tests/test_parts.py:15 |
 ```
+
+**Verdict rule.** Per-TOR verdicts are **PASS / FAIL / CANNOT VERIFY** only — there is no
+"pass with exceptions". The epic verdict is **PASS** if and only if every TOR is PASS, or every
+non-PASS TOR carries a **human waiver**. Otherwise the epic verdict is **FAIL**.
+
+**Waiver flow.** Before writing the Verdict line, for each TOR whose verdict is FAIL or CANNOT
+VERIFY, use `AskUserQuestion`:
+- Question: `"Waive TOR-<NN-XXXXXXX>? (<what is unmet>)"`
+- Options: `["Waive — record reason", "Do not waive — epic FAILs"]`
+
+If waived, request a one-line reason and record `Waived by / Date / Reason` in that TOR's row
+of the Deferrals table (append to the Verifier finding cell) and show the TOR as `WAIVED` in
+the Requirements Implemented table. An undisclosed deferral **may** be waived, but its
+`Disclosed: **no**` mark stays in the table permanently — waiving forgives the gap, not the
+silence. Ask about every non-PASS TOR before deciding the epic verdict; one "Do not waive"
+makes the epic FAIL.
 
 **Authoring the Highlights list:**
 
 - Highlights are **selective**, not comprehensive — 3–6 bullets is typical, not one bullet per item. Lead the reviewer to the substantive checks; skip trivialities.
 - Author them from what was actually run in Steps 1.2–1.4.
-- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for pass-with-exception, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
+- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for waived, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
+- Deferrals never appear *only* in Highlights — they are already in the Deferrals table at the top. Highlights may reference them but must not be the sole record.
 
 **If the verdict is FAIL:** Stop here. List the specific items that need to be fixed. Do NOT proceed to Phase 2. The implementer needs to address the failures, then this command should be run again.
 
-**If the verdict is PASS or PASS WITH EXCEPTIONS:** Ask the user to confirm before proceeding to Phase 2.
+**If the verdict is PASS:** Ask the user to confirm before proceeding to Phase 2.
 
 ---
 
@@ -246,7 +307,14 @@ Automatically commit all changes made during verification and completion without
 asking the user for permission:
 
 1. Stage the handoff file, updated `docs/implementation-plan/status/epic-$ARGUMENTS.md`, the updated epic spec file, and any other files modified during verification (specific file paths, not `git add -A`)
-2. Commit message format: `chore(epic-<id>): verify and complete — <brief summary>` (where `<id>` is `$ARGUMENTS` verbatim)
+2. Commit message format (where `<id>` is `$ARGUMENTS` verbatim):
+   ```
+   chore(epic-<id>): verify and complete — <brief summary>
+
+   Deferrals: <N>, waived: <M>.
+   Refs #<N>
+   ```
+   `Deferrals`/`waived` counts come from the Step 1.5 Deferrals table. Include the `Refs #<N>` line only if a source issue number was captured in Step 1.1 item 4.
 
 Do NOT push to the remote yet.
 
@@ -273,7 +341,7 @@ Based on the dependency graph and project state, recommend which epic to start n
 
 ### Step 3.4: Outstanding Items
 
-If the verification found any non-blocking issues (PASS WITH EXCEPTIONS, CANNOT VERIFY items, tech debt), list them here as items to address before the final QA epic or during CI/CD setup.
+If the verification found any non-blocking issues (waived TORs, CANNOT VERIFY items, tech debt), list them here as items to address before the final QA epic or during CI/CD setup.
 
 Present this as a clear summary the user can act on:
 
