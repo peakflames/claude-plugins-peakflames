@@ -9,8 +9,9 @@ it directly rather than re-reading `epic-<id>-complete.md` from disk.
 Placeholder reference:
 
 - `<id>`, `<Name>` — epic ID and epic name
-- `<N>` — source issue number from Step 1.1 item 4. **Omit the `Closes #<N>` line entirely**
-  if the spec has no `**Source:** Issue #<N>` header.
+- `<N>` — source issue number from Step 1.1 item 4. **Omit the issue-link line entirely**
+  if the spec has no `**Source:** Issue #<N>` header. Write `Closes #<N>` only when the
+  Deferrals count is 0; otherwise write `Refs #<N>` so a partially delivered issue stays open.
 - Deferrals block — lifted from the Step 1.5 report (already in memory). Always first. If the
   count is 0, the block is the heading plus the single line `None`.
 - TOR Counts, Highlights, Conclusion — lifted from the Step 1.5 verification report
@@ -37,7 +38,7 @@ Count: N (undisclosed: M, waived: W)
 <lift "What Was Built" content from Step 2.1 handoff — already in memory, do not re-read file>
 
 <conditional: include only when source issue number is known>
-Closes #<N>
+<`Closes #<N>` if Deferrals count is 0, else `Refs #<N>`>
 
 ## Spec
 - Epic <id>: <Name> — `docs/implementation-plan/phase-*/epic-<id>-*.md`

@@ -226,10 +226,12 @@ Middle step example:
   Deferred: <TOR-list of deferred TORs, or "none">
   Deferrals: <deferral-count>
 
-  Closes #<N>
+  Refs #<N>
   ```
   `<deferral-count>` is the `Count:` value from the handoff's Deferrals section (`0` if none).
-  Omit the `Closes #<N>` trailer if no source issue was captured. Do not push.
+  Always `Refs`, never `Closes` — the implementer cannot know whether the epic will pass
+  verification; only the wrapup PR body may close the source issue. Omit the `Refs #<N>`
+  trailer if no source issue was captured. Do not push.
 
 - **Present next steps** — output this block exactly:
   > ---
