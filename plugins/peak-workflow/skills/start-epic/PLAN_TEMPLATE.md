@@ -15,6 +15,7 @@ Placeholder reference:
 - `<test-directory>` — the project's test directory from CLAUDE.md's Verification & Quality
   Gates section (e.g., `tests/`, `spec/`, `__tests__/`)
 - `<deferral-count>` — the `Count:` value from the handoff's Deferrals section
+- `<handoff-path>` — `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md`
 
 ---
 
@@ -142,7 +143,8 @@ Middle step example:
       $(git diff --name-only <base-branch>; git ls-files --others --exclude-standard)
     ```
      Judge each hit: a marker describing incomplete TOR behavior is a deferral-gate trigger for
-     that TOR, unless the TOR already has a Deferrals row (the xfail reason itself will match).
+     that TOR, unless the TOR already has a Deferrals row (a hit inside a `Deferred:` xfail
+     reason is expected and not a trigger).
      Legitimate uses (e.g., argparse `placeholder`/`metavar`) are not triggers.
 
   **Any TOR reported FAIL or CANNOT VERIFY here that has no Deferrals row fires the deferral
@@ -197,7 +199,8 @@ Middle step example:
   After writing the handoff, run
   `grep -inE 'stub|partial|for now|follow-up|todo|placeholder|not implemented' <handoff-path>`.
   Any hit outside the Deferrals table that has no matching Deferrals row fires the deferral
-  gate for that TOR before continuing.
+  gate for that TOR before continuing. If Defer is chosen here, update that TOR's TOR Coverage
+  verdict to FAIL, apply the xfail marking, and re-run this grep.
 
   Plan approval already authorizes both the handoff write and any spec-level notation —
   do not re-prompt.
