@@ -78,6 +78,17 @@ Components. Each middle step must:
 If Step 1 item 13 (E2E audit) surfaced regression specs likely to break, include an explicit
 "update regression specs: …" item here, committed alongside the implementation.
 
+**Deferral gate.** If at any point during the middle steps a TOR's Given/When/Then cannot be
+fully met in this session (technical constraint, missing dependency, scope larger than
+estimated, or anything else), stop implementation and use `AskUserQuestion`:
+- Question: `"TOR-<NN-XXXXXXX> cannot be fully met: <reason>. How to proceed?"`
+- Options: `["Fix it now", "Defer — record in Deferrals with this reason", "Stop — I'll take it from here"]`
+
+Never continue silently past an unmet TOR, and never narrow the Then clause to make the
+requirement fit what was built. Every "Defer" answer must appear as a row in the Deferrals
+section of the implemented handoff (see Closing step 2). This gate is part of the plan — plan
+approval does not pre-authorize any deferral.
+
 Middle step example:
 ```
 5. Implement version-flag handler [TOR-01-Afs657G, TOR-01-Bcd2345]
@@ -93,13 +104,18 @@ Middle step example:
 
 ## Closing steps (always the last five plan items, in this order)
 
-- **Satisfy each TOR Given/When/Then** — for every TOR ID in the Requirements Anchors table:
+- **Implementer self-assessment** — each TOR Given/When/Then. For every TOR ID in the
+  Requirements Anchors table:
   1. Confirm that the implementation code has been written (see Middle steps above).
   2. Run the test(s) written for this TOR ID. Every test must pass.
-  3. Independently verify the implementation realizes the Given/When/Then (a passing test that
-     doesn't exercise the requirement is a FAIL — inspect source code to confirm).
+  3. Inspect source to confirm the implementation realizes the Given/When/Then (a passing test
+     that doesn't exercise the requirement is a FAIL).
   4. Also run the project's Verification & Quality Gates from `CLAUDE.md` (build, lint, console
      errors, brand audit if UI). Report each gate as PASS / FAIL / CANNOT VERIFY.
+
+  This is the implementer's own assessment of its own work. It is labeled as such in the
+  handoff and is not trusted by `/peak-workflow:wrapup-epic`, which re-verifies every TOR
+  independently in a fresh session.
 
   Report each TOR ID as:
   - **PASS** — test passes AND implementation inspection confirms the Given/When/Then is
@@ -121,13 +137,22 @@ Middle step example:
     change-control events and must go through `/peak-workflow:capture-requirements` on a `docs/`
     branch.
 
-  Write (or update) `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` with:
+  Write (or update) `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` with
+  these sections in this order:
   - **What Was Built** — 2–3 sentence summary
+  - **Deferrals** — **mandatory, always present, placed immediately after What Was Built.**
+    First line `Count: N`. Then a table `TOR ID | Unmet | Why | Decision | By | Date` with one
+    row per TOR whose Given/When/Then is not fully met, where `Decision` is the option chosen
+    at the deferral gate and `By` is the user who chose it. Every "Defer" answer from the
+    deferral gate must appear here. If nothing was deferred, write `Count: 0` followed by the
+    literal line `None` — do not omit the section.
   - **Key Files** table — files created or modified
   - **Spec Deviations** table — `TOR ID | As-Written | As-Implemented | Reason`
-    (empty if no deviations)
-  - **TOR Coverage** — list each TOR ID with its PASS / FAIL / CANNOT VERIFY verdict
-  - **Verification Results** — quality gate results
+    (empty if no deviations). A deviation is a Then clause that was *adjusted*; a deferral is a
+    Then clause that was *not met*. They are different and both must be recorded.
+  - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / FAIL / CANNOT VERIFY
+    verdict from the self-assessment step
+  - **Verification Results (self-assessment)** — quality gate results
 
   Plan approval already authorizes both the handoff write and any spec-level notation —
   do not re-prompt.
@@ -150,16 +175,19 @@ Middle step example:
   feat(epic-<id>): <short summary>
 
   Implements <TOR-list> — <1 sentence describing what the user can now do>.
+  Deferrals: <N>
 
   Closes #<N>
   ```
-  Omit the `Closes #<N>` trailer if no source issue was captured. Do not push.
+  `Deferrals: <N>` is the count from the handoff's Deferrals section (`0` if none). Omit the
+  `Closes #<N>` trailer if no source issue was captured. Do not push.
 
 - **Present next steps** — output this block exactly:
   > ---
   > **Next steps**
-  > - Open a new session and run `/peak-workflow:wrapup-epic $ARGUMENTS` to independently verify
-  >   each TOR requirement's Given/When/Then and close out this epic
+  > - Open a **new** session (wrapup refuses to run in this one) and run
+  >   `/peak-workflow:wrapup-epic $ARGUMENTS` to independently verify each TOR requirement's
+  >   Given/When/Then and close out this epic
   > - Or run `/peak-workflow:status` to review overall project progress and requirements coverage
   > - If something needs fixing before wrapup, make the changes and re-run
   >   `/peak-workflow:start-epic $ARGUMENTS` to continue on the same branch
