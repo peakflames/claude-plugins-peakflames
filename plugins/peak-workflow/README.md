@@ -134,7 +134,7 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 | Command | Purpose | Branch / Status |
 |---|---|---|
 | `/start-epic <id>` | Implement the epic — loads TOR Given/When/Then, creates user-story tasks, implements, verifies | Not Started → In Progress → **Implemented** |
-| `/wrapup-epic <id>` | Independent review — verifies each TOR's Given/When/Then is satisfied, closes out, ships | Implemented → **Complete** |
+| `/wrapup-epic <id>` | Independent review — verifies each TOR's Given/When/Then is satisfied, closes out, ships; runs on Opus in a fresh session | Implemented → **Complete** |
 | `/pause` | Stop mid-epic, save progress | In Progress → **Paused** |
 | `/quick-fix <issue\|description>` | Lightweight path for trivial bugs in already-implemented TORs — creates `hotfix/` branch, implements, ships | Not tracked in implementation plan |
 

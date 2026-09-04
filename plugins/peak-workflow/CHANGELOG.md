@@ -6,6 +6,52 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] — 2026-09-04
+
+Verification integrity (Refs #4): implementers disclose deferrals at the source; wrapup
+verifies blind and names anything undisclosed.
+
+### Added
+
+- **Deferral gate in `start-epic`** — an unmet TOR stops implementation and asks: fix, defer
+  with reason, or stop. No silent narrowing of the Then clause.
+- **Mandatory Deferrals section** in `epic-<id>-implemented.md`, first after What Was Built;
+  `Count: 0` + `None` when empty. Commit body records the count.
+- **Mechanical self-checks in `start-epic`** — TOR ID must be greppable in tests; stub-marker
+  scans of changed files and the handoff fire the gate.
+- **Session guard in `wrapup-epic`** — refuses to run in the conversation that implemented the
+  epic; asks for a fresh session.
+- **`model: opus` on `wrapup-epic`** — verification runs on a stronger model; a CLAUDE.md
+  `Verifier model:` line is informational only.
+- **Waiver step (1.4b)** — each non-PASS TOR is waived or not by the user before the report;
+  waiver recorded with who, date, reason.
+
+### Changed
+
+- **Blind verification** — wrapup locates tests by grep only; implementer handoff opened only
+  after every per-TOR verdict is recorded (Step 1.2b).
+- **Undisclosed deferral = FAIL** — any non-PASS TOR without an implementer Deferrals row is
+  marked `Disclosed: no` with a named `UNDISCLOSED DEFERRAL` row.
+- **`PASS WITH EXCEPTIONS` removed** — verdicts are PASS / FAIL / CANNOT VERIFY; epic passes
+  only if all TORs pass or are waived. ⚠️ = waived.
+- **Deferrals-first reporting** — verification report, completion handoff, and PR body open
+  with an identical Deferrals table before the summary.
+- **Closing step relabeled "Implementer self-assessment"** — handoff TOR Coverage and
+  Verification Results are marked as self-assessment, not trusted by wrapup.
+- **Test must mirror the Then** — a passing test that only checks a flag is accepted is FAIL;
+  CANNOT VERIFY may not dodge a large fixture.
+- **Source issue closes only on full delivery** — PR body uses `Closes #N` when Deferrals
+  count is 0, else `Refs #N`; commits always `Refs`.
+
+### Fixed
+
+- **`wrapup-epic` checks out the feature branch first** — sidecar and spec were read before
+  checkout, giving a false "start-epic must finish" stop from `develop`.
+- **`start-epic` Opening step 2 handles `Implemented` → `In Progress`** — rework after a
+  wrapup FAIL is treated as a resumption, no re-announce.
+
+---
+
 ## [1.5.1] — 2026-09-04
 
 ### Documentation
