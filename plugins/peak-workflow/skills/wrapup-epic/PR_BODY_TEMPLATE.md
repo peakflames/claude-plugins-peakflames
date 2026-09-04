@@ -15,7 +15,8 @@ Placeholder reference:
   count is 0, the block is the heading plus the single line `None`.
 - TOR Counts, Highlights, Conclusion — lifted from the Step 1.5 verification report
 - Requirements Implemented table — lifted from Step 1.5 verbatim (already in memory).
-  Verdict values: PASS / FAIL / CANNOT VERIFY / WAIVED.
+  Verdict values here are PASS / WAIVED only — a FAIL or CANNOT VERIFY without a waiver never
+  reaches Phase 2.
 - Manual verification — from the Step 2.0 disclosure
 
 Highlights legend: ✅ pass · ⚠️ waived · ❌ fail.
