@@ -76,7 +76,7 @@ Based on your description, these TOR IDs appear relevant:
 | ...    | ...          | ...            |
 
 **Unplanned TOR IDs (not yet in any epic):** [N]
-**Already-planned TOR IDs included above:** [N] — include if this epic extends existing coverage
+**Already-planned TOR IDs (owned by another epic):** [N] — each must be moved here or dropped (whole-capability check below)
 ```
 
 Use `AskUserQuestion`:
@@ -94,10 +94,20 @@ Wait for the user's answer. The confirmed TOR ID set is the Requirements Anchors
 
 **Whole-capability check.** An epic is a vertical slice: every TOR it lists must be fully
 realizable inside it — schema, service, endpoint, and screen together, whatever the Then clause
-needs to be observable. If any confirmed TOR would depend on code a *later* epic creates, widen
-this epic to include that code rather than listing the TOR and deferring it. A TOR ID may be
-owned by only one epic; if a confirmed TOR is already in another epic's `requirements:` field,
-ask the user which epic keeps it and remove it from the other.
+needs to be observable. If a confirmed TOR needs code that no Implemented or Complete epic
+provides and this epic does not create, widen this epic to include that code rather than listing
+the TOR and deferring it. Code an Implemented/Complete epic already provides is a dependency
+(Step 3), not a reason to widen.
+
+A TOR ID is owned by exactly one epic. For each confirmed TOR already in another epic's
+`requirements:` field, use `AskUserQuestion`:
+- Question: `"TOR-<NN-XXXXXXX> is already owned by Epic <id> (<status>). Keep it there, or move it here?"`
+- Options: `["Keep it in Epic <id> — drop it from this epic", "Move it here"]`
+
+Moving is allowed only when the other epic is **Not Started**: remove the ID from that epic's
+sidecar `requirements:` line and its spec's Requirements Anchors table (apply both edits in Step 7, alongside the new sidecar).
+If the other epic is In Progress, Implemented, or Complete, offer only the Keep option — the TOR
+stays where it is being (or was) delivered.
 
 **Assign the epic ID:** generate a fresh **7-character random alphanumeric ID** for each new epic via:
 
