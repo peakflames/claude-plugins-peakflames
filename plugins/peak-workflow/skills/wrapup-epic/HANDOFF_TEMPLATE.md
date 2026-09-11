@@ -10,14 +10,15 @@ Placeholder reference:
 - `<id>`, `<Name>` — epic ID and epic name from the spec
 - `<model>` — the model this wrapup session ran on (frontmatter default `opus`, or the
   project's `Verifier model:` override)
-- Deferrals table — lifted from the Step 1.5 report verbatim, including waiver annotations.
-  Always present; `Count: 0` + `None` if empty.
+- Deferrals table — lifted from the Step 1.5 report verbatim, including waiver annotations and
+  any `FIXED DURING WRAPUP` rows. Always present; `Count: 0` + `None` if empty.
 - TOR Counts, Highlights, Conclusion — lifted from the Step 1.5 verification report
 - Requirements Implemented table — lifted from the Step 1.5 report verbatim
 - Manual verification — from the Step 2.0 disclosure prompt (literal `Yes` / `No` plus
   user-authored description if `Yes`)
 
-Highlights legend: ✅ pass · ⚠️ waived (a non-PASS TOR a human explicitly waived) · ❌ fail.
+Highlights legend: ✅ pass · ⚠️ waived (a non-PASS TOR a human explicitly waived) · 🔧 fixed
+during wrapup by the verifier (Step 1.4b Fix now) · ❌ fail.
 
 ---
 
@@ -28,11 +29,11 @@ Highlights legend: ✅ pass · ⚠️ waived (a non-PASS TOR a human explicitly 
 **Verified by:** Independent review via `/peak-workflow:wrapup-epic <id>` (model: <model>, fresh session)
 
 ## Deferrals
-Count: N (undisclosed: M, waived: W)
+Count: N (undisclosed: M, waived: W, fixed at wrapup: F)
 
 | TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding | Waived by / Date / Reason |
 |--------|-------|-----------|----------------------|------------------|---------------------------|
-| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision (by, date)> | FAIL / CANNOT VERIFY — <detail> | <user> / <YYYY-MM-DD> / <reason> — or `—` |
+| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, or FIXED DURING WRAPUP — <what changed> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
 
 <If Count is 0: replace the table with the literal line `None`.>
 
@@ -60,13 +61,14 @@ Count: N (undisclosed: M, waived: W)
 ## Verification Summary
 
 ### Counts
-- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived)
+- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup)
 - Quality Gates: X/Y PASS
 - Tests: X passed, Y skipped, Z failed
 
 ### Highlights
 - ✅ TOR-NN-XXXXXXX — <scenario title> (test file:line, impl file:line)
-- ⚠️ TOR-NN-XXXXXXX — waived: <one-sentence gap> (waived by <user>, <date>)
+- ⚠️ TOR-NN-XXXXXXX — waived: <one-sentence gap> (waived by <user>, <date> → epic <succ>)
+- 🔧 TOR-NN-XXXXXXX — fixed during wrapup: <one-sentence gap and fix>
 - ❌ TOR-NN-XXXXXXX — <scenario title> — <one-sentence failure reason>
 
 ### Conclusion

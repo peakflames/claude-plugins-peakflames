@@ -145,8 +145,9 @@ Report each TOR ID:
   fixture would be large, a test is missing, or the check is tedious — write a throwaway probe
   (do not commit it) or run the CLI directly; if the behavior is still unobservable, FAIL.
 
-Record every verdict before moving on. These verdicts are final for the report — Step 1.2b may
-annotate them but never changes them.
+Record every verdict before moving on. Step 1.2b may annotate these verdicts but never changes
+them; the only thing that can replace a verdict is a Step 1.4b **Fix now** followed by a re-run
+of this step for that TOR.
 
 ### Step 1.2b: Compare to Implementer's Deferrals
 
@@ -160,10 +161,12 @@ Only now, with every per-TOR verdict recorded, read
    misfiled branch still applies). The warning itself does not affect the epic verdict (legacy
    handoffs pre-date this section).
 2. **For each TOR whose verdict is FAIL or CANNOT VERIFY** (one Deferrals-table row each;
-   `Count:` is the number of such TORs):
+   `Count:` is the number of rows — a row survives a later Step 1.4b fix):
    - If the TOR ID appears as a row in the implementer's Deferrals table → `Disclosed: yes`.
      Map the implementer's `Unmet` into `Unmet` (amend if your finding differs) and
-     `Decision — Why (By, Date)` into `Implementer decision`.
+     `Decision — Why → Successor epic (By, Date)` into `Implementer decision`. If the
+     successor epic's spec does not exist or does not list this TOR in its Requirements
+     Anchors, append ` — ⚠️ successor spec missing` to that cell.
    - Else if it appears as a Spec Deviations row, or as FAIL / CANNOT VERIFY in the handoff's
      TOR Coverage → `Disclosed: yes (misfiled)`; note where it was found.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
@@ -185,6 +188,13 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
 - Console check via `playwright-cli` (if UI was changed)
 
+**Gate discrepancies are findings.** After running the gates, compare each result against the
+implementer handoff's *Verification Results (self-assessment)* section (the handoff is already
+open from Step 1.2b). Any gate the handoff reports as PASS that does not pass now is a named
+Code Review finding in Step 1.5: `⚠️ GATE DISCREPANCY: <gate> — handoff reports PASS, reproduces
+FAIL (<one-line detail>)`. Report it even when the failure predates this epic — the discrepancy
+is the finding, not the failure's age.
+
 ### Step 1.4: Code Review
 
 Review the implementation for:
@@ -194,23 +204,46 @@ Review the implementation for:
 - Logging adequacy
 - Consistency with whichever of `docs/architecture.md` and `docs/design-notes.md` were loaded conditionally in Step 1.1 item 7. If neither was loaded (the epic had no cross-cutting surface), record "no architectural surface affected" and move on.
 
-### Step 1.4b: Waivers
+### Step 1.4b: Fix, Defer, or Stop
 
 **Verdict rule.** Per-TOR verdicts are **PASS / FAIL / CANNOT VERIFY** only — there is no
-"pass with exceptions". The epic verdict is **PASS** if and only if every TOR is PASS, or every
-non-PASS TOR carries a **human waiver**. Otherwise the epic verdict is **FAIL**.
+"pass with exceptions". The epic verdict is **PASS** if and only if every TOR is PASS (including
+TORs fixed during this wrapup), or every remaining non-PASS TOR carries a **human waiver**.
+Otherwise the epic verdict is **FAIL**.
 
-For each TOR whose verdict is FAIL or CANNOT VERIFY, use `AskUserQuestion` (one question per
-TOR, all asked before the report is rendered):
-- Question: `"Waive TOR-<NN-XXXXXXX>? (<what is unmet>)"`
-- Options: `["Waive — record reason", "Do not waive — epic FAILs"]`
+A substantive finding is never filed as a follow-up by default — it is put to the user as a
+decision, at the moment it is cheapest to act on. For each TOR whose verdict is FAIL or CANNOT
+VERIFY, use `AskUserQuestion` (one question per TOR, all asked before the report is rendered):
+- Question: `"TOR-<NN-XXXXXXX> is <FAIL | CANNOT VERIFY>: <what is unmet>. Recommendation: <Fix now | Defer | Stop> — <one clause why>. How to proceed?"`
+- Options: `["Fix now", "Defer — depends on a later epic", "Stop — epic FAILs"]`
 
-If waived, request a one-line reason and fill the TOR's `Waived by / Date / Reason` cell in
-the Deferrals table (`Waived by` is `git config user.name`); the TOR then displays as `WAIVED`
-in the Requirements Implemented table — a display state for a waived FAIL / CANNOT VERIFY, not
-a fourth verdict. An undisclosed deferral **may** be waived, but its `Disclosed: **no**` mark
-stays in the table permanently — waiving forgives the gap, not the silence. One "Do not waive"
-makes the epic FAIL; still ask about every remaining non-PASS TOR so the report is complete.
+The recommendation is mandatory — never ask without one. Recommend **Defer** only when the
+eligibility rule below is met.
+
+**Only an option the user selects counts.** A free-text reply that does not name one of the
+three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
+
+- **Fix now** — always offered; the human decides. Apply the fix, re-run Step 1.3 for the
+  affected gates, then re-run Step 1.2 for this TOR only and replace its verdict. The TOR's
+  Deferrals row is **kept** with Verifier finding `FIXED DURING WRAPUP — <what changed>` and
+  `Waived by / Date / Reason` set to `—`; the TOR shows `PASS` in Requirements Implemented.
+  This is the one place the verifier writes code it then verifies — the row is how the human
+  sees that. If the fix does not bring the TOR to PASS, re-ask with only `Defer` / `Stop`.
+- **Defer** — a waiver. Eligible only when the Then clause depends on code a later epic creates.
+  Ask which epic will deliver it (`<succ>`); run `ls docs/implementation-plan/phase-*/epic-<succ>-*.md`.
+  If no spec exists, Defer is not available — re-ask with `Fix now` / `Stop`. If the spec
+  exists but its Requirements Anchors table does not list this TOR, append the row and add the
+  TOR ID to `docs/implementation-plan/status/epic-<succ>.md`'s `requirements:` field. Then fill
+  the TOR's `Waived by / Date / Reason` cell (`Waived by` is `git config user.name`; `Reason`
+  ends with `→ epic <succ>`). The TOR displays as `WAIVED` in the Requirements Implemented
+  table — a display state for a waived FAIL / CANNOT VERIFY, not a fourth verdict. "Larger
+  than expected", "tedious", or "out of scope" are not eligible reasons — say so and re-ask
+  with `Fix now` / `Stop`.
+- **Stop** — the epic FAILs. Still ask about every remaining non-PASS TOR so the report is
+  complete.
+
+An undisclosed deferral **may** be fixed or waived, but its `Disclosed: **no**` mark stays in
+the table permanently — fixing or waiving forgives the gap, not the silence.
 
 ### Step 1.5: Present Verification Report
 
@@ -220,18 +253,20 @@ Present a consolidated report to the user. The report has three jobs: deferrals 
 # Epic <id>: [Name] — Verification Report
 
 ## Deferrals
-Count: N (undisclosed: M, waived: W)
+Count: N (undisclosed: M, waived: W, fixed at wrapup: F)
 
 | TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding | Waived by / Date / Reason |
 |--------|-------|-----------|----------------------|------------------|---------------------------|
-| TOR-02-Xyz5678 | negative-path (invalid token) rejection | yes | defer → follow-up epic (tschavey, 2026-09-04) | FAIL — confirmed unmet | tschavey / 2026-09-04 / follow-up epic scheduled |
-| TOR-03-Mno9012 | returns 201 on create | **no** | — (handoff Key Decisions: "201 can wait") | FAIL — ❌ UNDISCLOSED DEFERRAL | — |
+| TOR-02-Xyz5678 | negative-path (invalid token) rejection | yes | defer — needs auth middleware → epic B9xQr2z (tschavey, 2026-09-04) | FAIL — confirmed unmet | tschavey / 2026-09-04 / auth middleware lands in → epic B9xQr2z |
+| TOR-03-Mno9012 | returns 201 on create | **no** | — (handoff Key Decisions: "201 can wait") | FIXED DURING WRAPUP — status code changed to 201, test updated | — |
+| TOR-03-Pqr3456 | rejects empty name | **no** | — | FAIL — ❌ UNDISCLOSED DEFERRAL | — |
 
 (If Count is 0: write `None` in place of the table. Prepend the Step 1.2b warning line if the
-implementer handoff had no Deferrals section.)
+implementer handoff had no Deferrals section. `Count:` is the number of rows; a fixed TOR keeps
+its row.)
 
 ## Counts
-- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived)
+- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup)
 - Quality Gates: X/Y PASS
 - Tests: X passed, Y skipped, Z failed
 
@@ -246,8 +281,9 @@ implementer handoff had no Deferrals section.)
 ### Highlights
 - ✅ TOR-01-Afs657G — version flag implemented and tested (tests/test_cli.py:42, src/cli.py:118)
 - ✅ TOR-01-Bcd2345 — help flag implemented and tested (tests/test_cli.py:67, src/cli.py:124)
-- ⚠️ TOR-02-Xyz5678 — waived: negative-path test (invalid token) missing (waived by tschavey, 2026-09-04)
-- ❌ TOR-03-Mno9012 — returns 200 but the Then clause requires 201; deferral undisclosed
+- ⚠️ TOR-02-Xyz5678 — waived: negative-path test (invalid token) missing (waived by tschavey, 2026-09-04 → epic B9xQr2z)
+- 🔧 TOR-03-Mno9012 — fixed during wrapup: returned 200, Then requires 201; deferral was undisclosed
+- ❌ TOR-03-Pqr3456 — empty name accepted; deferral undisclosed
 
 ### Conclusion
 <2–3 sentences explaining why this verification is sufficient for the epic's TOR requirements,
@@ -269,7 +305,8 @@ or — if FAIL — what specifically needs to be addressed before re-run>
 | TOR-01-Afs657G | 01-cli.feature.md | PASS | tests/test_cli.py:42 |
 | TOR-01-Bcd2345 | 01-cli.feature.md | PASS | tests/test_cli.py:67 |
 | TOR-02-Xyz5678 | 02-auth.feature.md | WAIVED | tests/test_auth.py:91 |
-| TOR-03-Mno9012 | 03-parts.feature.md | FAIL | tests/test_parts.py:15 |
+| TOR-03-Mno9012 | 03-parts.feature.md | PASS | tests/test_parts.py:15 |
+| TOR-03-Pqr3456 | 03-parts.feature.md | FAIL | tests/test_parts.py:28 |
 ```
 
 The Verdict line follows the rule in Step 1.4b. The Deferrals table, Counts, and Requirements
@@ -280,10 +317,10 @@ column sets exactly as shown.
 
 - Highlights are **selective**, not comprehensive — 3–6 bullets is typical, not one bullet per item. Lead the reviewer to the substantive checks; skip trivialities.
 - Author them from what was actually run in Steps 1.2–1.4.
-- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for waived, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
+- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for waived, 🔧 for fixed during wrapup, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
 - Deferrals never appear *only* in Highlights — they are already in the Deferrals table at the top. Highlights may reference them but must not be the sole record.
 
-**If the verdict is FAIL:** Stop here. List the specific items that need to be fixed. Do NOT proceed to Phase 2. Tell the user: make the fixes (re-run `/peak-workflow:start-epic $ARGUMENTS` on the same branch, or fix by hand), then run `/peak-workflow:wrapup-epic $ARGUMENTS` again in a fresh session.
+**If the verdict is FAIL:** Stop here. List the specific items that need to be fixed — TORs already fixed during this wrapup are re-verified and not on that list. Do NOT proceed to Phase 2. Tell the user: make the fixes (re-run `/peak-workflow:start-epic $ARGUMENTS` on the same branch, or fix by hand), then run `/peak-workflow:wrapup-epic $ARGUMENTS` again in a fresh session. Any fix applied during this wrapup is uncommitted on the feature branch — say so, so it is not lost.
 
 **If the verdict is PASS:** Ask the user to confirm before proceeding to Phase 2.
 
@@ -333,10 +370,10 @@ asking the user for permission:
    ```
    chore(epic-<id>): verify and complete — <brief summary>
 
-   Deferrals: <deferral-count>, waived: <waived-count>.
+   Deferrals: <deferral-count>, waived: <waived-count>, fixed at wrapup: <fixed-count>.
    Refs #<N>
    ```
-   `<deferral-count>` / `<waived-count>` come from the Step 1.5 Deferrals `Count:` line. Include the `Refs #<N>` line only if a source issue number was captured in Step 1.1 item 4.
+   `<deferral-count>` / `<waived-count>` / `<fixed-count>` come from the Step 1.5 Deferrals `Count:` line. Include the `Refs #<N>` line only if a source issue number was captured in Step 1.1 item 4. Files changed by a Step 1.4b fix are part of this commit — stage them by path.
 
 Do NOT push to the remote yet.
 
@@ -363,7 +400,12 @@ Based on the dependency graph and project state, recommend which epic to start n
 
 ### Step 3.4: Outstanding Items
 
-If the verification found any non-blocking issues (waived TORs, CANNOT VERIFY items, tech debt), list them here as items to address before the final QA epic or during CI/CD setup.
+This section is a record, not a decision point. It may list only:
+- TORs already waived in Step 1.4b, each with its successor epic (`TOR-… → epic <succ>`)
+- Non-TOR observations from the Step 1.4 code review (tech debt, refactors)
+
+It must not originate a deferral. If a substantive finding first surfaces here, go back to the
+Step 1.4b question for it — do not file it as a follow-up.
 
 Present this as a clear summary the user can act on:
 
@@ -378,7 +420,8 @@ Present this as a clear summary the user can act on:
 [Your recommendation and why]
 
 ### Outstanding Items (non-blocking)
-- [Items to address later]
+- TOR-… — waived: <gap> → epic <succ>
+- <non-TOR code-review observation>
 ```
 
 After presenting the orientation summary, remind the user:

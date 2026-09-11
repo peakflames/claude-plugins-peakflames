@@ -6,15 +6,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.6.0] — 2026-09-04
+## [1.6.0] — 2026-09-11
 
-Verification integrity (Refs #4): implementers disclose deferrals at the source; wrapup
-verifies blind and names anything undisclosed.
+Verification integrity (Refs #4, Closes #6): implementers disclose deferrals at the source;
+wrapup verifies blind, names anything undisclosed, and asks fix-now-or-defer instead of filing.
 
 ### Added
 
-- **Deferral gate in `start-epic`** — an unmet TOR stops implementation and asks: fix, defer
-  with reason, or stop. No silent narrowing of the Then clause.
+- **Deferral gate in `start-epic`** — an unmet TOR stops implementation and asks: fix now,
+  defer, or stop, with a mandatory recommendation. No silent narrowing of the Then clause.
+- **Defer eligibility** — Defer is allowed only when the Then clause depends on a later epic;
+  the successor epic's spec must exist and list the TOR (added if missing). Recorded in a
+  `Successor epic` column.
+- **Fix-now path in `wrapup-epic` (1.4b)** — a non-PASS TOR may be fixed by the verifier;
+  gates and the TOR are re-verified, and the row stays as `FIXED DURING WRAPUP`. 🔧 = fixed.
+- **Gate discrepancies are findings** — a quality gate the handoff reports PASS that fails at
+  wrapup is a named Code Review finding, regardless of when the failure began.
 - **Mandatory Deferrals section** in `epic-<id>-implemented.md`, first after What Was Built;
   `Count: 0` + `None` when empty. Commit body records the count.
 - **Mechanical self-checks in `start-epic`** — TOR ID must be greppable in tests; stub-marker
@@ -23,8 +30,8 @@ verifies blind and names anything undisclosed.
   epic; asks for a fresh session.
 - **`model: opus` on `wrapup-epic`** — verification runs on a stronger model; a CLAUDE.md
   `Verifier model:` line is informational only.
-- **Waiver step (1.4b)** — each non-PASS TOR is waived or not by the user before the report;
-  waiver recorded with who, date, reason.
+- **Fix / Defer / Stop step (1.4b)** — each non-PASS TOR is decided by the user before the
+  report; a free-text "proceed" is not consent. Waivers record who, date, reason, successor.
 
 ### Changed
 
@@ -42,6 +49,8 @@ verifies blind and names anything undisclosed.
   CANNOT VERIFY may not dodge a large fixture.
 - **Source issue closes only on full delivery** — PR body uses `Closes #N` when Deferrals
   count is 0, else `Refs #N`; commits always `Refs`.
+- **Step 3.4 Outstanding Items is a record only** — lists waived TORs with their successor
+  epic and non-TOR review notes; it can no longer originate a deferral.
 
 ### Fixed
 

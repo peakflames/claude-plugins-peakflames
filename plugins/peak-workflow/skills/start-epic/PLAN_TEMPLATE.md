@@ -91,8 +91,12 @@ first middle step; it applies to every middle step and to the self-assessment. I
 a TOR's Given/When/Then cannot be fully met as written in this session (technical constraint,
 missing dependency, scope larger than estimated, a Then clause that would need adjusting, or
 anything else), stop implementation and use `AskUserQuestion`:
-- Question: `"TOR-<NN-XXXXXXX> cannot be fully met: <reason>. How to proceed?"`
-- Options: `["Fix it now", "Defer — record in Deferrals with this reason", "Stop — I'll take it from here"]`
+- Question: `"TOR-<NN-XXXXXXX> cannot be fully met: <reason>. Recommendation: <Fix now | Defer | Stop> — <one clause why>. How to proceed?"`
+- Options: `["Fix now", "Defer — depends on a later epic", "Stop — I'll take it from here"]`
+
+The recommendation is mandatory — never ask without one. Recommend **Defer** only when the
+eligibility rule below is met; otherwise recommend Fix now, or Stop if the fix is beyond this
+session.
 
 Rules:
 - Never continue silently past an unmet TOR, and never narrow the Then clause to make the
@@ -100,13 +104,30 @@ Rules:
   the TOR as written is not met.
 - If the constraint is already known when the plan is authored, fire the gate immediately
   after plan approval, before any middle step.
-- **Defer:** write the Deferrals row immediately to
+- **Only an option the user selects counts.** A free-text reply that does not name one of the
+  three options ("ok", "proceed", "go ahead") is not consent to defer — re-ask.
+- **Defer eligibility:** Defer is allowed only when the Then clause depends on code a later
+  epic creates (a handler, table, screen, or service that does not exist yet and is not this
+  epic's to build). "Larger than estimated", "tricky", "tedious", or "out of session scope" are
+  not eligible — those resolve to Fix now or Stop. If the user picks Defer for an ineligible
+  reason, say so and re-ask with only `Fix now` / `Stop`.
+- **Defer — successor check:** ask which epic will deliver the TOR (`<succ>` = its ID). Run
+  `ls docs/implementation-plan/phase-*/epic-<succ>-*.md`. If no spec exists, Defer is not
+  available — re-ask with `Fix now` / `Stop`. If the spec exists but its Requirements Anchors
+  table does not list this TOR, append the row (TOR ID, feature file, scenario title verbatim)
+  and add the TOR ID to `docs/implementation-plan/status/epic-<succ>.md`'s `requirements:`
+  field before continuing. Record `<succ>` in the Deferrals row's `Successor epic` column.
+- **Defer — record:** write the Deferrals row immediately to
   `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` (create the file with
   just a `## Deferrals` section if it does not exist yet; "Reconcile spec" fills in the rest
   later) so the decision survives a context clear. `By` is `git config user.name`. Keep the
   TOR's test but mark it skip/xfail with reason
   `Deferred: <TOR-ID> — <why>` so the suite stays green and the ID stays greppable. Report the
   TOR as FAIL in the self-assessment.
+- **Fix now:** implement the fix, then re-run that TOR's test and the two mechanical checks
+  from the self-assessment before continuing. If a Deferrals row was already written for this
+  TOR (the gate fired during self-assessment), delete the row, decrement `Count:`, and remove
+  the skip/xfail marking.
 - **Stop:** run `/peak-workflow:pause` so the sidecar and handoff reflect the stopping point.
 - Plan approval does not pre-authorize any deferral.
 
@@ -181,11 +202,13 @@ Middle step example:
   these sections in this order:
   - **What Was Built** — 2–3 sentence summary
   - **Deferrals** — **mandatory, always present, placed immediately after What Was Built.**
-    First line `Count: N`. Then a table `TOR ID | Unmet | Why | Decision | By | Date` with one
-    row per TOR whose Given/When/Then is not fully met, where `Decision` is the option chosen
-    at the deferral gate and `By` is the user who chose it. Every "Defer" answer from the
-    deferral gate must appear here. If nothing was deferred, write `Count: 0` followed by the
-    literal line `None` — do not omit the section.
+    First line `Count: N`. Then a table
+    `TOR ID | Unmet | Why | Decision | Successor epic | By | Date` with one row per TOR whose
+    Given/When/Then is not fully met, where `Decision` is the option chosen at the deferral
+    gate, `Successor epic` is the epic ID confirmed by the successor check, and `By` is the
+    user who chose it. Every "Defer" answer from the deferral gate must appear here. If
+    nothing was deferred, write `Count: 0` followed by the literal line `None` — do not omit
+    the section.
   - **Key Files** table — files created or modified
   - **Spec Deviations** table — `TOR ID | As-Written | As-Implemented | Reason`
     (empty if no deviations). A deviation is a Then clause that was *adjusted*; it is also a
