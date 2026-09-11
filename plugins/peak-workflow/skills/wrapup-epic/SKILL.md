@@ -371,9 +371,11 @@ Update `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
 1. Change `status: Implemented` to `status: Complete`
 2. Set `completed: <today>` (YYYY-MM-DD)
 3. Set `handoff: session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim)
-4. If any TOR was waived in Step 1.4b, add (or replace) a `waived: TOR-…, TOR-…` line after
-   `requirements:`. `/peak-workflow:status` treats a waived TOR as not satisfied by this epic —
-   its coverage comes from the successor epic. Omit the line when nothing was waived.
+4. If any TOR was waived in Step 1.4b, add (or replace) a
+   `waived: TOR-… → <succ>, TOR-… → <succ>` line after `requirements:`, where `<succ>` is the
+   successor epic ID recorded in the waiver. `/peak-workflow:status` treats a waived TOR as not
+   satisfied by this epic — its coverage comes from the successor. Omit the line when nothing
+   was waived.
 
 Then locate the epic spec file — `grep -rl "epic-$ARGUMENTS" docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` (or the glob `docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` directly) — and rewrite its `**Status:**` header line to `**Status:** Complete — <today>` (same date just written to `completed:`), so the spec stays in sync with the sidecar.
 
