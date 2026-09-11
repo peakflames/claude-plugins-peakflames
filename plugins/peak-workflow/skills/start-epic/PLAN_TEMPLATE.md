@@ -108,19 +108,23 @@ Rules:
   three options ("ok", "proceed", "go ahead") is not consent to defer — re-ask.
 - **Defer eligibility:** Defer is allowed only when the Then clause depends on code a later
   epic creates (a handler, table, screen, or service that does not exist yet and is not this
-  epic's to build). "Larger than estimated", "tricky", "tedious", or "out of session scope" are
-  not eligible — those resolve to Fix now or Stop. If the user picks Defer for an ineligible
-  reason, say so and re-ask with only `Fix now` / `Stop`.
-- **Defer — successor check:** ask which epic will deliver the TOR (`<succ>` = its ID). Run
+  epic's to build). When the user picks Defer, ask `"Which later epic creates the code this Then
+  clause depends on?"` and judge on that answer. "Larger than estimated", "tricky", "tedious",
+  or "out of session scope" name no epic and are not eligible. When not eligible, re-ask:
+  `"Defer is not eligible for TOR-<NN-XXXXXXX>: <reason> is not a dependency on a later epic. How to proceed?"`
+  with options `["Fix now", "Stop — I'll take it from here"]`.
+- **Defer — successor check:** with `<succ>` = the epic ID the user named, run
   `ls docs/implementation-plan/phase-*/epic-<succ>-*.md`. If no spec exists, Defer is not
-  available — re-ask with `Fix now` / `Stop`. If the spec exists but its Requirements Anchors
+  available — re-ask as above. If the spec exists but its Requirements Anchors
   table does not list this TOR, append the row (TOR ID, feature file, scenario title verbatim)
   and add the TOR ID to `docs/implementation-plan/status/epic-<succ>.md`'s `requirements:`
   field before continuing. Record `<succ>` in the Deferrals row's `Successor epic` column.
 - **Defer — record:** write the Deferrals row immediately to
-  `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` (create the file with
-  just a `## Deferrals` section if it does not exist yet; "Reconcile spec" fills in the rest
-  later) so the decision survives a context clear. `By` is `git config user.name`. Keep the
+  `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` (if the file does not
+  exist yet, create it with a `## Deferrals` section, `Count: 1`, and the table header;
+  "Reconcile spec" fills in the rest later) so the decision survives a context clear. Columns:
+  `Unmet` = the Then clause(s) not realized, `Why` = the reason given at the gate, `Decision` =
+  the option chosen, `Date` = today. `By` is `git config user.name`. Keep the
   TOR's test but mark it skip/xfail with reason
   `Deferred: <TOR-ID> — <why>` so the suite stays green and the ID stays greppable. Report the
   TOR as FAIL in the self-assessment.
@@ -240,7 +244,8 @@ Middle step example:
 - **Commit** — run `git branch --show-current` and confirm you are on
   `feature/epic-<id>-<short-name>`; if not, switch before staging anything. Stage all files
   created or modified during this epic by specific path (not `git add -A`), including the
-  handoff file, updated status sidecar, and updated spec file. Commit without asking for permission.
+  handoff file, updated status sidecar, updated spec file, and — if a Defer edited them — the
+  successor epic's spec and sidecar. Commit without asking for permission.
   Message format:
   ```
   feat(epic-<id>): <short summary>

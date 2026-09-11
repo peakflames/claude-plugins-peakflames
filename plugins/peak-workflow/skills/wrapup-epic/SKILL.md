@@ -166,7 +166,7 @@ Only now, with every per-TOR verdict recorded, read
      Map the implementer's `Unmet` into `Unmet` (amend if your finding differs) and
      `Decision — Why → Successor epic (By, Date)` into `Implementer decision`. If the
      successor epic's spec does not exist or does not list this TOR in its Requirements
-     Anchors, append ` — ⚠️ successor spec missing` to that cell.
+     Anchors, append ` — ⚠️ successor spec missing or does not list this TOR` to that cell.
    - Else if it appears as a Spec Deviations row, or as FAIL / CANNOT VERIFY in the handoff's
      TOR Coverage → `Disclosed: yes (misfiled)`; note where it was found.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
@@ -208,8 +208,14 @@ Review the implementation for:
 
 **Verdict rule.** Per-TOR verdicts are **PASS / FAIL / CANNOT VERIFY** only — there is no
 "pass with exceptions". The epic verdict is **PASS** if and only if every TOR is PASS (including
-TORs fixed during this wrapup), or every remaining non-PASS TOR carries a **human waiver**.
-Otherwise the epic verdict is **FAIL**.
+TORs fixed during this wrapup) or every remaining non-PASS TOR carries a **human waiver**, AND
+every quality gate from Step 1.3 passes (including any `GATE DISCREPANCY`). Otherwise the epic
+verdict is **FAIL**.
+
+**Failing quality gates first.** For each gate that failed in Step 1.3, ask the same question
+below with options `["Fix now", "Stop — epic FAILs"]` only — a gate cannot be deferred. On Fix
+now, apply the fix and re-run that gate; if it still fails, the epic verdict is FAIL. Record the
+outcome in Code Review Findings (`fixed at wrapup` or `unfixed — epic FAILs`).
 
 A substantive finding is never filed as a follow-up by default — it is put to the user as a
 decision, at the moment it is cheapest to act on. For each TOR whose verdict is FAIL or CANNOT
@@ -223,22 +229,27 @@ eligibility rule below is met.
 **Only an option the user selects counts.** A free-text reply that does not name one of the
 three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
 
-- **Fix now** — always offered; the human decides. Apply the fix, re-run Step 1.3 for the
-  affected gates, then re-run Step 1.2 for this TOR only and replace its verdict. The TOR's
+- **Fix now** — always offered; the human decides. Apply the fix, remove any
+  `Deferred: <TOR-ID>` skip/xfail marking the implementer left on the test, re-run Step 1.3
+  for the affected gates, then re-run Step 1.2 for this TOR only and replace its verdict. The TOR's
   Deferrals row is **kept** with Verifier finding `FIXED DURING WRAPUP — <what changed>` and
   `Waived by / Date / Reason` set to `—`; the TOR shows `PASS` in Requirements Implemented.
   This is the one place the verifier writes code it then verifies — the row is how the human
   sees that. If the fix does not bring the TOR to PASS, re-ask with only `Defer` / `Stop`.
 - **Defer** — a waiver. Eligible only when the Then clause depends on code a later epic creates.
-  Ask which epic will deliver it (`<succ>`); run `ls docs/implementation-plan/phase-*/epic-<succ>-*.md`.
-  If no spec exists, Defer is not available — re-ask with `Fix now` / `Stop`. If the spec
-  exists but its Requirements Anchors table does not list this TOR, append the row and add the
-  TOR ID to `docs/implementation-plan/status/epic-<succ>.md`'s `requirements:` field. Then fill
-  the TOR's `Waived by / Date / Reason` cell (`Waived by` is `git config user.name`; `Reason`
-  ends with `→ epic <succ>`). The TOR displays as `WAIVED` in the Requirements Implemented
-  table — a display state for a waived FAIL / CANNOT VERIFY, not a fourth verdict. "Larger
-  than expected", "tedious", or "out of scope" are not eligible reasons — say so and re-ask
-  with `Fix now` / `Stop`.
+  Ask `"Which later epic creates the code this Then clause depends on?"` — if the implementer's
+  Deferrals row (Step 1.2b) already names a successor, offer it as the default. Judge
+  eligibility on that answer: "larger than expected", "tedious", or "out of scope" name no
+  epic and are not eligible. When not eligible, re-ask:
+  `"Defer is not eligible for TOR-<NN-XXXXXXX>: <reason> is not a dependency on a later epic. How to proceed?"`
+  with options `["Fix now", "Stop — epic FAILs"]`.
+  When eligible (`<succ>` named): run `ls docs/implementation-plan/phase-*/epic-<succ>-*.md`.
+  If no spec exists, Defer is not available — re-ask as above. If the spec exists but its
+  Requirements Anchors table does not list this TOR, append the row and add the TOR ID to
+  `docs/implementation-plan/status/epic-<succ>.md`'s `requirements:` field. Then fill the
+  TOR's `Waived by / Date / Reason` cell (`Waived by` is `git config user.name`; `Reason` ends
+  with `→ epic <succ>`). The TOR displays as `WAIVED` in the Requirements Implemented table —
+  a display state for a waived FAIL / CANNOT VERIFY, not a fourth verdict.
 - **Stop** — the epic FAILs. Still ask about every remaining non-PASS TOR so the report is
   complete.
 
@@ -269,6 +280,9 @@ its row.)
 - TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup)
 - Quality Gates: X/Y PASS
 - Tests: X passed, Y skipped, Z failed
+
+(X includes TORs fixed at wrapup; Z and C include waived TORs; xfail/skip results count as
+skipped.)
 
 ## Requirements Anchor Reconciliation
 - [One of: "All TOR IDs verified in feature files — no discrepancies" /
@@ -357,6 +371,9 @@ Update `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
 1. Change `status: Implemented` to `status: Complete`
 2. Set `completed: <today>` (YYYY-MM-DD)
 3. Set `handoff: session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim)
+4. If any TOR was waived in Step 1.4b, add (or replace) a `waived: TOR-…, TOR-…` line after
+   `requirements:`. `/peak-workflow:status` treats a waived TOR as not satisfied by this epic —
+   its coverage comes from the successor epic. Omit the line when nothing was waived.
 
 Then locate the epic spec file — `grep -rl "epic-$ARGUMENTS" docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` (or the glob `docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` directly) — and rewrite its `**Status:**` header line to `**Status:** Complete — <today>` (same date just written to `completed:`), so the spec stays in sync with the sidecar.
 
@@ -484,15 +501,15 @@ be made by the user every invocation.
 
    The body follows the template at `plugins/peak-workflow/skills/wrapup-epic/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
 
-   The issue-link line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 and by the Step 1.5 Deferrals `Count:`. If no source issue is known, omit the line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way). If `Count:` is 0, write `Closes #<N>`. If `Count:` is greater than 0, write `Refs #<N>` — a deferred or waived TOR means the issue's requirement is not fully delivered, so merging must not auto-close it. Only the PR body may close the issue; the start-epic and wrapup commits always use `Refs`.
+   The issue-link line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 and by the Step 1.5 Deferrals **waived count** (`W`). If no source issue is known, omit the line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way). If `W` is 0, write `Closes #<N>` — rows marked `FIXED DURING WRAPUP` are delivered and do not block closing. If `W` is greater than 0, write `Refs #<N>` — a waived TOR means the issue's requirement is not fully delivered, so merging must not auto-close it. Only the PR body may close the issue; the start-epic and wrapup commits always use `Refs`.
 
 5. **Announce PR on the GitHub issue** (conditional) — run only if a source issue number was captured in Step 1.1 item 4 **and** `gh auth status` succeeds:
    ```bash
    gh issue comment <N> --body "PR opened for Epic <id>: <PR url>. Awaiting review."
    ```
-   If the Deferrals `Count:` is greater than 0, use this body instead:
+   If the waived count `W` is greater than 0, use this body instead:
    ```bash
-   gh issue comment <N> --body "PR opened for Epic <id>: <PR url>. <count> TOR(s) deferred or waived — see Deferrals in the PR body. This issue stays open until the follow-up ships."
+   gh issue comment <N> --body "PR opened for Epic <id>: <PR url>. <W> TOR(s) waived to a later epic — see Deferrals in the PR body. This issue stays open until the successor epic ships."
    ```
    Capture the PR URL from the `gh pr create` output in item 4. If `gh auth status` fails or the comment command errors, print a warning (`gh issue comment failed — PR is still open, manual issue update may be desired`) and continue; the PR itself is the essential deliverable, the comment is a courtesy. Skip this step entirely in solo mode (Step 5a) — nothing external to link to.
 6. Do **NOT** run `gh pr merge`. Merging is the reviewer's responsibility.

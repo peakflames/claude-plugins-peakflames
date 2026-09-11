@@ -1,7 +1,7 @@
 # PR Body Template — `/peak-workflow:wrapup-epic` team mode
 
 Used by Step 5b. Pass the populated template to `gh pr create --body`. Use literal Unicode
-✅ ⚠️ ❌ in the Highlights list — not shortcodes, which don't render in GitHub markdown.
+✅ ⚠️ 🔧 ❌ in the Highlights list — not shortcodes, which don't render in GitHub markdown.
 
 The "What Was Built" content is **already in memory** from Step 2.1's handoff write — reuse
 it directly rather than re-reading `epic-<id>-complete.md` from disk.
@@ -11,7 +11,8 @@ Placeholder reference:
 - `<id>`, `<Name>` — epic ID and epic name
 - `<N>` — source issue number from Step 1.1 item 4. **Omit the issue-link line entirely**
   if the spec has no `**Source:** Issue #<N>` header. Write `Closes #<N>` only when the
-  Deferrals count is 0; otherwise write `Refs #<N>` so a partially delivered issue stays open.
+  Deferrals **waived** count is 0 (fixed-at-wrapup rows do not block closing); otherwise write
+  `Refs #<N>` so a partially delivered issue stays open.
 - Deferrals block — lifted from the Step 1.5 report (already in memory), including any
   `FIXED DURING WRAPUP` rows. Always first. If the count is 0, the block is the heading plus
   the single line `None`.
@@ -31,7 +32,7 @@ Count: N (undisclosed: M, waived: W, fixed at wrapup: F)
 
 | TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding | Waived by / Date / Reason |
 |--------|-------|-----------|----------------------|------------------|---------------------------|
-| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, or FIXED DURING WRAPUP — <what changed> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
+| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision — why → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, or FIXED DURING WRAPUP — <what changed> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
 
 <If Count is 0: replace the table with the literal line `None`.>
 
@@ -39,7 +40,7 @@ Count: N (undisclosed: M, waived: W, fixed at wrapup: F)
 <lift "What Was Built" content from Step 2.1 handoff — already in memory, do not re-read file>
 
 <conditional: include only when source issue number is known>
-<`Closes #<N>` if Deferrals count is 0, else `Refs #<N>`>
+<`Closes #<N>` if the waived count is 0, else `Refs #<N>`>
 
 ## Spec
 - Epic <id>: <Name> — `docs/implementation-plan/phase-*/epic-<id>-*.md`
