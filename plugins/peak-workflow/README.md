@@ -98,15 +98,23 @@ The formal requirements baseline lives in Gherkin-style `.feature.md` files with
 > new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL). For a
 > one-off script, `epic-workflow` may be a better fit.
 
-### Small epics and the context budget
+### Vertical slices — one capability per epic
 
-**An epic is one focused session.** Keep epics small so Claude works from a small context — a
-large context degrades into needle-in-a-haystack retrieval and forces the model to juggle too
-many rules at once, which is exactly what breaks faithful tests and honest verification.
+**An epic is a vertical slice.** A TOR is a black-box, user-observable behavior, so the epic
+that owns it must deliver it end to end — schema, service, endpoint, screen — in one session. A
+"backend epic" can never satisfy a UI-observable Then clause; it can only defer it, and every
+deferral is a verification gate the operator has to sit through.
 
-**The signal:** when `/start-epic` presents its plan, context usage should be around 25%. Up to
-~35% is fine. Above that, the epic is too large — split it (`/add` for the remainder). Watch the
-status line's context meter; the operator enforces this, not the skills.
+`/plan-project` therefore starts with **one walking-skeleton epic** (scaffolding, build, CI, and
+the tool-hygiene TORs as the thin end-to-end path that sets the architectural pattern), then
+forms one slice per capability, seeded from the feature files. The rule is **whole-capability**:
+every TOR in an epic is fully realizable inside it; if one isn't, the slice widens. Prefer the
+fewest epics that satisfy that rule — each epic pays a fixed cost (plan, blind wrapup session,
+PR), and an oversized epic is cheap to split later.
+
+**If a slice overruns:** watch the status line's context meter in `/start-epic`. If the plan
+lands well over half your context, `/pause` and split the remainder off with `/add`. That is the
+operator's call, made where it can be measured — the planner does not guess at it.
 
 ## Skills
 

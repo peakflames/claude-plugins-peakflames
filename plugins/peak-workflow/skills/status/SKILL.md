@@ -88,8 +88,9 @@ Build a TOR ID → coverage status map. For every TOR ID from the feature files:
    | Implemented | `Implemented (pending independent verification)` |
    | Complete | `Verified` |
 
-3. If a TOR ID appears in multiple epics' `requirements:` fields (rare but valid — multi-layer
-   epic split), use the most advanced status among all containing epics.
+3. If a TOR ID appears in multiple epics' `requirements:` fields, use the most advanced status
+   among all containing epics and add a `⚠️ owned by N epics` note to the row — since
+   peak-workflow 1.7.0 each TOR is owned by exactly one epic (legacy plans may still have splits).
 
 Count totals for each coverage status. Compute overall verified percentage:
 `(Verified count / total TOR count) * 100`
