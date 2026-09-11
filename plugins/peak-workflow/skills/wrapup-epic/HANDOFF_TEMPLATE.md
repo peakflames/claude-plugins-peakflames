@@ -2,7 +2,7 @@
 
 Used by Step 2.1. Write the populated template to
 `docs/implementation-plan/session-handoffs/epic-<id>-complete.md`
-(where `<id>` is `$ARGUMENTS` verbatim). Use literal Unicode ✅ ⚠️ ❌ in the Highlights
+(where `<id>` is `$ARGUMENTS` verbatim). Use literal Unicode ✅ ⚠️ 🔧 ❌ in the Highlights
 list — not shortcodes (`:white_check_mark:` etc.) which don't render in many markdown viewers.
 
 Placeholder reference:
@@ -33,7 +33,7 @@ Count: N (undisclosed: M, waived: W, fixed at wrapup: F)
 
 | TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding | Waived by / Date / Reason |
 |--------|-------|-----------|----------------------|------------------|---------------------------|
-| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, or FIXED DURING WRAPUP — <what changed> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
+| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision — why → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, or FIXED DURING WRAPUP — <what changed> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
 
 <If Count is 0: replace the table with the literal line `None`.>
 

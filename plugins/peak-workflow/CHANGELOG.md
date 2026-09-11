@@ -51,6 +51,12 @@ wrapup verifies blind, names anything undisclosed, and asks fix-now-or-defer ins
   count is 0, else `Refs #N`; commits always `Refs`.
 - **Step 3.4 Outstanding Items is a record only** — lists waived TORs with their successor
   epic and non-TOR review notes; it can no longer originate a deferral.
+- **Failing quality gates fail the epic** — each failed gate gets Fix now / Stop at 1.4b;
+  gates cannot be deferred.
+- **`Closes #N` keys on the waived count** — TORs fixed at wrapup do not keep the source
+  issue open.
+- **Sidecar `waived:` line** — wrapup records waived TORs; `status` credits coverage to the
+  successor epic, not the waiving one.
 
 ### Fixed
 

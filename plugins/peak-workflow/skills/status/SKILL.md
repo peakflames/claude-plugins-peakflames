@@ -73,7 +73,10 @@ If no TOR IDs were found in Step 1 (requirements baseline is empty or missing), 
 
 Build a TOR ID → coverage status map. For every TOR ID from the feature files:
 
-1. Search all epic sidecars' `requirements:` fields for this TOR ID.
+1. Search all epic sidecars' `requirements:` fields for this TOR ID. Ignore any epic whose
+   `waived:` line also lists this TOR ID — a waived TOR is not satisfied by that epic; its
+   coverage comes from the successor epic that lists it. If no other epic lists it, the status
+   is `Waived (→ epic <succ>, no successor found)`.
 2. Map the TOR ID's coverage status based on the containing epic's `status:`:
 
    | Epic Status | TOR Coverage Status |
