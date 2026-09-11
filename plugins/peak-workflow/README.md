@@ -101,7 +101,7 @@ The formal requirements baseline lives in Gherkin-style `.feature.md` files with
 ### Vertical slices — one capability per epic
 
 **An epic is a vertical slice.** A TOR is a black-box, user-observable behavior, so the epic
-that owns it must deliver it end to end — schema, service, endpoint, screen — in one session. A
+that owns it must deliver it end to end — schema, service, endpoint, screen — inside that one epic. A
 "backend epic" can never satisfy a UI-observable Then clause; it can only defer it, and every
 deferral is a verification gate the operator has to sit through.
 
@@ -262,7 +262,11 @@ implemented: —
 completed: —
 handoff: —
 requirements: TOR-01-Afs657G, TOR-01-Bcd2345
+waived: TOR-01-Bcd2345 → B9xQr2z
 ```
+
+The `waived:` line is optional — `wrapup-epic` writes it when a TOR was waived to a successor
+epic, and `status` credits that TOR's coverage to the successor.
 
 The `requirements:` field is how `/peak-workflow:status` computes the Requirements Coverage dashboard.
 

@@ -102,8 +102,10 @@ sidecars in Step 1 item 5 — not the subsystem the TOR touches.
 ### 3A.3: Sizing — the Whole-Capability Rule
 
 **Every TOR in an epic must be fully realizable inside that epic.** No Then clause may depend on
-code a later epic creates. If a TOR can't be fully realized in the slice, **widen the slice** to
-include what it needs — never split the TOR across epics, and never park it in a layer epic.
+code a *later* epic creates. A Then clause may rely on code an *earlier* epic creates (an export
+TOR that needs auth's role check) — declare that as a functional dependency in 3A.4; do not
+widen. Widen the slice only when no earlier epic owns the code the TOR needs — never split the
+TOR across epics, and never park it in a layer epic.
 
 Prefer the **fewest epics** that satisfy this rule. Every epic pays a fixed cost regardless of
 size — a start-epic plan, a separate blind wrapup session, a PR — and an oversized epic is cheap
@@ -185,8 +187,8 @@ ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null 
 Collect the set of TOR IDs that are not yet assigned to any epic (the "unplanned TOR IDs").
 Read all existing epic specs to understand what has already been planned. For each unplanned
 TOR ID:
-- Does its functional area overlap an existing epic? → Consider adding to that epic if the
-  session scope fits. Flag for user confirmation.
+- Does its functional area overlap an existing epic? → Consider adding to that epic if it is
+  Not Started and the whole-capability rule still holds. Flag for user confirmation.
 - Is it genuinely new capability in a new area? → Add to the new epic list.
 
 ### 3B.3: Form New Epics
@@ -225,7 +227,9 @@ Present the full epic breakdown for approval. Do NOT write any files yet.
 | ... | ... | ... | ... | ... | ... | ... |
 
 The "Layers touched" column is how the user checks that slices are vertical — a domain epic
-showing a single layer is a sign the clustering slipped back to layers.
+showing a single layer is a sign the clustering slipped back to layers. Derive the layer names
+from the tech stack in `CLAUDE.md` (e.g., `db, api, ui`). For a single-process product (CLI
+tool, library) write `single-process` for every epic; the vertical check does not apply.
 
 ### Dependency Graph
 
@@ -308,7 +312,7 @@ directory structure. Separate into ### Backend and ### Frontend subheadings if b
 **Populating Requirements Anchors:**
 
 `/plan-project` has a natural advantage — Step 3A.2/3B.2 already groups TOR IDs by
-implementation cluster. For each epic, list every TOR ID assigned to it:
+capability slice. For each epic, list every TOR ID assigned to it:
 - Copy the TOR ID verbatim from the feature file.
 - Set Feature File to the relative path from the repo root (e.g., `docs/requirements/01-cli.feature.md`).
 - Copy the Scenario Title verbatim from the `Scenario: [TOR-NN-XXXXXXX] {title}` line.
@@ -416,7 +420,7 @@ Do **not** re-timestamp the file — the original timestamp is the discovery tim
 Before updating CLAUDE.md or presenting the summary, run an explicit post-write self-check.
 The per-spec "Quality Checks" in Step 5.2 ask whether each individual spec looks reasonable on
 its own. This step asks the more important cross-cutting question: **did every TOR ID from the
-requirements baseline land in at least one epic, explicitly and unambiguously?**
+requirements baseline land in exactly one epic, explicitly and unambiguously?**
 
 ### 6.1: Enumerate TOR IDs
 
