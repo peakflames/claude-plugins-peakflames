@@ -92,6 +92,13 @@ If the user confirms the list, use it. If the user specifies additions or remova
 
 Wait for the user's answer. The confirmed TOR ID set is the Requirements Anchors list for this epic.
 
+**Whole-capability check.** An epic is a vertical slice: every TOR it lists must be fully
+realizable inside it — schema, service, endpoint, and screen together, whatever the Then clause
+needs to be observable. If any confirmed TOR would depend on code a *later* epic creates, widen
+this epic to include that code rather than listing the TOR and deferring it. A TOR ID may be
+owned by only one epic; if a confirmed TOR is already in another epic's `requirements:` field,
+ask the user which epic keeps it and remove it from the other.
+
 **Assign the epic ID:** generate a fresh **7-character random alphanumeric ID** for each new epic via:
 
 ```bash
