@@ -49,7 +49,11 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 **Verification independence:** wrapup runs in a fresh session on a stronger model, blind to
 the implementer handoff until verdicts are recorded. `context: fork` is never used for
-verification.
+verification. A fix the verifier applies at wrapup is always recorded as `FIXED DURING WRAPUP`
+in the Deferrals table so the human sees the one place self-review occurs.
+
+**Deferral gate:** one contract in `start-epic` and `wrapup-epic` — Fix now / Defer / Stop with a
+recommendation. Defer only when the Then clause depends on a later epic whose spec names the TOR.
 
 ## Skill File Rules
 
