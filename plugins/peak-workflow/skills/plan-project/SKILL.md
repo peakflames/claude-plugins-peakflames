@@ -73,7 +73,9 @@ project scaffolding, build and test tooling, dev environment, CI, and the thinne
 through every layer the product has. The **tool-hygiene baseline TORs** captured in
 `capture-requirements` 3A.2.1 (version exposure, startup log line, logging convention, error
 message standard, and for CLIs exit codes and stdout/stderr discipline) are this epic's
-Requirements Anchors — they already touch every layer with no domain logic.
+Requirements Anchors — they already touch every layer with no domain logic. If no tool-hygiene
+TORs exist (`capture-requirements` skipped 3A.2.1), the skeleton has `requirements: —` (5.3b)
+and its spec Description states that wrapup verifies the architectural pattern only.
 
 The skeleton's job is to establish the architectural pattern every later slice follows (how a
 request reaches a handler, how a screen calls the API, where tests live). Its spec Description
