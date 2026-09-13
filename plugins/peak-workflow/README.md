@@ -108,7 +108,8 @@ deferral is a verification gate the operator has to sit through.
 `/plan-project` therefore starts with **one walking-skeleton epic** (scaffolding, build, CI, and
 the tool-hygiene TORs as the thin end-to-end path that sets the architectural pattern), then
 forms one slice per capability, seeded from the feature files. The rule is **whole-capability**:
-every TOR in an epic is fully realizable inside it; if one isn't, the slice widens. Prefer the
+every TOR in an epic is fully realizable inside it; if one isn't, the slice widens — unless an
+earlier epic already owns that code, which is then a dependency, not a reason to widen. Prefer the
 fewest epics that satisfy that rule — each epic pays a fixed cost (plan, blind wrapup session,
 PR), and an oversized epic is cheap to split later.
 
