@@ -6,6 +6,35 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.0] — 2026-09-11
+
+Vertical-slice epic formation (Closes #7): epics own whole user-observable capabilities instead
+of implementation layers, so no TOR is structurally forced into a deferral.
+
+### Changed
+
+- **`plan-project` Step 3A rewritten** — one walking-skeleton epic (tool-hygiene TORs as the
+  thin end-to-end path), then vertical slices clustered by ConOps scenario, seeded one per
+  feature file.
+- **Whole-capability rule replaces context budgeting** — every TOR must be fully realizable in
+  its epic; widen the slice, never split the TOR. Fewest epics that fit; ~4–20 TORs is a sanity
+  check, not a target. The 25% / 35% context language is removed.
+- **Phases are value milestones** — Foundation / Core / Extend / Harden, named after the
+  milestone; dependencies are functional, not architectural.
+- **Exclusive TOR ownership** — a TOR in two epics is a Step 6 gap; `status` flags legacy splits.
+- **`add` whole-capability check** — an added epic must fully realize each confirmed TOR and
+  may not share a TOR with another epic.
+- **`plan-project` Step 4 table gains "Layers touched"** so the user can see slices are vertical.
+
+### Documentation
+
+- **README "Vertical slices" section** replaces "Small epics and the context budget"; the
+  context meter is watched in `/start-epic`, with `/pause` + `/add` as the split path.
+- **`capture-requirements` 3A.1 nudge** — feature files seed epics, so keep them
+  capability-shaped, not layer-shaped.
+
+---
+
 ## [1.6.0] — 2026-09-11
 
 Verification integrity (Refs #4, Closes #6): implementers disclose deferrals at the source;
