@@ -55,6 +55,8 @@ Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For eac
 - `handoff:` link (if set)
 - `requirements:` field (comma-separated TOR IDs, or `—` if empty). Parse the TOR IDs into a
   list; this is the set of TOR IDs this epic is responsible for implementing.
+- `waived:` line (optional, written by `wrapup-epic`): comma-separated `TOR-… → <succ>` pairs.
+  Parse into a TOR ID → successor epic ID map.
 
 ## Step 3: Build Dependency Graph
 
@@ -75,8 +77,8 @@ Build a TOR ID → coverage status map. For every TOR ID from the feature files:
 
 1. Search all epic sidecars' `requirements:` fields for this TOR ID. Ignore any epic whose
    `waived:` line also lists this TOR ID — a waived TOR is not satisfied by that epic; its
-   coverage comes from the successor epic that lists it. If no other epic lists it, the status
-   is `Waived (→ epic <succ>, no successor found)`.
+   coverage comes from the successor epic named after the arrow. If no other epic lists it,
+   the status is `Waived (→ epic <succ>, successor does not list it)`.
 2. Map the TOR ID's coverage status based on the containing epic's `status:`:
 
    | Epic Status | TOR Coverage Status |
@@ -88,8 +90,10 @@ Build a TOR ID → coverage status map. For every TOR ID from the feature files:
    | Implemented | `Implemented (pending independent verification)` |
    | Complete | `Verified` |
 
-3. If a TOR ID appears in multiple epics' `requirements:` fields (rare but valid — multi-layer
-   epic split), use the most advanced status among all containing epics.
+3. If a TOR ID appears in multiple epics' `requirements:` fields **after excluding epics that
+   waive it**, use the most advanced status among those epics and record the TOR ID in a
+   multi-owner list for the dashboard — since peak-workflow 1.7.0 each TOR is owned by exactly
+   one epic (legacy plans may still have splits).
 
 Count totals for each coverage status. Compute overall verified percentage:
 `(Verified count / total TOR count) * 100`
@@ -144,12 +148,19 @@ Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2),
 | In Progress | [N] |
 | Planned (Not Started) | [N] |
 | Paused | [N] |
+| Waived (successor does not list it) | [N] |
 | Specified (no epic assigned) | [N] |
 
 **Total TOR requirements in baseline:** [Y]
 
 [If any TOR IDs are "Specified (no epic assigned)":]
 > ⚠️ [N] TOR requirements have no epic assigned. Run `/peak-workflow:add` to plan their implementation.
+
+[If any TOR IDs are "Waived (successor does not list it)":]
+> ⚠️ [N] waived TOR requirements name a successor epic that does not list them: {TOR → epic list}. Add them to the successor's spec and sidecar.
+
+[If the multi-owner list from Step 4.5 item 3 is non-empty:]
+> ⚠️ [N] TOR requirements are owned by more than one epic: {TOR (epic, epic) list}. Each TOR should have exactly one owner.
 
 ## Active Work
 

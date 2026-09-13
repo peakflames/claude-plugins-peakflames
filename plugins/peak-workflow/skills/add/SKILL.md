@@ -76,7 +76,7 @@ Based on your description, these TOR IDs appear relevant:
 | ...    | ...          | ...            |
 
 **Unplanned TOR IDs (not yet in any epic):** [N]
-**Already-planned TOR IDs included above:** [N] — include if this epic extends existing coverage
+**Already-planned TOR IDs (owned by another epic):** [N] — each must be moved here or dropped (whole-capability check below)
 ```
 
 Use `AskUserQuestion`:
@@ -91,6 +91,27 @@ If the user confirms the list, use it. If the user specifies additions or remova
 > to derive and approve new TOR IDs, then re-run `/peak-workflow:add`.
 
 Wait for the user's answer. The confirmed TOR ID set is the Requirements Anchors list for this epic.
+
+**Whole-capability check.** An epic is a vertical slice: every TOR it lists must be fully
+realizable inside it — schema, service, endpoint, and screen together, whatever the Then clause
+needs to be observable. If a confirmed TOR needs code that no other epic — of any status — owns
+or is planned to create, and this epic does not create it, widen this epic to include that code
+rather than listing the TOR and deferring it. Code another epic owns, whatever its status, is a
+dependency (Step 3), not a reason to widen; a Not Started provider only means this epic is
+blocked until that one is Implemented.
+
+A TOR ID is owned by exactly one epic. For each confirmed TOR already in another epic's
+`requirements:` field, use `AskUserQuestion`:
+- Question: `"TOR-<NN-XXXXXXX> is already owned by Epic <id> (<status>). Keep it there, or move it here?"`
+- Options: `["Keep it in Epic <id> — drop it from this epic", "Move it here"]`
+
+Moving is allowed only when the other epic is **Not Started**: remove the ID from that epic's
+sidecar `requirements:` line and its spec's Requirements Anchors table (Step 7 item 3).
+If the other epic is In Progress, Implemented, or Complete, offer only the Keep option — the TOR
+stays where it is being (or was) delivered.
+
+If every confirmed TOR was dropped via Keep, the set is empty — stop with the "No existing TOR
+requirements match" message above.
 
 **Assign the epic ID:** generate a fresh **7-character random alphanumeric ID** for each new epic via:
 
@@ -231,6 +252,10 @@ Before writing each spec, verify:
    requirement), use `requirements: —`.
    Create the `docs/implementation-plan/status/` directory if it does not already exist.
 
+3. **Moved TORs** — for each TOR moved here in Step 2.2, remove its ID from the donor epic's
+   sidecar `requirements:` line and delete its row from the donor spec's Requirements Anchors
+   table. Skip if nothing was moved.
+
 ## Step 8: Self-Check — Trace Inputs to Outputs
 
 Before presenting the summary, run an explicit post-write self-check. The pre-write "Quality
@@ -307,6 +332,7 @@ Show the user what was created:
 ### Plan Updated
 - 1 row appended to `docs/implementation-plan/{phase-dir}/index.md`
 - `docs/implementation-plan/status/epic-{id}.md` created (status: Not Started)
+- [If any TOR was moved:] Epic {donor-id} sidecar and spec updated — {TOR list} moved here
 
 ### Self-Check
 - {count} inputs traced to outputs, all Explicit=Y and Ambiguous=N (see Step 8 trace table above)

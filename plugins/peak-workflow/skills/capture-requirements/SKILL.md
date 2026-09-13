@@ -145,6 +145,11 @@ all of Product Vision Sections 5–8 (Goals, Scope, Scenarios). Group capabiliti
 - External integrations and interfaces
 - Background services and jobs
 
+Feature files seed epics one-to-one in `/plan-project`, so keep each area **capability-shaped**
+(something a user does — "supplier scorecards", "export") rather than layer-shaped ("database",
+"API", "UI"). A layer-shaped feature file produces an epic that cannot satisfy its own Then
+clauses.
+
 For each functional area:
 - Assign a sequential **2-digit zero-padded feature number** starting at `01`, incrementing by 1.
 - Numbers are **stable and append-only** — once assigned, a feature number never changes.

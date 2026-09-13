@@ -59,39 +59,72 @@ Existing epics: [N epics across M phases / none]
 
 ## Step 3A: Greenfield — Full Derivation
 
-### 3A.1: TOR Grouping by Implementation Layer
+Epics are **vertical slices**, not implementation layers. A TOR is a black-box, user-observable
+behavior (see `capture-requirements` 3A.2), so an epic that owns a TOR must be able to make that
+behavior observable end to end — schema, service, endpoint, and screen together, whatever the
+TOR needs. Do not form a "backend epic" and a "frontend epic" for the same behavior: the backend
+half can never satisfy the Then clause, which forces a deferral that the verification gates then
+have to catch. One horizontal epic is the exception, and it always comes first.
 
-Using the TOR IDs loaded in Step 1 (grouped by feature file and functional area), map each
-TOR ID to an **implementation layer**:
+### 3A.1: Walking Skeleton (Epic 0)
 
-| Layer | Examples |
-|-------|----------|
-| **Foundation** | Project scaffolding, build pipeline, dev environment, CLI entry points |
-| **Data** | Database schema, data access, connection factories, background jobs |
-| **Backend API** | REST endpoints, query logic, response models, business rules |
-| **Frontend** | Pages, components, state management, routing |
-| **Integration** | Cross-view navigation, deep linking, end-to-end flows |
-| **Deployment & QA** | CI/CD, containerization, quality audits |
+Form exactly one horizontal epic that stands the system up end to end with no domain logic:
+project scaffolding, build and test tooling, dev environment, CI, and the thinnest possible path
+through every layer the product has. The **tool-hygiene baseline TORs** captured in
+`capture-requirements` 3A.2.1 (version exposure, startup log line, logging convention, error
+message standard, and for CLIs exit codes and stdout/stderr discipline) are this epic's
+Requirements Anchors — they already touch every layer with no domain logic. If no tool-hygiene
+TORs exist (`capture-requirements` skipped 3A.2.1), the skeleton has `requirements: —` (5.3b)
+and its spec Description states that wrapup verifies the architectural pattern only.
 
-Not all layers apply to every project — omit layers with no TOR IDs, add domain-specific layers
-as needed (e.g., "Hardware Interface" for embedded systems tools).
+The skeleton's job is to establish the architectural pattern every later slice follows (how a
+request reaches a handler, how a screen calls the API, where tests live). Its spec Description
+must say so, and must state that `docs/architecture.md` records the pattern once the skeleton
+is complete.
 
-### 3A.2: Capability Grouping
+### 3A.2: Vertical Slices by Capability
 
-Many TOR IDs from different feature files may share an implementation layer. Group them by layer
-and identify natural clusters — TOR IDs that touch the same subsystem, file, or service. These
-clusters become epics.
+Cluster the remaining TOR IDs by **what a user can do once the slice ships**. The clustering key
+is the ConOps scenario / vision goal each TOR traces to — already loaded from the tracing
+sidecars in Step 1 item 5 — not the subsystem the TOR touches.
 
-### 3A.3: Epic Formation
+- **Seed:** one slice per feature file. Feature files are functional areas and are already
+  capability-shaped.
+- **Split** a feature file into two slices only when it holds more than one distinct ConOps
+  scenario (e.g., "search: basic" and "search: filters & sort"), and then split along the
+  scenario boundary.
+- **Merge** two adjacent feature files into one slice when each is small and they serve the
+  same scenario.
+- A slice spans every layer it needs. The spec's Key Components section uses `### Backend` /
+  `### Frontend` subheadings when both are involved.
+- **Cross-cutting TORs** (logging conventions, performance budgets, accessibility baselines)
+  belong in the skeleton, or in one small hardening epic at the end of the plan. Never spread
+  them across slices.
 
-Cluster TOR IDs within each layer into session-sized epics. "Session-sized" means `/start-epic`
-can load the spec, its TOR Given/When/Then, and the relevant reference material and present its
-plan at roughly 25% context usage (≤ ~35% is tolerated; beyond that the epic is too large). When
-in doubt, prefer more, smaller epics. Each epic should:
-- Cover **5–15 TOR IDs** (enough to be meaningful, not so many that a single session can't implement and test them all). Weigh TOR heft, not just count — a TOR carrying doc strings, data tables, or a `docs/reference/` dependency costs far more context than a one-line flag check.
+### 3A.3: Sizing — the Whole-Capability Rule
+
+**Every TOR in an epic must be fully realizable inside that epic.** No Then clause may depend on
+code a *later* epic creates. A Then clause may rely on code an *earlier* epic creates (an export
+TOR that needs auth's role check) — declare that as a functional dependency in 3A.4; do not
+widen. Widen the slice only when no earlier epic owns the code the TOR needs — never split the
+TOR across epics, and never park it in a layer epic.
+
+Prefer the **fewest epics** that satisfy this rule. Every epic pays a fixed cost regardless of
+size — a start-epic plan, a separate blind wrapup session, a PR — and an oversized epic is cheap
+to split later (`/pause`, then `/add` for the remainder) while an over-split plan pays that cost
+on every epic. Do not size epics by predicted context usage; that cannot be measured here, and
+the operator watches the meter in `/start-epic`.
+
+Count is a sanity check only, not a target:
+- More than **~20 TOR IDs** → split by ConOps scenario (3A.2).
+- Fewer than **~4 TOR IDs** → merge with the adjacent slice from the same scenario, unless the
+  TORs are individually heavy (doc strings, data tables, a `docs/reference/` dependency) — then
+  say so in the spec Description.
+
+Each epic must also:
 - Have a clear "done" state: every covered TOR ID has an implementation and a passing test
 - Be independently implementable once its dependencies are met
-- Ideally draw TOR IDs from one or two related feature files (to keep the implementation focused)
+- Own each of its TOR IDs exclusively — a TOR ID appears in exactly one epic (Step 6 enforces this)
 
 **Assign epic IDs:** for each new epic, generate a fresh **7-character random alphanumeric ID** via:
 
@@ -107,18 +140,24 @@ Example IDs: `a3f2K7p`, `B9xQr2z`, `m4Ljf0T`.
 
 **Do not** use incrementing integers or decimals for new epics. Random IDs eliminate collisions when multiple developers run `/add` or `/plan-project` concurrently, so the concept of "insertion order" no longer applies — ordering within a phase is by insertion time in the index.
 
-### 3A.4: Phase Structure
+### 3A.4: Phase Structure — Value Milestones
 
-Organize epics into phases. Start from this template and adapt:
+Phases are milestones of user value, not architectural layers. Start from this template and
+adapt:
 
-1. **Foundation** — scaffolding, build tooling, dev environment, project structure
-2. **Data Layer** — database connections, repositories, data access patterns
-3. **Backend API** — REST endpoints, query logic, response models
-4. **Frontend** — pages, components, views (may split into multiple phases if large)
-5. **Integration** — cross-view navigation, deep linking, end-to-end user flows
-6. **Deployment & QA** — CI/CD, containerization, final quality audit
+1. **Foundation** — the walking skeleton (3A.1). Exactly one epic.
+2. **Core** — the minimum set of slices that make the primary ConOps scenario work end to end
+   (the first thing a user could actually do with the product).
+3. **Extend** — further ConOps scenarios in priority order (from the vision's Priority Signal
+   or the ConOps scenario ordering). Split into multiple phases when there are natural release
+   boundaries.
+4. **Harden** — only if there are cross-cutting TORs left over from 3A.2 (a small hardening epic)
+   or deployment / QA work that has TORs of its own.
 
-Remove phases with no work. Split phases that are too large. Add domain-specific phases as needed (e.g., "Background Services" for geocoding).
+Remove phases with no work. Name phases after the milestone ("Scorecard export", "Supplier
+onboarding"), not the layer. Dependencies between epics are functional — "needs auth", "needs
+the scorecard list" — never architectural ("needs the data layer"); an epic that only needs the
+skeleton depends on Epic 0 alone, which is what makes slices parallelizable.
 
 Proceed to Step 4.
 
@@ -150,15 +189,16 @@ ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null 
 Collect the set of TOR IDs that are not yet assigned to any epic (the "unplanned TOR IDs").
 Read all existing epic specs to understand what has already been planned. For each unplanned
 TOR ID:
-- Does its functional area overlap an existing epic? → Consider adding to that epic if the
-  session scope fits. Flag for user confirmation.
+- Does its functional area overlap an existing epic? → Consider adding to that epic if it is
+  Not Started and the whole-capability rule still holds. Flag for user confirmation.
 - Is it genuinely new capability in a new area? → Add to the new epic list.
 
 ### 3B.3: Form New Epics
 
-Apply the same epic formation rules as greenfield (5–15 TOR IDs per epic, session-sized,
-independently implementable). New epics are added to existing phases where they fit, or to new
-phases if the work belongs to a new layer.
+Apply the same epic formation rules as greenfield (vertical slice per capability, the
+whole-capability rule from 3A.3, exclusive TOR ownership, ~4–20 TOR IDs as a sanity check). New
+epics are added to the phase whose milestone they extend, or to a new phase when they open a new
+ConOps scenario.
 
 **Assign IDs** using the same generation command as Step 3A.3 — a fresh 7-character random alphanumeric ID per new epic, regenerated if all-digit, unique across the batch. Do not reuse existing integer IDs; do not attempt to slot new epics into the old decimal scheme (e.g., `6.7`). Existing integer-IDed epics in the index remain untouched; new epics always get alphanumeric IDs.
 
@@ -182,11 +222,16 @@ Present the full epic breakdown for approval. Do NOT write any files yet.
 
 ### Epic Breakdown
 
-| Phase | Epic | Name | Dependencies | TOR IDs | Feature Files |
-|-------|------|------|--------------|--------:|---------------|
-| 1 | a3f2K7p | [Name] | — | [N] | 01-cli.feature.md |
-| 1 | B9xQr2z | [Name] | Epic a3f2K7p | [N] | 02-auth.feature.md, 03-parts.feature.md |
-| ... | ... | ... | ... | ... | ... |
+| Phase | Epic | Name | Dependencies | TOR IDs | Feature Files | Layers touched |
+|-------|------|------|--------------|--------:|---------------|----------------|
+| 1 | a3f2K7p | Walking skeleton | — | [N] | 01-app.feature.md | all |
+| 2 | B9xQr2z | [Capability name] | Epic a3f2K7p | [N] | 02-auth.feature.md | db, api, ui |
+| ... | ... | ... | ... | ... | ... | ... |
+
+The "Layers touched" column is how the user checks that slices are vertical — a domain epic
+showing a single layer is a sign the clustering slipped back to layers. Derive the layer names
+from the tech stack in `CLAUDE.md` (e.g., `db, api, ui`). For a single-process product (CLI
+tool, library) write `single-process` for every epic; the vertical check does not apply.
 
 ### Dependency Graph
 
@@ -269,7 +314,7 @@ directory structure. Separate into ### Backend and ### Frontend subheadings if b
 **Populating Requirements Anchors:**
 
 `/plan-project` has a natural advantage — Step 3A.2/3B.2 already groups TOR IDs by
-implementation cluster. For each epic, list every TOR ID assigned to it:
+capability slice. For each epic, list every TOR ID assigned to it:
 - Copy the TOR ID verbatim from the feature file.
 - Set Feature File to the relative path from the repo root (e.g., `docs/requirements/01-cli.feature.md`).
 - Copy the Scenario Title verbatim from the `Scenario: [TOR-NN-XXXXXXX] {title}` line.
@@ -377,7 +422,7 @@ Do **not** re-timestamp the file — the original timestamp is the discovery tim
 Before updating CLAUDE.md or presenting the summary, run an explicit post-write self-check.
 The per-spec "Quality Checks" in Step 5.2 ask whether each individual spec looks reasonable on
 its own. This step asks the more important cross-cutting question: **did every TOR ID from the
-requirements baseline land in at least one epic, explicitly and unambiguously?**
+requirements baseline land in exactly one epic, explicitly and unambiguously?**
 
 ### 6.1: Enumerate TOR IDs
 
@@ -404,12 +449,13 @@ Print the table verbatim — it is part of the Step 8 summary. Do not summarize 
 
 Rules:
 
-- A TOR ID may appear in **more than one epic** — list all. This is expected when the
-  requirement spans layers (e.g., backend + frontend). It is not a gap as long as each
-  capturing epic has it in its Requirements Anchors table and sidecar `requirements:` field.
+- A TOR ID must appear in **exactly one epic**. If it appears in two or more, list all and mark
+  `Ambiguous? Y` — that is a gap: the slice was split across layers. Remediate by widening one
+  epic to own the whole behavior and removing the TOR from the others (3A.3).
 - **Explicit? N** — the TOR ID is not in any epic's Requirements Anchors. Gap.
-- **Ambiguous? Y** — the TOR ID appears in an epic's Requirements Anchors but the scenario
-  title doesn't match the feature file (copy-paste error). Gap.
+- **Ambiguous? Y** — the TOR ID appears in more than one epic, or appears in an epic's
+  Requirements Anchors with a scenario title that doesn't match the feature file (copy-paste
+  error). Gap.
 - Out-of-scope items: `Explicit? N/A — deferred: {rationale}`. List explicitly; do not hide.
 
 ### 6.3: Remediate and Re-Run

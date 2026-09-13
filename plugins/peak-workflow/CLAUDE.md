@@ -38,7 +38,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
-**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs
+**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic) and an optional `waived: TOR-… → <succ>` line written by wrapup
 
 **Branch families:**
 - `docs/{task-short-name}` — full planning sequence (discover → capture-requirements → plan-project)
