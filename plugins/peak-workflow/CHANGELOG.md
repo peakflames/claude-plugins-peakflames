@@ -6,6 +6,67 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] — 2026-09-11
+
+Verification integrity (Refs #4, Closes #6): implementers disclose deferrals at the source;
+wrapup verifies blind, names anything undisclosed, and asks fix-now-or-defer instead of filing.
+
+### Added
+
+- **Deferral gate in `start-epic`** — an unmet TOR stops implementation and asks: fix now,
+  defer, or stop, with a mandatory recommendation. No silent narrowing of the Then clause.
+- **Defer eligibility** — Defer is allowed only when the Then clause depends on a later epic;
+  the successor epic's spec must exist and list the TOR (added if missing). Recorded in a
+  `Successor epic` column.
+- **Fix-now path in `wrapup-epic` (1.4b)** — a non-PASS TOR may be fixed by the verifier;
+  gates and the TOR are re-verified, and the row stays as `FIXED DURING WRAPUP`. 🔧 = fixed.
+- **Gate discrepancies are findings** — a quality gate the handoff reports PASS that fails at
+  wrapup is a named Code Review finding, regardless of when the failure began.
+- **Mandatory Deferrals section** in `epic-<id>-implemented.md`, first after What Was Built;
+  `Count: 0` + `None` when empty. Commit body records the count.
+- **Mechanical self-checks in `start-epic`** — TOR ID must be greppable in tests; stub-marker
+  scans of changed files and the handoff fire the gate.
+- **Session guard in `wrapup-epic`** — refuses to run in the conversation that implemented the
+  epic; asks for a fresh session.
+- **`model: opus` on `wrapup-epic`** — verification runs on a stronger model; a CLAUDE.md
+  `Verifier model:` line is informational only.
+- **Fix / Defer / Stop step (1.4b)** — each non-PASS TOR is decided by the user before the
+  report; a free-text "proceed" is not consent. Waivers record who, date, reason, successor.
+
+### Changed
+
+- **Blind verification** — wrapup locates tests by grep only; implementer handoff opened only
+  after every per-TOR verdict is recorded (Step 1.2b).
+- **Undisclosed deferral = FAIL** — any non-PASS TOR without an implementer Deferrals row is
+  marked `Disclosed: no` with a named `UNDISCLOSED DEFERRAL` row.
+- **`PASS WITH EXCEPTIONS` removed** — verdicts are PASS / FAIL / CANNOT VERIFY; epic passes
+  only if all TORs pass or are waived. ⚠️ = waived.
+- **Deferrals-first reporting** — verification report, completion handoff, and PR body open
+  with an identical Deferrals table before the summary.
+- **Closing step relabeled "Implementer self-assessment"** — handoff TOR Coverage and
+  Verification Results are marked as self-assessment, not trusted by wrapup.
+- **Test must mirror the Then** — a passing test that only checks a flag is accepted is FAIL;
+  CANNOT VERIFY may not dodge a large fixture.
+- **Source issue closes only on full delivery** — PR body uses `Closes #N` when Deferrals
+  count is 0, else `Refs #N`; commits always `Refs`.
+- **Step 3.4 Outstanding Items is a record only** — lists waived TORs with their successor
+  epic and non-TOR review notes; it can no longer originate a deferral.
+- **Failing quality gates fail the epic** — each failed gate gets Fix now / Stop at 1.4b;
+  gates cannot be deferred.
+- **`Closes #N` keys on the waived count** — TORs fixed at wrapup do not keep the source
+  issue open.
+- **Sidecar `waived:` line** — wrapup records waived TORs; `status` credits coverage to the
+  successor epic, not the waiving one.
+
+### Fixed
+
+- **`wrapup-epic` checks out the feature branch first** — sidecar and spec were read before
+  checkout, giving a false "start-epic must finish" stop from `develop`.
+- **`start-epic` Opening step 2 handles `Implemented` → `In Progress`** — rework after a
+  wrapup FAIL is treated as a resumption, no re-announce.
+
+---
+
 ## [1.5.1] — 2026-09-04
 
 ### Documentation

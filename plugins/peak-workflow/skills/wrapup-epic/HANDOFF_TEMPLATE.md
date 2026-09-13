@@ -2,16 +2,23 @@
 
 Used by Step 2.1. Write the populated template to
 `docs/implementation-plan/session-handoffs/epic-<id>-complete.md`
-(where `<id>` is `$ARGUMENTS` verbatim). Use literal Unicode ✅ ⚠️ ❌ in the Highlights
+(where `<id>` is `$ARGUMENTS` verbatim). Use literal Unicode ✅ ⚠️ 🔧 ❌ in the Highlights
 list — not shortcodes (`:white_check_mark:` etc.) which don't render in many markdown viewers.
 
 Placeholder reference:
 
 - `<id>`, `<Name>` — epic ID and epic name from the spec
+- `<model>` — the model this wrapup session ran on (frontmatter default `opus`, or the
+  project's `Verifier model:` override)
+- Deferrals table — lifted from the Step 1.5 report verbatim, including waiver annotations and
+  any `FIXED DURING WRAPUP` rows. Always present; `Count: 0` + `None` if empty.
 - TOR Counts, Highlights, Conclusion — lifted from the Step 1.5 verification report
 - Requirements Implemented table — lifted from the Step 1.5 report verbatim
 - Manual verification — from the Step 2.0 disclosure prompt (literal `Yes` / `No` plus
   user-authored description if `Yes`)
+
+Highlights legend: ✅ pass · ⚠️ waived (a non-PASS TOR a human explicitly waived) · 🔧 fixed
+during wrapup by the verifier (Step 1.4b Fix now) · ❌ fail.
 
 ---
 
@@ -19,7 +26,16 @@ Placeholder reference:
 # Epic <id>: <Name> — Complete
 
 **Completed:** <today's date YYYY-MM-DD>
-**Verified by:** Independent review via `/peak-workflow:wrapup-epic <id>`
+**Verified by:** Independent review via `/peak-workflow:wrapup-epic <id>` (model: <model>, fresh session)
+
+## Deferrals
+Count: N (undisclosed: M, waived: W, fixed at wrapup: F)
+
+| TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding | Waived by / Date / Reason |
+|--------|-------|-----------|----------------------|------------------|---------------------------|
+| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision — why → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, or FIXED DURING WRAPUP — <what changed> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
+
+<If Count is 0: replace the table with the literal line `None`.>
 
 ## What Was Built
 
@@ -40,18 +56,19 @@ Placeholder reference:
 | TOR ID | Feature File | Verdict | Test Reference |
 |--------|--------------|---------|----------------|
 | TOR-NN-XXXXXXX | `docs/requirements/NN-name.feature.md` | PASS | tests/test_file.py:line |
-| TOR-NN-XXXXXXX | `docs/requirements/NN-name.feature.md` | PASS | tests/test_file.py:line |
+| TOR-NN-XXXXXXX | `docs/requirements/NN-name.feature.md` | WAIVED | tests/test_file.py:line |
 
 ## Verification Summary
 
 ### Counts
-- TOR Requirements: X/Y PASS, Z CANNOT VERIFY
+- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup)
 - Quality Gates: X/Y PASS
 - Tests: X passed, Y skipped, Z failed
 
 ### Highlights
 - ✅ TOR-NN-XXXXXXX — <scenario title> (test file:line, impl file:line)
-- ⚠️ TOR-NN-XXXXXXX — <scenario title> — <one-sentence exception>
+- ⚠️ TOR-NN-XXXXXXX — waived: <one-sentence gap> (waived by <user>, <date> → epic <succ>)
+- 🔧 TOR-NN-XXXXXXX — fixed during wrapup: <one-sentence gap and fix>
 - ❌ TOR-NN-XXXXXXX — <scenario title> — <one-sentence failure reason>
 
 ### Conclusion
@@ -62,6 +79,6 @@ Placeholder reference:
 
 ## Known Issues / Follow-ups
 
-- <non-blocking issues, tech debt, or items deferred to later epics>
-- <TOR IDs that received CANNOT VERIFY — describe what would be needed to verify>
+- <non-TOR items only: tech debt, refactors, observations from code review>
+- <TOR-level gaps belong in the Deferrals table above, never here>
 ```

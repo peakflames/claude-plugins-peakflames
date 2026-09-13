@@ -137,7 +137,7 @@ Build the plan from:
 - Any context from previous handoff files (decisions made, patterns established)
 - Any reference materials surfaced by Step 1 item 12
 
-**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps** and **Closing steps** sections into your plan verbatim — substituting the placeholders (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
+**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, and **Closing steps** sections into your plan verbatim — substituting the placeholders (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
 
 ## Step 5: Execute the Plan
 
