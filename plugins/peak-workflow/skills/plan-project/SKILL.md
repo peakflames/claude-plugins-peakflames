@@ -31,7 +31,10 @@ Follow these steps exactly:
 
 ## Step 1: Load Context
 
-1. Read `CLAUDE.md` at the repo root for project context and tech stack.
+1. Read `CLAUDE.md` at the repo root for project context and tech stack. Capture the
+   **Project type** from its `Tool Hygiene & Operability` section and, when present, the
+   **UX Baseline** section (design system, app shell, screen-state and keyboard conventions) —
+   Step 3A.1 uses both to shape the walking skeleton.
 2. Read `docs/product-vision-planning/product-vision.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 3. Read `docs/product-vision-planning/concept-of-operations.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file:
@@ -82,6 +85,27 @@ request reaches a handler, how a screen calls the API, where tests live). Its sp
 must say so, and must state that `docs/architecture.md` records the pattern once the skeleton
 is complete.
 
+**UI products (Project type Web app, Desktop app, or a Hybrid with a UI):** the skeleton also
+owns the design system and the app shell. The **baseline UX TORs** captured in
+`capture-requirements` 3A.2.2 (screen states, keyboard reachability, visible focus, form labels
+and errors, destructive-action safety, progress feedback, layout floor, and the desktop
+conventions) join the tool-hygiene TORs as this epic's Requirements Anchors. To satisfy them the
+skeleton must:
+
+- Install the design system declared in `CLAUDE.md`'s **UX Baseline** section (default:
+  shadcn/ui on Tailwind, themed only through the CSS-variable tokens in the global stylesheet —
+  never by editing generated component files).
+- Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
+  apps the application menu, window-state persistence, and the About dialog.
+- Ship **one reference screen** that renders the loading, empty, error, and populated states and
+  passes every baseline UX TOR. It is the pattern every later screen copies.
+
+No later epic installs a component library, defines tokens, or builds a second shell — a slice
+composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
+Components must name the design-system files (`components.json`, the global stylesheet,
+`components/ui/`), the shell, and the reference screen, and its Description must state that
+`docs/architecture.md` records the token file and the screen-composition pattern.
+
 ### 3A.2: Vertical Slices by Capability
 
 Cluster the remaining TOR IDs by **what a user can do once the slice ships**. The clustering key
@@ -99,7 +123,8 @@ sidecars in Step 1 item 5 — not the subsystem the TOR touches.
   `### Frontend` subheadings when both are involved.
 - **Cross-cutting TORs** (logging conventions, performance budgets, accessibility baselines)
   belong in the skeleton, or in one small hardening epic at the end of the plan. Never spread
-  them across slices.
+  them across slices. Baseline UX TORs always go to the skeleton (3A.1) — they are verified on
+  the reference screen once, and every later screen inherits the pattern.
 
 ### 3A.3: Sizing — the Whole-Capability Rule
 
@@ -303,7 +328,9 @@ epic addresses, drawn from the feature files and tracing sidecars.}
 ## Key Components
 
 {List of file paths to create or modify, with brief descriptions. Use the project's actual
-directory structure. Separate into ### Backend and ### Frontend subheadings if both are involved.}
+directory structure. Separate into ### Backend and ### Frontend subheadings if both are involved.
+For a UI epic, list each screen the epic adds or changes and note that it composes from the
+skeleton's app shell and design system — no new component library, no new tokens.}
 ```
 
 **Conditional lines in the header template above** — do not carry this guidance into the written spec:

@@ -86,6 +86,11 @@ Components. Each middle step must:
 If Step 1 item 13 (E2E audit) surfaced regression specs likely to break, include an explicit
 "update regression specs: …" item here, committed alongside the implementation.
 
+For a UI epic (Step 1 item 11a), each middle step that adds or changes a screen must name the
+screen, state that it composes from the skeleton's app shell and design system, and list the
+loading / empty / error / populated states it renders — the wrapup UX Baseline gate checks
+every one of them.
+
 **Deferral gate.** Copy this paragraph verbatim into the plan as a standing rule ahead of the
 first middle step; it applies to every middle step and to the self-assessment. If at any point
 a TOR's Given/When/Then cannot be fully met as written in this session (technical constraint,
@@ -157,7 +162,9 @@ Middle step example:
   3. Inspect source to confirm the implementation realizes the Given/When/Then (a passing test
      that doesn't exercise the requirement is a FAIL).
   4. Also run the project's Verification & Quality Gates from `CLAUDE.md` (build, lint, console
-     errors, brand audit if UI). Report each gate as PASS / FAIL / CANNOT VERIFY.
+     errors, brand audit if UI, and for a UI epic the UX Baseline check that
+     `/peak-workflow:wrapup-epic` Step 1.3 runs — screen states, keyboard, forms, destructive
+     actions, feedback, layout floor). Report each gate as PASS / FAIL / CANNOT VERIFY.
 
   Before reporting, run two mechanical checks against the working tree (nothing is committed
   yet, so `git diff <base-branch>` alone would miss new files):
