@@ -113,9 +113,12 @@ earlier epic already owns that code, which is then a dependency, not a reason to
 fewest epics that satisfy that rule — each epic pays a fixed cost (plan, blind wrapup session,
 PR), and an oversized epic is cheap to split later.
 
-**If a slice overruns:** watch the status line's context meter in `/start-epic`. If the plan
-lands well over half your context, `/pause` and split the remainder off with `/add`. That is the
-operator's call, made where it can be measured — the planner does not guess at it.
+**The 25% context rule is still yours to keep.** Work from a small context — around 25% — because
+a crowded context is where sloppy tests and missed requirements come from. Claude Code cannot
+see context usage at planning time, so the planner no longer sizes epics to it; you enforce it
+where it can be measured. Watch the status line's context meter, and when a session gets heavy,
+roll to a fresh one with peak-workflow's `/newtask` (or your preferred handoff skill) and
+continue the same epic. The epic is not too big — the session is.
 
 ## Skills
 
