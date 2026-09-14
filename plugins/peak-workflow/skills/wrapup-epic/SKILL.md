@@ -187,6 +187,32 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Visual verification via `playwright-cli` (if UI was changed)
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
 - Console check via `playwright-cli` (if UI was changed)
+- UX Baseline check (if UI was changed and `CLAUDE.md` has a **UX Baseline** section) — see below
+
+**UX Baseline check.** This is a quality gate, not a code-review note. Using `playwright-cli`
+against the live app (for a desktop app, the dev build with a live main process), open every
+screen this epic adds or changes and confirm each active line of the UX Baseline holds on it:
+
+- **Screen states** — loading, empty, error, and populated states each render. Force each one
+  (throttle or block the data source, use an empty dataset, return an error).
+- **Keyboard** — every interactive element is reachable by Tab in a sensible order; Enter /
+  Space activate; Escape closes dialogs and menus; focus is visibly indicated at each stop.
+- **Forms** — every control has a visible label; a failed submission names the field and the
+  fix next to that field, and focus moves to the first error.
+- **Destructive actions** — an irreversible action asks for confirmation or offers undo.
+- **Feedback** — an action that takes longer than about a second shows progress; success and
+  failure are announced on screen in words.
+- **Layout floor** — the screen is usable at the declared minimum width or window size with no
+  clipped controls and no horizontal page scroll.
+- **Desktop conventions** (desktop apps only) — new commands appear in the application menu
+  with accelerators; dialogs use native file pickers where files are chosen.
+- Any project-specific line the section declares.
+
+The skeleton epic's baseline UX TORs proved these behaviors once on the reference screen; this
+gate checks that the new screens kept the pattern. Report `PASS` or
+`FAIL — <baseline line>: <screen>: <one-line detail>` per line. A FAIL is handled in Step 1.4b as
+a failing gate (Fix now / Stop) — it cannot be deferred. A configured `frontend-design` or brand
+skill does not replace this check.
 
 **Gate discrepancies are findings.** After running the gates, compare each result against the
 implementer handoff's *Verification Results (self-assessment)* section (the handoff is already
@@ -199,9 +225,13 @@ is the finding, not the failure's age.
 
 Review the implementation for:
 - Adherence to patterns established in previous epics and documented in `docs/reference/`
-- Security concerns (input validation, injection, secrets handling)
+- Security concerns (input validation, injection, secrets handling), including each item in
+  `CLAUDE.md`'s **Security Baseline** section where the project type makes it applicable
 - Error handling completeness
 - Logging adequacy
+- **UI epics:** screens compose from the skeleton's app shell and design system — no second
+  component library, no ad-hoc colors or spacing outside the token file, and any theme change
+  made in the global stylesheet's CSS-variable tokens rather than in generated component files
 - Consistency with whichever of `docs/architecture.md` and `docs/design-notes.md` were loaded conditionally in Step 1.1 item 7. If neither was loaded (the epic had no cross-cutting surface), record "no architectural surface affected" and move on.
 
 ### Step 1.4b: Fix, Defer, or Stop
