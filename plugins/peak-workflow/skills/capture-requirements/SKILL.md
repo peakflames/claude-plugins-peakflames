@@ -60,7 +60,9 @@ The user's request / brownfield description: $ARGUMENTS
    - **`Tool Hygiene & Operability` section** — Project type and the active (non-`N/A`)
      mechanism declarations. These drive the baseline TORs in Step 3A.2.1. Record the
      Project type; if the section is absent, infer it from the Tech Stack section
-     (Electron / Tauri → Desktop app; web framework or "frontend" → Web app).
+     (Electron / Tauri → Desktop app; web framework or "frontend" → Web app; otherwise treat the
+     project as non-UI — CLI tool, Service, or Library — and set
+     `ux_baseline_section_present = false` silently).
    - **`UX Baseline` section** — Presence, the **Design system** declaration (a declaration
      for the walking skeleton, not a TOR), and the active (non-`N/A`) TOR lines. These drive
      the baseline UX TORs in Step 3A.2.2. Set `ux_baseline_section_present = true` when the
