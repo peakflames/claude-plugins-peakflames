@@ -269,7 +269,7 @@ tool, library) write `single-process` for every epic; the vertical check does no
 ### Estimated Scope
 
 - Total epics: [N]
-- Total acceptance criteria: [N]
+- Total TOR IDs covered: [N]
 - Recommended session order: [list epic IDs in order]
 ```
 

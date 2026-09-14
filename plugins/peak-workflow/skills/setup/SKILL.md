@@ -25,7 +25,7 @@ Check for the presence and completeness of each section below. Report a status f
 | **Tech Stack** | Lists the languages, frameworks, package manager, and key libraries used |
 | **Local Environment** | Documents how to run the backend and frontend locally, whether the API is live and functional, and the preference for live data over mocking during verification |
 | **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
-| **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library projects report `[N/A] UX Baseline — no user interface`. |
+| **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library projects report `[N/A] UX Baseline — no user interface`. If Tool Hygiene & Operability is also missing, the Project type is not yet known — report `[MISS] UX Baseline — resolved after Project type is captured in Step 3` and let Step 3 turn it into `[N/A]` or a populated section. |
 | **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`, not derived as TORs. |
 | **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
@@ -63,7 +63,7 @@ user accepts the whole row with one answer or overrides any cell:
 | **Web app** | TypeScript end to end. Bun runtime with Hono (or Elysia) for the server; React + Vite + shadcn/ui + Tailwind v4 for the UI; `bun:sqlite` for the database. Bun for install / run / test / `bunx`. |
 | **Desktop app** | TypeScript end to end. Electron Forge `vite-typescript` template scaffolded with `bunx create-electron-app@latest <name> --template=vite-typescript`, React added afterwards (`bun add react react-dom`, `bun add -d @vitejs/plugin-react`); shadcn/ui + Tailwind v4 in the renderer; better-sqlite3 in the main process only (Forge rebuilds it for Electron automatically; DB file under `app.getPath('userData')`, WAL mode); electron-log; electron-window-state. Bun for install / run / test / `bunx` — the app itself runs on Electron's bundled Node, not the Bun runtime, so `bun:sqlite` and other Bun APIs are not available inside the app. |
 | **Service or API** | TypeScript. Bun runtime with Hono (or Elysia); `bun:sqlite`; Bun for install / run / test / `bunx`. |
-| **CLI tool / Library** | No stack default — use the language and toolchain the user names. |
+| **CLI tool / Library** | If no language is named: TypeScript on Bun (`bun init`, `bun test`, single-file executable via `bun build --compile`), `bun:sqlite` if it needs a database. If a language is named, that language's standard toolchain (e.g., Python: `uv`, `pytest`, `ruff`, a `pyproject.toml` console-script entry point). |
 
 Every project type: start with SQLite unless the user names another database. Desktop note:
 if `package.json` gains a `trustedDependencies` list, it replaces Bun's default trusted list,
@@ -399,7 +399,7 @@ makes them inapplicable.
 - Where does the requirements baseline live? (default: `docs/requirements/`)
 - Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard)
 - Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
-- Leave room for a `**Recommended skills:**` line — Step 8 writes it.
+- Leave room for a `**Recommended skills:**` line — Step 8 writes it for Web app / Desktop app / Hybrid-with-UI projects only; for CLI / Service / Library projects write nothing.
 
 **Verification & Quality Gates** (if missing):
 - What checks should run before an epic is marked complete? Ask about each:
@@ -409,6 +409,8 @@ makes them inapplicable.
   - Visual/screenshot verification? (suggest `playwright-cli` skill if frontend)
   - Brand or design compliance? (suggest brand guidelines skill if applicable)
   - Any other project-specific checks?
+
+  *For CLI/tool projects skip the visual/screenshot and brand questions — ask only about build, tests, lint, and "run the tool with a known input" (reuse the Local Environment invocation).*
 
 After gathering answers, **validate each command answer**: if the user provides a non-empty
 answer that looks like a description rather than a runnable shell command (e.g., it contains no
@@ -884,7 +886,7 @@ declared in Tool Hygiene & Operability:
 | Project type | Recommended skills |
 |---|---|
 | Web app / Desktop app / Hybrid with a UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic` |
-| CLI tool / Service or API / Library | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
+| CLI tool / Service or API / Library / Hybrid without a UI | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
 
 For each recommended skill, check whether it appears in this session's available-skills list
 and report `[PASS] {skill} — installed` or `[MISS] {skill} — not installed`.
@@ -926,12 +928,12 @@ Remind the user:
   version exposure, log startup stamping, logging convention, exit codes (CLI),
   stdout/stderr discipline (CLI), and error-message standards. Lines marked `N/A` are
   skipped.
-- For UI projects, the **UX Baseline** section in `CLAUDE.md` follows the same chain:
+- *(UI project types only — omit for CLI / Service / Library:)* the **UX Baseline** section in `CLAUDE.md` follows the same chain:
   `/peak-workflow:capture-requirements` turns each active line into a baseline UX TOR, the
   walking skeleton epic in `/peak-workflow:plan-project` installs the declared design system and
   proves those TORs on one reference screen, and `/peak-workflow:wrapup-epic` runs the UX
   Baseline check as a quality gate on every UI epic. Lines marked `N/A` are skipped.
-- Any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
+- *(UI project types only — omit for CLI / Service / Library:)* any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
   `frontend-design` shapes visual execution, and the UX Baseline and design-system tokens take
   precedence over its aesthetic choices.
 - The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:start-epic`

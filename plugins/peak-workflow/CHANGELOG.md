@@ -47,6 +47,16 @@ that CLI tools already get from Tool Hygiene & Operability.
   theme changes live in the token file rather than generated component files.
 - **`setup` Final Summary** renumbered to Step 9.
 
+### Fixed
+
+- **CLI dry-run pass** — CLI / Library projects get a stack default (TypeScript on Bun, or the
+  named language's toolchain); `start-epic` 11a and the `setup` summary, Recommended Skills
+  routing, and Quality Gates questions are gated on UI project types; `capture-requirements`
+  infers non-UI when Tool Hygiene is absent.
+- **Stale epic-workflow terms** — `start-epic` Step 4 builds the plan from TOR Given/When/Then
+  (not "acceptance criteria" / "verification steps"); `plan-project` scope line says "TOR IDs
+  covered"; plugin CLAUDE.md drops a machine-specific path.
+
 ---
 
 ## [1.7.1] — 2026-09-14

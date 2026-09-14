@@ -90,7 +90,7 @@ Prompt template for the simulation agent:
 
 ## Versioning
 
-Follows the repo-level versioning protocol in `/opt/github_public/peakflames/claude-plugins-peakflames/CLAUDE.md`.
+Follows the repo-level versioning protocol in the repo-root `CLAUDE.md`.
 Both `plugin.json` and `CHANGELOG.md` must be updated in the same commit.
 
 - **Patch** — wording, UX clarity, step renumbering, no behavioral change
