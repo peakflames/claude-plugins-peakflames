@@ -120,6 +120,31 @@ where it can be measured. Watch the status line's context meter, and when a sess
 roll to a fresh one with peak-workflow's `/newtask` (or your preferred handoff skill) and
 continue the same epic. The epic is not too big — the session is.
 
+### UX Baseline — web and desktop apps get the same treatment as CLIs
+
+CLI tools already have a verifiable operability baseline: the **Tool Hygiene & Operability**
+section of `CLAUDE.md` declares version flags, exit codes, and error-message standards, and
+`/capture-requirements` turns each line into a baseline TOR. Web apps and desktop apps get the
+same chain through the **UX Baseline** section that `/setup` writes for UI project types:
+
+| Stage | What happens |
+|---|---|
+| `/setup` | Declares the design system (default shadcn/ui on Tailwind v4, themed only through CSS-variable tokens in the global stylesheet) and the interaction conventions every screen must meet — Screen states, Keyboard & focus, Forms, Destructive actions, Progress feedback, Layout floor, Contrast, Reduced motion, Navigation, and for desktop apps the Desktop conventions. Every line has a default a non-technical user can accept. |
+| `/capture-requirements` | Derives one Playwright-observable baseline UX TOR per active line, ahead of the domain TORs. |
+| `/plan-project` | The walking-skeleton epic owns those TORs: it installs the design system, builds the app shell, and ships one reference screen that proves them. Later slices compose from the shell; none installs a second component library. |
+| `/start-epic` | UI middle steps name each screen and its four states. |
+| `/wrapup-epic` | Runs the UX Baseline check as a quality gate on every screen a UI epic adds or changes — a FAIL is Fix now / Stop, never deferred. |
+
+It is UX, not style: palette, typography, and brand are not TORs. `/setup` also recommends
+companion skills for UI projects — `frontend-design@claude-plugins-official` for visual
+execution and `playwright-cli` for verification — and records the precedence rule: the UX
+Baseline and the design-system tokens win over `frontend-design`'s aesthetic choices.
+
+**Stack defaults.** When the tech-stack answer is thin, `/setup` offers a one-answer default per
+project type: TypeScript end to end, Bun for install / run / test, shadcn/ui + Tailwind v4, and
+SQLite first. Desktop apps default to Electron Forge's `vite-typescript` template with
+better-sqlite3 in the main process; web apps and services to Bun + Hono with `bun:sqlite`.
+
 ## Skills
 
 Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill inventory.
@@ -129,7 +154,7 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 | Command | Purpose |
 |---|---|
 | `/new-project` | **Front door for newcomers.** Detects project state (greenfield, brownfield epic-workflow, or existing peak-workflow) and dispatches to the right entry point. Writes no state files. |
-| `/setup` | Audits `CLAUDE.md`, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`. **Run once per project, before `/discover`.** |
+| `/setup` | Audits `CLAUDE.md` (Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), offers stack defaults by project type, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, and recommends companion skills. **Run once per project, before `/discover`.** |
 
 ### Plan
 

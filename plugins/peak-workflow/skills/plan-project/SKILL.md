@@ -87,8 +87,8 @@ is complete.
 
 **UI products (Project type Web app, Desktop app, or a Hybrid with a UI):** the skeleton also
 owns the design system and the app shell. The **baseline UX TORs** captured in
-`capture-requirements` 3A.2.2 (screen states, keyboard reachability, visible focus, form labels
-and errors, destructive-action safety, progress feedback, layout floor, and the desktop
+`capture-requirements` 3A.2.2 (Screen states, Keyboard & focus, Forms, Destructive actions,
+Progress feedback, Layout floor, Contrast, Reduced motion, Navigation, and the Desktop
 conventions) join the tool-hygiene TORs as this epic's Requirements Anchors. To satisfy them the
 skeleton must:
 

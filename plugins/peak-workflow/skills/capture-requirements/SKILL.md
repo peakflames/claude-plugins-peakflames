@@ -58,7 +58,13 @@ The user's request / brownfield description: $ARGUMENTS
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
    already in context. Specifically capture, if present:
    - **`Tool Hygiene & Operability` section** — Project type and the active (non-`N/A`)
-     mechanism declarations. These drive the baseline TORs in Step 3A.2.1.
+     mechanism declarations. These drive the baseline TORs in Step 3A.2.1. Record the
+     Project type; if the section is absent, infer it from the Tech Stack section
+     (Electron / Tauri → Desktop app; web framework or "frontend" → Web app).
+   - **`UX Baseline` section** — Presence, the **Design system** declaration (a declaration
+     for the walking skeleton, not a TOR), and the active (non-`N/A`) TOR lines. These drive
+     the baseline UX TORs in Step 3A.2.2. Set `ux_baseline_section_present = true` when the
+     section exists.
    - **`Security Baseline` section** — Note its presence. Security Baseline items are NOT
      derived as TORs (they are negative invariants); they are passed forward to `/start-epic`
      and `/wrapup-epic` via CLAUDE.md, which is auto-loaded on every session.
@@ -77,6 +83,22 @@ The user's request / brownfield description: $ARGUMENTS
 
    If the user chooses Stop, end here. Otherwise, set an internal flag
    `tool_hygiene_section_present = false` and proceed; Step 3A.2.1 will be skipped.
+
+   If the `UX Baseline` section is missing **and** the Project type is a UI type (Web app,
+   Desktop app, or Hybrid with a UI), warn but allow continuation. For CLI / Service / Library
+   projects set `ux_baseline_section_present = false` silently — the section does not apply.
+   > `UX Baseline` section not found in `CLAUDE.md`. Baseline UX TORs (screen states,
+   > keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast,
+   > reduced motion, navigation, desktop conventions) will NOT be derived. To enable them,
+   > run `/peak-workflow:setup` to add the section, then re-run
+   > `/peak-workflow:capture-requirements`. Continuing without baseline UX TORs.
+
+   Use `AskUserQuestion`:
+   - Question: `"UX Baseline section is missing from CLAUDE.md — continue without baseline UX TORs, or stop to run /setup first?"`
+   - Options: `["Continue without baseline UX TORs", "Stop — I'll run /peak-workflow:setup first"]`
+
+   If the user chooses Stop, end here. Otherwise, set `ux_baseline_section_present = false`
+   and proceed; Step 3A.2.2 will be skipped.
 2. Read `docs/product-vision-planning/product-vision.md`. If missing or skeleton (no
    substantive `## 2. Problem Statement` content), stop:
    > Run `/peak-workflow:discover` first to produce the product vision document.
@@ -173,6 +195,12 @@ Present:
 | ... | ... | ... | ... |
 
 Total: {N} feature files
+[If tool_hygiene_section_present = true:]
+Baseline tool-hygiene TORs: leading section of docs/requirements/01-<name>.feature.md
+[If ux_baseline_section_present = true:]
+Baseline UX TORs: `# UX Baseline` section of docs/requirements/01-<name>.feature.md,
+immediately after the tool-hygiene block (say so if you want a dedicated
+NN-ux-baseline.feature.md instead)
 ```
 
 Use `AskUserQuestion`:
@@ -261,6 +289,92 @@ Scenario: [TOR-NN-{XXXXXXX}] The tool shall exit with code 0 on success, code 1 
 **Generate baseline TORs BEFORE non-baseline TORs in each affected feature file.** They
 should occupy the leading TOR positions in the file. Domain-specific TORs derived from
 vision / ConOps follow.
+
+### 3A.2.2: Baseline UX TORs
+
+If `ux_baseline_section_present = false` (Step 1), or the Project type has no user interface
+(CLI tool, Service or API, Library), skip this sub-step entirely.
+
+Otherwise, ensure every **active TOR line** of the `UX Baseline` section of `CLAUDE.md` is
+covered by TOR requirements. Active TOR lines are every bold-labelled line except
+**Design system** (a declaration the walking skeleton consumes, not a requirement) and any
+line marked `N/A`. For each active line derive at least one TOR — written in normal Scenario
+form, with the Scenario title as a complete `shall` statement matching the convention
+declared in `CLAUDE.md`. Each **Desktop conventions** bullet is its own line and yields its own
+TOR.
+
+Place baseline UX TORs in the **first feature file**, immediately after the tool-hygiene
+block, under a `# UX Baseline` section banner (`# ---` comment block per
+`FEATURE_TEMPLATE.md`). If the user asked for a dedicated file at the 3A.1b grouping gate,
+write them to `docs/requirements/NN-ux-baseline.feature.md` instead. Baseline UX TORs precede
+domain TORs, exactly like the tool-hygiene TORs.
+
+Baseline UX TORs are **black-box and Playwright-observable**: assert on roles, visible text,
+`document.activeElement`, computed styles, viewport size, and document title — never on
+component internals. Use generic screen and control names (`the Settings screen`, `the Save
+button`) unless the ConOps names a concrete one. For a desktop app, the same assertions run
+against the dev build with a live main process.
+
+The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
+override them. Where the Web app and Desktop app forms differ, both are given.
+
+| UX Baseline line | Default TOR shall-statement form (Web app) | Default TOR shall-statement form (Desktop app) |
+|---|---|---|
+| **Screen states** | The application shall render an explicit loading, empty, error, and populated state on every data-bearing screen, each distinguishable by visible text | (same) |
+| **Keyboard & focus** | The application shall allow every interactive control to be reached and operated by keyboard alone with no keyboard trap; shall display a visible focus indicator on the focused control that is not obscured by sticky UI; and shall move focus into a modal dialog on open, keep Tab within it, and return focus to the invoking control on close (one TOR per clause) | (same) |
+| **Forms** | The application shall associate a label with every form field, shall identify each invalid field in text next to it naming the problem and the fix, and shall move focus to the first invalid field on a failed submission | (same) |
+| **Destructive actions** | The application shall require an explicit confirmation before every irreversible action, with the safe option as the default and Escape cancelling | (same) |
+| **Progress feedback** | The application shall show a visible progress indicator within 1 second of starting any operation longer than 1 second, and shall offer a cancel control for any operation longer than 10 seconds | (same) |
+| **Layout floor** | The application shall present every screen without horizontal scrolling, overlap, or clipped controls at 320 CSS px viewport width and at 200% zoom | The application shall keep every control visible and usable at the declared minimum window size of {W} x {H}, and shall refuse to resize the window below it |
+| **Contrast** | The application shall render body text at a contrast ratio of at least 4.5:1 (3:1 for large text) and control boundaries and focus indicators at least 3:1 against adjacent colors | (same) |
+| **Reduced motion** | The application shall disable or replace with an instant transition all non-essential animation when the OS reduce-motion preference is set | (same) |
+| **Navigation** | The application shall give every screen a unique document title, exactly one visible H1 matching it, and a primary navigation whose current item is marked with `aria-current` | The application shall give every window a unique title, exactly one visible H1 matching it, and a primary navigation whose current item is marked |
+| **Responsiveness budget** (if not `N/A`) | The application shall render the primary screens at the 75th percentile with LCP ≤ 2.5 s, INP ≤ 200 ms, and CLS ≤ 0.1 | The application shall acknowledge every interaction on screen within {N} ms |
+| **Undo** (if not `N/A`) | The application shall offer an Undo action for at least 5 seconds after a reversible action, and shall preserve unsaved form input across a reload of the same screen | (same) |
+| **Desktop conventions** — menu | N/A | The application shall provide a menu bar with the platform's standard menus and standard roles for Undo, Redo, Cut, Copy, Paste, Select All, Close, Minimize, Quit, and About |
+| **Desktop conventions** — accelerators | N/A | The application shall bind each primary command to the platform's standard `CmdOrCtrl` accelerator and display the accelerator on its menu item |
+| **Desktop conventions** — window state | N/A | The application shall restore the main window's last size, position, and maximized state on relaunch, clamped to a visible display |
+| **Desktop conventions** — single instance | N/A | The application shall focus and restore the running window when launched a second time instead of starting a second instance |
+| **Desktop conventions** — file dialogs | N/A | The application shall use the platform's native file dialog with file-type filters for Open, Save, and Export |
+
+Error-message wording is covered by the Tool Hygiene **Error message standard** TOR in
+3A.2.1 — do not derive a second TOR for it here.
+
+For each baseline UX TOR, write a concrete, observable Given/When/Then. Examples:
+
+```gherkin
+Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit empty state when a list screen has no items
+    Given the user is authenticated and owns zero projects
+    When the user navigates to the Projects screen
+    Then the main content region should contain visible text "No projects yet"
+    And the main content region should contain a "Create project" button
+    And no element with role "progressbar" should be visible
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall identify an invalid form field in text that names the problem and the correction
+    Given the Create Account form is open
+    When the user enters "not-an-email" in the Email field and activates the Submit button
+    Then the Email field should have aria-invalid="true"
+    And an element referenced by the Email field's aria-describedby should contain text "Enter an email address in the form name@example.com"
+    And focus should be on the Email field
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall require confirmation before deleting a record, with Cancel as the safe default
+    Given the Documents list shows a document named "Q3 Report"
+    When the user activates the Delete action for "Q3 Report"
+    Then a dialog with role "dialog" and aria-modal="true" should be visible containing the text "Delete Q3 Report?"
+    And document.activeElement should be the Cancel button
+    When the user presses Escape
+    Then the dialog should not be visible and "Q3 Report" should still be listed
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall focus the running instance when launched a second time
+    Given the application is running with its main window minimized
+    When the user launches the application executable again
+    Then within 2 seconds exactly one application process should exist
+    And the main window should be restored and focused
+```
+
+**Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
+`CLAUDE.md` will have no **Desktop conventions** line and will typically mark
+`Responsiveness budget: N/A` and `Undo: N/A` — those rows produce no baseline TORs.
 
 ### 3A.3: TOR ID Generation
 
@@ -351,6 +465,14 @@ Read all existing `.feature.md` files. For each new capability from the delta:
   Use `AskUserQuestion` with these options. Wait for answer before proceeding.
 - **Genuinely new?** → Add as a new TOR requirement per 3A.2 rules.
 
+**UX Baseline added after the baseline (UI projects only).** If
+`ux_baseline_section_present = true` and no existing TOR traces to any `UX Baseline` line
+(the project added the section after its first requirements capture), treat every active
+TOR line of the section as part of the delta: derive TORs per Step 3A.2.2 and append them per
+3B.3 under a section banner `UX Baseline (added YYYY-MM-DD)` in the first feature file, or in
+a new `NN-ux-baseline.feature.md` if the user prefers at the 3B.3b gate. Lines already covered
+by an existing TOR are skipped.
+
 ### 3B.3: Assign IDs for New Requirements
 
 - New requirements added to an **existing feature file**: keep that file's `{NN}`, generate
@@ -416,6 +538,11 @@ internal scratch.
   if `tool_hygiene_section_present = true`.** Cite each as `CLAUDE.md Tool Hygiene: {line label}`
   (e.g., `CLAUDE.md Tool Hygiene: Version exposure`). Each must map to at least one
   baseline TOR generated in Step 3A.2.1.
+- **Every active TOR line in the `UX Baseline` section of `CLAUDE.md`, if
+  `ux_baseline_section_present = true`** (one row per **Desktop conventions** bullet). Cite
+  each as `CLAUDE.md UX Baseline: {line label}` (e.g., `CLAUDE.md UX Baseline: Screen states`,
+  `CLAUDE.md UX Baseline: Desktop conventions — single instance`). Each must map to at least
+  one baseline UX TOR generated in Step 3A.2.2. **Design system** is not a row.
 
 **Rules:**
 - An input may map to multiple TOR IDs — list all.
@@ -451,6 +578,10 @@ Before presenting the summary, verify:
   `CLAUDE.md`'s `Tool Hygiene & Operability` section is covered by at least one TOR
   in the produced feature files. The trace appears in the Step 4 trace table with the
   source `CLAUDE.md Tool Hygiene: {line label}` and `Explicit? = Y`.
+- [ ] If `ux_baseline_section_present = true`: every active (non-`N/A`) TOR line in
+  `CLAUDE.md`'s `UX Baseline` section (excluding **Design system**) is covered by at least one
+  TOR, placed under the `# UX Baseline` banner before any domain TOR. The trace appears in the
+  Step 4 trace table with the source `CLAUDE.md UX Baseline: {line label}` and `Explicit? = Y`.
 
 ---
 
@@ -482,9 +613,11 @@ Preserve the original timestamp. The `.processed` suffix prevents re-consumption
 - Functional areas (feature files): {N}
 - Total TOR requirements: {K}
 - Baseline tool-hygiene TORs: {H} [or "skipped — Tool Hygiene section absent"]
+- Baseline UX TORs: {G} [omit row if not a UI project; "skipped — UX Baseline section absent" if a UI project without the section]
 - ConOps scenario steps covered: {X} of {Y}
 - Product Vision goals/scope items covered: {A} of {B}
 - Tool Hygiene lines covered: {T} of {U} [omit row if section absent]
+- UX Baseline lines covered: {V} of {W} [omit row if not applicable]
 - Tracing gaps resolved: {M}
 
 ### Coverage Gaps (explicitly deferred)

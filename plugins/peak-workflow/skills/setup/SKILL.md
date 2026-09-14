@@ -24,7 +24,8 @@ Check for the presence and completeness of each section below. Report a status f
 |---------|---------------|
 | **Tech Stack** | Lists the languages, frameworks, package manager, and key libraries used |
 | **Local Environment** | Documents how to run the backend and frontend locally, whether the API is live and functional, and the preference for live data over mocking during verification |
-| **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
+| **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
+| **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library projects report `[N/A] UX Baseline — no user interface`. |
 | **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`, not derived as TORs. |
 | **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
@@ -40,6 +41,7 @@ Report the result as a checklist:
 [PASS] Peak Workflow — found with capture-requirements and TOR references
 [MISS] Verification & Quality Gates — section missing
 [WEAK] Important Reminders — section exists but has no content
+[N/A]  UX Baseline — no user interface
 ```
 
 ## Step 3: Fix Missing/Weak Sections
@@ -51,9 +53,25 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 - What package manager? (npm, bun, yarn, pip, dotnet, etc.)
 - Any key libraries or tools? (CSS framework, ORM, test runner, etc.)
 
+If the answers are thin (e.g., "whatever you recommend", "I don't know", or only a language
+is named), ask which project type the product is (the same list as Tool Hygiene item 1 below
+— carry the answer forward so it is not asked twice) and offer that type's default stack. The
+user accepts the whole row with one answer or overrides any cell:
+
+| Project type | Default stack (accept as-is or override any cell) |
+|---|---|
+| **Web app** | TypeScript end to end. Bun runtime with Hono (or Elysia) for the server; React + Vite + shadcn/ui + Tailwind v4 for the UI; `bun:sqlite` for the database. Bun for install / run / test / `bunx`. |
+| **Desktop app** | TypeScript end to end. Electron Forge `vite-typescript` template scaffolded with `bunx create-electron-app@latest <name> --template=vite-typescript`, React added afterwards (`bun add react react-dom`, `bun add -d @vitejs/plugin-react`); shadcn/ui + Tailwind v4 in the renderer; better-sqlite3 in the main process only (Forge rebuilds it for Electron automatically; DB file under `app.getPath('userData')`, WAL mode); electron-log; electron-window-state. Bun for install / run / test / `bunx` — the app itself runs on Electron's bundled Node, not the Bun runtime, so `bun:sqlite` and other Bun APIs are not available inside the app. |
+| **Service or API** | TypeScript. Bun runtime with Hono (or Elysia); `bun:sqlite`; Bun for install / run / test / `bunx`. |
+| **CLI tool / Library** | No stack default — use the language and toolchain the user names. |
+
+Every project type: start with SQLite unless the user names another database. Desktop note:
+if `package.json` gains a `trustedDependencies` list, it replaces Bun's default trusted list,
+so `electron` and `better-sqlite3` must then be listed explicitly.
+
 **Local Environment** (if missing):
 
-First, determine the project type from the Tech Stack answers already captured. If the tech stack includes a web framework, HTTP server, REST API library, or mentions "frontend" / "backend", treat it as a **web/server project**. Otherwise (CLI tool, library, script, desktop app with no server component), treat it as a **CLI/tool project**.
+First, determine the project type from the Tech Stack answers already captured. If the tech stack includes Electron, Tauri, or a native windowing toolkit, treat it as a **desktop project**. Otherwise, if it includes a web framework, HTTP server, REST API library, or mentions "frontend" / "backend", treat it as a **web/server project**. Otherwise (CLI tool, library, script), treat it as a **CLI/tool project**.
 
 *For CLI/tool projects:*
 - How do you invoke the tool locally? (e.g., `python -m fibcalc 10`, `./mytool --help`, `go run . 5`)
@@ -66,6 +84,11 @@ First, determine the project type from the Tech Stack answers already captured. 
 - Is the backend API live and functional in local dev? (i.e., can it connect to real data sources like databases?)
 - Should verification always use live data instead of mocking API responses?
 
+*For desktop projects:*
+- How do you start the dev build? (e.g., `bun run start` for Electron Forge, which launches the app with a live main process and renderer hot reload)
+- How do you run the test suite? (e.g., `bun test`, `npm test`)
+- Skip the live-API / live-data questions unless the app also talks to a backend service of its own — if it does, ask the web/server questions for that backend.
+
 **Tool Hygiene & Operability** (if missing):
 
 This section captures the project's chosen mechanisms for the load-bearing tool-hygiene
@@ -75,6 +98,7 @@ requirements. Ask in order:
 1. *Project type* — pick exactly one of:
    - **CLI tool** — primary interface is a command-line invocation
    - **Web app** — server-rendered or SPA, primary interface is a browser UI
+   - **Desktop app** — Electron / Tauri / native, primary interface is a windowed application
    - **Service or API** — headless service exposing HTTP / gRPC / message endpoints
    - **Library** — consumed by other code, no end-user runtime
    - **Hybrid** — combines two or more of the above (e.g., CLI that also runs as a service)
@@ -85,13 +109,17 @@ requirements. Ask in order:
    - CLI: `--version` flag printing `<name> v<semver>` to stdout, exit 0
    - Web app: GET `/version` endpoint returning JSON, plus version visible in app footer
      or About page
+   - Desktop app: Help > About dialog (App menu > About on macOS) showing the app name and
+     semantic version (Electron: `app.getVersion()` with `app.setAboutPanelOptions` and a
+     `role: 'about'` menu item, or a `dialog.showMessageBox`), plus the startup log line
    - Service/API: GET `/version` or `/health` endpoint with version field
    - Library: `__version__` (or language-equivalent) constant exported from package root
    - Hybrid: list each applicable mechanism
 
 3. *Version stamped at log startup* — confirm the project will emit the tool name and
    semantic version on the first log line at process / app / request-handler startup
-   (e.g., `[INFO] myapp v1.2.0 starting`).
+   (e.g., `[INFO] myapp v1.2.0 starting`). Desktop app: the main process logs
+   `<name> v<semver> starting` as its first line once the app is ready.
 
 4. *Version single source of truth* — what is the authoritative file for the version
    number? The version is defined in exactly one place and read everywhere else. Examples:
@@ -102,19 +130,24 @@ requirements. Ask in order:
    - Levels — what set? (default: `DEBUG / INFO / WARN / ERROR`)
    - Format — `structured JSON` / `key=value` / `human-readable plain text`?
    - Where is the logger configured? (file path)
+   - Desktop app default: electron-log in the main process (`electron-log/main`,
+     `log.initialize()`), file under `app.getPath('logs')`, human-readable plain text;
+     renderer logs route through `electron-log/renderer`.
 
-6. *Exit code convention* (CLI / Hybrid only — otherwise mark `N/A — not a CLI`):
+6. *Exit code convention* (CLI / Hybrid only — otherwise mark `N/A — not a CLI`; Desktop
+   app: `N/A` unless the app also has a CLI entry point):
    - 0 — success
    - 1 — operational failure (file not found, permission denied, downstream failure, etc.)
    - 2 — invalid invocation (bad flags, missing required args)
    - Any additional codes the project defines.
 
-7. *stdout / stderr discipline* (CLI / Hybrid only — otherwise mark `N/A`):
+7. *stdout / stderr discipline* (CLI / Hybrid only — otherwise mark `N/A`; Desktop app:
+   `N/A` unless the app also has a CLI entry point):
    - stdout — data, parseable output, primary results
    - stderr — diagnostics, progress, errors, log output
 
 8. *Error message standard* — confirm user-facing errors will name the problem AND the
-   next user action. Format example:
+   next user action (on screen for Web / Desktop apps, on stderr for CLI tools). Format example:
    `Error: configuration file not found at <path>. Try --config to specify an alternate path.`
 
 Generate the section using this template, filling in the project-specific answers:
@@ -127,11 +160,12 @@ Each line is a baseline TOR requirement source — `/peak-workflow:capture-requi
 ensure at least one TOR exists per active line, written in the form appropriate to the
 declared mechanism. Lines marked `N/A` are skipped.
 
-**Project type:** [CLI tool / Web app / Service or API / Library / Hybrid]
+**Project type:** [CLI tool / Web app / Desktop app / Service or API / Library / Hybrid]
 
 **Version exposure:** [Mechanism declaration. Example for a CLI: `--version` flag printing
 `myapp v<semver>` to stdout with exit code 0. Example for a Web app: GET `/version` endpoint
-returning JSON `{name, version}` AND version visible in app footer.]
+returning JSON `{name, version}` AND version visible in app footer. Example for a Desktop app:
+Help > About dialog showing `myapp v<semver>` via `app.getVersion()`.]
 
 **Version stamped at log startup:** The first log line emitted on process / app startup
 includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting`).
@@ -150,6 +184,176 @@ includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting
 **Error message standard:** User-facing errors name the problem AND the next user action.
 Example: `Error: configuration file not found at <path>. Try --config to specify an
 alternate path.`
+```
+
+**UX Baseline** (if missing — Project type Web app, Desktop app, or Hybrid with a UI only):
+
+If the Project type is CLI tool, Service or API, or Library, write nothing and report
+`[N/A] UX Baseline — no user interface`.
+
+This section is the UI counterpart of Tool Hygiene & Operability: the interaction conventions
+every screen must meet, each turned into a baseline TOR by
+`/peak-workflow:capture-requirements` (Step 3A.2.2) and checked on every UI epic by
+`/peak-workflow:wrapup-epic`. It covers UX, not visual style — palette, typography, and brand
+belong in a design doc or the `frontend-design` skill, never here. Every line has a default a
+non-technical user can accept as-is. Present the defaults as one block and ask for a single
+accept / override answer; override line by line only where the user asks.
+
+1. *Design system* — a declaration consumed by the walking skeleton in
+   `/peak-workflow:plan-project`, not a TOR. Default: **shadcn/ui on Tailwind v4**, themed
+   only through CSS-variable tokens:
+   - Tokens live in `:root` / `.dark` CSS variables in the global stylesheet
+     (`src/index.css` for Vite), exposed to Tailwind through an `@theme inline` block.
+   - `--radius` is the single radius knob — the whole radius scale derives from it.
+   - Base color is chosen at `bunx shadcn@latest init` (current set: `neutral`, `stone`,
+     `zinc`, `mauve`, `olive`, `mist`, `taupe`; default `neutral`) and is not changed casually
+     afterwards.
+   - Dark mode uses the `dark` class on the root element, switched by a ThemeProvider
+     (light / dark / system).
+   - New semantic colors are added by defining `--x` / `--x-foreground` in `:root` and `.dark`
+     and mapping them in `@theme inline` — never by editing generated files under
+     `components/ui/`. Regenerate components with `bunx shadcn@latest add <name> --overwrite`.
+   - Components are composed through `className` and variants; app code imports `cn` from
+     `@/lib/utils`.
+   If the user names another design system, record it in the same shape (where tokens live,
+   how themes change, what is never hand-edited). The TOR lines below apply regardless.
+
+2. *Screen states* (TOR) — every data-bearing screen renders explicit loading, empty, error,
+   and populated states, each distinguishable by visible text (WCAG 2.2 SC 4.1.3).
+
+3. *Keyboard & focus* (TOR) — every interactive control is reachable and operable by keyboard
+   alone with no keyboard trap, the focused control always shows a visible focus indicator that
+   is not hidden behind sticky headers or overlays, and every modal dialog moves focus inside on
+   open, keeps Tab within it, and returns focus to the invoking control on close
+   (WCAG 2.2 SC 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11; APG modal dialog pattern).
+
+4. *Forms* (TOR) — every form field has a programmatically associated label, every validation
+   error is shown in text next to the field naming the problem and the fix, and focus moves to
+   the first invalid field on a failed submission (WCAG 2.2 SC 1.3.1, 3.3.1, 3.3.2, 3.3.3).
+
+5. *Destructive actions* (TOR) — every irreversible action (delete, overwrite, send, pay)
+   requires an explicit confirmation whose safe option is the default and is triggered by
+   Escape (WCAG 2.2 SC 3.3.4; APG modal dialog pattern).
+
+6. *Progress feedback* (TOR) — any operation longer than 1 second shows a visible progress
+   indicator within 1 second, and any operation longer than 10 seconds can be cancelled
+   (WCAG 2.2 SC 4.1.3).
+
+7. *Layout floor* (TOR) — Web app: every screen is usable at 320 CSS px width and at 200% zoom
+   with no horizontal scrolling, overlap, or clipped controls (WCAG 2.2 SC 1.4.10, 1.4.4).
+   Desktop app: every window is usable at the declared minimum window size (default
+   800 x 600) with no clipped controls, and the window refuses to shrink below it. Ask the
+   user for the minimum window size.
+
+8. *Contrast* (TOR) — body text has a contrast ratio of at least 4.5:1 (3:1 for large text),
+   and control boundaries and focus indicators at least 3:1 against adjacent colors
+   (WCAG 2.2 SC 1.4.3, 1.4.11).
+
+9. *Reduced motion* (TOR) — when the OS reduce-motion preference is set, non-essential
+   animation is disabled or replaced by an instant transition (WCAG 2.2 SC 2.3.3, 2.2.2).
+
+10. *Navigation* (TOR) — every screen has a unique page or window title, a single visible H1
+    matching it, and a primary navigation whose current item is marked (WCAG 2.2 SC 2.4.2,
+    2.4.6, 3.2.3).
+
+    Error-message wording is already governed by the Tool Hygiene `Error message standard`
+    line — the section cross-references it and does not repeat it.
+
+11. *Responsiveness budget* (optional TOR, default `N/A`) — Web app: at the 75th percentile the
+    primary screens meet Core Web Vitals "good": LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1.
+    Desktop app: a declared local-interaction latency (e.g., every click acknowledged within
+    200 ms). Ask whether the user wants it; otherwise write `N/A`.
+
+12. *Undo* (optional TOR, default `N/A`) — reversible actions offer Undo (Ctrl/Cmd+Z or an
+    "Undo" control), and unsaved form input survives an accidental reload of the same screen
+    (WCAG 2.2 SC 3.3.7). Ask whether the user wants it; otherwise write `N/A`.
+
+13. *Desktop conventions* (Desktop app only — each bullet is a TOR; omit the whole line for
+    Web apps):
+    - Application menu with the platform's standard menus (App / File / Edit / View / Window /
+      Help on macOS; File / Edit / View / Help elsewhere) using standard roles for Undo, Redo,
+      Cut, Copy, Paste, Select All, Close, Minimize, Quit, About.
+    - Keyboard accelerators: primary commands use `CmdOrCtrl` accelerators matching the
+      platform's standard shortcuts, and every menu item with a shortcut displays it.
+    - Window size, position, and maximized state are restored on relaunch, clamped to a
+      visible display.
+    - Single instance: launching the app while it is running focuses and restores the existing
+      window (and opens any passed file in it) instead of starting a second instance.
+    - Open / Save / Export use the platform's native file dialogs with file-type filters.
+
+Generate the section using this template. Keep the bold labels exactly as written — downstream
+skills cite them. Bracketed `[Web app: … / Desktop app: …]` choices are resolved to the one
+that applies; the `[Desktop app only:]` tag is a conditional, not rendered text.
+
+```markdown
+## UX Baseline
+
+This section declares the interaction conventions every screen must meet. It covers UX, not
+visual style. Each line marked TOR is a baseline TOR requirement source —
+`/peak-workflow:capture-requirements` ensures at least one TOR exists per active line, and
+`/peak-workflow:wrapup-epic` checks every line on each UI epic. Lines marked `N/A` are skipped.
+Error-message wording is governed by the `Error message standard` line in Tool Hygiene &
+Operability and is not repeated here.
+
+**Design system:** [shadcn/ui on Tailwind v4, or the user's choice] (declaration — installed by
+the walking skeleton, not a TOR)
+- Tokens: `:root` / `.dark` CSS variables in [`src/index.css`], mapped through `@theme inline`.
+- `--radius` is the single radius knob. Base color: [neutral].
+- Dark mode: `dark` class on the root element, switched by a ThemeProvider (light / dark / system).
+- New semantic colors: define `--x` / `--x-foreground` in `:root` and `.dark`, map in `@theme inline`.
+- Never edit generated files under `components/ui/`; regenerate with `bunx shadcn@latest add <name> --overwrite`.
+- Compose through `className` and variants; import `cn` from `@/lib/utils`.
+
+**Screen states:** (TOR) Every data-bearing screen renders explicit loading, empty, error, and
+populated states, each distinguishable by visible text. (WCAG 2.2 SC 4.1.3)
+
+**Keyboard & focus:** (TOR) Every interactive control is reachable and operable by keyboard
+alone with no keyboard trap; the focused control always shows a visible focus indicator that is
+not hidden behind sticky UI; modal dialogs move focus inside on open, keep Tab within, and
+return focus to the invoking control on close. (WCAG 2.2 SC 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11)
+
+**Forms:** (TOR) Every form field has a programmatically associated label; every validation
+error is shown in text next to the field naming the problem and the fix; focus moves to the
+first invalid field on a failed submission. (WCAG 2.2 SC 1.3.1, 3.3.1, 3.3.2, 3.3.3)
+
+**Destructive actions:** (TOR) Every irreversible action requires an explicit confirmation whose
+safe option is the default and is triggered by Escape. (WCAG 2.2 SC 3.3.4)
+
+**Progress feedback:** (TOR) Any operation longer than 1 second shows a visible progress
+indicator within 1 second; any operation longer than 10 seconds can be cancelled.
+(WCAG 2.2 SC 4.1.3)
+
+**Layout floor:** (TOR) [Web app: Every screen is usable at 320 CSS px width and at 200% zoom
+with no horizontal scrolling, overlap, or clipped controls. (WCAG 2.2 SC 1.4.10, 1.4.4) /
+Desktop app: Every window is usable at the minimum window size of [800 x 600] with no clipped
+controls, and refuses to shrink below it.]
+
+**Contrast:** (TOR) Body text has a contrast ratio of at least 4.5:1 (3:1 for large text);
+control boundaries and focus indicators at least 3:1 against adjacent colors.
+(WCAG 2.2 SC 1.4.3, 1.4.11)
+
+**Reduced motion:** (TOR) When the OS reduce-motion preference is set, non-essential animation
+is disabled or replaced by an instant transition. (WCAG 2.2 SC 2.3.3, 2.2.2)
+
+**Navigation:** (TOR) Every screen has a unique page or window title, a single visible H1
+matching it, and a primary navigation whose current item is marked. (WCAG 2.2 SC 2.4.2, 2.4.6, 3.2.3)
+
+**Responsiveness budget:** [N/A / Web app: At the 75th percentile the primary screens meet
+LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1. / Desktop app: Every interaction is acknowledged on
+screen within [200 ms].]
+
+**Undo:** [N/A / Reversible actions offer Undo (Ctrl/Cmd+Z or an "Undo" control), and unsaved
+form input survives an accidental reload of the same screen. (WCAG 2.2 SC 3.3.7)]
+
+[Desktop app only:]
+**Desktop conventions:** (each bullet is a TOR)
+- Application menu with the platform's standard menus and standard roles for Undo, Redo, Cut,
+  Copy, Paste, Select All, Close, Minimize, Quit, About.
+- Primary commands have `CmdOrCtrl` accelerators matching platform shortcuts; every menu item
+  with a shortcut displays it.
+- Window size, position, and maximized state are restored on relaunch, clamped to a visible display.
+- A second launch focuses and restores the running window instead of starting a new instance.
+- Open / Save / Export use native file dialogs with file-type filters.
 ```
 
 **Security Baseline** (if missing):
@@ -195,6 +399,7 @@ makes them inapplicable.
 - Where does the requirements baseline live? (default: `docs/requirements/`)
 - Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard)
 - Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- Leave room for a `**Recommended skills:**` line — Step 8 writes it.
 
 **Verification & Quality Gates** (if missing):
 - What checks should run before an epic is marked complete? Ask about each:
@@ -671,7 +876,48 @@ For each `MISS` / `WEAK` not yet resolved, repeat the recommendation with the fi
 and the next action. The user is responsible for the legal / build-system items
 (LICENSE, CI config, lockfile); `/peak-workflow:setup` does not auto-create them.
 
-## Step 8: Final Summary
+## Step 8: Recommended Claude Code Skills
+
+Some project types work better with companion skills installed. Decide by the Project type
+declared in Tool Hygiene & Operability:
+
+| Project type | Recommended skills |
+|---|---|
+| Web app / Desktop app / Hybrid with a UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic` |
+| CLI tool / Service or API / Library | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
+
+For each recommended skill, check whether it appears in this session's available-skills list
+and report `[PASS] {skill} — installed` or `[MISS] {skill} — not installed`.
+
+For each `[MISS]`, use `AskUserQuestion`:
+- Question: `"The {skill} skill is not installed. Install it now?"`
+- Options: `["Yes — show me the install commands", "No — skip for now"]`
+
+On yes, print the commands for the user to run (this skill cannot run `/plugin` itself):
+
+> Run these in Claude Code, then restart Claude Code so the new skill loads:
+> ```
+> /plugin marketplace add anthropics/claude-plugins-official   # only if this marketplace is not already registered
+> /plugin install frontend-design@claude-plugins-official
+> ```
+
+For `playwright-cli`, print `/plugin install playwright-cli@<marketplace>` and tell the user to
+pick the marketplace that lists it (`/plugin` → Discover) — do not guess a marketplace name.
+
+Record the outcome as a `**Recommended skills:**` line inside the **Peak Workflow** section of
+`CLAUDE.md`, one entry per skill with its status, followed by the precedence rule:
+
+```markdown
+**Recommended skills:** `frontend-design@claude-plugins-official` (installed), `playwright-cli`
+(not installed — install before the first UI epic). `frontend-design` shapes visual execution;
+the UX Baseline and the design-system tokens take precedence over its aesthetic choices.
+```
+
+Also print the precedence rule to the user verbatim: `frontend-design` shapes visual
+execution; the UX Baseline and the design-system tokens take precedence over its aesthetic
+choices.
+
+## Step 9: Final Summary
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work
@@ -680,6 +926,14 @@ Remind the user:
   version exposure, log startup stamping, logging convention, exit codes (CLI),
   stdout/stderr discipline (CLI), and error-message standards. Lines marked `N/A` are
   skipped.
+- For UI projects, the **UX Baseline** section in `CLAUDE.md` follows the same chain:
+  `/peak-workflow:capture-requirements` turns each active line into a baseline UX TOR, the
+  walking skeleton epic in `/peak-workflow:plan-project` installs the declared design system and
+  proves those TORs on one reference screen, and `/peak-workflow:wrapup-epic` runs the UX
+  Baseline check as a quality gate on every UI epic. Lines marked `N/A` are skipped.
+- Any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
+  `frontend-design` shapes visual execution, and the UX Baseline and design-system tokens take
+  precedence over its aesthetic choices.
 - The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:start-epic`
   during implementation and by `/peak-workflow:wrapup-epic` during independent review. These
   reminders are not derived as TORs.

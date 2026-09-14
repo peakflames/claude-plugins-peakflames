@@ -193,20 +193,28 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 against the live app (for a desktop app, the dev build with a live main process), open every
 screen this epic adds or changes and confirm each active line of the UX Baseline holds on it:
 
-- **Screen states** — loading, empty, error, and populated states each render. Force each one
-  (throttle or block the data source, use an empty dataset, return an error).
-- **Keyboard** — every interactive element is reachable by Tab in a sensible order; Enter /
-  Space activate; Escape closes dialogs and menus; focus is visibly indicated at each stop.
-- **Forms** — every control has a visible label; a failed submission names the field and the
-  fix next to that field, and focus moves to the first error.
-- **Destructive actions** — an irreversible action asks for confirmation or offers undo.
-- **Feedback** — an action that takes longer than about a second shows progress; success and
-  failure are announced on screen in words.
-- **Layout floor** — the screen is usable at the declared minimum width or window size with no
-  clipped controls and no horizontal page scroll.
+- **Screen states** — loading, empty, error, and populated states each render with visible
+  text. Force each one (throttle or block the data source, use an empty dataset, return an error).
+- **Keyboard & focus** — every interactive element is reachable by Tab in a sensible order
+  with no trap; Enter / Space activate; Escape closes dialogs and menus; focus is visibly
+  indicated at each stop and not hidden behind sticky UI; a modal keeps focus inside and
+  returns it to the invoker on close.
+- **Forms** — every field has an associated label; a failed submission names the problem and
+  the fix next to the field, and focus moves to the first invalid field.
+- **Destructive actions** — an irreversible action asks for confirmation with the safe option
+  as the default and Escape cancelling.
+- **Progress feedback** — an operation longer than a second shows progress within a second;
+  one longer than ten seconds can be cancelled.
+- **Layout floor** — the screen is usable at 320 px and 200% zoom (web) or the declared
+  minimum window size (desktop) with no clipped controls and no horizontal page scroll.
+- **Contrast** — body text at least 4.5:1, control boundaries and focus indicators at least 3:1.
+- **Reduced motion** — with the OS reduce-motion preference set, non-essential animation is off.
+- **Navigation** — unique page or window title, one visible H1 matching it, current item
+  marked in the primary navigation.
 - **Desktop conventions** (desktop apps only) — new commands appear in the application menu
-  with accelerators; dialogs use native file pickers where files are chosen.
-- Any project-specific line the section declares.
+  with accelerators; file choices use native dialogs; window state and single-instance
+  behavior still hold.
+- Any project-specific line the section declares (Responsiveness budget, Undo) when not `N/A`.
 
 The skeleton epic's baseline UX TORs proved these behaviors once on the reference screen; this
 gate checks that the new screens kept the pattern. Report `PASS` or

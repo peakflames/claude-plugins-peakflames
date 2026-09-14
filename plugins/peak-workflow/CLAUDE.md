@@ -55,6 +55,19 @@ in the Deferrals table so the human sees the one place self-review occurs.
 **Deferral gate:** one contract in `start-epic` and `wrapup-epic` — Fix now / Defer / Stop with a
 recommendation. Defer only when the Then clause depends on a later epic whose spec names the TOR.
 
+**Baseline chains:** `CLAUDE.md` sections written by `setup` become baseline TORs in
+`capture-requirements` — `Tool Hygiene & Operability` (all project types, Step 3A.2.1) and
+`UX Baseline` (Web app / Desktop app / Hybrid with a UI, Step 3A.2.2). Both sets belong to the
+walking-skeleton epic in `plan-project`; the skeleton installs the declared design system
+(default shadcn/ui, themed only via CSS-variable tokens) and proves the UX TORs on one reference
+screen. `wrapup-epic` re-checks every UX Baseline line on each UI epic as a quality gate. The
+bold line labels in the UX Baseline template are cited verbatim by downstream skills — do not
+rename them.
+
+**Companion skills:** `setup` recommends `frontend-design@claude-plugins-official` and
+`playwright-cli` for UI projects. `frontend-design` shapes visual execution; the UX Baseline and
+design-system tokens take precedence over its aesthetic choices.
+
 ## Skill File Rules
 
 - `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere

@@ -6,6 +6,49 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.0] — 2026-09-14
+
+UX baseline for web and desktop apps: the same declare → baseline-TOR → skeleton → verify chain
+that CLI tools already get from Tool Hygiene & Operability.
+
+### Added
+
+- **`UX Baseline` CLAUDE.md section** — `setup` declares the design system (default shadcn/ui
+  on Tailwind v4, themed only via CSS-variable tokens) and interaction conventions with
+  acceptable defaults: Screen states, Keyboard & focus, Forms, Destructive actions, Progress
+  feedback, Layout floor, Contrast, Reduced motion, Navigation, Desktop conventions.
+- **Desktop app project type** — `setup` enumerates Electron / Tauri / native apps with Tool
+  Hygiene defaults (About dialog for version, electron-log, `N/A` exit codes unless a CLI
+  entry exists) and a desktop Local Environment branch.
+- **Tech Stack defaults by project type** — thin answers get a one-answer default: TypeScript
+  end to end, Bun for install / run / test, shadcn/ui + Tailwind v4, SQLite first; Electron
+  Forge `vite-typescript` + better-sqlite3 for desktop, Bun + Hono + `bun:sqlite` for web.
+- **Recommended Claude Code Skills step** — `setup` Step 8 checks UI projects for
+  `frontend-design` (default `frontend-design@claude-plugins-official`) and `playwright-cli`,
+  prints install commands on request, and records the precedence rule in CLAUDE.md.
+- **Baseline UX TORs** — `capture-requirements` Step 3A.2.2 derives at least one
+  Playwright-observable TOR per active UX Baseline line, placed after the tool-hygiene block
+  before domain TORs, with Web and Desktop shall-statement defaults.
+- **UX Baseline quality gate in `wrapup-epic`** — Step 1.3 checks every UX Baseline line on
+  each screen a UI epic adds or changes; a FAIL goes through Fix now / Stop and cannot be
+  deferred.
+
+### Changed
+
+- **Walking skeleton owns the design system** — for UI products `plan-project` 3A.1 has the
+  skeleton install the declared design system, build the app shell, and ship one reference
+  screen that proves the baseline UX TORs; no later epic installs a component library.
+- **UX Baseline traceability** — `capture-requirements` trace table, quality checklist, and
+  summary counts cover UX Baseline lines; brownfield 3B.2 appends TORs for lines added later.
+- **`start-epic` carries the UX Baseline** — UI epics compose from the skeleton's shell and
+  tokens; middle steps name each screen's four states; `frontend-design` shapes visuals but the
+  UX Baseline and tokens take precedence.
+- **`wrapup-epic` code review** — checks Security Baseline items and, for UI epics, that
+  theme changes live in the token file rather than generated component files.
+- **`setup` Final Summary** renumbered to Step 9.
+
+---
+
 ## [1.7.1] — 2026-09-14
 
 ### Documentation
