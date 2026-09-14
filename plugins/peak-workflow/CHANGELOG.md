@@ -6,6 +6,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.1] — 2026-09-14
+
+### Documentation
+
+- **README "context meter" guidance** — a heavy session is rolled to a fresh one with `/newtask`
+  (or your preferred handoff skill); the epic is not split. The 25% rule is the operator's to
+  keep, not the planner's to guess.
+
+---
+
 ## [1.7.0] — 2026-09-11
 
 Vertical-slice epic formation (Closes #7): epics own whole user-observable capabilities instead
