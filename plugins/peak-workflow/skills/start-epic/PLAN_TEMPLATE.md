@@ -12,8 +12,9 @@ Placeholder reference:
 - `<N>` — source issue number from Step 1 (omit announce/trailer if unknown)
 - `<base-branch>` — `develop` if it exists, else `main`, else `master`
 - `<TOR-list>` — comma-separated list of TOR IDs from the Requirements Anchors table
-- `<test-directory>` — the project's test directory from CLAUDE.md's Verification & Quality
-  Gates section (e.g., `tests/`, `spec/`, `__tests__/`)
+- `<test-directories>` — every directory listed under Test directories in CLAUDE.md's
+  Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if the line is
+  absent, the single test directory that section names)
 - `<deferral-count>` — the `Count:` value from the handoff's Deferrals section
 - `<handoff-path>` — `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md`
 
@@ -79,9 +80,10 @@ Components. Each middle step must:
 - **Include a test for each TOR ID** — the test must mirror the Gherkin structure: arrange the
   Given preconditions, act on the When, assert the Then outcome. Name the test file and test
   method/function. **The TOR ID must appear literally in the test** (name, docstring, or a
-  comment on the test) — wrapup locates tests by `grep -rl "<TOR-ID>" <test-directory>` and
-  nothing else. If the Then names a quantity or boundary (e.g., 10,000 rows), the test's Given
-  must construct it; a test that only checks a flag is accepted does not mirror the Then.
+  comment on the test) — wrapup locates tests by grepping every directory in
+  `<test-directories>` for the TOR ID and nothing else. If the Then names a quantity or
+  boundary (e.g., 10,000 rows), the test's Given must construct it; a test that only checks a
+  flag is accepted does not mirror the Then.
 
 If Step 1 item 13 (E2E audit) surfaced regression specs likely to break, include an explicit
 "update regression specs: …" item here, committed alongside the implementation.
@@ -162,14 +164,15 @@ Middle step example:
   3. Inspect source to confirm the implementation realizes the Given/When/Then (a passing test
      that doesn't exercise the requirement is a FAIL).
   4. Also run the project's Verification & Quality Gates from `CLAUDE.md` (build, lint, console
-     errors, brand audit if UI, and for a UI epic the UX Baseline check that
-     `/peak-workflow:wrapup-epic` Step 1.3 runs — screen states, keyboard, forms, destructive
-     actions, feedback, layout floor). Report each gate as PASS / FAIL / CANNOT VERIFY.
+     errors, brand audit if UI, and for a UI epic the UX Baseline check — every active line of
+     the UX Baseline section, exactly as `/peak-workflow:wrapup-epic` Step 1.3 lists them).
+     Report each gate as PASS / FAIL / CANNOT VERIFY.
 
   Before reporting, run two mechanical checks against the working tree (nothing is committed
   yet, so `git diff <base-branch>` alone would miss new files):
-  - `grep -rl "<TOR-ID>" <test-directory>` must hit for every TOR ID. A miss means the test
-     is not traceable — fix the test before continuing.
+  - `for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done` must hit in at least one
+     directory for every TOR ID. A miss means the test is not traceable — fix the test before
+     continuing.
   - ```bash
     grep -inE 'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
       $(git diff --name-only <base-branch>; git ls-files --others --exclude-standard)

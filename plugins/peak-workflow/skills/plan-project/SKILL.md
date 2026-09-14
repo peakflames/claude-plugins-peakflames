@@ -76,9 +76,10 @@ project scaffolding, build and test tooling, dev environment, CI, and the thinne
 through every layer the product has. The **tool-hygiene baseline TORs** captured in
 `capture-requirements` 3A.2.1 (version exposure, startup log line, logging convention, error
 message standard, and for CLIs exit codes and stdout/stderr discipline) are this epic's
-Requirements Anchors — they already touch every layer with no domain logic. If no tool-hygiene
-TORs exist (`capture-requirements` skipped 3A.2.1), the skeleton has `requirements: —` (5.3b)
-and its spec Description states that wrapup verifies the architectural pattern only.
+Requirements Anchors — they already touch every layer with no domain logic. If neither
+tool-hygiene nor baseline UX TORs exist (`capture-requirements` skipped 3A.2.1 and 3A.2.2), the
+skeleton has `requirements: —` (5.3b) and its spec Description states that wrapup verifies the
+architectural pattern only.
 
 The skeleton's job is to establish the architectural pattern every later slice follows (how a
 request reaches a handler, how a screen calls the API, where tests live). Its spec Description
@@ -94,11 +95,17 @@ skeleton must:
 
 - Install the design system declared in `CLAUDE.md`'s **UX Baseline** section (default:
   shadcn/ui on Tailwind, themed only through the CSS-variable tokens in the global stylesheet —
-  never by editing generated component files).
+  never by editing generated component files). For the Electron Forge template first add the
+  `@/* → src/*` path alias to `tsconfig.json`, and `resolve.alias` plus `@tailwindcss/vite` to
+  `vite.renderer.config.ts`, then `bunx shadcn@latest init`.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
 - Ship **one reference screen** that renders the loading, empty, error, and populated states and
-  passes every baseline UX TOR. It is the pattern every later screen copies.
+  passes every baseline UX TOR. It is the pattern every later screen copies. The reference
+  screen may be the thinnest real screen from ConOps Scenario 1 (one entity list, its create
+  form, its delete) — that is the minimum surface the Forms, Destructive actions, and Progress
+  feedback TORs need; a file-dialog TOR needs one Export action on it. "No domain logic" means
+  no business rules, not no data.
 
 No later epic installs a component library, defines tokens, or builds a second shell — a slice
 composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
@@ -140,7 +147,8 @@ to split later (`/pause`, then `/add` for the remainder) while an over-split pla
 on every epic. Do not size epics by predicted context usage; that cannot be measured here, and
 the operator watches the meter in `/start-epic`.
 
-Count is a sanity check only, not a target:
+Count is a sanity check only, not a target. The walking skeleton is exempt from the count
+check — its size is set by the baseline sections.
 - More than **~20 TOR IDs** → split by ConOps scenario (3A.2).
 - Fewer than **~4 TOR IDs** → merge with the adjacent slice from the same scenario, unless the
   TORs are individually heavy (doc strings, data tables, a `docs/reference/` dependency) — then

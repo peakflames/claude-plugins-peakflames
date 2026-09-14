@@ -253,14 +253,14 @@ dedicated `NN-logging.feature.md`), use that file instead.
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them.
 
-| Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) |
-|---|---|---|
-| **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page |
-| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level |
-| **Logging convention** | The tool shall emit log records at the levels DEBUG, INFO, WARN, and ERROR, in the format declared in CLAUDE.md (structured JSON / key=value / human-readable) | (same — substitute "web application") |
-| **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A |
-| **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A |
-| **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action |
+| Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) | Default TOR shall-statement form (Desktop app example) |
+|---|---|---|---|
+| **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page | The application shall display its name and semantic version in an About dialog opened from Help > About |
+| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level | The application shall write a first log line containing its name and semantic version to the electron-log file on startup |
+| **Logging convention** | The tool shall emit log records at the levels DEBUG, INFO, WARN, and ERROR, in the format declared in CLAUDE.md (structured JSON / key=value / human-readable) | (same — substitute "web application") | (same — substitute "application") |
+| **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A | N/A |
+| **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A | N/A |
+| **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action | The application shall display user-facing error messages on screen that name the problem AND name the next user action |
 
 For each baseline TOR, write a concrete, observable Given/When/Then. Examples:
 
@@ -303,7 +303,7 @@ covered by TOR requirements. Active TOR lines are every bold-labelled line excep
 line marked `N/A`. For each active line derive at least one TOR — written in normal Scenario
 form, with the Scenario title as a complete `shall` statement matching the convention
 declared in `CLAUDE.md`. Each **Desktop conventions** bullet is its own line and yields its own
-TOR.
+TOR (an `N/A` Desktop conventions bullet yields no TOR).
 
 Place baseline UX TORs in the **first feature file**, immediately after the tool-hygiene
 block, under a `# UX Baseline` section banner (`# ---` comment block per
@@ -315,15 +315,16 @@ Baseline UX TORs are **black-box and Playwright-observable**: assert on roles, v
 `document.activeElement`, computed styles, viewport size, and document title — never on
 component internals. Use generic screen and control names (`the Settings screen`, `the Save
 button`) unless the ConOps names a concrete one. For a desktop app, the same assertions run
-against the dev build with a live main process.
+through the project's Playwright Electron harness against the dev build with a live main process.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
-override them. Where the Web app and Desktop app forms differ, both are given.
+override them. Where the Web app and Desktop app forms differ, both are given. Rows with
+semicolon-separated clauses yield one TOR per clause.
 
 | UX Baseline line | Default TOR shall-statement form (Web app) | Default TOR shall-statement form (Desktop app) |
 |---|---|---|
 | **Screen states** | The application shall render an explicit loading, empty, error, and populated state on every data-bearing screen, each distinguishable by visible text | (same) |
-| **Keyboard & focus** | The application shall allow every interactive control to be reached and operated by keyboard alone with no keyboard trap; shall display a visible focus indicator on the focused control that is not obscured by sticky UI; and shall move focus into a modal dialog on open, keep Tab within it, and return focus to the invoking control on close (one TOR per clause) | (same) |
+| **Keyboard & focus** | The application shall allow every interactive control to be reached and operated by keyboard alone with no keyboard trap; shall display a visible focus indicator on the focused control that is not obscured by sticky UI; and shall move focus into a modal dialog on open, keep Tab within it, and return focus to the invoking control on close | (same) |
 | **Forms** | The application shall associate a label with every form field, shall identify each invalid field in text next to it naming the problem and the fix, and shall move focus to the first invalid field on a failed submission | (same) |
 | **Destructive actions** | The application shall require an explicit confirmation before every irreversible action, with the safe option as the default and Escape cancelling | (same) |
 | **Progress feedback** | The application shall show a visible progress indicator within 1 second of starting any operation longer than 1 second, and shall offer a cancel control for any operation longer than 10 seconds | (same) |
@@ -414,7 +415,10 @@ After all feature files are written, invoke a Haiku sub-agent using the `Agent` 
 > scenario, find the most specific matching section in
 > `docs/product-vision-planning/product-vision.md` and the most specific scenario step in
 > `docs/product-vision-planning/concept-of-operations.md`. Write paraphrases in your own words
-> — do not copy source text. If no credible trace can be found for a requirement, record it
+> — do not copy source text. Scenarios under the tool-hygiene banner or the `# UX Baseline`
+> banner trace to `CLAUDE.md` — record them under `traces_to.claude_md`, citing `section`
+> (`Tool Hygiene & Operability` or `UX Baseline`) and the bold `line` label; never record them
+> as `orphan_requirement`. If no credible trace can be found for a requirement, record it
 > under `coverage_gaps` with `gap_type: "orphan_requirement"`. Also enumerate ConOps scenario
 > steps and PV goals not covered by any TOR ID and record those under `coverage_gaps` with
 > `gap_type: "uncovered_source"` in the most relevant feature file's sidecar. Do NOT modify
@@ -575,7 +579,8 @@ Before presenting the summary, verify:
 - [ ] Every `Feature:` has the `As a … / I want … / So that …` triad.
 - [ ] Every `.feature.tracing.json` sidecar exists for every `.feature.md` file.
 - [ ] No `coverage_gaps` with `gap_type: "orphan_requirement"` remain unaddressed.
-  (Orphan requirements must either gain a source trace or be removed.)
+  (Orphan requirements must either gain a source trace — vision, ConOps, or a CLAUDE.md
+  baseline line — or be removed.)
 - [ ] If `tool_hygiene_section_present = true`: every active (non-`N/A`) line in
   `CLAUDE.md`'s `Tool Hygiene & Operability` section is covered by at least one TOR
   in the produced feature files. The trace appears in the Step 4 trace table with the
@@ -619,7 +624,7 @@ Preserve the original timestamp. The `.processed` suffix prevents re-consumption
 - ConOps scenario steps covered: {X} of {Y}
 - Product Vision goals/scope items covered: {A} of {B}
 - Tool Hygiene lines covered: {T} of {U} [omit row if section absent]
-- UX Baseline lines covered: {V} of {W} [omit row if not applicable]
+- UX Baseline lines covered: {V} of {W} [omit row if not applicable; each non-`N/A` Desktop conventions bullet counts as its own line]
 - Tracing gaps resolved: {M}
 
 ### Coverage Gaps (explicitly deferred)

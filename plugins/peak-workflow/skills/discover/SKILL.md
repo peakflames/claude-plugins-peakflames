@@ -147,7 +147,7 @@ This is the heart of the discovery. Produce draft content for Product Vision sec
 
 Produce draft content for Product Vision sections 9–11 and ConOps sections 7–9:
 
-- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction. *(For CLI/terminal projects, "design direction" means output formatting conventions, flag naming style, error message tone, and exit code behavior — not visual/GUI design.)*
+- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction. If `CLAUDE.md` has a **UX Baseline** section, draft §9 within its **Design system** declaration — do not propose another component library, token scheme, or dark-mode mechanism. *(For CLI/terminal projects, "design direction" means output formatting conventions, flag naming style, error message tone, and exit code behavior — not visual/GUI design.)*
 - **Product Vision Section 10 — Data Strategy:** Draft the data architecture description (sources, freshness, any background processes).
 - **Product Vision Section 11 — Backlog / Future Vision:** Draft a bulleted list of 5–10 deferred items representing the product's growth trajectory.
 - **ConOps Section 7 — Functional Summary:** Draft tables summarizing features by view/area.

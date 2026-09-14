@@ -61,7 +61,7 @@ user accepts the whole row with one answer or overrides any cell:
 | Project type | Default stack (accept as-is or override any cell) |
 |---|---|
 | **Web app** | TypeScript end to end. Bun runtime with Hono (or Elysia) for the server; React + Vite + shadcn/ui + Tailwind v4 for the UI; `bun:sqlite` for the database. Bun for install / run / test / `bunx`. |
-| **Desktop app** | TypeScript end to end. Electron Forge `vite-typescript` template scaffolded with `bunx create-electron-app@latest <name> --template=vite-typescript`, React added afterwards (`bun add react react-dom`, `bun add -d @vitejs/plugin-react`); shadcn/ui + Tailwind v4 in the renderer; better-sqlite3 in the main process only (Forge rebuilds it for Electron automatically; DB file under `app.getPath('userData')`, WAL mode); electron-log; electron-window-state. Bun for install / run / test / `bunx` — the app itself runs on Electron's bundled Node, not the Bun runtime, so `bun:sqlite` and other Bun APIs are not available inside the app. |
+| **Desktop app** | TypeScript end to end. Electron Forge `vite-typescript` template scaffolded with `bunx create-electron-app@latest <name> --template=vite-typescript`, React added afterwards (`bun add react react-dom`, `bun add -d @vitejs/plugin-react`); shadcn/ui + Tailwind v4 in the renderer; better-sqlite3 in the main process only (Forge rebuilds it for Electron automatically; DB file under `app.getPath('userData')`, WAL mode); electron-log; electron-window-state. Bun for install / scripts / `bunx`; tests via Vitest (`bunx vitest`) for renderer and pure-TypeScript main code, and Playwright Electron (`@playwright/test`, `_electron.launch`) for anything touching better-sqlite3 or IPC — `bun test` cannot load the Electron-rebuilt binary. The app itself runs on Electron's bundled Node, not the Bun runtime, so `bun:sqlite` and other Bun APIs are not available inside the app. |
 | **Service or API** | TypeScript. Bun runtime with Hono (or Elysia); `bun:sqlite`; Bun for install / run / test / `bunx`. |
 | **CLI tool / Library** | If no language is named: TypeScript on Bun (`bun init`, `bun test`, single-file executable via `bun build --compile`), `bun:sqlite` if it needs a database. If a language is named, that language's standard toolchain (e.g., Python: `uv`, `pytest`, `ruff`, a `pyproject.toml` console-script entry point). |
 
@@ -86,7 +86,7 @@ First, determine the project type from the Tech Stack answers already captured. 
 
 *For desktop projects:*
 - How do you start the dev build? (e.g., `bun run start` for Electron Forge, which launches the app with a live main process and renderer hot reload)
-- How do you run the test suite? (e.g., `bun test`, `npm test`)
+- How do you run the test suite? (e.g., `bunx vitest` for unit tests, `bunx playwright test` for the Electron E2E suite)
 - Skip the live-API / live-data questions unless the app also talks to a backend service of its own — if it does, ask the web/server questions for that backend.
 
 **Tool Hygiene & Operability** (if missing):
@@ -109,9 +109,10 @@ requirements. Ask in order:
    - CLI: `--version` flag printing `<name> v<semver>` to stdout, exit 0
    - Web app: GET `/version` endpoint returning JSON, plus version visible in app footer
      or About page
-   - Desktop app: Help > About dialog (App menu > About on macOS) showing the app name and
-     semantic version (Electron: `app.getVersion()` with `app.setAboutPanelOptions` and a
-     `role: 'about'` menu item, or a `dialog.showMessageBox`), plus the startup log line
+   - Desktop app: Help > About menu item (App menu > About on macOS) opens an in-app About
+     dialog rendered in the renderer showing `<name> v<semver>` obtained from
+     `app.getVersion()` over IPC, plus the startup log line. Native About panels sit outside
+     the DOM and cannot be asserted by Playwright — do not use `role: 'about'` alone.
    - Service/API: GET `/version` or `/health` endpoint with version field
    - Library: `__version__` (or language-equivalent) constant exported from package root
    - Hybrid: list each applicable mechanism
@@ -147,8 +148,9 @@ requirements. Ask in order:
    - stderr — diagnostics, progress, errors, log output
 
 8. *Error message standard* — confirm user-facing errors will name the problem AND the
-   next user action (on screen for Web / Desktop apps, on stderr for CLI tools). Format example:
-   `Error: configuration file not found at <path>. Try --config to specify an alternate path.`
+   next user action (on screen for Web / Desktop apps, on stderr for CLI tools). Format examples:
+   CLI — `Error: configuration file not found at <path>. Try --config to specify an alternate path.`
+   Desktop — `Could not save order #123: the database file is locked. Close other copies of the app and try again.`
 
 Generate the section using this template, filling in the project-specific answers:
 
@@ -165,7 +167,8 @@ declared mechanism. Lines marked `N/A` are skipped.
 **Version exposure:** [Mechanism declaration. Example for a CLI: `--version` flag printing
 `myapp v<semver>` to stdout with exit code 0. Example for a Web app: GET `/version` endpoint
 returning JSON `{name, version}` AND version visible in app footer. Example for a Desktop app:
-Help > About dialog showing `myapp v<semver>` via `app.getVersion()`.]
+Help > About opens an in-app About dialog (rendered in the renderer) showing `myapp v<semver>`
+from `app.getVersion()` over IPC.]
 
 **Version stamped at log startup:** The first log line emitted on process / app startup
 includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting`).
@@ -182,8 +185,10 @@ includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting
 **stdout / stderr discipline:** [CLI / Hybrid — restate; otherwise: `N/A`]
 
 **Error message standard:** User-facing errors name the problem AND the next user action.
-Example: `Error: configuration file not found at <path>. Try --config to specify an
+CLI example: `Error: configuration file not found at <path>. Try --config to specify an
 alternate path.`
+Desktop example: `Could not save order #123: the database file is locked. Close other copies
+of the app and try again.`
 ```
 
 **UX Baseline** (if missing — Project type Web app, Desktop app, or Hybrid with a UI only):
@@ -241,9 +246,9 @@ accept / override answer; override line by line only where the user asks.
 
 7. *Layout floor* (TOR) — Web app: every screen is usable at 320 CSS px width and at 200% zoom
    with no horizontal scrolling, overlap, or clipped controls (WCAG 2.2 SC 1.4.10, 1.4.4).
-   Desktop app: every window is usable at the declared minimum window size (default
-   800 x 600) with no clipped controls, and the window refuses to shrink below it. Ask the
-   user for the minimum window size.
+   Desktop app: every window is usable at the declared minimum window size with no clipped
+   controls, and the window refuses to shrink below it. Default shown in the block: 800 x 600
+   — changed only if the user names this line at the single accept / override question.
 
 8. *Contrast* (TOR) — body text has a contrast ratio of at least 4.5:1 (3:1 for large text),
    and control boundaries and focus indicators at least 3:1 against adjacent colors
@@ -262,14 +267,17 @@ accept / override answer; override line by line only where the user asks.
 11. *Responsiveness budget* (optional TOR, default `N/A`) — Web app: at the 75th percentile the
     primary screens meet Core Web Vitals "good": LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1.
     Desktop app: a declared local-interaction latency (e.g., every click acknowledged within
-    200 ms). Ask whether the user wants it; otherwise write `N/A`.
+    200 ms). Default shown in the block: `N/A` — changed only if the user names this line at
+    the single accept / override question.
 
 12. *Undo* (optional TOR, default `N/A`) — reversible actions offer Undo (Ctrl/Cmd+Z or an
     "Undo" control), and unsaved form input survives an accidental reload of the same screen
-    (WCAG 2.2 SC 3.3.7). Ask whether the user wants it; otherwise write `N/A`.
+    (WCAG 2.2 SC 3.3.7). Default shown in the block: `N/A` — changed only if the user names
+    this line at the single accept / override question.
 
 13. *Desktop conventions* (Desktop app only — each bullet is a TOR; omit the whole line for
-    Web apps):
+    Web apps). Any bullet may be marked `N/A`. Default the file-dialog bullet to `N/A` unless
+    the vision / ConOps or the user names Open, Save, Import, or Export:
     - Application menu with the platform's standard menus (App / File / Edit / View / Window /
       Help on macOS; File / Edit / View / Help elsewhere) using standard roles for Undo, Redo,
       Cut, Copy, Paste, Select All, Close, Minimize, Quit, About.
@@ -353,7 +361,8 @@ form input survives an accidental reload of the same screen. (WCAG 2.2 SC 3.3.7)
   with a shortcut displays it.
 - Window size, position, and maximized state are restored on relaunch, clamped to a visible display.
 - A second launch focuses and restores the running window instead of starting a new instance.
-- Open / Save / Export use native file dialogs with file-type filters.
+- [N/A unless a file operation exists: Open / Save / Import / Export use native file dialogs
+  with file-type filters.]
 ```
 
 **Security Baseline** (if missing):
@@ -409,8 +418,29 @@ makes them inapplicable.
   - Visual/screenshot verification? (suggest `playwright-cli` skill if frontend)
   - Brand or design compliance? (suggest brand guidelines skill if applicable)
   - Any other project-specific checks?
+  - Where do tests live? List every directory wrapup must grep — unit and E2E (Desktop
+    default: `tests/` and `e2e/`).
 
   *For CLI/tool projects skip the visual/screenshot and brand questions — ask only about build, tests, lint, and "run the tool with a known input" (reuse the Local Environment invocation).*
+
+  The written section must open with this template (substitute the answers; keep the bold
+  labels verbatim — `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` grep every
+  directory on the `Test directories` line, which is **space-separated**, no commas):
+
+```markdown
+## Verification & Quality Gates
+
+**Test directories:** tests/ e2e/
+
+Run every applicable check before marking an epic Implemented or Complete:
+
+- **Build:** `[build command]`
+- **Tests:** `[test command]`
+- **Lint / format:** `[lint command]`
+- **Visual / console (UI only):** [`playwright-cli` against the running app / the Playwright Electron harness in `e2e/`]
+- **Brand (UI only, if a brand skill is configured):** [skill name]
+- [Any other project-specific check]
+```
 
 After gathering answers, **validate each command answer**: if the user provides a non-empty
 answer that looks like a description rather than a runnable shell command (e.g., it contains no
@@ -445,8 +475,9 @@ If the second answer is still ambiguous, accept it and add a note in the written
 - How do you verify the tool/app works after build?
   - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`)
   - *Web/server projects:* curl a health endpoint (e.g., `curl http://localhost:8080/api/health`) or use `playwright-cli`
+  - *Desktop projects:* start the dev build (e.g., `bun run start`) and run the Playwright Electron smoke test (e.g., `bunx playwright test`)
 
-When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers.
+When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers. For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
 - Generate the section using this template, filling in the project-specific commands:
 
 ```markdown
@@ -459,7 +490,7 @@ A successful build (compile) does NOT equal working code. The workflow MUST be:
 1. **Implement** — Make the code changes
 2. **Lint** — Run `[lint command]` to verify formatting and static analysis
 3. **Build** — Run `[build command]` to build *(omit or replace with a no-op note for projects with no explicit build step)*
-4. **Verify** — Use curl, playwright, or manual testing to confirm functionality
+4. **Verify** — Use [curl / playwright / the tool invocation / the dev build + Playwright Electron smoke test] or manual testing to confirm functionality
 5. **Commit** — ONLY after verification passed
 
 **Why this matters:**
@@ -575,7 +606,8 @@ traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capt
 
 ### Generating `docs/architecture.md` stub
 
-Derive the content from CLAUDE.md's Tech Stack, data sources, and project description sections:
+Derive the content from CLAUDE.md's Tech Stack, data sources, and project description sections.
+For Desktop app projects title §4 "IPC Contracts" and §8 "Packaging & Distribution".
 
 ```markdown
 # [Project Name] — Architecture Document
@@ -885,11 +917,14 @@ declared in Tool Hygiene & Operability:
 
 | Project type | Recommended skills |
 |---|---|
-| Web app / Desktop app / Hybrid with a UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic` |
+| Web app / Hybrid with a web UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic` |
+| Desktop app | `frontend-design` (same source) for visual execution. UI verification uses the project's Playwright Electron harness (`@playwright/test`, a project dependency — not a skill); report `[N/A] playwright-cli — desktop apps verify through the Playwright Electron harness` |
 | CLI tool / Service or API / Library / Hybrid without a UI | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
 
 For each recommended skill, check whether it appears in this session's available-skills list
-and report `[PASS] {skill} — installed` or `[MISS] {skill} — not installed`.
+and report `[PASS] {skill} — installed` or `[MISS] {skill} — not installed`. Plugin skills are
+listed namespaced (e.g., `frontend-design:frontend-design`) — match on the skill name after the
+last `:`.
 
 For each `[MISS]`, use `AskUserQuestion`:
 - Question: `"The {skill} skill is not installed. Install it now?"`
@@ -920,6 +955,14 @@ execution; the UX Baseline and the design-system tokens take precedence over its
 choices.
 
 ## Step 9: Final Summary
+
+**Unborn-HEAD check:** if `git rev-parse --verify HEAD` fails (no commits yet), ask via
+`AskUserQuestion` whether to commit the setup files now as `chore: initial project setup` on the
+current branch (`main` by default) so `/peak-workflow:discover` can branch from a real base:
+- Question: `"This repo has no commits yet. Commit the setup files now as 'chore: initial project setup' so /peak-workflow:discover can branch from a real base?"`
+- Options: `["Commit now", "I'll commit myself"]`
+On "Commit now", stage the files this session wrote or modified by path (never `git add -A`)
+and commit.
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work
