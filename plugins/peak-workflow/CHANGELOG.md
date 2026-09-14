@@ -56,6 +56,18 @@ that CLI tools already get from Tool Hygiene & Operability.
 - **Stale epic-workflow terms** — `start-epic` Step 4 builds the plan from TOR Given/When/Then
   (not "acceptance criteria" / "verification steps"); `plan-project` scope line says "TOR IDs
   covered"; plugin CLAUDE.md drops a machine-specific path.
+- **Tracing sidecar knows CLAUDE.md sources** — `TRACING_TEMPLATE.md` gains a `claude_md`
+  trace (section + bold line); the Haiku brief never records baseline TORs as orphans.
+- **Desktop dry-run pass** — Playwright Electron harness (not `playwright-cli`) for desktop
+  verification; UX gate allows a named `N/A`; single accept/override answer for the UX Baseline;
+  per-bullet `N/A` for Desktop conventions; in-app About dialog for version exposure; Vitest +
+  Playwright Electron instead of `bun test` for desktop.
+- **Test directories line** — `setup` writes a Verification & Quality Gates template with a
+  space-separated `Test directories` line; `start-epic` and `wrapup-epic` grep every listed
+  directory for TOR IDs.
+- **Skeleton sizing and prerequisites** — reference screen may be Scenario 1's thinnest real
+  screen; skeleton exempt from the TOR-count check; shadcn init prerequisites on the Forge
+  template; `discover` §9 stays within the declared design system; unborn-HEAD check in `setup`.
 
 ---
 

@@ -64,8 +64,9 @@ screen. `wrapup-epic` re-checks every UX Baseline line on each UI epic as a qual
 bold line labels in the UX Baseline template are cited verbatim by downstream skills — do not
 rename them.
 
-**Companion skills:** `setup` recommends `frontend-design@claude-plugins-official` and
-`playwright-cli` for UI projects. `frontend-design` shapes visual execution; the UX Baseline and
+**Companion skills:** `setup` recommends `frontend-design@claude-plugins-official` for UI
+projects and `playwright-cli` for web UIs (desktop apps verify through a Playwright Electron
+harness, a project dependency rather than a skill). `frontend-design` shapes visual execution; the UX Baseline and
 design-system tokens take precedence over its aesthetic choices.
 
 ## Skill File Rules

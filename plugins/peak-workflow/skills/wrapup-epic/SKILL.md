@@ -110,12 +110,14 @@ implement this epic. Do not trust the implementer's self-assessment.
 1. **Read the Given/When/Then** (loaded in Step 1.1 item 4a).
 2. **Locate the test(s)** for this TOR ID by grep only:
    ```bash
-   grep -rl "<TOR-ID>" <test-directory>
+   for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done
    ```
-   where `<test-directory>` is derived from CLAUDE.md's Verification & Quality Gates section
-   (e.g., `tests/`, `spec/`, `__tests__/`). Read the matching files. If the grep returns
-   nothing, no test traces to this requirement — the TOR's verdict is **FAIL** ("no test
-   names TOR-…"), even if source inspection finds the behavior implemented. Do not go looking
+   where `<test-directories>` is every directory listed under **Test directories** in
+   CLAUDE.md's Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if
+   the line is absent, the single test directory that section names). Read the matching files.
+   If the grep returns nothing in any listed directory, no test traces to this requirement —
+   the TOR's verdict is **FAIL** ("no test names TOR-…"), even if source inspection finds the
+   behavior implemented. Do not go looking
    in the handoff for a test. **Do not open the implementer handoff before finishing this
    step** for every TOR; it is read only in Step 1.2b.
 3. **Verify the test mirrors the Gherkin structure:**
@@ -129,9 +131,12 @@ implement this epic. Do not trust the implementer's self-assessment.
 5. **Independently inspect source code** — read the implementation file to confirm the code
    actually realizes the Given/When/Then behavior. A passing test that exercises the wrong code
    path is a FAIL.
-6. **For UI TOR IDs:** use `playwright-cli` against the live backend with real data (see
-   "Local Environment" in `CLAUDE.md`). Do NOT mock API responses unless the backend genuinely
-   cannot start. Start the backend first, then the frontend.
+6. **For UI TOR IDs:** Web app: `playwright-cli` against the running app with real data (see
+   "Local Environment" in `CLAUDE.md`) — start the backend first, then the frontend. Do NOT
+   mock API responses unless the backend genuinely cannot start. Desktop app: the project's
+   Playwright Electron harness (`@playwright/test` with `_electron.launch`, in the E2E
+   directory listed under Test directories in Verification & Quality Gates); `playwright-cli`
+   cannot attach to an Electron window.
 
 Report each TOR ID:
 - **PASS** — a test that mirrors the Given/When/Then (item 3) passes AND implementation
@@ -184,14 +189,17 @@ one into a Highlights bullet or a Known Issue — it gets its own row, marked as
 
 Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently:
 - Build check
-- Visual verification via `playwright-cli` (if UI was changed)
+- Visual verification (if UI was changed) — web: `playwright-cli`; desktop: the Playwright Electron harness
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
-- Console check via `playwright-cli` (if UI was changed)
+- Console check (if UI was changed) — web: `playwright-cli`; desktop: the renderer console captured by the Playwright Electron harness
 - UX Baseline check (if UI was changed and `CLAUDE.md` has a **UX Baseline** section) — see below
 
-**UX Baseline check.** This is a quality gate, not a code-review note. Using `playwright-cli`
-against the live app (for a desktop app, the dev build with a live main process), open every
-screen this epic adds or changes and confirm each active line of the UX Baseline holds on it:
+**UX Baseline check.** This is a quality gate, not a code-review note. Web app: `playwright-cli`
+against the running app with real data. Desktop app: the project's Playwright Electron harness
+(`@playwright/test` with `_electron.launch`, in the E2E directory listed under Test directories
+in Verification & Quality Gates); `playwright-cli` cannot attach to an Electron window. Open
+every screen this epic adds or changes and confirm each active line of the UX Baseline holds
+on it:
 
 - **Screen states** — loading, empty, error, and populated states each render with visible
   text. Force each one (throttle or block the data source, use an empty dataset, return an error).
@@ -217,10 +225,16 @@ screen this epic adds or changes and confirm each active line of the UX Baseline
 - Any project-specific line the section declares (Responsiveness budget, Undo) when not `N/A`.
 
 The skeleton epic's baseline UX TORs proved these behaviors once on the reference screen; this
-gate checks that the new screens kept the pattern. Report `PASS` or
-`FAIL — <baseline line>: <screen>: <one-line detail>` per line. A FAIL is handled in Step 1.4b as
-a failing gate (Fix now / Stop) — it cannot be deferred. A configured `frontend-design` or brand
-skill does not replace this check.
+gate checks that the new screens kept the pattern. Report one of these per line:
+- `PASS`
+- `FAIL — <baseline line>: <screen>: <one-line detail>`
+- `N/A — <baseline line>: no <form / irreversible action / long operation / file operation> on
+  the screens this epic adds or changes (<screens checked>)` — must name the screens checked
+  and does not fail the gate. N/A is never valid for Screen states, Keyboard & focus, Layout
+  floor, Contrast, Reduced motion, or Navigation.
+
+A FAIL is handled in Step 1.4b as a failing gate (Fix now / Stop) — it cannot be deferred. A
+configured `frontend-design` or brand skill does not replace this check.
 
 **Gate discrepancies are findings.** After running the gates, compare each result against the
 implementer handoff's *Verification Results (self-assessment)* section (the handoff is already
