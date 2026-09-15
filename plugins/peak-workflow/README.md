@@ -146,20 +146,21 @@ for verification (web; desktop apps verify through a Playwright Electron harness
 and records the precedence rule: the UX Baseline and the design-system tokens win over
 `frontend-design`'s aesthetic choices.
 
-**Stack defaults.** When the tech-stack answer is thin, `/setup` offers a one-answer default per
-project type: TypeScript end to end, Bun for install / run / test, shadcn/ui + Tailwind v4, and
-SQLite first. Desktop apps default to Electron Forge's `vite-typescript` template with
-better-sqlite3 in the main process; web apps and services to Bun + Hono with `bun:sqlite`.
+**Stack defaults come from the reference sheets.** Two sheets ship with the plugin under
+[`references/`](references/): [`bun-web-app-stack.md`](references/bun-web-app-stack.md) (web
+apps and services — Bun runtime, Hono, React SPA, SQLite, S3, one Docker container) and
+[`bun-electron-desktop-stack.md`](references/bun-electron-desktop-stack.md) (desktop apps —
+Bun toolchain, Electron shell, electron-vite, React + shadcn/ui, better-sqlite3). When the
+tech-stack answer is thin, `/setup` reads the matching sheet's Stack Summary and offers those
+picks — there is no separate default list — and `/plan-project` builds the greenfield walking
+skeleton from the sheet's repository layout and config files instead of running a scaffolder.
+The user accepts the sheet wholesale or overrides any layer.
 
-**Reference stacks.** Two reference sheets ship with the plugin under
-[`references/`](references/): [`bun-web-app-stack.md`](references/bun-web-app-stack.md) and
-[`bun-electron-desktop-stack.md`](references/bun-electron-desktop-stack.md). They expand the
-stack defaults above with repository layout, config files, and the friction points each pick
-accounts for, and their *Stack Summary* tables double as a checklist of every layer an app of
-that shape has to handle. They are **reference only** — an existing project's `CLAUDE.md` Tech
-Stack always wins, differing from a sheet is never a gate failure or a TOR, and no skill ever
-proposes re-platforming a codebase to match one. See
-[`references/README.md`](references/README.md).
+For an **existing** project the sheets are reference only: its `CLAUDE.md` Tech Stack always
+wins, differing from a sheet is never a gate failure or a TOR, brownfield planning ignores the
+sheets entirely, and no skill proposes re-platforming a codebase to match one. Their *Stack
+Summary* tables are still useful there as a checklist of every layer an app of that shape has
+to handle. See [`references/README.md`](references/README.md).
 
 ## Skills
 

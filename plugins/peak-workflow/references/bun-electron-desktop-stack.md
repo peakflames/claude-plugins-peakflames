@@ -10,9 +10,10 @@ confidence over novelty.
 >
 > This is **reference material, not a migration mandate.** It exists for two purposes:
 >
-> 1. **A starting stack for a brand-new project** whose owner has no preference — the
->    `/peak-workflow:setup` Tech Stack default for this project type points here for the
->    fuller picture.
+> 1. **The recommended stack for a brand-new project of this shape.** When
+>    `/peak-workflow:setup` is told "whatever you recommend", it reads Section 2 of this sheet
+>    and offers exactly these picks — there is no separate default list. `/peak-workflow:plan-project`
+>    then builds the walking skeleton from Sections 3 and 4.
 > 2. **A layer checklist for any project** — the Stack Summary table names every layer an
 >    application of this shape has to handle (runtime, build, UI, state, routing, data,
 >    migrations, tests, lint, packaging, config, secrets, storage). Use it to notice a layer

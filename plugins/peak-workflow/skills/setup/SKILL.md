@@ -55,39 +55,37 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 
 If the answers are thin (e.g., "whatever you recommend", "I don't know", or only a language
 is named), ask which project type the product is (the same list as Tool Hygiene item 1 below
-— carry the answer forward so it is not asked twice) and offer that type's default stack. The
-user accepts the whole row with one answer or overrides any cell:
+— carry the answer forward so it is not asked twice). For the three project types that have a
+**reference stack sheet**, the sheet *is* the recommendation — read it and take its stack:
 
-| Project type | Default stack (accept as-is or override any cell) |
+| Project type | Reference sheet — read it before answering |
 |---|---|
-| **Web app** | TypeScript end to end. Bun runtime with Hono (or Elysia) for the server; React + Vite + shadcn/ui + Tailwind v4 for the UI; `bun:sqlite` for the database. Bun for install / run / test / `bunx`. |
-| **Desktop app** | TypeScript end to end. Electron Forge `vite-typescript` template — scaffold into a temporary directory (`bunx create-electron-app@latest /tmp/<name> --template=vite-typescript`; the scaffolder nests a folder and refuses a non-empty root), move the generated files into the repo root without overwriting `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, or `.gitignore`, then `bun install`; React added afterwards (`bun add react react-dom`, `bun add -d @vitejs/plugin-react`); shadcn/ui + Tailwind v4 in the renderer; better-sqlite3 in the main process only (Forge rebuilds it for Electron automatically; DB file under `app.getPath('userData')`, WAL mode); electron-log; electron-window-state. Bun for install / scripts / `bunx`; tests via Vitest (`bunx vitest`) for renderer and pure-TypeScript main code, and Playwright Electron (`@playwright/test`, `_electron.launch`) for anything touching better-sqlite3 or IPC — `bun test` cannot load the Electron-rebuilt binary. The app itself runs on Electron's bundled Node, not the Bun runtime, so `bun:sqlite` and other Bun APIs are not available inside the app. |
-| **Service or API** | TypeScript. Bun runtime with Hono (or Elysia); `bun:sqlite`; Bun for install / run / test / `bunx`. |
-| **CLI tool / Library** | If no language is named: TypeScript on Bun (`bun init`, `bun test`, single-file executable via `bun build --compile`), `bun:sqlite` if it needs a database. If a language is named, that language's standard toolchain (e.g., Python: `uv`, `pytest`, `ruff`, a `pyproject.toml` console-script entry point). |
+| **Web app** | `plugins/peak-workflow/references/bun-web-app-stack.md` |
+| **Service or API** | `plugins/peak-workflow/references/bun-web-app-stack.md` (same sheet; skip Section 7 Frontend Wiring and the SPA half of Section 8) |
+| **Desktop app** | `plugins/peak-workflow/references/bun-electron-desktop-stack.md` |
+| **Hybrid** | The sheet matching the primary interface, plus the other sheet's layers for the secondary one |
+
+Read the matching sheet's **Section 2 Stack Summary** and offer that table as the proposed
+stack, condensed to one line per layer. Do not invent, substitute, or "modernize" a pick, and
+do not paraphrase from memory — the sheet is the single source of truth for what gets offered.
+The user accepts the whole sheet with one answer or overrides any layer; record the accepted
+picks in `CLAUDE.md`'s Tech Stack table, and note in the section which sheet it came from so
+`plan-project` can read the same one. Sections 3 (Repository Layout), 4 (Configuration Files),
+and the later sections are for `plan-project` to apply when it builds the walking skeleton —
+not to be dumped into the conversation here.
+
+**CLI tool / Library** has no sheet: if no language is named, default to TypeScript on Bun
+(`bun init`, `bun test`, single-file executable via `bun build --compile`), `bun:sqlite` if it
+needs a database. If a language is named, use that language's standard toolchain (e.g., Python:
+`uv`, `pytest`, `ruff`, a `pyproject.toml` console-script entry point).
 
 Every project type: start with SQLite unless the user names another database or the product
-has no persistence. Desktop note:
-if `package.json` gains a `trustedDependencies` list, it replaces Bun's default trusted list,
-so `electron` and `better-sqlite3` must then be listed explicitly.
-
-**Reference stacks.** The Web app, Service or API, and Desktop app rows above are the condensed
-form of two reference sheets that ship with this plugin:
-
-| Project type | Reference sheet |
-|---|---|
-| Web app, Service or API | `plugins/peak-workflow/references/bun-web-app-stack.md` |
-| Desktop app | `plugins/peak-workflow/references/bun-electron-desktop-stack.md` |
-
-Read the matching sheet **only** when the user accepted a default row and wants the fuller
-picture (repository layout, config files, the friction points each pick already accounts for),
-or when you need the *Stack Summary* table as a checklist of the layers this project shape has
-to handle. Where a sheet and the default row above differ, the row above wins — the deviations
-are deliberate and recorded in `plugins/peak-workflow/references/README.md`.
+has no persistence.
 
 **Existing projects: reference only.** If `CLAUDE.md` already has a populated Tech Stack, that
 section is the single source of truth and this step is `[PASS]` — do not compare it against the
 sheets, do not report divergence, and never propose re-platforming, rewriting, or swapping a
-library to match. The sheets are usable on an existing project for one thing only: noticing a
+library to match. The sheets apply to an existing project for one thing only: noticing a
 **layer the project has not decided yet** (e.g., no migration tool, no E2E runner, no secrets
 convention). Raise such a gap as a question, never as a rewrite.
 
@@ -107,8 +105,8 @@ First, determine the project type from the Tech Stack answers already captured. 
 - Should verification always use live data instead of mocking API responses?
 
 *For desktop projects:*
-- How do you start the dev build? (e.g., `bun run start` for Electron Forge, which launches the app with a live main process and renderer hot reload)
-- How do you run the test suite? (e.g., `bunx vitest` for unit tests, `bunx playwright test` for the Electron E2E suite)
+- How do you start the dev build? (reference-sheet stack: `bun run dev`, which runs electron-vite with a live main process and renderer HMR)
+- How do you run the test suite? (reference-sheet stack: `bun test` for unit and component tests, `bun run test:e2e` for the Playwright Electron suite)
 - Skip the live-API / live-data questions unless the app also talks to a backend service of its own — if it does, ask the web/server questions for that backend.
 
 **Tool Hygiene & Operability** (if missing):
@@ -505,12 +503,12 @@ If the second answer is still ambiguous, accept it and add a note in the written
 - What command builds the project? (e.g., `dotnet build`, `npm run build`, `python -m build` — or skip if no explicit build step)
 - What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
 
-  A thin answer ("whatever you recommend") takes the project-type default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. Desktop (Electron Forge) defaults: Build `bunx tsc --noEmit && bun run package` (Forge defines `package`, not `build`); Lint `bun run lint` (the Forge template ships an eslint `lint` script). Web / Service on Bun: Build `bunx tsc --noEmit`; Lint `bunx eslint .`.
+  A thin answer ("whatever you recommend") takes the reference-sheet default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. Both sheets define the same script names, so the gates are identical for Web app, Service or API, and Desktop app: Build `bun run build` (Desktop also has `bun run package` for the electron-builder output); Lint `bun run lint` (Biome); Typecheck `bun run typecheck`; Dead code `bun run deadcode`; Tests `bun test` plus `bun run test:e2e`. `bun run check` runs typecheck + lint + deadcode + tests in one command — record it as the single pre-commit gate when the project took the sheet's `package.json` unchanged.
 - What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
 - How do you verify the tool/app works after build?
   - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
   - *Web/server projects:* curl a health endpoint (e.g., `curl http://localhost:8080/api/health`) or use `playwright-cli`
-  - *Desktop projects:* start the dev build (e.g., `bun run start`) and run the Playwright Electron smoke test (e.g., `bunx playwright test`)
+  - *Desktop projects:* start the dev build (e.g., `bun run dev`) and run the Playwright Electron smoke test (e.g., `bun run test:e2e`)
 
 When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
 - Generate the section using this template, filling in the project-specific commands:
