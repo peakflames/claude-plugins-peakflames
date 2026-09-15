@@ -118,8 +118,9 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 **Bench only (products that switch mains power or heat).** Before any command that flashes the
 board, runs it, or runs anything under `tests/hil/` — in this step's item 4, item 7, or the Step 1.3 Tests gate — ask the user in one plain question to confirm the bench setup: the equipment
 unplugged from mains, the output wired to an indicator lamp instead of the load. If they do not
-confirm, do not run it. Never set `HIL_BENCH=1` yourself and never write it into `CLAUDE.md` or a
-script; only the user sets it in their own shell. Ask it once at the start of this step when
+confirm, do not run it. `HIL_BENCH=1` goes on that one command line only, right after the user
+confirms for this run (e.g. `HIL_BENCH=1 <harness command>`) — never exported, never written into
+`CLAUDE.md`, a script, or a config file, and never set without the confirmation. Ask it once at the start of this step when
 the epic has `tests/hil/` TORs, and again only if the user changes the setup.
 
 For each TOR ID in the epic spec's Requirements Anchors table, independently verify the

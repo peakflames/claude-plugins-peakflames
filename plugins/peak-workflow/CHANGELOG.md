@@ -104,6 +104,12 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Fixed
 
+- **`HIL_BENCH` was unreachable** — the agent adds it to a single command right after the user
+  confirms the bench setup; the rule is copied into mains/heat plans only, written into
+  `CLAUDE.md` Important Reminders, and honoured by `quick-fix`.
+- **Reset-token check bypass** — web sheet reads the token with the handler's precedence, so an
+  empty body token cannot slip past the organization-address refusal.
+
 - **Bench-only rule reached only start-epic's pre-check** — it is now a verbatim standing rule in
   every plan and in wrapup's verification, covers flashing and running the board, and
   `HIL_BENCH=1` is set only by the user.

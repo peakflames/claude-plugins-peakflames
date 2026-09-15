@@ -1202,7 +1202,7 @@ export async function releaseUnverifiedEmail(email: string) {
       // Defense in depth: a link issued before this check (links last 1 hour) or by server code.
       // Peeks at the token without consuming it; the handler consumes it only after this passes.
       if (ctx.path === "/reset-password") {
-        const token = ctx.body?.token ?? ctx.query?.token;
+        const token = ctx.body?.token || ctx.query?.token; // same precedence as the handler: an empty body token falls through to the query
         const found = token && (await ctx.context.internalAdapter.findVerificationValue(`reset-password:${token}`));
         const owner = found && (await ctx.context.internalAdapter.findUserById(found.value));
         if (owner && isOrgAddress(owner.email)) throw useGoogleSignIn();
@@ -1245,7 +1245,7 @@ The web client turns a refusal into plain words — the email form reads `error.
   // Reached only by a verified account (an unverified one was released above), so its owner
   // proved this mailbox: they sign in the way they did before, or reset the password
   account_not_linked:
-    "This email already has an account. Sign in with its password (or use Forgot password), then choose Link Google in Settings.",
+    "This email already has an account. Sign in with its password (or use Forgot password), then choose Link Google in Settings. For an organization address, ask an administrator — its Google account changed and the old one must be removed first.",
   USE_GOOGLE_SIGN_IN: "Your organization address signs in with Google — use Continue with Google.",
 ```
 

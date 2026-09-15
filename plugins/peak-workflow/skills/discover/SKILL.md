@@ -92,6 +92,10 @@ Follow these steps exactly:
 
 **Brownfield** = product-vision.md has substantive content AND at least one epic is complete. Proceed to Step 2B.
 
+**Vision present, no epic complete, no Open line** — ask once whether to revise the vision and
+ConOps in place (run Step 2B's delta interview without writing a changelog) or stop; never
+silently restart the greenfield interview over existing documents.
+
 **Resolving open blockers** = product-vision.md has substantive content, no epic is complete, and
 the ConOps contains `**Open — blocks planning:**`. Do not re-interview and write no changelog.
 Show each open line, ask what changed (e.g. *"Has an independent thermal fuse or over-temperature
@@ -101,7 +105,7 @@ and Step 6.
 
 Report the detection result to the user before continuing:
 ```
-Mode: [Greenfield / Brownfield]
+Mode: [Greenfield / Brownfield / Resolving open blockers]
 Reason: [1-2 sentences explaining what was found]
 ```
 
