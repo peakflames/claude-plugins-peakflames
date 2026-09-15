@@ -104,6 +104,20 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Fixed
 
+- **Hardware safeguards became unmeetable Safety TORs** — assumption rows (thermal fuse, limit switch)
+  stay ConOps assumptions; the software's detectable counterpart becomes the TOR, with an automated
+  HIL check of command and timing.
+- **Unmet or unavailable observations** — wrapup ends the session instead of failing when the board,
+  provider credentials, or observer is missing; a mismatched pending observation is not an
+  undisclosed deferral.
+- **Web sheet create routes skipped the access rule** — every mutating route calls `can()`; role
+  changes restricted; Workspace-domain password sign-ups refused; org-only mode requires its domain.
+- **Desktop sheet lacked a root tsconfig and native menu** — root `tsconfig.json` with `@/` alias,
+  shipped `components.json`, `menu.ts` with standard roles and Help › About, focus-restoring About
+  dialog, relaunch and single-instance tests.
+- **Setup/discover commits on the base branch** — discover asks before committing leftovers, on the
+  docs branch only; the skeleton gate also catches `**Not decided yet:**`.
+
 - **Desktop E2E launched a file, not the app** — `args: ["."]` so Electron reads `package.json`;
   main entry now shows startup order, single instance, first log line, window minimum and state,
   and an About dialog.

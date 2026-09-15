@@ -21,11 +21,8 @@ The user's request: $ARGUMENTS
 
 1. Run `git branch --show-current`. Capture the result as `<current-branch>`.
 2. If `<current-branch>` is `develop`, `main`, or `master`:
-   - **Uncommitted changes first:** if `git status --porcelain` lists files (typically the ones
-     `/peak-workflow:setup` just wrote), tell the user in one line and commit them on
-     `<current-branch>` as `chore: peak-workflow setup` before branching, staging them by path —
-     setup's confirmation already covered that commit. If they include files setup did not write,
-     ask before committing.
+   - **Uncommitted changes:** note whether `git status --porcelain` lists files. They carry over
+     onto the new branch; handle them right after it is created (below).
    - Derive a short name from `$ARGUMENTS` or the `CLAUDE.md` Project Overview (e.g. `kiln-mvp`)
      and ask via `AskUserQuestion`:
      - Question: `"I'll keep this planning work on its own branch, docs/{derived}. OK?"`
@@ -40,6 +37,10 @@ The user's request: $ARGUMENTS
      ```bash
      git checkout -b docs/{slug}
      ```
+   - If uncommitted files carried over, ask once via `AskUserQuestion`: `"There are uncommitted
+     files from before this session ({list}). Commit them on docs/{slug} as 'chore: peak-workflow
+     setup'?"` — options `["Commit them here", "Leave them uncommitted"]`. Never commit on the base
+     branch from this step.
    - Confirm to the user:
      > Created and switched to branch `docs/{slug}`. All vision, requirements, and planning changes will live here until you merge.
 3. If `<current-branch>` already starts with `docs/`:
@@ -159,7 +160,7 @@ Produce draft content for Product Vision sections 9–11 and ConOps sections 7�
 - **Product Vision Section 11 — Backlog / Future Vision:** Draft a bulleted list of 5–10 deferred items representing the product's growth trajectory.
 - **ConOps Section 7 — Functional Summary:** Draft tables summarizing features by view/area.
 - **ConOps Section 8 — Operational Constraints & Assumptions:** Draft a table of constraints (deployment, users, auth, data freshness, etc.).
-- **ConOps Section 8 — What Must Never Happen** *(Embedded, or any product that switches physical equipment on or off — a heater, motor, valve, relay)*: draft first, as for every other section — a `### What Must Never Happen` table under §8 with the hazards this kind of product typically has (hazard, what could cause it, the safe state, the limit), then ask the user to react in plain words: *"Here's what I think this must never do, even if a wire comes loose, the power blinks, or a reading goes wrong — what's missing or wrong?"* For anything that switches mains power or heat, include a row stating that a **hardware** cutoff independent of the software (a thermal fuse, an over-temperature limit switch) is assumed — software cannot protect against a relay that has welded shut — and mark it an assumption for the user to confirm. `/peak-workflow:capture-requirements` turns each row into a `# Safety` TOR, and `/peak-workflow:plan-project` ships it with the first epic that drives that output. Do not skip this because the user is a hobbyist — they are the people least likely to raise it unprompted.
+- **ConOps Section 8 — What Must Never Happen** *(Embedded, or any product that switches physical equipment on or off — a heater, motor, valve, relay)*: draft first, as for every other section — a `### What Must Never Happen` table under §8 with the hazards this kind of product typically has (hazard, what could cause it, the safe state, the limit), then ask the user to react in plain words: *"Here's what I think this must never do, even if a wire comes loose, the power blinks, or a reading goes wrong — what's missing or wrong?"* For anything that switches mains power or heat, include a row stating that a **hardware** cutoff independent of the software (a thermal fuse, an over-temperature limit switch) is assumed — software cannot protect against a relay that has welded shut — and mark it `Assumption — hardware, outside the software` for the user to confirm. `/peak-workflow:capture-requirements` turns each hazard row the software can act on into a `# Safety` TOR (assumption rows stay assumptions), and `/peak-workflow:plan-project` ships it with the first epic that drives that output. Do not skip this because the user is a hobbyist — they are the people least likely to raise it unprompted.
 - **ConOps Section 9 — Glossary:** Draft a table of domain terms and definitions.
 
 ## Step 2B: Brownfield — Delta Discovery Interview
@@ -408,7 +409,8 @@ concretizes the ConOps steps with screen and control names — and then
 ```
 
 Do NOT commit on your own initiative while writing the documents (Steps 1–4). Committing only
-ever happens via the explicit Commit Gate in Step 6, and only with the user's confirmation.
+ever happens via the explicit Commit Gate in Step 6 — or Step 0's one-time question about files
+left uncommitted from before the session — and only with the user's confirmation.
 
 ## Step 6: Ship or Continue
 

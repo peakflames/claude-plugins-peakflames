@@ -71,7 +71,7 @@ defaults, so a change to a sheet's `package.json` section means updating the mat
 Local S3, Live updates, Per-request streaming, Secrets; on the desktop sheet: Auto-update). Renaming or merging one of those rows means updating that mapping
 in `skills/setup/SKILL.md` in the same commit — otherwise an `N/A` has nowhere to land.
 
-Each server-bearing sheet (web, desktop) has a **2.1 Dropping a layer** table directly after its
+Each sheet with droppable layers (web, desktop) has a **2.1 Dropping a layer** table directly after its
 Stack Summary. It lists, per droppable row, the tree entries, config lines, env vars, routes,
 services, tests, commands and Additional Considerations rows to omit. `plan-project` applies it for
 every `N/A` row while writing Sections 3–4 verbatim, so a dropped layer is not re-added. Adding a

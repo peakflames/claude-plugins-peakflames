@@ -141,7 +141,9 @@ implement this epic. Do not trust the implementer's self-assessment.
    also grep `tests/manual/` (and `tests/hil/` when present) for it, whether or not those are on
    the Test directories line. The checklist names the TOR ID and restates the Given / When / Then
    as steps a person performs and what they should see. Items 3–4 apply to the checklist (it
-   mirrors the Gherkin; there is nothing to run), and item 7 collects the observation.
+   mirrors the Gherkin), item 7 replaces item 4 for the part only a person can observe, and any
+   automated part the TOR also has (a Safety TOR's command and timing through `tests/hil/`) still
+   runs under item 4.
    If the grep returns nothing in any listed directory, no test traces to this requirement —
    the TOR's verdict is **FAIL** ("no test names TOR-…"), even if source inspection finds the
    behavior implemented. Do not go looking
@@ -165,13 +167,19 @@ implement this epic. Do not trust the implementer's self-assessment.
    on the Test directories line — setup lists the E2E directory last); `playwright-cli`
    cannot attach to an Electron window.
 7. **For device TOR IDs (Embedded, or any Then observed on physical hardware) and every
-   operator-observed TOR:** run the project's hardware-in-the-loop harness under `tests/hil/`
-   against the connected board for everything it can capture. If the board is not connected,
-   **ask the user to connect it**; if they cannot now, end the session with no verdicts recorded
-   and tell them to re-run `/peak-workflow:wrapup-epic <id>` once it is — a missing board is
-   neither CANNOT VERIFY nor FAIL. For each operator-observed TOR, walk the user through its
-   checklist in plain words, ask them to perform the When and describe what they see, and judge
-   it against the Then. Record the evidence as `operator-observed: <their words>`; that annotation
+   operator-observed TOR.**
+   - *Device:* run the project's hardware-in-the-loop harness under `tests/hil/` against the
+     connected board for everything it can capture. If the board is not connected, ask the user
+     to connect it.
+   - *Named provider sign-in:* the round-trip needs the real provider's credentials configured
+     and the app running where its callback URL points. If they are not set up, ask the user to
+     set them up.
+   - Whatever is missing — board, credentials, a person able to observe — if the user cannot
+     provide it now, **end the session with no verdicts recorded** and tell them to re-run
+     `/peak-workflow:wrapup-epic <id>` once they can. That is neither CANNOT VERIFY nor FAIL, and
+     never an undisclosed deferral.
+   - For each operator-observed TOR, walk the user through its checklist in plain words, ask them
+     to perform the When and describe what they see, and judge it against the Then. Record the evidence as `operator-observed: <their words>`; that annotation
    is carried into the Step 1.5 report's Highlights so the human sees every verdict that rests on
    an observation rather than a test.
 
@@ -181,7 +189,7 @@ Report each TOR ID:
   For an operator-observed TOR: the checklist mirrors the Gherkin, implementation inspection
   confirms the behavior, AND the operator's described observation matches the Then. Cite the
   checklist file, `impl file:line`, and `operator-observed: <their words>`. An observation that
-  does not match, or that the user cannot make, is FAIL.
+  does not match is FAIL; one the user cannot make now ends the session (item 7).
 - **FAIL** — test fails, OR no test mirrors the Then (e.g., the test only checks a flag is
   accepted when the Then names an outcome), OR test passes but implementation does not realize
   the requirement (describe specifically what is wrong).
@@ -215,6 +223,9 @@ Only now, with every per-TOR verdict recorded, read
      Anchors, append ` — ⚠️ successor spec missing or does not list this TOR` to that cell.
    - Else if it appears as a Spec Deviations row, or as FAIL / CANNOT VERIFY in the handoff's
      TOR Coverage → `Disclosed: yes (misfiled)`; note where it was found.
+   - Else if the handoff reported it `PASS (operator-observed pending)` and the observation did not
+     match → `Disclosed: n/a (observation)` — the implementer could not have known; no
+     UNDISCLOSED marker.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
      `FAIL — ❌ UNDISCLOSED DEFERRAL` (or `CANNOT VERIFY — ❌ UNDISCLOSED DEFERRAL`) in the
      Verifier finding column. A mention in Key Decisions or prose ("stub for now") does not
@@ -237,7 +248,7 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Access-control check (if `CLAUDE.md`'s `**Product shape:**` block records
   `**Access rule:** owner-or-permitted-role`, or its Tech Stack records
   `Auth: local accounts now, org SSO deferred`, and this epic touched user data) — see below
-- Deferred-value check (walking-skeleton epic only): `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen' CLAUDE.md`
+- Deferred-value check (walking-skeleton epic only): `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen|\*\*Not decided yet:\*\*' CLAUDE.md`
   on the feature branch must return nothing. Any hit is a FAIL — the skeleton owns resolving
   every one
 

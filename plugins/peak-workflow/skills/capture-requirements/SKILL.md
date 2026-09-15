@@ -82,7 +82,15 @@ The user's request / brownfield description: $ARGUMENTS
    the TOR anyway: at the 3A.1b grouping gate, ask for the value in plain words and offer a
    conservative default — never drop the TOR. If the section is missing on such a product, warn
    at 3A.1b and list the gap under Coverage Gaps. Safety TORs are never deferrable in
-   `start-epic` or `wrapup-epic`.
+   `start-epic` or `wrapup-epic`, so every one must be something this product's own software can
+   do and a test can check: a row marked `Assumption — hardware, outside the software` (a thermal
+   fuse, a limit switch) is **not** a TOR — list it under Coverage Gaps as
+   `hardware safeguard — outside the software, confirmed by the owner`, and, where the software
+   can detect the failure the hardware guards against, write that detection as the TOR instead
+   (*"The controller shall raise an alarm and keep the relay de-energized when the temperature
+   keeps rising while the relay is commanded off"*). Each Safety TOR needs an automated check of
+   its command and timing through the hardware-in-the-loop harness; tag it operator-observed
+   (0c) only for the physical part a harness cannot sense.
 
 0c. **Operator-observed TORs.** Tag a scenario with the comment line
    `# Verification: operator-observed` directly under its `Scenario:` line when no automated check
@@ -316,7 +324,7 @@ Hygiene lines covered" count.
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them. Project types without a column (Service or API, Library, Embedded) write each
 shall-statement in the mechanism `CLAUDE.md` declares — e.g. Service or API: *"The service shall
-expose its name and semantic version at GET `/version` as JSON without requiring sign-in"* and
+expose its name and semantic version at GET `/version` as JSON `{"name", "version"}` without requiring sign-in"* and
 *"The service shall return error responses as RFC 9457 problem details whose `detail` names the
 problem and the next action"*; the startup log line is asserted in the format the Logging line
 declares (a JSON record, not a `[INFO]` text line, when the logger writes JSON); Embedded: *"The device shall print its
@@ -331,7 +339,7 @@ change-control edit once its ID is immutable. The skeleton's tests name the conc
 |---|---|---|---|
 | **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page | The application shall display its name and semantic version in an About dialog opened from Help > About |
 | **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level | The application shall write a first log line containing its name and semantic version to the electron-log file on startup |
-| **Logging convention** | The tool shall emit log records at the levels DEBUG, INFO, WARN, and ERROR, in the format declared in CLAUDE.md (structured JSON / key=value / human-readable) | (same — substitute "web application") | (same — substitute "application") |
+| **Logging convention** | The tool shall emit log records at the levels declared in CLAUDE.md (default DEBUG, INFO, WARN, and ERROR — use the logger's own level names, e.g. `Information` / `Warning` for .NET, `info` / `warn` for Pino and electron-log), in the format declared there (structured JSON / key=value / human-readable) | (same — substitute "web application") | (same — substitute "application") |
 | **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A | N/A |
 | **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A | N/A |
 | **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action | The application shall display user-facing error messages on screen that name the problem AND name the next user action |
@@ -470,7 +478,7 @@ Scenario: [TOR-01-{XXXXXXX}] The application shall require confirmation before d
 Scenario: [TOR-01-{XXXXXXX}] The application shall focus the running instance when launched a second time
     Given the application is running with its main window minimized
     When the user launches the application executable again
-    Then within 2 seconds exactly one application process should exist
+    Then within 2 seconds the second launch should have exited and exactly one main window should exist
     And the main window should be restored and focused
 ```
 

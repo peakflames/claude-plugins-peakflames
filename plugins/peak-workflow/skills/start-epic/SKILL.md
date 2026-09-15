@@ -127,14 +127,15 @@ this order:
 1. **Board chosen?** If `CLAUDE.md` still records `Board: candidate … — unconfirmed` or
    `Board: not chosen` (walking skeleton), recommend a board in plain words — name, rough price,
    and any parts the product needs with it (e.g. a thermocouple amplifier, a relay module) — and
-   confirm it with the user. Nothing is ordered or installed on a guess. Record the confirmed
-   board in `CLAUDE.md`.
-2. **Board in hand?** If the user does not have it yet, say so plainly and suggest
-   `/peak-workflow:pause`; the epic resumes when it arrives. Host-side work may continue first
-   only if the user asks.
+   confirm it with the user. Nothing is ordered or installed on a guess. Recording the confirmed
+   board in `CLAUDE.md` is the plan's first step, on the feature branch.
+2. **Board in hand?** If the user does not have it yet, say so plainly, end the session, and tell
+   them to run `/peak-workflow:start-epic <id>` again when it arrives (nothing is In Progress yet,
+   so there is nothing to pause). Host-side work may start first only if the user asks.
 3. **Board connected?** Check the port named on the `CLAUDE.md` Local Environment `HIL port:` line
    (e.g. `HIL_PORT=/dev/ttyUSB0`, `COM3` on Windows) exists. If not, tell the user how to connect
-   it and how to find the port, and wait. The walking skeleton writes that line the first time.
+   it and how to find the port, and wait. On the walking skeleton the line does not exist yet: ask
+   the user to plug the board in, find the port with them, and write the line as a plan step.
 
 ## Step 3: Create Feature Branch
 

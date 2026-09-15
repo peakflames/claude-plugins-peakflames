@@ -60,8 +60,8 @@ recommendation. Defer only when the Then clause depends on a later epic whose sp
 sheet — all five (cross-device, sign-in, file uploads, live updates, product-held secret) for a Web
 app, 2–4 phrased for callers for a Service or API, 1–3 plus internet access (Q6) for a Desktop app,
 none for CLI / Library / Embedded. All five "no" on a Web app routes to `bun-static-spa-stack.md`;
-any "yes" routes to `bun-web-app-stack.md`. Sign-in means separate accounts or data seen from
-another device — a typed name on a record is an attribution field, not sign-in. The answers are
+any "yes" routes to `bun-web-app-stack.md`. Sign-in means separate accounts only — data seen from
+another device is question 1, and a typed name on a record is an attribution field, not sign-in. The answers are
 recorded in `CLAUDE.md` as a `**Product shape:**` block (unasked questions written `not asked`) and
 each dropped Stack Summary row is written `N/A — <reason> (shape Q<N>)`, which `plan-project` reads
 as a decision and applies through the sheet's **Section 2.1 Dropping a layer** table. `discover` Step 4.5 re-checks the answers against the ConOps scenarios and asks
