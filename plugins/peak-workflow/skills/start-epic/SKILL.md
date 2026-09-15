@@ -137,7 +137,8 @@ this order:
    first. Recording the confirmed board in `CLAUDE.md` is the first plan step after the opening
    steps, on the feature branch.
 2. **Board in hand?** If the user does not have it yet, print a short parts list to keep (board,
-   add-on parts, cable), end the session, and tell them to run `/peak-workflow:start-epic <id>`
+   add-on parts, cable, and — for anything that switches mains power or heat — a low-voltage
+   indicator lamp or LED module for the bench setup), end the session, and tell them to run `/peak-workflow:start-epic <id>`
    again when it arrives (nothing is In Progress yet, so there is nothing to pause). Host-side work may start first only if the user asks.
 3. **Board connected?** Check the port named on the `CLAUDE.md` Local Environment `HIL port:` line
    (e.g. `HIL_PORT=/dev/ttyUSB0`, `COM3` on Windows) exists. If not, tell the user how to connect
@@ -181,7 +182,7 @@ Build the plan from:
 - Any context from previous handoff files (decisions made, patterns established)
 - Any reference materials surfaced by Step 1 item 12
 
-**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
+**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
 
 ## Step 5: Execute the Plan
 

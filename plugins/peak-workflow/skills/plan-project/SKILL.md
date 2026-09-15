@@ -220,9 +220,9 @@ operator-observed — happens on the bench: the equipment unplugged from mains, 
 indicator lamp or LED instead of the load. `start-epic` and `wrapup-epic` ask the user before each run to confirm that setup in one
 plain question (*"Is the kiln unplugged, with the relay driving the test lamp?"*); if they cannot
 confirm, do not run it. The same rule covers flashing or running the board. The harness
-itself refuses to run a mains or heat output check unless `HIL_BENCH=1` is set in the user's own
-shell — never in `CLAUDE.md`, a script, or by the agent — so no command line can drive live
-equipment by accident. Every epic that drives such an output names this refusal in its Key
+itself refuses to run a mains or heat output check unless `HIL_BENCH=1` is on that command line —
+added by the agent only right after the user confirms the bench setup for that run, never exported
+or written into `CLAUDE.md` or a script — so no command line can drive live equipment by accident. Every epic that drives such an output names this refusal in its Key
 Components, and its spec carries the PLAN_TEMPLATE **Bench only** standing rule.
 
 **Embedded products — the skeleton also owns the hardware-in-the-loop harness:** a script under

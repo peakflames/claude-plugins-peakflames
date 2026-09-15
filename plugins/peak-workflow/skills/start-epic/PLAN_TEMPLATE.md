@@ -103,9 +103,11 @@ cites the screen's `S-NN`, its wireframe path, and the `data-component` primitiv
 board, runs it, or runs anything under `tests/hil/` — in a middle step, the self-assessment, or a
 quality gate — ask the user in one plain question to confirm the bench setup: the equipment
 unplugged from mains, the output wired to an indicator lamp instead of the load. If they do not
-confirm, do not run it. Never set `HIL_BENCH=1` yourself and never write it into `CLAUDE.md` or a
-script; only the user sets it in their own shell. Copy this paragraph verbatim into the plan as a standing rule ahead of the
-first middle step, next to the Deferral gate.
+confirm, do not run it. `HIL_BENCH=1` goes on that one command line only, right after the user
+confirms for this run (e.g. `HIL_BENCH=1 <harness command>`) — never exported, never written into
+`CLAUDE.md`, a script, or a config file, and never set without the confirmation. For a product that
+switches mains power or heat, copy this paragraph verbatim into the plan as a standing rule ahead
+of the first middle step, next to the Deferral gate; omit it for every other product.
 
 **Deferral gate.** Copy this paragraph verbatim into the plan as a standing rule ahead of the
 first middle step; it applies to every middle step and to the self-assessment. If at any point

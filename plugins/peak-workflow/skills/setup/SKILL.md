@@ -830,7 +830,10 @@ If the second answer is still ambiguous, accept it and add a note in the written
 decision this run recorded that a later session could undo by accident — for example *"Browser-only
 app: there is no server; anything needing one is a Product shape change (see above)"*, the
 deferred-sign-in rule, or an attribution field — *"Every record carries an Entered by field (typed
-initials); there is no sign-in"*. With nothing to record, write *"None yet — add project-specific gotchas here
+initials); there is no sign-in"*. For an Embedded product that switches mains power or heat, always
+write the **Bench only** rule here: *"Bench only: before flashing or running the board or anything
+under tests/hil/, the user confirms the equipment is unplugged and the output drives a test lamp;
+`HIL_BENCH=1` goes only on that confirmed command line."* With nothing to record, write *"None yet — add project-specific gotchas here
 as they are discovered."*; on a new project that line counts as populated, not `[WEAK]`.
 
 **Reference Materials** (if missing) — **default, plus one optional prompt folded into the
