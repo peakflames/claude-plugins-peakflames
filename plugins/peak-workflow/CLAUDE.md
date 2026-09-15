@@ -81,6 +81,9 @@ design-system tokens take precedence over its aesthetic choices.
 - `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere
 - Template files (`PLAN_TEMPLATE.md`, `HANDOFF_TEMPLATE.md`, etc.) live alongside SKILL.md in the skill directory
 - Sibling template files are referenced by path in SKILL.md; Claude Code makes them available at skill load time
+- `references/` holds plugin-level reference material shared by several skills (the Bun web and
+  Bun + Electron desktop stack sheets). It is reference only: no skill may treat a project's
+  divergence from a sheet as a finding, a TOR, or a reason to re-platform
 - `[Greenfield only:]` and `[Brownfield only:]` tags inside code-block templates are conditional — the LLM interprets them, not renders them. Tags that must not render go *outside* fenced template blocks as plain prose conditionals.
 
 ## Validating Changes

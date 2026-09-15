@@ -151,6 +151,16 @@ project type: TypeScript end to end, Bun for install / run / test, shadcn/ui + T
 SQLite first. Desktop apps default to Electron Forge's `vite-typescript` template with
 better-sqlite3 in the main process; web apps and services to Bun + Hono with `bun:sqlite`.
 
+**Reference stacks.** Two reference sheets ship with the plugin under
+[`references/`](references/): [`bun-web-app-stack.md`](references/bun-web-app-stack.md) and
+[`bun-electron-desktop-stack.md`](references/bun-electron-desktop-stack.md). They expand the
+stack defaults above with repository layout, config files, and the friction points each pick
+accounts for, and their *Stack Summary* tables double as a checklist of every layer an app of
+that shape has to handle. They are **reference only** — an existing project's `CLAUDE.md` Tech
+Stack always wins, differing from a sheet is never a gate failure or a TOR, and no skill ever
+proposes re-platforming a codebase to match one. See
+[`references/README.md`](references/README.md).
+
 ## Skills
 
 Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill inventory.
