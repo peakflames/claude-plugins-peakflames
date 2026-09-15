@@ -47,6 +47,13 @@ desktop apps are derived against named screens, controls, and states.
 
 - **`mockup` project-type guard runs first** — a CLI / Service / Library project gets the
   "does not apply" message before any branch question (CLI dry-run pass).
+- **Desktop dry-run pass** — Application menu / Window rows carry no wireframe; the UX
+  Baseline note may cite a list screen plus its form screen and the skeleton owns both;
+  wireframe fidelity reports `PASS (deviations noted)` and never FAILs; mockup writes a
+  discovery changelog only when feature files exist, replaces `## UX Changes` in place, and
+  stops on multiple unprocessed changelogs; no duplicate reference-screen state TORs; the
+  grayscale check is CSS-scoped; `/mockup` added to the CLAUDE.md and requirements README
+  command lists.
 
 ---
 

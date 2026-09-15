@@ -144,8 +144,8 @@ are processed from scratch (or only the scenario named in `$ARGUMENTS`).
 **Brownfield** = `ux/screens.md` exists with at least one screen row. Existing screens are the
 baseline; this run only **adds or changes** screens for the scenarios named in `$ARGUMENTS` or
 in the unprocessed discovery changelog listed above. Read the changelog **read-only** — do not
-archive or rename it; `/peak-workflow:capture-requirements` does that. Its "What Changed" rows for `concept-of-operations.md` Section 5 identify the
-scenarios in scope. If `$ARGUMENTS` is empty and no unprocessed changelog exists, diff the
+archive or rename it; `/peak-workflow:capture-requirements` does that. Its "What Changed" rows
+for `concept-of-operations.md` Section 5 identify the scenarios in scope. If `$ARGUMENTS` is empty and no unprocessed changelog exists, diff the
 ConOps against the last commit that touched `ux/screens.md`:
 ```bash
 git diff $(git log -1 --format=%H -- docs/product-vision-planning/ux/screens.md) -- docs/product-vision-planning/concept-of-operations.md
