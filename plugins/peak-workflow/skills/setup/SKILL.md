@@ -479,6 +479,8 @@ If the second answer is still ambiguous, accept it and add a note in the written
 **Verification Before Commit Rule** (if missing):
 - What command builds the project? (e.g., `dotnet build`, `npm run build`, `python -m build` — or skip if no explicit build step)
 - What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
+
+  A thin answer ("whatever you recommend") takes the project-type default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. Desktop (Electron Forge) defaults: Build `bunx tsc --noEmit && bun run package` (Forge defines `package`, not `build`); Lint `bun run lint` (the Forge template ships an eslint `lint` script). Web / Service on Bun: Build `bunx tsc --noEmit`; Lint `bunx eslint .`.
 - What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
 - How do you verify the tool/app works after build?
   - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).

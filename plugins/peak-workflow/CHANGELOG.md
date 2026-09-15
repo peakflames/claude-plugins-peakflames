@@ -81,6 +81,10 @@ that CLI tools already get from Tool Hygiene & Operability.
 - **Third dry-run pass (CLI)** — `git grep --untracked` in the legacy test-directory fallback;
   `start-epic` resolves test directories before plan mode (Step 1 item 4b); the walking
   skeleton's `Run the tool` gate uses the `--version` invocation; test command asked once.
+- **Third dry-run pass (desktop)** — Build / Lint defaults for thin answers (Forge `package`
+  and `lint`); the skeleton ships a test-only data-directory override and a self-contained E2E
+  harness that builds before launching; the wrapup doc-refresh sub-agent no longer waits on a
+  confirmation it cannot get.
 
 ---
 

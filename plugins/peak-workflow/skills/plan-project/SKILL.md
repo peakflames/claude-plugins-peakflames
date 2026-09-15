@@ -115,7 +115,15 @@ skeleton must:
 - Ship a **test-only fault / latency injection switch**: an environment variable read at
   startup, honored by the E2E harness, ignored in production builds. The error-state and
   Progress feedback TORs cite it in their Givens — a local SQLite app has nothing else to
-  throttle or fail.
+  throttle or fail. Ship a **test-only data-directory override** beside it: an environment
+  variable that redirects the database location (normally `app.getPath('userData')`) to a
+  fresh temp directory the harness creates per test, so empty-state, populated-state, and
+  destructive-action Givens start from an empty database instead of the developer's live data.
+  Name both switches in Key Components.
+- Make the **E2E harness self-contained**: its `globalSetup` (or the `test:e2e` script) runs the
+  production build the entry point needs (Electron Forge: `bun run package`, or the Vite
+  builds) and `_electron.launch` targets the built entry, so the Tests command in `CLAUDE.md`
+  works cold in a fresh wrapup session.
 
 No later epic installs a component library, defines tokens, or builds a second shell — a slice
 composes its screens from the skeleton's shell and the reference screen. The skeleton's Key

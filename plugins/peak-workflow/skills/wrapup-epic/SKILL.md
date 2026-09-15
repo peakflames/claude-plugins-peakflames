@@ -523,6 +523,8 @@ the Haiku model so the main session stays focused.
 Use the Agent tool with model `haiku` (the shorthand resolves to the current Haiku version automatically). Brief the subagent with:
 
 > Execute the `/peak-workflow:refresh-docs` skill (no arguments — refresh both documents).
+> At Step 5 (Gap Analysis), print the gap tables in your output and proceed to Step 6 without
+> waiting for confirmation — you have no user to ask.
 > When you reach Step 8 (Commit), auto-commit without asking the user for permission.
 > Commit message format: `docs: refresh architecture and design notes — <brief summary of changes>`
 > Do NOT push to the remote.
