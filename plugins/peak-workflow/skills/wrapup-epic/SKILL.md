@@ -249,6 +249,7 @@ on it:
 The skeleton epic's baseline UX TORs proved these behaviors once on the reference screen; this
 gate checks that the new screens kept the pattern. Report one of these per line:
 - `PASS`
+- `PASS (deviations noted)` — Wireframe fidelity only; each deviation goes to Code Review Findings
 - `FAIL — <baseline line>: <screen>: <one-line detail>`
 - `N/A — <baseline line>: no <form / irreversible action / long operation / file operation> on
   the screens this epic adds or changes (<screens checked>)` — must name the screens checked

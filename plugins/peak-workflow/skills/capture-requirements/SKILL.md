@@ -351,8 +351,9 @@ line. `mockup` 3.1 makes a create form with its own actions a separate screen; w
 inventory did that, the form screen is the second reference screen — cite it in the same note
 so the Forms TOR has a home, and name no third screen. `/plan-project` reads the IDs to pick the
 skeleton's screens. Those are the screens the walking skeleton in `/plan-project` builds —
-Givens that name any other screen make it build that one too. Error-state and Progress feedback Givens cite the skeleton's test-only fault / latency
-switch rather than a real failure or slow operation (`Given the test fault switch forces the
+Givens that name any other screen make it build that one too. Error-state and Progress
+feedback Givens cite the skeleton's test-only fault / latency switch rather than a real
+failure or slow operation (`Given the test fault switch forces the
 data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).
 For a desktop app, the same assertions run through the project's Playwright Electron harness
 against the dev build with a live main process.
@@ -410,7 +411,7 @@ Scenario: [TOR-01-{XXXXXXX}] The application shall identify an invalid form fiel
 
 Scenario: [TOR-01-{XXXXXXX}] The application shall require confirmation before deleting a record, with Cancel as the safe default
     Given the Projects List (S-01) lists a project named "Q3 Report"
-    When the user activates the "Delete…" menu item for "Q3 Report"
+    When the user activates the "Delete" button for "Q3 Report"
     Then a dialog with role "dialog" and aria-modal="true" should be visible containing the text "Delete Q3 Report?"
     And document.activeElement should be the Cancel button
     When the user presses Escape
