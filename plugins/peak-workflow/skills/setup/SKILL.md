@@ -150,7 +150,10 @@ resolving them, because choosing it means buying hardware.
 
 For **Desktop app**, also ask: *"Which computers will people run it on — Windows, Mac, or both?
 And will those computers have internet?"* Record `Target OS: …` in the Tech Stack table (the
-skeleton packages only for those) and the internet answer as shape **Q6** below.
+skeleton packages only for those) and the internet answer as shape **Q6** below. Installers are
+built on the operating system they target: when the computer the user builds on is not a target
+(e.g. a Mac building for Windows), record `Build: CI runner for <target OS>` — the CI runner has
+internet even when the target computers do not — and the Release Protocol CI note names it.
 
 **Shape questions — ask before offering any stack.**
 
@@ -201,10 +204,9 @@ question 2. **"Unsure" means yes only about separate accounts.** A "maybe later"
 computer or device follows question 1's rule (unsure means no) and is recorded as a growth note in
 the shape block, not as sign-in.
 
-A "yes" to question 2 routes to the web-app sheet either way — unless `code_present = true` or a
-required platform skipped the sheets, in which case it adds the sign-in layers to that stack (a
-Desktop app becomes a Hybrid with
-the web sheet's service layers). Once anyone other than the owner can see the data from another
+A "yes" to question 2 routes to the web-app sheet either way, and a Desktop app with a "yes"
+becomes a Hybrid with the web sheet's service layers. When `code_present = true` or a required
+platform skipped the sheets, it adds the sign-in layers to that stack instead. Once anyone other than the owner can see the data from another
 device, the rule about who sees what has to be enforced somewhere the person cannot edit, which
 means a server. Deferring the provider does not restore the static sheet — say this plainly rather
 than letting the user infer that deferral keeps the project small.
@@ -289,7 +291,7 @@ Library, and Embedded projects get no shape questions and **no `**Product shape:
 
 - **Q1 Same information on another device:** [yes / no / not asked (<type>)] — [in the user's own words]
 - **Q2 Sign-in, or others see the data:** [yes / no / no — attribution only (entered-by field)] — [in the user's own words]
-  - **Sign-in:** [named provider / `Auth: local accounts now, org SSO deferred` — candidate: X, confirmed by: Y]
+  - **Sign-in:** [named provider — org-only (domain X) / mixed audience (org domain X) / `Auth: local accounts now, org SSO deferred` — candidate: X, confirmed by: Y]
   - **Roles:** [no / the actual role names and what each may read and change]
   - **Access rule:** owner-or-permitted-role
 - **Q3 File attachments:** [yes / no / not asked (<type>)] — [in the user's own words]
@@ -311,7 +313,7 @@ Per-request streaming is marked `N/A — no streamed responses` unless the produ
 generated reply (an AI answer, a report being written). A Service or API marks the frontend rows
 (Frontend build, UI, Styling, Icons, Client state, Routing, Component tests)
 `N/A — no user interface (Service or API)`.
-On the desktop sheet: Q6 "no" → Auto-update. Each server-bearing sheet's **Section 2.1 Dropping a
+On the desktop sheet: Q6 "no" → Auto-update. Each sheet with a **Section 2.1 Dropping a
 layer** lists what else leaves with the row — `plan-project` applies it. Not every "no" maps onto
 a row — the static sheet has already excluded the server layers, and a Q1 "no" on the web sheet
 removes nothing. Where there is no row to mark, the `**Product shape:**`
@@ -421,7 +423,7 @@ every one has a correct answer for the project type.
    semantic version on the first log line at process / app / request-handler startup
    in the Logging format (`[INFO] myapp v1.2.0 starting` for plain text; a JSON record whose
    message is `myapp v1.2.0 starting` for a JSON logger). Desktop app: the main process logs
-   `<name> v<semver> starting` as its first line once the app is ready. Static SPA: `main.tsx`
+   `<name> v<semver> starting` (the `productName`) as its first line at startup. Static SPA: `main.tsx`
    writes `<name> v<semver> starting` to the browser console before mounting the router — the
    console is the only log this shape has. Embedded: the boot banner `<name> v<semver> starting`
    is the first line on the debug or serial console.
@@ -510,8 +512,8 @@ includes the tool name and semantic version, in the Logging format below [plain 
 [CLI example: `Error: configuration file not found at <path>. Try --config to specify an
 alternate path.` / Web or Desktop example: `Could not save order #123: the database file is
 locked. Close other copies of the app and try again.` / Service or API example: an RFC 9457
-problem-details body, `{"title": "Pokémon not found", "status": 404, "detail": "No Pokémon named
-'pikchu'. Check the spelling or search with GET /pokemon?name=pik."}` / Embedded example:
+problem-details body, `{"title": "Item not found", "status": 404, "detail": "No item with id
+'4711'. Check the id, or list items with GET /items."}` / Embedded example:
 `ERROR E012: temperature sensor not responding. Check the sensor cable, then power-cycle.` — keep
 the one that applies]
 ```
@@ -540,9 +542,10 @@ line by line only where the user asks.
      workspace layout, `src/renderer/src/index.css` for the desktop sheet. Name the path the
      project will actually have — the walking skeleton creates it.
    - `--radius` is the single radius knob — the whole radius scale derives from it.
-   - Base color is chosen at `bunx shadcn@latest init` (current set: `neutral`, `stone`,
-     `zinc`, `mauve`, `olive`, `mist`, `taupe`; default `neutral`) and is not changed casually
-     afterwards.
+   - Base color is chosen once — at `bunx shadcn@latest init` on the web and static sheets, in the
+     shipped `components.json` and token stylesheet on the desktop sheet (current set: `neutral`,
+     `stone`, `zinc`, `mauve`, `olive`, `mist`, `taupe`; default `neutral`) — and is not changed
+     casually afterwards.
    - Dark mode uses the `dark` class on the root element, switched by a ThemeProvider
      (light / dark / system).
    - New semantic colors are added by defining `--x` / `--x-foreground` in `:root` and `.dark`
@@ -856,7 +859,7 @@ them. Format fix: the sheet's `bun run lint:fix`, or the toolchain table's *form
   - *Desktop app:* `bun run test:e2e` alone — it builds and launches the app itself; do not also run `bun run dev`.
   - *Embedded:* host-side tests, then flash and read the boot banner on the debug console — or `TBD — set by the walking-skeleton epic`.
 
-When generating the Verification Before Commit section for a CLI tool or Embedded project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation (or flash + boot banner) command, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
+When generating the Verification Before Commit section for a CLI tool or Embedded project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation (or flash + boot banner) command, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with `bun run test:e2e`, which builds and launches the app itself.
 - Generate the section using this template, filling in the project-specific commands:
 
 ```markdown
@@ -869,7 +872,7 @@ A successful build (compile) does NOT equal working code. The workflow MUST be:
 1. **Implement** — Make the code changes
 2. **Lint** — Run `[lint command]` to verify formatting and static analysis
 3. **Build** — Run `[build command]` to build *(omit or replace with a no-op note for projects with no explicit build step)*
-4. **Verify** — Use [curl / playwright / the tool invocation / the dev build + Playwright Electron smoke test] or manual testing to confirm functionality
+4. **Verify** — Use [curl / playwright / the tool invocation / `bun run test:e2e` (desktop)] or manual testing to confirm functionality
 5. **Commit** — ONLY after verification passed
 
 **Why this matters:**
@@ -1315,8 +1318,7 @@ Check whether `.gitignore` exists at the repo root.
     - Rust: `target/`
     - Go: build outputs (project-specific)
     - .NET: `bin/`, `obj/`
-  - Editor / OS files: `.DS_Store`, `Thumbs.db`, `.vscode/` (project preference), `.idea/`
-    (project preference)
+  - OS files: `.DS_Store`, `Thumbs.db`
 
   For each missing high-signal entry, report `[WEAK] .gitignore — missing entries: {list}`
   and append them only if the Step 3 confirmation listed them and the user did not strike
@@ -1465,7 +1467,8 @@ When the repository already has commits, commit the files setup wrote or modifie
 `chore: peak-workflow setup` on the current branch — the confirmation said so (*"When I'm done I'll
 commit these setup files"*), and accepting it is the consent. Root files such as `CHANGELOG.md` and
 `README.md` are included; later planning commits do not stage them. If the user struck that line,
-tell them to commit before `/peak-workflow:discover`, which will otherwise commit them itself.
+tell them the files are uncommitted; `/peak-workflow:discover` asks once whether to commit them on
+its new docs/ branch.
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work

@@ -194,7 +194,7 @@ Middle step example:
      reason is expected and not a trigger).
      Legitimate uses (e.g., argparse `placeholder`/`metavar`, test doubles for hardware or a
      native dialog under the test directories) are not triggers.
-  - Walking-skeleton epic only: `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen' CLAUDE.md`
+  - Walking-skeleton epic only: `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen|\*\*Not decided yet:\*\*' CLAUDE.md`
      must return nothing. Each hit is a value this epic owns resolving — resolve it before reporting.
 
   **Any TOR reported FAIL or CANNOT VERIFY here that has no Deferrals row fires the deferral
@@ -244,7 +244,7 @@ Middle step example:
     deferral of the TOR as written, so every deviated TOR appears in both tables.
   - **Key Decisions** — design choices future epics should know about. Anything here that
     describes partial or stubbed behavior must have a matching Deferrals row.
-  - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / FAIL / CANNOT VERIFY
+  - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / PASS (operator-observed pending) / FAIL / CANNOT VERIFY
     verdict from the self-assessment step
   - **Verification Results (self-assessment)** — quality gate results
 

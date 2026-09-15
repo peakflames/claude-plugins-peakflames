@@ -124,9 +124,11 @@ skeleton must:
   component-test configuration, which `setup` marks `N/A — no user interface (Service or API)`)
   — then `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
   involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
-  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer (all
-  three sheets already carry the `@tailwindcss/vite` plugin and the path aliases in their Vite
-  config). Static-SPA specifics the sheet supplies and the skeleton must not drop: hash history
+  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer on the
+  web and static sheets (both carry the `@tailwindcss/vite` plugin and the path aliases in their
+  Vite config). The desktop sheet ships `components.json`, `lib/utils.ts`, and the token stylesheet
+  itself — `init` does not recognize electron-vite — so run only `bunx shadcn@latest add <name>`
+  there. Static-SPA specifics the sheet supplies and the skeleton must not drop: hash history
   on the router (a static host has no rewrite rules), `base` taken from `BASE_PATH` so the
   GitHub Pages project path resolves, `__APP_VERSION__` injected from `package.json#version`
   (this is the Version exposure mechanism — the footer and the first console line both read it),
@@ -147,7 +149,13 @@ skeleton must:
   (no placeholder identity, no anonymous fallback, no header-asserted user), an owner column on
   every table, one **owner-or-permitted-role** access rule that every route calls, and the role
   field plus the roles named in `CLAUDE.md` when the roles follow-up was yes. A **named** provider
-  is configured in the skeleton too, with tests signing in through the email-and-password helper.
+  is configured in the skeleton too, with tests signing in through the email-and-password helper,
+  in the audience mode `CLAUDE.md` records (org-only or mixed). The skeleton plan includes a plain
+  checklist for the person who administers the provider — create the OAuth client, register the
+  local and production callback URLs, set the consent screen's audience and publish it (an
+  unpublished app admits only listed test users), and paste the client ID and secret into `.env`.
+  Substitute the role names `CLAUDE.md` records into the sheet's single roles constant — nowhere
+  else.
   When the Tech Stack records `Auth: local accounts now, org SSO deferred`, the organization's
   provider is **its own later epic** — see Step 3A.4. Name the access rule, the owner columns, and
   the auth configuration in Key Components.
@@ -164,7 +172,8 @@ skeleton must:
 - Ship a **test-only fault / latency injection switch**: an environment variable read at
   startup (a build-time `import.meta.env` flag for a static SPA, which has no process
   environment), honored by the E2E harness, and ignored in anything a user runs — a packaged
-  desktop app (`app.isPackaged`), a production server, a deployed static build. The harness runs
+  desktop app (`app.isPackaged`), a production server (`NODE_ENV=production`,
+  `ASPNETCORE_ENVIRONMENT=Production`), a deployed static build. The harness runs
   the production build, so "ignored in production builds" is the wrong gate. The error-state and
   Progress feedback TORs cite it in their Givens — an app with a local database has nothing else
   to throttle or fail. Ship a **test-only data reset** beside it, in the form the stack actually
@@ -189,8 +198,8 @@ skeleton must:
 and read the `**Not decided yet:**` line. The skeleton spec's Description lists every hit, and the skeleton
 replaces each one in `CLAUDE.md` with the real command, path, or mechanism it established — on its
 own feature branch, so wrapup sees the change. A value that costs money or means buying hardware
-(the board, a hosting provider) is confirmed with the user in the start-epic plan before it is
-resolved — never picked silently. A skeleton that leaves one behind fails wrapup's TBD gate.
+(the board, a hosting provider) or depends on a team's accounts and policies (a CI provider) is
+confirmed with the user in the start-epic plan before it is resolved — never picked silently. A skeleton that leaves one behind fails wrapup's TBD gate.
 
 **Every project type with data or outputs — the test-only fault switch.** The fault / latency
 switch and data reset described for UI products apply to a Service or API, a CLI tool, and a
@@ -200,8 +209,11 @@ an error-path TOR such as "database unavailable" has a Given to cite.
 **Embedded products — the skeleton also owns the hardware-in-the-loop harness:** a script under
 `tests/hil/` that talks to the connected board over its debug or serial port non-interactively
 (port from `HIL_PORT`, a timeout, captured output asserted like any test), flashing the current
-build first. The device-side Tool Hygiene TORs (version, boot banner) are verified through it.
-It also owns **fault injection for Safety TORs**: a debug-build-only console command (compiled out
+build first (the debug build for fault-injection checks, the release build for the version and
+boot-banner checks). The device-side Tool Hygiene TORs (version, boot banner) are verified through it.
+The skeleton keeps every output de-energized — it proves the hardware abstraction reads inputs
+and reports, but never switches a heater, motor, or relay on; the first epic that drives an output
+ships that output's Safety TORs. It also owns **fault injection for Safety TORs**: a debug-build-only console command (compiled out
 of release builds by a build flag, so shipped firmware cannot be told to fake a fault) or a
 physical fault fixture on the bench (e.g. a switch that disconnects the sensor). Record in
 `CLAUDE.md` Local Environment a `HIL port:` line naming the variable and how to find the port on
@@ -762,7 +774,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
    **Team** (PR review required):
    ```bash
    git push -u origin docs/<task-name>
-   gh pr create --base develop --title "docs: requirements and plan baseline for <project>"
+   gh pr create --base <base-branch> --title "docs: requirements and plan baseline for <project>"
    # Await PR approval before starting epics
    ```
 

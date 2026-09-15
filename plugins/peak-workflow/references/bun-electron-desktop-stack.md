@@ -116,8 +116,10 @@ my-app/
 ├── bunfig.toml                  # test preload for happy-dom
 ├── biome.json
 ├── knip.json
-├── tsconfig.base.json
-├── electron.vite.config.ts
+├── tsconfig.base.json           # compiler options shared with packages/core
+├── tsconfig.json                # root: typecheck, path aliases incl. `@/*` (4.3)
+├── components.json              # shadcn/ui config, shipped, not generated (4.10)
+├── electron.vite.config.mts
 ├── electron-builder.yml         # only the Target OS blocks (2.1)
 ├── playwright.config.ts
 ├── drizzle.config.ts
@@ -135,10 +137,11 @@ my-app/
 │       └── tsconfig.json
 ├── src/
 │   ├── main/
-│   │   ├── index.ts             # startup order, single instance, first log line, window (6.4)
+│   │   ├── index.ts             # startup order, single instance, first log line at startup, menu, window (6.4)
+│   │   ├── menu.ts              # native application menu (6.8)
 │   │   ├── window-state.ts      # size/position restore, clamped to a display (6.5)
 │   │   ├── db.ts                # better-sqlite3 driver wiring
-│   │   ├── ipc.ts               # ipcMain handlers (validated)
+│   │   ├── ipc.ts               # ipcMain handlers + main → renderer events (validated)
 │   │   ├── test-env.ts          # test-only fault switch + data dir (7)
 │   │   └── updater.ts           # omit when Auto-update is N/A (2.1)
 │   ├── preload/
@@ -146,15 +149,19 @@ my-app/
 │   └── renderer/
 │       ├── index.html
 │       └── src/
-│           ├── main.tsx
+│           ├── main.tsx         # imports ./index.css
+│           ├── index.css        # Tailwind + shadcn design tokens (4.10)
 │           ├── router.tsx
 │           ├── env.d.ts         # window.api type (6.3)
+│           ├── lib/
+│           │   └── utils.ts     # `cn`, imported as "@/lib/utils" (4.10)
 │           ├── components/
-│           │   ├── ui/          # shadcn components
-│           │   └── help-menu.tsx # Help > About dialog (6.7)
+│           │   ├── ui/          # shadcn components (`bunx shadcn@latest add`)
+│           │   └── about-dialog.tsx # Help > About dialog (6.7)
 │           ├── stores/          # Zustand
 │           └── queries/         # TanStack Query hooks
 ├── tests/
+│   ├── setup/happy-dom.ts       # bun test preload (4.2)
 │   ├── unit/                    # bun test
 │   ├── components/              # bun test + happy-dom
 │   └── e2e/                     # Playwright (testDir in playwright.config.ts)
@@ -204,8 +211,8 @@ my-app/
     "react-dom": "^19",
     "lucide-react": "latest",
     "class-variance-authority": "latest",
-    "clsx": "latest",
-    "tailwind-merge": "latest"
+    "cn": "latest",
+    "radix-ui": "latest"
   },
   "devDependencies": {
     "electron": "^3x",
@@ -221,6 +228,8 @@ my-app/
     "@types/bun": "latest",
     "tailwindcss": "^4",
     "@tailwindcss/vite": "^4",
+    "shadcn": "latest",
+    "tw-animate-css": "latest",
     "drizzle-kit": "^0.31",
     "@biomejs/biome": "^2.2",
     "knip": "^5",
@@ -237,7 +246,8 @@ my-app/
 
 `productName` is the name `app.getName()`, the About dialog, the first log line and the installer
 show. No `"type": "module"`: with it electron-vite emits an ESM `preload/index.mjs`, which a
-sandboxed window (6.4) cannot load.
+sandboxed window (6.4) cannot load. `cn`, `radix-ui`, `shadcn` and `tw-animate-css` are what
+shadcn's style index installs; `index.css` (4.10) imports the last two.
 
 ### 4.2 `bunfig.toml`
 
@@ -253,7 +263,9 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 GlobalRegistrator.register();
 ```
 
-### 4.3 `tsconfig.base.json`
+### 4.3 `tsconfig.base.json` and `tsconfig.json`
+
+`tsconfig.base.json` (shared compiler options; `packages/core/tsconfig.json` extends it):
 
 ```json
 {
@@ -269,16 +281,31 @@ GlobalRegistrator.register();
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "types": ["bun"],
-    "paths": {
-      "@core/*": ["./packages/core/src/*"],
-      "@renderer/*": ["./src/renderer/src/*"]
-    }
+    "types": ["bun"]
   }
 }
 ```
 
-### 4.4 `electron.vite.config.ts`
+`tsconfig.json` (root — `typecheck`, `bun test` and the shadcn CLI all read this file):
+
+```json
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/renderer/src/*"],
+      "@core/*": ["./packages/core/src/*"],
+      "@renderer/*": ["./src/renderer/src/*"]
+    }
+  },
+  "include": ["src/main", "src/preload", "src/renderer/src", "packages/*/src", "tests"]
+}
+```
+
+`@/*` stays first: shadcn takes the first alias as the import prefix. Renderer code imports
+`@/…` (`import { cn } from "@/lib/utils"`); the Vite aliases (4.4) mirror these paths.
+
+### 4.4 `electron.vite.config.mts`
 
 ```ts
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
@@ -298,6 +325,7 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
+        "@": resolve("src/renderer/src"),
         "@core": resolve("packages/core/src"),
         "@renderer": resolve("src/renderer/src"),
       },
@@ -306,6 +334,9 @@ export default defineConfig({
 });
 ```
 
+`.mts` is ESM whatever `package.json` says, so the ESM-only `@tailwindcss/vite` always imports.
+electron-vite finds `electron.vite.config.{js,ts,mjs,cjs,mts,cts}` without a `--config` flag.
+
 ### 4.5 `biome.json`
 
 ```json
@@ -313,7 +344,14 @@ export default defineConfig({
   "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!!**/out", "!!**/dist", "!**/drizzle", "!src/renderer/src/components/ui"]
+    "includes": [
+      "**",
+      "!!**/out",
+      "!!**/dist",
+      "!**/drizzle",
+      "!src/renderer/src/components/ui",
+      "!src/renderer/src/index.css"
+    ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2 },
   "linter": {
@@ -330,7 +368,9 @@ export default defineConfig({
 ```
 
 Biome 2 has no `files.ignore`; `!` excludes from lint and format, `!!` also skips indexing (build
-output). shadcn components are excluded from linting so upstream updates stay diff-clean.
+output). shadcn components are excluded from linting so upstream updates stay diff-clean;
+`index.css` because shadcn rewrites it and Biome's CSS parser rejects Tailwind's `@theme` and
+`@apply` unless told otherwise.
 
 ### 4.6 `knip.json`
 
@@ -345,10 +385,13 @@ output). shadcn components are excluded from linting so upstream updates stay di
     "tests/e2e/**/*.spec.ts"
   ],
   "project": ["src/**/*.{ts,tsx}", "packages/**/*.ts"],
-  "ignore": ["src/renderer/src/components/ui/**"],
-  "ignoreDependencies": ["@electron/rebuild"]
+  "ignore": ["src/renderer/src/components/ui/**", "src/renderer/src/lib/utils.ts"],
+  "ignoreDependencies": ["@electron/rebuild", "shadcn", "tw-animate-css"]
 }
 ```
+
+`shadcn` and `tw-animate-css` are imported from CSS only; `lib/utils.ts` is shadcn's `utils` alias
+target even before app code imports it.
 
 ### 4.7 `drizzle.config.ts`
 
@@ -418,6 +461,177 @@ export default defineConfig({
 
 `testDir` keeps Playwright from collecting the `bun test` files. `test:e2e` runs `bun run build`
 first, so a cold session never launches a missing or stale `out/`.
+
+### 4.10 shadcn/ui files — instead of `shadcn init`
+
+**Do not run `bunx shadcn@latest init` on this layout.** `init` recognizes Vite only by a
+`vite.config.*` file, finds none, reports no supported framework and exits. These three files are
+what it would write (Radix base, `neutral` tokens). After `bun install`, only
+`bunx shadcn@latest add <component>` is needed; `add` reads `components.json` and `tsconfig.json`.
+
+`components.json`:
+
+```json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/renderer/src/index.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+```
+
+`"config": ""` marks Tailwind v4; with `new-york` the CLI then pulls the v4 Radix registry.
+
+`src/renderer/src/lib/utils.ts`:
+
+```ts
+export { cn } from "cn";
+```
+
+`src/renderer/src/index.css` (imported once by `main.tsx`; tokens change here, never in `components/ui/`):
+
+```css
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+```
 
 ---
 
@@ -516,14 +730,35 @@ export const ipc = {
 export type IpcChannel = keyof typeof ipc;
 export type IpcInput<C extends IpcChannel> = z.infer<(typeof ipc)[C]["input"]>;
 export type IpcOutput<C extends IpcChannel> = z.infer<(typeof ipc)[C]["output"]>;
+
+/** Main → renderer events: payload schemas (sent by `send`, 6.2; received by `on`, 6.3). */
+export const ipcEvents = {
+  "app:showAbout": z.void(),
+} as const;
+
+export type IpcEvent = keyof typeof ipcEvents;
+export type IpcEventPayload<E extends IpcEvent> = z.infer<(typeof ipcEvents)[E]>;
 ```
 
 ### 6.2 Main (`src/main/ipc.ts`)
 
 ```ts
-import { ipcMain } from "electron";
-import { ipc, type IpcChannel, type IpcInput, type IpcOutput } from "@core/ipc-contract";
+import { ipcMain, type WebContents } from "electron";
+import {
+  ipc,
+  ipcEvents,
+  type IpcChannel,
+  type IpcEvent,
+  type IpcEventPayload,
+  type IpcInput,
+  type IpcOutput,
+} from "@core/ipc-contract";
 import { faultDelay, faultThrow } from "./test-env";
+
+/** Main → renderer. The sandboxed preload cannot load zod, so the payload is validated here. */
+export function send<E extends IpcEvent>(to: WebContents, event: E, payload: IpcEventPayload<E>) {
+  to.send(event, ipcEvents[event].parse(payload));
+}
 
 export function handle<C extends IpcChannel>(
   channel: C,
@@ -544,12 +779,31 @@ export function handle<C extends IpcChannel>(
 ### 6.3 Preload (`src/preload/index.ts`)
 
 ```ts
-import { contextBridge, ipcRenderer } from "electron";
-import type { IpcChannel, IpcInput, IpcOutput } from "@core/ipc-contract";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import type {
+  IpcChannel,
+  IpcEvent,
+  IpcEventPayload,
+  IpcInput,
+  IpcOutput,
+} from "@core/ipc-contract";
+
+// Runtime allowlist; the Record type makes tsc demand exactly the contract's events.
+const events: Record<IpcEvent, true> = { "app:showAbout": true };
 
 const api = {
   invoke<C extends IpcChannel>(channel: C, input: IpcInput<C>): Promise<IpcOutput<C>> {
     return ipcRenderer.invoke(channel, input);
+  },
+  /** Subscribe to a main → renderer event. Returns the unsubscribe function. */
+  on<E extends IpcEvent>(event: E, listener: (payload: IpcEventPayload<E>) => void): () => void {
+    if (events[event] !== true) throw new Error(`Unknown IPC event: ${String(event)}`);
+    // Never hand the IpcRendererEvent (and its sender) to the renderer.
+    const wrapped = (_e: IpcRendererEvent, payload: IpcEventPayload<E>) => listener(payload);
+    ipcRenderer.on(event, wrapped);
+    return () => {
+      ipcRenderer.removeListener(event, wrapped);
+    };
   },
 };
 
@@ -583,6 +837,7 @@ import log from "electron-log/main";
 import { conversations } from "@core/db/schema";
 import { openDb } from "./db";
 import { handle } from "./ipc";
+import { setAppMenu } from "./menu";
 import { applyTestDataDir } from "./test-env";
 import { startUpdater } from "./updater"; // Auto-update only (2.1)
 import { restoreWindowState, trackWindowState } from "./window-state";
@@ -600,7 +855,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   log.initialize(); // 3. main.log under app.getPath("logs")
-  log.info(`${app.getName()} v${app.getVersion()} starting`);
+  log.info(`${app.getName()} v${app.getVersion()} starting`); // first log line, at startup
 
   void app.whenReady().then(() => {
     const driver = openDb();
@@ -615,11 +870,14 @@ if (!app.requestSingleInstanceLock()) {
         .map((c) => ({ id: c.id, title: c.title, createdAt: c.createdAt.getTime() })),
     );
 
-    const { bounds, maximized } = restoreWindowState(); // 4. window, minimum size, restored state
-    win = new BrowserWindow({
+    setAppMenu(() => win); // 4. native menu before the window (6.8)
+
+    const { bounds, maximized } = restoreWindowState(); // 5. window, minimum size, restored state
+    const w = new BrowserWindow({
       ...bounds,
       minWidth: 800,
       minHeight: 600,
+      show: false, // shown on first paint: no white flash, no jump to maximized
       webPreferences: {
         preload: join(__dirname, "../preload/index.js"),
         contextIsolation: true,
@@ -627,12 +885,16 @@ if (!app.requestSingleInstanceLock()) {
         sandbox: true,
       },
     });
-    if (maximized) win.maximize();
-    trackWindowState(win);
+    win = w;
+    w.once("ready-to-show", () => {
+      if (maximized) w.maximize();
+      w.show();
+    });
+    trackWindowState(w);
 
     const devUrl = process.env.ELECTRON_RENDERER_URL; // set by `electron-vite dev` only
-    if (!app.isPackaged && devUrl) void win.loadURL(devUrl);
-    else void win.loadFile(join(__dirname, "../renderer/index.html"));
+    if (!app.isPackaged && devUrl) void w.loadURL(devUrl);
+    else void w.loadFile(join(__dirname, "../renderer/index.html"));
 
     startUpdater(); // Auto-update only (2.1)
   });
@@ -716,59 +978,153 @@ export function useConversations() {
 }
 ```
 
-### 6.7 Help > About (`src/renderer/src/components/help-menu.tsx`)
+### 6.7 Help > About (`src/renderer/src/components/about-dialog.tsx`)
 
-The version shown in the app. An in-app menu, not a native one, so Playwright can click it (7).
-Needs `bunx shadcn@latest add button dialog dropdown-menu`.
+The version shown in the app. The native menu (6.8) is the only opener: its About item sends
+`app:showAbout`, so no in-app Help menu is needed and Playwright triggers it through the menu (7).
+Needs `bunx shadcn@latest add button dialog`.
 
 ```tsx
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@renderer/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@renderer/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@renderer/components/ui/dropdown-menu";
+} from "@/components/ui/dialog";
 
-export function HelpMenu() {
+export function AboutDialog() {
   const [open, setOpen] = useState(false);
+  const returnFocus = useRef<HTMLElement | null>(null); // the control focused before opening
   const { data } = useQuery({
     queryKey: ["app", "version"],
     queryFn: () => window.api.invoke("app:getVersion", undefined),
   });
+
+  // `on` returns the unsubscribe, which is this effect's cleanup.
+  useEffect(
+    () =>
+      window.api.on("app:showAbout", () => {
+        if (!returnFocus.current && document.activeElement instanceof HTMLElement) {
+          returnFocus.current = document.activeElement;
+        }
+        setOpen(true);
+      }),
+    [],
+  );
+
   return (
-    <>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost">Help</Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem onSelect={() => setOpen(true)}>About</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>About</DialogTitle>
-            <DialogDescription>{data ? `${data.name} v${data.version}` : "Loading…"}</DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent
+        onCloseAutoFocus={(event) => {
+          event.preventDefault(); // Radix would focus the absent trigger, leaving focus on <body>
+          returnFocus.current?.focus();
+          returnFocus.current = null;
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>About</DialogTitle>
+          <DialogDescription>{data ? `${data.name} v${data.version}` : "Loading…"}</DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
   );
 }
 ```
 
-Render `<HelpMenu />` in the app shell's header.
+Render `<AboutDialog />` once in the app shell. An in-app opener added later dispatches the same
+way (focus is captured from `document.activeElement` when the dialog opens), so focus returns to
+it too.
+
+### 6.8 Application menu (`src/main/menu.ts`)
+
+The native menu is the source of truth for menus and accelerators. Without
+`Menu.setApplicationMenu`, Electron ships its default menu (Reload, DevTools, links to
+electronjs.org). Top level: App (app name) / File / Edit / View / Window / Help on macOS;
+File / Edit / View / Help elsewhere.
+
+```ts
+import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
+import { send } from "./ipc";
+
+/** Call after app ready, before the first window. */
+export function setAppMenu(getWindow: () => BrowserWindow | null) {
+  const isMac = process.platform === "darwin";
+  const sep: MenuItemConstructorOptions = { type: "separator" };
+  const showAbout = () => {
+    const win = getWindow();
+    if (win) send(win.webContents, "app:showAbout", undefined);
+  };
+  const about: MenuItemConstructorOptions = {
+    id: "about", // E2E clicks it by id (7)
+    label: `About ${app.getName()}`,
+    click: showAbout,
+  };
+  const devItems: MenuItemConstructorOptions[] = app.isPackaged
+    ? []
+    : [sep, { role: "reload" }, { role: "toggleDevTools" }]; // dev and E2E builds only
+
+  const appMenu: MenuItemConstructorOptions = {
+    label: app.getName(),
+    submenu: [
+      { label: `About ${app.getName()}`, click: showAbout },
+      sep,
+      { role: "services" },
+      sep,
+      { role: "hide" },
+      { role: "hideOthers" },
+      { role: "unhide" },
+      sep,
+      { role: "quit" },
+    ],
+  };
+  // App commands go at the top of File, each with a CmdOrCtrl accelerator, e.g.
+  // { label: "New Conversation", accelerator: "CmdOrCtrl+N", click: () => { … } }, sep,
+  const fileMenu: MenuItemConstructorOptions = {
+    label: "File",
+    submenu: isMac
+      ? [{ role: "close" }]
+      : [{ role: "minimize" }, { role: "close" }, sep, { role: "quit" }],
+  };
+  const editMenu: MenuItemConstructorOptions = {
+    label: "Edit",
+    submenu: [
+      { role: "undo" },
+      { role: "redo" },
+      sep,
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "selectAll" },
+    ],
+  };
+  const viewMenu: MenuItemConstructorOptions = {
+    label: "View",
+    submenu: [
+      { role: "resetZoom" },
+      { role: "zoomIn" },
+      { role: "zoomOut" },
+      sep,
+      { role: "togglefullscreen" },
+      ...devItems,
+    ],
+  };
+  const windowMenu: MenuItemConstructorOptions = { label: "Window", role: "windowMenu" };
+  const helpMenu: MenuItemConstructorOptions = { label: "Help", role: "help", submenu: [about] };
+
+  const template = isMac
+    ? [appMenu, fileMenu, editMenu, viewMenu, windowMenu, helpMenu]
+    : [fileMenu, editMenu, viewMenu, helpMenu];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+```
+
+Roles bring the platform's labels and accelerators (Undo, Redo, Cut, Copy, Paste, Select All,
+Close, Minimize, Quit); macOS gets Minimize from `windowMenu`. A role ignores `click`, so About is a
+plain item that asks the renderer to open 6.7 — a native About panel sits outside the DOM, where
+Playwright cannot assert it.
 
 ---
 
@@ -785,7 +1141,7 @@ Render `<HelpMenu />` in the app shell's header.
 ```tsx
 import { test, expect } from "bun:test";
 import { render, screen } from "@testing-library/react";
-import { Button } from "@renderer/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 test("renders label", () => {
   render(<Button>Save</Button>);
@@ -831,26 +1187,49 @@ Launched on the file itself, Electron skips `package.json`: `app.getVersion()` r
 version, `app.getName()` is `Electron`, and `app.getAppPath()` is `out/main`, so migrations (5.3)
 are not found. The About test asserts the `package.json` version.
 
+`withApp` gives each launch a fresh data dir. Pass `dataDir` to share one across launches
+(window-state relaunch, second instance); the caller then removes it.
+
 ```ts
 import { test, expect, _electron as electron } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
+import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Fresh data dir per launch; `env` replaces process.env, so spread it.
-async function withApp(extra: Record<string, string>, body: (page: Page) => Promise<void>) {
-  const dataDir = mkdtempSync(join(tmpdir(), "my-app-e2e-"));
+const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+  productName: string;
+  version: string;
+};
+
+const tempDir = () => mkdtempSync(join(tmpdir(), "my-app-e2e-"));
+
+function removeDir(dir: string) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (err) {
+    console.warn(`E2E cleanup: could not remove ${dir}`, err); // never masks the test's failure
+  }
+}
+
+// `env` replaces process.env, so spread it.
+async function withApp(
+  extra: Record<string, string>,
+  body: (page: Page, app: ElectronApplication) => Promise<void>,
+  dataDir?: string,
+) {
+  const dir = dataDir ?? tempDir();
   let app: ElectronApplication | undefined;
   try {
     app = await electron.launch({
       args: ["."],
-      env: { ...process.env, APP_DATA_DIR: dataDir, ...extra } as Record<string, string>,
+      env: { ...process.env, APP_DATA_DIR: dir, ...extra } as Record<string, string>,
     });
-    await body(await app.firstWindow());
+    await body(await app.firstWindow(), app);
   } finally {
     await app?.close(); // Windows keeps app.db locked until the app exits
-    rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    if (!dataDir) removeDir(dir);
   }
 }
 
@@ -859,22 +1238,60 @@ test("app boots and shows sidebar", () =>
     await expect(page.getByRole("navigation")).toBeVisible();
   }));
 
-test("Help > About shows name and package.json version", () =>
-  withApp({}, async (page) => {
-    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
-      productName: string;
-      version: string;
-    };
-    await page.getByRole("button", { name: "Help" }).click();
-    await page.getByRole("menuitem", { name: "About" }).click();
+test("native menu: platform menus; Help > About shows name and package.json version", () =>
+  withApp({}, async (page, app) => {
+    const labels = await app.evaluate(
+      ({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label) ?? [],
+    );
+    expect(labels).toEqual(
+      process.platform === "darwin"
+        ? [pkg.productName, "File", "Edit", "View", "Window", "Help"]
+        : ["File", "Edit", "View", "Help"],
+    );
+    await app.evaluate(({ Menu }) => {
+      Menu.getApplicationMenu()?.getMenuItemById("about")?.click();
+    });
     await expect(page.getByRole("dialog")).toContainText(`${pkg.productName} v${pkg.version}`);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
   }));
+
+test("a second launch exits and restores the first window", async () => {
+  const dir = tempDir();
+  try {
+    await withApp(
+      {},
+      async (_page, app) => {
+        await expect
+          .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible()))
+          .toBe(true); // shown on ready-to-show (6.4)
+        await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.minimize());
+        const exe = await app.evaluate(() => process.execPath); // the Electron binary
+        const code = await new Promise<number | null>((done) => {
+          spawn(exe, ["."], { env: { ...process.env, APP_DATA_DIR: dir } }).on("exit", done);
+        });
+        expect(code).toBe(0); // lock held by the first instance: the second quits
+        await expect
+          .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMinimized()))
+          .toBe(false);
+      },
+      dir,
+    );
+  } finally {
+    removeDir(dir);
+  }
+});
 
 test("shows an error state when the data source fails", () =>
   withApp({ APP_FAULT_MODE: "fail" }, async (page) => {
     await expect(page.getByRole("alert")).toBeVisible();
   }));
 ```
+
+`app.evaluate` runs in the main process with the `electron` module as its argument; it cannot
+close over test-file variables. The second instance is spawned, not launched through Playwright,
+because it exits before a window exists. OS focus-stealing rules make "focused" unassertable, so
+the test checks the `second-instance` handler un-minimized the window.
 
 ---
 
@@ -887,7 +1304,7 @@ bun run db:generate          # after editing schema.ts; commit the SQL
 bun run check                # typecheck + lint + deadcode + unit/component tests
 bun run test:e2e             # builds, then Playwright against out/
 bun run package              # installers for this OS in dist/
-bunx shadcn@latest add button dialog dropdown-menu   # add UI components
+bunx shadcn@latest add button dialog   # add UI components (never `init` here, 4.10)
 ```
 
 ---
@@ -973,7 +1390,15 @@ says it is not configured here.
 | SQLite concurrency                  | Writes block reads under default journal mode.                                                                      | `journal_mode = WAL` set on open (5.3, 9.1).                                                                  |
 | Foreign keys off by default         | Cascading deletes silently do nothing.                                                                              | `foreign_keys = ON` pragma on open (5.3, 9.1).                                                                |
 | Routing in `file://` renderer       | Browser history APIs misbehave without a server.                                                                    | TanStack Router with memory history (2).                                                                      |
-| Tailwind v4 + shadcn                | Older shadcn templates assume Tailwind v3 config files.                                                             | Use `@tailwindcss/vite` plugin and CSS-first config; `bunx shadcn@latest init` detects v4 (4.4).              |
+| Tailwind v4 + shadcn                | Older shadcn templates assume Tailwind v3 config files.                                                             | `@tailwindcss/vite` plugin, CSS-first config, `"config": ""` in `components.json` (4.4, 4.10).                |
+| `shadcn init` on electron-vite      | `init` detects Vite only by `vite.config.*`, reports no supported framework and exits.                               | The sheet ships `components.json`, `index.css` and `lib/utils.ts`; run only `shadcn add` (4.10).              |
+| shadcn import alias                 | Without a root `tsconfig.json` whose first path is `@/*`, the shadcn CLI and `bun test` cannot resolve `@/…`.       | Root `tsconfig.json` paths, mirrored in the renderer's Vite aliases (4.3, 4.4).                               |
+| ESM-only Vite plugins               | A config bundled as CommonJS cannot load `@tailwindcss/vite`, which ships only ESM.                                 | `electron.vite.config.mts`: ESM regardless of `package.json` (4.4).                                           |
+| Biome and Tailwind CSS              | Biome's CSS parser rejects `@theme`, `@custom-variant` and `@apply` by default.                                     | `index.css` excluded in `biome.json` (4.5).                                                                   |
+| Default application menu            | Without `Menu.setApplicationMenu`, Electron ships Reload, DevTools and electronjs.org links — no standard-menu TORs. | `src/main/menu.ts`: platform template, standard roles, dev items only when unpackaged (6.8).                  |
+| Dialog focus without a trigger      | A dialog opened from the native menu has no trigger, so closing it drops focus on `<body>`.                        | `onCloseAutoFocus` restores the element focused before opening (6.7).                                         |
+| Main → renderer events              | The sandboxed preload cannot load zod, and a leaked `IpcRendererEvent` exposes `sender`.                            | `send()` validates in main; preload `on()` allowlists events, forwards the payload only, returns unsubscribe (6.2, 6.3). |
+| Launch flash                        | A window shown before first paint flashes blank, then jumps to its restored maximized state.                        | `show: false`; maximize and show on `ready-to-show` (6.4).                                                    |
 | Sidecar lifecycle (if used)         | Orphaned Bun process after app quit or crash loop.                                                                  | Supervisor with backoff and kill on `before-quit` (9.3).                                                      |
 | Stale E2E build                     | Playwright launches a missing or outdated `out/`, or collects `bun test` files.                                     | `test:e2e` builds first; `testDir: "./tests/e2e"` (4.1, 4.9).                                                 |
 | E2E launched on a file              | `args: ["out/main/index.js"]` skips `package.json`: Electron's version and name, app path `out/main`, no migrations. | `args: ["."]`; the About test asserts the `package.json` version (7).                                         |
@@ -981,8 +1406,8 @@ says it is not configured here.
 | Sandboxed ESM preload               | With `"type": "module"`, electron-vite emits `preload/index.mjs`; a sandboxed window cannot load it.                | No `"type"` field in `package.json` (4.1).                                                                    |
 | Test switches in production         | A fault or data-dir variable left in a user's environment breaks the installed app.                                 | Honored only when `!app.isPackaged` (7).                                                                      |
 | Fault switch breaks the shell       | `APP_FAULT_MODE=fail` on every channel also fails the version call.                                                 | Switches skip `app:*` channels (6.2).                                                                         |
-| E2E tests share data                | One test's rows leak into the next.                                                                                 | Each launch gets a fresh temp `APP_DATA_DIR` via `env` (7).                                                   |
-| Temp data dirs pile up              | A failed test skips cleanup; Windows keeps `app.db` locked while the app runs.                                      | `close()` then `rmSync` with retries in `finally` (7).                                                        |
+| E2E tests share data                | One test's rows leak into the next.                                                                                 | Each launch gets a fresh temp `APP_DATA_DIR` via `env`; relaunch and second-instance tests pass one `dataDir` (7). |
+| Temp data dirs pile up              | A failed test skips cleanup; Windows keeps `app.db` locked while the app runs.                                      | `close()` then `rmSync` with retries in `finally`; a cleanup error is logged, never masks the failure (7).   |
 | Publishing with Auto-update N/A     | An omitted `publish` lets electron-builder infer GitHub from the git remote and write `app-update.yml`.             | `publish: null` (2.1, 4.8).                                                                                   |
 | macOS signing                       | Gatekeeper blocks an unsigned or unnotarized app.                                                                   | `hardenedRuntime`, `notarize: true`, Apple credentials in CI env (4.8).                                       |
 | Auto-update on macOS                | electron-updater cannot update from a dmg, and macOS refuses updates to an unsigned app.                            | `zip` in `mac.target`, signed build, `publish` block (4.8).                                                   |
