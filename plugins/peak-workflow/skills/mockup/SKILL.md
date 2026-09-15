@@ -23,9 +23,25 @@ The user's request (scenario title, or blank for all scenarios): $ARGUMENTS
 
 ---
 
+## Project Type Guard
+
+**Before any other action (read-only):** read `CLAUDE.md` at the repo root (do not re-read if
+already in context) and take the **Project type** from its `Tool Hygiene & Operability`
+section. If it is `CLI tool`, `Library`, `Service or API`, or a `Hybrid` whose description names
+no UI, print and stop — before the branch guard, so a non-UI project never sees a branch question:
+
+> `mockup` does not apply to `<type>` projects — there are no screens to prototype.
+> Continue with `/peak-workflow:capture-requirements`.
+
+If the section is missing, ask via `AskUserQuestion`:
+- Question: `"CLAUDE.md has no Tool Hygiene & Operability section, so the project type is unknown. Is this a Web app, a Desktop app, or something without a UI?"`
+- Options: `["Web app", "Desktop app", "No UI — stop"]`
+
+On "No UI — stop", end here. Otherwise carry the project type into Step 1.
+
 ## Step 0: Branch Guard
 
-**Before any other action:**
+**After the project type guard:**
 
 1. Run `git branch --show-current`. Capture the result as `<current-branch>`.
 2. If `<current-branch>` is `develop`, `main`, or `master` — stop immediately:
@@ -66,15 +82,9 @@ Follow these steps exactly:
 
 ## Step 1: Load Context
 
-1. Read `CLAUDE.md` at the repo root. Do not re-read if already in context. Capture:
-   - **Project type** from the `Tool Hygiene & Operability` section. If it is `CLI tool`,
-     `Library`, `Service or API`, or a `Hybrid` whose description names no UI, print and stop:
-     > `mockup` does not apply to `<type>` projects — there are no screens to prototype.
-     > Continue with `/peak-workflow:capture-requirements`.
-
-     If the section is missing, ask via `AskUserQuestion`:
-     - Question: `"CLAUDE.md has no Tool Hygiene & Operability section, so the project type is unknown. Is this a Web app, a Desktop app, or something without a UI?"`
-     - Options: `["Web app", "Desktop app", "No UI — stop"]`
+1. From `CLAUDE.md` (already read by the Project Type Guard), capture:
+   - **Project type** — as resolved by the Project Type Guard (Web app, Desktop app, or a
+     Hybrid with a UI).
    - The **UX Baseline** section, when present: the declared design system (default shadcn/ui),
      the *Screen states* line, the *Layout floor* line (minimum width or window size), and for
      desktop apps the *Desktop conventions* line (standard menus, accelerators, window-state

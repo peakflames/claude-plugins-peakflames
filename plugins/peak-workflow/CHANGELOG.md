@@ -43,6 +43,11 @@ desktop apps are derived against named screens, controls, and states.
   for UI projects; README quick starts, skills table, branch families, and artifact hierarchy
   updated.
 
+### Fixed
+
+- **`mockup` project-type guard runs first** — a CLI / Service / Library project gets the
+  "does not apply" message before any branch question (CLI dry-run pass).
+
 ---
 
 ## [1.8.0] — 2026-09-14
