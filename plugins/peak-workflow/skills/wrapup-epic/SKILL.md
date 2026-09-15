@@ -114,7 +114,13 @@ implement this epic. Do not trust the implementer's self-assessment.
    ```
    where `<test-directories>` is every directory listed under **Test directories** in
    CLAUDE.md's Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if
-   the line is absent, the single test directory that section names). Read the matching files.
+   the line is absent, the single test directory that section names). If no directory can be
+   derived (a legacy Tests row like `pytest` names none), ask once via `AskUserQuestion`:
+   - Question: `"Which directories hold tests? (space-separated, E2E last)"`
+   - Then offer to write the answer as the `**Test directories:**` line of the Verification &
+     Quality Gates section. If the user declines, replace the loop with
+     `git grep -l "<TOR-ID>" -- ':!docs'`.
+   Read the matching files.
    If the grep returns nothing in any listed directory, no test traces to this requirement —
    the TOR's verdict is **FAIL** ("no test names TOR-…"), even if source inspection finds the
    behavior implemented. Do not go looking
@@ -125,17 +131,17 @@ implement this epic. Do not trust the implementer's self-assessment.
    - When → test performs the described action
    - Then → test asserts the described observable outcome
    A test that does not faithfully mirror the Gherkin is a gap regardless of whether it passes.
-4. **Run the test** yourself: `<project test command from CLAUDE.md> <specific test>`. The test
-   must pass — a skipped, xfail, or xpass result is not a pass (the runner exits 0 on these;
-   read the per-test outcome).
+4. **Run the test** yourself: the test command CLAUDE.md lists for that directory, followed by
+   the specific test. The test must pass — a skipped, xfail, or xpass result is not a pass
+   (the runner exits 0 on these; read the per-test outcome).
 5. **Independently inspect source code** — read the implementation file to confirm the code
    actually realizes the Given/When/Then behavior. A passing test that exercises the wrong code
    path is a FAIL.
 6. **For UI TOR IDs:** Web app: `playwright-cli` against the running app with real data (see
    "Local Environment" in `CLAUDE.md`) — start the backend first, then the frontend. Do NOT
    mock API responses unless the backend genuinely cannot start. Desktop app: the project's
-   Playwright Electron harness (`@playwright/test` with `_electron.launch`, in the E2E
-   directory listed under Test directories in Verification & Quality Gates); `playwright-cli`
+   Playwright Electron harness (`@playwright/test` with `_electron.launch`, in the last entry
+   on the Test directories line — setup lists the E2E directory last); `playwright-cli`
    cannot attach to an Electron window.
 
 Report each TOR ID:
@@ -196,13 +202,13 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 
 **UX Baseline check.** This is a quality gate, not a code-review note. Web app: `playwright-cli`
 against the running app with real data. Desktop app: the project's Playwright Electron harness
-(`@playwright/test` with `_electron.launch`, in the E2E directory listed under Test directories
-in Verification & Quality Gates); `playwright-cli` cannot attach to an Electron window. Open
+(`@playwright/test` with `_electron.launch`, in the last entry on the Test directories line —
+setup lists the E2E directory last); `playwright-cli` cannot attach to an Electron window. Open
 every screen this epic adds or changes and confirm each active line of the UX Baseline holds
 on it:
 
 - **Screen states** — loading, empty, error, and populated states each render with visible
-  text. Force each one (throttle or block the data source, use an empty dataset, return an error).
+  text. Force each one with the skeleton's test-only fault / latency switch (or an empty dataset for the empty state).
 - **Keyboard & focus** — every interactive element is reachable by Tab in a sensible order
   with no trap; Enter / Space activate; Escape closes dialogs and menus; focus is visibly
   indicated at each stop and not hidden behind sticky UI; a modal keeps focus inside and
@@ -287,7 +293,11 @@ three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
   Deferrals row is **kept** with Verifier finding `FIXED DURING WRAPUP — <what changed>` and
   `Waived by / Date / Reason` set to `—`; the TOR shows `PASS` in Requirements Implemented.
   This is the one place the verifier writes code it then verifies — the row is how the human
-  sees that. If the fix does not bring the TOR to PASS, re-ask with only `Defer` / `Stop`.
+  sees that. If the implementer's Deferrals row names a successor epic, also remove the TOR's
+  row from that epic's Requirements Anchors and its ID from
+  `docs/implementation-plan/status/epic-<succ>.md` `requirements:`, and stage those files —
+  a fixed TOR must not keep two owners. If the fix does not bring the TOR to PASS, re-ask with
+  only `Defer` / `Stop`.
 - **Defer** — a waiver. Eligible only when the Then clause depends on code a later epic creates.
   Ask `"Which later epic creates the code this Then clause depends on?"` — if the implementer's
   Deferrals row (Step 1.2b) already names a successor, offer it as the default. Judge

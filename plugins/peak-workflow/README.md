@@ -137,8 +137,9 @@ same chain through the **UX Baseline** section that `/setup` writes for UI proje
 
 It is UX, not style: palette, typography, and brand are not TORs. `/setup` also recommends
 companion skills for UI projects — `frontend-design@claude-plugins-official` for visual
-execution and `playwright-cli` for verification — and records the precedence rule: the UX
-Baseline and the design-system tokens win over `frontend-design`'s aesthetic choices.
+execution and `playwright-cli` for verification (web; desktop apps verify through a Playwright
+Electron harness in `e2e/`) — and records the precedence rule: the UX Baseline and the
+design-system tokens win over `frontend-design`'s aesthetic choices.
 
 **Stack defaults.** When the tech-stack answer is thin, `/setup` offers a one-answer default per
 project type: TypeScript end to end, Bun for install / run / test, shadcn/ui + Tailwind v4, and

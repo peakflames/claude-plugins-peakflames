@@ -72,8 +72,9 @@ have to catch. One horizontal epic is the exception, and it always comes first.
 ### 3A.1: Walking Skeleton (Epic 0)
 
 Form exactly one horizontal epic that stands the system up end to end with no domain logic:
-project scaffolding, build and test tooling, dev environment, CI, and the thinnest possible path
-through every layer the product has. The **tool-hygiene baseline TORs** captured in
+project scaffolding (including a tech-stack `.gitignore` — `setup` 7.4 only warns when one is
+missing), build and test tooling, dev environment, CI, and the thinnest possible path through
+every layer the product has. The **tool-hygiene baseline TORs** captured in
 `capture-requirements` 3A.2.1 (version exposure, startup log line, logging convention, error
 message standard, and for CLIs exit codes and stdout/stderr discipline) are this epic's
 Requirements Anchors — they already touch every layer with no domain logic. If neither
@@ -95,23 +96,33 @@ skeleton must:
 
 - Install the design system declared in `CLAUDE.md`'s **UX Baseline** section (default:
   shadcn/ui on Tailwind, themed only through the CSS-variable tokens in the global stylesheet —
-  never by editing generated component files). For the Electron Forge template first add the
-  `@/* → src/*` path alias to `tsconfig.json`, and `resolve.alias` plus `@tailwindcss/vite` to
+  never by editing generated component files). For a desktop app, scaffold the Electron Forge
+  template into a temporary directory (`bunx create-electron-app@latest /tmp/<name>
+  --template=vite-typescript` — the scaffolder nests a folder and refuses a non-empty root),
+  move the generated files into the repo root without overwriting `CLAUDE.md`, `docs/`,
+  `README.md`, `CHANGELOG.md`, or `.gitignore`, then `bun install`. Then add the `@/* → src/*`
+  path alias to `tsconfig.json`, and `resolve.alias` plus `@tailwindcss/vite` to
   `vite.renderer.config.ts`, then `bunx shadcn@latest init`.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
 - Ship **one reference screen** that renders the loading, empty, error, and populated states and
   passes every baseline UX TOR. It is the pattern every later screen copies. The reference
-  screen may be the thinnest real screen from ConOps Scenario 1 (one entity list, its create
-  form, its delete) — that is the minimum surface the Forms, Destructive actions, and Progress
-  feedback TORs need; a file-dialog TOR needs one Export action on it. "No domain logic" means
-  no business rules, not no data.
+  screen is the screen the baseline UX TORs name (the `# Note: reference screen` line under
+  the `# UX Baseline` banner — the thinnest entity list from ConOps Scenario 1 with its create
+  form and its delete); that is the minimum surface the Forms, Destructive actions, and
+  Progress feedback TORs need; a file-dialog TOR needs one Export action on it. "No domain
+  logic" means no business rules, not no data.
+- Ship a **test-only fault / latency injection switch**: an environment variable read at
+  startup, honored by the E2E harness, ignored in production builds. The error-state and
+  Progress feedback TORs cite it in their Givens — a local SQLite app has nothing else to
+  throttle or fail.
 
 No later epic installs a component library, defines tokens, or builds a second shell — a slice
 composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
 Components must name the design-system files (`components.json`, the global stylesheet,
-`components/ui/`), the shell, and the reference screen, and its Description must state that
-`docs/architecture.md` records the token file and the screen-composition pattern.
+`components/ui/`), the shell, the reference screen, and the fault / latency switch, and its
+Description must state that `docs/architecture.md` records the token file and the
+screen-composition pattern.
 
 ### 3A.2: Vertical Slices by Capability
 
