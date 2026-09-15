@@ -92,7 +92,8 @@ Follow these steps exactly:
 
 **Brownfield** = product-vision.md has substantive content AND at least one epic is complete. Proceed to Step 2B.
 
-**Vision present, no epic complete, no Open line** — ask once whether to revise the vision and
+**Revise in place** = product-vision.md has substantive content, no epic is complete, and the
+ConOps has no `**Open — blocks planning:**` line — ask once whether to revise the vision and
 ConOps in place (run Step 2B's delta interview without writing a changelog) or stop; never
 silently restart the greenfield interview over existing documents.
 
@@ -105,7 +106,7 @@ and Step 6.
 
 Report the detection result to the user before continuing:
 ```
-Mode: [Greenfield / Brownfield / Resolving open blockers]
+Mode: [Greenfield / Brownfield / Revise in place / Resolving open blockers]
 Reason: [1-2 sentences explaining what was found]
 ```
 
@@ -411,6 +412,9 @@ Show the user what was created:
 - [N] glossary terms defined
 
 ### Next Step
+[When the ConOps contains `**Open — blocks planning:**`, replace this whole section with: "Planning is
+blocked: <each open line in plain words>. Resolve it, then run `/peak-workflow:discover` again —
+requirements capture and planning will stop until then."]
 Run `/peak-workflow:capture-requirements` to derive the formal TOR requirements baseline from
 these documents. The requirements capture will run on the same `docs/` branch as this discovery
 session. After that, `/peak-workflow:plan-project` derives the implementation plan.
@@ -427,6 +431,10 @@ left uncommitted from before the session — and only with the user's confirmati
 ## Step 6: Ship or Continue
 
 After presenting the summary, ask the user how to proceed via `AskUserQuestion`:
+
+When the ConOps contains `**Open — blocks planning:**`, do not recommend continuing: offer only
+`"Stop here — I'll resolve the blocker and run /peak-workflow:discover again"` (commit through the
+Commit Gate first if the user wants the work saved) and the merge options without a recommendation.
 
 - Question: `"How would you like to proceed with the docs/ branch?"`
 - Options:
