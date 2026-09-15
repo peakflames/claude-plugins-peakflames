@@ -63,6 +63,17 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
     the cited feature file and locate the `Scenario: [TOR-NN-XXXXXXX]` block with that exact ID.
     Read the full Given/When/Then. These become the verification specifications — every subsequent
     verification step judges the implementation against these Given/When/Then statements.
+4b. **Load Screens (UI epics only).** If the spec has a `## Screens` section, open each listed
+    wireframe file (`docs/product-vision-planning/ux/wireframes/S-NN-*.html`); skip rows whose
+    Wireframe is `—` (the Application menu and Window rows — their contract is the
+    `ux/screens.md` row and the Desktop conventions TORs). Wireframes are planning artifacts
+    approved by the `docs/` branch merge, not the implementer's handoff — safe to read blind.
+    Step 1.3's **Wireframe fidelity** line checks the built screens against them, and takes the
+    wireframe path verbatim from the `Wireframe` column of
+    `docs/product-vision-planning/ux/screens.md` (resolved under `docs/product-vision-planning/ux/`)
+    for a screen this epic changes but another epic's `## Screens` table owns — read
+    `ux/screens.md` too when it exists. If neither the section nor `ux/screens.md` exists, skip
+    this item without comment.
 5. **Verify Requirements Anchors.** An independent reviewer loads TOR requirements first so all
    subsequent verification is judged against the requirements baseline, not the implementer's
    self-assessment. For each row in the Requirements Anchors table:
@@ -110,12 +121,21 @@ implement this epic. Do not trust the implementer's self-assessment.
 1. **Read the Given/When/Then** (loaded in Step 1.1 item 4a).
 2. **Locate the test(s)** for this TOR ID by grep only:
    ```bash
-   grep -rl "<TOR-ID>" <test-directory>
+   for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done
    ```
-   where `<test-directory>` is derived from CLAUDE.md's Verification & Quality Gates section
-   (e.g., `tests/`, `spec/`, `__tests__/`). Read the matching files. If the grep returns
-   nothing, no test traces to this requirement — the TOR's verdict is **FAIL** ("no test
-   names TOR-…"), even if source inspection finds the behavior implemented. Do not go looking
+   where `<test-directories>` is every directory listed under **Test directories** in
+   CLAUDE.md's Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if
+   the line is absent, the single test directory that section names). If no directory can be
+   derived (a legacy Tests row like `pytest` names none), ask once via `AskUserQuestion`:
+   - Question: `"Which directories hold tests? (space-separated, E2E last)"`
+   - Then offer to write the answer as the `**Test directories:**` line of the Verification &
+     Quality Gates section. If the user declines, replace the loop with
+     `git grep --untracked -l "<TOR-ID>" -- ':!docs'` (`--untracked` so a test file created by a
+     Step 1.4b Fix now is found on the re-run).
+   Read the matching files.
+   If the grep returns nothing in any listed directory, no test traces to this requirement —
+   the TOR's verdict is **FAIL** ("no test names TOR-…"), even if source inspection finds the
+   behavior implemented. Do not go looking
    in the handoff for a test. **Do not open the implementer handoff before finishing this
    step** for every TOR; it is read only in Step 1.2b.
 3. **Verify the test mirrors the Gherkin structure:**
@@ -123,15 +143,18 @@ implement this epic. Do not trust the implementer's self-assessment.
    - When → test performs the described action
    - Then → test asserts the described observable outcome
    A test that does not faithfully mirror the Gherkin is a gap regardless of whether it passes.
-4. **Run the test** yourself: `<project test command from CLAUDE.md> <specific test>`. The test
-   must pass — a skipped, xfail, or xpass result is not a pass (the runner exits 0 on these;
-   read the per-test outcome).
+4. **Run the test** yourself: the test command CLAUDE.md lists for that directory, followed by
+   the specific test. The test must pass — a skipped, xfail, or xpass result is not a pass
+   (the runner exits 0 on these; read the per-test outcome).
 5. **Independently inspect source code** — read the implementation file to confirm the code
    actually realizes the Given/When/Then behavior. A passing test that exercises the wrong code
    path is a FAIL.
-6. **For UI TOR IDs:** use `playwright-cli` against the live backend with real data (see
-   "Local Environment" in `CLAUDE.md`). Do NOT mock API responses unless the backend genuinely
-   cannot start. Start the backend first, then the frontend.
+6. **For UI TOR IDs:** Web app: `playwright-cli` against the running app with real data (see
+   "Local Environment" in `CLAUDE.md`) — start the backend first, then the frontend. Do NOT
+   mock API responses unless the backend genuinely cannot start. Desktop app: the project's
+   Playwright Electron harness (`@playwright/test` with `_electron.launch`, in the last entry
+   on the Test directories line — setup lists the E2E directory last); `playwright-cli`
+   cannot attach to an Electron window.
 
 Report each TOR ID:
 - **PASS** — a test that mirrors the Given/When/Then (item 3) passes AND implementation
@@ -184,9 +207,59 @@ one into a Highlights bullet or a Known Issue — it gets its own row, marked as
 
 Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently:
 - Build check
-- Visual verification via `playwright-cli` (if UI was changed)
+- Visual verification (if UI was changed) — web: `playwright-cli`; desktop: the Playwright Electron harness
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
-- Console check via `playwright-cli` (if UI was changed)
+- Console check (if UI was changed) — web: `playwright-cli`; desktop: the renderer console captured by the Playwright Electron harness
+- UX Baseline check (if UI was changed and `CLAUDE.md` has a **UX Baseline** section) — see below
+
+**UX Baseline check.** This is a quality gate, not a code-review note. Web app: `playwright-cli`
+against the running app with real data. Desktop app: the project's Playwright Electron harness
+(`@playwright/test` with `_electron.launch`, in the last entry on the Test directories line —
+setup lists the E2E directory last); `playwright-cli` cannot attach to an Electron window. Open
+every screen this epic adds or changes and confirm each active line of the UX Baseline holds
+on it:
+
+- **Screen states** — loading, empty, error, and populated states each render with visible
+  text. Force each one with the skeleton's test-only fault / latency switch (or an empty dataset for the empty state).
+- **Keyboard & focus** — every interactive element is reachable by Tab in a sensible order
+  with no trap; Enter / Space activate; Escape closes dialogs and menus; focus is visibly
+  indicated at each stop and not hidden behind sticky UI; a modal keeps focus inside and
+  returns it to the invoker on close.
+- **Forms** — every field has an associated label; a failed submission names the problem and
+  the fix next to the field, and focus moves to the first invalid field.
+- **Destructive actions** — an irreversible action asks for confirmation with the safe option
+  as the default and Escape cancelling.
+- **Progress feedback** — an operation longer than a second shows progress within a second;
+  one longer than ten seconds can be cancelled.
+- **Layout floor** — the screen is usable at 320 px and 200% zoom (web) or the declared
+  minimum window size (desktop) with no clipped controls and no horizontal page scroll.
+- **Contrast** — body text at least 4.5:1, control boundaries and focus indicators at least 3:1.
+- **Reduced motion** — with the OS reduce-motion preference set, non-essential animation is off.
+- **Navigation** — unique page or window title, one visible H1 matching it, current item
+  marked in the primary navigation.
+- **Desktop conventions** (desktop apps only) — new commands appear in the application menu
+  with accelerators; file choices use native dialogs; window state and single-instance
+  behavior still hold.
+- **Wireframe fidelity** (only when `ux/screens.md` exists — Step 1.1 item 4b) — check every
+  screen this epic adds or changes, taking the wireframe path from the `Wireframe` column of
+  `ux/screens.md` when the screen is owned by another epic's `## Screens` table: the screen's
+  regions, control texts, and four states match its wireframe. This line never yields FAIL — report
+  `PASS (deviations noted)` and record each deviation in Code Review Findings; a deviation a
+  TOR's Then requires is not a deviation.
+- Any project-specific line the section declares (Responsiveness budget, Undo) when not `N/A`.
+
+The skeleton epic's baseline UX TORs proved these behaviors once on the reference screen; this
+gate checks that the new screens kept the pattern. Report one of these per line:
+- `PASS`
+- `PASS (deviations noted)` — Wireframe fidelity only; each deviation goes to Code Review Findings
+- `FAIL — <baseline line>: <screen>: <one-line detail>`
+- `N/A — <baseline line>: no <form / irreversible action / long operation / file operation> on
+  the screens this epic adds or changes (<screens checked>)` — must name the screens checked
+  and does not fail the gate. N/A is never valid for Screen states, Keyboard & focus, Layout
+  floor, Contrast, Reduced motion, or Navigation.
+
+A FAIL is handled in Step 1.4b as a failing gate (Fix now / Stop) — it cannot be deferred. A
+configured `frontend-design` or brand skill does not replace this check.
 
 **Gate discrepancies are findings.** After running the gates, compare each result against the
 implementer handoff's *Verification Results (self-assessment)* section (the handoff is already
@@ -199,9 +272,13 @@ is the finding, not the failure's age.
 
 Review the implementation for:
 - Adherence to patterns established in previous epics and documented in `docs/reference/`
-- Security concerns (input validation, injection, secrets handling)
+- Security concerns (input validation, injection, secrets handling), including each item in
+  `CLAUDE.md`'s **Security Baseline** section where the project type makes it applicable
 - Error handling completeness
 - Logging adequacy
+- **UI epics:** screens compose from the skeleton's app shell and design system — no second
+  component library, no ad-hoc colors or spacing outside the token file, and any theme change
+  made in the global stylesheet's CSS-variable tokens rather than in generated component files
 - Consistency with whichever of `docs/architecture.md` and `docs/design-notes.md` were loaded conditionally in Step 1.1 item 7. If neither was loaded (the epic had no cross-cutting surface), record "no architectural surface affected" and move on.
 
 ### Step 1.4b: Fix, Defer, or Stop
@@ -235,7 +312,11 @@ three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
   Deferrals row is **kept** with Verifier finding `FIXED DURING WRAPUP — <what changed>` and
   `Waived by / Date / Reason` set to `—`; the TOR shows `PASS` in Requirements Implemented.
   This is the one place the verifier writes code it then verifies — the row is how the human
-  sees that. If the fix does not bring the TOR to PASS, re-ask with only `Defer` / `Stop`.
+  sees that. If the implementer's Deferrals row names a successor epic, also remove the TOR's
+  row from that epic's Requirements Anchors and its ID from
+  `docs/implementation-plan/status/epic-<succ>.md` `requirements:`, and stage those files —
+  a fixed TOR must not keep two owners. If the fix does not bring the TOR to PASS, re-ask with
+  only `Defer` / `Stop`.
 - **Defer** — a waiver. Eligible only when the Then clause depends on code a later epic creates.
   Ask `"Which later epic creates the code this Then clause depends on?"` — if the implementer's
   Deferrals row (Step 1.2b) already names a successor, offer it as the default. Judge
@@ -460,6 +541,8 @@ the Haiku model so the main session stays focused.
 Use the Agent tool with model `haiku` (the shorthand resolves to the current Haiku version automatically). Brief the subagent with:
 
 > Execute the `/peak-workflow:refresh-docs` skill (no arguments — refresh both documents).
+> At Step 5 (Gap Analysis), print the gap tables in your output and proceed to Step 6 without
+> waiting for confirmation — you have no user to ask.
 > When you reach Step 8 (Commit), auto-commit without asking the user for permission.
 > Commit message format: `docs: refresh architecture and design notes — <brief summary of changes>`
 > Do NOT push to the remote.

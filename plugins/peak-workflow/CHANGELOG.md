@@ -6,6 +6,174 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.10.0] — 2026-09-15
+
+Two reference stack sheets become the greenfield stack recommendation for web, service, and
+desktop projects; they stay reference-only for existing projects.
+
+### Added
+
+- **`references/` directory** — `bun-web-app-stack.md` (Bun runtime, Hono, React SPA, SQLite,
+  S3, one Docker container), `bun-electron-desktop-stack.md` (Bun toolchain, Electron shell,
+  electron-vite, React + shadcn/ui, better-sqlite3), and a `README.md` index.
+- **Layer checklist use** — each sheet's Stack Summary table names every layer a project of
+  that shape must handle, so an undecided layer (migrations, E2E runner, secrets) is visible.
+- **Reference-only guardrail** — sheets, index, and both call sites state that an existing
+  project's `CLAUDE.md` Tech Stack wins and that divergence is never a finding, a TOR, or a
+  reason to re-platform.
+
+### Changed
+
+- **`setup` Tech Stack step** — a thin answer now reads the matching sheet's Section 2 and
+  offers those picks verbatim; the per-project-type default stack table is gone.
+- **`setup` quality gates and Local Environment** — desktop and web defaults now quote the
+  sheets' script names (`bun run dev`, `build`, `package`, `lint`, `typecheck`, `deadcode`,
+  `bun test`, `test:e2e`, `check`) in place of the Electron Forge and Vitest commands.
+- **`plan-project` walking skeleton** — greenfield scaffolding builds the sheet's Section 3
+  tree and Section 4 config files directly instead of running `create-electron-app`; the
+  sheet's Stack Summary is the checklist for the skeleton's end-to-end path. Brownfield
+  planning ignores the sheets.
+
+---
+
+## [1.9.0] — 2026-09-15
+
+Low-fidelity UX prototyping between discovery and requirements capture, so TORs for web and
+desktop apps are derived against named screens, controls, and states.
+
+### Added
+
+- **`/mockup` skill** — new step between `/discover` and `/capture-requirements` for Web app,
+  Desktop app, and UI-Hybrid projects; stops with a message on CLI / Library / Service projects.
+- **Screen inventory** — writes `docs/product-vision-planning/ux/screens.md` with stable `S-NN`
+  IDs, named controls, the four screen states, ConOps step refs, and one mermaid flow per
+  scenario with explicit error and empty branches.
+- **Grayscale wireframes** — one self-contained HTML file per screen under `ux/wireframes/`,
+  with a four-state switcher, `data-component` tags naming the shadcn/ui primitive per region,
+  a desktop menu-bar strip, and a visible keyboard-focus outline. No colors, typefaces, or
+  external resources.
+- **ConOps feedback loop** — rewrites Section 5 steps to name each screen (`S-NN`) and exact
+  control text, adds a `**Screens:**` line per scenario, and minor-bumps the ConOps version.
+- **Brownfield UX changelog** — appends a `## UX Changes` table to the unprocessed discovery
+  changelog, or creates one with "New Capabilities Identified: None", so the
+  `/capture-requirements` brownfield path consumes UX-only deltas unchanged.
+- **Mockup templates** — `SCREENS_TEMPLATE.md` and `WIREFRAME_TEMPLATE.md`; `S-NN` IDs are
+  append-only and never renumbered, mirroring feature-number stability.
+- **Epic spec `## Screens` section** — optional, UI epics only; each screen belongs to exactly
+  one epic; `plan-project` Step 6 adds a Screen → Epic trace; `add` applies the same rule.
+
+### Changed
+
+- **`capture-requirements` reads `ux/screens.md`** — Givens name screens and controls as the
+  inventory does; empty and error states become explicit negative-path TORs; trace rows cite
+  `UX screens: S-NN …`; the UX Baseline reference screen is Scenario 1's thinnest `S-NN`.
+- **`start-epic` and `wrapup-epic` read wireframes** — the wireframe is the layout contract
+  (regions, control text, states); wrapup's UX Baseline gate gains a wireframe-fidelity bullet.
+- **Routing** — `discover`, `triage` (HEAVY), and `new-project` (greenfield) list `/mockup`
+  for UI projects; README quick starts, skills table, branch families, and artifact hierarchy
+  updated.
+
+### Fixed
+
+- **`mockup` project-type guard runs first** — a CLI / Service / Library project gets the
+  "does not apply" message before any branch question (CLI dry-run pass).
+- **Desktop dry-run pass** — Application menu / Window rows carry no wireframe; the UX
+  Baseline note may cite a list screen plus its form screen and the skeleton owns both;
+  wireframe fidelity reports `PASS (deviations noted)` and never FAILs; mockup writes a
+  discovery changelog only when feature files exist, replaces `## UX Changes` in place, and
+  stops on multiple unprocessed changelogs; no duplicate reference-screen state TORs; the
+  grayscale check is CSS-scoped; `/mockup` added to the CLAUDE.md and requirements README
+  command lists.
+- **Confirmation pass** — `screens.md` gains a `Wireframe` column that every consumer copies
+  verbatim; the list screen carries the row-level Delete the Destructive actions TOR anchors on;
+  skeleton-owned screens are Keep-only in `add` and moved screens leave the donor's table;
+  `start-epic` opens wireframes of screens its TORs name; mockup's own changelog never scopes a
+  run.
+
+---
+
+## [1.8.0] — 2026-09-14
+
+UX baseline for web and desktop apps: the same declare → baseline-TOR → skeleton → verify chain
+that CLI tools already get from Tool Hygiene & Operability.
+
+### Added
+
+- **`UX Baseline` CLAUDE.md section** — `setup` declares the design system (default shadcn/ui
+  on Tailwind v4, themed only via CSS-variable tokens) and interaction conventions with
+  acceptable defaults: Screen states, Keyboard & focus, Forms, Destructive actions, Progress
+  feedback, Layout floor, Contrast, Reduced motion, Navigation, Desktop conventions.
+- **Desktop app project type** — `setup` enumerates Electron / Tauri / native apps with Tool
+  Hygiene defaults (About dialog for version, electron-log, `N/A` exit codes unless a CLI
+  entry exists) and a desktop Local Environment branch.
+- **Tech Stack defaults by project type** — thin answers get a one-answer default: TypeScript
+  end to end, Bun for install / run / test, shadcn/ui + Tailwind v4, SQLite first; Electron
+  Forge `vite-typescript` + better-sqlite3 for desktop, Bun + Hono + `bun:sqlite` for web.
+- **Recommended Claude Code Skills step** — `setup` Step 8 checks UI projects for
+  `frontend-design` (default `frontend-design@claude-plugins-official`) and `playwright-cli`,
+  prints install commands on request, and records the precedence rule in CLAUDE.md.
+- **Baseline UX TORs** — `capture-requirements` Step 3A.2.2 derives at least one
+  Playwright-observable TOR per active UX Baseline line, placed after the tool-hygiene block
+  before domain TORs, with Web and Desktop shall-statement defaults.
+- **UX Baseline quality gate in `wrapup-epic`** — Step 1.3 checks every UX Baseline line on
+  each screen a UI epic adds or changes; a FAIL goes through Fix now / Stop and cannot be
+  deferred.
+
+### Changed
+
+- **Walking skeleton owns the design system** — for UI products `plan-project` 3A.1 has the
+  skeleton install the declared design system, build the app shell, and ship one reference
+  screen that proves the baseline UX TORs; no later epic installs a component library.
+- **UX Baseline traceability** — `capture-requirements` trace table, quality checklist, and
+  summary counts cover UX Baseline lines; brownfield 3B.2 appends TORs for lines added later.
+- **`start-epic` carries the UX Baseline** — UI epics compose from the skeleton's shell and
+  tokens; middle steps name each screen's four states; `frontend-design` shapes visuals but the
+  UX Baseline and tokens take precedence.
+- **`wrapup-epic` code review** — checks Security Baseline items and, for UI epics, that
+  theme changes live in the token file rather than generated component files.
+- **`setup` Final Summary** renumbered to Step 9.
+
+### Fixed
+
+- **CLI dry-run pass** — CLI / Library projects get a stack default (TypeScript on Bun, or the
+  named language's toolchain); `start-epic` 11a and the `setup` summary, Recommended Skills
+  routing, and Quality Gates questions are gated on UI project types; `capture-requirements`
+  infers non-UI when Tool Hygiene is absent.
+- **Stale epic-workflow terms** — `start-epic` Step 4 builds the plan from TOR Given/When/Then
+  (not "acceptance criteria" / "verification steps"); `plan-project` scope line says "TOR IDs
+  covered"; plugin CLAUDE.md drops a machine-specific path.
+- **Tracing sidecar knows CLAUDE.md sources** — `TRACING_TEMPLATE.md` gains a `claude_md`
+  trace (section + bold line); the Haiku brief never records baseline TORs as orphans.
+- **Desktop dry-run pass** — Playwright Electron harness (not `playwright-cli`) for desktop
+  verification; UX gate allows a named `N/A`; single accept/override answer for the UX Baseline;
+  per-bullet `N/A` for Desktop conventions; in-app About dialog for version exposure; Vitest +
+  Playwright Electron instead of `bun test` for desktop.
+- **Test directories line** — `setup` writes a Verification & Quality Gates template with a
+  space-separated `Test directories` line; `start-epic` and `wrapup-epic` grep every listed
+  directory for TOR IDs.
+- **Skeleton sizing and prerequisites** — reference screen may be Scenario 1's thinnest real
+  screen; skeleton exempt from the TOR-count check; shadcn init prerequisites on the Forge
+  template; `discover` §9 stays within the declared design system; unborn-HEAD check in `setup`.
+- **Second dry-run pass (CLI + desktop)** — literal `# Tool Hygiene & Operability` banner and
+  Haiku reads CLAUDE.md labels; Project type and Version single source of truth are
+  declarations, not TOR sources; baseline UX TOR Givens anchor on one reference screen with a
+  test-only fault switch; `About` dropped from standard menu roles.
+- **Verification & Quality Gates template** — `(UI only)` rows omitted for non-UI projects, a
+  `Run the tool` row for CLIs, per-directory test commands, E2E directory listed last; legacy
+  CLAUDE.md without a Test directories line prompts once or falls back to `git grep`.
+- **Housekeeping** — Fix-now at wrapup removes a successor's duplicate TOR ownership; stub grep
+  excludes dependency dirs and the skeleton adds `.gitignore`; Forge scaffold goes through a
+  temp dir; `bun.lock` recognised; SQLite default skipped for products without persistence.
+- **Third dry-run pass (CLI)** — `git grep --untracked` in the legacy test-directory fallback;
+  `start-epic` resolves test directories before plan mode (Step 1 item 4b); the walking
+  skeleton's `Run the tool` gate uses the `--version` invocation; test command asked once.
+- **Third dry-run pass (desktop)** — Build / Lint defaults for thin answers (Forge `package`
+  and `lint`); the skeleton ships a test-only data-directory override and a self-contained E2E
+  harness that builds before launching; the wrapup doc-refresh sub-agent no longer waits on a
+  confirmation it cannot get.
+
+---
+
 ## [1.7.1] — 2026-09-14
 
 ### Documentation

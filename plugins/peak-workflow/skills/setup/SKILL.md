@@ -24,9 +24,10 @@ Check for the presence and completeness of each section below. Report a status f
 |---------|---------------|
 | **Tech Stack** | Lists the languages, frameworks, package manager, and key libraries used |
 | **Local Environment** | Documents how to run the backend and frontend locally, whether the API is live and functional, and the preference for live data over mocking during verification |
-| **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
+| **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
+| **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library projects report `[N/A] UX Baseline — no user interface`. If Tool Hygiene & Operability is also missing, the Project type is not yet known — report `[MISS] UX Baseline — resolved after Project type is captured in Step 3` and let Step 3 turn it into `[N/A]` or a populated section. |
 | **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`, not derived as TORs. |
-| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
+| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
@@ -40,6 +41,7 @@ Report the result as a checklist:
 [PASS] Peak Workflow — found with capture-requirements and TOR references
 [MISS] Verification & Quality Gates — section missing
 [WEAK] Important Reminders — section exists but has no content
+[N/A]  UX Baseline — no user interface
 ```
 
 ## Step 3: Fix Missing/Weak Sections
@@ -51,9 +53,45 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 - What package manager? (npm, bun, yarn, pip, dotnet, etc.)
 - Any key libraries or tools? (CSS framework, ORM, test runner, etc.)
 
+If the answers are thin (e.g., "whatever you recommend", "I don't know", or only a language
+is named), ask which project type the product is (the same list as Tool Hygiene item 1 below
+— carry the answer forward so it is not asked twice). For the three project types that have a
+**reference stack sheet**, the sheet *is* the recommendation — read it and take its stack:
+
+| Project type | Reference sheet — read it before answering |
+|---|---|
+| **Web app** | `plugins/peak-workflow/references/bun-web-app-stack.md` |
+| **Service or API** | `plugins/peak-workflow/references/bun-web-app-stack.md` (same sheet; skip Section 7 Frontend Wiring and the SPA half of Section 8) |
+| **Desktop app** | `plugins/peak-workflow/references/bun-electron-desktop-stack.md` |
+| **Hybrid** | The sheet matching the primary interface, plus the other sheet's layers for the secondary one |
+
+Read the matching sheet's **Section 2 Stack Summary** and offer that table as the proposed
+stack, condensed to one line per layer. Do not invent, substitute, or "modernize" a pick, and
+do not paraphrase from memory — the sheet is the single source of truth for what gets offered.
+The user accepts the whole sheet with one answer or overrides any layer; record the accepted
+picks in `CLAUDE.md`'s Tech Stack table, and note in the section which sheet it came from so
+`plan-project` can read the same one. Sections 3 (Repository Layout), 4 (Configuration Files),
+and the later sections are for `plan-project` to apply when it builds the walking skeleton —
+not to be dumped into the conversation here.
+
+**CLI tool / Library** has no sheet: if no language is named, default to TypeScript on Bun
+(`bun init`, `bun test`, single-file executable via `bun build --compile`), `bun:sqlite` if it
+needs a database. If a language is named, use that language's standard toolchain (e.g., Python:
+`uv`, `pytest`, `ruff`, a `pyproject.toml` console-script entry point).
+
+Every project type: start with SQLite unless the user names another database or the product
+has no persistence.
+
+**Existing projects: reference only.** If `CLAUDE.md` already has a populated Tech Stack, that
+section is the single source of truth and this step is `[PASS]` — do not compare it against the
+sheets, do not report divergence, and never propose re-platforming, rewriting, or swapping a
+library to match. The sheets apply to an existing project for one thing only: noticing a
+**layer the project has not decided yet** (e.g., no migration tool, no E2E runner, no secrets
+convention). Raise such a gap as a question, never as a rewrite.
+
 **Local Environment** (if missing):
 
-First, determine the project type from the Tech Stack answers already captured. If the tech stack includes a web framework, HTTP server, REST API library, or mentions "frontend" / "backend", treat it as a **web/server project**. Otherwise (CLI tool, library, script, desktop app with no server component), treat it as a **CLI/tool project**.
+First, determine the project type from the Tech Stack answers already captured. If the tech stack includes Electron, Tauri, or a native windowing toolkit, treat it as a **desktop project**. Otherwise, if it includes a web framework, HTTP server, REST API library, or mentions "frontend" / "backend", treat it as a **web/server project**. Otherwise (CLI tool, library, script), treat it as a **CLI/tool project**.
 
 *For CLI/tool projects:*
 - How do you invoke the tool locally? (e.g., `python -m fibcalc 10`, `./mytool --help`, `go run . 5`)
@@ -66,6 +104,11 @@ First, determine the project type from the Tech Stack answers already captured. 
 - Is the backend API live and functional in local dev? (i.e., can it connect to real data sources like databases?)
 - Should verification always use live data instead of mocking API responses?
 
+*For desktop projects:*
+- How do you start the dev build? (reference-sheet stack: `bun run dev`, which runs electron-vite with a live main process and renderer HMR)
+- How do you run the test suite? (reference-sheet stack: `bun test` for unit and component tests, `bun run test:e2e` for the Playwright Electron suite)
+- Skip the live-API / live-data questions unless the app also talks to a backend service of its own — if it does, ask the web/server questions for that backend.
+
 **Tool Hygiene & Operability** (if missing):
 
 This section captures the project's chosen mechanisms for the load-bearing tool-hygiene
@@ -75,6 +118,7 @@ requirements. Ask in order:
 1. *Project type* — pick exactly one of:
    - **CLI tool** — primary interface is a command-line invocation
    - **Web app** — server-rendered or SPA, primary interface is a browser UI
+   - **Desktop app** — Electron / Tauri / native, primary interface is a windowed application
    - **Service or API** — headless service exposing HTTP / gRPC / message endpoints
    - **Library** — consumed by other code, no end-user runtime
    - **Hybrid** — combines two or more of the above (e.g., CLI that also runs as a service)
@@ -85,13 +129,18 @@ requirements. Ask in order:
    - CLI: `--version` flag printing `<name> v<semver>` to stdout, exit 0
    - Web app: GET `/version` endpoint returning JSON, plus version visible in app footer
      or About page
+   - Desktop app: Help > About menu item (App menu > About on macOS) opens an in-app About
+     dialog rendered in the renderer showing `<name> v<semver>` obtained from
+     `app.getVersion()` over IPC, plus the startup log line. Native About panels sit outside
+     the DOM and cannot be asserted by Playwright — do not use `role: 'about'` alone.
    - Service/API: GET `/version` or `/health` endpoint with version field
    - Library: `__version__` (or language-equivalent) constant exported from package root
    - Hybrid: list each applicable mechanism
 
 3. *Version stamped at log startup* — confirm the project will emit the tool name and
    semantic version on the first log line at process / app / request-handler startup
-   (e.g., `[INFO] myapp v1.2.0 starting`).
+   (e.g., `[INFO] myapp v1.2.0 starting`). Desktop app: the main process logs
+   `<name> v<semver> starting` as its first line once the app is ready.
 
 4. *Version single source of truth* — what is the authoritative file for the version
    number? The version is defined in exactly one place and read everywhere else. Examples:
@@ -102,20 +151,26 @@ requirements. Ask in order:
    - Levels — what set? (default: `DEBUG / INFO / WARN / ERROR`)
    - Format — `structured JSON` / `key=value` / `human-readable plain text`?
    - Where is the logger configured? (file path)
+   - Desktop app default: electron-log in the main process (`electron-log/main`,
+     `log.initialize()`), file under `app.getPath('logs')`, human-readable plain text;
+     renderer logs route through `electron-log/renderer`.
 
-6. *Exit code convention* (CLI / Hybrid only — otherwise mark `N/A — not a CLI`):
+6. *Exit code convention* (CLI / Hybrid only — otherwise mark `N/A — not a CLI`; Desktop
+   app: `N/A` unless the app also has a CLI entry point):
    - 0 — success
    - 1 — operational failure (file not found, permission denied, downstream failure, etc.)
    - 2 — invalid invocation (bad flags, missing required args)
    - Any additional codes the project defines.
 
-7. *stdout / stderr discipline* (CLI / Hybrid only — otherwise mark `N/A`):
+7. *stdout / stderr discipline* (CLI / Hybrid only — otherwise mark `N/A`; Desktop app:
+   `N/A` unless the app also has a CLI entry point):
    - stdout — data, parseable output, primary results
    - stderr — diagnostics, progress, errors, log output
 
 8. *Error message standard* — confirm user-facing errors will name the problem AND the
-   next user action. Format example:
-   `Error: configuration file not found at <path>. Try --config to specify an alternate path.`
+   next user action (on screen for Web / Desktop apps, on stderr for CLI tools). Format examples:
+   CLI — `Error: configuration file not found at <path>. Try --config to specify an alternate path.`
+   Desktop — `Could not save order #123: the database file is locked. Close other copies of the app and try again.`
 
 Generate the section using this template, filling in the project-specific answers:
 
@@ -125,13 +180,16 @@ Generate the section using this template, filling in the project-specific answer
 This section declares the project's conventions for the load-bearing tool-hygiene practices.
 Each line is a baseline TOR requirement source — `/peak-workflow:capture-requirements` will
 ensure at least one TOR exists per active line, written in the form appropriate to the
-declared mechanism. Lines marked `N/A` are skipped.
+declared mechanism. Lines marked `N/A` are skipped. Project type and Version single source
+of truth are declarations, not TOR sources.
 
-**Project type:** [CLI tool / Web app / Service or API / Library / Hybrid]
+**Project type:** [CLI tool / Web app / Desktop app / Service or API / Library / Hybrid]
 
 **Version exposure:** [Mechanism declaration. Example for a CLI: `--version` flag printing
 `myapp v<semver>` to stdout with exit code 0. Example for a Web app: GET `/version` endpoint
-returning JSON `{name, version}` AND version visible in app footer.]
+returning JSON `{name, version}` AND version visible in app footer. Example for a Desktop app:
+Help > About opens an in-app About dialog (rendered in the renderer) showing `myapp v<semver>`
+from `app.getVersion()` over IPC.]
 
 **Version stamped at log startup:** The first log line emitted on process / app startup
 includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting`).
@@ -148,8 +206,185 @@ includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting
 **stdout / stderr discipline:** [CLI / Hybrid — restate; otherwise: `N/A`]
 
 **Error message standard:** User-facing errors name the problem AND the next user action.
-Example: `Error: configuration file not found at <path>. Try --config to specify an
-alternate path.`
+[CLI example: `Error: configuration file not found at <path>. Try --config to specify an
+alternate path.` / Web or Desktop example: `Could not save order #123: the database file is
+locked. Close other copies of the app and try again.` — keep the one that applies]
+```
+
+**UX Baseline** (if missing — Project type Web app, Desktop app, or Hybrid with a UI only):
+
+If the Project type is CLI tool, Service or API, or Library, write nothing and report
+`[N/A] UX Baseline — no user interface`.
+
+This section is the UI counterpart of Tool Hygiene & Operability: the interaction conventions
+every screen must meet, each turned into a baseline TOR by
+`/peak-workflow:capture-requirements` (Step 3A.2.2) and checked on every UI epic by
+`/peak-workflow:wrapup-epic`. It covers UX, not visual style — palette, typography, and brand
+belong in a design doc or the `frontend-design` skill, never here. Every line has a default a
+non-technical user can accept as-is. Present the defaults as one block and ask for a single
+accept / override answer; override line by line only where the user asks.
+
+1. *Design system* — a declaration consumed by the walking skeleton in
+   `/peak-workflow:plan-project`, not a TOR. Default: **shadcn/ui on Tailwind v4**, themed
+   only through CSS-variable tokens:
+   - Tokens live in `:root` / `.dark` CSS variables in the global stylesheet
+     (`src/index.css` for Vite), exposed to Tailwind through an `@theme inline` block.
+   - `--radius` is the single radius knob — the whole radius scale derives from it.
+   - Base color is chosen at `bunx shadcn@latest init` (current set: `neutral`, `stone`,
+     `zinc`, `mauve`, `olive`, `mist`, `taupe`; default `neutral`) and is not changed casually
+     afterwards.
+   - Dark mode uses the `dark` class on the root element, switched by a ThemeProvider
+     (light / dark / system).
+   - New semantic colors are added by defining `--x` / `--x-foreground` in `:root` and `.dark`
+     and mapping them in `@theme inline` — never by editing generated files under
+     `components/ui/`. Regenerate components with `bunx shadcn@latest add <name> --overwrite`.
+   - Components are composed through `className` and variants; app code imports `cn` from
+     `@/lib/utils`.
+   If the user names another design system, record it in the same shape (where tokens live,
+   how themes change, what is never hand-edited). The TOR lines below apply regardless.
+
+2. *Screen states* (TOR) — every data-bearing screen renders explicit loading, empty, error,
+   and populated states, each distinguishable by visible text (WCAG 2.2 SC 4.1.3).
+
+3. *Keyboard & focus* (TOR) — every interactive control is reachable and operable by keyboard
+   alone with no keyboard trap, the focused control always shows a visible focus indicator that
+   is not hidden behind sticky headers or overlays, and every modal dialog moves focus inside on
+   open, keeps Tab within it, and returns focus to the invoking control on close
+   (WCAG 2.2 SC 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11; APG modal dialog pattern).
+
+4. *Forms* (TOR) — every form field has a programmatically associated label, every validation
+   error is shown in text next to the field naming the problem and the fix, and focus moves to
+   the first invalid field on a failed submission (WCAG 2.2 SC 1.3.1, 3.3.1, 3.3.2, 3.3.3).
+
+5. *Destructive actions* (TOR) — every irreversible action (delete, overwrite, send, pay)
+   requires an explicit confirmation whose safe option is the default and is triggered by
+   Escape (WCAG 2.2 SC 3.3.4; APG modal dialog pattern).
+
+6. *Progress feedback* (TOR) — any operation longer than 1 second shows a visible progress
+   indicator within 1 second, and any operation longer than 10 seconds can be cancelled
+   (WCAG 2.2 SC 4.1.3).
+
+7. *Layout floor* (TOR) — Web app: every screen is usable at 320 CSS px width and at 200% zoom
+   with no horizontal scrolling, overlap, or clipped controls (WCAG 2.2 SC 1.4.10, 1.4.4).
+   Desktop app: every window is usable at the declared minimum window size with no clipped
+   controls, and the window refuses to shrink below it. Default shown in the block: 800 x 600
+   — changed only if the user names this line at the single accept / override question.
+
+8. *Contrast* (TOR) — body text has a contrast ratio of at least 4.5:1 (3:1 for large text),
+   and control boundaries and focus indicators at least 3:1 against adjacent colors
+   (WCAG 2.2 SC 1.4.3, 1.4.11).
+
+9. *Reduced motion* (TOR) — when the OS reduce-motion preference is set, non-essential
+   animation is disabled or replaced by an instant transition (WCAG 2.2 SC 2.3.3, 2.2.2).
+
+10. *Navigation* (TOR) — every screen has a unique page or window title, a single visible H1
+    matching it, and a primary navigation whose current item is marked (WCAG 2.2 SC 2.4.2,
+    2.4.6, 3.2.3).
+
+    Error-message wording is already governed by the Tool Hygiene `Error message standard`
+    line — the section cross-references it and does not repeat it.
+
+11. *Responsiveness budget* (optional TOR, default `N/A`) — Web app: at the 75th percentile the
+    primary screens meet Core Web Vitals "good": LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1.
+    Desktop app: a declared local-interaction latency (e.g., every click acknowledged within
+    200 ms). Default shown in the block: `N/A` — changed only if the user names this line at
+    the single accept / override question.
+
+12. *Undo* (optional TOR, default `N/A`) — reversible actions offer Undo (Ctrl/Cmd+Z or an
+    "Undo" control), and unsaved form input survives an accidental reload of the same screen
+    (WCAG 2.2 SC 3.3.7). Default shown in the block: `N/A` — changed only if the user names
+    this line at the single accept / override question.
+
+13. *Desktop conventions* (Desktop app only — each bullet is a TOR; omit the whole line for
+    Web apps). Any bullet may be marked `N/A`. Default the file-dialog bullet to `N/A` unless
+    the vision / ConOps or the user names Open, Save, Import, or Export:
+    - Application menu with the platform's standard menus (App / File / Edit / View / Window /
+      Help on macOS; File / Edit / View / Help elsewhere) using standard roles for Undo, Redo,
+      Cut, Copy, Paste, Select All, Close, Minimize, Quit. Help > About is the in-app item
+      declared under Version exposure, not a standard role.
+    - Keyboard accelerators: primary commands use `CmdOrCtrl` accelerators matching the
+      platform's standard shortcuts, and every menu item with a shortcut displays it.
+    - Window size, position, and maximized state are restored on relaunch, clamped to a
+      visible display.
+    - Single instance: launching the app while it is running focuses and restores the existing
+      window (and opens any passed file in it) instead of starting a second instance.
+    - Open / Save / Export use the platform's native file dialogs with file-type filters.
+
+Generate the section using this template. Keep the bold labels exactly as written — downstream
+skills cite them. Bracketed `[Web app: … / Desktop app: …]` choices are resolved to the one
+that applies; the `[Desktop app only:]` tag is a conditional, not rendered text.
+
+```markdown
+## UX Baseline
+
+This section declares the interaction conventions every screen must meet. It covers UX, not
+visual style. Each line marked TOR is a baseline TOR requirement source —
+`/peak-workflow:capture-requirements` ensures at least one TOR exists per active line, and
+`/peak-workflow:wrapup-epic` checks every line on each UI epic. Lines marked `N/A` are skipped.
+Error-message wording is governed by the `Error message standard` line in Tool Hygiene &
+Operability and is not repeated here.
+
+**Design system:** [shadcn/ui on Tailwind v4, or the user's choice] (declaration — installed by
+the walking skeleton, not a TOR)
+- Tokens: `:root` / `.dark` CSS variables in [`src/index.css`], mapped through `@theme inline`.
+- `--radius` is the single radius knob. Base color: [neutral].
+- Dark mode: `dark` class on the root element, switched by a ThemeProvider (light / dark / system).
+- New semantic colors: define `--x` / `--x-foreground` in `:root` and `.dark`, map in `@theme inline`.
+- Never edit generated files under `components/ui/`; regenerate with `bunx shadcn@latest add <name> --overwrite`.
+- Compose through `className` and variants; import `cn` from `@/lib/utils`.
+
+**Screen states:** (TOR) Every data-bearing screen renders explicit loading, empty, error, and
+populated states, each distinguishable by visible text. (WCAG 2.2 SC 4.1.3)
+
+**Keyboard & focus:** (TOR) Every interactive control is reachable and operable by keyboard
+alone with no keyboard trap; the focused control always shows a visible focus indicator that is
+not hidden behind sticky UI; modal dialogs move focus inside on open, keep Tab within, and
+return focus to the invoking control on close. (WCAG 2.2 SC 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.4.11)
+
+**Forms:** (TOR) Every form field has a programmatically associated label; every validation
+error is shown in text next to the field naming the problem and the fix; focus moves to the
+first invalid field on a failed submission. (WCAG 2.2 SC 1.3.1, 3.3.1, 3.3.2, 3.3.3)
+
+**Destructive actions:** (TOR) Every irreversible action requires an explicit confirmation whose
+safe option is the default and is triggered by Escape. (WCAG 2.2 SC 3.3.4)
+
+**Progress feedback:** (TOR) Any operation longer than 1 second shows a visible progress
+indicator within 1 second; any operation longer than 10 seconds can be cancelled.
+(WCAG 2.2 SC 4.1.3)
+
+**Layout floor:** (TOR) [Web app: Every screen is usable at 320 CSS px width and at 200% zoom
+with no horizontal scrolling, overlap, or clipped controls. (WCAG 2.2 SC 1.4.10, 1.4.4) /
+Desktop app: Every window is usable at the minimum window size of [800 x 600] with no clipped
+controls, and refuses to shrink below it.]
+
+**Contrast:** (TOR) Body text has a contrast ratio of at least 4.5:1 (3:1 for large text);
+control boundaries and focus indicators at least 3:1 against adjacent colors.
+(WCAG 2.2 SC 1.4.3, 1.4.11)
+
+**Reduced motion:** (TOR) When the OS reduce-motion preference is set, non-essential animation
+is disabled or replaced by an instant transition. (WCAG 2.2 SC 2.3.3, 2.2.2)
+
+**Navigation:** (TOR) Every screen has a unique page or window title, a single visible H1
+matching it, and a primary navigation whose current item is marked. (WCAG 2.2 SC 2.4.2, 2.4.6, 3.2.3)
+
+**Responsiveness budget:** [N/A / Web app: At the 75th percentile the primary screens meet
+LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1. / Desktop app: Every interaction is acknowledged on
+screen within [200 ms].]
+
+**Undo:** [N/A / Reversible actions offer Undo (Ctrl/Cmd+Z or an "Undo" control), and unsaved
+form input survives an accidental reload of the same screen. (WCAG 2.2 SC 3.3.7)]
+
+[Desktop app only:]
+**Desktop conventions:** (each bullet is a TOR)
+- Application menu with the platform's standard menus and standard roles for Undo, Redo, Cut,
+  Copy, Paste, Select All, Close, Minimize, Quit; Help > About is the in-app item declared
+  under Version exposure.
+- Primary commands have `CmdOrCtrl` accelerators matching platform shortcuts; every menu item
+  with a shortcut displays it.
+- Window size, position, and maximized state are restored on relaunch, clamped to a visible display.
+- A second launch focuses and restores the running window instead of starting a new instance.
+- [N/A unless a file operation exists: Open / Save / Import / Export use native file dialogs
+  with file-type filters.]
 ```
 
 **Security Baseline** (if missing):
@@ -194,16 +429,45 @@ makes them inapplicable.
 **Peak Workflow** (if missing):
 - Where does the requirements baseline live? (default: `docs/requirements/`)
 - Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard)
-- Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- Leave room for a `**Recommended skills:**` line — Step 8 writes it for Web app / Desktop app / Hybrid-with-UI projects only; for CLI / Service / Library projects write nothing.
 
 **Verification & Quality Gates** (if missing):
 - What checks should run before an epic is marked complete? Ask about each:
   - Build/compile check? If so, what command?
-  - Tests? If so, what command?
+  - Tests? If so, what command? (Reuse the test command already captured under Local Environment — ask only where the tests live.)
   - Linting or formatting? If so, what command?
-  - Visual/screenshot verification? (suggest `playwright-cli` skill if frontend)
+  - Visual/screenshot verification? (suggest `playwright-cli` for web UIs; the Playwright
+    Electron harness in `e2e/` for desktop)
   - Brand or design compliance? (suggest brand guidelines skill if applicable)
   - Any other project-specific checks?
+  - Where do tests live? List every directory wrapup must grep — unit and E2E (Desktop
+    default: `tests/` and `e2e/`). List the E2E directory last on the Test directories line.
+
+  *For CLI/tool projects skip the visual/screenshot and brand questions — ask only about build, tests, lint, "run the tool with a known input" (reuse the Local Environment invocation), and where tests live (usually one directory; no E2E).*
+
+  The written section must open with this template (substitute the answers; keep the bold
+  labels verbatim — `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` grep every
+  directory on the `Test directories` line, which is **space-separated**, no commas, E2E
+  directory last). Omit the `(UI only)` rows for CLI / Service / Library projects; include the
+  `Run the tool` row for CLI projects only; drop the second half of the `Tests` row when there
+  is no E2E suite:
+
+```markdown
+## Verification & Quality Gates
+
+**Test directories:** tests/ e2e/
+
+Run every applicable check before marking an epic Implemented or Complete:
+
+- **Build:** `[build command]`
+- **Tests:** `[unit command]` (tests/); `[e2e command]` (e2e/)
+- **Lint / format:** `[lint command]`
+- **Run the tool:** `[invocation with known input]` → `[expected output]` *(the walking-skeleton epic uses the `--version` invocation here — domain inputs apply once the owning epic ships)*
+- **Visual / console (UI only):** [`playwright-cli` against the running app / the Playwright Electron harness in `e2e/`]
+- **Brand (UI only, if a brand skill is configured):** [skill name]
+- [Any other project-specific check]
+```
 
 After gathering answers, **validate each command answer**: if the user provides a non-empty
 answer that looks like a description rather than a runnable shell command (e.g., it contains no
@@ -222,6 +486,10 @@ If the second answer is still ambiguous, accept it and add a note in the written
 **Reference Materials** (if missing):
 - Are there architecture docs, design docs, or reference projects Claude should read?
 - Any external resources (Confluence, Linear, Figma) worth pointing to?
+- For a Web app, Service or API, or Desktop app project, offer to add a line pointing at the
+  matching reference stack sheet (`plugins/peak-workflow/references/bun-web-app-stack.md` or
+  `bun-electron-desktop-stack.md`), labelled as reference and layer checklist only — never a
+  target to migrate the project toward.
 
 **Git Workflow** (if missing):
 - What is the branch strategy? (e.g., `develop` for active work, `main` for releases)
@@ -234,12 +502,15 @@ If the second answer is still ambiguous, accept it and add a note in the written
 **Verification Before Commit Rule** (if missing):
 - What command builds the project? (e.g., `dotnet build`, `npm run build`, `python -m build` — or skip if no explicit build step)
 - What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
+
+  A thin answer ("whatever you recommend") takes the reference-sheet default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. Both sheets define the same script names, so the gates are identical for Web app, Service or API, and Desktop app: Build `bun run build` (Desktop also has `bun run package` for the electron-builder output); Lint `bun run lint` (Biome); Typecheck `bun run typecheck`; Dead code `bun run deadcode`; Tests `bun test` plus `bun run test:e2e`. `bun run check` runs typecheck + lint + deadcode + tests in one command — record it as the single pre-commit gate when the project took the sheet's `package.json` unchanged.
 - What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
 - How do you verify the tool/app works after build?
-  - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`)
+  - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
   - *Web/server projects:* curl a health endpoint (e.g., `curl http://localhost:8080/api/health`) or use `playwright-cli`
+  - *Desktop projects:* start the dev build (e.g., `bun run dev`) and run the Playwright Electron smoke test (e.g., `bun run test:e2e`)
 
-When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers.
+When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
 - Generate the section using this template, filling in the project-specific commands:
 
 ```markdown
@@ -252,7 +523,7 @@ A successful build (compile) does NOT equal working code. The workflow MUST be:
 1. **Implement** — Make the code changes
 2. **Lint** — Run `[lint command]` to verify formatting and static analysis
 3. **Build** — Run `[build command]` to build *(omit or replace with a no-op note for projects with no explicit build step)*
-4. **Verify** — Use curl, playwright, or manual testing to confirm functionality
+4. **Verify** — Use [curl / playwright / the tool invocation / the dev build + Playwright Electron smoke test] or manual testing to confirm functionality
 5. **Commit** — ONLY after verification passed
 
 **Why this matters:**
@@ -352,11 +623,12 @@ traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capt
 ## Lifecycle
 
 1. Run `/peak-workflow:discover` to establish or update the product vision and ConOps.
-2. Run `/peak-workflow:capture-requirements` to derive TOR requirements from the vision/ConOps.
-3. Run `/peak-workflow:plan-project` to derive epics that implement the TOR requirements.
-4. Run `/peak-workflow:start-epic <id>` to implement each epic — tests are derived from
+2. On UI projects run `/peak-workflow:mockup` to inventory screens and draw wireframes.
+3. Run `/peak-workflow:capture-requirements` to derive TOR requirements from the vision/ConOps.
+4. Run `/peak-workflow:plan-project` to derive epics that implement the TOR requirements.
+5. Run `/peak-workflow:start-epic <id>` to implement each epic — tests are derived from
    TOR Given/When/Then.
-5. Run `/peak-workflow:wrapup-epic <id>` to independently verify each TOR requirement is satisfied.
+6. Run `/peak-workflow:wrapup-epic <id>` to independently verify each TOR requirement is satisfied.
 ```
 
   Report: `[PASS] Requirements directory — created docs/requirements/README.md stub`
@@ -368,7 +640,8 @@ traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capt
 
 ### Generating `docs/architecture.md` stub
 
-Derive the content from CLAUDE.md's Tech Stack, data sources, and project description sections:
+Derive the content from CLAUDE.md's Tech Stack, data sources, and project description sections.
+For Desktop app projects title §4 "IPC Contracts" and §8 "Packaging & Distribution".
 
 ```markdown
 # [Project Name] — Architecture Document
@@ -632,7 +905,7 @@ secrets, and policies. Print this guidance:
 ### 7.6: Lockfile
 
 Check for a lockfile appropriate to the tech stack declared in CLAUDE.md:
-- Node.js: `package-lock.json` | `yarn.lock` | `pnpm-lock.yaml` | `bun.lockb`
+- Node.js: `package-lock.json` | `yarn.lock` | `pnpm-lock.yaml` | `bun.lock` | `bun.lockb`
 - Python: `poetry.lock` | `uv.lock` | `Pipfile.lock` | `requirements.txt` with pinned `==` versions
 - Rust: `Cargo.lock`
 - Go: `go.sum`
@@ -671,7 +944,69 @@ For each `MISS` / `WEAK` not yet resolved, repeat the recommendation with the fi
 and the next action. The user is responsible for the legal / build-system items
 (LICENSE, CI config, lockfile); `/peak-workflow:setup` does not auto-create them.
 
-## Step 8: Final Summary
+## Step 8: Recommended Claude Code Skills
+
+Some project types work better with companion skills installed. Decide by the Project type
+declared in Tool Hygiene & Operability:
+
+| Project type | Recommended skills |
+|---|---|
+| Web app / Hybrid with a web UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic` |
+| Desktop app | `frontend-design` (same source) for visual execution. UI verification uses the project's Playwright Electron harness (`@playwright/test`, a project dependency — not a skill); report `[N/A] playwright-cli — desktop apps verify through the Playwright Electron harness` |
+| CLI tool / Service or API / Library / Hybrid without a UI | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
+
+For each recommended skill, check whether it appears in this session's available-skills list
+and report `[PASS] {skill} — installed` or `[MISS] {skill} — not installed`. Plugin skills are
+listed namespaced (e.g., `frontend-design:frontend-design`) — match on the skill name after the
+last `:`.
+
+For each `[MISS]`, use `AskUserQuestion`:
+- Question: `"The {skill} skill is not installed. Install it now?"`
+- Options: `["Yes — show me the install commands", "No — skip for now"]`
+
+On yes, print the commands for the user to run (this skill cannot run `/plugin` itself):
+
+> Run these in Claude Code, then restart Claude Code so the new skill loads:
+> ```
+> /plugin marketplace add anthropics/claude-plugins-official   # only if this marketplace is not already registered
+> /plugin install frontend-design@claude-plugins-official
+> ```
+
+For `playwright-cli`, print `/plugin install playwright-cli@<marketplace>` and tell the user to
+pick the marketplace that lists it (`/plugin` → Discover) — do not guess a marketplace name.
+
+Record the outcome as a `**Recommended skills:**` line inside the **Peak Workflow** section of
+`CLAUDE.md`, one entry per skill with its status, followed by the precedence rule:
+
+```markdown
+**Recommended skills:** `frontend-design@claude-plugins-official` (installed), `playwright-cli`
+(not installed — install before the first UI epic). `frontend-design` shapes visual execution;
+the UX Baseline and the design-system tokens take precedence over its aesthetic choices.
+```
+
+Desktop app variant of the first sentence:
+
+```markdown
+**Recommended skills:** `frontend-design@claude-plugins-official` (installed); `playwright-cli`
+N/A — desktop apps verify through the Playwright Electron harness in `e2e/`.
+```
+
+Also print the precedence rule to the user verbatim: `frontend-design` shapes visual
+execution; the UX Baseline and the design-system tokens take precedence over its aesthetic
+choices.
+
+## Step 9: Final Summary
+
+**Unborn-HEAD check:** first run `git rev-parse --is-inside-work-tree`; if it fails, this is
+not a git repository — suggest `git init` and skip the rest of this check. Otherwise, if
+`git rev-parse --verify HEAD` fails (no commits yet), ask via `AskUserQuestion` whether to
+commit the setup files now as `chore: initial project setup` on the current branch (`main` by
+default) so `/peak-workflow:discover` can branch from a real base:
+- Question: `"This repo has no commits yet. Commit the setup files now as 'chore: initial project setup' so /peak-workflow:discover can branch from a real base?"`
+- Options: `["Commit now", "I'll commit myself"]`
+On "Commit now", stage the files this session wrote or modified by path (never `git add -A`)
+and commit. On "I'll commit myself", print: "Commit before running `/peak-workflow:discover` —
+otherwise `main` will not exist to merge the docs/ branch back to."
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work
@@ -680,6 +1015,14 @@ Remind the user:
   version exposure, log startup stamping, logging convention, exit codes (CLI),
   stdout/stderr discipline (CLI), and error-message standards. Lines marked `N/A` are
   skipped.
+- *(UI project types only — omit for CLI / Service / Library:)* the **UX Baseline** section in `CLAUDE.md` follows the same chain:
+  `/peak-workflow:capture-requirements` turns each active line into a baseline UX TOR, the
+  walking skeleton epic in `/peak-workflow:plan-project` installs the declared design system and
+  proves those TORs on one reference screen, and `/peak-workflow:wrapup-epic` runs the UX
+  Baseline check as a quality gate on every UI epic. Lines marked `N/A` are skipped.
+- *(UI project types only — omit for CLI / Service / Library:)* any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
+  `frontend-design` shapes visual execution, and the UX Baseline and design-system tokens take
+  precedence over its aesthetic choices.
 - The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:start-epic`
   during implementation and by `/peak-workflow:wrapup-epic` during independent review. These
   reminders are not derived as TORs.

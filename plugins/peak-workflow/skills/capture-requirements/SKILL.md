@@ -58,7 +58,15 @@ The user's request / brownfield description: $ARGUMENTS
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
    already in context. Specifically capture, if present:
    - **`Tool Hygiene & Operability` section** — Project type and the active (non-`N/A`)
-     mechanism declarations. These drive the baseline TORs in Step 3A.2.1.
+     mechanism declarations. These drive the baseline TORs in Step 3A.2.1. Record the
+     Project type; if the section is absent, infer it from the Tech Stack section
+     (Electron / Tauri → Desktop app; web framework or "frontend" → Web app; otherwise treat the
+     project as non-UI — CLI tool, Service, or Library — and set
+     `ux_baseline_section_present = false` silently).
+   - **`UX Baseline` section** — Presence, the **Design system** declaration (a declaration
+     for the walking skeleton, not a TOR), and the active (non-`N/A`) TOR lines. These drive
+     the baseline UX TORs in Step 3A.2.2. Set `ux_baseline_section_present = true` when the
+     section exists.
    - **`Security Baseline` section** — Note its presence. Security Baseline items are NOT
      derived as TORs (they are negative invariants); they are passed forward to `/start-epic`
      and `/wrapup-epic` via CLAUDE.md, which is auto-loaded on every session.
@@ -77,11 +85,32 @@ The user's request / brownfield description: $ARGUMENTS
 
    If the user chooses Stop, end here. Otherwise, set an internal flag
    `tool_hygiene_section_present = false` and proceed; Step 3A.2.1 will be skipped.
+
+   If the `UX Baseline` section is missing **and** the Project type is a UI type (Web app,
+   Desktop app, or Hybrid with a UI), warn but allow continuation. For CLI / Service / Library
+   projects set `ux_baseline_section_present = false` silently — the section does not apply.
+   > `UX Baseline` section not found in `CLAUDE.md`. Baseline UX TORs (screen states,
+   > keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast,
+   > reduced motion, navigation, desktop conventions) will NOT be derived. To enable them,
+   > run `/peak-workflow:setup` to add the section, then re-run
+   > `/peak-workflow:capture-requirements`. Continuing without baseline UX TORs.
+
+   Use `AskUserQuestion`:
+   - Question: `"UX Baseline section is missing from CLAUDE.md — continue without baseline UX TORs, or stop to run /setup first?"`
+   - Options: `["Continue without baseline UX TORs", "Stop — I'll run /peak-workflow:setup first"]`
+
+   If the user chooses Stop, end here. Otherwise, set `ux_baseline_section_present = false`
+   and proceed; Step 3A.2.2 will be skipped.
 2. Read `docs/product-vision-planning/product-vision.md`. If missing or skeleton (no
    substantive `## 2. Problem Statement` content), stop:
    > Run `/peak-workflow:discover` first to produce the product vision document.
 3. Read `docs/product-vision-planning/concept-of-operations.md`. If missing or skeleton, stop
    with the same message.
+3a. Read `docs/product-vision-planning/ux/screens.md` if it exists (written by
+    `/peak-workflow:mockup` on UI projects). Capture every screen's `S-NN` ID, name, primary
+    actions with their control text, and its four states (or `n/a — not data-bearing`). Set
+    `screens_present = true`; Steps 3A.2, 3A.2.2, 4, and 5 use it. If absent, set it `false`
+    silently — CLI / Service / Library projects never have one.
 4. Glob `docs/requirements/*.feature.md`. For each file found, capture:
    - The feature number `{NN}` from the filename prefix (e.g., `01` from `01-cli.feature.md`)
    - All existing TOR IDs (parse every `Scenario: [TOR-NN-XXXXXXX]` line)
@@ -96,6 +125,7 @@ Requirements baseline state:
 - Highest feature number: [NN] (next available: [NN+1])
 - Existing TOR IDs: [count]
 - Tracing sidecars present: [count]
+- UX screens.md: [none / N screens, S-01–S-NN]
 ```
 
 ---
@@ -173,6 +203,17 @@ Present:
 | ... | ... | ... | ... |
 
 Total: {N} feature files
+[If tool_hygiene_section_present = true:]
+Baseline tool-hygiene TORs: leading `# Tool Hygiene & Operability` section of
+docs/requirements/01-<name>.feature.md
+[If ux_baseline_section_present = true:]
+Baseline UX TORs: `# UX Baseline` section of docs/requirements/01-<name>.feature.md,
+immediately after the tool-hygiene block (say so if you want a dedicated
+NN-ux-baseline.feature.md instead)
+[If the ConOps names Open / Save / Import / Export and the Desktop conventions file-dialog
+bullet in CLAUDE.md is N/A:]
+Desktop conventions — file dialogs: the ConOps names <operation>, so the file-dialog TOR will
+be derived anyway — flip the `N/A` bullet in CLAUDE.md's UX Baseline section to active.
 ```
 
 Use `AskUserQuestion`:
@@ -204,6 +245,13 @@ One ConOps scenario step often yields **multiple requirements**:
 - Error handling and user feedback (what the system communicates when things go wrong)
 - Accessibility and usability expectations (where applicable)
 
+When `screens_present = true`, Givens and Whens name screens and controls exactly as the
+inventory does — `the Orders List (S-01)`, `the "Save" button` — never a paraphrase, so the
+wireframe, the ConOps step, and the TOR agree on one name. Each data-bearing screen's empty
+and error states (from the inventory's `## States`) are explicit negative-path requirements,
+one TOR each, asserting the visible text and the call-to-action or retry control — except the
+reference screen(s), whose empty and error states are already the 3A.2.2 Screen states TORs.
+
 ### 3A.2.1: Baseline Tool Hygiene TORs
 
 If `tool_hygiene_section_present = false` (Step 1), skip this sub-step entirely.
@@ -218,19 +266,27 @@ Place baseline TORs in the **most appropriate functional-area feature file** (ty
 the first feature file — `01-cli.feature.md` for CLI tools, `01-app.feature.md` for web
 apps, `01-service.feature.md` for services, `01-api.feature.md` for libraries / SDKs).
 If the natural functional area is not the first file (e.g., logging baseline belongs in a
-dedicated `NN-logging.feature.md`), use that file instead.
+dedicated `NN-logging.feature.md`), use that file instead. Write them under a literal
+`# Tool Hygiene & Operability` section banner (`# ---` comment block per
+`FEATURE_TEMPLATE.md`) — the Haiku sub-agent in 3A.5 keys on that exact heading, as it does
+on `# UX Baseline` in 3A.2.2.
+
+**Project type** and **Version single source of truth** are declarations, not TOR sources —
+neither has a black-box observable, so neither yields a TOR (the same carve-out as **Design
+system** in 3A.2.2). Exclude both from the Step 4 trace table and from the Step 7 "Tool
+Hygiene lines covered" count.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them.
 
-| Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) |
-|---|---|---|
-| **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page |
-| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level |
-| **Logging convention** | The tool shall emit log records at the levels DEBUG, INFO, WARN, and ERROR, in the format declared in CLAUDE.md (structured JSON / key=value / human-readable) | (same — substitute "web application") |
-| **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A |
-| **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A |
-| **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action |
+| Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) | Default TOR shall-statement form (Desktop app example) |
+|---|---|---|---|
+| **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page | The application shall display its name and semantic version in an About dialog opened from Help > About |
+| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level | The application shall write a first log line containing its name and semantic version to the electron-log file on startup |
+| **Logging convention** | The tool shall emit log records at the levels DEBUG, INFO, WARN, and ERROR, in the format declared in CLAUDE.md (structured JSON / key=value / human-readable) | (same — substitute "web application") | (same — substitute "application") |
+| **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A | N/A |
+| **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A | N/A |
+| **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action | The application shall display user-facing error messages on screen that name the problem AND name the next user action |
 
 For each baseline TOR, write a concrete, observable Given/When/Then. Examples:
 
@@ -261,6 +317,123 @@ Scenario: [TOR-NN-{XXXXXXX}] The tool shall exit with code 0 on success, code 1 
 **Generate baseline TORs BEFORE non-baseline TORs in each affected feature file.** They
 should occupy the leading TOR positions in the file. Domain-specific TORs derived from
 vision / ConOps follow.
+
+### 3A.2.2: Baseline UX TORs
+
+If `ux_baseline_section_present = false` (Step 1), or the Project type has no user interface
+(CLI tool, Service or API, Library), skip this sub-step entirely.
+
+Otherwise, ensure every **active TOR line** of the `UX Baseline` section of `CLAUDE.md` is
+covered by TOR requirements. Active TOR lines are every bold-labelled line except
+**Design system** (a declaration the walking skeleton consumes, not a requirement) and any
+line marked `N/A`. For each active line derive at least one TOR — written in normal Scenario
+form, with the Scenario title as a complete `shall` statement matching the convention
+declared in `CLAUDE.md`. Each **Desktop conventions** bullet is its own line and yields its own
+TOR (an `N/A` Desktop conventions bullet yields no TOR).
+
+Place baseline UX TORs in the **first feature file**, immediately after the tool-hygiene
+block, under a `# UX Baseline` section banner (`# ---` comment block per
+`FEATURE_TEMPLATE.md`) followed by a `# Note: reference screen — <screen>` line naming the
+screen every Given below is anchored on (with its `S-NN` when `screens_present = true`:
+`# Note: reference screen — Orders List (S-01)`). When the inventory gives that screen's create
+form its own `S-NN`, the note cites both — `# Note: reference screens — Orders List (S-01),
+Order Form (S-02)` — and every Given names one of them. If the user asked for a dedicated file at
+the 3A.1b grouping gate, write them to `docs/requirements/NN-ux-baseline.feature.md` instead.
+Baseline UX TORs precede domain TORs, exactly like the tool-hygiene TORs.
+
+Baseline UX TORs are **black-box and Playwright-observable**: assert on roles, visible text,
+`document.activeElement`, computed styles, viewport size, and document title — never on
+component internals. Anchor every baseline UX TOR's Given on **one reference screen**: the
+thinnest entity list in ConOps Scenario 1, with its create form and its delete action (the
+Application menu / Window stands in for Desktop conventions). When `screens_present = true`,
+that is Scenario 1's thinnest list screen in `ux/screens.md` — cite its `S-NN` in the `# Note:`
+line. `mockup` 3.1 makes a create form with its own actions a separate screen; when the
+inventory did that, the form screen is the second reference screen — cite it in the same note
+so the Forms TOR has a home, and name no third screen. If neither reference screen carries an
+irreversible action in the inventory, anchor **Destructive actions** on the list screen's
+row-level Delete and flag the inventory row at the 3A.1b gate. `/plan-project` reads the IDs to
+pick the skeleton's screens. Those are the screens the walking skeleton in `/plan-project`
+builds — Givens that name any other screen make it build that one too. Error-state and Progress
+feedback Givens cite the skeleton's test-only fault / latency switch rather than a real
+failure or slow operation (`Given the test fault switch forces the
+data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).
+For a desktop app, the same assertions run through the project's Playwright Electron harness
+against the dev build with a live main process.
+
+The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
+override them. Where the Web app and Desktop app forms differ, both are given. Rows with
+semicolon-separated clauses yield one TOR per clause.
+
+| UX Baseline line | Default TOR shall-statement form (Web app) | Default TOR shall-statement form (Desktop app) |
+|---|---|---|
+| **Screen states** | The application shall render an explicit loading, empty, error, and populated state on every data-bearing screen, each distinguishable by visible text | (same) |
+| **Keyboard & focus** | The application shall allow every interactive control to be reached and operated by keyboard alone with no keyboard trap; shall display a visible focus indicator on the focused control that is not obscured by sticky UI; and shall move focus into a modal dialog on open, keep Tab within it, and return focus to the invoking control on close | (same) |
+| **Forms** | The application shall associate a label with every form field, shall identify each invalid field in text next to it naming the problem and the fix, and shall move focus to the first invalid field on a failed submission | (same) |
+| **Destructive actions** | The application shall require an explicit confirmation before every irreversible action, with the safe option as the default and Escape cancelling | (same) |
+| **Progress feedback** | The application shall show a visible progress indicator within 1 second of starting any operation longer than 1 second, and shall offer a cancel control for any operation longer than 10 seconds | (same) |
+| **Layout floor** | The application shall present every screen without horizontal scrolling, overlap, or clipped controls at 320 CSS px viewport width and at 200% zoom | The application shall keep every control visible and usable at the declared minimum window size of {W} x {H}, and shall refuse to resize the window below it |
+| **Contrast** | The application shall render body text at a contrast ratio of at least 4.5:1 (3:1 for large text) and control boundaries and focus indicators at least 3:1 against adjacent colors | (same) |
+| **Reduced motion** | The application shall disable or replace with an instant transition all non-essential animation when the OS reduce-motion preference is set | (same) |
+| **Navigation** | The application shall give every screen a unique document title, exactly one visible H1 matching it, and a primary navigation whose current item is marked with `aria-current` | The application shall give every window a unique title, exactly one visible H1 matching it, and a primary navigation whose current item is marked |
+| **Responsiveness budget** (if not `N/A`) | The application shall render the primary screens at the 75th percentile with LCP ≤ 2.5 s, INP ≤ 200 ms, and CLS ≤ 0.1 | The application shall acknowledge every interaction on screen within {N} ms |
+| **Undo** (if not `N/A`) | The application shall offer an Undo action for at least 5 seconds after a reversible action, and shall preserve unsaved form input across a reload of the same screen | (same) |
+| **Desktop conventions** — menu | N/A | The application shall provide a menu bar with the platform's standard menus and standard roles for Undo, Redo, Cut, Copy, Paste, Select All, Close, Minimize, and Quit; Help > About is the in-app item declared under Version exposure |
+| **Desktop conventions** — accelerators | N/A | The application shall bind each primary command to the platform's standard `CmdOrCtrl` accelerator and display the accelerator on its menu item |
+| **Desktop conventions** — window state | N/A | The application shall restore the main window's last size, position, and maximized state on relaunch, clamped to a visible display |
+| **Desktop conventions** — single instance | N/A | The application shall focus and restore the running window when launched a second time instead of starting a second instance |
+| **Desktop conventions** — file dialogs | N/A | The application shall use the platform's native file dialog with file-type filters for Open, Save, and Export |
+
+Error-message wording is covered by the Tool Hygiene **Error message standard** TOR in
+3A.2.1 — do not derive a second TOR for it here.
+
+For each baseline UX TOR, write a concrete, observable Given/When/Then. Examples:
+
+```gherkin
+# Note: reference screens — Projects List (S-01), Project Form (S-02)
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit empty state when a list screen has no items
+    Given the user is authenticated and owns zero projects
+    When the user navigates to the Projects List (S-01)
+    Then the main content region should contain visible text "No projects yet"
+    And the main content region should contain a "Create project" button
+    And no element with role "progressbar" should be visible
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit error state when a data-bearing screen fails to load
+    Given the test fault switch forces the data source to fail
+    When the user navigates to the Projects List (S-01)
+    Then the main content region should contain visible text "Could not load projects"
+    And the main content region should contain a "Retry" button
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall identify an invalid form field in text that names the problem and the correction
+    Given the Project Form (S-02) is open
+    When the user leaves the Name field empty and activates the "Create" button
+    Then the Name field should have aria-invalid="true"
+    And an element referenced by the Name field's aria-describedby should contain text "Enter a project name"
+    And focus should be on the Name field
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall require confirmation before deleting a record, with Cancel as the safe default
+    Given the Projects List (S-01) lists a project named "Q3 Report"
+    When the user activates the "Delete" button for "Q3 Report"
+    Then a dialog with role "dialog" and aria-modal="true" should be visible containing the text "Delete Q3 Report?"
+    And document.activeElement should be the Cancel button
+    When the user presses Escape
+    Then the dialog should not be visible and "Q3 Report" should still be listed
+
+Scenario: [TOR-01-{XXXXXXX}] The application shall focus the running instance when launched a second time
+    Given the application is running with its main window minimized
+    When the user launches the application executable again
+    Then within 2 seconds exactly one application process should exist
+    And the main window should be restored and focused
+```
+
+**Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
+`CLAUDE.md` will have no **Desktop conventions** line and will typically mark
+`Responsiveness budget: N/A` and `Undo: N/A` — those rows produce no baseline TORs.
+
+One exception: setup defaults the Desktop conventions file-dialog bullet to `N/A` before a
+ConOps exists. If the ConOps names Open, Save, Import, or Export and that bullet is still
+`N/A`, derive the file-dialog TOR anyway and flag the `CLAUDE.md` bullet at the 3A.1b grouping
+gate for the user to flip to active.
 
 ### 3A.3: TOR ID Generation
 
@@ -298,8 +471,13 @@ After all feature files are written, invoke a Haiku sub-agent using the `Agent` 
 > scenario, find the most specific matching section in
 > `docs/product-vision-planning/product-vision.md` and the most specific scenario step in
 > `docs/product-vision-planning/concept-of-operations.md`. Write paraphrases in your own words
-> — do not copy source text. If no credible trace can be found for a requirement, record it
-> under `coverage_gaps` with `gap_type: "orphan_requirement"`. Also enumerate ConOps scenario
+> — do not copy source text. Read the `Tool Hygiene & Operability` and `UX Baseline` sections
+> of `CLAUDE.md`. Scenarios under the `# Tool Hygiene & Operability` banner or the
+> `# UX Baseline` banner trace to `CLAUDE.md` — record them under `traces_to.claude_md`,
+> citing `section` (`Tool Hygiene & Operability` or `UX Baseline`) and copying the bold label
+> verbatim into `line` (for Desktop conventions, `Desktop conventions — <bullet>`); never
+> record them as `orphan_requirement`. If no credible trace can be found for a requirement,
+> record it under `coverage_gaps` with `gap_type: "orphan_requirement"`. Also enumerate ConOps scenario
 > steps and PV goals not covered by any TOR ID and record those under `coverage_gaps` with
 > `gap_type: "uncovered_source"` in the most relevant feature file's sidecar. Do NOT modify
 > any `.feature.md` file. Do NOT commit. After processing all files, report one line per
@@ -317,7 +495,9 @@ Adopt the same seasoned-PM persona as 3A. Differences from greenfield:
 
 1. **Exactly one unprocessed changelog found:** Read it. The "New Capabilities Identified"
    section is your primary input. The "Priority Signal" section guides requirement priority.
-   Record the changelog path for archival in Step 6.
+   Record the changelog path for archival in Step 6. A changelog whose "New Capabilities
+   Identified" reads "None — UX concretization only" (written by `/peak-workflow:mockup`) is
+   still consumed and archived; its `## UX Changes` rows are the inputs for 3B.2.
 
 2. **Two or more unprocessed changelogs found:** STOP. Do not attempt to merge silently. Inform
    the user:
@@ -340,7 +520,9 @@ Adopt the same seasoned-PM persona as 3A. Differences from greenfield:
 
 ### 3B.2: Map Against Existing Requirements
 
-Read all existing `.feature.md` files. For each new capability from the delta:
+Read all existing `.feature.md` files. For each new capability from the delta (and each
+`## UX Changes` row — an Added screen's states and primary actions, a Modified screen's changed
+control text or states — when the changelog has that section):
 - **Already covered by an existing TOR?** → Skip. Note: "already covered by `TOR-NN-XXXXXXX`".
 - **Extends an existing TOR's scope?** → Flag. This is a potential requirements change, which
   is a change-control event. Surface to user:
@@ -350,6 +532,14 @@ Read all existing `.feature.md` files. For each new capability from the delta:
   > scenario (requires stakeholder review), (3) Defer.
   Use `AskUserQuestion` with these options. Wait for answer before proceeding.
 - **Genuinely new?** → Add as a new TOR requirement per 3A.2 rules.
+
+**UX Baseline added after the baseline (UI projects only).** If
+`ux_baseline_section_present = true` and no existing TOR traces to any `UX Baseline` line
+(the project added the section after its first requirements capture), treat every active
+TOR line of the section as part of the delta: derive TORs per Step 3A.2.2 and append them per
+3B.3 under a section banner `UX Baseline (added YYYY-MM-DD)` in the first feature file, or in
+a new `NN-ux-baseline.feature.md` if the user prefers at the 3B.3b gate. Lines already covered
+by an existing TOR are skipped.
 
 ### 3B.3: Assign IDs for New Requirements
 
@@ -415,7 +605,20 @@ internal scratch.
 - **Every active (non-`N/A`) line in the `Tool Hygiene & Operability` section of `CLAUDE.md`,
   if `tool_hygiene_section_present = true`.** Cite each as `CLAUDE.md Tool Hygiene: {line label}`
   (e.g., `CLAUDE.md Tool Hygiene: Version exposure`). Each must map to at least one
-  baseline TOR generated in Step 3A.2.1.
+  baseline TOR generated in Step 3A.2.1. **Project type** and **Version single source of
+  truth** are declarations, not rows (3A.2.1).
+- **Every active TOR line in the `UX Baseline` section of `CLAUDE.md`, if
+  `ux_baseline_section_present = true`** (one row per **Desktop conventions** bullet). Cite
+  each as `CLAUDE.md UX Baseline: {line label}` (e.g., `CLAUDE.md UX Baseline: Screen states`,
+  `CLAUDE.md UX Baseline: Desktop conventions — single instance`). Each must map to at least
+  one baseline UX TOR generated in Step 3A.2.2. **Design system** is not a row.
+- **Every data-bearing screen's empty and error states, and every primary action, in
+  `ux/screens.md`, if `screens_present = true`.** Cite each as
+  `UX screens: S-NN <state|control text>` (e.g., `UX screens: S-01 empty`,
+  `UX screens: S-02 "Save" button`). A screen's loading and populated rows are not inputs of
+  their own — they map to the 3A.2.2 Screen states TOR and to the domain TOR that renders the
+  screen. The Application menu and Window rows trace through the Desktop conventions rows
+  above, not here.
 
 **Rules:**
 - An input may map to multiple TOR IDs — list all.
@@ -446,11 +649,21 @@ Before presenting the summary, verify:
 - [ ] Every `Feature:` has the `As a … / I want … / So that …` triad.
 - [ ] Every `.feature.tracing.json` sidecar exists for every `.feature.md` file.
 - [ ] No `coverage_gaps` with `gap_type: "orphan_requirement"` remain unaddressed.
-  (Orphan requirements must either gain a source trace or be removed.)
+  (Orphan requirements must either gain a source trace — vision, ConOps, or a CLAUDE.md
+  baseline line — or be removed.)
 - [ ] If `tool_hygiene_section_present = true`: every active (non-`N/A`) line in
-  `CLAUDE.md`'s `Tool Hygiene & Operability` section is covered by at least one TOR
-  in the produced feature files. The trace appears in the Step 4 trace table with the
-  source `CLAUDE.md Tool Hygiene: {line label}` and `Explicit? = Y`.
+  `CLAUDE.md`'s `Tool Hygiene & Operability` section (excluding **Project type** and
+  **Version single source of truth**) is covered by at least one TOR, placed under the
+  `# Tool Hygiene & Operability` banner before any domain TOR. The trace appears in the
+  Step 4 trace table with the source `CLAUDE.md Tool Hygiene: {line label}` and
+  `Explicit? = Y`.
+- [ ] If `ux_baseline_section_present = true`: every active (non-`N/A`) TOR line in
+  `CLAUDE.md`'s `UX Baseline` section (excluding **Design system**) is covered by at least one
+  TOR, placed under the `# UX Baseline` banner before any domain TOR. The trace appears in the
+  Step 4 trace table with the source `CLAUDE.md UX Baseline: {line label}` and `Explicit? = Y`.
+- [ ] If `screens_present = true`: every data-bearing screen's empty and error states are
+  covered by a TOR whose Given/When/Then names the screen by `S-NN` and cites the state's
+  visible text and control from `ux/screens.md`.
 
 ---
 
@@ -482,9 +695,11 @@ Preserve the original timestamp. The `.processed` suffix prevents re-consumption
 - Functional areas (feature files): {N}
 - Total TOR requirements: {K}
 - Baseline tool-hygiene TORs: {H} [or "skipped — Tool Hygiene section absent"]
+- Baseline UX TORs: {G} [omit row if not a UI project; "skipped — UX Baseline section absent" if a UI project without the section]
 - ConOps scenario steps covered: {X} of {Y}
 - Product Vision goals/scope items covered: {A} of {B}
-- Tool Hygiene lines covered: {T} of {U} [omit row if section absent]
+- Tool Hygiene lines covered: {T} of {U} [omit row if section absent; Project type and Version single source of truth are declarations and do not count]
+- UX Baseline lines covered: {V} of {W} [omit row if not applicable; each non-`N/A` Desktop conventions bullet counts as its own line]
 - Tracing gaps resolved: {M}
 
 ### Coverage Gaps (explicitly deferred)
@@ -500,6 +715,7 @@ Epic specs will reference TOR IDs as their Requirements Anchors — the TOR Give
 becomes the acceptance criterion and verification procedure.
 ```
 
-**Do NOT commit.** The full planning sequence (`discover` → `capture-requirements` →
-`plan-project` → optional `add`) runs on the `docs/` branch before the user merges. The merge
-(solo or team PR) is the approval gate for the entire requirements and plan as a unit.
+**Do NOT commit.** The full planning sequence (`discover` → optional `mockup` →
+`capture-requirements` → `plan-project` → optional `add`) runs on the `docs/` branch before
+the user merges. The merge (solo or team PR) is the approval gate for the entire requirements
+and plan as a unit.
