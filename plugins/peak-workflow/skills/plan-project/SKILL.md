@@ -219,9 +219,11 @@ an error-path TOR such as "database unavailable" has a Given to cite.
 operator-observed — happens on the bench: the equipment unplugged from mains, the output wired to an
 indicator lamp or LED instead of the load. `start-epic` and `wrapup-epic` ask the user before each run to confirm that setup in one
 plain question (*"Is the kiln unplugged, with the relay driving the test lamp?"*); if they cannot
-confirm, do not run it. The harness
-itself refuses to run a mains or heat output check unless an environment variable such as
-`HIL_BENCH=1` is set, so no command line can drive live equipment by accident.
+confirm, do not run it. The same rule covers flashing or running the board. The harness
+itself refuses to run a mains or heat output check unless `HIL_BENCH=1` is set in the user's own
+shell — never in `CLAUDE.md`, a script, or by the agent — so no command line can drive live
+equipment by accident. Every epic that drives such an output names this refusal in its Key
+Components, and its spec carries the PLAN_TEMPLATE **Bench only** standing rule.
 
 **Embedded products — the skeleton also owns the hardware-in-the-loop harness:** a script under
 `tests/hil/` that talks to the connected board over its debug or serial port non-interactively
@@ -235,7 +237,7 @@ of release builds by a build flag, so shipped firmware cannot be told to fake a 
 physical fault fixture on the bench (e.g. a switch that disconnects the sensor). Record in
 `CLAUDE.md` Local Environment a `HIL port:` line naming the variable and how to find the port on
 the user's OS, label the harness command `(tests/hil)` on the `Verification & Quality Gates` Tests
-line, and name the harness and the fault mechanism in Key Components.
+line, and name the harness, the `HIL_BENCH` refusal, and the fault mechanism in Key Components.
 
 **Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack — under the
 installed plugin's `references/` directory (`${CLAUDE_PLUGIN_ROOT}/references/`, not a path

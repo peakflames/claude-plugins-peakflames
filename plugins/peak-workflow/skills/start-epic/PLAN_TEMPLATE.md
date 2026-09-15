@@ -99,6 +99,14 @@ every one of them. When the spec has a `## Screens` section (Step 1 item 4c), th
 cites the screen's `S-NN`, its wireframe path, and the `data-component` primitives it composes
 — the wrapup Wireframe fidelity line checks regions, control texts, and states against that file.
 
+**Bench only (products that switch mains power or heat).** Before any command that flashes the
+board, runs it, or runs anything under `tests/hil/` — in a middle step, the self-assessment, or a
+quality gate — ask the user in one plain question to confirm the bench setup: the equipment
+unplugged from mains, the output wired to an indicator lamp instead of the load. If they do not
+confirm, do not run it. Never set `HIL_BENCH=1` yourself and never write it into `CLAUDE.md` or a
+script; only the user sets it in their own shell. Copy this paragraph verbatim into the plan as a standing rule ahead of the
+first middle step, next to the Deferral gate.
+
 **Deferral gate.** Copy this paragraph verbatim into the plan as a standing rule ahead of the
 first middle step; it applies to every middle step and to the self-assessment. If at any point
 a TOR's Given/When/Then cannot be fully met as written in this session (technical constraint,

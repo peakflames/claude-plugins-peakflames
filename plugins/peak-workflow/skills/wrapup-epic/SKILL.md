@@ -115,6 +115,13 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 
 ### Step 1.2: Verify Requirements (TOR IDs)
 
+**Bench only (products that switch mains power or heat).** Before any command that flashes the
+board, runs it, or runs anything under `tests/hil/` — in this step's item 4, item 7, or the Step 1.3 Tests gate — ask the user in one plain question to confirm the bench setup: the equipment
+unplugged from mains, the output wired to an indicator lamp instead of the load. If they do not
+confirm, do not run it. Never set `HIL_BENCH=1` yourself and never write it into `CLAUDE.md` or a
+script; only the user sets it in their own shell. Ask it once at the start of this step when
+the epic has `tests/hil/` TORs, and again only if the user changes the setup.
+
 For each TOR ID in the epic spec's Requirements Anchors table, independently verify the
 requirement is satisfied by the implementation. You are the independent reviewer — you did NOT
 implement this epic. Do not trust the implementer's self-assessment.
