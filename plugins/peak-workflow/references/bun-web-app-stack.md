@@ -335,20 +335,26 @@ globalThis.EventSource = FakeEventSource as unknown as typeof EventSource;
 `tests/setup/env.ts`:
 
 ```ts
-process.env.DATABASE_PATH ??= ":memory:";
+// bun test loads .env first (4.8): these are forced, or /data/app.db and a real mail provider leak in
+process.env.DATABASE_PATH = ":memory:";
+process.env.EMAIL_DELIVERY = "log"; // no mail provider: signInForTest reads the link from the outbox (9)
 process.env.S3_BUCKET ??= "test-bucket";
 process.env.S3_ENDPOINT ??= "http://localhost:9000";
 process.env.S3_ACCESS_KEY_ID ??= "minioadmin";
 process.env.S3_SECRET_ACCESS_KEY ??= "minioadmin";
 process.env.BETTER_AUTH_SECRET ??= "test-secret-at-least-32-characters-long";
-process.env.EMAIL_DELIVERY ??= "log"; // no mail provider: signInForTest reads the link from the outbox (9)
 process.env.APP_URL ??= "http://localhost:3000";
 ```
 
-Google provider only (6.3), `env.ts` adds the domain the squatting test (9) signs up against:
+Named identity provider only (6.3), `env.ts` adds:
 
 ```ts
-process.env.GOOGLE_WORKSPACE_DOMAIN ??= "workspace.test";
+// Forced over .env: the squatting test (9) signs up against this domain, and real provider
+// credentials would switch the provider on — tests never drive it
+process.env.GOOGLE_WORKSPACE_DOMAIN = "workspace.test"; // Google only
+for (const key of ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"]) {
+  delete process.env[key];
+}
 ```
 
 `tests/setup/auth.ts` is defined in Section 9.
@@ -972,10 +978,12 @@ export const { db } = createDb();
 // auth.ts
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { eq } from "drizzle-orm";
 import { ROLES } from "@core/access";
 import * as schema from "@core/db/schema";
 import { env } from "@core/env";
 import { db } from "./db";
+import { logger } from "./logger";
 import { sendMail } from "./mail";
 
 export const auth = betterAuth({
@@ -997,15 +1005,39 @@ export const auth = betterAuth({
         subject: "Reset your password",
         text: `Reset your password: ${url}\n\nIf you did not ask for this, ignore this email.`,
       }),
+    // The reset link reached this inbox, so it proves the address: an unverified account is
+    // recovered, and a stranger's earlier sign-up for it loses its password and sessions
+    onPasswordReset: async ({ user }) => {
+      await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.id, user.id));
+    },
+    // Signing up again sends no new verification link; this tells the owner how to get in
+    onExistingUserSignUp: ({ user }) =>
+      sendMail({
+        to: user.email,
+        subject: "You already have an account",
+        text: "Someone (maybe you) tried to sign up with this email, which already has an account. Sign in, or use Forgot password to set a new password — that also confirms your email. If this was not you, ignore this email.",
+      }),
   },
   emailVerification: {
-    // Sent on sign-up (follows requireEmailVerification); the link expires after 1 hour
+    // Sent on sign-up and again on each password sign-in while unverified; the link lasts 24 hours
+    sendOnSignIn: true,
+    expiresIn: 60 * 60 * 24, // seconds
     sendVerificationEmail: ({ user, url }) =>
       sendMail({
         to: user.email,
         subject: "Verify your email",
         text: `Verify your email: ${url}\n\nIf you did not sign up, ignore this email.`,
       }),
+  },
+  advanced: {
+    // Sign-up, sign-in and reset emails go out after the response, so a slow mail provider does not
+    // reveal which request hit a real account; Better Auth logs a failed send. The resend endpoint
+    // still awaits its send, behind its own 500 ms response floor.
+    backgroundTasks: {
+      handler: (task) => {
+        task.catch((err) => logger.error({ err }, "auth background task failed"));
+      },
+    },
   },
   user: {
     additionalFields: {
@@ -1019,8 +1051,15 @@ export const auth = betterAuth({
 `input: false` stops a client from choosing its own role at sign-up or through
 `authClient.updateUser`. Roles change only through 6.8; with the cookie cache, a change reaches
 existing sessions within 5 minutes. An unverified account's sign-in is refused with
-`EMAIL_NOT_VERIFIED` (403), so it never reaches `/api`. Sign-up answers the same for a new and an
-existing address, so it does not reveal who has an account.
+`EMAIL_NOT_VERIFIED` (403), so it never reaches `/api`. Sign-up answers the same body for a new and
+an existing address, and its email is sent after the response, so neither the answer nor a mail
+delay reveals who has an account (the few local database writes a new account adds remain).
+
+**Unverified accounts always recover.** A lost or expired link is replaced by signing in with the
+password (`sendOnSignIn`), by Resend verification link (7.6), or by a password reset, which marks
+the email verified. **A stranger who signed up first** cannot keep the address: the owner's own
+sign-up sends the "already have an account" email, and the reset it points to replaces the
+password and revokes sessions (a cached session lasts up to 5 minutes).
 
 ```ts
 // apps/api/src/mail.ts — the one email sender
@@ -1033,6 +1072,8 @@ type Mail = { to: string; subject: string; text: string };
 export const outbox: Mail[] = [];
 
 export async function sendMail(mail: Mail) {
+  // Log mode records before any await, so a backgrounded send (6.3) is in the outbox by the time
+  // the response returns
   if (env.EMAIL_DELIVERY === "log") {
     outbox.push(mail);
     if (outbox.length > 100) outbox.shift();
@@ -1060,7 +1101,9 @@ export const authClient = createAuthClient({ baseURL: `${window.location.origin}
 // Plain words for Better Auth error codes. A sign-in form reads `error.code` from
 // authClient.signIn.email(…); a provider callback reloads the page with `?error=<code>`.
 const SIGN_IN_ERRORS: Record<string, string> = {
-  EMAIL_NOT_VERIFIED: "Confirm your email first — open the link we sent when you signed up.",
+  // Refused only after a correct password, which also emails a fresh link (sendOnSignIn, 6.3)
+  EMAIL_NOT_VERIFIED:
+    "Confirm your email first — we just sent a new link. Nothing arrived? Use Resend verification link or Forgot password.",
 };
 
 export function signInErrorMessage(code: string | null | undefined) {
@@ -1074,10 +1117,24 @@ recorded provider's entries to `betterAuth({ … })` — the `user` block below 
 adding `hostedDomain`; rerun the Better Auth CLI (5.2) — and its lines to 5.1 and 4.8:
 
 ```ts
-// auth.ts — added imports and helper
+// auth.ts — added imports (`and` joins the drizzle-orm import) and helpers
 import { and, eq } from "drizzle-orm";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { GoogleProfile } from "better-auth/social-providers";
+
+// An organization address (or a subdomain of it) registers only through Google.
+// Workspace secondary domains are not covered: add each one the organization uses.
+function isOrgAddress(email: string) {
+  const domain = env.GOOGLE_WORKSPACE_DOMAIN?.toLowerCase();
+  const address = email.toLowerCase();
+  return Boolean(domain && (address.endsWith(`@${domain}`) || address.endsWith(`.${domain}`)));
+}
+
+const useGoogleSignIn = () =>
+  new APIError("BAD_REQUEST", {
+    code: "USE_GOOGLE_SIGN_IN",
+    message: `${env.GOOGLE_WORKSPACE_DOMAIN} addresses sign in with Google.`,
+  });
 
 // A Google-verified address outranks an unverified password sign-up for it. Better Auth refuses to
 // link Google into an unverified row (account_not_linked), so that row would lock the real person
@@ -1129,6 +1186,13 @@ export async function releaseUnverifiedEmail(email: string) {
   // Same-email provider sign-in never attaches to an existing account (pre-account takeover);
   // a signed-in user adds a provider with authClient.linkSocial() (7.6), proving control of both.
   account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
+  hooks: {
+    // Refuses before Better Auth looks the address up, so an existing and a new organization
+    // address get the same 400 — the create hook alone answers 200 for an existing one
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-up/email" && isOrgAddress(String(ctx.body?.email ?? ""))) throw useGoogleSignIn();
+    }),
+  },
   databaseHooks: {
     user: {
       create: {
@@ -1136,15 +1200,7 @@ export async function releaseUnverifiedEmail(email: string) {
         before: async (user, ctx) => {
           const fromGoogle = ctx?.path?.startsWith("/callback/") && ctx.params?.id === "google";
           const domain = env.GOOGLE_WORKSPACE_DOMAIN?.toLowerCase();
-          // An organization address (or a subdomain of it) registers only through Google.
-          // Workspace secondary domains are not covered: add each one the organization uses.
-          const email = user.email.toLowerCase();
-          if (domain && !fromGoogle && (email.endsWith(`@${domain}`) || email.endsWith(`.${domain}`))) {
-            throw new APIError("BAD_REQUEST", {
-              code: "USE_GOOGLE_SIGN_IN",
-              message: `${domain} addresses sign in with Google.`,
-            });
-          }
+          if (!fromGoogle && isOrgAddress(user.email)) throw useGoogleSignIn(); // backstop for any other create path
           const inOrg = Boolean(fromGoogle && domain && user.hostedDomain === domain);
           return {
             data: {
@@ -1182,16 +1238,17 @@ The web client turns a refusal into plain words — the email form reads `error.
 // Sign-up form:   signInErrorMessage((await authClient.signUp.email(input)).error?.code)
 ```
 
-- **Only the recorded provider.** Microsoft alone: omit the Google entry, the added imports,
-  `releaseUnverifiedEmail`, `hostedDomain`, `databaseHooks`, the two added `SIGN_IN_ERRORS` entries,
-  the 7.6 Link Google line and the `GOOGLE_*` checks. Google alone: omit the Microsoft entry.
+- **Only the recorded provider.** Microsoft alone: omit the Google entry, the added imports and
+  helpers, `releaseUnverifiedEmail`, `hostedDomain`, `hooks`, `databaseHooks`, the two added `SIGN_IN_ERRORS` entries,
+  the 7.6 Link Google line, the `GOOGLE_*` checks and the `GOOGLE_WORKSPACE_DOMAIN` test line (4.2).
+  Google alone: omit the Microsoft entry.
 - **Two Google modes — recorded as `GOOGLE_AUDIENCE`** (5.1 crashes at boot if Google is on without
   it, or either mode lacks the domain). *Org-only*: `hd` is set, so Better Auth rejects any token whose
   verified `hd` claim differs; production also sets `emailAndPassword.disableSignUp:
   env.GOOGLE_AUDIENCE === "org-only" && process.env.NODE_ENV === "production"` so outsiders cannot
   register by password (Email delivery is then `N/A`, 2.1). *Mixed* (members of the organization plus outsiders on personal Google or
-  email/password): no `hd`; everyone signs in, the hook grants the org role only to a verified `hd`
-  equal to `GOOGLE_WORKSPACE_DOMAIN`, and refuses a non-Google sign-up at that domain or a subdomain.
+  email/password): no `hd`; everyone signs in, the create hook grants the org role only to a verified `hd`
+  equal to `GOOGLE_WORKSPACE_DOMAIN`, and `hooks.before` refuses a password sign-up at that domain or a subdomain.
   Outsiders' password accounts must verify their email first. Mixed needs
   the OAuth consent screen's user type set to **External**.
 - **Unverified password account, then Google for the same address.** The unverified account never
@@ -1557,13 +1614,21 @@ as in 6.3.
 ```ts
 import { authClient } from "@web/auth-client";
 
-// Sign-up form — the emailed verification link returns here; no session until it is opened
+// Sign-up form — the emailed verification link (valid 24 hours) returns here; no session until it is opened
 await authClient.signUp.email({ name, email, password, callbackURL: window.location.origin });
+
+// Sign-in form — while unverified, refused with EMAIL_NOT_VERIFIED and a fresh link returning here
+await authClient.signIn.email({ email, password, callbackURL: window.location.origin });
+
+// "Resend verification link" (sign-in screen, offered with EMAIL_NOT_VERIFIED) — answers success
+// for any address, so it reveals nothing
+await authClient.sendVerificationEmail({ email, callbackURL: window.location.origin });
 
 // Forgot-password screen — emails a link that lands on /reset-password?token=…
 await authClient.requestPasswordReset({ email, redirectTo: `${window.location.origin}/reset-password` });
 
-// Reset-password screen — `?error=INVALID_TOKEN` instead of a token means the link expired
+// Reset-password screen — `?error=INVALID_TOKEN` instead of a token means the link expired.
+// A completed reset also confirms the email, so it rescues an unverified account (6.3).
 const token = new URLSearchParams(window.location.search).get("token");
 if (token) await authClient.resetPassword({ token, newPassword });
 
@@ -1685,8 +1750,8 @@ presigning. The second option is cleaner and is what `presignUpload` should use.
 | API routes | `bun test` + `app.request()` | No port, no network. Sign in with `signInForTest` (`tests/setup/auth.ts`). |
 | Access rule | `bun test` + `app.request()` | Per resource: owner allowed, non-owner 404, permitted role allowed, and list routes return only readable rows — for every record route. Every create route refuses a role without a create grant (403). |
 | Role change | `bun test` + `app.request()` | `PATCH /api/users/:id/role`: every role but the org role gets 403; a name outside `ROLES` gets 400; the org role succeeds. |
-| Unverified sign-up | `bun test` + `app.request()` | A password sign-up gets no session: sign-in is 403 `EMAIL_NOT_VERIFIED`, `/api` is 401. Google provider only: `releaseUnverifiedEmail` removes the row and its credential, so a Google sign-in for that address starts a fresh account. |
-| Organization address squatting | `bun test` + `app.request()` (Google provider only) | Password sign-up at `GOOGLE_WORKSPACE_DOMAIN` or a subdomain is refused with `USE_GOOGLE_SIGN_IN`. |
+| Unverified sign-up | `bun test` + `app.request()` | A password sign-up gets no session: sign-in is 403 `EMAIL_NOT_VERIFIED` and emails a fresh link, `/api` is 401. Resend verification link sends a link that verifies. A repeat sign-up emails the owner; a password reset verifies the account and replaces the password. Google provider only: `releaseUnverifiedEmail` removes the row and its credential, so a Google sign-in for that address starts a fresh account. |
+| Organization address squatting | `bun test` + `app.request()` (Google provider only) | Password sign-up at `GOOGLE_WORKSPACE_DOMAIN` or a subdomain is refused with `USE_GOOGLE_SIGN_IN` — the same 400 for an existing address. |
 | Live updates | `bun test` on `events.ts`; E2E with two browser contexts | A change in one context appears in the other without a reload. |
 | S3 wrapper | `bun test` against MinIO from compose | Real client, real bucket. Skip with `test.skipIf(!process.env.MINIO_UP)` in CI without Docker. |
 | React components | `bun test` + happy-dom + Testing Library | Preloaded via `bunfig.toml` on origin `http://localhost:3000`; `EventSource` is `FakeEventSource` — import it from `tests/setup/happy-dom.ts` and drive it with `FakeEventSource.instances[0]?.emit("change", …)` (4.2). |
@@ -1722,6 +1787,11 @@ async function postOk(app: App, path: string, body: object) {
 // Log-mode email (EMAIL_DELIVERY=log): the newest link sent to this address
 export function lastLinkTo(email: string) {
   return outbox.filter((m) => m.to === email).at(-1)?.text.match(/https?:\/\/\S+/)?.[0];
+}
+
+// How many emails this address received — links sent in the same second are identical, so count
+export function mailsTo(email: string) {
+  return outbox.filter((m) => m.to === email).length;
 }
 
 export async function signInForTest(app: App, role: string = ROLES.default) {
@@ -1824,12 +1894,44 @@ test("an unverified password account gets no session", async () => {
   const signIn = await post(app, "/auth/sign-in/email", body);
   expect(signIn.status).toBe(403);
   expect(((await signIn.json()) as { code?: string }).code).toBe("EMAIL_NOT_VERIFIED");
+  expect(mailsTo(body.email)).toBe(2); // sign-up's link, then sendOnSignIn's fresh one
   const cookie = signIn.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
   expect((await app.request("/api/conversations", { headers: { cookie } })).status).toBe(401);
 });
+
+test("Resend verification link sends a link that verifies", async () => {
+  const body = { email: `resend-${crypto.randomUUID()}@example.com`, password: "test-password-123", name: "Resend" };
+  await post(app, "/auth/sign-up/email", body);
+  expect((await post(app, "/auth/send-verification-email", { email: body.email })).status).toBe(200);
+  expect(mailsTo(body.email)).toBe(2);
+  const link = lastLinkTo(body.email);
+  if (!link) throw new Error("resent link missing");
+  await app.request(link);
+  expect((await post(app, "/auth/sign-in/email", body)).status).toBe(200);
+});
+
+test("a repeat sign-up emails the owner, and a password reset verifies and takes the account", async () => {
+  // A stranger signs up first with the owner's address and a password the owner does not know
+  const email = `owner-${crypto.randomUUID()}@example.com`;
+  const stranger = { email, password: "stranger-password-1", name: "Stranger" };
+  await post(app, "/auth/sign-up/email", stranger);
+  const repeat = await post(app, "/auth/sign-up/email", { email, password: "owner-password-123", name: "Owner" });
+  expect(((await repeat.json()) as { token: string | null }).token).toBeNull(); // same answer as a new address
+  expect(outbox.filter((m) => m.to === email).at(-1)?.subject).toBe("You already have an account");
+
+  await post(app, "/auth/request-password-reset", { email });
+  const resetLink = lastLinkTo(email); // <APP_URL>/auth/reset-password/<token>?callbackURL=
+  const token = resetLink && new URL(resetLink).pathname.split("/").at(-1);
+  if (!token) throw new Error("reset link missing");
+  expect((await post(app, "/auth/reset-password", { token, newPassword: "owner-password-123" })).status).toBe(200);
+
+  expect((await post(app, "/auth/sign-in/email", stranger)).status).toBe(401);
+  expect((await post(app, "/auth/sign-in/email", { email, password: "owner-password-123" })).status).toBe(200);
+});
 ```
 
-The test file imports `post` alongside `signInForTest`. Google provider only — needs the
+The test file imports `post`, `lastLinkTo` and `mailsTo` alongside `signInForTest`, and `outbox`
+from `@api/mail`. Google provider only — needs the
 `GOOGLE_WORKSPACE_DOMAIN` test line (4.2); imports `releaseUnverifiedEmail` from `@api/auth`,
 `eq` from `drizzle-orm`, and `account`, `user` from `@core/db/schema`:
 
@@ -1846,13 +1948,15 @@ test("Google for the same address does not inherit an unverified password accoun
   expect((await post(app, "/auth/sign-in/email", body)).status).toBe(401); // the password is gone too
 });
 
-test("an organization address cannot register by password", async () => {
-  for (const host of ["workspace.test", "mail.workspace.test"]) {
-    const res = await post(app, "/auth/sign-up/email", {
-      email: `squatter-${crypto.randomUUID()}@${host}`,
-      password: "test-password-123",
-      name: "Squatter",
-    });
+test("an organization address cannot register by password, existing or not", async () => {
+  // An existing member, as Google's callback would have created them
+  const existing = `member-${crypto.randomUUID()}@workspace.test`;
+  const now = new Date();
+  await db.insert(user).values({ id: crypto.randomUUID(), name: "Member", email: existing, emailVerified: true, createdAt: now, updatedAt: now });
+
+  const emails = [existing, `squatter-${crypto.randomUUID()}@workspace.test`, `squatter-${crypto.randomUUID()}@mail.workspace.test`];
+  for (const email of emails) {
+    const res = await post(app, "/auth/sign-up/email", { email, password: "test-password-123", name: "Squatter" });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { code?: string }).code).toBe("USE_GOOGLE_SIGN_IN");
   }
@@ -1917,6 +2021,7 @@ Each of these is already handled by the configuration above.
 | Unsafe object keys | Path traversal or collisions from user filenames. | Sanitized key under `users/<id>/attachments/<uuid>/` (5.4). |
 | Content type allowlist | Executable or HTML uploads served from your origin. | Zod enum of allowed MIME types; bucket is private (6.4). |
 | Provider secrets required everywhere | Tests and compose crash without Google or Microsoft credentials. | Provider variables optional (5.1); each provider on only when its credentials are set (6.3). |
+| `.env` leaks into tests | `bun test` loads `.env`, so `/data/app.db`, a real mail provider, domain or provider credentials override test defaults. | `tests/setup/env.ts` force-assigns `DATABASE_PATH`, `EMAIL_DELIVERY` and `GOOGLE_WORKSPACE_DOMAIN` and deletes provider credentials (4.2). |
 | SSE dropped by idle timeout | Streams cut off after 120 s of silence. | `idleTimeout: 120` on `Bun.serve` (6.2); `ping` event every 15 s on the Live updates stream (6.7); Per-request streams with long gaps send the same. |
 | Abandoned streams waste model calls | Closed tab keeps upstream generation running. | Propagate `c.req.raw.signal` (6.5). |
 | Live updates on one process | Fan-out is in memory; a second container's clients miss events. | Single container by design (1); shared bus in the Growth Path (12). |
@@ -1931,7 +2036,10 @@ Each of these is already handled by the configuration above.
 | Role names scattered | Renaming a role misses a copy and silently drops a grant. | One `ROLES` constant in `access.ts`, imported everywhere (5.5). |
 | Account takeover through provider linking | An attacker registers the victim's address by password first: the victim's Google sign-in either merges into it or is locked out (`account_not_linked`), and the attacker acts as them. | `requireEmailVerification`: an unverified account gets no session. A Google-verified sign-in deletes the unverified row (`releaseUnverifiedEmail`) and starts a fresh account; `disableImplicitLinking`, no `trustedProviders`; linking only via signed-in `linkSocial()`; tested (6.3, 7.6, 9). |
 | Email never delivered | Verification and reset links vanish, so nobody can finish signing up. | `EMAIL_DELIVERY` defaults to `api` and `superRefine` requires `EMAIL_API_KEY` at boot; `log` only where set explicitly (4.8, 5.1, 6.3). |
-| Organization address squatting | Someone registers a Workspace address by password first, locking the real person out (`account_not_linked`) and posing as them. | Create hook refuses non-Google sign-ups at `GOOGLE_WORKSPACE_DOMAIN` or a subdomain with `USE_GOOGLE_SIGN_IN`; the client shows plain words; tested (6.3, 9). |
+| Unverified account locked out | The verification link expires or never arrives; signing up again sends nothing, so the address is stuck. | Link lasts 24 h (`emailVerification.expiresIn`); each password sign-in mails a fresh one (`sendOnSignIn`); Resend verification link (`sendVerificationEmail`); `onPasswordReset` marks the email verified; tested (6.3, 7.6, 9). |
+| Stranger's sign-up claims the address | Someone signs up with the victim's address; the victim clicks that earlier link and verifies the stranger's password. | The victim's own sign-up triggers `onExistingUserSignUp`, emailing "use Forgot password"; the reset verifies, replaces the password and revokes sessions (cached ones within 5 minutes); tested (6.3, 9). |
+| Sign-up timing reveals accounts | An awaited email makes a new address answer slower than an existing one. | `advanced.backgroundTasks.handler` sends sign-up, sign-in and reset emails after the response; log mode records the link before returning (6.3). |
+| Organization address squatting | Someone registers a Workspace address by password first, locking the real person out (`account_not_linked`) and posing as them. | `hooks.before` on `/sign-up/email` refuses `GOOGLE_WORKSPACE_DOMAIN` or a subdomain with `USE_GOOGLE_SIGN_IN` before any lookup, so existing and new addresses get the same 400; the create hook is the backstop; tested (6.3, 9). |
 | Org role from user input | A sign-up body or outside Google account claims the organization's role. | Role set in `databaseHooks.user.create.before` from Google's `hd` claim on the Google callback only; `role` is `input: false` (6.3). |
 | Org-only admits any Google account | Google on without a mode, or org-only without a domain, sets no `hd`; mixed without a domain grants nobody the org role and skips the squatting check. | `GOOGLE_AUDIENCE` plus `superRefine` (domain required whenever a mode is set) crash at boot; `hd` read from it (5.1, 6.3). |
 | Provider-written fields editable | `authClient.updateUser` rewrites `hostedDomain` or `role`. | `databaseHooks.user.update.before` strips both; no authorization reads `hostedDomain` except the create hook (6.3). |

@@ -381,7 +381,7 @@ that has them:
 | Toolchain table row (named language, or CLI tool / Library / Embedded) | Its *Run / start* column | Its *Tests* column | Embedded: host-side tests run on the computer; `tests/hil` and on-device runs need the board connected and are `TBD — set by the walking-skeleton epic` until it is chosen |
 | Web sheet | `bun run dev` (API on `:3000`, web on `:5173` with proxy); `docker compose up -d minio minio-init` first when object storage is in the stack | `bun run test`; `bun run test:e2e` (needs Docker running and `.env` copied from `.env.example`) | The sheet's Section 10 Daily Commands. Name Docker as a prerequisite |
 | Static SPA sheet | `bun run dev` (Vite on `:5173`) | `bun run test`; `bun run test:e2e` (builds and previews the production bundle first) | No server — nothing to mock; verification uses the real app and its real IndexedDB |
-| Desktop sheet | `bun run dev` (electron-vite, live main process, renderer HMR) | `bun run test`; `bun run test:e2e` (builds, then Playwright Electron against the build) | Add the web sheet's rows only if the app also runs a service of its own |
+| Desktop sheet | `bun run dev` (electron-vite, live main process, renderer HMR) | `bun run test`; `bun run test:e2e` (builds, then Playwright Electron against the build) | Needs Bun and Node.js 22.12+ (LTS) installed — Playwright and electron-vite run on Node. Add the web sheet's rows only if the app also runs a service of its own |
 
 Always write this line, for every project type — it is a plugin convention, not a question:
 *"Verification runs against the real, running project with its real local data. Never mock the
@@ -984,7 +984,8 @@ Adapt the example to the project type. A few lines that matter by type:
 
 - **Desktop app:** *"Runs on: Windows only, no internet needed (no automatic updates). Window:
   never smaller than 800 × 600; standard menus, remembers its size and position; Export uses the
-  normal Save dialog; only one copy runs at a time. No undo and no speed target unless you want
+  normal Save dialog; only one copy runs at a time. Needs: Bun and Node.js installed on the computer
+  you build on. No undo and no speed target unless you want
   them. Version: Help › About. Logs: a file in the app's data folder."*
 - **Web app with sign-in:** *"Sign-in: Google for everyone — coordinators through your Workspace,
   volunteers with a personal Google account or an email and password; only Workspace accounts get

@@ -85,8 +85,10 @@ The user's request / brownfield description: $ARGUMENTS
    at 3A.1b and list the gap under Coverage Gaps. Safety TORs are never deferrable in
    `start-epic` or `wrapup-epic`, so every one must be something this product's own software can
    do and a test can check: a row marked `Assumption — hardware, outside the software` (a thermal
-   fuse, a limit switch) is **not** a TOR — list it under Coverage Gaps as
-   `hardware safeguard — outside the software, confirmed by the owner`, and, where the software
+   fuse, a limit switch) is **not** a TOR — when the row is marked `— confirmed by the owner`, list
+   it under Coverage Gaps as `hardware safeguard — outside the software, confirmed by the owner`;
+   when it is marked `— NOT present` or carries no confirmation, stop and send the user back to
+   `/peak-workflow:discover`. For a confirmed row, where the software
    can detect the failure the hardware guards against, write that detection as the TOR instead
    (*"The controller shall raise an alarm and keep the relay de-energized when the temperature
    keeps rising while the relay is commanded off"*). Each Safety TOR needs an automated check of
@@ -339,7 +341,7 @@ change-control edit once its ID is immutable. The skeleton's tests name the conc
 | Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) | Default TOR shall-statement form (Desktop app example) |
 |---|---|---|---|
 | **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page | The application shall display its name and semantic version in an About dialog opened from Help > About |
-| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level | The application shall write a first log line containing its name and semantic version to the electron-log file on startup |
+| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at the logger's info level | The web application shall emit a log line on application startup containing its name and semantic version at the logger's info level | The application shall write a first log line containing its name and semantic version to the electron-log file on startup |
 | **Logging convention** | The tool shall emit log records at the levels declared in CLAUDE.md (default DEBUG, INFO, WARN, and ERROR — use the logger's own level names, e.g. `Information` / `Warning` for .NET, `info` / `warn` for Pino and electron-log), in the format declared there (structured JSON / key=value / human-readable) | (same — substitute "web application") | (same — substitute "application") |
 | **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A | N/A |
 | **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A | N/A |
@@ -659,7 +661,7 @@ internal scratch.
 **Input sources to enumerate (be granular — one ConOps step that says "X and Y" is two rows):**
 - Every numbered step in every ConOps Section 5 scenario
 - Every row of the ConOps §8 `What Must Never Happen` table (a hazard row → its `# Safety` TOR; an
-  assumption row → the Coverage Gaps entry `hardware safeguard — outside the software, confirmed by the owner`)
+  assumption row marked `— confirmed by the owner` → the Coverage Gaps entry `hardware safeguard — outside the software, confirmed by the owner`)
 - Every MVP goal, in-scope feature, and success criterion from PV Sections 5–6
 - Every item under "New Capabilities Identified" in the brownfield changelog (if consumed)
 - User-stated priorities from `$ARGUMENTS` (if non-empty)

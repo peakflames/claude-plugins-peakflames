@@ -44,7 +44,7 @@ Follow these steps exactly:
     >
     > To fix:
     > ```bash
-    > git checkout develop          # or main / master
+    > git checkout <base-branch>    # develop if it exists, else main, else master
     > git merge docs/<task-name> --no-ff
     > git push
     > git checkout feature/epic-<id>-<short-name>   # resume (or re-create) feature branch
@@ -143,6 +143,12 @@ this order:
    (e.g. `HIL_PORT=/dev/ttyUSB0`, `COM3` on Windows) exists. If not, tell the user how to connect
    it and how to find the port, and wait. On the walking skeleton the line does not exist yet: ask
    the user to plug the board in, find the port with them, and write the line as a plan step.
+
+**Bench only, for anything that switches mains power or heat.** Every `tests/hil/` run — automated or
+operator-observed — happens on the bench: the equipment unplugged from mains, the output wired to an
+indicator lamp or LED instead of the load. Before each run, ask the user to confirm that setup in one
+plain question (*"Is the kiln unplugged, with the relay driving the test lamp?"*); if they cannot
+confirm, do not run it.
 
 ## Step 3: Create Feature Branch
 

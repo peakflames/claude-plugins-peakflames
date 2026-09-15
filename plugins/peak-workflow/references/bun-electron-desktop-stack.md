@@ -1451,6 +1451,9 @@ Stub `showOpenDialog` the same way (`{ canceled: false, filePaths: [target] }`) 
 
 ## 8. Daily Commands
 
+Prerequisites on the build computer: Bun, and Node.js 22.12 or later (LTS) — Playwright's runner and
+electron-vite both run on Node, and without it `bun run test:e2e` can hang.
+
 ```bash
 bun install                  # runs only trustedDependencies scripts (Electron binary download)
 bun run dev                  # electron-vite with HMR
