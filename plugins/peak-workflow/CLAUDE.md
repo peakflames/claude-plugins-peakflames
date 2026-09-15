@@ -16,6 +16,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 | `new-project` | Front-door router — detects project state and dispatches to the right entry point |
 | `setup` | Audit CLAUDE.md, stub architecture/design-notes docs (run once before discover) |
 | `discover` | Adaptive interview → product-vision.md + concept-of-operations.md |
+| `mockup` | UI projects only — screen inventory (`S-NN`), per-scenario flows, grayscale wireframes; concretizes ConOps steps |
 | `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json |
 | `plan-project` | Derive epics from TOR IDs → phase indexes + epic specs + sidecars |
 | `add` | Add new epic(s) referencing existing TOR IDs |
@@ -41,7 +42,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 **Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic) and an optional `waived: TOR-… → <succ>` line written by wrapup
 
 **Branch families:**
-- `docs/{task-short-name}` — full planning sequence (discover → capture-requirements → plan-project)
+- `docs/{task-short-name}` — full planning sequence (discover → mockup [UI] → capture-requirements → plan-project)
 - `feature/epic-<id>-<short-name>` — implementation
 - `hotfix/<slug>` — quick-fix
 
@@ -55,11 +56,36 @@ in the Deferrals table so the human sees the one place self-review occurs.
 **Deferral gate:** one contract in `start-epic` and `wrapup-epic` — Fix now / Defer / Stop with a
 recommendation. Defer only when the Then clause depends on a later epic whose spec names the TOR.
 
+**Baseline chains:** `CLAUDE.md` sections written by `setup` become baseline TORs in
+`capture-requirements` — `Tool Hygiene & Operability` (all project types, Step 3A.2.1) and
+`UX Baseline` (Web app / Desktop app / Hybrid with a UI, Step 3A.2.2). Both sets belong to the
+walking-skeleton epic in `plan-project`; the skeleton installs the declared design system
+(default shadcn/ui, themed only via CSS-variable tokens) and proves the UX TORs on one reference
+screen. `wrapup-epic` re-checks every UX Baseline line on each UI epic as a quality gate. The
+bold line labels in the UX Baseline template are cited verbatim by downstream skills — do not
+rename them.
+
+**Mockups are planning artifacts:** `mockup` writes `docs/product-vision-planning/ux/` (screens.md
+with stable, append-only `S-NN` IDs; grayscale `wireframes/*.html`) and rewrites ConOps Section 5
+steps to name screens and controls. Screen IDs are referenced by ConOps steps, TOR Given/When/Then,
+and epic `## Screens` tables — never renumbered. Wireframes carry no colors or typefaces; visual
+design lands in the walking-skeleton epic. `mockup` never invokes `frontend-design`.
+
+**Companion skills:** `setup` recommends `frontend-design@claude-plugins-official` for UI
+projects and `playwright-cli` for web UIs (desktop apps verify through a Playwright Electron
+harness, a project dependency rather than a skill). `frontend-design` shapes visual execution; the UX Baseline and
+design-system tokens take precedence over its aesthetic choices.
+
 ## Skill File Rules
 
 - `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere
 - Template files (`PLAN_TEMPLATE.md`, `HANDOFF_TEMPLATE.md`, etc.) live alongside SKILL.md in the skill directory
 - Sibling template files are referenced by path in SKILL.md; Claude Code makes them available at skill load time
+- `references/` holds the two stack sheets (Bun web, Bun + Electron desktop). They are the
+  single source of truth for the greenfield stack: `setup` offers a sheet's Section 2 and
+  `plan-project` builds the skeleton from its Sections 3-4, so no skill keeps its own copy of
+  the picks or the script names. For an **existing** project they are reference only — no skill
+  may treat divergence from a sheet as a finding, a TOR, or a reason to re-platform
 - `[Greenfield only:]` and `[Brownfield only:]` tags inside code-block templates are conditional — the LLM interprets them, not renders them. Tags that must not render go *outside* fenced template blocks as plain prose conditionals.
 
 ## Validating Changes
@@ -77,7 +103,7 @@ Prompt template for the simulation agent:
 
 ## Versioning
 
-Follows the repo-level versioning protocol in `/opt/github_public/peakflames/claude-plugins-peakflames/CLAUDE.md`.
+Follows the repo-level versioning protocol in the repo-root `CLAUDE.md`.
 Both `plugin.json` and `CHANGELOG.md` must be updated in the same commit.
 
 - **Patch** — wording, UX clarity, step renumbering, no behavioral change

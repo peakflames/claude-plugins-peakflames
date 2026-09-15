@@ -31,7 +31,10 @@ Follow these steps exactly:
 
 ## Step 1: Load Context
 
-1. Read `CLAUDE.md` at the repo root for project context and tech stack.
+1. Read `CLAUDE.md` at the repo root for project context and tech stack. Capture the
+   **Project type** from its `Tool Hygiene & Operability` section and, when present, the
+   **UX Baseline** section (design system, app shell, screen-state and keyboard conventions) —
+   Step 3A.1 uses both to shape the walking skeleton.
 2. Read `docs/product-vision-planning/product-vision.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 3. Read `docs/product-vision-planning/concept-of-operations.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file:
@@ -42,6 +45,7 @@ Follow these steps exactly:
    > derive formal TOR requirements from the vision and ConOps documents. `/plan-project`
    > derives epics from TOR IDs, not directly from ConOps scenarios.
 5. **Load tracing sidecars.** Glob `docs/requirements/*.feature.tracing.json`. For each, read the vision and ConOps linkage for supplementary context when writing epic Descriptions.
+6. **Load the screen inventory (UI projects).** Read `docs/product-vision-planning/ux/screens.md` if present (written by `/peak-workflow:mockup`). Capture every `S-NN` ID, name, wireframe path (the `Wireframe` column — `wireframes/S-NN-{kebab}.html`, relative to `ux/`, or `—`), states, and the per-scenario `## Flows`. Set `screens_present = true`; Steps 3A.1, 3A.2, 4, 5.2, and 6 use it. Absent → `false`, no comment.
 
 ## Step 2: Detect Greenfield vs Brownfield
 
@@ -69,24 +73,96 @@ have to catch. One horizontal epic is the exception, and it always comes first.
 ### 3A.1: Walking Skeleton (Epic 0)
 
 Form exactly one horizontal epic that stands the system up end to end with no domain logic:
-project scaffolding, build and test tooling, dev environment, CI, and the thinnest possible path
-through every layer the product has. The **tool-hygiene baseline TORs** captured in
+project scaffolding (including a tech-stack `.gitignore` — `setup` 7.4 only warns when one is
+missing), build and test tooling, dev environment, CI, and the thinnest possible path through
+every layer the product has. The **tool-hygiene baseline TORs** captured in
 `capture-requirements` 3A.2.1 (version exposure, startup log line, logging convention, error
 message standard, and for CLIs exit codes and stdout/stderr discipline) are this epic's
-Requirements Anchors — they already touch every layer with no domain logic. If no tool-hygiene
-TORs exist (`capture-requirements` skipped 3A.2.1), the skeleton has `requirements: —` (5.3b)
-and its spec Description states that wrapup verifies the architectural pattern only.
+Requirements Anchors — they already touch every layer with no domain logic. If neither
+tool-hygiene nor baseline UX TORs exist (`capture-requirements` skipped 3A.2.1 and 3A.2.2), the
+skeleton has `requirements: —` (5.3b) and its spec Description states that wrapup verifies the
+architectural pattern only.
 
 The skeleton's job is to establish the architectural pattern every later slice follows (how a
 request reaches a handler, how a screen calls the API, where tests live). Its spec Description
 must say so, and must state that `docs/architecture.md` records the pattern once the skeleton
 is complete.
 
+**UI products (Project type Web app, Desktop app, or a Hybrid with a UI):** the skeleton also
+owns the design system and the app shell. The **baseline UX TORs** captured in
+`capture-requirements` 3A.2.2 (Screen states, Keyboard & focus, Forms, Destructive actions,
+Progress feedback, Layout floor, Contrast, Reduced motion, Navigation, and the Desktop
+conventions) join the tool-hygiene TORs as this epic's Requirements Anchors. To satisfy them the
+skeleton must:
+
+- Install the design system declared in `CLAUDE.md`'s **UX Baseline** section (default:
+  shadcn/ui on Tailwind, themed only through the CSS-variable tokens in the global stylesheet —
+  never by editing generated component files). When `CLAUDE.md`'s Tech Stack came from a
+  reference sheet (`/peak-workflow:setup` names which one), scaffold from that sheet rather
+  than from a generator: create the tree in its **Section 3 Repository Layout** and write the
+  files in its **Section 4 Configuration Files** verbatim, substituting the project name, then
+  `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
+  involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
+  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer (both
+  sheets already carry the `@tailwindcss/vite` plugin and the path aliases in their Vite
+  config). Desktop specifics the sheet supplies and the skeleton must not drop:
+  `trustedDependencies` (`electron`, `better-sqlite3`, `@electron/rebuild`) and the
+  `electron-rebuild` postinstall, `asarUnpack` for `better-sqlite3`, `contextIsolation` +
+  `sandbox` + `nodeIntegration: false`, Zod-validated IPC, and `migrate()` at startup resolving
+  the SQL folder from `process.resourcesPath` when packaged.
+- Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
+  apps the application menu, window-state persistence, and the About dialog.
+- Ship **one reference screen** that renders the loading, empty, error, and populated states and
+  passes every baseline UX TOR. It is the pattern every later screen copies. The reference
+  screen is the screen the baseline UX TORs name (the `# Note: reference screen` line under
+  the `# UX Baseline` banner — the thinnest entity list from ConOps Scenario 1 with its create
+  form and its delete; when `screens_present = true`, every `S-NN` that note names — the list
+  screen and, when `mockup` made the create form its own screen, that form screen too — each
+  listed in the skeleton spec's `## Screens` section); that is the minimum surface the Forms,
+  Destructive actions, and Progress feedback TORs need; a file-dialog TOR needs one Export
+  action on it. The screens the note names are skeleton-owned: a later slice that extends one
+  of them does not re-list it. "No domain logic" means no business rules, not no data.
+- Ship a **test-only fault / latency injection switch**: an environment variable read at
+  startup, honored by the E2E harness, ignored in production builds. The error-state and
+  Progress feedback TORs cite it in their Givens — a local SQLite app has nothing else to
+  throttle or fail. Ship a **test-only data-directory override** beside it: an environment
+  variable that redirects the database location (normally `app.getPath('userData')`) to a
+  fresh temp directory the harness creates per test, so empty-state, populated-state, and
+  destructive-action Givens start from an empty database instead of the developer's live data.
+  Name both switches in Key Components.
+- Make the **E2E harness self-contained**: its `globalSetup` (or the `test:e2e` script) runs the
+  production build the entry point needs (reference-sheet desktop stack: `bun run build`, whose
+  electron-vite output is the `out/main/index.js` the sheet's Section 7 E2E example launches;
+  web: the Vite build) and `_electron.launch` targets the built entry, so the Tests command in
+  `CLAUDE.md` works cold in a fresh wrapup session.
+
+**Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack —
+`plugins/peak-workflow/references/bun-web-app-stack.md` for a web app or service,
+`plugins/peak-workflow/references/bun-electron-desktop-stack.md` for a desktop app — is the
+skeleton's build instructions: Section 2 is the stack, Section 3 the tree, Section 4 the config
+files, and the later sections the wiring (data access, IPC or routes, tests, packaging). Its
+*Stack Summary* table is also the checklist for "every layer the product has" — if the skeleton
+does not touch a layer the table names, that layer is missing from the skeleton. Two limits:
+a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md` and wins over
+the sheet, and in **Brownfield mode (Step 3B) the sheets play no part at all** — never plan an
+epic that re-platforms an existing codebase toward a sheet.
+
+No later epic installs a component library, defines tokens, or builds a second shell — a slice
+composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
+Components must name the design-system files (`components.json`, the global stylesheet,
+`components/ui/`), the shell, the reference screen, and the fault / latency switch, and its
+Description must state that `docs/architecture.md` records the token file and the
+screen-composition pattern.
+
 ### 3A.2: Vertical Slices by Capability
 
 Cluster the remaining TOR IDs by **what a user can do once the slice ships**. The clustering key
 is the ConOps scenario / vision goal each TOR traces to — already loaded from the tracing
-sidecars in Step 1 item 5 — not the subsystem the TOR touches.
+sidecars in Step 1 item 5 — not the subsystem the TOR touches. When `screens_present = true`,
+the per-scenario flows in `ux/screens.md` are a second clustering signal: the screens a flow
+walks through belong to the slice that ships that scenario (except the reference screens the
+`# Note:` line names — those stay with the skeleton, 3A.1), and the TORs that name those
+screens (`S-NN` in their Given/When) travel with them.
 
 - **Seed:** one slice per feature file. Feature files are functional areas and are already
   capability-shaped.
@@ -99,7 +175,8 @@ sidecars in Step 1 item 5 — not the subsystem the TOR touches.
   `### Frontend` subheadings when both are involved.
 - **Cross-cutting TORs** (logging conventions, performance budgets, accessibility baselines)
   belong in the skeleton, or in one small hardening epic at the end of the plan. Never spread
-  them across slices.
+  them across slices. Baseline UX TORs always go to the skeleton (3A.1) — they are verified on
+  the reference screen once, and every later screen inherits the pattern.
 
 ### 3A.3: Sizing — the Whole-Capability Rule
 
@@ -115,7 +192,8 @@ to split later (`/pause`, then `/add` for the remainder) while an over-split pla
 on every epic. Do not size epics by predicted context usage; that cannot be measured here, and
 the operator watches the meter in `/start-epic`.
 
-Count is a sanity check only, not a target:
+Count is a sanity check only, not a target. The walking skeleton is exempt from the count
+check — its size is set by the baseline sections.
 - More than **~20 TOR IDs** → split by ConOps scenario (3A.2).
 - Fewer than **~4 TOR IDs** → merge with the adjacent slice from the same scenario, unless the
   TORs are individually heavy (doc strings, data tables, a `docs/reference/` dependency) — then
@@ -222,16 +300,21 @@ Present the full epic breakdown for approval. Do NOT write any files yet.
 
 ### Epic Breakdown
 
-| Phase | Epic | Name | Dependencies | TOR IDs | Feature Files | Layers touched |
-|-------|------|------|--------------|--------:|---------------|----------------|
-| 1 | a3f2K7p | Walking skeleton | — | [N] | 01-app.feature.md | all |
-| 2 | B9xQr2z | [Capability name] | Epic a3f2K7p | [N] | 02-auth.feature.md | db, api, ui |
-| ... | ... | ... | ... | ... | ... | ... |
+| Phase | Epic | Name | Dependencies | TOR IDs | Feature Files | Screens | Layers touched |
+|-------|------|------|--------------|--------:|---------------|---------|----------------|
+| 1 | a3f2K7p | Walking skeleton | — | [N] | 01-app.feature.md | S-01 | all |
+| 2 | B9xQr2z | [Capability name] | Epic a3f2K7p | [N] | 02-auth.feature.md | S-02, S-03 | db, api, ui |
+| ... | ... | ... | ... | ... | ... | ... | ... |
 
 The "Layers touched" column is how the user checks that slices are vertical — a domain epic
 showing a single layer is a sign the clustering slipped back to layers. Derive the layer names
 from the tech stack in `CLAUDE.md` (e.g., `db, api, ui`). For a single-process product (CLI
 tool, library) write `single-process` for every epic; the vertical check does not apply.
+
+The "Screens" column appears only when `screens_present = true` — omit it otherwise. List the
+`S-NN` IDs the epic delivers, or `—` for an epic with no screen. Every screen in `ux/screens.md`
+appears in exactly one row (the Application menu and Window rows go to the skeleton; `mockup`
+draws no wireframe for them).
 
 ### Dependency Graph
 
@@ -244,7 +327,7 @@ tool, library) write `single-process` for every epic; the vertical check does no
 ### Estimated Scope
 
 - Total epics: [N]
-- Total acceptance criteria: [N]
+- Total TOR IDs covered: [N]
 - Recommended session order: [list epic IDs in order]
 ```
 
@@ -300,16 +383,25 @@ epic addresses, drawn from the feature files and tracing sidecars.}
 | TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` | {Scenario title verbatim from the feature file} |
 | TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` | {Scenario title verbatim from the feature file} |
 
+## Screens
+
+| Screen | Wireframe | States this epic delivers |
+|--------|-----------|---------------------------|
+| S-NN {Name} | `docs/product-vision-planning/ux/wireframes/S-NN-{kebab}.html` | loading / empty / error / populated |
+
 ## Key Components
 
 {List of file paths to create or modify, with brief descriptions. Use the project's actual
-directory structure. Separate into ### Backend and ### Frontend subheadings if both are involved.}
+directory structure. Separate into ### Backend and ### Frontend subheadings if both are involved.
+For a UI epic, list each screen the epic adds or changes and note that it composes from the
+skeleton's app shell and design system — no new component library, no new tokens.}
 ```
 
-**Conditional lines in the header template above** — do not carry this guidance into the written spec:
+**Conditional lines and sections in the template above** — do not carry this guidance into the written spec:
 
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise.
+- Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it. Copy the name verbatim from `ux/screens.md`, and the wireframe path verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
 
 **Populating Requirements Anchors:**
 
@@ -458,15 +550,22 @@ Rules:
   error). Gap.
 - Out-of-scope items: `Explicit? N/A — deferred: {rationale}`. List explicitly; do not hide.
 
+When `screens_present = true`, print a second table directly below it — `## Self-Check: Screen →
+Epic Trace` — one row per `S-NN` in `ux/screens.md` with columns `Screen | Captured in Epic(s)
+(## Screens) | Explicit? (Y/N) | Ambiguous? (Y/N)`. The same rules apply: not in any epic's
+`## Screens` section → `Explicit? N`; in two or more → `Ambiguous? Y`; the Application menu and
+Window rows trace to the skeleton; a retired screen is `N/A — retired`.
+
 ### 6.3: Remediate and Re-Run
 
 For every gap:
 
 1. Add the missing TOR ID to the relevant epic's Requirements Anchors table and to the sidecar
-   `requirements:` field.
+   `requirements:` field. For a screen gap, add the row to (or remove it from) the epic's
+   `## Screens` section so each screen has one owner.
 2. If the TOR ID doesn't fit any existing epic's scope, create a new epic per Step 5.2 rules,
    then re-run Step 4 negotiation for that one epic.
-3. Re-run the table. Iterate until every row is `Explicit? Y` and `Ambiguous? N`, or explicit
+3. Re-run the table(s). Iterate until every row is `Explicit? Y` and `Ambiguous? N`, or explicit
    deferral.
 
 Do not proceed to Step 7 with unresolved gaps.
