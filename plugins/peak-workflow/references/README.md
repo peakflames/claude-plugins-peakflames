@@ -6,8 +6,18 @@ from. For an **existing** project they are reference material only — never a m
 
 | Sheet | Shape | Runtime |
 |---|---|---|
+| [`bun-static-spa-stack.md`](bun-static-spa-stack.md) | Browser-only web app — React SPA, data in IndexedDB on the person's device, deployed to GitHub Pages. No server, no accounts, no uploads | Bun is the **toolchain**; the app runs in the browser |
 | [`bun-web-app-stack.md`](bun-web-app-stack.md) | Web app / Service or API — React SPA + Hono, single Docker container, SQLite on a volume, S3-compatible object storage | Bun **is** the runtime |
 | [`bun-electron-desktop-stack.md`](bun-electron-desktop-stack.md) | Desktop app — Electron shell, React + shadcn/ui renderer, SQLite on disk | Bun is the **toolchain**; the app runs on Electron's Node |
+
+**Web app is two sheets, not one.** `/peak-workflow:setup` asks five plain-language product-shape
+questions before reading any sheet — does the data follow the person to another device, does
+anyone sign in, are there file uploads, does anything update on its own, does the product hold a
+secret of its own. All five "no" routes to the static sheet; any "yes" routes to the web-app
+sheet. The answers are recorded in `CLAUDE.md` as a `**Product shape:**` block, and each Stack
+Summary row they drop is written as `N/A — <reason> (shape Q<N>)` rather than omitted, so
+`plan-project` reads it as a decision instead of a gap. `/peak-workflow:discover` re-checks those
+answers against the ConOps scenarios once the product is described (its Step 4.5).
 
 ## What these are for
 
@@ -48,3 +58,8 @@ names (`dev`, `build`, `package`, `typecheck`, `lint`, `deadcode`, `test`, `test
 `setup` and `plan-project` quote those script names in their quality-gate and verification
 defaults, so a change to a sheet's `package.json` section means updating the matching lines in
 `skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit.
+
+A sheet must also be able to satisfy the baseline TORs `setup` derives from it. Every sheet's
+Section 4 `package.json` carries a `version` field, and the sheet shows where that version is
+exposed to the user and stamped on the first log line — otherwise `capture-requirements` writes
+tool-hygiene TORs the skeleton cannot pass.

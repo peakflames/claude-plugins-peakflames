@@ -56,6 +56,15 @@ in the Deferrals table so the human sees the one place self-review occurs.
 **Deferral gate:** one contract in `start-epic` and `wrapup-epic` — Fix now / Defer / Stop with a
 recommendation. Defer only when the Then clause depends on a later epic whose spec names the TOR.
 
+**Product shape drives the stack:** `setup` asks five plain-language questions (cross-device,
+sign-in, file uploads, live updates, product-held secret) before reading any sheet. All five "no"
+on a Web app routes to `bun-static-spa-stack.md`; any "yes" routes to `bun-web-app-stack.md`. The
+answers are recorded in `CLAUDE.md` as a `**Product shape:**` block and each dropped Stack Summary
+row is written `N/A — <reason> (shape Q<N>)`, which `plan-project` reads as a decision rather than
+a missing layer. `discover` Step 4.5 re-checks the answers against the ConOps scenarios and asks
+before changing anything; the revision rides the same `docs/` branch merge as the requirements
+baseline.
+
 **Baseline chains:** `CLAUDE.md` sections written by `setup` become baseline TORs in
 `capture-requirements` — `Tool Hygiene & Operability` (all project types, Step 3A.2.1) and
 `UX Baseline` (Web app / Desktop app / Hybrid with a UI, Step 3A.2.2). Both sets belong to the
@@ -81,11 +90,13 @@ design-system tokens take precedence over its aesthetic choices.
 - `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere
 - Template files (`PLAN_TEMPLATE.md`, `HANDOFF_TEMPLATE.md`, etc.) live alongside SKILL.md in the skill directory
 - Sibling template files are referenced by path in SKILL.md; Claude Code makes them available at skill load time
-- `references/` holds the two stack sheets (Bun web, Bun + Electron desktop). They are the
-  single source of truth for the greenfield stack: `setup` offers a sheet's Section 2 and
-  `plan-project` builds the skeleton from its Sections 3-4, so no skill keeps its own copy of
-  the picks or the script names. For an **existing** project they are reference only — no skill
-  may treat divergence from a sheet as a finding, a TOR, or a reason to re-platform
+- `references/` holds the three stack sheets (Bun static SPA, Bun web, Bun + Electron desktop).
+  They are the single source of truth for the greenfield stack: `setup` offers a sheet's
+  Section 2 and `plan-project` builds the skeleton from its Sections 3-4, so no skill keeps its
+  own copy of the picks or the script names. Sheets are addressed as
+  `${CLAUDE_PLUGIN_ROOT}/references/<sheet>.md` — never as a path inside the user's repository.
+  For an **existing** project they are reference only — no skill may treat divergence from a
+  sheet as a finding, a TOR, or a reason to re-platform
 - `[Greenfield only:]` and `[Brownfield only:]` tags inside code-block templates are conditional — the LLM interprets them, not renders them. Tags that must not render go *outside* fenced template blocks as plain prose conditionals.
 
 ## Validating Changes

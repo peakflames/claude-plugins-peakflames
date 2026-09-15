@@ -146,15 +146,26 @@ for verification (web; desktop apps verify through a Playwright Electron harness
 and records the precedence rule: the UX Baseline and the design-system tokens win over
 `frontend-design`'s aesthetic choices.
 
-**Stack defaults come from the reference sheets.** Two sheets ship with the plugin under
-[`references/`](references/): [`bun-web-app-stack.md`](references/bun-web-app-stack.md) (web
-apps and services — Bun runtime, Hono, React SPA, SQLite, S3, one Docker container) and
+**Stack defaults come from the reference sheets.** Three sheets ship with the plugin under
+[`references/`](references/): [`bun-static-spa-stack.md`](references/bun-static-spa-stack.md)
+(browser-only apps — React SPA, IndexedDB via Dexie, GitHub Pages, no server),
+[`bun-web-app-stack.md`](references/bun-web-app-stack.md) (web apps and services — Bun runtime,
+Hono, React SPA, SQLite, S3, one Docker container) and
 [`bun-electron-desktop-stack.md`](references/bun-electron-desktop-stack.md) (desktop apps —
 Bun toolchain, Electron shell, electron-vite, React + shadcn/ui, better-sqlite3). When the
 tech-stack answer is thin, `/setup` reads the matching sheet's Stack Summary and offers those
 picks — there is no separate default list — and `/plan-project` builds the greenfield walking
 skeleton from the sheet's repository layout and config files instead of running a scaffolder.
 The user accepts the sheet wholesale or overrides any layer.
+
+**The sheet is chosen by product shape, not project type.** Before reading any sheet, `/setup`
+asks five questions in plain language — does the information need to follow the person to another
+device, does anyone sign in, do people attach files, does anything update on its own, does the
+product hold a secret of its own. A Web app answering "no" to all five is a static SPA and gets
+that sheet; any "yes" gets the web-app sheet. The answers are recorded in `CLAUDE.md`, and rows
+they drop are written `N/A — <reason> (shape Q<N>)` so `/plan-project` reads them as decisions
+rather than gaps. `/discover` re-checks the answers against the ConOps scenarios once the product
+is actually described, and asks before changing anything.
 
 For an **existing** project the sheets are reference only: its `CLAUDE.md` Tech Stack always
 wins, differing from a sheet is never a gate failure or a TOR, brownfield planning ignores the

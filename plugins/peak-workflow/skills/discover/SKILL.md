@@ -280,6 +280,55 @@ Before presenting the final documents to the user, verify:
 - [ ] Cross-references between documents are correct (ConOps references Product Vision as companion)
 - [ ] Brownfield only: the discovery changelog accurately captures all changes
 
+## Step 4.5: Product-Shape Re-check
+
+`/peak-workflow:setup` chose the stack from five product-shape questions asked **before** the
+product was described. Discovery is the first point where those answers can be checked against
+what the product actually does, and it is the last cheap moment to change them — the walking
+skeleton in `/peak-workflow:plan-project` materializes the stack.
+
+Read the `**Product shape:**` block in `CLAUDE.md`'s Tech Stack section. If there is none (the
+project pre-dates it, or `setup` was never run), skip this step entirely — do not re-derive a
+stack for an existing project.
+
+Re-read the ConOps scenarios and the Product Vision's §10 Data Strategy against each recorded
+answer. A contradiction is a scenario step that needs something the recorded shape says the
+product does not have:
+
+| Recorded as "no" | Contradicted by a scenario that… |
+|---|---|
+| Cross-device / sync | uses the product from a second device, or expects data on a phone and a laptop |
+| Sign-in / multiple people | names more than one role acting on the same data, or anything shared, assigned, or reviewed |
+| File attachments | attaches, uploads, imports, or exports a photo, document, or spreadsheet |
+| Live updates from elsewhere | expects something to appear without the person acting — a notification, another person's change |
+| Product-held secret | calls a paid or authenticated third-party service |
+
+**If nothing contradicts,** say so in one line in the Step 5 summary and move on.
+
+**If something contradicts,** do not rewrite `CLAUDE.md` silently and do not change the vision or
+ConOps to fit the stack. Name the contradiction in the user's own words, say what it changes, and
+ask:
+
+- Question: `"Scenario {N} says {plain-language quote}. The stack we recorded assumes {recorded answer} — {plain consequence, e.g. 'the information only lives in one browser, so it will not be on their phone'}. Which is right?"`
+- Options:
+  - `"The scenario is right — update the stack"`
+  - `"The stack is right — I'll simplify the scenario"`
+  - `"Leave both for now — decide before planning"`
+
+On *"update the stack"*: re-run the Tech Stack step of `/peak-workflow:setup` for the changed
+answers only, rewrite the `**Product shape:**` block and the affected Stack Summary rows, and
+note the change in the Step 5 summary. The edit lands on this `docs/` branch, so the stack change
+is reviewed and approved by the same merge as the requirements baseline.
+
+On *"simplify the scenario"*: edit the ConOps scenario and re-run Step 4's quality check on it.
+
+On *"leave both"*: record the open question under ConOps §8 Operational Constraints &
+Assumptions and surface it again in the Step 5 summary as a blocker for `/peak-workflow:plan-project`.
+
+A shape change from `N/A` to active is never silent: it adds layers that every later epic pays
+for. A change in the other direction (a recorded "yes" that no scenario needs) is worth raising
+too — the same question, inverted.
+
 ## Step 5: Present Summary & Next Steps
 
 Show the user what was created:
