@@ -15,11 +15,10 @@ Placeholder reference:
 - `<test-directories>` — every directory listed under Test directories in CLAUDE.md's
   Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if the line is
   absent, the single test directory that section names). If no directory can be derived (a
-  legacy Tests row like `pytest` names none), ask once via `AskUserQuestion`:
-  - Question: `"Which directories hold tests? (space-separated, E2E last)"`
-  - Then offer to write the answer as the `**Test directories:**` line of the Verification &
-    Quality Gates section. If the user declines, replace the per-directory grep loop with
-    `git grep -l "<TOR-ID>" -- ':!docs'`.
+  legacy Tests row like `pytest` names none), `start-epic` Step 1 item 4b already asked the
+  user and resolved this value before plan mode; if the user declined to record it, replace
+  the per-directory grep loop with `git grep --untracked -l "<TOR-ID>" -- ':!docs'` (the
+  `--untracked` flag matters — new test files are not yet staged at self-assessment time).
 - `<deferral-count>` — the `Count:` value from the handoff's Deferrals section
 - `<handoff-path>` — `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md`
 

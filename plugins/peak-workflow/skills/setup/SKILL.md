@@ -416,7 +416,7 @@ makes them inapplicable.
 **Verification & Quality Gates** (if missing):
 - What checks should run before an epic is marked complete? Ask about each:
   - Build/compile check? If so, what command?
-  - Tests? If so, what command?
+  - Tests? If so, what command? (Reuse the test command already captured under Local Environment — ask only where the tests live.)
   - Linting or formatting? If so, what command?
   - Visual/screenshot verification? (suggest `playwright-cli` for web UIs; the Playwright
     Electron harness in `e2e/` for desktop)
@@ -444,7 +444,7 @@ Run every applicable check before marking an epic Implemented or Complete:
 - **Build:** `[build command]`
 - **Tests:** `[unit command]` (tests/); `[e2e command]` (e2e/)
 - **Lint / format:** `[lint command]`
-- **Run the tool:** `[invocation with known input]` → `[expected output]`
+- **Run the tool:** `[invocation with known input]` → `[expected output]` *(the walking-skeleton epic uses the `--version` invocation here — domain inputs apply once the owning epic ships)*
 - **Visual / console (UI only):** [`playwright-cli` against the running app / the Playwright Electron harness in `e2e/`]
 - **Brand (UI only, if a brand skill is configured):** [skill name]
 - [Any other project-specific check]
@@ -481,7 +481,7 @@ If the second answer is still ambiguous, accept it and add a note in the written
 - What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
 - What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
 - How do you verify the tool/app works after build?
-  - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`)
+  - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
   - *Web/server projects:* curl a health endpoint (e.g., `curl http://localhost:8080/api/health`) or use `playwright-cli`
   - *Desktop projects:* start the dev build (e.g., `bun run start`) and run the Playwright Electron smoke test (e.g., `bunx playwright test`)
 
