@@ -27,7 +27,7 @@ Check for the presence and completeness of each section below. Report a status f
 | **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
 | **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library projects report `[N/A] UX Baseline — no user interface`. If Tool Hygiene & Operability is also missing, the Project type is not yet known — report `[MISS] UX Baseline — resolved after Project type is captured in Step 3` and let Step 3 turn it into `[N/A]` or a populated section. |
 | **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`, not derived as TORs. |
-| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
+| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
@@ -410,7 +410,7 @@ makes them inapplicable.
 **Peak Workflow** (if missing):
 - Where does the requirements baseline live? (default: `docs/requirements/`)
 - Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard)
-- Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
 - Leave room for a `**Recommended skills:**` line — Step 8 writes it for Web app / Desktop app / Hybrid-with-UI projects only; for CLI / Service / Library projects write nothing.
 
 **Verification & Quality Gates** (if missing):
@@ -600,11 +600,12 @@ traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capt
 ## Lifecycle
 
 1. Run `/peak-workflow:discover` to establish or update the product vision and ConOps.
-2. Run `/peak-workflow:capture-requirements` to derive TOR requirements from the vision/ConOps.
-3. Run `/peak-workflow:plan-project` to derive epics that implement the TOR requirements.
-4. Run `/peak-workflow:start-epic <id>` to implement each epic — tests are derived from
+2. On UI projects run `/peak-workflow:mockup` to inventory screens and draw wireframes.
+3. Run `/peak-workflow:capture-requirements` to derive TOR requirements from the vision/ConOps.
+4. Run `/peak-workflow:plan-project` to derive epics that implement the TOR requirements.
+5. Run `/peak-workflow:start-epic <id>` to implement each epic — tests are derived from
    TOR Given/When/Then.
-5. Run `/peak-workflow:wrapup-epic <id>` to independently verify each TOR requirement is satisfied.
+6. Run `/peak-workflow:wrapup-epic <id>` to independently verify each TOR requirement is satisfied.
 ```
 
   Report: `[PASS] Requirements directory — created docs/requirements/README.md stub`

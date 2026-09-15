@@ -221,7 +221,7 @@ both are involved.}
 
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise.
-- Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name and wireframe path copied verbatim from `ux/screens.md`; a screen marked `n/a — not data-bearing` lists `populated` only. A screen appears in exactly one epic's Screens table.
+- Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name and wireframe path copied verbatim from `ux/screens.md`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) write `—` in the Wireframe column — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. A screen appears in exactly one epic's Screens table.
 
 **Populating Requirements Anchors:**
 
