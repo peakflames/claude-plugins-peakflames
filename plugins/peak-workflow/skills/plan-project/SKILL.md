@@ -118,6 +118,14 @@ skeleton must:
   the SQL folder from `process.resourcesPath` when packaged.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
+- When `CLAUDE.md`'s Tech Stack records `Auth: deferred provider`, the skeleton owns the half that
+  is not deferred: every record carries an owner, every read and write filters by the current
+  user, the role field and one permission-check seam exist if roles were declared, and the
+  development sign-in stub sits behind a single "who is the current user?" module that fails
+  closed in a production build. Name that module and the ownership columns in Key Components.
+  Swapping the stub for the real provider is **its own later epic**, listed in the plan with the
+  open decision from `docs/design-notes.md` as its trigger — never folded into the skeleton and
+  never left unplanned.
 - Ship **one reference screen** that renders the loading, empty, error, and populated states and
   passes every baseline UX TOR. It is the pattern every later screen copies. The reference
   screen is the screen the baseline UX TORs name (the `# Note: reference screen` line under
@@ -154,7 +162,8 @@ packaging). Its *Stack Summary* table is also the checklist for "every layer the
 if the skeleton does not touch a layer the table names, that layer is missing from the skeleton.
 Three limits: a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md`
 and wins over the sheet; a row `CLAUDE.md` marks `N/A — <reason> (shape Q<N>)` is a recorded
-decision, so it is **not** a missing layer and the skeleton must not build it back; and in
+decision, so it is **not** a missing layer and the skeleton must not build it back (a row marked
+`deferred provider` is the exception — half of it is built now, the rest by its own epic); and in
 **Brownfield mode (Step 3B) the sheets play no part at all** — never plan an epic that
 re-platforms an existing codebase toward a sheet.
 
