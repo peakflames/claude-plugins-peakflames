@@ -89,6 +89,16 @@ grep -l '^## Acceptance Criteria' docs/implementation-plan/phase-*/epic-*.md 2>/
 
 This is the epic-workflow format (peak-workflow specs use `## Requirements Anchors` instead).
 
+### 1.6 — Existing code
+
+```bash
+ls package.json pyproject.toml Cargo.toml go.mod CMakeLists.txt platformio.ini Makefile *.sln *.csproj */*.csproj src 2>/dev/null | head -5
+```
+
+Set `has_code = true` if any match. It does not change the verdict — a repository with code and
+no peak-workflow artifacts still starts with `/peak-workflow:setup` — but it changes the wording,
+and `setup` and `plan-project` both detect it and extend the code rather than scaffold.
+
 ---
 
 ## Step 2: Reach a Verdict
@@ -124,6 +134,7 @@ Signals observed:
 - docs/implementation-plan/status/ present: <yes | no>
 - Sidecars contain `requirements:` field: <yes | no | n/a>
 - Epic specs use `## Acceptance Criteria` (epic-workflow format): <yes | no | n/a>
+- Existing code (build manifest or src/): <yes | no>
 ```
 
 ---
@@ -153,6 +164,10 @@ After the docs/ branch from steps 2-5 is merged, you'll iterate with:
 I'd start with `/peak-workflow:setup`. Each later step benefits from a fresh session for
 clean context.
 ```
+
+When `has_code = true`, replace the first line with: *"There's code here already, but no
+peak-workflow planning yet. Setup reads your existing stack from the code — nothing gets
+re-scaffolded. The path is:"*
 
 Ask:
 - Question: `"Run /peak-workflow:setup now?"`

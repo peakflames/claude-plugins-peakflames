@@ -140,18 +140,19 @@ This is the heart of the discovery. Produce draft content for Product Vision sec
 
   **Outcome:** [What the actor walks away with]
   ```
-  Each scenario should have 4–12 steps that are specific enough to derive acceptance criteria from. Name UI elements, data fields, and user actions explicitly. *(For CLI projects, "UI elements" means flags, arguments, stdin/stdout, and exit codes — e.g., "user runs `fibcalc 10`, tool prints `55` to stdout and exits 0".)*
+  Each scenario should have 4–12 steps that are specific enough to derive acceptance criteria from. Name UI elements, data fields, and user actions explicitly. *(For CLI projects, "UI elements" means flags, arguments, stdin/stdout, and exit codes — e.g., "user runs `fibcalc 10`, tool prints `55` to stdout and exits 0". For a Service or API, it means endpoints, query parameters, request and response fields, and status codes — e.g., "caller sends `GET /pokemon?type=fire&page=2`, receives `200` with 20 items and a `next` link". For Embedded, it means physical controls, indicators, displays, and the debug console — e.g., "potter holds START for 2 seconds, the display shows `FIRING 1/4`".)*
 - **ConOps Section 6 — System Interfaces & Data Flows:** Draft data source tables and a data flow diagram (ASCII or description).
 
 ### Phase 4: Constraints, Data & Future
 
 Produce draft content for Product Vision sections 9–11 and ConOps sections 7–9:
 
-- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction. If `CLAUDE.md` has a **UX Baseline** section, draft §9 within its **Design system** declaration — do not propose another component library, token scheme, or dark-mode mechanism. *(For CLI/terminal projects, "design direction" means output formatting conventions, flag naming style, error message tone, and exit code behavior — not visual/GUI design.)*
+- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction. If `CLAUDE.md` has a **UX Baseline** section, draft §9 within its **Design system** declaration — do not propose another component library, token scheme, or dark-mode mechanism. *(For CLI/terminal projects, "design direction" means output formatting conventions, flag naming style, error message tone, and exit code behavior — not visual/GUI design. For a Service or API, it means resource naming, pagination and filtering conventions, error body shape, and versioning. For Embedded, it means what the person sees and presses on the device and how it signals trouble.)*
 - **Product Vision Section 10 — Data Strategy:** Draft the data architecture description (sources, freshness, any background processes).
 - **Product Vision Section 11 — Backlog / Future Vision:** Draft a bulleted list of 5–10 deferred items representing the product's growth trajectory.
 - **ConOps Section 7 — Functional Summary:** Draft tables summarizing features by view/area.
 - **ConOps Section 8 — Operational Constraints & Assumptions:** Draft a table of constraints (deployment, users, auth, data freshness, etc.).
+- **ConOps Section 8 — What Must Never Happen** *(Embedded, or any product that switches physical equipment on or off — a heater, motor, valve, relay)*: ask in plain words, *"What must this never do, even if something breaks — a wire comes loose, the power blinks, a reading goes wrong?"* and *"When something does go wrong, what is the safe thing for it to do?"* Draft a `### What Must Never Happen` table under §8: hazard, what could cause it, the safe state, and any limit the user gives (a temperature, a time). `/peak-workflow:capture-requirements` turns each row into a `# Safety` TOR, and `/peak-workflow:plan-project` ships it with the first epic that drives that output. Do not skip this because the user is a hobbyist — they are the people least likely to raise it unprompted.
 - **ConOps Section 9 — Glossary:** Draft a table of domain terms and definitions.
 
 ## Step 2B: Brownfield — Delta Discovery Interview
@@ -274,7 +275,8 @@ Before presenting the final documents to the user, verify:
 - [ ] Every Product Vision section (1–11) has substantive content (not placeholders)
 - [ ] Every ConOps section (1–9) has substantive content
 - [ ] ConOps scenarios have specific, numbered steps (not vague descriptions)
-- [ ] ConOps scenarios name specific UI elements, data fields, and user actions
+- [ ] ConOps scenarios name specific UI elements, data fields, and user actions (or the CLI / API / device equivalents)
+- [ ] Embedded or equipment-controlling products: ConOps §8 has a `What Must Never Happen` table with a safe state per hazard
 - [ ] The "As-Is" section describes real current-state pain points (not generic ones)
 - [ ] The Glossary defines all domain-specific terms used in both documents
 - [ ] Cross-references between documents are correct (ConOps references Product Vision as companion)
@@ -282,7 +284,7 @@ Before presenting the final documents to the user, verify:
 
 ## Step 4.5: Product-Shape Re-check
 
-`/peak-workflow:setup` chose the stack from five product-shape questions asked **before** the
+`/peak-workflow:setup` chose the stack from product-shape questions asked **before** the
 product was described. Discovery is the first point where those answers can be checked against
 what the product actually does, and it is the last cheap moment to change them — the walking
 skeleton in `/peak-workflow:plan-project` materializes the stack.
@@ -290,29 +292,35 @@ skeleton in `/peak-workflow:plan-project` materializes the stack.
 Read the `**Product shape:**` block in `CLAUDE.md`'s Tech Stack section, then branch:
 
 - **Block present** — run the re-check below.
-- **No block, and `CLAUDE.md` has a populated Tech Stack** (an existing project, or a greenfield one
-  whose owner named their own stack, so `setup` never asked the shape questions) — do not re-derive
-  a stack. Say in one line that no recorded shape exists to check against, and offer to run the five
-  questions now if the ConOps surfaced something the stack may not cover.
+- **No block, and the Project type is CLI tool, Library, or Embedded** — these never get shape
+  questions. Skip in one line; offer nothing.
+- **No block, and `CLAUDE.md` has a populated Tech Stack** (an existing project from before shape
+  questions existed) — do not re-derive a stack. Say in one line that no recorded shape exists to
+  check against, and offer to run the shape questions now only if the ConOps surfaced something
+  the stack may not cover.
 - **No block and no Tech Stack** — skip silently; `setup` has not run.
 
 Re-read the ConOps scenarios and the Product Vision's §10 Data Strategy against each recorded
 answer. A contradiction is a scenario step that needs something the recorded shape says the
-product does not have:
+product does not have. An answer recorded `not asked (<type>)` is never a contradiction:
 
 | Recorded as "no" | Contradicted by a scenario that… |
 |---|---|
 | Cross-device / sync | uses the product from a second device expecting to find the same data already there |
-| Sign-in / multiple people | names two roles with **different permissions** over the same data, or anything shared, assigned, reviewed, or approved |
+| Sign-in / multiple people | names two roles with **different permissions** over the same data, or anything shared, assigned, reviewed, or approved **inside the product, from another device or account** |
 | File attachments | attaches or uploads a photo, document, or spreadsheet **the product then has to store** |
 | Live updates from elsewhere | expects something to appear without the person acting — a notification, another person's change |
 | Product-held secret | calls a paid or authenticated third-party service |
+| Internet on the computers it runs on (Q6, desktop) | syncs, emails, checks for updates, or calls any online service |
 
 Two things are **not** contradictions, and firing on them would re-platform a correct stack:
 
 - **A JSON backup export or import.** It is part of the static stack by design (that sheet makes it
   the walking skeleton's job and the cross-device transfer path), so it contradicts neither the
   file-attachment row nor the cross-device row.
+- **Attribution and hand-offs outside the product.** A typed name or initials on a record
+  (recorded `no — attribution only`), or a person who only receives an exported file, is not
+  sign-in and not "others see the data".
 - **A roles table with one real actor.** `/peak-workflow:discover` writes ConOps Section 4 for every
   project, so a single-person product still lists a role or two. Only differing permissions count.
 
@@ -335,7 +343,8 @@ ask:
 
 On *"update the stack"*: if only a row or two changes, re-run the Tech Stack step of
 `/peak-workflow:setup` for the changed answers, rewrite the `**Product shape:**` block and the
-affected Stack Summary rows. **If the sheet itself changes** (static ↔ web), re-run
+affected Stack Summary rows. **If the sheet itself changes** (static ↔ web, or desktop ↔ Hybrid
+with the web sheet's service layers), re-run
 `/peak-workflow:setup` wholesale instead of patching — a sheet change invalidates more than the
 stack table, and each of these is load-bearing:
 
@@ -344,7 +353,7 @@ stack table, and each of these is load-bearing:
 | Verification & Quality Gates → `Test directories` | The sheets have different test trees; a stale line makes every `start-epic` and `wrapup-epic` grep silently return nothing |
 | Local Environment | The static branch skips the backend and live-data questions the web branch requires |
 | Tool Hygiene → Version exposure | Footer plus console line on a static SPA; a `/version` endpoint on a served app |
-| Security Baseline | Gains the fourth reminder when sign-in enters the picture |
+| Security Baseline | Gains the sign-in reminders when sign-in enters the picture |
 | Reference Materials | Its sheet pointer now names the wrong sheet |
 
 Either way, note the change in the Step 5 summary. The edit lands on this `docs/` branch, so the

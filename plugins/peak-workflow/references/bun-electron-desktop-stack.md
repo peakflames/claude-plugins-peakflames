@@ -16,7 +16,7 @@ confidence over novelty.
 >    then builds the walking skeleton from Sections 3 and 4.
 > 2. **A layer checklist for any project** — the Stack Summary table names every layer an
 >    application of this shape has to handle (runtime, build, UI, state, routing, data,
->    migrations, tests, lint, packaging, config, secrets, storage). Use it to notice a layer
+>    migrations, tests, lint, packaging, auto-update, config, secrets, storage). Use it to notice a layer
 >    the project has not decided yet.
 >
 > **Never** propose re-platforming, rewriting, or swapping a library in an existing project
@@ -38,7 +38,7 @@ confidence over novelty.
 │  │ Renderer      │ ◄──────────────────► │ Main (Node)        │ │
 │  │ React 19      │                      │ ipcMain handlers   │ │
 │  │ shadcn/ui     │                      │ window mgmt        │ │
-│  │ TanStack      │                      │ auto-update        │ │
+│  │ TanStack      │                      │ auto-update (opt.) │ │
 │  └──────────────┘                      └─────────┬─────────┘ │
 │        ▲ preload (contextBridge)                  │           │
 │                                        ┌─────────▼─────────┐ │
@@ -78,12 +78,33 @@ unless you add a Bun sidecar process (Section 9).
 | Migrations      | drizzle-kit `generate`, applied with Drizzle `migrate()` at startup | SQL folder shipped as an extra resource. Never `push` in production.                             |
 | Unit tests      | `bun test`                                                          | Native, Jest-compatible API.                                                                     |
 | Component tests | `bun test` + happy-dom + Testing Library                            | Officially documented by Bun. One runner for everything.                                         |
-| E2E             | Playwright with the Electron launcher                               | Tests the real packaged window.                                                                  |
+| E2E             | Playwright with the Electron launcher                               | Builds, then tests the production build (`out/`) in a real Electron window.                      |
 | Lint + format   | Biome 2                                                             | One tool, one config. Covers React hooks rules and Tailwind class sorting.                       |
 | Type-level lint | `tsc --noEmit` with `noUnusedLocals` and `noUnusedParameters`       | Catches what linters miss.                                                                       |
 | Dead code       | Knip                                                                | Unused files, exports, types and dependencies. Has Vite and Electron plugins.                    |
-| Packaging       | electron-builder + electron-updater                                 | Signing, notarization and delta updates.                                                         |
+| Packaging       | electron-builder                                                    | Installers for the target OSes recorded in `CLAUDE.md` (NSIS, dmg, AppImage/deb). Per-OS signing. |
+| Auto-update     | electron-updater                                                    | Delta updates from a publish target (GitHub Releases). Needs network and a publish target.       |
 | Validation      | Zod                                                                 | Shared schemas for IPC, config and settings.                                                     |
+
+### 2.1 Dropping a layer
+
+When `CLAUDE.md` marks a row `N/A`, or the Packaging row omits an OS, leave out exactly these
+pieces instead of copying Sections 3-4 verbatim. Everything else stays.
+
+| Dropped                                           | Section 3 tree        | Section 4                                                                    | Other source / sections                                                         | Section 10 rows to omit                |
+| ------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------- |
+| Auto-update — `N/A — computers have no internet (shape Q6)` | `src/main/updater.ts` | 4.1 `electron-updater` dependency; 4.8 `publish` block and `zip` in `mac.target` | `updater.ts` import and call in `src/main/index.ts`                             | Auto-update on macOS                   |
+| Packaging: macOS not a target                     | —                     | 4.8 `mac` block                                                              | 9.3 `bun-darwin-*` build lines (sidecar only)                                   | macOS signing; Auto-update on macOS    |
+| Packaging: Windows not a target                   | —                     | 4.8 `win` and `nsis` blocks                                                  | 9.3 `bun-windows-x64` build line (sidecar only)                                 | Windows code signing and SmartScreen   |
+| Packaging: Linux not a target                     | —                     | 4.8 `linux` block                                                            | 9.3 `bun-linux-x64` build line (sidecar only)                                   | —                                      |
+
+No row removes a script: every 4.1 script name stays, and `bun run package` builds installers only
+for the OS it runs on.
+
+**Offline.** When Auto-update is `N/A`, nothing in the app may need network at runtime: no CDN
+scripts or stylesheets, no web fonts fetched at launch (system font stack or a bundled
+`@fontsource/*` package), icons from the bundled `lucide-react` only, no telemetry upload. Only
+`bun install` and `bun run package` on the build machine touch the network.
 
 ---
 
@@ -97,7 +118,8 @@ my-app/
 ├── knip.json
 ├── tsconfig.base.json
 ├── electron.vite.config.ts
-├── electron-builder.yml
+├── electron-builder.yml         # only the target OSes' blocks (2.1)
+├── playwright.config.ts
 ├── drizzle.config.ts
 ├── drizzle/                     # generated SQL migrations (committed)
 │   └── 0000_init.sql
@@ -116,7 +138,8 @@ my-app/
 │   │   ├── index.ts             # app lifecycle, BrowserWindow
 │   │   ├── db.ts                # better-sqlite3 driver wiring
 │   │   ├── ipc.ts               # ipcMain handlers (validated)
-│   │   └── updater.ts
+│   │   ├── test-env.ts          # test-only fault switch + data dir (7)
+│   │   └── updater.ts           # omit when Auto-update is N/A (2.1)
 │   ├── preload/
 │   │   └── index.ts             # contextBridge.exposeInMainWorld
 │   └── renderer/
@@ -130,7 +153,7 @@ my-app/
 ├── tests/
 │   ├── unit/                    # bun test
 │   ├── components/              # bun test + happy-dom
-│   └── e2e/                     # Playwright
+│   └── e2e/                     # Playwright (testDir in playwright.config.ts)
 └── sidecar/                     # optional, Section 9
 ```
 
@@ -160,7 +183,7 @@ my-app/
     "lint:fix": "biome check --write .",
     "deadcode": "knip",
     "test": "bun test tests/unit tests/components",
-    "test:e2e": "playwright test tests/e2e",
+    "test:e2e": "bun run build && playwright test",
     "db:generate": "drizzle-kit generate",
     "check": "bun run typecheck && bun run lint && bun run deadcode && bun run test"
   },
@@ -342,18 +365,47 @@ extraResources:
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
 npmRebuild: true
+
+# ── Windows target only ──
+win:
+  target: [nsis]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # perMachine: true    # install for every user of a shared PC (needs admin)
+
+# ── macOS target only ──
 mac:
   category: public.app-category.productivity
   hardenedRuntime: true
-  notarize: true
-  target: [dmg, zip]
-win:
-  target: [nsis]
+  notarize: true        # APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID in env
+  target: [dmg, zip]    # zip is what electron-updater consumes
+
+# ── Linux target only ──
 linux:
   target: [AppImage, deb]
+
+# ── Auto-update only ──
 publish:
   provider: github
 ```
+
+Keep only the blocks for the target OSes recorded in `CLAUDE.md`, and `publish` only when
+Auto-update is kept (2.1). Build each OS's installer on that OS (or a CI runner for it);
+cross-building needs extra tooling.
+
+### 4.9 `playwright.config.ts`
+
+```ts
+import { defineConfig } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./tests/e2e",
+});
+```
+
+`testDir` keeps Playwright from collecting the `bun test` files. `test:e2e` runs `bun run build`
+first, so a cold session never launches a missing or stale `out/main/index.js`.
 
 ---
 
@@ -455,12 +507,15 @@ export type IpcOutput<C extends IpcChannel> = z.infer<(typeof ipc)[C]["output"]>
 ```ts
 import { ipcMain } from "electron";
 import { ipc, type IpcChannel, type IpcInput, type IpcOutput } from "@core/ipc-contract";
+import { faultDelay, faultThrow } from "./test-env";
 
 export function handle<C extends IpcChannel>(
   channel: C,
   fn: (input: IpcInput<C>) => Promise<IpcOutput<C>> | IpcOutput<C>,
 ) {
   ipcMain.handle(channel, async (_event, raw: unknown) => {
+    await faultDelay(); // test-only switches, no-ops in a packaged app (7)
+    faultThrow();
     const input = ipc[channel].input.parse(raw);
     const result = await fn(input as IpcInput<C>);
     return ipc[channel].output.parse(result);
@@ -520,7 +575,7 @@ export function useConversations() {
 | ------------------------------------------------------------ | ---------------------------------------- | ----------------------------------------------------------- |
 | `packages/core`, pure main logic                             | `bun test`                               | No Electron imports allowed in `core`, so it runs anywhere. |
 | React components                                             | `bun test` + happy-dom + Testing Library | Preloaded via `bunfig.toml`.                                |
-| Anything touching `ipcMain`, `BrowserWindow`, native modules | Playwright Electron                      | `bun test` does not run inside Electron.                    |
+| Anything touching `ipcMain`, `BrowserWindow`, native modules | Playwright Electron                      | `bun test` does not run inside Electron. Runs the built `out/`. |
 
 ### Component test example
 
@@ -535,15 +590,63 @@ test("renders label", () => {
 });
 ```
 
+### Test-only fault switch and data directory (`src/main/test-env.ts`)
+
+Error-state and progress-feedback requirements need a failure or a slow call on demand, and each E2E
+test needs its own empty database. The harness runs the unpackaged build, so the gate is
+`app.isPackaged`: an installed app ignores both variables.
+
+```ts
+import { app } from "electron";
+
+const honored = !app.isPackaged; // dev and E2E (out/main/index.js) only
+const mode = honored ? (process.env.APP_FAULT_MODE ?? "") : "";
+
+export const faultDelay = () =>
+  mode === "slow" ? new Promise<void>((r) => setTimeout(r, 3000)) : Promise.resolve();
+
+export const faultThrow = () => {
+  if (mode === "fail") throw new Error("Injected failure (APP_FAULT_MODE=fail)");
+};
+
+/** Call at the top of src/main/index.ts, before app.whenReady() and openDb(). */
+export function applyTestDataDir() {
+  const dir = honored ? process.env.APP_DATA_DIR : undefined;
+  if (dir) app.setPath("userData", dir);
+}
+```
+
+`handle()` (6.2) calls `faultDelay` and `faultThrow` on every channel. `openDb()` (5.3) reads
+`userData`, so a fresh `APP_DATA_DIR` is a fresh `app.db`.
+
 ### E2E example (`tests/e2e/app.spec.ts`)
 
 ```ts
 import { test, expect, _electron as electron } from "@playwright/test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+// Fresh data dir per launch; `env` replaces process.env, so spread it.
+function launch(extra: Record<string, string> = {}) {
+  const dataDir = mkdtempSync(join(tmpdir(), "my-app-e2e-"));
+  return electron.launch({
+    args: ["out/main/index.js"],
+    env: { ...process.env, APP_DATA_DIR: dataDir, ...extra } as Record<string, string>,
+  });
+}
 
 test("app boots and shows sidebar", async () => {
-  const app = await electron.launch({ args: ["out/main/index.js"] });
+  const app = await launch();
   const page = await app.firstWindow();
   await expect(page.getByRole("navigation")).toBeVisible();
+  await app.close();
+});
+
+test("shows an error state when the data source fails", async () => {
+  const app = await launch({ APP_FAULT_MODE: "fail" });
+  const page = await app.firstWindow();
+  await expect(page.getByRole("alert")).toBeVisible();
   await app.close();
 });
 ```
@@ -557,8 +660,8 @@ bun install                  # respects trustedDependencies, runs electron-rebui
 bun run dev                  # electron-vite with HMR
 bun run db:generate          # after editing schema.ts; commit the SQL
 bun run check                # typecheck + lint + deadcode + unit/component tests
-bun run test:e2e             # Playwright against a built app
-bun run package              # electron-builder output in dist/
+bun run test:e2e             # builds, then Playwright against out/
+bun run package              # installers for this OS in dist/
 bunx shadcn@latest add button dialog   # add UI components
 ```
 
@@ -646,6 +749,12 @@ These are known friction points. The configuration in this sheet already applies
 | Routing in `file://` renderer       | Browser history APIs misbehave without a server.                                                                    | TanStack Router with memory history (2).                                                                      |
 | Tailwind v4 + shadcn                | Older shadcn templates assume Tailwind v3 config files.                                                             | Use `@tailwindcss/vite` plugin and CSS-first config; `bunx shadcn@latest init` detects v4 (4.4).              |
 | Sidecar lifecycle (if used)         | Orphaned Bun process after app quit or crash loop.                                                                  | Supervisor with backoff and kill on `before-quit` (9.3).                                                      |
+| Stale E2E build                     | Playwright launches a missing or outdated `out/main/index.js`, or collects `bun test` files.                        | `test:e2e` builds first; `testDir: "./tests/e2e"` (4.1, 4.9).                                                 |
+| Test switches in production         | A fault or data-dir variable left in a user's environment breaks the installed app.                                 | Honored only when `!app.isPackaged` (7).                                                                      |
+| E2E tests share data                | One test's rows leak into the next.                                                                                 | Each launch gets a fresh temp `APP_DATA_DIR` via `env` (7).                                                   |
+| macOS signing                       | Gatekeeper blocks an unsigned or unnotarized app.                                                                   | `hardenedRuntime`, `notarize: true`, Apple credentials in CI env (4.8).                                       |
+| Auto-update on macOS                | electron-updater cannot update from a dmg, and macOS refuses updates to an unsigned app.                            | `zip` in `mac.target`, signed build, `publish` block (4.8).                                                   |
+| Windows code signing and SmartScreen | An unsigned NSIS installer shows a SmartScreen / unknown-publisher warning.                                        | Sign in CI with an Authenticode certificate (`WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`). An unsigned installer still installs and runs offline on an internal PC after the user accepts the warning. |
 
 ---
 

@@ -54,16 +54,32 @@ The user's request / brownfield description: $ARGUMENTS
 
 ## Step 1: Load Context
 
-0. **Deferred organization sign-in.** If `CLAUDE.md`'s Tech Stack records
-   `Auth: local accounts now, org SSO deferred`, the identity provider is not built yet. Do **not**
-   write TORs whose Then clause depends on it — SSO redirects, directory-sourced role claims,
-   account provisioning or deprovisioning, MFA, or organization password policy. Those belong in
-   the **Coverage Gaps (explicitly deferred)** section, named as waiting on the provider epic.
-   Do write, and require, the TORs the project satisfies for real today: a person sees only the
-   records they own or their role grants, an unauthenticated request is rejected, and each declared
-   role can do exactly what `CLAUDE.md` says it may. Add one line under each role TOR noting that
-   the role is assigned in the product's own accounts until the provider epic maps it from the
-   directory.
+0. **Sign-in projects.** If `CLAUDE.md`'s `**Product shape:**` block records
+   `**Access rule:** owner-or-permitted-role` (named provider or deferred), write, and require, the
+   access TORs: a person sees only the records they own or their role grants, an unauthenticated
+   request is rejected, and each declared role can do exactly what `CLAUDE.md` says it may.
+   - **Named provider:** write the provider round-trip TOR (signing in through the named provider
+     lands the person in the product with their role). Automated tests sign in through the
+     email-and-password test helper; add the comment line
+     `# Verification: operator-observed against the real <provider> tenant` under that TOR so
+     `wrapup-epic` asks for the observation instead of failing it.
+   - **Deferred** — Tech Stack records `Auth: local accounts now, org SSO deferred`: the identity
+     provider is not built yet. Do **not** write TORs whose Then clause depends on it — SSO
+     redirects, directory-sourced role claims, account provisioning or deprovisioning, MFA, or
+     organization password policy. Those belong in the **Coverage Gaps (explicitly deferred)**
+     section, named as waiting on the provider epic. Add one line under each role TOR noting that
+     the role is assigned in the product's own accounts until the provider epic maps it from the
+     directory.
+
+0b. **Safety (Embedded, or any product that switches physical equipment on or off).** Read the
+   ConOps **What Must Never Happen** section `/peak-workflow:discover` writes for these products.
+   Each hazard there becomes at least one TOR under a literal `# Safety` section banner, written as
+   the safe outcome the product guarantees — *"The controller shall de-energize the heater relay
+   within 2 seconds when the thermocouple reads open-circuit"* — with a Given that forces the fault
+   through the skeleton's fault switch or the hardware-in-the-loop harness. A hazard with no
+   number the user gave (a limit, a time) gets the TOR anyway with the value flagged at the 3A.1b
+   grouping gate — never dropped. If the section is missing on such a product, warn at 3A.1b and
+   list the gap under Coverage Gaps.
 
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
@@ -292,9 +308,11 @@ The mappings below are the **default**; project-specific declarations in `CLAUDE
 override them. Project types without a column (Service or API, Library, Embedded) write each
 shall-statement in the mechanism `CLAUDE.md` declares — e.g. Embedded: *"The device shall print its
 name and semantic version on the debug console in response to the `version` command"*. A line
-still reading `TBD — set by the walking-skeleton epic` yields a TOR stating the observable outcome
-only (*"The device shall report its name and semantic version"*), with the mechanism left to the
-skeleton.
+still reading `TBD — set by the walking-skeleton epic` yields a TOR whose title, Given, When, and
+Then all stay at the observable level — *"The device shall report its name and semantic version
+on its reporting channel"*, `When the device is asked for its version over its reporting
+channel` — so the TOR stays true whichever mechanism the skeleton picks and never needs a
+change-control edit once its ID is immutable. The skeleton's tests name the concrete channel.
 
 | Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) | Default TOR shall-statement form (Desktop app example) |
 |---|---|---|---|
@@ -375,7 +393,7 @@ feedback Givens cite the skeleton's test-only fault / latency switch rather than
 failure or slow operation (`Given the test fault switch forces the
 data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).
 For a desktop app, the same assertions run through the project's Playwright Electron harness
-against the dev build with a live main process.
+against the production build (`out/`), which `bun run test:e2e` builds first.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them. Where the Web app and Desktop app forms differ, both are given. Rows with

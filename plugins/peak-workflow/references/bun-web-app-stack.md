@@ -14,11 +14,12 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 > 1. **The recommended stack for a brand-new project of this shape.** When
 >    `/peak-workflow:setup` is told "whatever you recommend", it reads Section 2 of this sheet
 >    and offers exactly these picks — there is no separate default list. `/peak-workflow:plan-project`
->    then builds the walking skeleton from Sections 3 and 4.
+>    then builds the walking skeleton from Sections 3 and 4, minus any layer 2.1 drops.
 > 2. **A layer checklist for any project** — the Stack Summary table names every layer an
->    application of this shape has to handle (runtime, build, UI, state, routing, data,
->    migrations, tests, lint, packaging, config, secrets, storage). Use it to notice a layer
->    the project has not decided yet.
+>    application of this shape has to handle (runtime, HTTP, API style, streaming, auth, build,
+>    UI, styling, icons, client state, routing, database, migrations, object storage, validation,
+>    config, secrets, versioning, tests, lint, dead code, container, hosting, backups, logging).
+>    Use it to notice a layer the project has not decided yet.
 >
 > **Never** propose re-platforming, rewriting, or swapping a library in an existing project
 > because it differs from this sheet. A project that ships on a different framework, test
@@ -71,8 +72,8 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 | Runtime | Bun 1.2+ | Single runtime for server, tests, scripts and bundling. Native SQLite and S3 clients. |
 | HTTP framework | Hono | Runs natively on `Bun.serve`, tiny, typed routes, built-in SSE helper, `hc` typed RPC client. |
 | API style | Hono RPC (`hono/client`) + Zod validators | End-to-end types with zero codegen. |
-| Streaming | SSE via Hono `streamSSE`, consumed with `fetch` | Server-pushed updates such as token streaming. Long-lived connections need the idle timeout in 6.2. |
-| Auth | Better Auth | Bun-native, Drizzle adapter, email/password + OAuth, sessions in SQLite. |
+| Streaming | SSE via Hono `streamSSE`: broadcast `GET /api/events` (`EventSource`) and per-request `POST` streams (`fetch`) | Broadcast makes someone else's change appear live (6.7, 7.5); per-request carries token streaming (6.5, 7.4). 15 s heartbeat under the idle timeout (6.2). |
+| Auth | Better Auth | Bun-native, Drizzle adapter, sessions in SQLite. Email/password always; a named provider only when recorded (6.3). One owner-or-permitted-role rule (5.5). |
 | Frontend build | Vite 6 | Fast HMR, Tailwind v4 plugin, output served by Hono in prod. |
 | UI | React 19 + TypeScript 5 (strict) | Boring and correct. |
 | Styling | Tailwind CSS v4 + shadcn/ui | Components copied into the repo, no version lock. |
@@ -85,8 +86,8 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 | Local S3 | MinIO in docker compose | Same API, same code path, no mocks. |
 | Validation | Zod | Shared schemas for API input, env vars and config. |
 | Config | Environment variables parsed by Zod in `env.ts`, documented in `.env.example` | Every environment difference is a variable; a bad one crashes at boot, not an hour later. |
-| Secrets | Runtime environment variables; `.env` gitignored, never baked into the image | The server holds the keys (auth secret, S3 credentials) the browser must never see. |
-| Versioning | `package.json#version`, read once in `packages/core/src/app.ts` | Served at `GET /version`, rendered in the footer, stamped on the first log line. |
+| Secrets | Runtime environment variables; `.env` gitignored, never baked into the image | The server holds keys the browser must never see — auth secret, provider client secrets, storage credentials, a product API key. |
+| Versioning | `package.json#name` and `#version`, read once in `packages/core/src/app.ts` | Served at `GET /version`, rendered in the footer, stamped on the first log line. |
 | Unit tests | `bun test` | Native, Jest-compatible API. |
 | API tests | `bun test` + `app.request()` | Hono apps are testable in-process without a port. |
 | Component tests | `bun test` + happy-dom + Testing Library | One test runner for everything. |
@@ -95,8 +96,22 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 | Type-level lint | `tsc --noEmit` with unused checks | Catches what linters miss. |
 | Dead code | Knip | Unused files, exports, types and dependencies. |
 | Container | Multi-stage `oven/bun` image | Build frontend + server, ship a slim runtime image. |
-| Backups | Litestream sidecar or cron `sqlite3 .backup` to S3 | Continuous SQLite replication to the same bucket provider. |
-| Logging | Pino via `hono-pino`, JSON to stdout | Container-native; let the platform collect logs. |
+| Hosting | Any container host with a persistent volume and HTTPS | The concrete host costs money, so it is chosen with the user before the first deploy — never picked silently. |
+| Backups | Litestream to the object-storage bucket, or a scheduled `sqlite3 .backup` to a mounted backup volume | Litestream when Object storage is in the stack; the backup volume when it is N/A (2.1). The copy never lives on the data volume. |
+| Logging | Pino via `hono-pino`, JSON to stdout, sensitive keys redacted | Container-native; let the platform collect logs. |
+
+### 2.1 Dropping a layer
+
+`setup` writes a dropped row as `N/A — <reason> (shape Q<N>)`. `plan-project` still writes
+Sections 3–4 verbatim **minus** what this table lists for each `N/A` row, and skips the listed
+wiring. Anything not listed stays.
+
+| Dropped row (shape) | Tree (3) | Config and env (4, 5.1) | Code (5–7) | Compose, tests, commands (8.2, 9, 10) | Section 11 rows | Instead |
+|---|---|---|---|---|---|---|
+| **Auth** (Q2) | `apps/api/src/auth.ts`, `packages/core/src/access.ts`, `apps/web/src/auth-client.ts`, `tests/setup/auth.ts` | 4.1 `better-auth`; 4.2 `BETTER_AUTH_SECRET`; 4.4 `"/auth"` proxy entry; 4.8 `# Auth` block; 5.1 `BETTER_AUTH_SECRET` and provider lines | 5.2 Better Auth tables and `userId` columns; `userId` segment of `attachmentKey` (5.4); 6.1 `./auth` import, `/auth/*` handler, `/api` session middleware, `userId`/`role` in `Variables`; 6.3; `can()` and `userId` filters (6.4, 6.6) | 9 `signInForTest`, cookie headers, access-rule test, E2E sign-in steps | Access rule bypass; Auth tables drift; Session cookie cross-origin in dev | Routes are public; keep `/healthz`, `/version` as-is |
+| **Object storage** + **Local S3** (Q3) | `packages/core/src/storage/`, `apps/api/src/routes/attachments.ts`; "+ minio" in the `docker-compose.yml` comment | 4.2 the four `S3_*` lines; 4.8 `# S3` block; 5.1 every `S3_*` | 5.2 `attachments` table; 5.4; 6.1 `attachments` import and `.route("/attachments", …)`; 6.4; 7.3 | 8.2 `minio`, `minio-init`, the app's `S3_*` environment lines and `depends_on`, `miniodata` volume, both notes under 8.2; 9 S3 wrapper row, upload-slot test, "upload" in the E2E row; 10 `docker compose up -d minio minio-init` | Bulk uploads through the app; Trusting client-reported size; Orphaned S3 objects; Presigned URL host mismatch locally; Missing CORS on bucket; Unsafe object keys; Content type allowlist | **Backups:** the host scheduler runs `sqlite3 <data-volume>/app.db ".backup <backup-volume>/app-<date>.db"` into a mounted backup volume (not S3) |
+| **Streaming** (Q4) | `packages/core/src/events.ts`, `apps/api/src/routes/events.ts`, `apps/api/src/routes/messages.ts`, `apps/web/src/queries/live-updates.ts` | — | 6.1 `events` and `messages` imports and routes; 6.5; 6.7; `publish()` calls (6.6); 7.4; 7.5 | 9 Live updates row and test; "streaming, live updates" in the E2E row | SSE dropped by idle timeout; Abandoned streams waste model calls; Live updates on one process | TanStack Query refetch on focus; `idleTimeout` may stay |
+| **Secrets** (Q5 — reachable only when Auth and Object storage are also N/A) | — | Nothing further: those rows already removed every secret | — | — | — | `.env` stays gitignored (it still holds config); the deploy needs no secret store |
 
 ---
 
@@ -108,17 +123,22 @@ my-app/
 ├── bunfig.toml
 ├── biome.json
 ├── knip.json
-├── tsconfig.base.json
+├── tsconfig.base.json             # compiler options
+├── tsconfig.json                  # extends base; paths + include — read by tsc and by Bun at runtime
 ├── drizzle.config.ts
+├── playwright.config.ts
 ├── drizzle/                       # generated SQL migrations (committed)
 ├── Dockerfile
 ├── docker-compose.yml             # app + minio for local
 ├── .env.example
 ├── packages/
 │   └── core/
+│       ├── package.json
 │       └── src/
 │           ├── app.ts             # APP_NAME + APP_VERSION (from package.json)
 │           ├── env.ts             # Zod-validated process.env
+│           ├── access.ts          # the one owner-or-permitted-role rule
+│           ├── events.ts          # in-process pub/sub for live updates
 │           ├── db/
 │           │   ├── schema.ts
 │           │   ├── client.ts      # bun:sqlite + drizzle + migrate
@@ -129,29 +149,36 @@ my-app/
 │           └── contracts/         # Zod schemas shared by API + web
 ├── apps/
 │   ├── api/
+│   │   ├── package.json
 │   │   └── src/
 │   │       ├── index.ts           # Bun.serve entry
 │   │       ├── app.ts             # Hono app (exported for tests)
-│   │       ├── logger.ts          # the one Pino instance
+│   │       ├── logger.ts          # the one Pino instance; emits the startup line
+│   │       ├── db.ts              # the one database handle
 │   │       ├── auth.ts            # Better Auth instance
 │   │       ├── routes/
-│   │       │   ├── conversations.ts
-│   │       │   ├── messages.ts    # SSE streaming
+│   │       │   ├── conversations.ts # access rule in use
+│   │       │   ├── messages.ts    # per-request SSE (token streaming)
+│   │       │   ├── events.ts      # broadcast SSE (live updates)
 │   │       │   └── attachments.ts # presigned URLs
 │   │       └── middleware/
 │   └── web/
+│       ├── package.json
 │       ├── index.html
 │       ├── vite.config.ts
 │       └── src/
 │           ├── main.tsx
 │           ├── router.tsx
 │           ├── api.ts             # hc<AppType> client
+│           ├── auth-client.ts     # Better Auth client on /auth
 │           ├── components/
 │           │   ├── app-footer.tsx # renders APP_NAME v<version>
 │           │   └── ui/            # shadcn
 │           ├── stores/
 │           └── queries/
+│               └── live-updates.ts # EventSource → invalidate queries
 └── tests/
+    ├── setup/                     # happy-dom.ts, env.ts, auth.ts (signInForTest)
     ├── unit/
     ├── api/
     ├── components/
@@ -172,8 +199,9 @@ my-app/
   "type": "module",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "dev": "bun run --filter '*' dev",
+    "dev": "bun run --filter './apps/*' dev",
     "dev:api": "bun --hot apps/api/src/index.ts",
+    "dev:api:pretty": "bun --hot apps/api/src/index.ts | pino-pretty",
     "dev:web": "bun run --cwd apps/web vite",
     "build": "bun run --cwd apps/web vite build",
     "start": "bun apps/api/src/index.ts",
@@ -231,10 +259,28 @@ my-app/
 
 > Version ranges are indicative. Pin from the lockfile.
 >
-> `version` is the single source of truth for the app's version. `packages/core/src/app.ts` (5.0)
-> reads it once; the API serves it at `GET /version` (6.1), the footer renders it (7.2), and the
-> server stamps it on the first log line (6.2). `check` calls `bun run test`, never bare `bun test`
-> — a bare run also collects the Playwright specs under `tests/e2e/` and fails.
+> `name` and `version` are the single source of truth for the app's identity. `packages/core/src/app.ts`
+> (5.0) reads both; the API serves them at `GET /version` (6.1), the footer renders them (7.2), and
+> `logger.ts` stamps them on the first log line (6.2). `check` calls `bun run test`, never bare
+> `bun test` — a bare run also collects the Playwright specs under `tests/e2e/` and fails.
+> `dev:api:pretty` is the only consumer of `pino-pretty`, which keeps Knip from flagging it.
+
+Workspace manifests — all dependencies stay in the root `package.json`:
+
+```json
+// packages/core/package.json
+{ "name": "@my-app/core", "private": true, "type": "module" }
+```
+
+```json
+// apps/api/package.json — `dev` runs from the root so `.env` and relative paths resolve
+{ "name": "@my-app/api", "private": true, "type": "module", "scripts": { "dev": "bun run --cwd ../.. dev:api" } }
+```
+
+```json
+// apps/web/package.json
+{ "name": "@my-app/web", "private": true, "type": "module", "scripts": { "dev": "vite" } }
+```
 
 ### 4.2 `bunfig.toml`
 
@@ -262,9 +308,12 @@ process.env.BETTER_AUTH_SECRET ??= "test-secret-at-least-32-characters-long";
 process.env.APP_URL ??= "http://localhost:3000";
 ```
 
-### 4.3 `tsconfig.base.json`
+`tests/setup/auth.ts` is defined in Section 9.
+
+### 4.3 `tsconfig.base.json` and `tsconfig.json`
 
 ```json
+// tsconfig.base.json
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -279,15 +328,28 @@ process.env.APP_URL ??= "http://localhost:3000";
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "types": ["bun-types"],
+    "types": ["bun-types"]
+  }
+}
+```
+
+```json
+// tsconfig.json
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
     "paths": {
       "@core/*": ["./packages/core/src/*"],
       "@api/*": ["./apps/api/src/*"],
       "@web/*": ["./apps/web/src/*"]
     }
-  }
+  },
+  "include": ["apps", "packages", "tests", "*.ts"]
 }
 ```
+
+`paths` lives in `tsconfig.json` itself because Bun resolves the `@core/*` aliases from it at
+runtime — so the runtime image copies both files (8.1).
 
 ### 4.4 `apps/web/vite.config.ts`
 
@@ -337,18 +399,36 @@ export default defineConfig({
 
 ### 4.6 `knip.json`
 
+With `workspaces` in `package.json`, Knip ignores root-level `entry`/`project`; each workspace is
+configured under `workspaces`, the root as `"."`.
+
 ```json
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": [
-    "apps/api/src/index.ts",
-    "apps/web/src/main.tsx",
-    "apps/web/src/routes/**/*.tsx",
-    "tests/**/*.test.ts?(x)",
-    "tests/e2e/**/*.spec.ts"
-  ],
-  "project": ["apps/**/*.{ts,tsx}", "packages/**/*.ts"],
-  "ignore": ["apps/web/src/components/ui/**", "apps/web/src/routeTree.gen.ts"]
+  "workspaces": {
+    ".": {
+      "entry": ["tests/**/*.test.ts?(x)", "tests/e2e/**/*.spec.ts", "tests/setup/*.ts"],
+      "project": ["tests/**/*.{ts,tsx}", "*.ts"]
+    },
+    "apps/api": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "paths": { "@core/*": ["../../packages/core/src/*"] }
+    },
+    "apps/web": {
+      "entry": ["src/main.tsx", "src/routes/**/*.tsx"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "paths": {
+        "@core/*": ["../../packages/core/src/*"],
+        "@api/*": ["../api/src/*"],
+        "@web/*": ["./src/*"]
+      },
+      "ignore": ["src/components/ui/**", "src/routeTree.gen.ts"]
+    },
+    "packages/core": {
+      "project": ["src/**/*.ts"]
+    }
+  }
 }
 ```
 
@@ -373,11 +453,22 @@ PORT=3000
 APP_URL=http://localhost:3000
 LOG_LEVEL=info
 
-# Database (file path inside the container volume)
+# Database (file path inside the container volume).
+# Host dev (`bun run dev`, outside compose): use DATABASE_PATH=./data/app.db and
+# S3_ENDPOINT=http://localhost:9000 — `/data` and `minio` exist only inside compose.
 DATABASE_PATH=/data/app.db
 
 # Auth
 BETTER_AUTH_SECRET=change-me-to-a-random-32-plus-character-string
+# Named identity provider only (6.3) — uncomment the recorded provider's lines
+# Google callback: <APP_URL>/auth/callback/google
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+# GOOGLE_WORKSPACE_DOMAIN=example.com
+# Microsoft callback: <APP_URL>/auth/callback/microsoft
+# MICROSOFT_CLIENT_ID=
+# MICROSOFT_CLIENT_SECRET=
+# MICROSOFT_TENANT_ID=
 
 # S3 (local: MinIO; prod: leave S3_ENDPOINT empty for AWS)
 S3_BUCKET=attachments
@@ -395,14 +486,14 @@ S3_FORCE_PATH_STYLE=true
 ### 5.0 `packages/core/src/app.ts` — name and version, in one place
 
 ```ts
-import { version } from "../../../package.json";
+import { name, version } from "../../../package.json";
 
-export const APP_NAME = "my-app";
+export const APP_NAME: string = name;
 export const APP_VERSION: string = version;
 ```
 
 Imported by the API (6.1, 6.2) and the web app (7.2) alike. It imports nothing but
-`package.json`, so it is safe in the browser bundle.
+`package.json`, so it is safe in the browser bundle, and renaming the project in 4.1 flows through.
 
 ### 5.1 `packages/core/src/env.ts`
 
@@ -428,6 +519,18 @@ export type Env = typeof env;
 ```
 
 Fail fast at boot. A bad env var should crash the container, not surface as a 500 an hour later.
+
+**Named identity provider only.** Absent unless the project records an approved provider; once
+added, the recorded provider's lines are required, so a missing secret crashes at boot:
+
+```ts
+  GOOGLE_CLIENT_ID: z.string(),
+  GOOGLE_CLIENT_SECRET: z.string(),
+  GOOGLE_WORKSPACE_DOMAIN: z.string(),   // only when sign-in is restricted to one Workspace domain
+  MICROSOFT_CLIENT_ID: z.string(),
+  MICROSOFT_CLIENT_SECRET: z.string(),
+  MICROSOFT_TENANT_ID: z.string(),       // the organization's tenant ID, not "common"
+```
 
 ### 5.2 `packages/core/src/db/schema.ts`
 
@@ -464,7 +567,8 @@ export const attachments = sqliteTable("attachments", {
 });
 ```
 
-Better Auth generates its own `user`, `session`, `account` and `verification` tables. Run
+`userId` is the owner column on every user-data table. Better Auth generates its own `user`,
+`session`, `account` and `verification` tables, including the `role` field from 6.3. Run
 `bunx @better-auth/cli generate` to emit them into the same schema file.
 
 ### 5.3 `packages/core/src/db/client.ts`
@@ -550,6 +654,51 @@ export function deleteObject(key: string) {
 
 One code path for AWS and MinIO. The only difference is `S3_ENDPOINT` and path style.
 
+### 5.5 `packages/core/src/access.ts` — the one access rule
+
+```ts
+type Action = "read" | "update" | "delete";
+
+// What each role may do to records it does not own. Use the roles the ConOps names.
+const ROLE_GRANTS: Record<string, readonly Action[]> = {
+  admin: ["read", "update", "delete"],
+  member: [],
+};
+
+export function can(user: { id: string; role: string }, action: Action, record: { userId: string }) {
+  if (record.userId === user.id) return true;               // owner
+  return ROLE_GRANTS[user.role]?.includes(action) ?? false;  // permitted role
+}
+```
+
+Every route that reads or changes a record calls `can()` (6.6); list queries apply the same rule
+in their `where` clause. Pure TS, so the web app may import it to hide controls — the server check
+is still the one that counts.
+
+### 5.6 `packages/core/src/events.ts` — in-process pub/sub
+
+```ts
+// A TanStack Query key to invalidate. Never record data: the client refetches through can().
+type ChangeEvent = { key: string[] };
+type Listener = (event: ChangeEvent) => void;
+
+const listeners = new Set<Listener>();
+
+export function subscribe(listener: Listener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function publish(event: ChangeEvent) {
+  for (const listener of listeners) listener(event);
+}
+```
+
+Fan-out is in memory, so it reaches only connections on this process. More than one container
+needs a shared bus (12).
+
 ---
 
 ## 6. API (Hono on Bun)
@@ -557,6 +706,7 @@ One code path for AWS and MinIO. The only difference is `S3_ENDPOINT` and path s
 ### 6.1 `apps/api/src/app.ts`
 
 ```ts
+import "./logger"; // keep first: the startup line (6.2) precedes auth and the database opening
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
@@ -566,11 +716,12 @@ import { auth } from "./auth";
 import { logger } from "./logger";
 import { conversations } from "./routes/conversations";
 import { messages } from "./routes/messages";
+import { events } from "./routes/events";
 import { attachments } from "./routes/attachments";
 import { APP_NAME, APP_VERSION } from "@core/app";
 import { env } from "@core/env";
 
-export type Variables = { userId: string };
+export type Variables = { userId: string; role: string };
 
 export function createApp() {
   const app = new Hono<{ Variables: Variables }>();
@@ -579,6 +730,7 @@ export function createApp() {
   app.use(secureHeaders());
   app.use("/api/*", cors({ origin: env.APP_URL, credentials: true }));
 
+  // Better Auth, mounted at its basePath "/auth" (6.3). Outside /api, so the session gate never sees it.
   app.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
 
   app.get("/healthz", (c) => c.json({ ok: true }));
@@ -590,10 +742,12 @@ export function createApp() {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
       if (!session) return c.json({ error: "unauthorized" }, 401);
       c.set("userId", session.user.id);
+      c.set("role", session.user.role ?? "member");
       await next();
     })
     .route("/conversations", conversations)
     .route("/messages", messages)
+    .route("/events", events)
     .route("/attachments", attachments);
 
   // Static SPA with history fallback (prod only; Vite serves in dev)
@@ -607,33 +761,47 @@ export type AppType = ReturnType<typeof createApp>["api"];
 ```
 
 `/healthz` and `/version` sit outside `/api`, so neither needs a session — the container
-healthcheck and the Version-exposure TOR both call them signed out.
+healthcheck and the Version-exposure TOR both call them signed out. The session middleware is
+registered on the `/api` base path only, so `/auth/*` (sign-in, sign-up, provider callbacks) is
+never gated.
 
 ### 6.2 `apps/api/src/logger.ts` and `apps/api/src/index.ts`
 
 ```ts
 // logger.ts — the one logger; hono-pino (6.1) reuses it for request logs
 import pino from "pino";
+import { APP_NAME, APP_VERSION } from "@core/app";
 import { env } from "@core/env";
 
-export const logger = pino({ level: env.LOG_LEVEL });
+export const logger = pino({
+  level: env.LOG_LEVEL,
+  redact: {
+    paths: [
+      "password", "token", "secret", "authorization", "cookie",
+      "*.password", "*.token", "*.secret", "*.authorization", "*.cookie",
+      "req.headers.authorization", "req.headers.cookie", 'res.headers["set-cookie"]',
+    ],
+    censor: "[redacted]",
+  },
+});
+
+// Emitted at module init. index.ts and app.ts import this module first, so nothing logs before it.
+logger.info(`${APP_NAME} v${APP_VERSION} starting`);
 ```
 
 ```ts
 // index.ts
+import "./logger"; // must stay the first import — see logger.ts
+import { env } from "@core/env";
 import { createApp } from "./app";
 import { logger } from "./logger";
-import { APP_NAME, APP_VERSION } from "@core/app";
-import { env } from "@core/env";
-
-logger.info(`${APP_NAME} v${APP_VERSION} starting`);   // the first log line the process emits
 
 const { app } = createApp();
 
 const server = Bun.serve({
   port: env.PORT,
   fetch: app.fetch,
-  idleTimeout: 120,          // long enough for SSE streams
+  idleTimeout: 120,          // seconds (max 255); SSE streams send a heartbeat every 15 s (6.7)
 });
 
 logger.info(`listening on http://localhost:${server.port}`);
@@ -643,25 +811,91 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
 }
 ```
 
-### 6.3 `apps/api/src/auth.ts`
+The bare `import "./logger"` is a side-effect import, which import sorting leaves in place.
+Pino writes one JSON object per line, so the first stdout line is:
+
+```json
+{"level":30,"time":1757923200000,"pid":1,"hostname":"…","msg":"my-app v0.1.0 starting"}
+```
+
+A test parses the first line and asserts `level === 30` and `msg === \`${name} v${version} starting\``.
+It is emitted at `info`, so `LOG_LEVEL=warn` or `error` suppresses it.
+
+### 6.3 `apps/api/src/db.ts` and `apps/api/src/auth.ts`
 
 ```ts
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
+// db.ts — the one database handle, shared by auth, routes and tests
 import { createDb } from "@core/db/client";
-import * as schema from "@core/db/schema";
-import { env } from "@core/env";
 
 export const { db } = createDb();
+```
+
+```ts
+// auth.ts
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import * as schema from "@core/db/schema";
+import { env } from "@core/env";
+import { db } from "./db";
 
 export const auth = betterAuth({
   baseURL: env.APP_URL,
+  basePath: "/auth",         // default is /api/auth; must match the mount (6.1) and the Vite proxy (4.4)
   secret: env.BETTER_AUTH_SECRET,
+  // Vite dev server sends Origin :5173 while APP_URL is :3000; trust it outside production only
+  trustedOrigins: process.env.NODE_ENV === "production" ? [] : ["http://localhost:5173"],
   database: drizzleAdapter(db, { provider: "sqlite", schema }),
   emailAndPassword: { enabled: true },
+  user: {
+    additionalFields: {
+      role: { type: "string", required: false, defaultValue: "member", input: false },
+    },
+  },
   session: { cookieCache: { enabled: true, maxAge: 300 } },
 });
 ```
+
+`input: false` stops a client from choosing its own role at sign-up. With the cookie cache, a role
+change reaches existing sessions within 5 minutes.
+
+The web client uses the same path:
+
+```ts
+// apps/web/src/auth-client.ts
+import { createAuthClient } from "better-auth/react";
+
+export const authClient = createAuthClient({ baseURL: `${window.location.origin}/auth` });
+```
+
+**Named identity provider — only when the project records a named, approved provider.** Add the
+recorded provider's block to `betterAuth({ … })`, and its lines to 5.1 and 4.8:
+
+```ts
+  socialProviders: {
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      hd: env.GOOGLE_WORKSPACE_DOMAIN,   // only when restricted to one Workspace domain
+    },
+    microsoft: {
+      clientId: env.MICROSOFT_CLIENT_ID,
+      clientSecret: env.MICROSOFT_CLIENT_SECRET,
+      tenantId: env.MICROSOFT_TENANT_ID,
+    },
+  },
+  account: { accountLinking: { enabled: true, trustedProviders: ["google", "microsoft"] } },
+```
+
+- **Callback URLs** to register with the provider: `<APP_URL>/auth/callback/google`,
+  `<APP_URL>/auth/callback/microsoft`. Sign-in starts with
+  `authClient.signIn.social({ provider: "google" })`.
+- **Google Workspace domain:** `hd` makes Better Auth require that hosted-domain claim. Still
+  enforce the domain in the access rule for anything the domain gates.
+- **Microsoft:** Entra omits the `email` claim for managed users unless the app registration adds it.
+- **Account linking** lets a provider sign-in attach to the existing email/password account for
+  the same address, so deferred SSO adds a method rather than new accounts.
+- **Tests never drive the real provider.** API and E2E tests sign in with email/password
+  (`signInForTest`, 9); the provider round-trip is verified manually against the real tenant.
 
 ### 6.4 `apps/api/src/routes/attachments.ts`
 
@@ -670,7 +904,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { db } from "../auth";
+import { db } from "../db";
 import { attachments as table } from "@core/db/schema";
 import { attachmentKey, presignUpload, presignDownload, objectExists, objectSize } from "@core/storage/s3";
 import type { Variables } from "../app";
@@ -727,7 +961,7 @@ export const attachments = new Hono<{ Variables: Variables }>()
   });
 ```
 
-### 6.5 `apps/api/src/routes/messages.ts` (SSE streaming)
+### 6.5 `apps/api/src/routes/messages.ts` (per-request SSE streaming)
 
 ```ts
 import { Hono } from "hono";
@@ -755,7 +989,62 @@ export const messages = new Hono<{ Variables: Variables }>()
   });
 ```
 
-Pass `c.req.raw.signal` into the model call so a closed tab cancels the upstream request.
+One request, one streamed response — for long output such as model tokens. Pass
+`c.req.raw.signal` into the model call so a closed tab cancels the upstream request. Omit this
+route when the product streams no long response; live updates use 6.7.
+
+### 6.6 `apps/api/src/routes/conversations.ts` (access rule in use)
+
+```ts
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { can } from "@core/access";
+import { conversations as table } from "@core/db/schema";
+import { publish } from "@core/events";
+import { db } from "../db";
+import type { Variables } from "../app";
+
+export const conversations = new Hono<{ Variables: Variables }>()
+  .patch("/:id", zValidator("json", z.object({ title: z.string().min(1).max(200) })), async (c) => {
+    const actor = { id: c.get("userId"), role: c.get("role") };
+    const row = await db.query.conversations.findFirst({ where: eq(table.id, c.req.param("id")) });
+    if (!row || !can(actor, "update", row)) return c.json({ error: "not found" }, 404); // 404: don't confirm it exists
+
+    await db.update(table).set({ title: c.req.valid("json").title }).where(eq(table.id, row.id));
+    publish({ key: ["conversations"] });   // live update for every open tab (6.7)
+    return c.json({ ok: true });
+  });
+```
+
+### 6.7 `apps/api/src/routes/events.ts` (broadcast SSE)
+
+```ts
+import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
+import { subscribe } from "@core/events";
+import type { Variables } from "../app";
+
+export const events = new Hono<{ Variables: Variables }>()
+  .get("/", (c) =>
+    streamSSE(c, async (stream) => {
+      const unsubscribe = subscribe((event) => {
+        void stream.writeSSE({ event: "change", data: JSON.stringify(event) });
+      });
+      stream.onAbort(unsubscribe);
+
+      while (!stream.aborted) {
+        await stream.writeSSE({ event: "ping", data: "" });   // heartbeat under the 120 s idleTimeout
+        await stream.sleep(15_000);
+      }
+      unsubscribe();
+    }),
+  );
+```
+
+Signed-in only (it sits under `/api`). Events carry query keys, never record data, so a
+subscriber learns only that something changed; the refetch goes through `can()`.
 
 ---
 
@@ -818,7 +1107,7 @@ export function useUploadAttachment() {
 }
 ```
 
-### 7.4 SSE consumption
+### 7.4 Per-request SSE consumption
 
 ```ts
 export async function* streamReply(body: unknown, signal: AbortSignal) {
@@ -847,6 +1136,38 @@ export async function* streamReply(body: unknown, signal: AbortSignal) {
 
 Use `fetch` rather than `EventSource` because the request is a POST with a body.
 
+### 7.5 `apps/web/src/queries/live-updates.ts` (broadcast consumption)
+
+```ts
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+
+export function useLiveUpdates() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    const source = new EventSource("/api/events"); // same origin, so the session cookie is sent
+    source.addEventListener("change", (e) => {
+      const { key } = JSON.parse(e.data) as { key: string[] };
+      void qc.invalidateQueries({ queryKey: key });
+    });
+    source.onopen = () => {
+      void qc.invalidateQueries(); // first connect and every reconnect: catch up on missed events
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void qc.invalidateQueries();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      source.close();
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [qc]);
+}
+```
+
+Call it once in the signed-in layout. `EventSource` reconnects on its own after a network drop;
+a 401 closes it for good, so it must not run while signed out.
+
 ---
 
 ## 8. Docker
@@ -873,6 +1194,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=build /app/package.json /app/bun.lock ./
+# Bun reads `paths` from tsconfig.json at runtime; without these, @core/* imports fail
+COPY --from=build /app/tsconfig.json /app/tsconfig.base.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
 COPY --from=build /app/apps/api ./apps/api
@@ -955,27 +1278,82 @@ presigning. The second option is cleaner and is what `presignUpload` should use.
 | Scope | Runner | Notes |
 |---|---|---|
 | `core` services | `bun test`, `DATABASE_PATH=:memory:` | Fresh in-memory DB per test file. |
-| API routes | `bun test` + `app.request()` | No port, no network. Inject a signed-in session cookie via a test helper. |
+| API routes | `bun test` + `app.request()` | No port, no network. Sign in with `signInForTest` (`tests/setup/auth.ts`). |
+| Access rule | `bun test` + `app.request()` | Owner allowed, non-owner 404, permitted role allowed — for every record route. |
+| Live updates | `bun test` on `events.ts`; E2E with two browser contexts | A change in one context appears in the other without a reload. |
 | S3 wrapper | `bun test` against MinIO from compose | Real client, real bucket. Skip with `test.skipIf(!process.env.MINIO_UP)` in CI without Docker. |
 | React components | `bun test` + happy-dom + Testing Library | Preloaded via `bunfig.toml`. |
-| E2E | Playwright against `docker compose up` | Exercises auth, upload, streaming and the served SPA. |
+| E2E | Playwright against `docker compose up` | Needs Docker running and a `.env` copied from `.env.example`. Exercises email/password auth, upload, streaming, live updates and the served SPA. |
+
+### `tests/setup/auth.ts` — email/password sign-in for tests
+
+```ts
+import { eq } from "drizzle-orm";
+import type { createApp } from "@api/app";
+import { db } from "@api/db";
+import { user } from "@core/db/schema";
+
+type App = ReturnType<typeof createApp>["app"];
+
+async function post(app: App, path: string, body: object) {
+  const res = await app.request(path, {
+    method: "POST",
+    // Origin must match APP_URL (tests/setup/env.ts) or Better Auth rejects the request
+    headers: { "Content-Type": "application/json", Origin: "http://localhost:3000" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  return res;
+}
+
+export async function signInForTest(app: App, role = "member") {
+  const email = `test-${crypto.randomUUID()}@example.com`;
+  const password = "test-password-123";
+  await post(app, "/auth/sign-up/email", { email, password, name: "Test User" });
+  await db.update(user).set({ role }).where(eq(user.email, email)); // before sign-in: cookie cache holds the role
+  const res = await post(app, "/auth/sign-in/email", { email, password });
+
+  const [row] = await db.select({ id: user.id }).from(user).where(eq(user.email, email));
+  if (!row) throw new Error("test user missing");
+  const cookie = res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+  return { cookie, userId: row.id };
+}
+```
+
+E2E signs in the same way — through the sign-in screen or `request.post("/auth/sign-in/email")` —
+never through a real identity provider.
 
 ### API test example
 
 ```ts
 import { test, expect, beforeAll } from "bun:test";
 import { createApp } from "@api/app";
+import { db } from "@api/db";
+import { conversations } from "@core/db/schema";
 import { signInForTest } from "../setup/auth";
 
 let app: ReturnType<typeof createApp>["app"];
-let cookie: string;
 
-beforeAll(async () => {
+beforeAll(() => {
   ({ app } = createApp());
-  cookie = await signInForTest(app);
+});
+
+test("only the owner can rename a conversation", async () => {
+  const owner = await signInForTest(app);
+  const other = await signInForTest(app);
+  await db.insert(conversations).values({ id: "c1", userId: owner.userId, title: "mine", createdAt: new Date() });
+
+  const rename = (cookie: string) => app.request("/api/conversations/c1", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", cookie },
+    body: JSON.stringify({ title: "renamed" }),
+  });
+  expect((await rename(other.cookie)).status).toBe(404);
+  expect((await rename(owner.cookie)).status).toBe(200);
 });
 
 test("requests an upload slot", async () => {
+  const { cookie } = await signInForTest(app);
   const res = await app.request("/api/attachments", {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie },
@@ -987,16 +1365,20 @@ test("requests an upload slot", async () => {
 });
 ```
 
-### Playwright config note
+### `playwright.config.ts`
 
 ```ts
-// playwright.config.ts
+import { defineConfig } from "@playwright/test";
+
 export default defineConfig({
   testDir: "tests/e2e",      // otherwise Playwright also collects the bun:test files
   webServer: { command: "docker compose up --build", url: "http://localhost:3000/healthz", timeout: 180_000, reuseExistingServer: true },
   use: { baseURL: "http://localhost:3000" },
 });
 ```
+
+`webServer` starts the compose stack, so Docker must be running and `.env` must exist
+(`cp .env.example .env`) — compose reads it through `env_file`.
 
 ---
 
@@ -1007,10 +1389,11 @@ cp .env.example .env
 bun install
 docker compose up -d minio minio-init   # local S3 only
 bun run dev                              # api on :3000 (--hot), web on :5173 with proxy
+bun run dev:api:pretty                   # api alone, human-readable logs
 bun run db:generate                      # after schema changes; commit drizzle/*.sql
 bun run check                            # typecheck + lint + deadcode + tests
 bun run compose:up                       # full stack as it runs in prod
-bun run test:e2e
+bun run test:e2e                         # needs Docker running and .env
 bunx shadcn@latest add button dialog
 ```
 
@@ -1023,12 +1406,15 @@ Each of these is already handled by the configuration above.
 | Consideration | What happens | Applied fix |
 |---|---|---|
 | Env misconfiguration | Missing secret or bucket surfaces as a runtime 500. | Zod-validated `env.ts` crashes at boot (5.1). |
-| Version not observable | Nobody can tell which build is deployed. | `package.json#version` read once (5.0), served at `/version` (6.1), in the footer (7.2), on the first log line (6.2). |
+| Version not observable | Nobody can tell which build is deployed. | `package.json#name`/`#version` read once (5.0), served at `/version` (6.1), in the footer (7.2), on the first log line (6.2). |
+| Startup line not first | Auth or database init logs before the version line. | `logger.ts` emits it at module init and is the first import of `index.ts` and `app.ts` (6.1, 6.2). |
+| Secrets in logs | Passwords, tokens or cookies written to stdout. | Pino `redact` on known-sensitive keys and headers (6.2). |
 | Test runners collecting each other's files | `bun test` loads Playwright specs; Playwright loads `bun:test` files. | `check` calls `bun run test` (4.1); Playwright `testDir: "tests/e2e"` (9). |
+| Path aliases fail in the container | `@core/*` imports cannot resolve at runtime. | Both tsconfig files copied into the runtime image (4.3, 8.1). |
 | SQLite on an ephemeral filesystem | Data lost on redeploy. | `/data` declared as a volume; mount persistent storage in prod (8.1). |
 | SQLite write contention | `SQLITE_BUSY` under concurrent writes. | WAL + `busy_timeout = 5000` (5.3). Single process keeps this rare. |
 | Foreign keys off | Cascades silently no-op. | `foreign_keys = ON` on every connection (5.3). |
-| No backup story | Volume corruption or host loss destroys everything. | Litestream sidecar or scheduled `.backup` to the S3 bucket (2). |
+| No backup story | Volume corruption or host loss destroys everything. | Litestream or scheduled `.backup` to the bucket; `sqlite3 .backup` to a backup volume when Object storage is N/A (2, 2.1). |
 | Bulk uploads through the app | Server memory and bandwidth become the bottleneck. | Presigned PUT/GET, server handles metadata only (5.4, 6.4). |
 | Trusting client-reported size | Client lies about `size`, quota bypass. | `complete` step verifies with `s3.stat` (6.4). |
 | Orphaned S3 objects | Client gets a slot but never PUTs. | `status: pending` rows; a cron deletes pending rows and objects older than 24 h. |
@@ -1036,15 +1422,18 @@ Each of these is already handled by the configuration above.
 | Missing CORS on bucket | Browser PUT to S3 blocked. | `mc admin config set ... cors_allow_origin` locally; bucket CORS rule in AWS (8.2). |
 | Unsafe object keys | Path traversal or collisions from user filenames. | Sanitized key under `users/<id>/attachments/<uuid>/` (5.4). |
 | Content type allowlist | Executable or HTML uploads served from your origin. | Zod enum of allowed MIME types; bucket is private (6.4). |
-| SSE dropped by idle timeout | Long generations cut off mid-stream. | `idleTimeout: 120` on `Bun.serve`; send a heartbeat comment every 15 s for longer streams (6.2). |
+| SSE dropped by idle timeout | Streams cut off after 120 s of silence. | `idleTimeout: 120` on `Bun.serve` (6.2); `ping` event every 15 s on the broadcast stream (6.7); per-request streams with long gaps send the same. |
 | Abandoned streams waste model calls | Closed tab keeps upstream generation running. | Propagate `c.req.raw.signal` (6.5). |
+| Live updates on one process | Fan-out is in memory; a second container's clients miss events. | Single container by design (1); shared bus in the Growth Path (12). |
 | SPA deep links 404 | Refresh on `/c/123` hits Hono, not React. | `serveStatic` fallback to `index.html` after API routes (6.1). |
 | Server code leaking to browser | Importing `AppType` pulls in Hono routes. | `import type` only in `api.ts`; Vite tree-shakes types (7.1). |
+| Auth path mismatch | Better Auth defaults to `/api/auth`; the mount and proxy use `/auth`. | `basePath: "/auth"` (6.3) matches the mount (6.1), proxy (4.4) and client. |
+| Access rule bypass | A route returns or changes a record for anyone signed in. | Every record route calls `can()`; non-owners get 404 (5.5, 6.6, 9). |
 | Auth tables drift | Better Auth schema out of sync with Drizzle. | Regenerate with the Better Auth CLI, then `drizzle-kit generate` (5.2). |
 | Session cookie cross-origin in dev | Vite on 5173, API on 3000. | Vite proxy for `/api` and `/auth` so cookies are same-origin (4.4). |
 | Container runs as root | Larger blast radius on compromise. | `USER bun`, `/data` chowned (8.1). |
 | Docker build cache misses | Every code change reinstalls deps. | Lockfile and workspace manifests copied before source (8.1). |
-| Logs unreadable locally | JSON logs in a terminal. | `bun run dev:api | bunx pino-pretty` for local use. |
+| Logs unreadable locally | JSON logs in a terminal. | `bun run dev:api:pretty` (4.1). |
 | Lint noise from generated files | shadcn and route tree churn. | Excluded in Biome and Knip (4.5, 4.6). |
 
 ---
@@ -1056,6 +1445,7 @@ When a single container stops being enough, change one layer at a time:
 | Trigger | Change | Effort |
 |---|---|---|
 | Need horizontal scaling or zero-downtime deploys | Swap `bun:sqlite` for Postgres via `drizzle-orm/bun-sql` (Bun's native Postgres client). Schema stays; regenerate migrations. | Medium |
+| Live updates across more than one container | Back `events.ts` with a shared bus (Postgres `LISTEN/NOTIFY` or Redis pub/sub); keep the `subscribe`/`publish` signatures. | Small |
 | Attachment processing (thumbnails, PDF text) | Add a Bun worker process or a queue table polled by a second container. | Small |
 | Multiple regions | Move to R2 or Tigris for storage; Postgres with a managed provider. | Medium |
 | Realtime beyond SSE | `Bun.serve` WebSocket support with Hono's `upgradeWebSocket`. | Small |

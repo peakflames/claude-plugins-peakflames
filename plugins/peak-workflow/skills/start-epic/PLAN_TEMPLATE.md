@@ -187,7 +187,10 @@ Middle step example:
      Judge each hit: a marker describing incomplete TOR behavior is a deferral-gate trigger for
      that TOR, unless the TOR already has a Deferrals row (a hit inside a `Deferred:` xfail
      reason is expected and not a trigger).
-     Legitimate uses (e.g., argparse `placeholder`/`metavar`) are not triggers.
+     Legitimate uses (e.g., argparse `placeholder`/`metavar`, test doubles for hardware or a
+     native dialog under the test directories) are not triggers.
+  - Walking-skeleton epic only: `grep -n 'TBD — set by the walking-skeleton epic' CLAUDE.md` must
+     return nothing. Each hit is a value this epic owns resolving — resolve it before reporting.
 
   **Any TOR reported FAIL or CANNOT VERIFY here that has no Deferrals row fires the deferral
   gate** before the handoff is written — the self-assessment and the Deferrals section must

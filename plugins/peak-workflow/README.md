@@ -167,7 +167,7 @@ Anything nothing can decide yet is written `TBD — set by the walking-skeleton 
 skeleton resolves it.
 
 **The sheet is chosen by product shape, not project type.** Before reading any sheet, `/setup`
-asks five questions in plain language — does the information need to follow the person to another
+asks up to five questions in plain language — does the information need to follow the person to another
 device, does anyone sign in, do people attach files, does anything update on its own, does the
 product hold a secret of its own. A Web app answering "no" to all five is a static SPA and gets
 that sheet; any "yes" gets the web-app sheet. The answers are recorded in `CLAUDE.md`, and rows

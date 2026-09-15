@@ -8,7 +8,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [1.11.0] — 2026-09-15
 
-Product shape, not project type, chooses the stack: five plain-language questions route a web
+Product shape, not project type, chooses the stack: plain-language questions route a web
 project to a new browser-only sheet or the existing server sheet, and discovery re-checks the
 answer. `setup` now asks only what a non-technical user can answer and defaults the rest.
 
@@ -54,10 +54,35 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
   exists; `plan-project` makes the skeleton resolve every one in `CLAUDE.md`.
 - **Web sheet Streaming, Config, Secrets, and Versioning rows** — shape answers Q4 and Q5 now have
   a row to mark `N/A`, and the skeleton checklist covers config and secrets.
+- **Named identity providers in the web sheet** — Google and Microsoft config, env vars, callback
+  URLs, a role field, and a single `can()` access rule; tests sign in via a defined email/password helper.
+- **Live broadcast streaming** — web sheet adds `GET /api/events` with in-process fan-out, heartbeat,
+  and an `EventSource` hook, alongside the per-request token stream.
+- **Hardware-in-the-loop verification** — Embedded skeletons build a `tests/hil/` serial harness;
+  `start-epic` and `wrapup-epic` stop for a missing board and record `operator-observed` evidence.
+- **Safety baseline** — `discover` asks what must never happen for equipment-controlling products;
+  `capture-requirements` writes `# Safety` TORs; `plan-project` ships each with the first epic driving
+  that output.
+- **Walking-skeleton TBD gate** — `PLAN_TEMPLATE` and `wrapup-epic` fail the skeleton while
+  `TBD — set by the walking-skeleton epic` remains in `CLAUDE.md`.
+- **Desktop Auto-update row and target OS** — updater is its own droppable row (`N/A` offline);
+  `electron-builder.yml` blocks are per target OS with Windows NSIS and signing notes.
 - **`plan-project` places deferred-decision epics** — it now reads `design-notes.md` and creates an
   epic in the last phase for each deferred decision, which TOR clustering could never produce.
 
 ### Changed
+
+- **Sign-in always carries an access rule** — every sign-in "yes", named provider or deferred,
+  records `**Access rule:** owner-or-permitted-role`, which now drives access TORs, skeleton owner
+  columns and roles, Security Baseline reminders, and wrapup's access-control gate.
+- **Sign-in vs attribution** — setup asks whether people need separate accounts or just a name on
+  each record; a shared offline PC with typed initials no longer routes to a server.
+- **Shape questions by project type** — Service or API gets questions 2–4 phrased for callers;
+  Desktop gets 1–3 plus internet access (Q6) and a target-OS field; unasked answers are recorded.
+- **Existing code is extended, never re-scaffolded** — `new-project`, `setup`, and `plan-project`
+  detect build manifests; the skeleton adds missing layers to the existing project and ignores sheets.
+- **Housekeeping folds into the one confirmation** — `.gitignore` entries, add-on skills, repo stubs,
+  and the first commit no longer ask separately; per-type confirmation examples added.
 
 - **Sheet paths are plugin-relative** — `setup`, `plan-project`, and the references index now
   address sheets as `${CLAUDE_PLUGIN_ROOT}/references/<sheet>.md` instead of a repository path
@@ -73,6 +98,18 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
   sections that fit their shape instead of permanently empty server sections.
 
 ### Fixed
+
+- **Web sheet older bugs** — root `tsconfig.json` defined and copied into the image; Better Auth
+  `basePath` matches the `/auth` mount; Vite dev origin trusted outside production; host-dev env
+  values documented; `APP_NAME` read from `package.json`.
+- **Section 4 copied verbatim re-added dropped layers** — web and desktop sheets gain a Section 2.1
+  "Dropping a layer" table that `plan-project` applies for every `N/A` row.
+- **Desktop E2E ran a stale or missing build** — `test:e2e` builds first; Playwright config scoped to
+  `tests/e2e`; test fault switch gated on `app.isPackaged`, not "production builds".
+- **Logging default leaked the Bun sheet into other stacks** — the toolchain table gains a Logging
+  column; a sheet's logger path is written only when the sheet was taken.
+- **Mechanical fixes** — unclosed fence in the shape block, stale `e2e/` paths, the
+  `start-epic` Security Baseline claim, `appsettings` never-commit example, .NET lockfile guidance.
 
 - **Dry-run fixes across the new paths** — the static sheet gained the `index.html`, `index.css`,
   `app-footer.tsx`, `APP_NAME` and fault-injection files it referenced but never defined; `check`

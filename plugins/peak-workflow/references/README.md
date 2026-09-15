@@ -1,6 +1,6 @@
 # Reference Stacks
 
-Reference sheets for the two application shapes peak-workflow builds most often. For a **new**
+Reference sheets for the three application shapes peak-workflow builds most often. For a **new**
 project they are the recommended stack `/setup` offers and the blueprint `/plan-project` builds
 from. For an **existing** project they are reference material only — never a migration mandate.
 
@@ -21,8 +21,9 @@ answers against the ConOps scenarios once the product is described (its Step 4.5
 
 ## What these are for
 
-1. **The recommended stack for a new project.** These sheets *are* the recommendation — no
-   condensed default list exists anywhere else in the plugin. When `/peak-workflow:setup` gets
+1. **The recommended stack for a new project.** These sheets *are* the recommendation for the shapes
+   they cover — no copy of their picks exists anywhere else in the plugin (`setup`'s toolchain
+   table covers only stacks no sheet does). When `/peak-workflow:setup` gets
    a thin Tech Stack answer ("whatever you recommend"), it reads the matching sheet's
    **Section 2 Stack Summary** and offers those picks; the user accepts the sheet wholesale or
    overrides individual layers, and what they accept is recorded in `CLAUDE.md`. When
@@ -57,7 +58,8 @@ them. Specifically:
 
 The sheets are the single source of truth for the picks, the repository layout, and the script
 names (`dev`, `build`, `typecheck`, `lint`, `deadcode`, `test`, `test:e2e`, `check`; plus
-`package` on the desktop sheet and `preview` / `lint:fix` on the static sheet).
+`package` on the desktop sheet, `preview` on the static sheet, and `lint:fix` on the static and
+web sheets).
 `setup` and `plan-project` quote those script names in their quality-gate and verification
 defaults, so a change to a sheet's `package.json` section means updating the matching lines in
 `skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit. `check` always calls
@@ -66,6 +68,12 @@ defaults, so a change to a sheet's `package.json` section means updating the mat
 `setup` maps shape answers onto named Stack Summary rows (on the web sheet: Auth, Object storage,
 Local S3, Streaming, Secrets). Renaming or merging one of those rows means updating that mapping
 in `skills/setup/SKILL.md` in the same commit — otherwise an `N/A` has nowhere to land.
+
+Each server-bearing sheet (web, desktop) has a **2.1 Dropping a layer** table directly after its
+Stack Summary. It lists, per droppable row, the tree entries, config lines, env vars, routes,
+services, tests, commands and Additional Considerations rows to omit. `plan-project` applies it for
+every `N/A` row while writing Sections 3–4 verbatim, so a dropped layer is not re-added. Adding a
+file or env var tied to a droppable layer means adding it to that table in the same commit.
 
 A sheet must also be able to satisfy the baseline TORs `setup` derives from it. Every sheet's
 Section 4 `package.json` carries a `version` field, and the sheet shows where that version is
