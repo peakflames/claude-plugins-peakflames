@@ -249,7 +249,8 @@ When `screens_present = true`, Givens and Whens name screens and controls exactl
 inventory does — `the Orders List (S-01)`, `the "Save" button` — never a paraphrase, so the
 wireframe, the ConOps step, and the TOR agree on one name. Each data-bearing screen's empty
 and error states (from the inventory's `## States`) are explicit negative-path requirements,
-one TOR each, asserting the visible text and the call-to-action or retry control.
+one TOR each, asserting the visible text and the call-to-action or retry control — except the
+reference screen(s), whose empty and error states are already the 3A.2.2 Screen states TORs.
 
 ### 3A.2.1: Baseline Tool Hygiene TORs
 
@@ -333,8 +334,10 @@ TOR (an `N/A` Desktop conventions bullet yields no TOR).
 Place baseline UX TORs in the **first feature file**, immediately after the tool-hygiene
 block, under a `# UX Baseline` section banner (`# ---` comment block per
 `FEATURE_TEMPLATE.md`) followed by a `# Note: reference screen — <screen>` line naming the
-one screen every Given below is anchored on (with its `S-NN` when `screens_present = true`:
-`# Note: reference screen — Orders List (S-01)`). If the user asked for a dedicated file at
+screen every Given below is anchored on (with its `S-NN` when `screens_present = true`:
+`# Note: reference screen — Orders List (S-01)`). When the inventory gives that screen's create
+form its own `S-NN`, the note cites both — `# Note: reference screens — Orders List (S-01),
+Order Form (S-02)` — and every Given names one of them. If the user asked for a dedicated file at
 the 3A.1b grouping gate, write them to `docs/requirements/NN-ux-baseline.feature.md` instead.
 Baseline UX TORs precede domain TORs, exactly like the tool-hygiene TORs.
 
@@ -343,10 +346,12 @@ Baseline UX TORs are **black-box and Playwright-observable**: assert on roles, v
 component internals. Anchor every baseline UX TOR's Given on **one reference screen**: the
 thinnest entity list in ConOps Scenario 1, with its create form and its delete action (the
 Application menu / Window stands in for Desktop conventions). When `screens_present = true`,
-that is Scenario 1's thinnest screen in `ux/screens.md` — cite its `S-NN` in the `# Note:`
-line; `/plan-project` reads the ID to pick the skeleton's screen. That is the screen the
-walking skeleton in `/plan-project` builds — Givens that name several screens make it build
-all of them. Error-state and Progress feedback Givens cite the skeleton's test-only fault / latency
+that is Scenario 1's thinnest list screen in `ux/screens.md` — cite its `S-NN` in the `# Note:`
+line. `mockup` 3.1 makes a create form with its own actions a separate screen; when the
+inventory did that, the form screen is the second reference screen — cite it in the same note
+so the Forms TOR has a home, and name no third screen. `/plan-project` reads the IDs to pick the
+skeleton's screens. Those are the screens the walking skeleton in `/plan-project` builds —
+Givens that name any other screen make it build that one too. Error-state and Progress feedback Givens cite the skeleton's test-only fault / latency
 switch rather than a real failure or slow operation (`Given the test fault switch forces the
 data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).
 For a desktop app, the same assertions run through the project's Playwright Electron harness
@@ -381,31 +386,31 @@ Error-message wording is covered by the Tool Hygiene **Error message standard** 
 For each baseline UX TOR, write a concrete, observable Given/When/Then. Examples:
 
 ```gherkin
-# Note: reference screen — the Projects screen (project list, Create project form, Delete project)
+# Note: reference screens — Projects List (S-01), Project Form (S-02)
 
 Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit empty state when a list screen has no items
     Given the user is authenticated and owns zero projects
-    When the user navigates to the Projects screen
+    When the user navigates to the Projects List (S-01)
     Then the main content region should contain visible text "No projects yet"
     And the main content region should contain a "Create project" button
     And no element with role "progressbar" should be visible
 
 Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit error state when a data-bearing screen fails to load
     Given the test fault switch forces the data source to fail
-    When the user navigates to the Projects screen
+    When the user navigates to the Projects List (S-01)
     Then the main content region should contain visible text "Could not load projects"
     And the main content region should contain a "Retry" button
 
 Scenario: [TOR-01-{XXXXXXX}] The application shall identify an invalid form field in text that names the problem and the correction
-    Given the Create project form is open on the Projects screen
-    When the user leaves the Name field empty and activates the Create button
+    Given the Project Form (S-02) is open
+    When the user leaves the Name field empty and activates the "Create" button
     Then the Name field should have aria-invalid="true"
     And an element referenced by the Name field's aria-describedby should contain text "Enter a project name"
     And focus should be on the Name field
 
 Scenario: [TOR-01-{XXXXXXX}] The application shall require confirmation before deleting a record, with Cancel as the safe default
-    Given the Projects screen lists a project named "Q3 Report"
-    When the user activates the Delete action for "Q3 Report"
+    Given the Projects List (S-01) lists a project named "Q3 Report"
+    When the user activates the "Delete…" menu item for "Q3 Report"
     Then a dialog with role "dialog" and aria-modal="true" should be visible containing the text "Delete Q3 Report?"
     And document.activeElement should be the Cancel button
     When the user presses Escape
@@ -604,10 +609,13 @@ internal scratch.
   each as `CLAUDE.md UX Baseline: {line label}` (e.g., `CLAUDE.md UX Baseline: Screen states`,
   `CLAUDE.md UX Baseline: Desktop conventions — single instance`). Each must map to at least
   one baseline UX TOR generated in Step 3A.2.2. **Design system** is not a row.
-- **Every screen state and primary action in `ux/screens.md`, if `screens_present = true`.**
-  Cite each as `UX screens: S-NN <state|control text>` (e.g., `UX screens: S-01 empty`,
-  `UX screens: S-02 "Save" button`). The Application menu and Window rows trace through the
-  Desktop conventions rows above, not here.
+- **Every data-bearing screen's empty and error states, and every primary action, in
+  `ux/screens.md`, if `screens_present = true`.** Cite each as
+  `UX screens: S-NN <state|control text>` (e.g., `UX screens: S-01 empty`,
+  `UX screens: S-02 "Save" button`). A screen's loading and populated rows are not inputs of
+  their own — they map to the 3A.2.2 Screen states TOR and to the domain TOR that renders the
+  screen. The Application menu and Window rows trace through the Desktop conventions rows
+  above, not here.
 
 **Rules:**
 - An input may map to multiple TOR IDs — list all.

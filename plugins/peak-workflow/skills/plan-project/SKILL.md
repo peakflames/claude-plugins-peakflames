@@ -110,10 +110,12 @@ skeleton must:
   passes every baseline UX TOR. It is the pattern every later screen copies. The reference
   screen is the screen the baseline UX TORs name (the `# Note: reference screen` line under
   the `# UX Baseline` banner — the thinnest entity list from ConOps Scenario 1 with its create
-  form and its delete; when `screens_present = true`, the `S-NN` that note names, listed in
-  the skeleton spec's `## Screens` section); that is the minimum surface the Forms,
+  form and its delete; when `screens_present = true`, every `S-NN` that note names — the list
+  screen and, when `mockup` made the create form its own screen, that form screen too — each
+  listed in the skeleton spec's `## Screens` section); that is the minimum surface the Forms,
   Destructive actions, and Progress feedback TORs need; a file-dialog TOR needs one Export
-  action on it. "No domain logic" means no business rules, not no data.
+  action on it. The screens the note names are skeleton-owned: a later slice that extends one
+  of them does not re-list it. "No domain logic" means no business rules, not no data.
 - Ship a **test-only fault / latency injection switch**: an environment variable read at
   startup, honored by the E2E harness, ignored in production builds. The error-state and
   Progress feedback TORs cite it in their Givens — a local SQLite app has nothing else to
@@ -140,7 +142,8 @@ Cluster the remaining TOR IDs by **what a user can do once the slice ships**. Th
 is the ConOps scenario / vision goal each TOR traces to — already loaded from the tracing
 sidecars in Step 1 item 5 — not the subsystem the TOR touches. When `screens_present = true`,
 the per-scenario flows in `ux/screens.md` are a second clustering signal: the screens a flow
-walks through belong to the slice that ships that scenario, and the TORs that name those
+walks through belong to the slice that ships that scenario (except the reference screens the
+`# Note:` line names — those stay with the skeleton, 3A.1), and the TORs that name those
 screens (`S-NN` in their Given/When) travel with them.
 
 - **Seed:** one slice per feature file. Feature files are functional areas and are already
@@ -292,7 +295,8 @@ tool, library) write `single-process` for every epic; the vertical check does no
 
 The "Screens" column appears only when `screens_present = true` — omit it otherwise. List the
 `S-NN` IDs the epic delivers, or `—` for an epic with no screen. Every screen in `ux/screens.md`
-appears in exactly one row (the Application menu and Window rows go to the skeleton).
+appears in exactly one row (the Application menu and Window rows go to the skeleton; `mockup`
+draws no wireframe for them).
 
 ### Dependency Graph
 
@@ -379,7 +383,7 @@ skeleton's app shell and design system — no new component library, no new toke
 
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise.
-- Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns the reference screen; a slice owns the screens its TORs name. Copy the name and wireframe path verbatim from `ux/screens.md`; a screen marked `n/a — not data-bearing` lists `populated` only. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
+- Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it. Copy the name and wireframe path verbatim from `ux/screens.md`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) write `—` in the Wireframe column — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
 
 **Populating Requirements Anchors:**
 

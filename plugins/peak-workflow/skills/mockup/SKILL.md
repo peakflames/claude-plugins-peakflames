@@ -126,17 +126,25 @@ substring match), list the available titles and ask the user to pick one via `As
 
 ## Step 2: Detect Greenfield vs Brownfield
 
+First, in either mode, list the unprocessed discovery changelogs:
+```bash
+ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null | grep -v '\.processed$'
+```
+If two or more are listed, stop before drafting anything — Step 7 could write the UX delta to
+neither. Print the same message `/peak-workflow:capture-requirements` 3B.1 uses:
+> Found {N} unprocessed discovery changelogs:
+> {list filenames}
+>
+> Please reconcile — delete superseded ones or merge their "New Capabilities" sections into a
+> single file, then re-run.
+
 **Greenfield** = `ux/screens.md` does not exist or has zero screen rows. All scenarios in scope
 are processed from scratch (or only the scenario named in `$ARGUMENTS`).
 
 **Brownfield** = `ux/screens.md` exists with at least one screen row. Existing screens are the
 baseline; this run only **adds or changes** screens for the scenarios named in `$ARGUMENTS` or
-in an unprocessed discovery changelog:
-```bash
-ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null | grep -v '\.processed$'
-```
-Read the changelog **read-only** — do not archive or rename it; `/peak-workflow:capture-requirements`
-does that. Its "What Changed" rows for `concept-of-operations.md` Section 5 identify the
+in the unprocessed discovery changelog listed above. Read the changelog **read-only** — do not
+archive or rename it; `/peak-workflow:capture-requirements` does that. Its "What Changed" rows for `concept-of-operations.md` Section 5 identify the
 scenarios in scope. If `$ARGUMENTS` is empty and no unprocessed changelog exists, diff the
 ConOps against the last commit that touched `ux/screens.md`:
 ```bash
@@ -358,11 +366,17 @@ concrete.
    **Screens:** S-01 Orders List, S-02 Order Form, S-03 Order Detail
    ```
 3. **Update the header:** bump the ConOps **Document Version** by a minor increment (1.0 → 1.1)
-   and set **Date** to today.
+   and set **Date** to today. Also set the `**Companion:**` line in `ux/screens.md` to the bumped
+   ConOps version — Step 4.3 wrote it before the bump.
 4. Do not touch Sections 1–4 or 6–9, and do not rewrite scenarios out of scope.
-5. **Discovery changelog** (brownfield, or greenfield when `feature_files_exist = true` — the
-   capture-requirements brownfield path needs the delta either way):
-   - If exactly one unprocessed discovery changelog exists (Step 2), append this section to it:
+5. **Discovery changelog** — write one only when `feature_files_exist = true` (Step 2), in
+   either mode. Otherwise the coming `/peak-workflow:capture-requirements` run is greenfield and
+   would never consume it, and the stale file would later trip the two-unprocessed-changelogs
+   stop — write no changelog. When it applies:
+   - If exactly one unprocessed discovery changelog exists (Step 2 already stopped on two or
+     more), append this section to it. If the changelog already has a `## UX Changes` section
+     (a second run on the same `docs/` branch), replace that section in place rather than
+     appending a second one:
      ```markdown
      ## UX Changes
 
@@ -393,9 +407,6 @@ concrete.
 
      None — UX concretization only.
      ```
-   - If two or more unprocessed changelogs exist, append to none of them; tell the user to
-     reconcile before running `/peak-workflow:capture-requirements`.
-   - Greenfield with no feature files: write no changelog.
 
 ---
 
@@ -416,13 +427,19 @@ Before the self-check, verify:
 - [ ] Desktop apps: `ux/screens.md` has the Application menu and Window rows; every wireframe
   has the menu-bar strip.
 - [ ] No color names, hex values other than grays, `font-family` other than the system stack,
-  images, or external URLs anywhere in `ux/`:
+  images, or external URLs anywhere in `ux/`. Run the hex test against each file's `<style>`
+  block only — dialog copy such as `Delete order #0412?` would otherwise match — and the other
+  checks file-wide:
   ```bash
-  grep -rnoiE 'font-family:[^;]*|#[0-9a-f]{3,6}\b|url\(|<img|<link|https?://' docs/product-vision-planning/ux/wireframes/ | grep -viE 'system-ui|#(fff|f2f2f2|e5e5e5|999|777|222)\b'
+  for f in docs/product-vision-planning/ux/wireframes/*.html; do
+    sed -n '/<style>/,/<\/style>/p' "$f" | grep -oiE '#[0-9a-f]{3,6}\b' | grep -viE '^#(fff|f2f2f2|e5e5e5|999|777|222)$' | sed "s|^|$f: |"
+  done
+  grep -rnoiE 'font-family:[^;]*|url\(|<img|<link|https?://' docs/product-vision-planning/ux/wireframes/ | grep -viE 'system-ui'
   ```
   Any output is a violation — fix it.
 - [ ] `ux/screens.md` mermaid blocks parse (node handles have no hyphens; every edge has a label).
-- [ ] ConOps Document Version and Date were bumped; every rewritten step names a screen ID.
+- [ ] ConOps Document Version and Date were bumped, `ux/screens.md`'s `**Companion:**` line cites
+  the bumped version, and every rewritten step names a screen ID.
 - [ ] Brownfield: no existing `S-NN` ID was renumbered or reassigned.
 
 Fix every failure in place before continuing.
@@ -473,7 +490,7 @@ internal scratch.
 - `docs/product-vision-planning/ux/wireframes/S-NN-<name>.html` — [one line per file written]
 - `docs/product-vision-planning/ux/README.md` — [Created / unchanged]
 - `docs/product-vision-planning/concept-of-operations.md` — Section 5 steps concretized, v{N.N}
-[Brownfield only:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` — [UX Changes appended / created]
+[Only when `feature_files_exist = true`:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` — [UX Changes appended / replaced / created]
 
 ### By the Numbers
 - Screens: {N} ({M} new, {K} modified) [desktop: + Application menu and Window rows]

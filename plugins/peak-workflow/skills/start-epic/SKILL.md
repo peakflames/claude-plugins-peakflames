@@ -59,7 +59,9 @@ Follow these steps exactly:
 4c. **Load Screens (UI epics only).** If the spec has a `## Screens` section, open each listed
     wireframe file (`docs/product-vision-planning/ux/wireframes/S-NN-*.html`, written by
     `/peak-workflow:mockup`) and carry its regions (the `data-component` values), its control
-    texts, and its four `section.state` blocks into the Step 4 middle steps. The wireframe is
+    texts, and its four `section.state` blocks into the Step 4 middle steps. Skip rows whose
+    Wireframe is `—` (the Application menu and Window rows — their contract is the
+    `ux/screens.md` row and the Desktop conventions TORs). The wireframe is
     the **layout contract** — what is on the screen and what it is called; the TOR
     Given/When/Then is the **behavior contract**. Where they disagree, the TOR wins and the
     middle step says so. If the section is absent, skip this item without comment.
