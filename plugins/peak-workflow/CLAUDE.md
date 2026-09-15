@@ -16,6 +16,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 | `new-project` | Front-door router — detects project state and dispatches to the right entry point |
 | `setup` | Audit CLAUDE.md, stub architecture/design-notes docs (run once before discover) |
 | `discover` | Adaptive interview → product-vision.md + concept-of-operations.md |
+| `mockup` | UI projects only — screen inventory (`S-NN`), per-scenario flows, grayscale wireframes; concretizes ConOps steps |
 | `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json |
 | `plan-project` | Derive epics from TOR IDs → phase indexes + epic specs + sidecars |
 | `add` | Add new epic(s) referencing existing TOR IDs |
@@ -41,7 +42,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 **Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic) and an optional `waived: TOR-… → <succ>` line written by wrapup
 
 **Branch families:**
-- `docs/{task-short-name}` — full planning sequence (discover → capture-requirements → plan-project)
+- `docs/{task-short-name}` — full planning sequence (discover → mockup [UI] → capture-requirements → plan-project)
 - `feature/epic-<id>-<short-name>` — implementation
 - `hotfix/<slug>` — quick-fix
 
@@ -63,6 +64,12 @@ walking-skeleton epic in `plan-project`; the skeleton installs the declared desi
 screen. `wrapup-epic` re-checks every UX Baseline line on each UI epic as a quality gate. The
 bold line labels in the UX Baseline template are cited verbatim by downstream skills — do not
 rename them.
+
+**Mockups are planning artifacts:** `mockup` writes `docs/product-vision-planning/ux/` (screens.md
+with stable, append-only `S-NN` IDs; grayscale `wireframes/*.html`) and rewrites ConOps Section 5
+steps to name screens and controls. Screen IDs are referenced by ConOps steps, TOR Given/When/Then,
+and epic `## Screens` tables — never renumbered. Wireframes carry no colors or typefaces; visual
+design lands in the walking-skeleton epic. `mockup` never invokes `frontend-design`.
 
 **Companion skills:** `setup` recommends `frontend-design@claude-plugins-official` for UI
 projects and `playwright-cli` for web UIs (desktop apps verify through a Playwright Electron

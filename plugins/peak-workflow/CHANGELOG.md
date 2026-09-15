@@ -6,6 +6,45 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.9.0] — 2026-09-15
+
+Low-fidelity UX prototyping between discovery and requirements capture, so TORs for web and
+desktop apps are derived against named screens, controls, and states.
+
+### Added
+
+- **`/mockup` skill** — new step between `/discover` and `/capture-requirements` for Web app,
+  Desktop app, and UI-Hybrid projects; stops with a message on CLI / Library / Service projects.
+- **Screen inventory** — writes `docs/product-vision-planning/ux/screens.md` with stable `S-NN`
+  IDs, named controls, the four screen states, ConOps step refs, and one mermaid flow per
+  scenario with explicit error and empty branches.
+- **Grayscale wireframes** — one self-contained HTML file per screen under `ux/wireframes/`,
+  with a four-state switcher, `data-component` tags naming the shadcn/ui primitive per region,
+  a desktop menu-bar strip, and a visible keyboard-focus outline. No colors, typefaces, or
+  external resources.
+- **ConOps feedback loop** — rewrites Section 5 steps to name each screen (`S-NN`) and exact
+  control text, adds a `**Screens:**` line per scenario, and minor-bumps the ConOps version.
+- **Brownfield UX changelog** — appends a `## UX Changes` table to the unprocessed discovery
+  changelog, or creates one with "New Capabilities Identified: None", so the
+  `/capture-requirements` brownfield path consumes UX-only deltas unchanged.
+- **Mockup templates** — `SCREENS_TEMPLATE.md` and `WIREFRAME_TEMPLATE.md`; `S-NN` IDs are
+  append-only and never renumbered, mirroring feature-number stability.
+- **Epic spec `## Screens` section** — optional, UI epics only; each screen belongs to exactly
+  one epic; `plan-project` Step 6 adds a Screen → Epic trace; `add` applies the same rule.
+
+### Changed
+
+- **`capture-requirements` reads `ux/screens.md`** — Givens name screens and controls as the
+  inventory does; empty and error states become explicit negative-path TORs; trace rows cite
+  `UX screens: S-NN …`; the UX Baseline reference screen is Scenario 1's thinnest `S-NN`.
+- **`start-epic` and `wrapup-epic` read wireframes** — the wireframe is the layout contract
+  (regions, control text, states); wrapup's UX Baseline gate gains a wireframe-fidelity bullet.
+- **Routing** — `discover`, `triage` (HEAVY), and `new-project` (greenfield) list `/mockup`
+  for UI projects; README quick starts, skills table, branch families, and artifact hierarchy
+  updated.
+
+---
+
 ## [1.8.0] — 2026-09-14
 
 UX baseline for web and desktop apps: the same declare → baseline-TOR → skeleton → verify chain
