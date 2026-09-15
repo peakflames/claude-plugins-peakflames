@@ -10,7 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 Product shape, not project type, chooses the stack: five plain-language questions route a web
 project to a new browser-only sheet or the existing server sheet, and discovery re-checks the
-answer.
+answer. `setup` now asks only what a non-technical user can answer and defaults the rest.
 
 ### Added
 
@@ -41,6 +41,19 @@ answer.
   server-side.
 - **`capture-requirements` knows about deferred SSO** — provider-flow TORs route to Coverage Gaps;
   ownership and role TORs are required and noted as locally assigned until the provider epic lands.
+- **Defaults-first `setup`** — asks only the Project Overview, Project type, shape and sign-in
+  questions, and a required language or device. Commands, test directories, logging, git, and
+  release conventions default from code, sheet, or toolchain table behind one confirmation.
+- **Project Overview section** — drafted from the description `new-project` now passes through;
+  `architecture.md` §1 and the README stub derive from it instead of a section that never existed.
+- **Embedded project type** — device and firmware software gets Tool Hygiene defaults (version on
+  the debug console, boot banner), a CMake toolchain row, and `N/A` for exit codes and UX Baseline.
+- **Toolchain table in `setup`** — run, test, lint, build, and version-file defaults for
+  TypeScript on Bun, Python, Rust, Go, .NET, and embedded C/C++ when no sheet applies.
+- **`TBD — set by the walking-skeleton epic`** — marks values nothing can decide before code
+  exists; `plan-project` makes the skeleton resolve every one in `CLAUDE.md`.
+- **Web sheet Streaming, Config, Secrets, and Versioning rows** — shape answers Q4 and Q5 now have
+  a row to mark `N/A`, and the skeleton checklist covers config and secrets.
 - **`plan-project` places deferred-decision epics** — it now reads `design-notes.md` and creates an
   epic in the last phase for each deferred decision, which TOR clustering could never produce.
 
@@ -53,7 +66,11 @@ answer.
   `__APP_VERSION__`, Dexie versions, `fake-indexeddb`, export/import, deploy workflow) and treats
   an `N/A` row as a decision, never rebuilding it.
 - **Tool Hygiene defaults** — version exposure, startup log line, and logging convention now have
-  static-SPA and web-app answers instead of desktop-only ones.
+  static-SPA, web-app, CLI, and embedded answers instead of desktop-only ones.
+- **Repo hygiene on a new project** — README and CHANGELOG stubs are created without asking;
+  missing `.gitignore`, CI, and lockfile report `N/A` until the walking skeleton creates them.
+- **Architecture stub variants** — static-SPA and embedded projects get section titles and `N/A`
+  sections that fit their shape instead of permanently empty server sections.
 
 ### Fixed
 
@@ -71,8 +88,13 @@ answer.
   yes, since a lay "no" there is simply wrong. Question 2 now defaults to yes when unsure.
 - **Corrected a false claim** — `CLAUDE.md`'s Security Baseline said `start-epic` reviews it; it
   does not, and `setup` no longer says so.
-- **Dead test-command carry-forward** — the web/server Local Environment branch now asks for the
-  test command that Verification & Quality Gates was told to reuse.
+- **Web sheet version exposure** — `package.json` gains `version`, served at `GET /version`,
+  rendered in a footer, and stamped on the first log line, so the baseline Tool Hygiene TORs are
+  satisfiable.
+- **Test runners collecting each other's files** — web and desktop `check` call `bun run test`
+  instead of bare `bun test`; Playwright is scoped to `tests/e2e`.
+- **Desktop Test directories** — `setup` named `tests/ e2e/`, which the desktop sheet never
+  creates; now `tests/unit tests/components tests/e2e`.
 - **`Test directories` placeholder** — named as a placeholder with per-sheet examples, so the line
   `start-epic` and `wrapup-epic` grep points at directories that exist.
 - **UX Baseline token path** — follows the stack's layout instead of hard-coding `src/index.css`.

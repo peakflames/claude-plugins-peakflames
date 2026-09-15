@@ -160,9 +160,9 @@ my-app/
     "lint:fix": "biome check --write .",
     "deadcode": "knip",
     "test": "bun test tests/unit tests/components",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test tests/e2e",
     "db:generate": "drizzle-kit generate",
-    "check": "bun run typecheck && bun run lint && bun run deadcode && bun test"
+    "check": "bun run typecheck && bun run lint && bun run deadcode && bun run test"
   },
   "dependencies": {
     "better-sqlite3": "^11",

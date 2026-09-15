@@ -70,7 +70,8 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 |---|---|---|
 | Runtime | Bun 1.2+ | Single runtime for server, tests, scripts and bundling. Native SQLite and S3 clients. |
 | HTTP framework | Hono | Runs natively on `Bun.serve`, tiny, typed routes, built-in SSE helper, `hc` typed RPC client. |
-| API style | Hono RPC (`hono/client`) + Zod validators | End-to-end types with zero codegen. SSE for token streaming. |
+| API style | Hono RPC (`hono/client`) + Zod validators | End-to-end types with zero codegen. |
+| Streaming | SSE via Hono `streamSSE`, consumed with `fetch` | Server-pushed updates such as token streaming. Long-lived connections need the idle timeout in 6.2. |
 | Auth | Better Auth | Bun-native, Drizzle adapter, email/password + OAuth, sessions in SQLite. |
 | Frontend build | Vite 6 | Fast HMR, Tailwind v4 plugin, output served by Hono in prod. |
 | UI | React 19 + TypeScript 5 (strict) | Boring and correct. |
@@ -83,6 +84,9 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 | Object storage | `Bun.S3Client` | Built into Bun. Works with AWS S3 and MinIO via `endpoint`. Presigned URLs included. |
 | Local S3 | MinIO in docker compose | Same API, same code path, no mocks. |
 | Validation | Zod | Shared schemas for API input, env vars and config. |
+| Config | Environment variables parsed by Zod in `env.ts`, documented in `.env.example` | Every environment difference is a variable; a bad one crashes at boot, not an hour later. |
+| Secrets | Runtime environment variables; `.env` gitignored, never baked into the image | The server holds the keys (auth secret, S3 credentials) the browser must never see. |
+| Versioning | `package.json#version`, read once in `packages/core/src/app.ts` | Served at `GET /version`, rendered in the footer, stamped on the first log line. |
 | Unit tests | `bun test` | Native, Jest-compatible API. |
 | API tests | `bun test` + `app.request()` | Hono apps are testable in-process without a port. |
 | Component tests | `bun test` + happy-dom + Testing Library | One test runner for everything. |
@@ -113,6 +117,7 @@ my-app/
 ├── packages/
 │   └── core/
 │       └── src/
+│           ├── app.ts             # APP_NAME + APP_VERSION (from package.json)
 │           ├── env.ts             # Zod-validated process.env
 │           ├── db/
 │           │   ├── schema.ts
@@ -127,6 +132,7 @@ my-app/
 │   │   └── src/
 │   │       ├── index.ts           # Bun.serve entry
 │   │       ├── app.ts             # Hono app (exported for tests)
+│   │       ├── logger.ts          # the one Pino instance
 │   │       ├── auth.ts            # Better Auth instance
 │   │       ├── routes/
 │   │       │   ├── conversations.ts
@@ -140,7 +146,9 @@ my-app/
 │           ├── main.tsx
 │           ├── router.tsx
 │           ├── api.ts             # hc<AppType> client
-│           ├── components/ui/     # shadcn
+│           ├── components/
+│           │   ├── app-footer.tsx # renders APP_NAME v<version>
+│           │   └── ui/            # shadcn
 │           ├── stores/
 │           └── queries/
 └── tests/
@@ -159,6 +167,7 @@ my-app/
 ```json
 {
   "name": "my-app",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "workspaces": ["packages/*", "apps/*"],
@@ -176,7 +185,7 @@ my-app/
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "check": "bun run typecheck && bun run lint && bun run deadcode && bun test",
+    "check": "bun run typecheck && bun run lint && bun run deadcode && bun run test",
     "compose:up": "docker compose up --build",
     "compose:down": "docker compose down -v"
   },
@@ -221,6 +230,11 @@ my-app/
 ```
 
 > Version ranges are indicative. Pin from the lockfile.
+>
+> `version` is the single source of truth for the app's version. `packages/core/src/app.ts` (5.0)
+> reads it once; the API serves it at `GET /version` (6.1), the footer renders it (7.2), and the
+> server stamps it on the first log line (6.2). `check` calls `bun run test`, never bare `bun test`
+> — a bare run also collects the Playwright specs under `tests/e2e/` and fails.
 
 ### 4.2 `bunfig.toml`
 
@@ -262,6 +276,7 @@ process.env.APP_URL ??= "http://localhost:3000";
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "types": ["bun-types"],
@@ -376,6 +391,18 @@ S3_FORCE_PATH_STYLE=true
 ---
 
 ## 5. Core Package
+
+### 5.0 `packages/core/src/app.ts` — name and version, in one place
+
+```ts
+import { version } from "../../../package.json";
+
+export const APP_NAME = "my-app";
+export const APP_VERSION: string = version;
+```
+
+Imported by the API (6.1, 6.2) and the web app (7.2) alike. It imports nothing but
+`package.json`, so it is safe in the browser bundle.
 
 ### 5.1 `packages/core/src/env.ts`
 
@@ -536,9 +563,11 @@ import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "hono/bun";
 import { pinoLogger } from "hono-pino";
 import { auth } from "./auth";
+import { logger } from "./logger";
 import { conversations } from "./routes/conversations";
 import { messages } from "./routes/messages";
 import { attachments } from "./routes/attachments";
+import { APP_NAME, APP_VERSION } from "@core/app";
 import { env } from "@core/env";
 
 export type Variables = { userId: string };
@@ -546,13 +575,14 @@ export type Variables = { userId: string };
 export function createApp() {
   const app = new Hono<{ Variables: Variables }>();
 
-  app.use(pinoLogger());
+  app.use(pinoLogger({ pino: logger }));
   app.use(secureHeaders());
   app.use("/api/*", cors({ origin: env.APP_URL, credentials: true }));
 
   app.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
 
   app.get("/healthz", (c) => c.json({ ok: true }));
+  app.get("/version", (c) => c.json({ name: APP_NAME, version: APP_VERSION }));
 
   const api = app
     .basePath("/api")
@@ -576,11 +606,27 @@ export function createApp() {
 export type AppType = ReturnType<typeof createApp>["api"];
 ```
 
-### 6.2 `apps/api/src/index.ts`
+`/healthz` and `/version` sit outside `/api`, so neither needs a session — the container
+healthcheck and the Version-exposure TOR both call them signed out.
+
+### 6.2 `apps/api/src/logger.ts` and `apps/api/src/index.ts`
 
 ```ts
-import { createApp } from "./app";
+// logger.ts — the one logger; hono-pino (6.1) reuses it for request logs
+import pino from "pino";
 import { env } from "@core/env";
+
+export const logger = pino({ level: env.LOG_LEVEL });
+```
+
+```ts
+// index.ts
+import { createApp } from "./app";
+import { logger } from "./logger";
+import { APP_NAME, APP_VERSION } from "@core/app";
+import { env } from "@core/env";
+
+logger.info(`${APP_NAME} v${APP_VERSION} starting`);   // the first log line the process emits
 
 const { app } = createApp();
 
@@ -590,7 +636,7 @@ const server = Bun.serve({
   idleTimeout: 120,          // long enough for SSE streams
 });
 
-console.log(`listening on http://localhost:${server.port}`);
+logger.info(`listening on http://localhost:${server.port}`);
 
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, () => { server.stop(); process.exit(0); });
@@ -726,7 +772,24 @@ export const api = hc<AppType>("/api", { init: { credentials: "include" } });
 
 Type imports only, so the server code never lands in the browser bundle.
 
-### 7.2 Upload hook
+### 7.2 `apps/web/src/components/app-footer.tsx`
+
+The on-screen half of Version exposure — what a Playwright test asserts against. Mount it once in
+the root route so every screen carries it.
+
+```tsx
+import { APP_NAME, APP_VERSION } from "@core/app";
+
+export function AppFooter() {
+  return (
+    <footer className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+      <span data-testid="app-version">{`${APP_NAME} v${APP_VERSION}`}</span>
+    </footer>
+  );
+}
+```
+
+### 7.3 Upload hook
 
 ```ts
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -755,7 +818,7 @@ export function useUploadAttachment() {
 }
 ```
 
-### 7.3 SSE consumption
+### 7.4 SSE consumption
 
 ```ts
 export async function* streamReply(body: unknown, signal: AbortSignal) {
@@ -929,6 +992,7 @@ test("requests an upload slot", async () => {
 ```ts
 // playwright.config.ts
 export default defineConfig({
+  testDir: "tests/e2e",      // otherwise Playwright also collects the bun:test files
   webServer: { command: "docker compose up --build", url: "http://localhost:3000/healthz", timeout: 180_000, reuseExistingServer: true },
   use: { baseURL: "http://localhost:3000" },
 });
@@ -959,6 +1023,8 @@ Each of these is already handled by the configuration above.
 | Consideration | What happens | Applied fix |
 |---|---|---|
 | Env misconfiguration | Missing secret or bucket surfaces as a runtime 500. | Zod-validated `env.ts` crashes at boot (5.1). |
+| Version not observable | Nobody can tell which build is deployed. | `package.json#version` read once (5.0), served at `/version` (6.1), in the footer (7.2), on the first log line (6.2). |
+| Test runners collecting each other's files | `bun test` loads Playwright specs; Playwright loads `bun:test` files. | `check` calls `bun run test` (4.1); Playwright `testDir: "tests/e2e"` (9). |
 | SQLite on an ephemeral filesystem | Data lost on redeploy. | `/data` declared as a volume; mount persistent storage in prod (8.1). |
 | SQLite write contention | `SQLITE_BUSY` under concurrent writes. | WAL + `busy_timeout = 5000` (5.3). Single process keeps this rare. |
 | Foreign keys off | Cascades silently no-op. | `foreign_keys = ON` on every connection (5.3). |

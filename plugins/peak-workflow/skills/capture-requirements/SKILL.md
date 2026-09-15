@@ -72,7 +72,7 @@ The user's request / brownfield description: $ARGUMENTS
      mechanism declarations. These drive the baseline TORs in Step 3A.2.1. Record the
      Project type; if the section is absent, infer it from the Tech Stack section
      (Electron / Tauri → Desktop app; web framework or "frontend" → Web app; otherwise treat the
-     project as non-UI — CLI tool, Service, or Library — and set
+     project as non-UI — CLI tool, Service, Library, or Embedded — and set
      `ux_baseline_section_present = false` silently).
    - **`UX Baseline` section** — Presence, the **Design system** declaration (a declaration
      for the walking skeleton, not a TOR), and the active (non-`N/A`) TOR lines. These drive
@@ -98,8 +98,8 @@ The user's request / brownfield description: $ARGUMENTS
    `tool_hygiene_section_present = false` and proceed; Step 3A.2.1 will be skipped.
 
    If the `UX Baseline` section is missing **and** the Project type is a UI type (Web app,
-   Desktop app, or Hybrid with a UI), warn but allow continuation. For CLI / Service / Library
-   projects set `ux_baseline_section_present = false` silently — the section does not apply.
+   Desktop app, or Hybrid with a UI), warn but allow continuation. For CLI / Service / Library /
+   Embedded projects set `ux_baseline_section_present = false` silently — the section does not apply.
    > `UX Baseline` section not found in `CLAUDE.md`. Baseline UX TORs (screen states,
    > keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast,
    > reduced motion, navigation, desktop conventions) will NOT be derived. To enable them,
@@ -121,7 +121,7 @@ The user's request / brownfield description: $ARGUMENTS
     `/peak-workflow:mockup` on UI projects). Capture every screen's `S-NN` ID, name, primary
     actions with their control text, and its four states (or `n/a — not data-bearing`). Set
     `screens_present = true`; Steps 3A.2, 3A.2.2, 4, and 5 use it. If absent, set it `false`
-    silently — CLI / Service / Library projects never have one.
+    silently — CLI / Service / Library / Embedded projects never have one.
 4. Glob `docs/requirements/*.feature.md`. For each file found, capture:
    - The feature number `{NN}` from the filename prefix (e.g., `01` from `01-cli.feature.md`)
    - All existing TOR IDs (parse every `Scenario: [TOR-NN-XXXXXXX]` line)
@@ -275,7 +275,8 @@ mechanism declared in `CLAUDE.md`.
 
 Place baseline TORs in the **most appropriate functional-area feature file** (typically
 the first feature file — `01-cli.feature.md` for CLI tools, `01-app.feature.md` for web
-apps, `01-service.feature.md` for services, `01-api.feature.md` for libraries / SDKs).
+apps, `01-service.feature.md` for services, `01-api.feature.md` for libraries / SDKs,
+`01-device.feature.md` for embedded).
 If the natural functional area is not the first file (e.g., logging baseline belongs in a
 dedicated `NN-logging.feature.md`), use that file instead. Write them under a literal
 `# Tool Hygiene & Operability` section banner (`# ---` comment block per
@@ -288,7 +289,12 @@ system** in 3A.2.2). Exclude both from the Step 4 trace table and from the Step 
 Hygiene lines covered" count.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
-override them.
+override them. Project types without a column (Service or API, Library, Embedded) write each
+shall-statement in the mechanism `CLAUDE.md` declares — e.g. Embedded: *"The device shall print its
+name and semantic version on the debug console in response to the `version` command"*. A line
+still reading `TBD — set by the walking-skeleton epic` yields a TOR stating the observable outcome
+only (*"The device shall report its name and semantic version"*), with the mechanism left to the
+skeleton.
 
 | Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) | Default TOR shall-statement form (Desktop app example) |
 |---|---|---|---|
@@ -332,7 +338,7 @@ vision / ConOps follow.
 ### 3A.2.2: Baseline UX TORs
 
 If `ux_baseline_section_present = false` (Step 1), or the Project type has no user interface
-(CLI tool, Service or API, Library), skip this sub-step entirely.
+(CLI tool, Service or API, Library, Embedded), skip this sub-step entirely.
 
 Otherwise, ensure every **active TOR line** of the `UX Baseline` section of `CLAUDE.md` is
 covered by TOR requirements. Active TOR lines are every bold-labelled line except

@@ -34,7 +34,7 @@ answers against the ConOps scenarios once the product is described (its Step 4.5
    table names the layers an application of that shape has to handle — runtime, build, UI, styling,
    client state, routing, data access, migrations, unit/component/E2E tests, lint, type checking,
    dead code, and whatever else that shape implies (packaging on the desktop sheet; hosting, config
-   and secrets on the static sheet). Use it to notice a layer a project has not decided on yet. The
+   and secrets on the static sheet; streaming, config, secrets, and versioning on the web sheet). Use it to notice a layer a project has not decided on yet. The
    gap is the finding, not the library — and where a sheet has no row for a layer the project does
    need, that absence is itself the finding.
 
@@ -60,7 +60,12 @@ names (`dev`, `build`, `typecheck`, `lint`, `deadcode`, `test`, `test:e2e`, `che
 `package` on the desktop sheet and `preview` / `lint:fix` on the static sheet).
 `setup` and `plan-project` quote those script names in their quality-gate and verification
 defaults, so a change to a sheet's `package.json` section means updating the matching lines in
-`skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit.
+`skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit. `check` always calls
+`bun run test`, never bare `bun test`, which would also collect the Playwright specs.
+
+`setup` maps shape answers onto named Stack Summary rows (on the web sheet: Auth, Object storage,
+Local S3, Streaming, Secrets). Renaming or merging one of those rows means updating that mapping
+in `skills/setup/SKILL.md` in the same commit — otherwise an `N/A` has nowhere to land.
 
 A sheet must also be able to satisfy the baseline TORs `setup` derives from it. Every sheet's
 Section 4 `package.json` carries a `version` field, and the sheet shows where that version is

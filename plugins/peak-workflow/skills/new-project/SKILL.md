@@ -158,9 +158,10 @@ Ask:
 - Question: `"Run /peak-workflow:setup now?"`
 - Options: `["Run /peak-workflow:setup now", "I'll run it manually"]`
 
-On confirm, invoke:
+On confirm, invoke — passing the user's description through, so `setup` drafts the Project
+Overview from it instead of asking again:
 ```
-Skill({ skill: "peak-workflow:setup", args: "" })
+Skill({ skill: "peak-workflow:setup", args: "$ARGUMENTS" })
 ```
 
 ### Verdict: MIGRATE FROM EPIC-WORKFLOW

@@ -142,7 +142,7 @@ ConOps scenarios into an `S-NN` screen inventory, flows, and wireframes that are
 purpose, because visual design lands in the walking-skeleton epic. It is UX, not style:
 palette, typography, and brand are not TORs. `/setup` also recommends companion skills for UI
 projects — `frontend-design@claude-plugins-official` for visual execution and `playwright-cli`
-for verification (web; desktop apps verify through a Playwright Electron harness in `e2e/`) —
+for verification (web; desktop apps verify through a Playwright Electron harness in `tests/e2e/`) —
 and records the precedence rule: the UX Baseline and the design-system tokens win over
 `frontend-design`'s aesthetic choices.
 
@@ -153,10 +153,18 @@ and records the precedence rule: the UX Baseline and the design-system tokens wi
 Hono, React SPA, SQLite, S3, one Docker container) and
 [`bun-electron-desktop-stack.md`](references/bun-electron-desktop-stack.md) (desktop apps —
 Bun toolchain, Electron shell, electron-vite, React + shadcn/ui, better-sqlite3). When the
-tech-stack answer is thin, `/setup` reads the matching sheet's Stack Summary and offers those
+tech-stack answer is thin, `/setup` reads the matching sheet's Stack Summary and takes those
 picks — there is no separate default list — and `/plan-project` builds the greenfield walking
 skeleton from the sheet's repository layout and config files instead of running a scaffolder.
-The user accepts the sheet wholesale or overrides any layer.
+The user sees the stack in one plain-language confirmation and can override any layer.
+
+**`/setup` asks little and defaults the rest.** It asks only what the user alone knows — what the
+product is, what kind of thing it is (CLI tool, web app, desktop app, service, library, embedded
+device software, or a hybrid), the shape questions, sign-in, and any language or device they must
+use. Commands, test directories, logging, versioning, git, and release conventions come from the
+existing code, the sheet, or a per-language toolchain table, and are shown once for confirmation.
+Anything nothing can decide yet is written `TBD — set by the walking-skeleton epic`, and the
+skeleton resolves it.
 
 **The sheet is chosen by product shape, not project type.** Before reading any sheet, `/setup`
 asks five questions in plain language — does the information need to follow the person to another
@@ -182,7 +190,7 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 | Command | Purpose |
 |---|---|
 | `/new-project` | **Front door for newcomers.** Detects project state (greenfield, brownfield epic-workflow, or existing peak-workflow) and dispatches to the right entry point. Writes no state files. |
-| `/setup` | Audits `CLAUDE.md` (Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), offers stack defaults by project type, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, and recommends companion skills. **Run once per project, before `/discover`.** |
+| `/setup` | Audits `CLAUDE.md` (Project Overview, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, and recommends companion skills. **Run once per project, before `/discover`.** |
 
 ### Plan
 
