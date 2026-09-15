@@ -119,7 +119,8 @@ implement this epic. Do not trust the implementer's self-assessment.
    - Question: `"Which directories hold tests? (space-separated, E2E last)"`
    - Then offer to write the answer as the `**Test directories:**` line of the Verification &
      Quality Gates section. If the user declines, replace the loop with
-     `git grep -l "<TOR-ID>" -- ':!docs'`.
+     `git grep --untracked -l "<TOR-ID>" -- ':!docs'` (`--untracked` so a test file created by a
+     Step 1.4b Fix now is found on the re-run).
    Read the matching files.
    If the grep returns nothing in any listed directory, no test traces to this requirement —
    the TOR's verdict is **FAIL** ("no test names TOR-…"), even if source inspection finds the

@@ -78,6 +78,9 @@ that CLI tools already get from Tool Hygiene & Operability.
 - **Housekeeping** — Fix-now at wrapup removes a successor's duplicate TOR ownership; stub grep
   excludes dependency dirs and the skeleton adds `.gitignore`; Forge scaffold goes through a
   temp dir; `bun.lock` recognised; SQLite default skipped for products without persistence.
+- **Third dry-run pass (CLI)** — `git grep --untracked` in the legacy test-directory fallback;
+  `start-epic` resolves test directories before plan mode (Step 1 item 4b); the walking
+  skeleton's `Run the tool` gate uses the `--version` invocation; test command asked once.
 
 ---
 

@@ -53,6 +53,9 @@ Follow these steps exactly:
     `Scenario: [TOR-NN-XXXXXXX]` block with the exact TOR ID. Read the full Given/When/Then.
     These become the implementation specifications for this epic — carry them forward into Step 4
     (plan mode) and the plan's Middle and Closing steps.
+4b. **Resolve the test directories.** Read the `Test directories` line of `CLAUDE.md`'s Verification & Quality Gates section (space-separated, E2E last). If the line is absent, use the single directory the Tests command names. If none can be derived (a legacy Tests row like `pytest`), ask once via `AskUserQuestion`:
+    - Question: `"Which directories hold tests? (space-separated, E2E last)"`
+    - Then ask: `"Record this as the Test directories line in CLAUDE.md's Verification & Quality Gates section?"` with options `["Yes — write it now", "No — use a git grep fallback this session"]`. On Yes, write the line now (this is a docs edit, not implementation, so it precedes plan mode). Carry the result forward as `<test-directories>` for the Step 4 plan.
 5. **Pre-flight scan for new artifacts.** After reading the spec, grep its body for the literal strings `NEW component` and `NEW spec`. Surface any matches in your plan as explicit "create file X" steps so the plan names every new file upfront, rather than discovering them mid-implementation.
 6. **Verify the Requirements Anchors.** The epic spec contains a `## Requirements Anchors` table
    listing TOR IDs and their feature files. Before planning or implementation, perform this
