@@ -104,6 +104,15 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Fixed
 
+- **Automated HIL runs could drive live equipment** — every `tests/hil/` run on mains power or heat
+  requires a confirmed bench setup, and the harness refuses without `HIL_BENCH=1`.
+- **Discovery blockers never reached planning** — `**Open — blocks planning:**` lines and missing
+  hardware safeguards stop `plan-project`; only owner-confirmed safeguards become Coverage Gaps.
+- **Unverified sign-ups could be locked out** — web sheet resends verification on sign-in, lengthens
+  link expiry, verifies on password reset, warns existing owners on repeat sign-up, and sends mail
+  in the background; test env ignores a local `.env`.
+- **Desktop Node.js prerequisite** — setup and the desktop sheet name Node.js 22.12+ alongside Bun.
+
 - **Public password sign-up allowed impersonation** — web sheet requires email verification and
   reset through a new droppable Email delivery row; a verified Google sign-in releases an unverified
   squatter account.

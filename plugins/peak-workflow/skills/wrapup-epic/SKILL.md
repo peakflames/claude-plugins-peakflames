@@ -170,7 +170,9 @@ implement this epic. Do not trust the implementer's self-assessment.
    operator-observed TOR.**
    - *Device:* run the project's hardware-in-the-loop harness under `tests/hil/` against the
      connected board for everything it can capture. If the board is not connected, ask the user
-     to connect it.
+     to connect it. For anything that switches mains power or heat, first ask the user to confirm
+     the bench setup — equipment unplugged, output driving an indicator lamp — and do not run
+     until they do.
    - *Named provider sign-in:* the round-trip needs the real provider's credentials configured
      and the app running where its callback URL points. If they are not set up, ask the user to
      set them up.

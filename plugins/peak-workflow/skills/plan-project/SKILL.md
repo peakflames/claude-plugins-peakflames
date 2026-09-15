@@ -40,6 +40,9 @@ Follow these steps exactly:
    (for example *Organization Sign-In Deferred*) is an epic this plan must carry — Step 3A.4 places
    it. A decision with no epic is the failure mode this read exists to prevent.
 2. Read `docs/product-vision-planning/product-vision.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
+2b. **Blockers from discovery.** Grep `docs/product-vision-planning/concept-of-operations.md` for
+   `**Open — blocks planning:**` and `— NOT present`. Any hit stops this skill: quote the line and
+   tell the user it must be resolved (by re-running `/peak-workflow:discover`) before planning.
 3. Read `docs/product-vision-planning/concept-of-operations.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file:
    - Parse every `Scenario: [TOR-NN-XXXXXXX]` block: capture the TOR ID, scenario title, feature file path, and full Given/When/Then.
@@ -211,6 +214,14 @@ confirmed with the user in the start-epic plan before it is resolved — never p
 switch and data reset described for UI products apply to a Service or API, a CLI tool, and a
 desktop app alike (an environment variable read at startup, ignored in anything a user runs), so
 an error-path TOR such as "database unavailable" has a Given to cite.
+
+**Bench only, for anything that switches mains power or heat.** Every `tests/hil/` run — automated or
+operator-observed — happens on the bench: the equipment unplugged from mains, the output wired to an
+indicator lamp or LED instead of the load. `start-epic` and `wrapup-epic` ask the user before each run to confirm that setup in one
+plain question (*"Is the kiln unplugged, with the relay driving the test lamp?"*); if they cannot
+confirm, do not run it. The harness
+itself refuses to run a mains or heat output check unless an environment variable such as
+`HIL_BENCH=1` is set, so no command line can drive live equipment by accident.
 
 **Embedded products — the skeleton also owns the hardware-in-the-loop harness:** a script under
 `tests/hil/` that talks to the connected board over its debug or serial port non-interactively
