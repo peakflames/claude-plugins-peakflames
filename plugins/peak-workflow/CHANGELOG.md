@@ -8,28 +8,31 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [1.10.0] — 2026-09-15
 
-Reference stack sheets for web and desktop projects, shipped as reference material only.
+Two reference stack sheets become the greenfield stack recommendation for web, service, and
+desktop projects; they stay reference-only for existing projects.
 
 ### Added
 
-- **`references/` directory** — two reference sheets, `bun-web-app-stack.md` (Bun runtime,
-  Hono, single container, SQLite, S3) and `bun-electron-desktop-stack.md` (Bun toolchain,
-  Electron shell, React + shadcn/ui, SQLite), plus a `README.md` index.
+- **`references/` directory** — `bun-web-app-stack.md` (Bun runtime, Hono, React SPA, SQLite,
+  S3, one Docker container), `bun-electron-desktop-stack.md` (Bun toolchain, Electron shell,
+  electron-vite, React + shadcn/ui, better-sqlite3), and a `README.md` index.
 - **Layer checklist use** — each sheet's Stack Summary table names every layer a project of
-  that shape must handle, so `/setup` and `/plan-project` can spot an undecided layer.
-- **Reference-only guardrail** — sheets, index, and both call sites state that `CLAUDE.md`'s
-  Tech Stack always wins and that divergence is never a finding, a TOR, or a reason to
-  re-platform an existing project.
-- **Recorded deviations** — `references/README.md` tables the three deliberate differences
-  between the desktop sheet and the `/setup` desktop default (scaffolder, packaging, test
-  runner), so neither side gets "corrected" toward the other.
+  that shape must handle, so an undecided layer (migrations, E2E runner, secrets) is visible.
+- **Reference-only guardrail** — sheets, index, and both call sites state that an existing
+  project's `CLAUDE.md` Tech Stack wins and that divergence is never a finding, a TOR, or a
+  reason to re-platform.
 
 ### Changed
 
-- **`setup` Tech Stack step** — points the Web app, Service or API, and Desktop app defaults
-  at the matching sheet, and marks a populated Tech Stack section `[PASS]` without comparison.
-- **`plan-project` walking skeleton** — greenfield only, uses the matching sheet's layer list
-  to check the skeleton's end-to-end path; brownfield planning ignores the sheets entirely.
+- **`setup` Tech Stack step** — a thin answer now reads the matching sheet's Section 2 and
+  offers those picks verbatim; the per-project-type default stack table is gone.
+- **`setup` quality gates and Local Environment** — desktop and web defaults now quote the
+  sheets' script names (`bun run dev`, `build`, `package`, `lint`, `typecheck`, `deadcode`,
+  `bun test`, `test:e2e`, `check`) in place of the Electron Forge and Vitest commands.
+- **`plan-project` walking skeleton** — greenfield scaffolding builds the sheet's Section 3
+  tree and Section 4 config files directly instead of running `create-electron-app`; the
+  sheet's Stack Summary is the checklist for the skeleton's end-to-end path. Brownfield
+  planning ignores the sheets.
 
 ---
 

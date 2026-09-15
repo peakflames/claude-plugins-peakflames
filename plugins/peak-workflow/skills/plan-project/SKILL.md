@@ -97,13 +97,19 @@ skeleton must:
 
 - Install the design system declared in `CLAUDE.md`'s **UX Baseline** section (default:
   shadcn/ui on Tailwind, themed only through the CSS-variable tokens in the global stylesheet —
-  never by editing generated component files). For a desktop app, scaffold the Electron Forge
-  template into a temporary directory (`bunx create-electron-app@latest /tmp/<name>
-  --template=vite-typescript` — the scaffolder nests a folder and refuses a non-empty root),
-  move the generated files into the repo root without overwriting `CLAUDE.md`, `docs/`,
-  `README.md`, `CHANGELOG.md`, or `.gitignore`, then `bun install`. Then add the `@/* → src/*`
-  path alias to `tsconfig.json`, and `resolve.alias` plus `@tailwindcss/vite` to
-  `vite.renderer.config.ts`, then `bunx shadcn@latest init`.
+  never by editing generated component files). When `CLAUDE.md`'s Tech Stack came from a
+  reference sheet (`/peak-workflow:setup` names which one), scaffold from that sheet rather
+  than from a generator: create the tree in its **Section 3 Repository Layout** and write the
+  files in its **Section 4 Configuration Files** verbatim, substituting the project name, then
+  `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
+  involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
+  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer (both
+  sheets already carry the `@tailwindcss/vite` plugin and the path aliases in their Vite
+  config). Desktop specifics the sheet supplies and the skeleton must not drop:
+  `trustedDependencies` (`electron`, `better-sqlite3`, `@electron/rebuild`) and the
+  `electron-rebuild` postinstall, `asarUnpack` for `better-sqlite3`, `contextIsolation` +
+  `sandbox` + `nodeIntegration: false`, Zod-validated IPC, and `migrate()` at startup resolving
+  the SQL folder from `process.resourcesPath` when packaged.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
 - Ship **one reference screen** that renders the loading, empty, error, and populated states and
@@ -125,19 +131,21 @@ skeleton must:
   destructive-action Givens start from an empty database instead of the developer's live data.
   Name both switches in Key Components.
 - Make the **E2E harness self-contained**: its `globalSetup` (or the `test:e2e` script) runs the
-  production build the entry point needs (Electron Forge: `bun run package`, or the Vite
-  builds) and `_electron.launch` targets the built entry, so the Tests command in `CLAUDE.md`
-  works cold in a fresh wrapup session.
+  production build the entry point needs (reference-sheet desktop stack: `bun run build`, whose
+  electron-vite output is the `out/main/index.js` the sheet's Section 7 E2E example launches;
+  web: the Vite build) and `_electron.launch` targets the built entry, so the Tests command in
+  `CLAUDE.md` works cold in a fresh wrapup session.
 
-**Reference stacks (greenfield only).** When deciding which layers the skeleton's "thinnest
-possible path" has to touch, the *Stack Summary* table in the matching reference sheet —
+**Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack —
 `plugins/peak-workflow/references/bun-web-app-stack.md` for a web app or service,
-`plugins/peak-workflow/references/bun-electron-desktop-stack.md` for a desktop app — is a
-checklist of the layers a product of that shape handles. Use it to catch a layer the skeleton
-forgot (migrations, E2E runner, packaging, secrets handling). It is **not** a stack to impose:
-`CLAUDE.md`'s Tech Stack wins wherever the two differ, and in Brownfield mode (Step 3B) the
-sheets play no part at all — never plan an epic that re-platforms an existing codebase toward
-them.
+`plugins/peak-workflow/references/bun-electron-desktop-stack.md` for a desktop app — is the
+skeleton's build instructions: Section 2 is the stack, Section 3 the tree, Section 4 the config
+files, and the later sections the wiring (data access, IPC or routes, tests, packaging). Its
+*Stack Summary* table is also the checklist for "every layer the product has" — if the skeleton
+does not touch a layer the table names, that layer is missing from the skeleton. Two limits:
+a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md` and wins over
+the sheet, and in **Brownfield mode (Step 3B) the sheets play no part at all** — never plan an
+epic that re-platforms an existing codebase toward a sheet.
 
 No later epic installs a component library, defines tokens, or builds a second shell — a slice
 composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
