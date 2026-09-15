@@ -1251,7 +1251,17 @@ Auth sends the person to its own bare `/auth/error` page). Add to `SIGN_IN_ERROR
 ```
 
 ```ts
-// Sign-in screen: signInErrorMessage(new URLSearchParams(window.location.search).get("error"))
+// Sign-in screen: read the provider error once, then drop it from the URL so a retry or a later
+// successful linkSocial (which returns to this same URL) never re-shows it
+export function takeProviderError(): string | null {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("error");
+  url.searchParams.delete("error");
+  url.searchParams.delete("error_description");
+  if (code) history.replaceState(null, "", url);
+  return code;
+}
+// signInErrorMessage(takeProviderError())
 // Sign-up form:   signInErrorMessage((await authClient.signUp.email(input)).error?.code)
 // Sign-in form:   signInErrorMessage((await authClient.signIn.email(input)).error?.code)
 ```
