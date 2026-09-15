@@ -84,7 +84,8 @@ have to catch. One horizontal epic is the exception, and it always comes first.
 
 Form exactly one horizontal epic that stands the system up end to end with no domain logic:
 project scaffolding (including a tech-stack `.gitignore` — `setup` 7.4 only warns when one is
-missing), build and test tooling, dev environment, CI, and the thinnest possible path through
+missing), build and test tooling, dev environment, CI (only when `CLAUDE.md`'s Release Protocol
+or `**Not decided yet:**` line names one), and the thinnest possible path through
 every layer the product has. The **tool-hygiene baseline TORs** captured in
 `capture-requirements` 3A.2.1 (version exposure, startup log line, logging convention, error
 message standard, and for CLIs exit codes and stdout/stderr discipline) are this epic's
@@ -98,6 +99,9 @@ generator, and never reads a reference sheet. It extends what is there: adds onl
 `CLAUDE.md`'s `**Not decided yet:**` line lists or marks `TBD`, replaces template sample code (e.g. a
 `WeatherForecast` endpoint) with the tool-hygiene baseline, and adds the version element when the
 manifest lacks it. Name every existing project and file the skeleton will modify in Key Components.
+
+A sheet's sample domain (the web sheet's `conversations` / `messages`) is illustrative: the
+skeleton replaces it with the entity the reference screen needs, keeping the same file shapes.
 
 The skeleton's job is to establish the architectural pattern every later slice follows (how a
 request reaches a handler, how a screen calls the API, how the firmware reaches the hardware
@@ -138,8 +142,8 @@ skeleton must:
   feeding `GET /version`, the footer, and the first log line from `apps/api/src/logger.ts`; the root
   `tsconfig.json`; the auth `basePath`; and Playwright's `testDir: "tests/e2e"`. Desktop specifics the
   sheet supplies and the skeleton must not drop:
-  `trustedDependencies` (`electron`, `better-sqlite3`, `@electron/rebuild`) and the
-  `electron-rebuild` postinstall, `asarUnpack` for `better-sqlite3`, `contextIsolation` +
+  `trustedDependencies` (`electron`), better-sqlite3's N-API prebuilds with no native rebuild
+  (`npmRebuild: false`), `asarUnpack` for `better-sqlite3`, `contextIsolation` +
   `sandbox` + `nodeIntegration: false`, Zod-validated IPC, and `migrate()` at startup resolving
   the SQL folder from `process.resourcesPath` when packaged.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
@@ -195,10 +199,12 @@ skeleton must:
 `TBD — set by the walking-skeleton epic` wherever nothing could decide a value before code existed
 (typical on Embedded: board, build and flash commands, logger location, version channel). Grep
 `CLAUDE.md` for `TBD — set by the walking-skeleton epic`, `— unconfirmed`, and `Board: not chosen`,
-and read the `**Not decided yet:**` line. The skeleton spec's Description lists every hit, and the skeleton
+and read the `**Not decided yet:**` line. Once every layer on that line is a Tech Stack row, the
+skeleton deletes the line. The skeleton spec's Description lists every hit, and the skeleton
 replaces each one in `CLAUDE.md` with the real command, path, or mechanism it established — on its
 own feature branch, so wrapup sees the change. A value that costs money or means buying hardware
-(the board, a hosting provider) or depends on a team's accounts and policies (a CI provider) is
+(the board, a hosting provider, an email delivery provider) or depends on a team's accounts and
+policies (a CI provider) is
 confirmed with the user in the start-epic plan before it is resolved — never picked silently. A skeleton that leaves one behind fails wrapup's TBD gate.
 
 **Every project type with data or outputs — the test-only fault switch.** The fault / latency
@@ -766,7 +772,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
 
    **Solo** (no team review needed):
    ```bash
-   git checkout develop        # or main / master
+   git checkout <base-branch>  # develop if it exists, else main, else master
    git merge docs/<task-name> --no-ff -m "docs(plan): merge docs/<task-name> — requirements and plan baseline"
    git branch -d docs/<task-name>
    git push

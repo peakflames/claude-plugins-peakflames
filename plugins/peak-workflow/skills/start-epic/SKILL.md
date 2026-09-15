@@ -122,16 +122,23 @@ Proceed with the implementation, using git history and the current codebase to d
 
 Check the epic's Dependencies section (from the phase index row loaded in Step 1). For each prerequisite epic, verify that `docs/implementation-plan/status/epic-<dep-id>.md` has `status: Implemented` or `status: Complete` (both mean the code exists). If any dependency is not met, inform the user and suggest which epic to start instead.
 
+**Walking skeleton — values that cost money or follow team policy.** Before planning, list the
+`CLAUDE.md` values this epic resolves that are a CI, hosting, or email delivery provider (from the
+`**Not decided yet:**` line or `TBD` rows) and confirm each with the user in one question, with a
+recommended default (e.g. GitHub Actions for a GitHub repository). Never pick one silently.
+
 **Hardware on the desk (Embedded, or any epic whose TORs are verified through `tests/hil/`).** In
 this order:
 1. **Board chosen?** If `CLAUDE.md` still records `Board: candidate … — unconfirmed` or
    `Board: not chosen` (walking skeleton), recommend a board in plain words — name, rough price,
    and any parts the product needs with it (e.g. a thermocouple amplifier, a relay module) — and
-   confirm it with the user. Nothing is ordered or installed on a guess. Recording the confirmed
-   board in `CLAUDE.md` is the plan's first step, on the feature branch.
-2. **Board in hand?** If the user does not have it yet, say so plainly, end the session, and tell
-   them to run `/peak-workflow:start-epic <id>` again when it arrives (nothing is In Progress yet,
-   so there is nothing to pause). Host-side work may start first only if the user asks.
+   confirm it with the user. Nothing is ordered or installed on a guess. If `CLAUDE.md` still says
+   unconfirmed but the user already bought a board on an earlier run, ask which board they have
+   first. Recording the confirmed board in `CLAUDE.md` is the first plan step after the opening
+   steps, on the feature branch.
+2. **Board in hand?** If the user does not have it yet, print a short parts list to keep (board,
+   add-on parts, cable), end the session, and tell them to run `/peak-workflow:start-epic <id>`
+   again when it arrives (nothing is In Progress yet, so there is nothing to pause). Host-side work may start first only if the user asks.
 3. **Board connected?** Check the port named on the `CLAUDE.md` Local Environment `HIL port:` line
    (e.g. `HIL_PORT=/dev/ttyUSB0`, `COM3` on Windows) exists. If not, tell the user how to connect
    it and how to find the port, and wait. On the walking skeleton the line does not exist yet: ask

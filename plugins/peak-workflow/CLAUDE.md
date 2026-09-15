@@ -89,11 +89,14 @@ operator-observed against the real tenant; automated tests sign in through the e
 helper.
 
 **Hardware and safety are first-class for Embedded.** Device-side TORs are verified through a
-hardware-in-the-loop harness under `tests/hil/` that the skeleton builds; a missing board stops
-`start-epic` and `wrapup-epic` to ask, and an observation no harness can capture is recorded
-`operator-observed: <words>` and surfaced in wrapup's Highlights. `discover` asks what must never
-happen for any product that switches equipment; `capture-requirements` writes each hazard as a
-`# Safety` TOR; `plan-project` ships it with the first epic that drives that output. Board and
+hardware-in-the-loop harness under `tests/hil/` that the skeleton builds; a missing board (or
+provider credentials, or observer) ends the `start-epic` / `wrapup-epic` session with no verdict
+until it is available, and an observation no harness can capture is recorded
+`operator-observed: <words>` and surfaced in wrapup's Highlights. `discover` drafts what must never
+happen for any product that switches equipment; `capture-requirements` writes each hazard the
+software can act on as a `# Safety` TOR (hardware safeguards stay assumptions) with an automated
+HIL check that is never deferrable; `plan-project` ships it with the first epic that drives that
+output. Board and
 hosting choices are confirmed with the user, never picked silently.
 
 **Auth defers the organization's provider, never authentication itself.** A "yes" to sign-in with

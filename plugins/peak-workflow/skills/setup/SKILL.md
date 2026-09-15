@@ -359,9 +359,12 @@ it; this step asks no stack question. Do not compare it against the sheets, do n
 divergence, and never propose re-platforming, rewriting, or swapping a library to match. The
 sheets apply to an existing project for one thing only: noticing a **layer the project has not
 decided yet** (e.g., no database, no migration tool, no E2E runner, no CI, no secrets convention).
-Write them into the Tech Stack section as one line — `**Not decided yet:** database, CI` — which
-`plan-project`'s skeleton reads, and show the same list in the confirmation. Never ask about them
-separately, never propose a rewrite.
+Write them into the Tech Stack section as one line — `**Not decided yet:** database (default
+SQLite), CI` — which `plan-project`'s skeleton reads, and show the same list in the confirmation.
+List only layers the Project Overview actually needs: container, hosting, and backups only when
+deploying is in scope; secrets only when the product holds one. For existing code, a missing
+database always goes on this line with its default, rather than being recorded as decided. Never
+ask about them separately, never propose a rewrite.
 
 When a value the defaults need is missing from existing code — typically the version element
 (`<Version>` absent from a `.csproj`, no `version` in `package.json`) — write
@@ -433,7 +436,9 @@ every one has a correct answer for the project type.
    *Version single source of truth* column.
 
 5. *Logging convention*:
-   - Levels — default `DEBUG / INFO / WARN / ERROR`
+   - Levels — default `DEBUG / INFO / WARN / ERROR`, written in the logger's own level names
+     (e.g. `Debug / Information / Warning / Error` for `Microsoft.Extensions.Logging`, `debug /
+     info / warn / error` for Pino and electron-log)
    - Format — `structured JSON` / `key=value` / `human-readable plain text`
    - Configured at — a file path
    - Web app / Service on the web sheet: Pino, structured JSON to stdout, level from a
@@ -984,8 +989,9 @@ Adapt the example to the project type. A few lines that matter by type:
 - **Web app with sign-in:** *"Sign-in: Google for everyone — coordinators through your Workspace,
   volunteers with a personal Google account or an email and password; only Workspace accounts get
   the coordinator role. Coordinators see everything, volunteers see open shifts and their own claims.
-  Needs: Docker installed to run the full app and its browser tests. Where it's hosted: chosen
-  with you before the first deploy."*
+  People who sign up with a password confirm their email address first, so the app needs an email
+  service — chosen with you before the first deploy, like hosting. Needs: Docker installed to run the
+  full app and its browser tests. Where it's hosted: chosen with you before the first deploy."*
 - **Service or API (existing code):** *"Found in your code: .NET 8 Web API, xUnit tests in
   tests/, `dotnet build` / `dotnet test`. Version: GET /version (the project has no version number
   yet — the first epic adds one). Not decided yet: database, CI."*
@@ -1340,7 +1346,11 @@ If **at least one is present**: `[PASS] CI configuration — detected ({which})`
 If **none present** and `code_present = false`: report `[N/A] CI configuration — no code yet;
 the walking-skeleton epic sets up CI` and skip the guidance below.
 
-If **none present** and `code_present = true`: print `[MISS] CI configuration — no pipeline detected`. Do NOT
+If **none present**, `code_present = true`, and the `**Not decided yet:**` line lists CI: report
+`[N/A] CI configuration — the walking-skeleton epic adds it (provider confirmed with you first)`
+and skip the guidance below.
+
+If **none present** and `code_present = true` otherwise: print `[MISS] CI configuration — no pipeline detected`. Do NOT
 auto-create — CI configuration is platform-specific and depends on the team's CI provider,
 secrets, and policies. Print this guidance:
 
