@@ -56,23 +56,45 @@ in the Deferrals table so the human sees the one place self-review occurs.
 **Deferral gate:** one contract in `start-epic` and `wrapup-epic` — Fix now / Defer / Stop with a
 recommendation. Defer only when the Then clause depends on a later epic whose spec names the TOR.
 
-**Product shape drives the stack:** `setup` asks five plain-language questions (cross-device,
-sign-in, file uploads, live updates, product-held secret) before reading any sheet. All five "no"
-on a Web app routes to `bun-static-spa-stack.md`; any "yes" routes to `bun-web-app-stack.md`. The
-answers are recorded in `CLAUDE.md` as a `**Product shape:**` block and each dropped Stack Summary
-row is written `N/A — <reason> (shape Q<N>)`, which `plan-project` reads as a decision rather than
-a missing layer. `discover` Step 4.5 re-checks the answers against the ConOps scenarios and asks
+**Product shape drives the stack:** `setup` asks plain-language shape questions before reading any
+sheet — all five (cross-device, sign-in, file uploads, live updates, product-held secret) for a Web
+app, 2–4 phrased for callers for a Service or API, 1–3 plus internet access (Q6) for a Desktop app,
+none for CLI / Library / Embedded. All five "no" on a Web app routes to `bun-static-spa-stack.md`;
+any "yes" routes to `bun-web-app-stack.md`. Sign-in means separate accounts or data seen from
+another device — a typed name on a record is an attribution field, not sign-in. The answers are
+recorded in `CLAUDE.md` as a `**Product shape:**` block (unasked questions written `not asked`) and
+each dropped Stack Summary row is written `N/A — <reason> (shape Q<N>)`, which `plan-project` reads
+as a decision and applies through the sheet's **Section 2.1 Dropping a layer** table. `discover` Step 4.5 re-checks the answers against the ConOps scenarios and asks
 before changing anything; the revision rides the same `docs/` branch merge as the requirements
 baseline.
 
 **Setup asks little, defaults the rest.** `setup` asks only what the user alone knows: Project
 Overview (drafted from `new-project`'s description when given), Project type (now including
 Embedded), the shape and sign-in questions, and a required language or device. Every other value
-comes from existing code, then the sheet, then the toolchain table, then a plugin convention, and is
-shown in one plain-language confirmation. A value nothing can decide yet is written
+comes from existing code, then a stack the user named, then the sheet, then the toolchain table,
+then a plugin convention, and is shown in one plain-language confirmation — which also carries the
+housekeeping (repo files, `.gitignore`, add-on skills, first commit) instead of separate questions.
+Existing code is never re-scaffolded: `setup` reads the stack from it and `plan-project`'s skeleton
+extends it. A value nothing can decide yet is written
 `TBD — set by the walking-skeleton epic` (verbatim — `plan-project` greps it) and the skeleton
 resolves it. Defaults must never assume a Bun stack: CLI tools, libraries, embedded software, and
 other languages default through the toolchain table, not a sheet.
+
+**Sign-in always means an access rule.** Every sign-in "yes" — named provider or deferred — writes
+`**Access rule:** owner-or-permitted-role` (verbatim, greppable) into the shape block. That line,
+not the deferral string, drives the access TORs in `capture-requirements`, the skeleton's owner
+columns and role field in `plan-project`, the sign-in Security Baseline reminders, and
+`wrapup-epic`'s access-control gate. A named provider's round-trip TOR is verified
+operator-observed against the real tenant; automated tests sign in through the email-and-password
+helper.
+
+**Hardware and safety are first-class for Embedded.** Device-side TORs are verified through a
+hardware-in-the-loop harness under `tests/hil/` that the skeleton builds; a missing board stops
+`start-epic` and `wrapup-epic` to ask, and an observation no harness can capture is recorded
+`operator-observed: <words>` and surfaced in wrapup's Highlights. `discover` asks what must never
+happen for any product that switches equipment; `capture-requirements` writes each hazard as a
+`# Safety` TOR; `plan-project` ships it with the first epic that drives that output. Board and
+hosting choices are confirmed with the user, never picked silently.
 
 **Auth defers the organization's provider, never authentication itself.** A "yes" to sign-in with
 no approved identity provider selects deferred mode, recorded by the greppable string
@@ -113,8 +135,11 @@ design-system tokens take precedence over its aesthetic choices.
 - Sibling template files are referenced by path in SKILL.md; Claude Code makes them available at skill load time
 - `references/` holds the three stack sheets (Bun static SPA, Bun web, Bun + Electron desktop).
   They are the single source of truth for the greenfield stack: `setup` offers a sheet's
-  Section 2 and `plan-project` builds the skeleton from its Sections 3-4, so no skill keeps its
-  own copy of the picks or the script names. Sheets are addressed as
+  Section 2 and `plan-project` builds the skeleton from its Sections 3-4 (minus what Section 2.1
+  drops for `N/A` rows), so no skill keeps its
+  own copy of a sheet's picks or script names. `setup`'s toolchain table is the one default list
+  outside the sheets, and it covers only stacks no sheet does (CLI tools, libraries, embedded, other
+  languages) — it never overrides a sheet. Sheets are addressed as
   `${CLAUDE_PLUGIN_ROOT}/references/<sheet>.md` — never as a path inside the user's repository.
   For an **existing** project they are reference only — no skill may treat divergence from a
   sheet as a finding, a TOR, or a reason to re-platform

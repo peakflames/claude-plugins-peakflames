@@ -122,6 +122,12 @@ Proceed with the implementation, using git history and the current codebase to d
 
 Check the epic's Dependencies section (from the phase index row loaded in Step 1). For each prerequisite epic, verify that `docs/implementation-plan/status/epic-<dep-id>.md` has `status: Implemented` or `status: Complete` (both mean the code exists). If any dependency is not met, inform the user and suggest which epic to start instead.
 
+**Hardware on the desk (Embedded, or any epic whose TORs are verified through `tests/hil/`).** Before
+planning, confirm the board is connected — the port named by `HIL_PORT` (or the project's
+equivalent in `CLAUDE.md`) exists. If it does not, ask the user to connect it, in plain words, and
+wait. For the walking skeleton, a board still recorded as `Board: candidate … — unconfirmed` or
+`not chosen` is confirmed with the user first; nothing is ordered or installed on a guess.
+
 ## Step 3: Create Feature Branch
 
 Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric) and `<short-name>` was extracted in Step 1 (e.g., `feature/epic-3-user-auth`, `feature/epic-a3f2K7p-user-auth`). If no short name was available, use `feature/epic-<id>`.

@@ -55,6 +55,9 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
    - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
    - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
+   - After checkout, **re-read `CLAUDE.md`** from the working tree. The copy loaded at session start
+     came from the base branch; an epic that changed `CLAUDE.md` (the walking skeleton resolving
+     `TBD` lines, for one) is only visible after checkout.
 2. Read `docs/implementation-plan/status/epic-$ARGUMENTS.md` to get the epic's current status. Phase 3 (Orient) loads all phase indexes and sidecars when it walks the dependency graph — Step 1.1 only needs this epic's sidecar.
 3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress`, `status: Paused`, or `status: Not Started`, inform the user that `/peak-workflow:start-epic $ARGUMENTS` must finish first and stop. If `status: Complete`, inform the user it has already been wrapped up.
 4. Read the epic spec file located in item 1a. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` / `Refs #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip that line later.
@@ -155,6 +158,14 @@ implement this epic. Do not trust the implementer's self-assessment.
    Playwright Electron harness (`@playwright/test` with `_electron.launch`, in the last entry
    on the Test directories line — setup lists the E2E directory last); `playwright-cli`
    cannot attach to an Electron window.
+7. **For device TOR IDs (Embedded, or any Then observed on physical hardware):** run the project's
+   hardware-in-the-loop harness under `tests/hil/` against the connected board. If the board is not
+   connected, **stop and ask the user to connect it** — a missing board is neither CANNOT VERIFY
+   nor FAIL. When the Then names something no harness can capture (a relay clicks, a light turns
+   on, the provider's real sign-in page appears), ask the user to perform the When and describe
+   what they observe; record the verdict with the evidence `operator-observed: <their words>`.
+   That annotation is carried into the Step 1.5 report's Highlights so the human sees every
+   verdict that rests on an observation rather than a test.
 
 Report each TOR ID:
 - **PASS** — a test that mirrors the Given/When/Then (item 3) passes AND implementation
@@ -211,11 +222,15 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
 - Console check (if UI was changed) — web: `playwright-cli`; desktop: the renderer console captured by the Playwright Electron harness
 - UX Baseline check (if UI was changed and `CLAUDE.md` has a **UX Baseline** section) — see below
-- Access-control check (if `CLAUDE.md`'s Tech Stack records
-  `Auth: local accounts now, org SSO deferred` and this epic touched user data) — see below
+- Access-control check (if `CLAUDE.md`'s `**Product shape:**` block records
+  `**Access rule:** owner-or-permitted-role`, or its Tech Stack records
+  `Auth: local accounts now, org SSO deferred`, and this epic touched user data) — see below
+- Deferred-value check (walking-skeleton epic only): `grep -n 'TBD — set by the walking-skeleton epic' CLAUDE.md`
+  on the feature branch must return nothing. Any hit is a FAIL — the skeleton owns resolving
+  every one
 
 **Access-control check.** A quality gate, not a code-review note, on any epic that adds or changes
-user data while the organization's provider is still deferred. Record PASS / FAIL per line with the
+user data in a project with sign-in — named provider or deferred. Record PASS / FAIL per line with the
 evidence, and treat a FAIL like any other failed gate — Fix now or Stop, never a Known Issue:
 
 - **No sign-in bypass.** Grep the diff and the auth configuration for a development-only login,
