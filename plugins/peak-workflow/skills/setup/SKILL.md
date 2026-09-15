@@ -10,11 +10,22 @@ description: |
 
 You are auditing the project's `CLAUDE.md` file to ensure it contains the sections that the epic workflow depends on, and ensuring the documentation stubs exist for the architecture and design documents that the workflow reads and maintains.
 
+The user's description of the product (may be empty — `/peak-workflow:new-project` passes it
+through): $ARGUMENTS
+
 Follow these steps exactly:
 
-## Step 1: Read CLAUDE.md
+## Step 1: Read CLAUDE.md and Detect Existing Code
 
-Read `CLAUDE.md` at the repo root. If it doesn't exist, inform the user and offer to create one from scratch.
+Read `CLAUDE.md` at the repo root. If it doesn't exist, say so in one line and treat every
+section in Step 2 as `[MISS]` — Step 4 creates the file. Do not ask permission to create it;
+running this skill is the request.
+
+Then check whether the repository already holds code: a build manifest at the root or one level
+down (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `*.csproj`, `*.sln`,
+`CMakeLists.txt`, `platformio.ini`, `Makefile`) or a populated `src/`. Record
+`code_present = true / false`. Step 3 reads defaults from the code when it is present, and from
+a reference sheet or the toolchain table when it is not.
 
 ## Step 2: Check Required Sections
 
@@ -22,10 +33,11 @@ Check for the presence and completeness of each section below. Report a status f
 
 | Section | What to check |
 |---------|---------------|
+| **Project Overview** | Two to four plain sentences: what the product is, who uses it, and what it replaces or improves. `docs/architecture.md` §1 and the README stub (Step 7.1) are derived from it |
 | **Tech Stack** | Lists the languages, frameworks, package manager, and key libraries used |
-| **Local Environment** | Documents how to run the backend and frontend locally, whether the API is live and functional, and the preference for live data over mocking during verification |
-| **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
-| **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library projects report `[N/A] UX Baseline — no user interface`. If Tool Hygiene & Operability is also missing, the Project type is not yet known — report `[MISS] UX Baseline — resolved after Project type is captured in Step 3` and let Step 3 turn it into `[N/A]` or a populated section. |
+| **Local Environment** | Documents how to start the project locally (every process it has) and run its tests, and that verification uses the real running project rather than mocked responses |
+| **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Embedded / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
+| **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library / Embedded projects report `[N/A] UX Baseline — no user interface`. If Tool Hygiene & Operability is also missing, the Project type is not yet known — report `[MISS] UX Baseline — resolved after Project type is captured in Step 3` and let Step 3 turn it into `[N/A]` or a populated section. |
 | **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`, not derived as TORs. |
 | **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
@@ -44,18 +56,85 @@ Report the result as a checklist:
 [N/A]  UX Baseline — no user interface
 ```
 
-## Step 3: Fix Missing/Weak Sections
+## Step 3: Fix Missing/Weak Sections — Ask Little, Default the Rest
 
-For each section that is MISS or WEAK, ask the user targeted questions to populate it. Ask one section at a time — do not dump all questions at once.
+Assume the person running this has never built or deployed software. Ask only what they alone
+can know. Everything else has a default, and a default is **applied, not asked**.
+
+Every value in every section below is one of three kinds:
+
+| Kind | What it is | How to handle it |
+|---|---|---|
+| **Ask** | Only the user knows it: what the product is, what kind of thing it is, the product-shape answers, how people sign in and who may do what, a language or platform they are required to use, the device it runs on | Ask in plain language, in the order below, one short block at a time |
+| **Default** | Something already decides it: the existing code (`code_present`), the chosen reference sheet, the toolchain table below, or a plugin convention (branch names, `--no-ff`, tag `vX.Y.Z`, Keep a Changelog, the Security Baseline) | Fill it in silently. Never turn it into a question |
+| **Later** | Nothing decides it yet and the user cannot know — e.g. the build command for firmware whose vendor tools are not chosen | Write `TBD — set by the walking-skeleton epic` and move on. `/peak-workflow:plan-project` makes the skeleton resolve every such line |
+
+**Precedence for defaults:** existing code, then a stack the user named, then the reference
+sheet, then the toolchain table, then a plugin convention. When `code_present = true`, read the
+values from the repository before anything else — scripts in the manifest, the CI workflow,
+test directories that exist, `git tag --list`, an existing `CHANGELOG.md` — and never let a sheet
+or table value override what the code already does.
+
+**The only questions, in this order** — skip any already answered by `CLAUDE.md`, by
+`$ARGUMENTS`, or by the code:
+
+1. *Project Overview* — below.
+2. *Project type* — below.
+3. *Required language or platform* — under Tech Stack below. For Embedded, also the device.
+4. *Shape questions*, with the sign-in follow-ups — Web app, Hybrid with a web UI, and (questions
+   1–3 only) Desktop app.
+5. *One confirmation* of everything defaulted — below.
+
+Nothing else is a question. Do not ask how to run, build, test, or lint the project; where tests
+live; the logging format or file; where the version lives; the branch strategy, merge style, or
+push rule; files never to commit; the release branch, tag format, or CI behaviour; or whether to
+create a CHANGELOG. Each has a default in its section below. A user who already knows these and
+wants something else says so at the confirmation.
+
+**Project Overview** (if missing):
+
+If `$ARGUMENTS` describes the product, draft the overview from it and fold it into the
+confirmation rather than asking. Otherwise ask one question: *"In a sentence or two, what are
+you building, and who is it for?"* Write two to four plain sentences under `## Project
+Overview` at the top of `CLAUDE.md`. Do not interview for more — `/peak-workflow:discover` does
+that.
+
+**Project type** (if `Tool Hygiene & Operability` is missing — ask it here, early, because it
+routes everything after it). Pick exactly one. Lead with the plain gloss and keep the technical
+label as the parenthetical, never the other way round:
+
+- **CLI tool** — people run it by typing a command in a terminal
+- **Web app** — people open it in a web browser, on a laptop, tablet, or phone (server-rendered
+  or SPA). *A tablet or phone app people reach at a web address is this, not a desktop app.*
+- **Desktop app** — people install and launch it as a window on their computer (Electron /
+  Tauri / native)
+- **Service or API** — no screen at all; other software calls it (headless HTTP / gRPC /
+  message endpoints)
+- **Library** — other developers add it to their own code; it has no end-user runtime
+- **Embedded** — it runs on a device or circuit board rather than on a computer or phone
+  (firmware, microcontroller, single-board computer)
+- **Hybrid** — two or more of the above (e.g., a command-line tool that also runs as a service)
+
+If the user describes something for a phone or tablet, ask whether people would open it in a
+browser or install it from an app store before recording the answer — the two route to
+different stacks, and "app" alone does not distinguish them. If the description could be a
+program on a computer *or* software on the device itself ("it reads the sensor"), ask which
+one runs where; a desktop app that talks to a device is a Hybrid.
 
 **Tech Stack** (if missing):
-- What language and framework does this project use?
-- What package manager? (npm, bun, yarn, pip, dotnet, etc.)
-- Any key libraries or tools? (CSS framework, ORM, test runner, etc.)
 
-If the answers are thin (e.g., "whatever you recommend", "I don't know", or only a language
-is named), ask which project type the product is (the same list as Tool Hygiene item 1 below
-— carry the answer forward so it is not asked twice).
+Ask one question: *"Is there a programming language or platform you have to use — because your
+team already knows it, your organization requires it, or the device needs it? If not, I'll
+pick."* A "no", "I don't know", or "whatever you recommend" is an answer, not a gap: take the
+sheet the shape questions route to (Web app, Service or API, Desktop app) or the toolchain table
+below (CLI tool, Library, Embedded). A named language or platform that no sheet uses (e.g. .NET
+for a web app) skips the sheet: record it, take its row in the toolchain table, and still record
+the shape answers — they decide which layers the project needs. A user who names a full stack
+gets it recorded as named, with only the gaps filled from the table.
+
+For **Embedded**, also ask: *"What board or chip does it run on, if you know — and does the
+maker supply its own development tools?"* An unknown board is a normal answer: record
+`TBD — set by the walking-skeleton epic` for the toolchain rows rather than guessing a vendor.
 
 **Shape questions — ask before offering any stack.**
 
@@ -91,8 +170,8 @@ approval the user cannot give during a planning session.
 
 - *Provider:* "Do you already know how people will sign in — a provider your organization has
   approved, such as Microsoft, Google, or Okta — or is that still to be worked out?"
-- *Roles:* "Will different people be able to do different things — some can only look, others
-  can change things?"
+- *Roles:* "Will different people be able to do different things — for example, some only look,
+  some enter the work, and others review or approve it?"
 
 A "yes" to question 2 routes to the web-app sheet either way. Once anyone other than the owner
 can see the data, the rule about who sees what has to be enforced somewhere the person cannot
@@ -156,6 +235,7 @@ are not blocked on them now; it does not make that work smaller."*
 | **Service or API** | `${CLAUDE_PLUGIN_ROOT}/references/bun-web-app-stack.md` (same sheet; skip Section 7 Frontend Wiring and the SPA half of Section 8) |
 | **Desktop app** | `${CLAUDE_PLUGIN_ROOT}/references/bun-electron-desktop-stack.md` — ask questions 1–3 anyway; a "yes" to any means the desktop app also needs the web sheet's service layers, which makes it a Hybrid |
 | **Hybrid** | The sheet matching the primary interface, plus the other sheet's layers for the secondary one |
+| **CLI tool / Library / Embedded** | No sheet, and no shape questions — the toolchain table below |
 
 Paths are relative to the installed plugin, not the user's repository. If `${CLAUDE_PLUGIN_ROOT}`
 does not resolve in this session, locate the sheet under the plugin's own `references/` directory
@@ -181,28 +261,39 @@ reads the Stack Summary as a completeness checklist for the walking skeleton, so
 simply absent reads as an oversight, while `N/A — no file uploads (shape Q3)` reads as a
 decision.
 
-Not every "no" maps onto a row — the static sheet has already excluded the server layers, and on
-the web sheet a "no" to streaming touches a clause inside the API-style row rather than a row of
-its own. Where there is no row to mark, the `**Product shape:**` block **is** the record; do not
-invent a row to carry the `N/A`.
+On the web sheet the rows each answer drops are: Q2 "no" → Auth; Q3 "no" → Object storage and
+Local S3; Q4 "no" → Streaming; Q5 "no" → Secrets (only reachable when Q2 and Q3 are also "no").
+Not every "no" maps onto a row — the static sheet has already excluded the server layers, and a
+Q1 "no" on the web sheet removes nothing. Where there is no row to mark, the `**Product shape:**`
+block **is** the record; do not invent a row to carry the `N/A`.
 
-Read the matching sheet's **Section 2 Stack Summary** and offer that table as the proposed
-stack, condensed to one line per layer, with any shape-dropped rows already marked `N/A`. Do not
-invent, substitute, or "modernize" a pick, and do not paraphrase from memory — the sheet is the
-single source of truth for what gets offered.
-The user accepts the whole sheet with one answer or overrides any layer; record the accepted
-picks in `CLAUDE.md`'s Tech Stack table, and note in the section which sheet it came from so
+Read the matching sheet's **Section 2 Stack Summary** and take that table as the stack, with any
+shape-dropped rows already marked `N/A`. Do not invent, substitute, or "modernize" a pick, and
+do not paraphrase from memory — the sheet is the single source of truth. The stack is shown to
+the user in the single confirmation at the end of this step, in plain words (one line per layer,
+the technical name in parentheses), not as its own question. Record the accepted picks in
+`CLAUDE.md`'s Tech Stack table, and note in the section which sheet it came from so
 `plan-project` can read the same one. Sections 3 (Repository Layout), 4 (Configuration Files),
 and the later sections are for `plan-project` to apply when it builds the walking skeleton —
 not to be dumped into the conversation here.
 
-**CLI tool / Library** has no sheet: if no language is named, default to TypeScript on Bun
-(`bun init`, `bun test`, single-file executable via `bun build --compile`), `bun:sqlite` if it
-needs a database. If a language is named, use that language's standard toolchain (e.g., Python:
-`uv`, `pytest`, `ruff`, a `pyproject.toml` console-script entry point).
+**Toolchain table — the defaults when no sheet applies** (CLI tool, Library, Embedded, or a
+language no sheet uses). With no language named, CLI tool and Library take TypeScript on Bun.
+A language not listed takes its community-standard toolchain, named as the source in the
+confirmation; where no clear standard exists, write `TBD — set by the walking-skeleton epic`.
 
-Every project type: start with SQLite unless the user names another database or the product
-has no persistence.
+| Stack | Run / start | Tests (Test directories) | Lint / format fix | Build | Version single source of truth |
+|---|---|---|---|---|---|
+| TypeScript on Bun | `bun run src/index.ts` | `bun test` (`tests/`) | `bunx biome check .` / `bunx biome check --write .` | CLI: `bun build --compile src/index.ts --outfile dist/<name>`; Library: `bunx tsc --noEmit` | `package.json#version` |
+| Python | `uv run <name>` | `uv run pytest` (`tests/`) | `uv run ruff check .` / `uv run ruff format .` | `uv build` | `pyproject.toml [project.version]` |
+| Rust | `cargo run --` | `cargo test` (`tests/`) | `cargo clippy -- -D warnings` / `cargo fmt` | `cargo build --release` | `Cargo.toml [package.version]` |
+| Go | `go run .` | `go test ./...` (`.`) | `go vet ./...` / `gofmt -w .` | `go build ./...` | `const Version` in `version.go` |
+| C# / .NET | `dotnet run --project src/<Name>` | `dotnet test` (`tests/`) | `dotnet format --verify-no-changes` / `dotnet format` | `dotnet build` | `<Version>` in the `.csproj` |
+| Embedded C / C++ (CMake) | `TBD — set by the walking-skeleton epic` (flashing depends on the board) | host-side unit tests: `ctest --test-dir build` (`tests/`) | `TBD — set by the walking-skeleton epic` | `cmake -B build && cmake --build build`, or `TBD — set by the walking-skeleton epic` when the maker's own tools build it | `project(<name> VERSION x.y.z)` in `CMakeLists.txt` |
+
+Every project type that stores data: start with SQLite unless the user names another database,
+the product has no persistence, or it is Embedded (record storage as `TBD — set by the
+walking-skeleton epic` until the device is known).
 
 **Existing projects: reference only.** If `CLAUDE.md` already has a populated Tech Stack, that
 section is the single source of truth and this step is `[PASS]` — do not compare it against the
@@ -211,65 +302,40 @@ library to match. The sheets apply to an existing project for one thing only: no
 **layer the project has not decided yet** (e.g., no migration tool, no E2E runner, no secrets
 convention). Raise such a gap as a question, never as a rewrite.
 
-**Local Environment** (if missing):
+**Local Environment** (if missing) — **default, no questions.** On a new project nothing exists
+to run yet, so there is nothing the user could answer. Take the commands from the first source
+that has them:
 
-First, determine the project type from the Tech Stack answers already captured. If the tech stack includes Electron, Tauri, or a native windowing toolkit, treat it as a **desktop project**. Otherwise, if it includes a web framework, HTTP server, REST API library, or mentions "frontend" / "backend", treat it as a **web/server project**. Otherwise (CLI tool, library, script), treat it as a **CLI/tool project**.
+| Stack | Start | Tests | Notes to write |
+|---|---|---|---|
+| Existing code | The manifest's scripts / the README | The manifest's test script | Whatever the code already does |
+| Web sheet | `bun run dev` (API on `:3000`, web on `:5173` with proxy); `docker compose up -d minio minio-init` first when object storage is in the stack | `bun run test`; `bun run test:e2e` | The sheet's Section 10 Daily Commands |
+| Static SPA sheet | `bun run dev` (Vite on `:5173`) | `bun run test`; `bun run test:e2e` (builds and previews the production bundle first) | No server — nothing to mock; verification uses the real app and its real IndexedDB |
+| Desktop sheet | `bun run dev` (electron-vite, live main process, renderer HMR) | `bun run test`; `bun run test:e2e` (Playwright Electron) | Add the web sheet's rows only if the app also runs a service of its own |
+| Toolchain table row | Its *Run / start* column | Its *Tests* column | Embedded: host-side tests run on the computer; on-device runs are `TBD — set by the walking-skeleton epic` until the board is known |
 
-*For CLI/tool projects:*
-- How do you invoke the tool locally? (e.g., `python -m fibcalc 10`, `./mytool --help`, `go run . 5`)
-- How do you run the test suite? (e.g., `pytest tests/`, `go test ./...`, `cargo test`)
-- Skip the frontend/backend/live-data questions — they don't apply.
-
-*For web/server projects (a server is part of the stack):*
-- How do you run the backend locally? (e.g., `dotnet run`, `npm start`, etc.)
-- How do you run the frontend locally? (e.g., `bun run dev`, `npm run dev`, etc.)
-- How do you run the test suite? (reference-sheet stack: `bun test` for unit, API and component
-  tests, `bun run test:e2e` for the Playwright suite) — capture it here so the Verification &
-  Quality Gates step can reuse it instead of asking again.
-- Is the backend API live and functional in local dev? (i.e., can it connect to real data sources like databases?)
-- Should verification always use live data instead of mocking API responses?
-
-*For browser-only web projects (static SPA — the shape questions all answered "no"):*
-- How do you start the dev server? (reference-sheet stack: `bun run dev`, Vite on `:5173`)
-- How do you run the test suite? (reference-sheet stack: `bun test` for unit and component
-  tests, `bun run test:e2e`, which builds and previews the production bundle first)
-- Skip the backend / live-API / live-data questions — there is no server. Verification runs
-  against the real app and its real IndexedDB, so there is nothing to mock either.
-
-*For desktop projects:*
-- How do you start the dev build? (reference-sheet stack: `bun run dev`, which runs electron-vite with a live main process and renderer HMR)
-- How do you run the test suite? (reference-sheet stack: `bun test` for unit and component tests, `bun run test:e2e` for the Playwright Electron suite)
-- Skip the live-API / live-data questions unless the app also talks to a backend service of its own — if it does, ask the web/server questions for that backend.
+Always write this line, for every project type — it is a plugin convention, not a question:
+*"Verification runs against the real, running project with its real local data. Never mock the
+project's own API or database to make a check pass."*
 
 **Tool Hygiene & Operability** (if missing):
 
 This section captures the project's chosen mechanisms for the load-bearing tool-hygiene
 practices that `/peak-workflow:capture-requirements` will turn into baseline TOR
-requirements. Ask in order:
+requirements. **Only item 1 was asked** (earlier in this step). Items 2–8 are **defaults**: fill
+each from the existing code, the sheet, or the per-type default below, and show them in the
+single confirmation — they are engineering conventions a non-technical user cannot weigh, and
+every one has a correct answer for the project type.
 
-1. *Project type* — pick exactly one. This question **routes** the plain-language shape questions
-   in the Tech Stack step, so it gets the same no-jargon treatment: lead with the plain gloss and
-   keep the technical label as the parenthetical, never the other way round.
-   - **CLI tool** — people run it by typing a command in a terminal
-   - **Web app** — people open it in a web browser, on a laptop, tablet, or phone (server-rendered
-     or SPA). *A tablet or phone app people reach at a web address is this, not a desktop app.*
-   - **Desktop app** — people install and launch it as a window on their computer (Electron /
-     Tauri / native)
-   - **Service or API** — no screen at all; other software calls it (headless HTTP / gRPC /
-     message endpoints)
-   - **Library** — other developers add it to their own code; it has no end-user runtime
-   - **Hybrid** — two or more of the above (e.g., a command-line tool that also runs as a service)
-
-   If the user describes something for a phone or tablet, ask whether people would open it in a
-   browser or install it from an app store before recording the answer — the two route to
-   different stacks, and "app" alone does not distinguish them.
+1. *Project type* — the answer to the project-type question asked earlier in this step.
 
 2. *Version exposure* — how does an end user observe the running tool's version? The
    mechanism varies by project type; the requirement that *some mechanism exists* is
-   universal. Suggest defaults:
+   universal. Defaults:
    - CLI: `--version` flag printing `<name> v<semver>` to stdout, exit 0
-   - Web app (with a server): GET `/version` endpoint returning JSON, plus version visible in
-     app footer or About page
+   - Web app (with a server): GET `/version` endpoint returning JSON `{name, version}`, plus the
+     version in the app footer (web sheet: `apps/api/src/app.ts` and
+     `apps/web/src/components/app-footer.tsx`, both reading `packages/core/src/app.ts`)
    - Web app (browser-only / static SPA): no endpoint is possible — the version comes from
      `package.json#version`, injected at build time as `__APP_VERSION__` and rendered in the app
      footer, plus the version-stamped first console line
@@ -279,6 +345,10 @@ requirements. Ask in order:
      the DOM and cannot be asserted by Playwright — do not use `role: 'about'` alone.
    - Service/API: GET `/version` or `/health` endpoint with version field
    - Library: `__version__` (or language-equivalent) constant exported from package root
+   - Embedded: a `version` command on the device's debug or serial console printing
+     `<name> v<semver>`; a device with no console exposes the version through whatever channel
+     it has (a readable register, a status message, a BLE characteristic) — `TBD — set by the
+     walking-skeleton epic` until the board is known
    - Hybrid: list each applicable mechanism
 
 3. *Version stamped at log startup* — confirm the project will emit the tool name and
@@ -286,19 +356,23 @@ requirements. Ask in order:
    (e.g., `[INFO] myapp v1.2.0 starting`). Desktop app: the main process logs
    `<name> v<semver> starting` as its first line once the app is ready. Static SPA: `main.tsx`
    writes `<name> v<semver> starting` to the browser console before mounting the router — the
-   console is the only log this shape has.
+   console is the only log this shape has. Embedded: the boot banner `<name> v<semver> starting`
+   is the first line on the debug or serial console.
 
-4. *Version single source of truth* — what is the authoritative file for the version
-   number? The version is defined in exactly one place and read everywhere else. Examples:
-   `pyproject.toml [project.version]`, `package.json#version`, `Cargo.toml [package.version]`,
-   `*.csproj <Version>`, `go.mod` (with build-time injection), etc.
+4. *Version single source of truth* — the one file the version number is defined in, read
+   everywhere else. Default: the sheet's `package.json#version`, or the toolchain table's
+   *Version single source of truth* column.
 
 5. *Logging convention*:
-   - Levels — what set? (default: `DEBUG / INFO / WARN / ERROR`)
-   - Format — `structured JSON` / `key=value` / `human-readable plain text`?
-   - Where is the logger configured? (file path)
-   - Web app / Service default (reference sheet): Pino via `hono-pino`, structured JSON to
-     stdout, level from a `LOG_LEVEL` env var, configured in `apps/api/src/app.ts`.
+   - Levels — default `DEBUG / INFO / WARN / ERROR`
+   - Format — `structured JSON` / `key=value` / `human-readable plain text`
+   - Configured at — a file path
+   - Web app / Service default (reference sheet): Pino, structured JSON to stdout, level from a
+     `LOG_LEVEL` env var, configured in `apps/api/src/logger.ts` and reused by `hono-pino`.
+   - CLI tool / Library default: human-readable plain text to stderr, level from a `--verbose`
+     flag or a `LOG_LEVEL` env var, configured in the entry-point module.
+   - Embedded default: human-readable plain text on the debug or serial console, configured at
+     `TBD — set by the walking-skeleton epic`.
    - Static SPA default: the browser `console` — there is nowhere to ship logs to. Declare the
      levels in use and keep `console.debug` out of the production path.
    - Desktop app default: electron-log in the main process (`electron-log/main`,
@@ -306,7 +380,8 @@ requirements. Ask in order:
      renderer logs route through `electron-log/renderer`.
 
 6. *Exit code convention* (CLI / Hybrid only — otherwise mark `N/A — not a CLI`; Desktop
-   app: `N/A` unless the app also has a CLI entry point):
+   app: `N/A` unless the app also has a CLI entry point; Embedded: `N/A — firmware does not
+   exit`):
    - 0 — success
    - 1 — operational failure (file not found, permission denied, downstream failure, etc.)
    - 2 — invalid invocation (bad flags, missing required args)
@@ -317,10 +392,12 @@ requirements. Ask in order:
    - stdout — data, parseable output, primary results
    - stderr — diagnostics, progress, errors, log output
 
-8. *Error message standard* — confirm user-facing errors will name the problem AND the
-   next user action (on screen for Web / Desktop apps, on stderr for CLI tools). Format examples:
+8. *Error message standard* — user-facing errors name the problem AND the next user action
+   (on screen for Web / Desktop apps, on stderr for CLI tools, on the debug console — plus any
+   indicator the device has — for Embedded). Format examples:
    CLI — `Error: configuration file not found at <path>. Try --config to specify an alternate path.`
    Desktop — `Could not save order #123: the database file is locked. Close other copies of the app and try again.`
+   Embedded — `ERROR E012: temperature sensor not responding on I2C bus 1. Check the sensor cable, then power-cycle.`
 
 Generate the section using this template, filling in the project-specific answers:
 
@@ -333,7 +410,7 @@ ensure at least one TOR exists per active line, written in the form appropriate 
 declared mechanism. Lines marked `N/A` are skipped. Project type and Version single source
 of truth are declarations, not TOR sources.
 
-**Project type:** [CLI tool / Web app / Desktop app / Service or API / Library / Hybrid]
+**Project type:** [CLI tool / Web app / Desktop app / Service or API / Library / Embedded / Hybrid]
 
 **Version exposure:** [Mechanism declaration. Example for a CLI: `--version` flag printing
 `myapp v<semver>` to stdout with exit code 0. Example for a Web app: GET `/version` endpoint
@@ -363,7 +440,7 @@ locked. Close other copies of the app and try again.` — keep the one that appl
 
 **UX Baseline** (if missing — Project type Web app, Desktop app, or Hybrid with a UI only):
 
-If the Project type is CLI tool, Service or API, or Library, write nothing and report
+If the Project type is CLI tool, Service or API, Library, or Embedded, write nothing and report
 `[N/A] UX Baseline — no user interface`.
 
 This section is the UI counterpart of Tool Hygiene & Operability: the interaction conventions
@@ -371,8 +448,10 @@ every screen must meet, each turned into a baseline TOR by
 `/peak-workflow:capture-requirements` (Step 3A.2.2) and checked on every UI epic by
 `/peak-workflow:wrapup-epic`. It covers UX, not visual style — palette, typography, and brand
 belong in a design doc or the `frontend-design` skill, never here. Every line has a default a
-non-technical user can accept as-is. Present the defaults as one block and ask for a single
-accept / override answer; override line by line only where the user asks.
+non-technical user can accept as-is. Do not ask about it separately: it appears in the single
+confirmation as one plain summary line ("screens follow standard accessibility rules — keyboard
+use, readable contrast, clear error messages, confirmation before deleting"), and is overridden
+line by line only where the user asks.
 
 1. *Design system* — a declaration consumed by the walking skeleton in
    `/peak-workflow:plan-project`, not a TOR. Default: **shadcn/ui on Tailwind v4**, themed
@@ -420,8 +499,8 @@ accept / override answer; override line by line only where the user asks.
 7. *Layout floor* (TOR) — Web app: every screen is usable at 320 CSS px width and at 200% zoom
    with no horizontal scrolling, overlap, or clipped controls (WCAG 2.2 SC 1.4.10, 1.4.4).
    Desktop app: every window is usable at the declared minimum window size with no clipped
-   controls, and the window refuses to shrink below it. Default shown in the block: 800 x 600
-   — changed only if the user names this line at the single accept / override question.
+   controls, and the window refuses to shrink below it. Default: 800 x 600
+   — changed only if the user names this line at the single confirmation.
 
 8. *Contrast* (TOR) — body text has a contrast ratio of at least 4.5:1 (3:1 for large text),
    and control boundaries and focus indicators at least 3:1 against adjacent colors
@@ -440,13 +519,13 @@ accept / override answer; override line by line only where the user asks.
 11. *Responsiveness budget* (optional TOR, default `N/A`) — Web app: at the 75th percentile the
     primary screens meet Core Web Vitals "good": LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1.
     Desktop app: a declared local-interaction latency (e.g., every click acknowledged within
-    200 ms). Default shown in the block: `N/A` — changed only if the user names this line at
-    the single accept / override question.
+    200 ms). Default: `N/A` — changed only if the user names this line at
+    the single confirmation.
 
 12. *Undo* (optional TOR, default `N/A`) — reversible actions offer Undo (Ctrl/Cmd+Z or an
     "Undo" control), and unsaved form input survives an accidental reload of the same screen
-    (WCAG 2.2 SC 3.3.7). Default shown in the block: `N/A` — changed only if the user names
-    this line at the single accept / override question.
+    (WCAG 2.2 SC 3.3.7). Default: `N/A` — changed only if the user names
+    this line at the single confirmation.
 
 13. *Desktop conventions* (Desktop app only — each bullet is a TOR; omit the whole line for
     Web apps). Any bullet may be marked `N/A`. Default the file-dialog bullet to `N/A` unless
@@ -599,38 +678,40 @@ its access rule in the same change. `/peak-workflow:wrapup-epic` reviews both on
 touches user data.
 ```
 
-**Peak Workflow** (if missing):
-- Where does the requirements baseline live? (default: `docs/requirements/`)
-- Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard)
-- Confirm the peak commands should be listed: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
-- Leave room for a `**Recommended skills:**` line — Step 8 writes it for Web app / Desktop app / Hybrid-with-UI projects only; for CLI / Service / Library projects write nothing.
+**Peak Workflow** (if missing) — **default, no questions**:
+- Requirements baseline: `docs/requirements/`
+- Implementation plan: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard
+- List the peak commands: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- Leave room for a `**Recommended skills:**` line — Step 8 writes it for Web app / Desktop app / Hybrid-with-UI projects only; for CLI / Service / Library / Embedded projects write nothing.
 
-**Verification & Quality Gates** (if missing):
-- What checks should run before an epic is marked complete? Ask about each:
-  - Build/compile check? If so, what command?
-  - Tests? If so, what command? (Reuse the test command already captured under Local Environment — ask only where the tests live.)
-  - Linting or formatting? If so, what command?
-  - Visual/screenshot verification? (suggest `playwright-cli` for web UIs; the Playwright
-    Electron harness in `e2e/` for desktop)
-  - Brand or design compliance? (suggest brand guidelines skill if applicable)
-  - Any other project-specific checks?
-  - Where do tests live? List every directory wrapup must grep — unit and E2E (Desktop
-    default: `tests/` and `e2e/`). List the E2E directory last on the Test directories line.
+**Verification & Quality Gates** (if missing) — **default, no questions.** Fill every row from
+the same source as Local Environment (existing code → sheet → toolchain table):
 
-  *For CLI/tool projects skip the visual/screenshot and brand questions — ask only about build, tests, lint, "run the tool with a known input" (reuse the Local Environment invocation), and where tests live (usually one directory; no E2E).*
+- *Build, Tests, Lint* — reference-sheet stacks: Build `bun run build`, Tests `bun run test` plus
+  `bun run test:e2e`, Lint `bun run lint`; `bun run check` (typecheck + lint + deadcode + tests)
+  is the single pre-commit gate when the project took the sheet's `package.json` unchanged.
+  Otherwise the toolchain table's columns.
+- *Visual / console* (UI only) — `playwright-cli` against the running app for a web UI; the
+  Playwright Electron harness in `tests/e2e/` for a desktop app.
+- *Brand* — omit unless the user mentioned brand guidelines or a brand skill is installed.
+- *Run the tool* — CLI: the Local Environment invocation. Embedded: the boot banner on the
+  debug console after flashing, or `TBD — set by the walking-skeleton epic` until the board is
+  known.
+- *Test directories* — the directories the project will actually have, space-separated, E2E
+  last: web sheet `tests/unit tests/api tests/components tests/e2e`; static SPA
+  `tests/unit tests/components tests/e2e`; desktop sheet `tests/unit tests/components tests/e2e`;
+  otherwise the toolchain table's *Tests* column.
 
-  The written section must open with this template (substitute the answers; keep the bold
-  labels verbatim — `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` grep every
-  directory on the `Test directories` line, which is **space-separated**, no commas, E2E
-  directory last). Omit the `(UI only)` rows for CLI / Service / Library projects; include the
-  `Run the tool` row for CLI projects only; drop the second half of the `Tests` row when there
-  is no E2E suite.
+  The written section must open with this template (keep the bold labels verbatim —
+  `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` grep every directory on the
+  `Test directories` line, which is **space-separated**, no commas, E2E directory last). Omit
+  the `(UI only)` rows for CLI / Service / Library / Embedded projects; include the `Run the
+  tool` row for CLI and Embedded projects only; drop the second half of the `Tests` row when
+  there is no E2E suite.
 
-  `tests/ e2e/` in the template below is a placeholder, not a default — write the directories the
-  project actually has. For a stack taken from a reference sheet, copy the sheet's Section 3
-  layout: web app `tests/unit tests/api tests/components tests/e2e`; static SPA
-  `tests/unit tests/components tests/e2e`; desktop app `tests/ e2e/`. A directory named here that
-  does not exist makes every `start-epic` and `wrapup-epic` grep silently return nothing:
+  `tests/ e2e/` in the template below is a placeholder, not a default — write the directories
+  listed above. A directory named here that does not exist makes every `start-epic` and
+  `wrapup-epic` grep silently return nothing:
 
 ```markdown
 ## Verification & Quality Gates
@@ -643,13 +724,13 @@ Run every applicable check before marking an epic Implemented or Complete:
 - **Tests:** `[unit command]` (tests/); `[e2e command]` (e2e/)
 - **Lint / format:** `[lint command]`
 - **Run the tool:** `[invocation with known input]` → `[expected output]` *(the walking-skeleton epic uses the `--version` invocation here — domain inputs apply once the owning epic ships)*
-- **Visual / console (UI only):** [`playwright-cli` against the running app / the Playwright Electron harness in `e2e/`]
+- **Visual / console (UI only):** [`playwright-cli` against the running app / the Playwright Electron harness in `tests/e2e/`]
 - **Brand (UI only, if a brand skill is configured):** [skill name]
 - [Any other project-specific check]
 ```
 
-After gathering answers, **validate each command answer**: if the user provides a non-empty
-answer that looks like a description rather than a runnable shell command (e.g., it contains no
+When the user overrides a command at the confirmation, **validate it**: if the answer looks like
+a description rather than a runnable shell command (e.g., it contains no
 executable token — no path separators, no dot-separated binary name, no recognizable CLI verb
 like `pytest`, `npm`, `dotnet`, `make`, `cargo`, `go test`, etc.), prompt once:
 > That looks like a description rather than a shell command. What's the exact command to run?
@@ -657,41 +738,44 @@ like `pytest`, `npm`, `dotnet`, `make`, `cargo`, `go test`, etc.), prompt once:
 If the second answer is still ambiguous, accept it and add a note in the written section:
 > *(Command may need refinement — update CLAUDE.md before the first `/peak-workflow:start-epic`)*
 
-**Important Reminders** (if missing):
-- Any project-specific constraints or gotchas that Claude should always know about?
-- Libraries or patterns to avoid?
-- Naming conventions or code organization rules?
+**Important Reminders** (if missing) — **default, no questions.** Write one line for each
+decision this run recorded that a later session could undo by accident — for example *"Browser-only
+app: there is no server; anything needing one is a Product shape change (see above)"*, or the
+deferred-sign-in rule. With nothing to record, write *"None yet — add project-specific gotchas here
+as they are discovered."*; on a new project that line counts as populated, not `[WEAK]`.
 
-**Reference Materials** (if missing):
-- Are there architecture docs, design docs, or reference projects Claude should read?
-- Any external resources (Confluence, Linear, Figma) worth pointing to?
-- For a Web app, Service or API, or Desktop app project, offer to add a line pointing at the
-  reference stack sheet the Tech Stack step actually used — `bun-web-app-stack.md`,
+**Reference Materials** (if missing) — **default, plus one optional prompt folded into the
+confirmation**:
+- For a Web app, Service or API, or Desktop app project, add a line pointing at the reference
+  stack sheet the Tech Stack step actually used — `bun-web-app-stack.md`,
   `bun-static-spa-stack.md`, or `bun-electron-desktop-stack.md` under the installed plugin's
   `references/` directory (`${CLAUDE_PLUGIN_ROOT}/references/`, not a path inside this
   repository) — labelled as reference and layer checklist only, never a target to migrate the
-  project toward.
+  project toward. For Embedded, add the board's datasheet or vendor SDK once named.
+- The confirmation invites, in one clause, any existing documents, designs, or links the user
+  already has. Record what they give; ask nothing further.
 
-**Git Workflow** (if missing):
-- What is the branch strategy? (e.g., `develop` for active work, `main` for releases)
+**Git Workflow** (if missing) — **default, no questions.** Write these plugin conventions:
+- *Base branch:* `develop` if it already exists, otherwise `main`. Epic, docs, and quick-fix
+  branches merge into the base branch. Do not create `develop` for a solo project — every skill
+  detects which base exists.
 - Epic feature branches use the naming convention `feature/epic-<id>-<short-name>` where `<id>` is either a legacy integer (pre-v2.0.0 epics, e.g., `7` or `6.5`) or a 7-character alphanumeric ID (v2.0.0+ epics, e.g., `a3f2K7p`), and `<short-name>` is derived from the epic spec filename (e.g., `epic-a3f2K7p-user-auth.md` → `feature/epic-a3f2K7p-user-auth`). Include this convention in the Git Workflow section.
 - Quick-fix branches use the naming convention `hotfix/issue-<N>-<slug>` when tied to a GitHub issue, or `hotfix/<slug>` otherwise. Include this convention too.
-- Should merges use `--no-ff` to preserve commit history?
-- Should Claude ask before pushing to origin?
-- Are there files that must NEVER be committed? (e.g., `.env`, `appsettings*.json`, credentials)
+- Merges use `--no-ff` to preserve history.
+- Claude asks before every push to a remote.
+- Never commit: `.env` and `.env.*` (except `.env.example`), credential and key files, and the
+  stack's build output — plus whatever the existing `.gitignore` already excludes.
 
-**Verification Before Commit Rule** (if missing):
-- What command builds the project? (e.g., `dotnet build`, `npm run build`, `python -m build` — or skip if no explicit build step)
-- What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
+**Verification Before Commit Rule** (if missing) — **default, no questions.** Reuse the Build,
+Lint, and Tests commands already filled in for Verification & Quality Gates; do not re-derive
+them. Format fix: the sheet's `bun run lint:fix`, or the toolchain table's *format fix*. The
+*Verify* step by project type:
+  - *CLI tool:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
+  - *Web app / Service:* `curl` the version endpoint (web sheet: `curl http://localhost:3000/version`) or use `playwright-cli`. Static SPA: `bun run test:e2e`, which builds and previews the bundle.
+  - *Desktop app:* start the dev build (`bun run dev`) and run the Playwright Electron smoke test (`bun run test:e2e`).
+  - *Embedded:* host-side tests, then flash and read the boot banner on the debug console — or `TBD — set by the walking-skeleton epic`.
 
-  A thin answer ("whatever you recommend") takes the reference-sheet default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. All three sheets define the same core script names, so the gates are near-identical for Web app, Service or API, static SPA, and Desktop app: Build `bun run build` (Desktop also has `bun run package` for the electron-builder output); Lint `bun run lint` (Biome); Typecheck `bun run typecheck`; Dead code `bun run deadcode`; Tests `bun test` plus `bun run test:e2e`. `bun run check` runs typecheck + lint + deadcode + tests in one command — record it as the single pre-commit gate when the project took the sheet's `package.json` unchanged.
-- What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
-- How do you verify the tool/app works after build?
-  - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
-  - *Web/server projects:* curl a health endpoint (e.g., `curl http://localhost:8080/api/health`) or use `playwright-cli`
-  - *Desktop projects:* start the dev build (e.g., `bun run dev`) and run the Playwright Electron smoke test (e.g., `bun run test:e2e`)
-
-When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
+When generating the Verification Before Commit section for a CLI tool or Embedded project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation (or flash + boot banner) command, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
 - Generate the section using this template, filling in the project-specific commands:
 
 ```markdown
@@ -723,12 +807,16 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 ```​
 ```
 
-**Release Protocol** (if missing):
-- What branch do releases merge from? (e.g., `develop` → `main`)
-- Where does the version number live? (e.g., `.csproj`, `package.json`, `setup.py`)
-- Is there a CHANGELOG? If not, should one be created?
-- What tag format is used? (e.g., `vX.Y.Z`)
-- How does CI/CD respond to tags vs branch pushes?
+**Release Protocol** (if missing) — **default, no questions**:
+- *Branches:* from the Git Workflow base branch. With no `develop`, drop steps 2 and 4 of the
+  template and tag on `main` directly.
+- *Version file:* the Tool Hygiene **Version single source of truth** — never asked twice.
+- *CHANGELOG:* `CHANGELOG.md` in Keep a Changelog format; Step 7.2 creates it without asking.
+- *Tag format:* `vX.Y.Z`.
+- *CI note:* the existing workflows' behaviour when `code_present = true`; otherwise what the
+  sheet ships (static SPA: tests on pull requests, deploy to GitHub Pages on push to `main`;
+  web sheet: none yet — the walking-skeleton epic adds CI), or `TBD — set by the walking-skeleton
+  epic`.
 - Generate the section using this template, filling in the project-specific details:
 
 ```markdown
@@ -771,9 +859,42 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 **Note:** [Describe CI/CD behavior for branch pushes vs tags]
 ```
 
+**The one confirmation.** After the asked questions, and before Step 4 writes anything, show
+everything defaulted as a single plain-language summary — short, grouped by section, most
+technical detail in parentheses, each group naming its source (*found in your code* / *the
+recommended stack* / *standard for this language* / *peak-workflow convention* / *decided later
+by the first epic*). Example shape:
+
+```
+Here's how I'll set the project up. Nothing below needs a decision from you unless you want
+something different.
+
+What it is: A habit tracker for one person, used in the browser on their own devices.
+How it's built (the recommended stack): runs entirely in the browser (React + Vite), saves to
+  the browser's own storage (IndexedDB), published free on GitHub Pages.
+How it's checked before each commit (standard for this stack): type check, lint, tests
+  (`bun run check`), plus browser tests (`bun run test:e2e`).
+Version: shown in the app footer and the first console line (from package.json).
+Screens: follow standard accessibility rules — keyboard use, readable contrast, clear error
+  messages, confirmation before deleting.
+Git (peak-workflow convention): work happens on branches merged into main; I ask before pushing.
+Releases: tagged vX.Y.Z with a CHANGELOG.
+Decided later by the first epic: none.
+
+Does this look right? Say "ok", or tell me anything to change — and mention any existing
+documents or designs I should point to.
+```
+
+Ask it once, with `AskUserQuestion` (options: `"Looks right — write it"`, `"I want to change
+something"`), and apply every change the user names in one pass. Do not walk the sections one at
+a time, and do not re-confirm after applying changes unless a change alters the project type or
+a shape answer.
+
 ## Step 4: Apply Updates
 
-After gathering answers, add or update the missing sections in `CLAUDE.md`. Preserve all existing content — only add or strengthen sections.
+Add or update the missing sections in `CLAUDE.md` with the confirmed values. Preserve all existing
+content — only add or strengthen sections. Write `## Project Overview` first, directly under the
+title.
 
 ## Step 5: Summary
 
@@ -821,8 +942,12 @@ traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capt
 
 ### Generating `docs/architecture.md` stub
 
-Derive the content from CLAUDE.md's Tech Stack, data sources, and project description sections.
-For Desktop app projects title §4 "IPC Contracts" and §8 "Packaging & Distribution".
+Derive the content from CLAUDE.md's Project Overview, Tech Stack, and `**Product shape:**` block.
+For Desktop app projects title §4 "IPC Contracts" and §8 "Packaging & Distribution". For a
+static SPA (the browser-only sheet) write §4, §5, and §7 as `N/A — browser-only app, no server
+(Product shape)` and title §8 "Hosting" (GitHub Pages). For Embedded, title §4 "Hardware
+Interfaces", §6 "Device Software Architecture", and §8 "Build, Flash & Update", and write §5 and
+§7 as `N/A` unless the product also runs a service.
 
 ```markdown
 # [Project Name] — Architecture Document
@@ -836,7 +961,7 @@ For Desktop app projects title §4 "IPC Contracts" and §8 "Packaging & Distribu
 
 ## 1. System Overview
 
-[Derive from CLAUDE.md project description — 2-3 sentences about what the system does, who uses it, and the high-level deployment model (single container, microservices, serverless, etc.)]
+[Derive from CLAUDE.md's Project Overview — 2-3 sentences about what the system does, who uses it, and the high-level deployment model (single container, microservices, serverless, etc.)]
 
 ---
 
@@ -891,7 +1016,9 @@ For Desktop app projects title §4 "IPC Contracts" and §8 "Packaging & Distribu
 
 ### Generating `docs/design-notes.md` stub
 
-Derive the content from CLAUDE.md's Key Architecture Decisions and Important Reminders:
+Derive the content from the decisions this run recorded — the reference sheet chosen and why
+(the Product shape answers), any deferred sign-in — plus CLAUDE.md's Important Reminders and,
+in an existing project, any Key Architecture Decisions section it already has:
 
 ```markdown
 # [Project Name] — Design Decision Notes
@@ -908,7 +1035,7 @@ These notes capture design decisions and rationale that complement the Architect
 ---
 ```
 
-Then, for each item in CLAUDE.md's **Key Architecture Decisions** section (or equivalent), generate a numbered section:
+Then, for each of those decisions, generate a numbered section:
 
 ```markdown
 ## N. [Decision Title]
@@ -971,13 +1098,14 @@ For each item, check the repo root and report `[PASS]` / `[MISS]` / `[WEAK]`.
 Check whether `README.md` exists at the repo root.
 
 - If **present and non-empty**: `[PASS] README.md — exists`.
-- If **missing or empty**: prompt to create a stub. If the user agrees, generate using
-  this template (substitute project name and tech stack from CLAUDE.md):
+- If **missing or empty**: create the stub without asking — it is a default, and the user saw it
+  listed in the Step 3 confirmation. Use this template (substitute project name and tech stack
+  from CLAUDE.md):
 
 ```markdown
 # {Project Name}
 
-> {One-line description derived from CLAUDE.md project description.}
+> {One-line description derived from CLAUDE.md's Project Overview.}
 
 ## Install
 
@@ -1016,8 +1144,8 @@ See [LICENSE](LICENSE).
 Check whether `CHANGELOG.md` exists at the repo root.
 
 - If **present**: `[PASS] CHANGELOG.md — exists`.
-- If **missing**: prompt to create a [Keep a Changelog](https://keepachangelog.com/) stub.
-  If the user agrees, generate:
+- If **missing**: create a [Keep a Changelog](https://keepachangelog.com/) stub without asking —
+  the Release Protocol default already committed the project to one. Generate:
 
 ```markdown
 # Changelog
@@ -1061,7 +1189,9 @@ Check whether `LICENSE` (or `LICENSE.md`, `LICENSE.txt`) exists at the repo root
 
 Check whether `.gitignore` exists at the repo root.
 
-- If **missing entirely**: print `[MISS] .gitignore — file missing`. Recommend creating
+- If **missing entirely** and `code_present = false`: report `[N/A] .gitignore — no code yet;
+  the walking-skeleton epic creates it for the stack`. Nothing to do now.
+- If **missing entirely** and `code_present = true`: print `[MISS] .gitignore — file missing`. Recommend creating
   one from a tech-stack-appropriate template (e.g., GitHub's gitignore templates at
   `https://github.com/github/gitignore`). Do NOT auto-generate — the right template
   depends on the full toolchain.
@@ -1093,7 +1223,10 @@ Check whether any of these exist:
 
 If **at least one is present**: `[PASS] CI configuration — detected ({which})`.
 
-If **none present**: print `[MISS] CI configuration — no pipeline detected`. Do NOT
+If **none present** and `code_present = false`: report `[N/A] CI configuration — no code yet;
+the walking-skeleton epic sets up CI` and skip the guidance below.
+
+If **none present** and `code_present = true`: print `[MISS] CI configuration — no pipeline detected`. Do NOT
 auto-create — CI configuration is platform-specific and depends on the team's CI provider,
 secrets, and policies. Print this guidance:
 
@@ -1119,7 +1252,10 @@ Check for a lockfile appropriate to the tech stack declared in CLAUDE.md:
 
 If **lockfile present**: `[PASS] Lockfile — {filename} present`.
 
-If **lockfile missing** for the detected stack: print `[MISS] Lockfile — none found for
+If **lockfile missing** and `code_present = false`: report `[N/A] Lockfile — no code yet; the
+walking-skeleton epic's first install creates it` and skip the guidance below.
+
+If **lockfile missing** and `code_present = true`: print `[MISS] Lockfile — none found for
 {stack}`. Do NOT auto-create — lockfiles must be generated by the package manager
 (`npm install`, `poetry lock`, `cargo build`, etc.). Print this guidance:
 
@@ -1127,6 +1263,7 @@ If **lockfile missing** for the detected stack: print `[MISS] Lockfile — none 
 > CI runs may resolve different transitive dependency versions, producing flaky behavior.
 > Generate the lockfile by running the package manager's install command, then commit it.
 > For example:
+> - Bun: `bun install` (creates `bun.lock`) — commit it
 > - Node.js: `npm install` (creates `package-lock.json`) — commit it
 > - Python (Poetry): `poetry lock` — commit `poetry.lock`
 > - Python (uv): `uv lock` — commit `uv.lock`
@@ -1139,9 +1276,9 @@ Print a final checklist:
 [PASS / MISS / WEAK] README.md
 [PASS / MISS / WEAK] CHANGELOG.md
 [PASS / MISS]        LICENSE
-[PASS / MISS / WEAK] .gitignore
-[PASS / MISS]        CI configuration
-[PASS / MISS]        Lockfile ({stack-specific filename})
+[PASS / MISS / WEAK / N/A] .gitignore
+[PASS / MISS / N/A]  CI configuration
+[PASS / MISS / N/A]  Lockfile ({stack-specific filename})
 ```
 
 For each `MISS` / `WEAK` not yet resolved, repeat the recommendation with the file path
@@ -1157,7 +1294,7 @@ declared in Tool Hygiene & Operability:
 |---|---|
 | Web app / Hybrid with a web UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic` |
 | Desktop app | `frontend-design` (same source) for visual execution. UI verification uses the project's Playwright Electron harness (`@playwright/test`, a project dependency — not a skill); report `[N/A] playwright-cli — desktop apps verify through the Playwright Electron harness` |
-| CLI tool / Service or API / Library / Hybrid without a UI | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
+| CLI tool / Service or API / Library / Embedded / Hybrid without a UI | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
 
 For each recommended skill, check whether it appears in this session's available-skills list
 and report `[PASS] {skill} — installed` or `[MISS] {skill} — not installed`. Plugin skills are
@@ -1219,12 +1356,12 @@ Remind the user:
   version exposure, log startup stamping, logging convention, exit codes (CLI),
   stdout/stderr discipline (CLI), and error-message standards. Lines marked `N/A` are
   skipped.
-- *(UI project types only — omit for CLI / Service / Library:)* the **UX Baseline** section in `CLAUDE.md` follows the same chain:
+- *(UI project types only — omit for CLI / Service / Library / Embedded:)* the **UX Baseline** section in `CLAUDE.md` follows the same chain:
   `/peak-workflow:capture-requirements` turns each active line into a baseline UX TOR, the
   walking skeleton epic in `/peak-workflow:plan-project` installs the declared design system and
   proves those TORs on one reference screen, and `/peak-workflow:wrapup-epic` runs the UX
   Baseline check as a quality gate on every UI epic. Lines marked `N/A` are skipped.
-- *(UI project types only — omit for CLI / Service / Library:)* any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
+- *(UI project types only — omit for CLI / Service / Library / Embedded:)* any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
   `frontend-design` shapes visual execution, and the UX Baseline and design-system tokens take
   precedence over its aesthetic choices.
 - The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:wrapup-epic`

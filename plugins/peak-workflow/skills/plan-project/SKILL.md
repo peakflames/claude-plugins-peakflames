@@ -114,7 +114,10 @@ skeleton must:
   GitHub Pages project path resolves, `__APP_VERSION__` injected from `package.json#version`
   (this is the Version exposure mechanism — the footer and the first console line both read it),
   the Dexie `version().stores()` block, `fake-indexeddb` preloaded for tests, the JSON
-  export/import pair, and the deploy workflow in `.github/workflows/`. Desktop specifics the
+  export/import pair, and the deploy workflow in `.github/workflows/`. Web-sheet specifics the
+  skeleton must not drop: `packages/core/src/app.ts` as the one reader of `package.json#version`,
+  feeding `GET /version`, the footer, and the first log line from `apps/api/src/logger.ts`; and
+  Playwright's `testDir: "tests/e2e"`. Desktop specifics the
   sheet supplies and the skeleton must not drop:
   `trustedDependencies` (`electron`, `better-sqlite3`, `@electron/rebuild`) and the
   `electron-rebuild` postinstall, `asarUnpack` for `better-sqlite3`, `contextIsolation` +
@@ -157,6 +160,13 @@ skeleton must:
   static SPA: the sheet's `webServer` command builds and previews the bundle; web: the Vite
   build) and the launcher targets the built entry, so the Tests command in `CLAUDE.md` works
   cold in a fresh wrapup session.
+
+**Every project type — resolve the deferred setup values.** `/peak-workflow:setup` writes
+`TBD — set by the walking-skeleton epic` wherever nothing could decide a value before code existed
+(typical on Embedded: flash command, logger location, version channel). Grep `CLAUDE.md` for that
+string. The skeleton spec's Description lists every hit, and the skeleton replaces each one in
+`CLAUDE.md` with the real command, path, or mechanism it established — on its own feature branch,
+so wrapup sees the change. A skeleton that leaves one behind is not complete.
 
 **Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack — under the
 installed plugin's `references/` directory (`${CLAUDE_PLUGIN_ROOT}/references/`, not a path

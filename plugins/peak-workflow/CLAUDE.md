@@ -14,7 +14,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 | Skill | Purpose |
 |-------|---------|
 | `new-project` | Front-door router — detects project state and dispatches to the right entry point |
-| `setup` | Audit CLAUDE.md, stub architecture/design-notes docs (run once before discover) |
+| `setup` | Audit CLAUDE.md — ask only what the user alone knows, default the rest behind one confirmation; stub architecture/design-notes docs (run once before discover) |
 | `discover` | Adaptive interview → product-vision.md + concept-of-operations.md |
 | `mockup` | UI projects only — screen inventory (`S-NN`), per-scenario flows, grayscale wireframes; concretizes ConOps steps |
 | `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json |
@@ -64,6 +64,15 @@ row is written `N/A — <reason> (shape Q<N>)`, which `plan-project` reads as a 
 a missing layer. `discover` Step 4.5 re-checks the answers against the ConOps scenarios and asks
 before changing anything; the revision rides the same `docs/` branch merge as the requirements
 baseline.
+
+**Setup asks little, defaults the rest.** `setup` asks only what the user alone knows: Project
+Overview (drafted from `new-project`'s description when given), Project type (now including
+Embedded), the shape and sign-in questions, and a required language or device. Every other value
+comes from existing code, then the sheet, then the toolchain table, then a plugin convention, and is
+shown in one plain-language confirmation. A value nothing can decide yet is written
+`TBD — set by the walking-skeleton epic` (verbatim — `plan-project` greps it) and the skeleton
+resolves it. Defaults must never assume a Bun stack: CLI tools, libraries, embedded software, and
+other languages default through the toolchain table, not a sheet.
 
 **Auth defers the organization's provider, never authentication itself.** A "yes" to sign-in with
 no approved identity provider selects deferred mode, recorded by the greppable string
