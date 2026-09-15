@@ -862,7 +862,7 @@ them. Format fix: the sheet's `bun run lint:fix`, or the toolchain table's *form
   - *CLI tool:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
   - *Web app / Service:* `curl` the version endpoint on the port the project actually uses (web sheet: `curl http://localhost:3000/version`; .NET: the port in `Properties/launchSettings.json`) or use `playwright-cli`. Static SPA: `bun run test:e2e`, which builds and previews the bundle.
   - *Desktop app:* `bun run test:e2e` alone — it builds and launches the app itself; do not also run `bun run dev`.
-  - *Embedded:* host-side tests, then flash and read the boot banner on the debug console — or `TBD — set by the walking-skeleton epic`.
+  - *Embedded:* host-side tests, then flash and read the boot banner on the debug console, on the bench setup when the product switches mains power or heat — or `TBD — set by the walking-skeleton epic`.
 
 When generating the Verification Before Commit section for a CLI tool or Embedded project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation (or flash + boot banner) command, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with `bun run test:e2e`, which builds and launches the app itself.
 - Generate the section using this template, filling in the project-specific commands:

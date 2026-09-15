@@ -117,7 +117,7 @@ listed stays.
 | Dropped row (shape) | Tree (3) | Config and env (4, 5.1) | Code (5–7) | Compose, tests, commands (8.2, 9, 10) | Section 11 rows | Instead |
 |---|---|---|---|---|---|---|
 | **Auth** (Q2) | `apps/api/src/auth.ts`, `apps/api/src/routes/users.ts`, `packages/core/src/access.ts`, `apps/web/src/auth-client.ts`, `tests/setup/auth.ts` | 4.1 `better-auth`; 4.2 `BETTER_AUTH_SECRET` and `GOOGLE_WORKSPACE_DOMAIN`; 4.4 `"/auth"` proxy entry; 4.8 `# Auth` block, including the `GOOGLE_*`/`MICROSOFT_*` lines; 5.1 `BETTER_AUTH_SECRET`, the `GOOGLE_*`/`MICROSOFT_*` lines and `superRefine` | 5.2 Better Auth tables and `userId` columns; `userId` segment of `attachmentKey` (5.4); 6.1 `./auth` and `ROLES` imports, `users` import and `.route("/users", …)`, `/auth/*` handler, `/api` session middleware, `userId`/`role` in `Variables`; 6.3; 6.8; 7.6; `can()` calls, actors and `userId` filters (6.4, 6.5, 6.6) | 9 Access rule, Role change, Unverified sign-up and Organization address squatting rows; `signInForTest`, `json` helper, access-rule, create-refused, role-change, unverified sign-up and squatting tests; E2E sign-in steps | Access rule bypass; Create skips the access rule; Derived data leaks other people's rows; No role change path; Role names scattered; Account takeover through provider linking; Organization address squatting; Org role from user input; Org-only admits any Google account; Provider-written fields editable; Post-login blank page in dev; Provider secrets required everywhere; Auth tables drift; Session cookie cross-origin in dev | Routes are public; keep `/healthz`, `/version` as-is. Email delivery is also `N/A` |
-| **Email delivery** (Q2 — no public password sign-up: Auth `N/A`, Google `org-only`, or every account comes from the named provider) | `apps/api/src/mail.ts` | 4.2 `EMAIL_DELIVERY` line; 4.8 `# Email` block; 5.1 the `EMAIL_*` lines and their `superRefine` check | 6.3 `./mail` import, `requireEmailVerification`, `revokeSessionsOnPasswordReset`, `sendResetPassword`, the `emailVerification` block, the `EMAIL_NOT_VERIFIED` entry and the "or use Forgot password" clause; 7.6 sign-up `callbackURL` note and the forgot/reset-password lines | 9 Unverified sign-up row and test (keep its `releaseUnverifiedEmail` half when Google is on); `outbox` import, `lastLinkTo` and the verification lines in `signInForTest`; "verification link" in the E2E row | Email never delivered; the verification clause of Account takeover through provider linking | Production sets `emailAndPassword.disableSignUp: process.env.NODE_ENV === "production"` (org-only already does, 6.3), so no stranger registers a password account to verify |
+| **Email delivery** (Q2 — no public password sign-up: Auth `N/A`, Google `org-only`, or every account comes from the named provider) | `apps/api/src/mail.ts` | 4.2 `EMAIL_DELIVERY` line; 4.8 `# Email` block; 5.1 the `EMAIL_*` lines and their `superRefine` check | 6.3 `./mail` import, `requireEmailVerification`, `revokeSessionsOnPasswordReset`, `sendResetPassword`, the `emailVerification` block, the `EMAIL_NOT_VERIFIED` entry, the "or use Forgot password" clause and the `hooks.before` reset branches; 7.6 sign-up `callbackURL` note and the forgot/reset-password lines | 9 Unverified sign-up row and test (keep its `releaseUnverifiedEmail` half when Google is on); the reset clauses of the squatting row and test; `outbox` import, `lastLinkTo`, `mailsTo` and the verification lines in `signInForTest`; "verification link" in the E2E row | Email never delivered; the verification clause of Account takeover through provider linking | Production sets `emailAndPassword.disableSignUp: process.env.NODE_ENV === "production"` (org-only already does, 6.3), so no stranger registers a password account to verify |
 | **Object storage** + **Local S3** (Q3) | `packages/core/src/storage/`, `apps/api/src/routes/attachments.ts`; "+ minio" in the `docker-compose.yml` comment | 4.2 the four `S3_*` lines; 4.8 `# S3` block, including its host-dev `S3_ENDPOINT` comment; 5.1 every `S3_*` | 5.2 `attachments` table; 5.4; 5.5 `"attachment"` in `Resource` and every `attachment` grant; 6.1 `attachments` import and `.route("/attachments", …)`; 6.4; 7.3 | 8.2 `minio`, `minio-init`, the app's `S3_*` environment lines and `depends_on`, `miniodata` volume, both notes under 8.2; 9 S3 wrapper row, `slot` and the upload-slot test, "upload" in the E2E row; 10 `docker compose up -d minio minio-init` — the create-refused test moves to the project's first create route | Bulk uploads through the app; Trusting client-reported size; Orphaned S3 objects; Presigned URL host mismatch locally; Missing CORS on bucket; Unsafe object keys; Content type allowlist | **Backups:** the host scheduler runs `sqlite3 <data-volume>/app.db ".backup <backup-volume>/app-<date>.db"` into a mounted backup volume (not S3) |
 | **Live updates** (Q4) | `packages/core/src/events.ts`, `apps/api/src/routes/events.ts`, `apps/web/src/queries/live-updates.ts` | 4.2 `FakeEventSource` and its assignment in `tests/setup/happy-dom.ts` | 6.1 `events` import and `.route("/events", …)`; 6.7; `publish` import and calls (6.6); 7.5 | 9 Live updates row; "live updates" in the E2E row | Live updates on one process; SSE dropped by idle timeout (only when Per-request streaming is also `N/A`) | TanStack Query refetch on window focus; `idleTimeout` may stay |
 | **Per-request streaming** (no shape question — `N/A — no streamed responses`) | `apps/api/src/routes/messages.ts`, `packages/core/src/services/assistant.ts` | — | 5.2 `messages` table and the `attachments.messageId` column that references it; 6.1 `messages` import and `.route("/messages", …)`; 6.5; 7.4 | "streaming" in the 9 E2E row | Abandoned streams waste model calls; SSE dropped by idle timeout (only when Live updates is also `N/A`) | The response is returned whole by a normal route |
@@ -1187,10 +1187,26 @@ export async function releaseUnverifiedEmail(email: string) {
   // a signed-in user adds a provider with authClient.linkSocial() (7.6), proving control of both.
   account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
   hooks: {
-    // Refuses before Better Auth looks the address up, so an existing and a new organization
-    // address get the same 400 — the create hook alone answers 200 for an existing one
+    // An organization address never gets or uses a password, so Workspace policy (MFA, offboarding)
+    // governs every sign-in. Each check runs before Better Auth looks the address up, so an existing
+    // and a new organization address get the same answer — the create hook alone answers 200 for an
+    // existing one on sign-up.
     before: createAuthMiddleware(async (ctx) => {
-      if (ctx.path === "/sign-up/email" && isOrgAddress(String(ctx.body?.email ?? ""))) throw useGoogleSignIn();
+      const email = String(ctx.body?.email ?? "");
+      if ((ctx.path === "/sign-up/email" || ctx.path === "/sign-in/email") && isOrgAddress(email)) throw useGoogleSignIn();
+      // A reset creates a credential password on an account that has none. Returning skips the
+      // handler (no token, no mail) with its unknown-address answer, so the response reveals nothing.
+      if (ctx.path === "/request-password-reset" && isOrgAddress(email)) {
+        return ctx.json({ status: true, message: "If this email exists in our system, check your email for the reset link" });
+      }
+      // Defense in depth: a link issued before this check (links last 1 hour) or by server code.
+      // Peeks at the token without consuming it; the handler consumes it only after this passes.
+      if (ctx.path === "/reset-password") {
+        const token = ctx.body?.token ?? ctx.query?.token;
+        const found = token && (await ctx.context.internalAdapter.findVerificationValue(`reset-password:${token}`));
+        const owner = found && (await ctx.context.internalAdapter.findUserById(found.value));
+        if (owner && isOrgAddress(owner.email)) throw useGoogleSignIn();
+      }
     }),
   },
   databaseHooks: {
@@ -1236,6 +1252,7 @@ The web client turns a refusal into plain words — the email form reads `error.
 ```ts
 // Sign-in screen: signInErrorMessage(new URLSearchParams(window.location.search).get("error"))
 // Sign-up form:   signInErrorMessage((await authClient.signUp.email(input)).error?.code)
+// Sign-in form:   signInErrorMessage((await authClient.signIn.email(input)).error?.code)
 ```
 
 - **Only the recorded provider.** Microsoft alone: omit the Google entry, the added imports and
@@ -1248,9 +1265,14 @@ The web client turns a refusal into plain words — the email form reads `error.
   env.GOOGLE_AUDIENCE === "org-only" && process.env.NODE_ENV === "production"` so outsiders cannot
   register by password (Email delivery is then `N/A`, 2.1). *Mixed* (members of the organization plus outsiders on personal Google or
   email/password): no `hd`; everyone signs in, the create hook grants the org role only to a verified `hd`
-  equal to `GOOGLE_WORKSPACE_DOMAIN`, and `hooks.before` refuses a password sign-up at that domain or a subdomain.
+  equal to `GOOGLE_WORKSPACE_DOMAIN`, and `hooks.before` keeps passwords away from that domain or a subdomain:
+  sign-up and sign-in are refused, a reset request sends nothing, and a reset token is refused.
   Outsiders' password accounts must verify their email first. Mixed needs
   the OAuth consent screen's user type set to **External**.
+- **No other path sets a password.** `setPassword` is server-only (never on the HTTP router);
+  `changePassword` needs an existing credential; Resend verification link and `onPasswordReset`
+  write no password; `user.changeEmail` stays off. Server code never calls `auth.api.setPassword`
+  for an organization address.
 - **Unverified password account, then Google for the same address.** The unverified account never
   had a session. Google's verified sign-in deletes it (`releaseUnverifiedEmail`) and creates a new
   account; Better Auth's own gate would refuse to link Google into the unverified row anyway.
@@ -1751,7 +1773,7 @@ presigning. The second option is cleaner and is what `presignUpload` should use.
 | Access rule | `bun test` + `app.request()` | Per resource: owner allowed, non-owner 404, permitted role allowed, and list routes return only readable rows — for every record route. Every create route refuses a role without a create grant (403). |
 | Role change | `bun test` + `app.request()` | `PATCH /api/users/:id/role`: every role but the org role gets 403; a name outside `ROLES` gets 400; the org role succeeds. |
 | Unverified sign-up | `bun test` + `app.request()` | A password sign-up gets no session: sign-in is 403 `EMAIL_NOT_VERIFIED` and emails a fresh link, `/api` is 401. Resend verification link sends a link that verifies. A repeat sign-up emails the owner; a password reset verifies the account and replaces the password. Google provider only: `releaseUnverifiedEmail` removes the row and its credential, so a Google sign-in for that address starts a fresh account. |
-| Organization address squatting | `bun test` + `app.request()` (Google provider only) | Password sign-up at `GOOGLE_WORKSPACE_DOMAIN` or a subdomain is refused with `USE_GOOGLE_SIGN_IN` — the same 400 for an existing address. |
+| Organization address squatting | `bun test` + `app.request()` (Google provider only) | At `GOOGLE_WORKSPACE_DOMAIN` or a subdomain, existing address or not: password sign-up and sign-in are refused with `USE_GOOGLE_SIGN_IN` (400); a reset request sends no mail and answers exactly as for an unknown address; a reset token for such an account is refused and creates no password. |
 | Live updates | `bun test` on `events.ts`; E2E with two browser contexts | A change in one context appears in the other without a reload. |
 | S3 wrapper | `bun test` against MinIO from compose | Real client, real bucket. Skip with `test.skipIf(!process.env.MINIO_UP)` in CI without Docker. |
 | React components | `bun test` + happy-dom + Testing Library | Preloaded via `bunfig.toml` on origin `http://localhost:3000`; `EventSource` is `FakeEventSource` — import it from `tests/setup/happy-dom.ts` and drive it with `FakeEventSource.instances[0]?.emit("change", …)` (4.2). |
@@ -1932,7 +1954,7 @@ test("a repeat sign-up emails the owner, and a password reset verifies and takes
 
 The test file imports `post`, `lastLinkTo` and `mailsTo` alongside `signInForTest`, and `outbox`
 from `@api/mail`. Google provider only — needs the
-`GOOGLE_WORKSPACE_DOMAIN` test line (4.2); imports `releaseUnverifiedEmail` from `@api/auth`,
+`GOOGLE_WORKSPACE_DOMAIN` test line (4.2); imports `auth` and `releaseUnverifiedEmail` from `@api/auth`,
 `eq` from `drizzle-orm`, and `account`, `user` from `@core/db/schema`:
 
 ```ts
@@ -1948,18 +1970,37 @@ test("Google for the same address does not inherit an unverified password accoun
   expect((await post(app, "/auth/sign-in/email", body)).status).toBe(401); // the password is gone too
 });
 
-test("an organization address cannot register by password, existing or not", async () => {
-  // An existing member, as Google's callback would have created them
+test("an organization address never gets or uses a password, existing or not", async () => {
+  // An existing member, as Google's callback would have created them — no credential account
   const existing = `member-${crypto.randomUUID()}@workspace.test`;
+  const memberId = crypto.randomUUID();
   const now = new Date();
-  await db.insert(user).values({ id: crypto.randomUUID(), name: "Member", email: existing, emailVerified: true, createdAt: now, updatedAt: now });
+  await db.insert(user).values({ id: memberId, name: "Member", email: existing, emailVerified: true, createdAt: now, updatedAt: now });
+
+  // What Better Auth answers for an address with no account
+  const unknown = await post(app, "/auth/request-password-reset", { email: `nobody-${crypto.randomUUID()}@example.com` });
+  const generic = await unknown.json();
 
   const emails = [existing, `squatter-${crypto.randomUUID()}@workspace.test`, `squatter-${crypto.randomUUID()}@mail.workspace.test`];
   for (const email of emails) {
-    const res = await post(app, "/auth/sign-up/email", { email, password: "test-password-123", name: "Squatter" });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { code?: string }).code).toBe("USE_GOOGLE_SIGN_IN");
+    for (const path of ["/auth/sign-up/email", "/auth/sign-in/email"]) {
+      const res = await post(app, path, { email, password: "test-password-123", name: "Squatter" });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { code?: string }).code).toBe("USE_GOOGLE_SIGN_IN");
+    }
+    const reset = await post(app, "/auth/request-password-reset", { email });
+    expect(reset.status).toBe(200);
+    expect(await reset.json()).toEqual(generic);
+    expect(mailsTo(email)).toBe(0);
   }
+
+  // A reset token for the member (as the handler would issue it) is refused, not consumed into a password
+  const token = crypto.randomUUID();
+  const ctx = await auth.$context;
+  await ctx.internalAdapter.createVerificationValue({ value: memberId, identifier: `reset-password:${token}`, expiresAt: new Date(Date.now() + 60_000) });
+  const res = await post(app, "/auth/reset-password", { token, newPassword: "test-password-123" });
+  expect(((await res.json()) as { code?: string }).code).toBe("USE_GOOGLE_SIGN_IN");
+  expect(await db.select().from(account).where(eq(account.userId, memberId))).toEqual([]);
 });
 ```
 
@@ -2039,7 +2080,7 @@ Each of these is already handled by the configuration above.
 | Unverified account locked out | The verification link expires or never arrives; signing up again sends nothing, so the address is stuck. | Link lasts 24 h (`emailVerification.expiresIn`); each password sign-in mails a fresh one (`sendOnSignIn`); Resend verification link (`sendVerificationEmail`); `onPasswordReset` marks the email verified; tested (6.3, 7.6, 9). |
 | Stranger's sign-up claims the address | Someone signs up with the victim's address; the victim clicks that earlier link and verifies the stranger's password. | The victim's own sign-up triggers `onExistingUserSignUp`, emailing "use Forgot password"; the reset verifies, replaces the password and revokes sessions (cached ones within 5 minutes); tested (6.3, 9). |
 | Sign-up timing reveals accounts | An awaited email makes a new address answer slower than an existing one. | `advanced.backgroundTasks.handler` sends sign-up, sign-in and reset emails after the response; log mode records the link before returning (6.3). |
-| Organization address squatting | Someone registers a Workspace address by password first, locking the real person out (`account_not_linked`) and posing as them. | `hooks.before` on `/sign-up/email` refuses `GOOGLE_WORKSPACE_DOMAIN` or a subdomain with `USE_GOOGLE_SIGN_IN` before any lookup, so existing and new addresses get the same 400; the create hook is the backstop; tested (6.3, 9). |
+| Organization address squatting | Someone registers a Workspace address by password first, locking the real person out (`account_not_linked`) and posing as them. Or Forgot password adds a password to a Google-created account, so its owner or anyone with the mailbox signs in outside Workspace policy (MFA, offboarding) with the org role. | `hooks.before`, for `GOOGLE_WORKSPACE_DOMAIN` or a subdomain, before any lookup: `/sign-up/email` and `/sign-in/email` throw `USE_GOOGLE_SIGN_IN` (same 400 for existing and new); `/request-password-reset` returns the unknown-address answer, sending nothing; `/reset-password` refuses such a token's owner. The create hook is the backstop; `setPassword` is server-only; tested (6.3, 9). |
 | Org role from user input | A sign-up body or outside Google account claims the organization's role. | Role set in `databaseHooks.user.create.before` from Google's `hd` claim on the Google callback only; `role` is `input: false` (6.3). |
 | Org-only admits any Google account | Google on without a mode, or org-only without a domain, sets no `hd`; mixed without a domain grants nobody the org role and skips the squatting check. | `GOOGLE_AUDIENCE` plus `superRefine` (domain required whenever a mode is set) crash at boot; `hd` read from it (5.1, 6.3). |
 | Provider-written fields editable | `authClient.updateUser` rewrites `hostedDomain` or `role`. | `databaseHooks.user.update.before` strips both; no authorization reads `hostedDomain` except the create hook (6.3). |

@@ -104,6 +104,14 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Fixed
 
+- **Bench-only rule reached only start-epic's pre-check** — it is now a verbatim standing rule in
+  every plan and in wrapup's verification, covers flashing and running the board, and
+  `HIL_BENCH=1` is set only by the user.
+- **Organization accounts could gain a password** — web sheet refuses password sign-in, reset
+  requests, and reset tokens for organization addresses, keeping Workspace sign-in policy in force.
+- **No way back from a planning blocker** — `discover` resolves `**Open — blocks planning:**` lines in
+  place, without a new interview or changelog.
+
 - **Automated HIL runs could drive live equipment** — every `tests/hil/` run on mains power or heat
   requires a confirmed bench setup, and the harness refuses without `HIL_BENCH=1`.
 - **Discovery blockers never reached planning** — `**Open — blocks planning:**` lines and missing
