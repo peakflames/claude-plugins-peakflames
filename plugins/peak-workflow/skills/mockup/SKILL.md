@@ -145,8 +145,13 @@ are processed from scratch (or only the scenario named in `$ARGUMENTS`).
 baseline; this run only **adds or changes** screens for the scenarios named in `$ARGUMENTS` or
 in the unprocessed discovery changelog listed above. Read the changelog **read-only** — do not
 archive or rename it; `/peak-workflow:capture-requirements` does that. Its "What Changed" rows
-for `concept-of-operations.md` Section 5 identify the scenarios in scope. If `$ARGUMENTS` is empty and no unprocessed changelog exists, diff the
-ConOps against the last commit that touched `ux/screens.md`:
+for `concept-of-operations.md` Section 5 identify the scenarios in scope. A changelog whose
+`**Mode:**` line reads `Brownfield (UX concretization)` is this skill's own output from an earlier
+run on this branch — it names no changed scenarios, so for scoping it counts as no discovery
+changelog: fall through to `$ARGUMENTS` or the git-diff fallback below. It still counts toward
+the two-or-more stop above and still receives the Step 7 item 5 in-place replace. If `$ARGUMENTS`
+is empty and no discovery changelog scopes the run, diff the ConOps against the last commit that
+touched `ux/screens.md`:
 ```bash
 git diff $(git log -1 --format=%H -- docs/product-vision-planning/ux/screens.md) -- docs/product-vision-planning/concept-of-operations.md
 ```
@@ -159,7 +164,7 @@ Report detection:
 ```
 Mode: [Greenfield / Brownfield]
 Scenarios in scope: [list of "Scenario N: {title}"]
-Unprocessed discovery changelog: [filename or "none found"]
+Unprocessed discovery changelog: [filename / filename (UX concretization — not used for scoping) / "none found"]
 ```
 
 ---
@@ -184,6 +189,7 @@ One row per screen, with these columns (the table format is in
 |---|---|
 | **Screen ID** | `S-NN`, 2-digit zero-padded, sequential from `S-01`. Brownfield: continue from the highest existing number; never renumber. |
 | **Name** | Title-case noun phrase the user would say — "Orders List", "Order Detail", "Sign In". |
+| **Wireframe** | `wireframes/S-NN-<kebab-name>.html`, relative to `ux/` — the file Step 5.1 writes. The Application menu and Window rows write `—`. Downstream skills copy this path verbatim into epic `## Screens` tables. |
 | **Purpose** | One sentence: what the actor accomplishes here. |
 | **Entry points** | How the user arrives: a nav item, a control on another screen (`S-02 "Open" button`), a deep link, app launch. |
 | **Primary actions** | Each action **names its control and its visible text** — "Save button", "Delete… menu item", "Status filter select". No bare verbs. |
@@ -199,6 +205,9 @@ Rules:
 - Prefer the fewest screens that satisfy the scenarios. A dialog or sheet that has its own
   actions and data is a screen; a confirmation dialog for a destructive action is **not** — it
   is an action on its parent screen and appears in the wireframe's populated state.
+- Scenario 1's thinnest list screen carries the entity's row-level `"Delete…"` action, with its
+  confirmation dialog in the populated state (as `WIREFRAME_TEMPLATE.md` shows) — this is what
+  the **Destructive actions** baseline TOR in `/peak-workflow:capture-requirements` anchors on.
 - Keep to the design-system primitives the UX Baseline declares (default shadcn/ui). Name nothing
   the walking skeleton cannot compose from them.
 - **Desktop apps (`is_desktop = true`)** also get two rows that share the ID space but are not
@@ -274,8 +283,9 @@ row and states in place; bump the document version (minor) and date.
 
 ### 5.1: One HTML file per screen
 
-For every screen in scope (not the Application menu and Window rows), write
-`docs/product-vision-planning/ux/wireframes/S-NN-<kebab-name>.html` following
+For every screen in scope (not the Application menu and Window rows), write the file its
+`Wireframe` column in `ux/screens.md` names —
+`docs/product-vision-planning/ux/wireframes/S-NN-<kebab-name>.html` — following
 `plugins/peak-workflow/skills/mockup/WIREFRAME_TEMPLATE.md`. Each file is self-contained:
 
 - **Inline CSS only** — grayscale palette, system font stack, dashed region boxes with a small
@@ -420,9 +430,9 @@ Before the self-check, verify:
   has all four `section.state` blocks with matching copy.
 - [ ] Every primary action names a control with its visible text; the same text appears in the
   wireframe and in the rewritten ConOps step.
-- [ ] Every wireframe file referenced from `ux/screens.md` exists at
-  `docs/product-vision-planning/ux/wireframes/S-NN-<kebab-name>.html`, and every file there is
-  referenced.
+- [ ] Every path in the `Wireframe` column of `ux/screens.md` exists under
+  `docs/product-vision-planning/ux/` (`wireframes/S-NN-<kebab-name>.html`), and every file in
+  `wireframes/` appears in that column. Only the Application menu and Window rows carry `—`.
 - [ ] Every `div.region` carries a `data-component` value from the Step 5.1 list.
 - [ ] Desktop apps: `ux/screens.md` has the Application menu and Window rows; every wireframe
   has the menu-bar strip.
