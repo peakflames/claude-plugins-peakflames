@@ -61,11 +61,12 @@ user accepts the whole row with one answer or overrides any cell:
 | Project type | Default stack (accept as-is or override any cell) |
 |---|---|
 | **Web app** | TypeScript end to end. Bun runtime with Hono (or Elysia) for the server; React + Vite + shadcn/ui + Tailwind v4 for the UI; `bun:sqlite` for the database. Bun for install / run / test / `bunx`. |
-| **Desktop app** | TypeScript end to end. Electron Forge `vite-typescript` template scaffolded with `bunx create-electron-app@latest <name> --template=vite-typescript`, React added afterwards (`bun add react react-dom`, `bun add -d @vitejs/plugin-react`); shadcn/ui + Tailwind v4 in the renderer; better-sqlite3 in the main process only (Forge rebuilds it for Electron automatically; DB file under `app.getPath('userData')`, WAL mode); electron-log; electron-window-state. Bun for install / scripts / `bunx`; tests via Vitest (`bunx vitest`) for renderer and pure-TypeScript main code, and Playwright Electron (`@playwright/test`, `_electron.launch`) for anything touching better-sqlite3 or IPC — `bun test` cannot load the Electron-rebuilt binary. The app itself runs on Electron's bundled Node, not the Bun runtime, so `bun:sqlite` and other Bun APIs are not available inside the app. |
+| **Desktop app** | TypeScript end to end. Electron Forge `vite-typescript` template — scaffold into a temporary directory (`bunx create-electron-app@latest /tmp/<name> --template=vite-typescript`; the scaffolder nests a folder and refuses a non-empty root), move the generated files into the repo root without overwriting `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, or `.gitignore`, then `bun install`; React added afterwards (`bun add react react-dom`, `bun add -d @vitejs/plugin-react`); shadcn/ui + Tailwind v4 in the renderer; better-sqlite3 in the main process only (Forge rebuilds it for Electron automatically; DB file under `app.getPath('userData')`, WAL mode); electron-log; electron-window-state. Bun for install / scripts / `bunx`; tests via Vitest (`bunx vitest`) for renderer and pure-TypeScript main code, and Playwright Electron (`@playwright/test`, `_electron.launch`) for anything touching better-sqlite3 or IPC — `bun test` cannot load the Electron-rebuilt binary. The app itself runs on Electron's bundled Node, not the Bun runtime, so `bun:sqlite` and other Bun APIs are not available inside the app. |
 | **Service or API** | TypeScript. Bun runtime with Hono (or Elysia); `bun:sqlite`; Bun for install / run / test / `bunx`. |
 | **CLI tool / Library** | If no language is named: TypeScript on Bun (`bun init`, `bun test`, single-file executable via `bun build --compile`), `bun:sqlite` if it needs a database. If a language is named, that language's standard toolchain (e.g., Python: `uv`, `pytest`, `ruff`, a `pyproject.toml` console-script entry point). |
 
-Every project type: start with SQLite unless the user names another database. Desktop note:
+Every project type: start with SQLite unless the user names another database or the product
+has no persistence. Desktop note:
 if `package.json` gains a `trustedDependencies` list, it replaces Bun's default trusted list,
 so `electron` and `better-sqlite3` must then be listed explicitly.
 
@@ -160,7 +161,8 @@ Generate the section using this template, filling in the project-specific answer
 This section declares the project's conventions for the load-bearing tool-hygiene practices.
 Each line is a baseline TOR requirement source — `/peak-workflow:capture-requirements` will
 ensure at least one TOR exists per active line, written in the form appropriate to the
-declared mechanism. Lines marked `N/A` are skipped.
+declared mechanism. Lines marked `N/A` are skipped. Project type and Version single source
+of truth are declarations, not TOR sources.
 
 **Project type:** [CLI tool / Web app / Desktop app / Service or API / Library / Hybrid]
 
@@ -185,10 +187,9 @@ includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting
 **stdout / stderr discipline:** [CLI / Hybrid — restate; otherwise: `N/A`]
 
 **Error message standard:** User-facing errors name the problem AND the next user action.
-CLI example: `Error: configuration file not found at <path>. Try --config to specify an
-alternate path.`
-Desktop example: `Could not save order #123: the database file is locked. Close other copies
-of the app and try again.`
+[CLI example: `Error: configuration file not found at <path>. Try --config to specify an
+alternate path.` / Web or Desktop example: `Could not save order #123: the database file is
+locked. Close other copies of the app and try again.` — keep the one that applies]
 ```
 
 **UX Baseline** (if missing — Project type Web app, Desktop app, or Hybrid with a UI only):
@@ -280,7 +281,8 @@ accept / override answer; override line by line only where the user asks.
     the vision / ConOps or the user names Open, Save, Import, or Export:
     - Application menu with the platform's standard menus (App / File / Edit / View / Window /
       Help on macOS; File / Edit / View / Help elsewhere) using standard roles for Undo, Redo,
-      Cut, Copy, Paste, Select All, Close, Minimize, Quit, About.
+      Cut, Copy, Paste, Select All, Close, Minimize, Quit. Help > About is the in-app item
+      declared under Version exposure, not a standard role.
     - Keyboard accelerators: primary commands use `CmdOrCtrl` accelerators matching the
       platform's standard shortcuts, and every menu item with a shortcut displays it.
     - Window size, position, and maximized state are restored on relaunch, clamped to a
@@ -356,7 +358,8 @@ form input survives an accidental reload of the same screen. (WCAG 2.2 SC 3.3.7)
 [Desktop app only:]
 **Desktop conventions:** (each bullet is a TOR)
 - Application menu with the platform's standard menus and standard roles for Undo, Redo, Cut,
-  Copy, Paste, Select All, Close, Minimize, Quit, About.
+  Copy, Paste, Select All, Close, Minimize, Quit; Help > About is the in-app item declared
+  under Version exposure.
 - Primary commands have `CmdOrCtrl` accelerators matching platform shortcuts; every menu item
   with a shortcut displays it.
 - Window size, position, and maximized state are restored on relaunch, clamped to a visible display.
@@ -415,17 +418,21 @@ makes them inapplicable.
   - Build/compile check? If so, what command?
   - Tests? If so, what command?
   - Linting or formatting? If so, what command?
-  - Visual/screenshot verification? (suggest `playwright-cli` skill if frontend)
+  - Visual/screenshot verification? (suggest `playwright-cli` for web UIs; the Playwright
+    Electron harness in `e2e/` for desktop)
   - Brand or design compliance? (suggest brand guidelines skill if applicable)
   - Any other project-specific checks?
   - Where do tests live? List every directory wrapup must grep — unit and E2E (Desktop
-    default: `tests/` and `e2e/`).
+    default: `tests/` and `e2e/`). List the E2E directory last on the Test directories line.
 
-  *For CLI/tool projects skip the visual/screenshot and brand questions — ask only about build, tests, lint, and "run the tool with a known input" (reuse the Local Environment invocation).*
+  *For CLI/tool projects skip the visual/screenshot and brand questions — ask only about build, tests, lint, "run the tool with a known input" (reuse the Local Environment invocation), and where tests live (usually one directory; no E2E).*
 
   The written section must open with this template (substitute the answers; keep the bold
   labels verbatim — `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` grep every
-  directory on the `Test directories` line, which is **space-separated**, no commas):
+  directory on the `Test directories` line, which is **space-separated**, no commas, E2E
+  directory last). Omit the `(UI only)` rows for CLI / Service / Library projects; include the
+  `Run the tool` row for CLI projects only; drop the second half of the `Tests` row when there
+  is no E2E suite:
 
 ```markdown
 ## Verification & Quality Gates
@@ -435,8 +442,9 @@ makes them inapplicable.
 Run every applicable check before marking an epic Implemented or Complete:
 
 - **Build:** `[build command]`
-- **Tests:** `[test command]`
+- **Tests:** `[unit command]` (tests/); `[e2e command]` (e2e/)
 - **Lint / format:** `[lint command]`
+- **Run the tool:** `[invocation with known input]` → `[expected output]`
 - **Visual / console (UI only):** [`playwright-cli` against the running app / the Playwright Electron harness in `e2e/`]
 - **Brand (UI only, if a brand skill is configured):** [skill name]
 - [Any other project-specific check]
@@ -477,7 +485,7 @@ If the second answer is still ambiguous, accept it and add a note in the written
   - *Web/server projects:* curl a health endpoint (e.g., `curl http://localhost:8080/api/health`) or use `playwright-cli`
   - *Desktop projects:* start the dev build (e.g., `bun run start`) and run the Playwright Electron smoke test (e.g., `bunx playwright test`)
 
-When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers. For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
+When generating the Verification Before Commit section for a CLI/tool project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation command from the Local Environment answers, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
 - Generate the section using this template, filling in the project-specific commands:
 
 ```markdown
@@ -871,7 +879,7 @@ secrets, and policies. Print this guidance:
 ### 7.6: Lockfile
 
 Check for a lockfile appropriate to the tech stack declared in CLAUDE.md:
-- Node.js: `package-lock.json` | `yarn.lock` | `pnpm-lock.yaml` | `bun.lockb`
+- Node.js: `package-lock.json` | `yarn.lock` | `pnpm-lock.yaml` | `bun.lock` | `bun.lockb`
 - Python: `poetry.lock` | `uv.lock` | `Pipfile.lock` | `requirements.txt` with pinned `==` versions
 - Rust: `Cargo.lock`
 - Go: `go.sum`
@@ -950,19 +958,29 @@ Record the outcome as a `**Recommended skills:**` line inside the **Peak Workflo
 the UX Baseline and the design-system tokens take precedence over its aesthetic choices.
 ```
 
+Desktop app variant of the first sentence:
+
+```markdown
+**Recommended skills:** `frontend-design@claude-plugins-official` (installed); `playwright-cli`
+N/A — desktop apps verify through the Playwright Electron harness in `e2e/`.
+```
+
 Also print the precedence rule to the user verbatim: `frontend-design` shapes visual
 execution; the UX Baseline and the design-system tokens take precedence over its aesthetic
 choices.
 
 ## Step 9: Final Summary
 
-**Unborn-HEAD check:** if `git rev-parse --verify HEAD` fails (no commits yet), ask via
-`AskUserQuestion` whether to commit the setup files now as `chore: initial project setup` on the
-current branch (`main` by default) so `/peak-workflow:discover` can branch from a real base:
+**Unborn-HEAD check:** first run `git rev-parse --is-inside-work-tree`; if it fails, this is
+not a git repository — suggest `git init` and skip the rest of this check. Otherwise, if
+`git rev-parse --verify HEAD` fails (no commits yet), ask via `AskUserQuestion` whether to
+commit the setup files now as `chore: initial project setup` on the current branch (`main` by
+default) so `/peak-workflow:discover` can branch from a real base:
 - Question: `"This repo has no commits yet. Commit the setup files now as 'chore: initial project setup' so /peak-workflow:discover can branch from a real base?"`
 - Options: `["Commit now", "I'll commit myself"]`
 On "Commit now", stage the files this session wrote or modified by path (never `git add -A`)
-and commit.
+and commit. On "I'll commit myself", print: "Commit before running `/peak-workflow:discover` —
+otherwise `main` will not exist to merge the docs/ branch back to."
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work

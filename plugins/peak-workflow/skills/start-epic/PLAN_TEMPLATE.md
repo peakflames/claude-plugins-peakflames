@@ -14,7 +14,12 @@ Placeholder reference:
 - `<TOR-list>` — comma-separated list of TOR IDs from the Requirements Anchors table
 - `<test-directories>` — every directory listed under Test directories in CLAUDE.md's
   Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if the line is
-  absent, the single test directory that section names)
+  absent, the single test directory that section names). If no directory can be derived (a
+  legacy Tests row like `pytest` names none), ask once via `AskUserQuestion`:
+  - Question: `"Which directories hold tests? (space-separated, E2E last)"`
+  - Then offer to write the answer as the `**Test directories:**` line of the Verification &
+    Quality Gates section. If the user declines, replace the per-directory grep loop with
+    `git grep -l "<TOR-ID>" -- ':!docs'`.
 - `<deferral-count>` — the `Count:` value from the handoff's Deferrals section
 - `<handoff-path>` — `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md`
 
@@ -174,7 +179,8 @@ Middle step example:
      directory for every TOR ID. A miss means the test is not traceable — fix the test before
      continuing.
   - ```bash
-    grep -inE 'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
+    grep -inE --exclude-dir={.venv,node_modules,__pycache__,.pytest_cache,dist,build,out} \
+      'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
       $(git diff --name-only <base-branch>; git ls-files --others --exclude-standard)
     ```
      Judge each hit: a marker describing incomplete TOR behavior is a deferral-gate trigger for

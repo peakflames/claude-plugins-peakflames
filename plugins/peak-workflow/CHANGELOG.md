@@ -68,6 +68,16 @@ that CLI tools already get from Tool Hygiene & Operability.
 - **Skeleton sizing and prerequisites** — reference screen may be Scenario 1's thinnest real
   screen; skeleton exempt from the TOR-count check; shadcn init prerequisites on the Forge
   template; `discover` §9 stays within the declared design system; unborn-HEAD check in `setup`.
+- **Second dry-run pass (CLI + desktop)** — literal `# Tool Hygiene & Operability` banner and
+  Haiku reads CLAUDE.md labels; Project type and Version single source of truth are
+  declarations, not TOR sources; baseline UX TOR Givens anchor on one reference screen with a
+  test-only fault switch; `About` dropped from standard menu roles.
+- **Verification & Quality Gates template** — `(UI only)` rows omitted for non-UI projects, a
+  `Run the tool` row for CLIs, per-directory test commands, E2E directory listed last; legacy
+  CLAUDE.md without a Test directories line prompts once or falls back to `git grep`.
+- **Housekeeping** — Fix-now at wrapup removes a successor's duplicate TOR ownership; stub grep
+  excludes dependency dirs and the skeleton adds `.gitignore`; Forge scaffold goes through a
+  temp dir; `bun.lock` recognised; SQLite default skipped for products without persistence.
 
 ---
 

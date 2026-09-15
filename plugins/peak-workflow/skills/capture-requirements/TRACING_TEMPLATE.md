@@ -35,12 +35,13 @@ For each TOR ID in the feature file:
    scenario step (cite as `S{N}` for scenario number, `.{step}` for step number within the
    scenario) that the requirement traces to. Write a 1–2 sentence paraphrase explaining
    **what user intent this requirement serves**.
-4. If the Scenario sits under the tool-hygiene banner or the `# UX Baseline` banner, it is a
-   baseline TOR: trace it to `CLAUDE.md` under `claude_md` with `section` (`Tool Hygiene &
-   Operability` or `UX Baseline`) and `line` (the bold label; for Desktop conventions,
-   `Desktop conventions — <bullet>`), plus a 1–2 sentence paraphrase. The `vision` and `conops`
-   arrays may be empty for these; domain TORs leave `claude_md` empty. Never record a baseline
-   TOR as `orphan_requirement`.
+4. Read the `Tool Hygiene & Operability` and `UX Baseline` sections of `CLAUDE.md`. If the
+   Scenario sits under the `# Tool Hygiene & Operability` banner or the `# UX Baseline`
+   banner, it is a baseline TOR: trace it to `CLAUDE.md` under `claude_md` with `section`
+   (`Tool Hygiene & Operability` or `UX Baseline`) and `line` (copy the bold label verbatim;
+   for Desktop conventions, `Desktop conventions — <bullet>`), plus a 1–2 sentence paraphrase.
+   The `vision` and `conops` arrays may be empty for these; domain TORs leave `claude_md`
+   empty. Never record a baseline TOR as `orphan_requirement`.
 5. If a credible trace cannot be found for any source: record the TOR ID under
    `coverage_gaps` with `gap_type: "orphan_requirement"`.
 6. After processing all TOR IDs, enumerate ConOps scenario steps and PV goals that are

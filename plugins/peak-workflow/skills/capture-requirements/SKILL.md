@@ -198,11 +198,16 @@ Present:
 
 Total: {N} feature files
 [If tool_hygiene_section_present = true:]
-Baseline tool-hygiene TORs: leading section of docs/requirements/01-<name>.feature.md
+Baseline tool-hygiene TORs: leading `# Tool Hygiene & Operability` section of
+docs/requirements/01-<name>.feature.md
 [If ux_baseline_section_present = true:]
 Baseline UX TORs: `# UX Baseline` section of docs/requirements/01-<name>.feature.md,
 immediately after the tool-hygiene block (say so if you want a dedicated
 NN-ux-baseline.feature.md instead)
+[If the ConOps names Open / Save / Import / Export and the Desktop conventions file-dialog
+bullet in CLAUDE.md is N/A:]
+Desktop conventions — file dialogs: the ConOps names <operation>, so the file-dialog TOR will
+be derived anyway — flip the `N/A` bullet in CLAUDE.md's UX Baseline section to active.
 ```
 
 Use `AskUserQuestion`:
@@ -248,7 +253,15 @@ Place baseline TORs in the **most appropriate functional-area feature file** (ty
 the first feature file — `01-cli.feature.md` for CLI tools, `01-app.feature.md` for web
 apps, `01-service.feature.md` for services, `01-api.feature.md` for libraries / SDKs).
 If the natural functional area is not the first file (e.g., logging baseline belongs in a
-dedicated `NN-logging.feature.md`), use that file instead.
+dedicated `NN-logging.feature.md`), use that file instead. Write them under a literal
+`# Tool Hygiene & Operability` section banner (`# ---` comment block per
+`FEATURE_TEMPLATE.md`) — the Haiku sub-agent in 3A.5 keys on that exact heading, as it does
+on `# UX Baseline` in 3A.2.2.
+
+**Project type** and **Version single source of truth** are declarations, not TOR sources —
+neither has a black-box observable, so neither yields a TOR (the same carve-out as **Design
+system** in 3A.2.2). Exclude both from the Step 4 trace table and from the Step 7 "Tool
+Hygiene lines covered" count.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them.
@@ -307,15 +320,22 @@ TOR (an `N/A` Desktop conventions bullet yields no TOR).
 
 Place baseline UX TORs in the **first feature file**, immediately after the tool-hygiene
 block, under a `# UX Baseline` section banner (`# ---` comment block per
-`FEATURE_TEMPLATE.md`). If the user asked for a dedicated file at the 3A.1b grouping gate,
-write them to `docs/requirements/NN-ux-baseline.feature.md` instead. Baseline UX TORs precede
-domain TORs, exactly like the tool-hygiene TORs.
+`FEATURE_TEMPLATE.md`) followed by a `# Note: reference screen — <screen>` line naming the
+one screen every Given below is anchored on. If the user asked for a dedicated file at the
+3A.1b grouping gate, write them to `docs/requirements/NN-ux-baseline.feature.md` instead.
+Baseline UX TORs precede domain TORs, exactly like the tool-hygiene TORs.
 
 Baseline UX TORs are **black-box and Playwright-observable**: assert on roles, visible text,
 `document.activeElement`, computed styles, viewport size, and document title — never on
-component internals. Use generic screen and control names (`the Settings screen`, `the Save
-button`) unless the ConOps names a concrete one. For a desktop app, the same assertions run
-through the project's Playwright Electron harness against the dev build with a live main process.
+component internals. Anchor every baseline UX TOR's Given on **one reference screen**: the
+thinnest entity list in ConOps Scenario 1, with its create form and its delete action (the
+Application menu / Window stands in for Desktop conventions). That is the screen the walking
+skeleton in `/plan-project` builds — Givens that name several screens make it build all of
+them. Error-state and Progress feedback Givens cite the skeleton's test-only fault / latency
+switch rather than a real failure or slow operation (`Given the test fault switch forces the
+data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).
+For a desktop app, the same assertions run through the project's Playwright Electron harness
+against the dev build with a live main process.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them. Where the Web app and Desktop app forms differ, both are given. Rows with
@@ -334,7 +354,7 @@ semicolon-separated clauses yield one TOR per clause.
 | **Navigation** | The application shall give every screen a unique document title, exactly one visible H1 matching it, and a primary navigation whose current item is marked with `aria-current` | The application shall give every window a unique title, exactly one visible H1 matching it, and a primary navigation whose current item is marked |
 | **Responsiveness budget** (if not `N/A`) | The application shall render the primary screens at the 75th percentile with LCP ≤ 2.5 s, INP ≤ 200 ms, and CLS ≤ 0.1 | The application shall acknowledge every interaction on screen within {N} ms |
 | **Undo** (if not `N/A`) | The application shall offer an Undo action for at least 5 seconds after a reversible action, and shall preserve unsaved form input across a reload of the same screen | (same) |
-| **Desktop conventions** — menu | N/A | The application shall provide a menu bar with the platform's standard menus and standard roles for Undo, Redo, Cut, Copy, Paste, Select All, Close, Minimize, Quit, and About |
+| **Desktop conventions** — menu | N/A | The application shall provide a menu bar with the platform's standard menus and standard roles for Undo, Redo, Cut, Copy, Paste, Select All, Close, Minimize, and Quit; Help > About is the in-app item declared under Version exposure |
 | **Desktop conventions** — accelerators | N/A | The application shall bind each primary command to the platform's standard `CmdOrCtrl` accelerator and display the accelerator on its menu item |
 | **Desktop conventions** — window state | N/A | The application shall restore the main window's last size, position, and maximized state on relaunch, clamped to a visible display |
 | **Desktop conventions** — single instance | N/A | The application shall focus and restore the running window when launched a second time instead of starting a second instance |
@@ -346,6 +366,8 @@ Error-message wording is covered by the Tool Hygiene **Error message standard** 
 For each baseline UX TOR, write a concrete, observable Given/When/Then. Examples:
 
 ```gherkin
+# Note: reference screen — the Projects screen (project list, Create project form, Delete project)
+
 Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit empty state when a list screen has no items
     Given the user is authenticated and owns zero projects
     When the user navigates to the Projects screen
@@ -353,15 +375,21 @@ Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit empty stat
     And the main content region should contain a "Create project" button
     And no element with role "progressbar" should be visible
 
+Scenario: [TOR-01-{XXXXXXX}] The application shall render an explicit error state when a data-bearing screen fails to load
+    Given the test fault switch forces the data source to fail
+    When the user navigates to the Projects screen
+    Then the main content region should contain visible text "Could not load projects"
+    And the main content region should contain a "Retry" button
+
 Scenario: [TOR-01-{XXXXXXX}] The application shall identify an invalid form field in text that names the problem and the correction
-    Given the Create Account form is open
-    When the user enters "not-an-email" in the Email field and activates the Submit button
-    Then the Email field should have aria-invalid="true"
-    And an element referenced by the Email field's aria-describedby should contain text "Enter an email address in the form name@example.com"
-    And focus should be on the Email field
+    Given the Create project form is open on the Projects screen
+    When the user leaves the Name field empty and activates the Create button
+    Then the Name field should have aria-invalid="true"
+    And an element referenced by the Name field's aria-describedby should contain text "Enter a project name"
+    And focus should be on the Name field
 
 Scenario: [TOR-01-{XXXXXXX}] The application shall require confirmation before deleting a record, with Cancel as the safe default
-    Given the Documents list shows a document named "Q3 Report"
+    Given the Projects screen lists a project named "Q3 Report"
     When the user activates the Delete action for "Q3 Report"
     Then a dialog with role "dialog" and aria-modal="true" should be visible containing the text "Delete Q3 Report?"
     And document.activeElement should be the Cancel button
@@ -378,6 +406,11 @@ Scenario: [TOR-01-{XXXXXXX}] The application shall focus the running instance wh
 **Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
 `CLAUDE.md` will have no **Desktop conventions** line and will typically mark
 `Responsiveness budget: N/A` and `Undo: N/A` — those rows produce no baseline TORs.
+
+One exception: setup defaults the Desktop conventions file-dialog bullet to `N/A` before a
+ConOps exists. If the ConOps names Open, Save, Import, or Export and that bullet is still
+`N/A`, derive the file-dialog TOR anyway and flag the `CLAUDE.md` bullet at the 3A.1b grouping
+gate for the user to flip to active.
 
 ### 3A.3: TOR ID Generation
 
@@ -415,11 +448,13 @@ After all feature files are written, invoke a Haiku sub-agent using the `Agent` 
 > scenario, find the most specific matching section in
 > `docs/product-vision-planning/product-vision.md` and the most specific scenario step in
 > `docs/product-vision-planning/concept-of-operations.md`. Write paraphrases in your own words
-> — do not copy source text. Scenarios under the tool-hygiene banner or the `# UX Baseline`
-> banner trace to `CLAUDE.md` — record them under `traces_to.claude_md`, citing `section`
-> (`Tool Hygiene & Operability` or `UX Baseline`) and the bold `line` label; never record them
-> as `orphan_requirement`. If no credible trace can be found for a requirement, record it
-> under `coverage_gaps` with `gap_type: "orphan_requirement"`. Also enumerate ConOps scenario
+> — do not copy source text. Read the `Tool Hygiene & Operability` and `UX Baseline` sections
+> of `CLAUDE.md`. Scenarios under the `# Tool Hygiene & Operability` banner or the
+> `# UX Baseline` banner trace to `CLAUDE.md` — record them under `traces_to.claude_md`,
+> citing `section` (`Tool Hygiene & Operability` or `UX Baseline`) and copying the bold label
+> verbatim into `line` (for Desktop conventions, `Desktop conventions — <bullet>`); never
+> record them as `orphan_requirement`. If no credible trace can be found for a requirement,
+> record it under `coverage_gaps` with `gap_type: "orphan_requirement"`. Also enumerate ConOps scenario
 > steps and PV goals not covered by any TOR ID and record those under `coverage_gaps` with
 > `gap_type: "uncovered_source"` in the most relevant feature file's sidecar. Do NOT modify
 > any `.feature.md` file. Do NOT commit. After processing all files, report one line per
@@ -543,7 +578,8 @@ internal scratch.
 - **Every active (non-`N/A`) line in the `Tool Hygiene & Operability` section of `CLAUDE.md`,
   if `tool_hygiene_section_present = true`.** Cite each as `CLAUDE.md Tool Hygiene: {line label}`
   (e.g., `CLAUDE.md Tool Hygiene: Version exposure`). Each must map to at least one
-  baseline TOR generated in Step 3A.2.1.
+  baseline TOR generated in Step 3A.2.1. **Project type** and **Version single source of
+  truth** are declarations, not rows (3A.2.1).
 - **Every active TOR line in the `UX Baseline` section of `CLAUDE.md`, if
   `ux_baseline_section_present = true`** (one row per **Desktop conventions** bullet). Cite
   each as `CLAUDE.md UX Baseline: {line label}` (e.g., `CLAUDE.md UX Baseline: Screen states`,
@@ -582,9 +618,11 @@ Before presenting the summary, verify:
   (Orphan requirements must either gain a source trace — vision, ConOps, or a CLAUDE.md
   baseline line — or be removed.)
 - [ ] If `tool_hygiene_section_present = true`: every active (non-`N/A`) line in
-  `CLAUDE.md`'s `Tool Hygiene & Operability` section is covered by at least one TOR
-  in the produced feature files. The trace appears in the Step 4 trace table with the
-  source `CLAUDE.md Tool Hygiene: {line label}` and `Explicit? = Y`.
+  `CLAUDE.md`'s `Tool Hygiene & Operability` section (excluding **Project type** and
+  **Version single source of truth**) is covered by at least one TOR, placed under the
+  `# Tool Hygiene & Operability` banner before any domain TOR. The trace appears in the
+  Step 4 trace table with the source `CLAUDE.md Tool Hygiene: {line label}` and
+  `Explicit? = Y`.
 - [ ] If `ux_baseline_section_present = true`: every active (non-`N/A`) TOR line in
   `CLAUDE.md`'s `UX Baseline` section (excluding **Design system**) is covered by at least one
   TOR, placed under the `# UX Baseline` banner before any domain TOR. The trace appears in the
@@ -623,7 +661,7 @@ Preserve the original timestamp. The `.processed` suffix prevents re-consumption
 - Baseline UX TORs: {G} [omit row if not a UI project; "skipped — UX Baseline section absent" if a UI project without the section]
 - ConOps scenario steps covered: {X} of {Y}
 - Product Vision goals/scope items covered: {A} of {B}
-- Tool Hygiene lines covered: {T} of {U} [omit row if section absent]
+- Tool Hygiene lines covered: {T} of {U} [omit row if section absent; Project type and Version single source of truth are declarations and do not count]
 - UX Baseline lines covered: {V} of {W} [omit row if not applicable; each non-`N/A` Desktop conventions bullet counts as its own line]
 - Tracing gaps resolved: {M}
 
