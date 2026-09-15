@@ -39,7 +39,7 @@ Follow these steps exactly:
    > The requirements baseline is empty. Run `/peak-workflow:capture-requirements` first to
    > establish TOR requirements before adding epics. Epics reference TOR IDs as their acceptance
    > criteria — without a requirements baseline, there are no acceptance criteria to reference.
-5. Read `docs/product-vision-planning/ux/screens.md` if it exists (UI projects — written by `/peak-workflow:mockup`). Capture each `S-NN`, name, and wireframe path, and grep existing specs for `## Screens` sections to note which epic owns each screen. Steps 2.2 and 6 use this.
+5. Read `docs/product-vision-planning/ux/screens.md` if it exists (UI projects — written by `/peak-workflow:mockup`). Capture each `S-NN`, name, and wireframe path (the `Wireframe` column — `wireframes/S-NN-{kebab}.html`, relative to `ux/`, or `—`), and grep existing specs for `## Screens` sections to note which epic owns each screen. Steps 2.2 and 6 use this.
 
 ## Step 2: Resolve the Request
 
@@ -117,7 +117,9 @@ requirements match" message above.
 **Screens (UI epics, when `ux/screens.md` exists).** A UI epic lists the `S-NN` screens its
 confirmed TORs name in their Given/When — those are its `## Screens` rows in Step 6. A screen
 belongs to exactly one epic: if another epic's spec already lists it, ask the same Keep / Move
-question as for a TOR, with the same Not Started rule for moving.
+question as for a TOR, with the same Not Started rule for moving. Never offer Move for an `S-NN`
+the `# Note: reference screen` / `reference screens` line in the first feature file names — those
+are skeleton-owned; offer Keep only, and the new epic extends the screen without re-listing it.
 
 **Assign the epic ID:** generate a fresh **7-character random alphanumeric ID** for each new epic via:
 
@@ -221,7 +223,7 @@ both are involved.}
 
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise.
-- Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name and wireframe path copied verbatim from `ux/screens.md`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) write `—` in the Wireframe column — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. A screen appears in exactly one epic's Screens table.
+- Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name copied verbatim from `ux/screens.md` and wireframe path copied verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. A screen appears in exactly one epic's Screens table.
 
 **Populating Requirements Anchors:**
 
@@ -265,9 +267,10 @@ Before writing each spec, verify:
    requirement), use `requirements: —`.
    Create the `docs/implementation-plan/status/` directory if it does not already exist.
 
-3. **Moved TORs** — for each TOR moved here in Step 2.2, remove its ID from the donor epic's
-   sidecar `requirements:` line and delete its row from the donor spec's Requirements Anchors
-   table. Skip if nothing was moved.
+3. **Moved TORs and screens** — for each TOR moved here in Step 2.2, remove its ID from the
+   donor epic's sidecar `requirements:` line and delete its row from the donor spec's
+   Requirements Anchors table. For each `S-NN` moved here, delete its row from the donor spec's
+   `## Screens` table. Skip if nothing was moved.
 
 ## Step 8: Self-Check — Trace Inputs to Outputs
 

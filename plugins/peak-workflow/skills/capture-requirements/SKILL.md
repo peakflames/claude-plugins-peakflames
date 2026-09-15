@@ -349,9 +349,11 @@ Application menu / Window stands in for Desktop conventions). When `screens_pres
 that is Scenario 1's thinnest list screen in `ux/screens.md` — cite its `S-NN` in the `# Note:`
 line. `mockup` 3.1 makes a create form with its own actions a separate screen; when the
 inventory did that, the form screen is the second reference screen — cite it in the same note
-so the Forms TOR has a home, and name no third screen. `/plan-project` reads the IDs to pick the
-skeleton's screens. Those are the screens the walking skeleton in `/plan-project` builds —
-Givens that name any other screen make it build that one too. Error-state and Progress
+so the Forms TOR has a home, and name no third screen. If neither reference screen carries an
+irreversible action in the inventory, anchor **Destructive actions** on the list screen's
+row-level Delete and flag the inventory row at the 3A.1b gate. `/plan-project` reads the IDs to
+pick the skeleton's screens. Those are the screens the walking skeleton in `/plan-project`
+builds — Givens that name any other screen make it build that one too. Error-state and Progress
 feedback Givens cite the skeleton's test-only fault / latency switch rather than a real
 failure or slow operation (`Given the test fault switch forces the
 data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).

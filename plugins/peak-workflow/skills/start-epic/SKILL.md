@@ -64,7 +64,11 @@ Follow these steps exactly:
     `ux/screens.md` row and the Desktop conventions TORs). The wireframe is
     the **layout contract** — what is on the screen and what it is called; the TOR
     Given/When/Then is the **behavior contract**. Where they disagree, the TOR wins and the
-    middle step says so. If the section is absent, skip this item without comment.
+    middle step says so. Also open, via the `Wireframe` column in
+    `docs/product-vision-planning/ux/screens.md`, the wireframe of every `S-NN` this epic's TOR
+    Givens/Whens (item 4a) name that is absent from the spec's `## Screens` — a slice extending
+    a skeleton-owned screen — and carry it into the middle steps the same way. If neither the
+    section nor `ux/screens.md` exists, skip this item without comment.
 5. **Pre-flight scan for new artifacts.** After reading the spec, grep its body for the literal strings `NEW component` and `NEW spec`. Surface any matches in your plan as explicit "create file X" steps so the plan names every new file upfront, rather than discovering them mid-implementation.
 6. **Verify the Requirements Anchors.** The epic spec contains a `## Requirements Anchors` table
    listing TOR IDs and their feature files. Before planning or implementation, perform this

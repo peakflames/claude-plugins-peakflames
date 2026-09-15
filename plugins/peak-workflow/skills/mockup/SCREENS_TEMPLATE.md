@@ -17,6 +17,7 @@ feature numbers: **stable and append-only**.
 | `{S-NN}` | Screen ID, 2-digit zero-padded, sequential (`S-01`, `S-02`, …) |
 | `{Screen Name}` | Title-case noun phrase the user would say ("Orders List", "Sign In") |
 | `{kebab-name}` | `{Screen Name}` in kebab case — the wireframe filename stem |
+| `{wireframe}` | `wireframes/{S-NN}-{kebab-name}.html`, relative to `ux/`; `—` for the Application menu and Window rows |
 | `{purpose}` | One sentence: what the actor accomplishes on this screen |
 | `{entry points}` | Nav item, `{S-NN} "{control text}"` on another screen, deep link, or app launch |
 | `{control text}` | The exact visible text of a control, followed by its kind: `"Save" button` |
@@ -42,13 +43,13 @@ feature numbers: **stable and append-only**.
 
 ## Screen Inventory
 
-| Screen ID | Name | Purpose | Entry points | Primary actions | Data shown | States | Serves |
-|-----------|------|---------|--------------|-----------------|------------|--------|--------|
-| {S-NN} | {Screen Name} | {purpose} | {entry points} | `"{control text}" button`; `"{control text}" menu item` | {data shown} | loading / empty / error / populated | {S1.1}, {S1.2} |
-| {S-NN} | {Screen Name} | {purpose} | {S-NN} `"{control text}" button` | `"{control text}" button` | {data shown} | n/a — not data-bearing | {S1.3} |
+| Screen ID | Name | Wireframe | Purpose | Entry points | Primary actions | Data shown | States | Serves |
+|-----------|------|-----------|---------|--------------|-----------------|------------|--------|--------|
+| {S-NN} | {Screen Name} | `wireframes/{S-NN}-{kebab-name}.html` | {purpose} | {entry points} | `"{control text}" button`; `"{control text}" menu item` | {data shown} | loading / empty / error / populated | {S1.1}, {S1.2} |
+| {S-NN} | {Screen Name} | `wireframes/{S-NN}-{kebab-name}.html` | {purpose} | {S-NN} `"{control text}" button` | `"{control text}" button` | {data shown} | n/a — not data-bearing | {S1.3} |
 [Desktop only:]
-| {S-NN} | Application menu | Platform menu bar | App launch | File: `"New…" Ctrl+N`, `"Open…" Ctrl+O`, `"Save" Ctrl+S`, `"Quit" Ctrl+Q`; Edit: `"Undo"`, `"Redo"`, `"Cut"`, `"Copy"`, `"Paste"`, `"Select All"`; View: …; Window: …; Help: `"About {Product Name}"` | — | n/a — not data-bearing | {S2.1}, {S4.6} |
-| {S-NN} | Window | Top-level window behavior | App launch | Resize, move, maximize | Minimum size {W×H}; last bounds and maximized state restored on relaunch; title `{doc name}{unsaved marker} — {Product Name}` | n/a — not data-bearing | {S1.1} |
+| {S-NN} | Application menu | — | Platform menu bar | App launch | File: `"New…" Ctrl+N`, `"Open…" Ctrl+O`, `"Save" Ctrl+S`, `"Quit" Ctrl+Q`; Edit: `"Undo"`, `"Redo"`, `"Cut"`, `"Copy"`, `"Paste"`, `"Select All"`; View: …; Window: …; Help: `"About {Product Name}"` | — | n/a — not data-bearing | {S2.1}, {S4.6} |
+| {S-NN} | Window | — | Top-level window behavior | App launch | Resize, move, maximize | Minimum size {W×H}; last bounds and maximized state restored on relaunch; title `{doc name}{unsaved marker} — {Product Name}` | n/a — not data-bearing | {S1.1} |
 
 ---
 

@@ -54,6 +54,11 @@ desktop apps are derived against named screens, controls, and states.
   stops on multiple unprocessed changelogs; no duplicate reference-screen state TORs; the
   grayscale check is CSS-scoped; `/mockup` added to the CLAUDE.md and requirements README
   command lists.
+- **Confirmation pass** — `screens.md` gains a `Wireframe` column that every consumer copies
+  verbatim; the list screen carries the row-level Delete the Destructive actions TOR anchors on;
+  skeleton-owned screens are Keep-only in `add` and moved screens leave the donor's table;
+  `start-epic` opens wireframes of screens its TORs name; mockup's own changelog never scopes a
+  run.
 
 ---
 

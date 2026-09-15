@@ -45,7 +45,7 @@ Follow these steps exactly:
    > derive formal TOR requirements from the vision and ConOps documents. `/plan-project`
    > derives epics from TOR IDs, not directly from ConOps scenarios.
 5. **Load tracing sidecars.** Glob `docs/requirements/*.feature.tracing.json`. For each, read the vision and ConOps linkage for supplementary context when writing epic Descriptions.
-6. **Load the screen inventory (UI projects).** Read `docs/product-vision-planning/ux/screens.md` if present (written by `/peak-workflow:mockup`). Capture every `S-NN` ID, name, wireframe path (`docs/product-vision-planning/ux/wireframes/S-NN-{kebab}.html`), states, and the per-scenario `## Flows`. Set `screens_present = true`; Steps 3A.1, 3A.2, 4, 5.2, and 6 use it. Absent → `false`, no comment.
+6. **Load the screen inventory (UI projects).** Read `docs/product-vision-planning/ux/screens.md` if present (written by `/peak-workflow:mockup`). Capture every `S-NN` ID, name, wireframe path (the `Wireframe` column — `wireframes/S-NN-{kebab}.html`, relative to `ux/`, or `—`), states, and the per-scenario `## Flows`. Set `screens_present = true`; Steps 3A.1, 3A.2, 4, 5.2, and 6 use it. Absent → `false`, no comment.
 
 ## Step 2: Detect Greenfield vs Brownfield
 
@@ -383,7 +383,7 @@ skeleton's app shell and design system — no new component library, no new toke
 
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise.
-- Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it. Copy the name and wireframe path verbatim from `ux/screens.md`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) write `—` in the Wireframe column — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
+- Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it. Copy the name verbatim from `ux/screens.md`, and the wireframe path verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
 
 **Populating Requirements Anchors:**
 
