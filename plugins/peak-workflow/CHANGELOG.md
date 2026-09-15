@@ -6,6 +6,33 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.10.0] — 2026-09-15
+
+Reference stack sheets for web and desktop projects, shipped as reference material only.
+
+### Added
+
+- **`references/` directory** — two reference sheets, `bun-web-app-stack.md` (Bun runtime,
+  Hono, single container, SQLite, S3) and `bun-electron-desktop-stack.md` (Bun toolchain,
+  Electron shell, React + shadcn/ui, SQLite), plus a `README.md` index.
+- **Layer checklist use** — each sheet's Stack Summary table names every layer a project of
+  that shape must handle, so `/setup` and `/plan-project` can spot an undecided layer.
+- **Reference-only guardrail** — sheets, index, and both call sites state that `CLAUDE.md`'s
+  Tech Stack always wins and that divergence is never a finding, a TOR, or a reason to
+  re-platform an existing project.
+- **Recorded deviations** — `references/README.md` tables the three deliberate differences
+  between the desktop sheet and the `/setup` desktop default (scaffolder, packaging, test
+  runner), so neither side gets "corrected" toward the other.
+
+### Changed
+
+- **`setup` Tech Stack step** — points the Web app, Service or API, and Desktop app defaults
+  at the matching sheet, and marks a populated Tech Stack section `[PASS]` without comparison.
+- **`plan-project` walking skeleton** — greenfield only, uses the matching sheet's layer list
+  to check the skeleton's end-to-end path; brownfield planning ignores the sheets entirely.
+
+---
+
 ## [1.9.0] — 2026-09-15
 
 Low-fidelity UX prototyping between discovery and requirements capture, so TORs for web and

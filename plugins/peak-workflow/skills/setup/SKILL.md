@@ -70,6 +70,27 @@ has no persistence. Desktop note:
 if `package.json` gains a `trustedDependencies` list, it replaces Bun's default trusted list,
 so `electron` and `better-sqlite3` must then be listed explicitly.
 
+**Reference stacks.** The Web app, Service or API, and Desktop app rows above are the condensed
+form of two reference sheets that ship with this plugin:
+
+| Project type | Reference sheet |
+|---|---|
+| Web app, Service or API | `plugins/peak-workflow/references/bun-web-app-stack.md` |
+| Desktop app | `plugins/peak-workflow/references/bun-electron-desktop-stack.md` |
+
+Read the matching sheet **only** when the user accepted a default row and wants the fuller
+picture (repository layout, config files, the friction points each pick already accounts for),
+or when you need the *Stack Summary* table as a checklist of the layers this project shape has
+to handle. Where a sheet and the default row above differ, the row above wins — the deviations
+are deliberate and recorded in `plugins/peak-workflow/references/README.md`.
+
+**Existing projects: reference only.** If `CLAUDE.md` already has a populated Tech Stack, that
+section is the single source of truth and this step is `[PASS]` — do not compare it against the
+sheets, do not report divergence, and never propose re-platforming, rewriting, or swapping a
+library to match. The sheets are usable on an existing project for one thing only: noticing a
+**layer the project has not decided yet** (e.g., no migration tool, no E2E runner, no secrets
+convention). Raise such a gap as a question, never as a rewrite.
+
 **Local Environment** (if missing):
 
 First, determine the project type from the Tech Stack answers already captured. If the tech stack includes Electron, Tauri, or a native windowing toolkit, treat it as a **desktop project**. Otherwise, if it includes a web framework, HTTP server, REST API library, or mentions "frontend" / "backend", treat it as a **web/server project**. Otherwise (CLI tool, library, script), treat it as a **CLI/tool project**.
@@ -467,6 +488,10 @@ If the second answer is still ambiguous, accept it and add a note in the written
 **Reference Materials** (if missing):
 - Are there architecture docs, design docs, or reference projects Claude should read?
 - Any external resources (Confluence, Linear, Figma) worth pointing to?
+- For a Web app, Service or API, or Desktop app project, offer to add a line pointing at the
+  matching reference stack sheet (`plugins/peak-workflow/references/bun-web-app-stack.md` or
+  `bun-electron-desktop-stack.md`), labelled as reference and layer checklist only — never a
+  target to migrate the project toward.
 
 **Git Workflow** (if missing):
 - What is the branch strategy? (e.g., `develop` for active work, `main` for releases)

@@ -129,6 +129,16 @@ skeleton must:
   builds) and `_electron.launch` targets the built entry, so the Tests command in `CLAUDE.md`
   works cold in a fresh wrapup session.
 
+**Reference stacks (greenfield only).** When deciding which layers the skeleton's "thinnest
+possible path" has to touch, the *Stack Summary* table in the matching reference sheet —
+`plugins/peak-workflow/references/bun-web-app-stack.md` for a web app or service,
+`plugins/peak-workflow/references/bun-electron-desktop-stack.md` for a desktop app — is a
+checklist of the layers a product of that shape handles. Use it to catch a layer the skeleton
+forgot (migrations, E2E runner, packaging, secrets handling). It is **not** a stack to impose:
+`CLAUDE.md`'s Tech Stack wins wherever the two differ, and in Brownfield mode (Step 3B) the
+sheets play no part at all — never plan an epic that re-platforms an existing codebase toward
+them.
+
 No later epic installs a component library, defines tokens, or builds a second shell — a slice
 composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
 Components must name the design-system files (`components.json`, the global stylesheet,
