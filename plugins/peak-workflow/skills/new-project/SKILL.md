@@ -143,10 +143,11 @@ This looks like a fresh project. The greenfield path is:
 
 1. /peak-workflow:setup                 — audit CLAUDE.md, stub architecture/design-notes
 2. /peak-workflow:discover              — adaptive interview → product-vision + ConOps
-3. /peak-workflow:capture-requirements  — derive TOR feature files from vision/ConOps
-4. /peak-workflow:plan-project          — derive epics + phases from the TOR baseline
+3. /peak-workflow:mockup                — (UI projects only — screen inventory, flows, wireframes)
+4. /peak-workflow:capture-requirements  — derive TOR feature files from vision/ConOps
+5. /peak-workflow:plan-project          — derive epics + phases from the TOR baseline
 
-After the docs/ branch from steps 2-4 is merged, you'll iterate with:
+After the docs/ branch from steps 2-5 is merged, you'll iterate with:
    /peak-workflow:start-epic <id>   →   /peak-workflow:wrapup-epic <id>
 
 I'd start with `/peak-workflow:setup`. Each later step benefits from a fresh session for

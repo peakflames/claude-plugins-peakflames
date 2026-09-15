@@ -106,6 +106,11 @@ The user's request / brownfield description: $ARGUMENTS
    > Run `/peak-workflow:discover` first to produce the product vision document.
 3. Read `docs/product-vision-planning/concept-of-operations.md`. If missing or skeleton, stop
    with the same message.
+3a. Read `docs/product-vision-planning/ux/screens.md` if it exists (written by
+    `/peak-workflow:mockup` on UI projects). Capture every screen's `S-NN` ID, name, primary
+    actions with their control text, and its four states (or `n/a — not data-bearing`). Set
+    `screens_present = true`; Steps 3A.2, 3A.2.2, 4, and 5 use it. If absent, set it `false`
+    silently — CLI / Service / Library projects never have one.
 4. Glob `docs/requirements/*.feature.md`. For each file found, capture:
    - The feature number `{NN}` from the filename prefix (e.g., `01` from `01-cli.feature.md`)
    - All existing TOR IDs (parse every `Scenario: [TOR-NN-XXXXXXX]` line)
@@ -120,6 +125,7 @@ Requirements baseline state:
 - Highest feature number: [NN] (next available: [NN+1])
 - Existing TOR IDs: [count]
 - Tracing sidecars present: [count]
+- UX screens.md: [none / N screens, S-01–S-NN]
 ```
 
 ---
@@ -239,6 +245,12 @@ One ConOps scenario step often yields **multiple requirements**:
 - Error handling and user feedback (what the system communicates when things go wrong)
 - Accessibility and usability expectations (where applicable)
 
+When `screens_present = true`, Givens and Whens name screens and controls exactly as the
+inventory does — `the Orders List (S-01)`, `the "Save" button` — never a paraphrase, so the
+wireframe, the ConOps step, and the TOR agree on one name. Each data-bearing screen's empty
+and error states (from the inventory's `## States`) are explicit negative-path requirements,
+one TOR each, asserting the visible text and the call-to-action or retry control.
+
 ### 3A.2.1: Baseline Tool Hygiene TORs
 
 If `tool_hygiene_section_present = false` (Step 1), skip this sub-step entirely.
@@ -321,17 +333,20 @@ TOR (an `N/A` Desktop conventions bullet yields no TOR).
 Place baseline UX TORs in the **first feature file**, immediately after the tool-hygiene
 block, under a `# UX Baseline` section banner (`# ---` comment block per
 `FEATURE_TEMPLATE.md`) followed by a `# Note: reference screen — <screen>` line naming the
-one screen every Given below is anchored on. If the user asked for a dedicated file at the
-3A.1b grouping gate, write them to `docs/requirements/NN-ux-baseline.feature.md` instead.
+one screen every Given below is anchored on (with its `S-NN` when `screens_present = true`:
+`# Note: reference screen — Orders List (S-01)`). If the user asked for a dedicated file at
+the 3A.1b grouping gate, write them to `docs/requirements/NN-ux-baseline.feature.md` instead.
 Baseline UX TORs precede domain TORs, exactly like the tool-hygiene TORs.
 
 Baseline UX TORs are **black-box and Playwright-observable**: assert on roles, visible text,
 `document.activeElement`, computed styles, viewport size, and document title — never on
 component internals. Anchor every baseline UX TOR's Given on **one reference screen**: the
 thinnest entity list in ConOps Scenario 1, with its create form and its delete action (the
-Application menu / Window stands in for Desktop conventions). That is the screen the walking
-skeleton in `/plan-project` builds — Givens that name several screens make it build all of
-them. Error-state and Progress feedback Givens cite the skeleton's test-only fault / latency
+Application menu / Window stands in for Desktop conventions). When `screens_present = true`,
+that is Scenario 1's thinnest screen in `ux/screens.md` — cite its `S-NN` in the `# Note:`
+line; `/plan-project` reads the ID to pick the skeleton's screen. That is the screen the
+walking skeleton in `/plan-project` builds — Givens that name several screens make it build
+all of them. Error-state and Progress feedback Givens cite the skeleton's test-only fault / latency
 switch rather than a real failure or slow operation (`Given the test fault switch forces the
 data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).
 For a desktop app, the same assertions run through the project's Playwright Electron harness
@@ -472,7 +487,9 @@ Adopt the same seasoned-PM persona as 3A. Differences from greenfield:
 
 1. **Exactly one unprocessed changelog found:** Read it. The "New Capabilities Identified"
    section is your primary input. The "Priority Signal" section guides requirement priority.
-   Record the changelog path for archival in Step 6.
+   Record the changelog path for archival in Step 6. A changelog whose "New Capabilities
+   Identified" reads "None — UX concretization only" (written by `/peak-workflow:mockup`) is
+   still consumed and archived; its `## UX Changes` rows are the inputs for 3B.2.
 
 2. **Two or more unprocessed changelogs found:** STOP. Do not attempt to merge silently. Inform
    the user:
@@ -495,7 +512,9 @@ Adopt the same seasoned-PM persona as 3A. Differences from greenfield:
 
 ### 3B.2: Map Against Existing Requirements
 
-Read all existing `.feature.md` files. For each new capability from the delta:
+Read all existing `.feature.md` files. For each new capability from the delta (and each
+`## UX Changes` row — an Added screen's states and primary actions, a Modified screen's changed
+control text or states — when the changelog has that section):
 - **Already covered by an existing TOR?** → Skip. Note: "already covered by `TOR-NN-XXXXXXX`".
 - **Extends an existing TOR's scope?** → Flag. This is a potential requirements change, which
   is a change-control event. Surface to user:
@@ -585,6 +604,10 @@ internal scratch.
   each as `CLAUDE.md UX Baseline: {line label}` (e.g., `CLAUDE.md UX Baseline: Screen states`,
   `CLAUDE.md UX Baseline: Desktop conventions — single instance`). Each must map to at least
   one baseline UX TOR generated in Step 3A.2.2. **Design system** is not a row.
+- **Every screen state and primary action in `ux/screens.md`, if `screens_present = true`.**
+  Cite each as `UX screens: S-NN <state|control text>` (e.g., `UX screens: S-01 empty`,
+  `UX screens: S-02 "Save" button`). The Application menu and Window rows trace through the
+  Desktop conventions rows above, not here.
 
 **Rules:**
 - An input may map to multiple TOR IDs — list all.
@@ -627,6 +650,9 @@ Before presenting the summary, verify:
   `CLAUDE.md`'s `UX Baseline` section (excluding **Design system**) is covered by at least one
   TOR, placed under the `# UX Baseline` banner before any domain TOR. The trace appears in the
   Step 4 trace table with the source `CLAUDE.md UX Baseline: {line label}` and `Explicit? = Y`.
+- [ ] If `screens_present = true`: every data-bearing screen's empty and error states are
+  covered by a TOR whose Given/When/Then names the screen by `S-NN` and cites the state's
+  visible text and control from `ux/screens.md`.
 
 ---
 
@@ -678,6 +704,7 @@ Epic specs will reference TOR IDs as their Requirements Anchors — the TOR Give
 becomes the acceptance criterion and verification procedure.
 ```
 
-**Do NOT commit.** The full planning sequence (`discover` → `capture-requirements` →
-`plan-project` → optional `add`) runs on the `docs/` branch before the user merges. The merge
-(solo or team PR) is the approval gate for the entire requirements and plan as a unit.
+**Do NOT commit.** The full planning sequence (`discover` → optional `mockup` →
+`capture-requirements` → `plan-project` → optional `add`) runs on the `docs/` branch before
+the user merges. The merge (solo or team PR) is the approval gate for the entire requirements
+and plan as a unit.

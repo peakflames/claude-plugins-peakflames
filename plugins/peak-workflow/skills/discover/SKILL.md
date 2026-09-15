@@ -303,6 +303,10 @@ Show the user what was created:
 Run `/peak-workflow:capture-requirements` to derive the formal TOR requirements baseline from
 these documents. The requirements capture will run on the same `docs/` branch as this discovery
 session. After that, `/peak-workflow:plan-project` derives the implementation plan.
+[UI projects only (Web app / Desktop app / Hybrid with a UI):] Run `/peak-workflow:mockup`
+first — it derives the screen inventory, per-scenario flows, and grayscale wireframes and
+concretizes the ConOps steps with screen and control names — and then
+`/peak-workflow:capture-requirements`.
 ```
 
 Do NOT commit on your own initiative while writing the documents (Steps 1–4). Committing only
@@ -314,14 +318,15 @@ After presenting the summary, ask the user how to proceed via `AskUserQuestion`:
 
 - Question: `"How would you like to proceed with the docs/ branch?"`
 - Options:
-  - `"Continue planning — run /peak-workflow:capture-requirements next on this branch (recommended for greenfield — do not merge yet)"`
+  - `"Continue planning — run /peak-workflow:capture-requirements next on this branch, or /peak-workflow:mockup first on a UI project (recommended for greenfield — do not merge yet)"`
   - `"Solo merge — merge this docs/ branch to base now (vision-only sessions only: use when no requirements derivation is needed this cycle)"`
   - `"Team PR — push and open a PR for vision-only review (same caveat — appropriate only when requirements capture is not part of this cycle)"`
 
 ### If "Continue"
 
 Do nothing further. The user will invoke `/peak-workflow:capture-requirements` to continue on
-the same `docs/` branch.
+the same `docs/` branch — preceded by `/peak-workflow:mockup` when the Project type is Web app,
+Desktop app, or a Hybrid with a UI.
 
 ### Commit Gate (required before "Solo merge" or "Team PR")
 
