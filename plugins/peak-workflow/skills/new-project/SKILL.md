@@ -92,8 +92,11 @@ This is the epic-workflow format (peak-workflow specs use `## Requirements Ancho
 ### 1.6 — Existing code
 
 ```bash
-ls package.json pyproject.toml Cargo.toml go.mod CMakeLists.txt platformio.ini Makefile *.sln *.csproj */*.csproj src 2>/dev/null | head -5
+find . -maxdepth 2 -not -path './node_modules/*' -not -path './.git/*' \( -name package.json -o -name pyproject.toml -o -name Cargo.toml -o -name go.mod -o -name CMakeLists.txt -o -name platformio.ini -o -name Makefile -o -name '*.sln' -o -name '*.csproj' \) 2>/dev/null | head -5
+test -d src && echo "src/"
 ```
+
+(`find`, not a glob list — zsh aborts a whole `ls` command when one pattern matches nothing.)
 
 Set `has_code = true` if any match. It does not change the verdict — a repository with code and
 no peak-workflow artifacts still starts with `/peak-workflow:setup` — but it changes the wording,

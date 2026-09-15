@@ -63,6 +63,11 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 - **Safety baseline** — `discover` asks what must never happen for equipment-controlling products;
   `capture-requirements` writes `# Safety` TORs; `plan-project` ships each with the first epic driving
   that output.
+- **Operator-observed TORs** — scenarios tagged `# Verification: operator-observed` trace to a
+  `tests/manual/` checklist and PASS on a matching recorded observation, for provider sign-in and
+  physical device behaviour.
+- **Safety TORs are never deferrable** — `start-epic` and `wrapup-epic` offer only Fix now or Stop;
+  embedded skeletons own a debug-build-only or bench fault fixture for their Givens.
 - **Walking-skeleton TBD gate** — `PLAN_TEMPLATE` and `wrapup-epic` fail the skeleton while
   `TBD — set by the walking-skeleton epic` remains in `CLAUDE.md`.
 - **Desktop Auto-update row and target OS** — updater is its own droppable row (`N/A` offline);
@@ -98,6 +103,20 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
   sections that fit their shape instead of permanently empty server sections.
 
 ### Fixed
+
+- **Desktop E2E launched a file, not the app** — `args: ["."]` so Electron reads `package.json`;
+  main entry now shows startup order, single instance, first log line, window minimum and state,
+  and an About dialog.
+- **Mixed-audience Google sign-in** — web sheet omits the domain restriction when outsiders sign
+  in, grants the org role only from a verified Workspace domain, and disables implicit account linking.
+- **Web sheet compile and config errors** — `"types": ["bun"]`, Biome 2 `files.includes`, optional
+  provider env vars, `hc` client prefix, resource-aware `can()`; Streaming split into Live updates
+  and Per-request streaming rows.
+- **Sign-in clarifier re-asked cross-device** — "unsure means yes" now covers only separate accounts;
+  "maybe another computer later" is a growth note.
+- **Setup files left uncommitted, undecided layers lost** — setup commits its files with the
+  confirmation's consent and writes a `**Not decided yet:**` line the skeleton reads.
+- **zsh aborted code detection** — `new-project` uses `find` instead of a glob list.
 
 - **Web sheet older bugs** — root `tsconfig.json` defined and copied into the image; Better Auth
   `basePath` matches the `/auth` mount; Vite dev origin trusted outside production; host-dev env

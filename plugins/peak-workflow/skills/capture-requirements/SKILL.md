@@ -60,9 +60,8 @@ The user's request / brownfield description: $ARGUMENTS
    request is rejected, and each declared role can do exactly what `CLAUDE.md` says it may.
    - **Named provider:** write the provider round-trip TOR (signing in through the named provider
      lands the person in the product with their role). Automated tests sign in through the
-     email-and-password test helper; add the comment line
-     `# Verification: operator-observed against the real <provider> tenant` under that TOR so
-     `wrapup-epic` asks for the observation instead of failing it.
+     email-and-password test helper; tag the round-trip TOR `# Verification: operator-observed`
+     (item 0c) so `wrapup-epic` asks for the observation instead of failing it.
    - **Deferred** — Tech Stack records `Auth: local accounts now, org SSO deferred`: the identity
      provider is not built yet. Do **not** write TORs whose Then clause depends on it — SSO
      redirects, directory-sourced role claims, account provisioning or deprovisioning, MFA, or
@@ -75,11 +74,21 @@ The user's request / brownfield description: $ARGUMENTS
    ConOps **What Must Never Happen** section `/peak-workflow:discover` writes for these products.
    Each hazard there becomes at least one TOR under a literal `# Safety` section banner, written as
    the safe outcome the product guarantees — *"The controller shall de-energize the heater relay
-   within 2 seconds when the thermocouple reads open-circuit"* — with a Given that forces the fault
-   through the skeleton's fault switch or the hardware-in-the-loop harness. A hazard with no
-   number the user gave (a limit, a time) gets the TOR anyway with the value flagged at the 3A.1b
-   grouping gate — never dropped. If the section is missing on such a product, warn at 3A.1b and
-   list the gap under Coverage Gaps.
+   within 2 seconds when the thermocouple reading is lost"*. Write the Given at the observable
+   level (`Given the thermocouple reading is lost`), never naming the injection mechanism — the
+   skeleton's hardware fault fixture or debug-build fault command decides how. Place the banner
+   in the feature file of the capability that drives the output, directly after any baseline
+   banners and before domain TORs. A hazard with no number the user gave (a limit, a time) gets
+   the TOR anyway: at the 3A.1b grouping gate, ask for the value in plain words and offer a
+   conservative default — never drop the TOR. If the section is missing on such a product, warn
+   at 3A.1b and list the gap under Coverage Gaps. Safety TORs are never deferrable in
+   `start-epic` or `wrapup-epic`.
+
+0c. **Operator-observed TORs.** Tag a scenario with the comment line
+   `# Verification: operator-observed` directly under its `Scenario:` line when no automated check
+   can observe its Then — a named provider's real sign-in round-trip, a relay clicking, a display
+   or indicator on a device. Automated tests still cover everything they can; the tag routes only
+   the unobservable part to a person in `wrapup-epic`.
 
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
@@ -306,7 +315,11 @@ Hygiene lines covered" count.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them. Project types without a column (Service or API, Library, Embedded) write each
-shall-statement in the mechanism `CLAUDE.md` declares — e.g. Embedded: *"The device shall print its
+shall-statement in the mechanism `CLAUDE.md` declares — e.g. Service or API: *"The service shall
+expose its name and semantic version at GET `/version` as JSON without requiring sign-in"* and
+*"The service shall return error responses as RFC 9457 problem details whose `detail` names the
+problem and the next action"*; the startup log line is asserted in the format the Logging line
+declares (a JSON record, not a `[INFO]` text line, when the logger writes JSON); Embedded: *"The device shall print its
 name and semantic version on the debug console in response to the `version` command"*. A line
 still reading `TBD — set by the walking-skeleton epic` yields a TOR whose title, Given, When, and
 Then all stay at the observable level — *"The device shall report its name and semantic version
@@ -511,7 +524,9 @@ After all feature files are written, invoke a Haiku sub-agent using the `Agent` 
 > `# UX Baseline` banner trace to `CLAUDE.md` — record them under `traces_to.claude_md`,
 > citing `section` (`Tool Hygiene & Operability` or `UX Baseline`) and copying the bold label
 > verbatim into `line` (for Desktop conventions, `Desktop conventions — <bullet>`); never
-> record them as `orphan_requirement`. If no credible trace can be found for a requirement,
+> record them as `orphan_requirement`. Scenarios under the `# Safety` banner trace to the ConOps
+> §8 `What Must Never Happen` table — record them under `traces_to.conops` with `scenario: "§8"`,
+> `step: null`, and the hazard row paraphrased; never as `orphan_requirement`. If no credible trace can be found for a requirement,
 > record it under `coverage_gaps` with `gap_type: "orphan_requirement"`. Also enumerate ConOps scenario
 > steps and PV goals not covered by any TOR ID and record those under `coverage_gaps` with
 > `gap_type: "uncovered_source"` in the most relevant feature file's sidecar. Do NOT modify

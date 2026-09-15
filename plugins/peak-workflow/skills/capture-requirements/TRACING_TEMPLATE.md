@@ -42,6 +42,9 @@ For each TOR ID in the feature file:
    for Desktop conventions, `Desktop conventions — <bullet>`), plus a 1–2 sentence paraphrase.
    The `vision` and `conops` arrays may be empty for these; domain TORs leave `claude_md`
    empty. Never record a baseline TOR as `orphan_requirement`.
+4b. If the Scenario sits under the `# Safety` banner, trace it to the ConOps §8
+   `What Must Never Happen` table under `conops` with `"scenario": "§8"`, `"step": null`, and a
+   paraphrase naming the hazard. Never record a Safety TOR as `orphan_requirement`.
 5. If a credible trace cannot be found for any source: record the TOR ID under
    `coverage_gaps` with `gap_type: "orphan_requirement"`.
 6. After processing all TOR IDs, enumerate ConOps scenario steps and PV goals that are
