@@ -54,6 +54,17 @@ The user's request / brownfield description: $ARGUMENTS
 
 ## Step 1: Load Context
 
+0. **Deferred organization sign-in.** If `CLAUDE.md`'s Tech Stack records
+   `Auth: local accounts now, org SSO deferred`, the identity provider is not built yet. Do **not**
+   write TORs whose Then clause depends on it — SSO redirects, directory-sourced role claims,
+   account provisioning or deprovisioning, MFA, or organization password policy. Those belong in
+   the **Coverage Gaps (explicitly deferred)** section, named as waiting on the provider epic.
+   Do write, and require, the TORs the project satisfies for real today: a person sees only the
+   records they own or their role grants, an unauthenticated request is rejected, and each declared
+   role can do exactly what `CLAUDE.md` says it may. Add one line under each role TOR noting that
+   the role is assigned in the product's own accounts until the provider epic maps it from the
+   directory.
+
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
    already in context. Specifically capture, if present:

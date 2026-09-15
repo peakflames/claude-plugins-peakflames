@@ -34,7 +34,11 @@ Follow these steps exactly:
 1. Read `CLAUDE.md` at the repo root for project context and tech stack. Capture the
    **Project type** from its `Tool Hygiene & Operability` section and, when present, the
    **UX Baseline** section (design system, app shell, screen-state and keyboard conventions) —
-   Step 3A.1 uses both to shape the walking skeleton.
+   Step 3A.1 uses both to shape the walking skeleton. Also capture the `**Product shape:**` block
+   when present — a row it records as `N/A — <reason> (shape Q<N>)` is a decision, not a gap.
+1b. Read `docs/design-notes.md` when it exists. A numbered decision there that names deferred work
+   (for example *Organization Sign-In Deferred*) is an epic this plan must carry — Step 3A.4 places
+   it. A decision with no epic is the failure mode this read exists to prevent.
 2. Read `docs/product-vision-planning/product-vision.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 3. Read `docs/product-vision-planning/concept-of-operations.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file:
@@ -118,14 +122,13 @@ skeleton must:
   the SQL folder from `process.resourcesPath` when packaged.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
-- When `CLAUDE.md`'s Tech Stack records `Auth: deferred provider`, the skeleton owns the half that
-  is not deferred: every record carries an owner, every read and write filters by the current
-  user, the role field and one permission-check seam exist if roles were declared, and the
-  development sign-in stub sits behind a single "who is the current user?" module that fails
-  closed in a production build. Name that module and the ownership columns in Key Components.
-  Swapping the stub for the real provider is **its own later epic**, listed in the plan with the
-  open decision from `docs/design-notes.md` as its trigger — never folded into the skeleton and
-  never left unplanned.
+- When `CLAUDE.md`'s Tech Stack records `Auth: local accounts now, org SSO deferred`, the skeleton
+  owns everything except the organization's provider: the sheet's auth layer with email-and-password
+  sign-in working for real (no placeholder identity, no anonymous fallback, no header-asserted
+  user), an owner column on every table, one **owner-or-permitted-role** access rule that every
+  route calls, and the role field plus the roles named in `CLAUDE.md` when the roles follow-up was
+  yes. Name the access rule, the owner columns, and the auth configuration in Key Components.
+  Adding the organization's provider is **its own later epic** — see Step 3A.4.
 - Ship **one reference screen** that renders the loading, empty, error, and populated states and
   passes every baseline UX TOR. It is the pattern every later screen copies. The reference
   screen is the screen the baseline UX TORs name (the `# Note: reference screen` line under
@@ -139,12 +142,15 @@ skeleton must:
 - Ship a **test-only fault / latency injection switch**: an environment variable read at
   startup (a build-time `import.meta.env` flag for a static SPA, which has no process
   environment), honored by the E2E harness, ignored in production builds. The error-state and
-  Progress feedback TORs cite it in their Givens — a local SQLite app has nothing else to
-  throttle or fail. Ship a **test-only data-directory override** beside it: an environment
-  variable that redirects the database location (normally `app.getPath('userData')`) to a
-  fresh temp directory the harness creates per test, so empty-state, populated-state, and
-  destructive-action Givens start from an empty database instead of the developer's live data.
-  Name both switches in Key Components.
+  Progress feedback TORs cite it in their Givens — an app with a local database has nothing else
+  to throttle or fail. Ship a **test-only data reset** beside it, in the form the stack actually
+  has: a desktop app redirects the database location (normally `app.getPath('userData')`) to a
+  fresh temp directory per test via an environment variable; a served web app points at a throwaway
+  database file the same way; a static SPA has no process environment and no data directory, so it
+  deletes and recreates its IndexedDB database in the harness's per-test setup (the static sheet's
+  Section 7 shows this). Either way, empty-state, populated-state, and destructive-action Givens
+  start from an empty database instead of the developer's live data. Name both switches in Key
+  Components.
 - Make the **E2E harness self-contained**: its `globalSetup` (or the `test:e2e` script) runs the
   production build the entry point needs (reference-sheet desktop stack: `bun run build`, whose
   electron-vite output is the `out/main/index.js` the sheet's Section 7 E2E example launches;
@@ -163,7 +169,8 @@ if the skeleton does not touch a layer the table names, that layer is missing fr
 Three limits: a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md`
 and wins over the sheet; a row `CLAUDE.md` marks `N/A — <reason> (shape Q<N>)` is a recorded
 decision, so it is **not** a missing layer and the skeleton must not build it back (a row marked
-`deferred provider` is the exception — half of it is built now, the rest by its own epic); and in
+`org SSO deferred` is the exception — the layer is built now, and one later epic adds the
+organization's provider to it); and in
 **Brownfield mode (Step 3B) the sheets play no part at all** — never plan an epic that
 re-platforms an existing codebase toward a sheet.
 
@@ -239,6 +246,22 @@ Example IDs: `a3f2K7p`, `B9xQr2z`, `m4Ljf0T`.
 **Do not** use incrementing integers or decimals for new epics. Random IDs eliminate collisions when multiple developers run `/add` or `/plan-project` concurrently, so the concept of "insertion order" no longer applies — ordering within a phase is by insertion time in the index.
 
 ### 3A.4: Phase Structure — Value Milestones
+
+**Deferred-decision epics.** Epics are otherwise formed by clustering TOR IDs (3A.2), so an epic
+with no TOR IDs of its own can never arise that way and would be lost. For each deferred decision
+captured from `docs/design-notes.md` in Step 1, create one epic explicitly:
+
+- Name it for the decision (e.g. `Organization Sign-In`), give it `requirements: —`, and cite the
+  design-notes section in its Description as the reason it exists.
+- Place it in the **last phase**, and record in the phase index that no production release should
+  precede it. Its trigger is external (the user confirming the provider), so it is scheduled, not
+  blocked on other epics.
+- Scope it from the decision's own text rather than assuming a one-line swap — for an identity
+  provider that means the callback route, session configuration, mapping directory groups onto the
+  project's roles, and updating the end-to-end sign-in helper.
+- Because it has no TOR IDs, the "every covered TOR has a passing test" criterion is vacuous for it.
+  State its done-criterion in the spec instead, in terms of the behavior the decision describes.
+
 
 Phases are milestones of user value, not architectural layers. Start from this template and
 adapt:

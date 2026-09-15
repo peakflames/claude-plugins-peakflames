@@ -211,6 +211,24 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
 - Console check (if UI was changed) — web: `playwright-cli`; desktop: the renderer console captured by the Playwright Electron harness
 - UX Baseline check (if UI was changed and `CLAUDE.md` has a **UX Baseline** section) — see below
+- Access-control check (if `CLAUDE.md`'s Tech Stack records
+  `Auth: local accounts now, org SSO deferred` and this epic touched user data) — see below
+
+**Access-control check.** A quality gate, not a code-review note, on any epic that adds or changes
+user data while the organization's provider is still deferred. Record PASS / FAIL per line with the
+evidence, and treat a FAIL like any other failed gate — Fix now or Stop, never a Known Issue:
+
+- **No sign-in bypass.** Grep the diff and the auth configuration for a development-only login,
+  an anonymous fallback, or a current user taken from a request header, query parameter, or
+  environment variable. Any hit is a FAIL. Tests signing in through the auth layer's own test
+  helper are not a bypass.
+- **Owner on every new table.** Each table this epic added carries an owner column. FAIL if one
+  does not.
+- **Every new read and write goes through the access rule.** Each route this epic added calls the
+  project's single access rule rather than re-deriving access inline or relying on a front-end
+  check. FAIL on any that does not.
+- **Role checks are server-side.** If roles are declared, the permission decision happens on the
+  server. A role read only from client state is a FAIL.
 
 **UX Baseline check.** This is a quality gate, not a code-review note. Web app: `playwright-cli`
 against the running app with real data. Desktop app: the project's Playwright Electron harness

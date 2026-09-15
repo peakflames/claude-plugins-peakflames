@@ -73,12 +73,17 @@ the answers, not the questions. Ask all five as one block and accept one combine
 | 2 | "Will people need to sign in? Does anyone other than them ever see their information?" | Auth, sessions, per-user access rules |
 | 3 | "Will people attach photos, PDFs, or other files?" | Object storage, presigned uploads, local S3 |
 | 4 | "Does anything on screen need to update by itself while they are watching — like a message arriving from someone else?" | Streaming endpoints, long-lived connections |
-| 5 | "Does the product need to keep any password or key of its own secret from the people using it?" | Server — a browser-only app cannot hold a secret |
+| 5 | "Does the product need to keep any password or key of its own secret from the people using it?" — **skip this one and record "yes — implied by sign-in / file uploads" if question 2 or 3 was yes**; it is a consequence of those answers, not an independent choice, and a lay "no" here is simply wrong | Server — a browser-only app cannot hold a secret |
 
-If the user is unsure on any question, treat it as **no** and say so plainly: *"I'll assume no
-for now — every one of these is easier to add later than to carry unused."* Adding a server to
-a browser-only app is a contained change (the static sheet's Growth Path covers it); carrying an
-unused auth and storage layer through every epic is not.
+If the user is unsure on questions 1, 3 or 4, treat it as **no** and say so plainly: *"I'll assume
+no for now — every one of these is easier to add later than to carry unused."* Adding a server to
+a browser-only app is a bounded migration the static sheet's Growth Path describes (it rates the
+move Medium, not free); carrying an unused storage and streaming layer through every epic is not.
+
+**Question 2 is the exception: unsure means yes.** "No" there selects a stack with no access
+control at all, so guessing wrong is only cheap in one direction. If the user hesitates, re-ask
+with a concrete example — *"Will a manager, a colleague, or an administrator ever need to open
+something another person entered?"* — and take a maybe as a yes.
 
 **If question 2 is "yes", ask two follow-ups.** Sign-in is the answer most likely to stall a
 project: an organization's identity provider is usually someone else's decision, behind an IT
@@ -97,30 +102,50 @@ plainly rather than letting the user infer that deferral keeps the project small
 | Provider answer | What goes in the stack |
 |---|---|
 | Named and approved | The sheet's auth layer, configured for that provider. Record the provider in the Tech Stack table. |
-| Still to be worked out, or "I don't know" | **Deferred-provider mode** below. |
+| A vendor is likely but unconfirmed — *"I think we use Microsoft, I'd have to ask IT"* | **Deferred mode** below, and record the candidate and who confirms it. Hand the user the one question to ask: *"Are we on Microsoft Entra ID, and can we register an application?"* A named vendor usually turns the later work into a configuration change, not a rebuild — do not discard the hint. |
+| Still to be worked out, or "I don't know" | **Deferred mode** below. |
 
-**Deferred-provider mode.** Defer *who issues the identity*. Never defer *who owns the data* —
-that is the half that is ruinous to retrofit, because it means migrating every table and
-rewriting every query later. Record all five of these:
+**Deferred mode — local accounts now, the organization's sign-in later.** Defer *who vouches for
+the identity*. Never defer authentication itself, and never defer *who owns the data*. Ownership is
+the half that is ruinous to retrofit — it means migrating every table and rewriting every query
+later — and a hand-built sign-in placeholder is never the answer, because the sheet already ships
+a real one.
 
-1. **Ownership is built now.** Every record carries an owner, and every read and write filters by
-   the current user, starting with the walking-skeleton epic. This is not deferred, not stubbed,
-   and not a later epic.
-2. **Roles are modelled now if question 2b was yes** — a role field and one permission-check seam,
-   even when only one role exists today. The provider supplies the real role claim later.
-3. **Sign-in is a development-only stub** behind a single module that answers "who is the current
-   user?". Swapping that module for the real provider is the whole of the later integration.
-4. **The stub fails closed.** A production build with no provider configured refuses to start. It
-   never falls back to a signed-in user, an anonymous user, or a default account.
-5. **The provider is an open decision**, recorded in the Tech Stack table as
-   `Auth: deferred provider — ownership enforced, sign-in stubbed (shape Q2a)` and written into
-   `docs/design-notes.md` as a numbered decision with its rationale (blocked on IT approval /
-   provider not yet chosen). `/peak-workflow:plan-project` turns it into its own epic.
+**Do not build a sign-in stub.** The web sheet's auth layer (Better Auth) supports email and
+password out of the box, with real password hashing, real session cookies, and a real test helper.
+Email-and-password accounts need no IT approval, no tenant, and no provider decision — so the
+project gets *real authentication from the first epic*, and the organization's provider is added
+later as an additional method against the same user and session tables. A fake identity module
+would be more work, less safe, and would make every later access-control test meaningless.
 
-Tell the user, in plain language, what deferral does and does not buy: *"You can build and use the
-whole product this way. Connecting it to your organization's real sign-in is its own piece of work
-later — usually a week or more with your IT people involved. Deferring it means you are not
-blocked on them now; it does not make that work smaller."*
+Record all five of these:
+
+1. **Authentication is real from the first epic** — the sheet's auth layer with email and password
+   enabled. No placeholder, no bypass, no "anonymous in development" default.
+2. **Ownership is built now.** Every record carries an owner, and every read and write goes through
+   one access rule. The rule is *owner, or a role the product grants access to* — not owner-only.
+   A product that answered question 2 "yes" because someone else reviews the work needs that
+   someone else to be able to read it; an owner-only filter makes the product's reason for
+   existing impossible.
+3. **Roles are modelled now if the roles follow-up was yes** — name the actual roles the user gave
+   (e.g. *inspector*, *supervisor*), a role field on the account, and one permission helper every
+   route calls. Write down what each role may read and may change; that sentence is what the
+   access rule in item 2 implements.
+4. **The organization's provider is added, not swapped in.** It becomes an extra sign-in method on
+   the same accounts. Plan for what it actually brings: a callback route, the provider's own
+   session configuration, mapping directory groups onto the roles from item 3, and updating the
+   end-to-end sign-in helper. It is not a one-module change.
+5. **The deferral is an open decision**, recorded in the Tech Stack table as a row whose text
+   begins with the exact greppable string `Auth: local accounts now, org SSO deferred` — other
+   skills match on that string, so keep it verbatim — followed by the candidate provider and who
+   confirms it, when the user named one. Write the same decision into `docs/design-notes.md`.
+   `/peak-workflow:plan-project` turns it into its own epic.
+
+Tell the user, in plain language, what this does and does not buy: *"You can build and use the
+whole product this way — people will sign in with an email address and a password, which is real
+security, not a placeholder. Connecting it to your organization's own sign-in is a separate piece
+of work later, usually a week or more with your IT people involved. Doing it this way means you
+are not blocked on them now; it does not make that work smaller."*
 
 **Route on the answers, not on the project type alone:**
 
@@ -136,15 +161,30 @@ Paths are relative to the installed plugin, not the user's repository. If `${CLA
 does not resolve in this session, locate the sheet under the plugin's own `references/` directory
 — do not proceed from memory.
 
-**Record the answers, not just their consequences.** Write a short `**Product shape:**` block
-above the Tech Stack table listing each question and its answer in the user's terms (e.g.
-*"Same device only — no cross-device sync"*). When question 2 was yes, the block also carries the
-provider answer — either the named provider or *"Sign-in: deferred provider — ownership enforced,
-stub fails closed"* — and whether roles are in play. Any Stack Summary row the answers drop is written
+**Record the answers, not just their consequences.** Write the block verbatim in this shape above
+the Tech Stack table — `/peak-workflow:discover` Step 4.5 reads it back by these fixed labels, so
+keep `Q1:`–`Q5:` even when an answer is short:
+
+```markdown
+**Product shape:** (five questions asked by `/peak-workflow:setup` before the stack was chosen)
+
+- **Q1 Same information on another device:** [yes / no] — [in the user's own words]
+- **Q2 Sign-in, or others see the data:** [yes / no] — [in the user's own words]
+  - **Sign-in:** [named provider / `Auth: local accounts now, org SSO deferred` — candidate: X, confirmed by: Y]
+  - **Roles:** [no / the actual role names and what each may read and change]
+- **Q3 File attachments:** [yes / no] — [in the user's own words]
+- **Q4 Updates on screen without the person acting:** [yes / no] — [in the user's own words]
+- **Q5 Product holds a secret of its own:** [yes / no — "yes, implied by Q2/Q3" when either was yes]
+``` Any Stack Summary row the answers drop is written
 into the table as `N/A — <reason> (shape Q<N>)` rather than omitted. `/peak-workflow:plan-project`
 reads the Stack Summary as a completeness checklist for the walking skeleton, so a row that is
 simply absent reads as an oversight, while `N/A — no file uploads (shape Q3)` reads as a
 decision.
+
+Not every "no" maps onto a row — the static sheet has already excluded the server layers, and on
+the web sheet a "no" to streaming touches a clause inside the API-style row rather than a row of
+its own. Where there is no row to mark, the `**Product shape:**` block **is** the record; do not
+invent a row to carry the `N/A`.
 
 Read the matching sheet's **Section 2 Stack Summary** and offer that table as the proposed
 stack, condensed to one line per layer, with any shape-dropped rows already marked `N/A`. Do not
@@ -207,13 +247,22 @@ This section captures the project's chosen mechanisms for the load-bearing tool-
 practices that `/peak-workflow:capture-requirements` will turn into baseline TOR
 requirements. Ask in order:
 
-1. *Project type* — pick exactly one of:
-   - **CLI tool** — primary interface is a command-line invocation
-   - **Web app** — server-rendered or SPA, primary interface is a browser UI
-   - **Desktop app** — Electron / Tauri / native, primary interface is a windowed application
-   - **Service or API** — headless service exposing HTTP / gRPC / message endpoints
-   - **Library** — consumed by other code, no end-user runtime
-   - **Hybrid** — combines two or more of the above (e.g., CLI that also runs as a service)
+1. *Project type* — pick exactly one. This question **routes** the plain-language shape questions
+   in the Tech Stack step, so it gets the same no-jargon treatment: lead with the plain gloss and
+   keep the technical label as the parenthetical, never the other way round.
+   - **CLI tool** — people run it by typing a command in a terminal
+   - **Web app** — people open it in a web browser, on a laptop, tablet, or phone (server-rendered
+     or SPA). *A tablet or phone app people reach at a web address is this, not a desktop app.*
+   - **Desktop app** — people install and launch it as a window on their computer (Electron /
+     Tauri / native)
+   - **Service or API** — no screen at all; other software calls it (headless HTTP / gRPC /
+     message endpoints)
+   - **Library** — other developers add it to their own code; it has no end-user runtime
+   - **Hybrid** — two or more of the above (e.g., a command-line tool that also runs as a service)
+
+   If the user describes something for a phone or tablet, ask whether people would open it in a
+   browser or install it from an app store before recording the answer — the two route to
+   different stacks, and "app" alone does not distinguish them.
 
 2. *Version exposure* — how does an end user observe the running tool's version? The
    mechanism varies by project type; the requirement that *some mechanism exists* is
@@ -496,8 +545,8 @@ form input survives an accidental reload of the same screen. (WCAG 2.2 SC 3.3.7)
 This section is a static set of coding-standard reminders. They are NOT customized per
 project — write the section verbatim. The reminders are not derived as TORs because they
 are negative invariants ("do not X") that are hard to verify by Given/When/Then. They are
-reviewed by `/peak-workflow:start-epic` (during implementation) and `/peak-workflow:wrapup-epic`
-(during independent review).
+reviewed by `/peak-workflow:wrapup-epic` during independent review. (`/peak-workflow:start-epic`
+does not currently check them — do not tell the user it does.)
 
 Generate the section verbatim:
 
@@ -530,18 +579,23 @@ be in `.gitignore`. Use environment variables, secret managers, or encrypted fil
 makes them inapplicable.
 ```
 
-**Deferred-provider projects only** — when the Tech Stack records `Auth: deferred provider`,
-append this fourth reminder to the section verbatim. It is the guardrail for the stub the
-Tech Stack step just authorized:
+**Deferred-SSO projects only** — when the Tech Stack records
+`Auth: local accounts now, org SSO deferred`, append this fourth reminder verbatim. Add it whenever
+the project enters that state, including when a later shape change introduces it through
+`/peak-workflow:discover` Step 4.5 — not only on this first run:
 
 ```markdown
-**A stubbed sign-in must never reach production.**
-Until the provider epic lands, the development sign-in stub is the only identity mechanism in
-the codebase. It must be unreachable in a production build: a production build with no identity
-provider configured refuses to start rather than falling back to a signed-in, anonymous, or
-default user. Never widen the stub to "just for this demo" — a temporary auth bypass that ships
-is a breach, not a shortcut. Per-user ownership checks are NOT part of the stub and are enforced
-for real from the first epic; `/peak-workflow:wrapup-epic` reviews both on every epic that
+**No sign-in bypass, ever — not even in development.**
+Accounts are real from the first epic: email and password through the project's auth layer, with
+the organization's provider added later as an extra method. There is no development-only login, no
+anonymous fallback, no "current user" that a request header or a query parameter can assert. A
+temporary auth bypass that ships is a breach, not a shortcut, and one added "just for this demo"
+is how it ships. Tests sign in through the real auth layer's test helper like any other client.
+
+**Every read and write goes through the access rule.**
+Access is owner-or-permitted-role, decided in one place that every route calls — never re-derived
+per handler and never left to a front-end check. Adding a table means adding its owner column and
+its access rule in the same change. `/peak-workflow:wrapup-epic` reviews both on every epic that
 touches user data.
 ```
 
@@ -630,7 +684,7 @@ If the second answer is still ambiguous, accept it and add a note in the written
 - What command builds the project? (e.g., `dotnet build`, `npm run build`, `python -m build` — or skip if no explicit build step)
 - What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
 
-  A thin answer ("whatever you recommend") takes the reference-sheet default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. All three sheets define the same script names, so the gates are identical for Web app, Service or API, static SPA, and Desktop app: Build `bun run build` (Desktop also has `bun run package` for the electron-builder output); Lint `bun run lint` (Biome); Typecheck `bun run typecheck`; Dead code `bun run deadcode`; Tests `bun test` plus `bun run test:e2e`. `bun run check` runs typecheck + lint + deadcode + tests in one command — record it as the single pre-commit gate when the project took the sheet's `package.json` unchanged.
+  A thin answer ("whatever you recommend") takes the reference-sheet default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. All three sheets define the same core script names, so the gates are near-identical for Web app, Service or API, static SPA, and Desktop app: Build `bun run build` (Desktop also has `bun run package` for the electron-builder output); Lint `bun run lint` (Biome); Typecheck `bun run typecheck`; Dead code `bun run deadcode`; Tests `bun test` plus `bun run test:e2e`. `bun run check` runs typecheck + lint + deadcode + tests in one command — record it as the single pre-commit gate when the project took the sheet's `package.json` unchanged.
 - What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
 - How do you verify the tool/app works after build?
   - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
@@ -865,23 +919,27 @@ Then, for each item in CLAUDE.md's **Key Architecture Decisions** section (or eq
 *(Rationale to be documented during implementation.)*
 ```
 
-If the Tech Stack records `Auth: deferred provider`, write that decision as a numbered section
-here — it is a real architectural decision with a stated rationale, and Step 3 promised it would
-land in this file:
+If the Tech Stack records `Auth: local accounts now, org SSO deferred`, write that decision as a
+numbered section here — it is a real architectural decision with a stated rationale, and Step 3
+promised it would land in this file:
 
 ```markdown
-## N. Identity Provider Deferred
+## N. Organization Sign-In Deferred
 
-**Decision:** Per-record ownership and permission checks are enforced from the first epic. The
-identity provider is not yet chosen; sign-in is a development-only stub behind a single
-"who is the current user?" module, which fails closed in a production build.
+**Decision:** Accounts are real from the first epic — email and password through the project's auth
+layer. Every record carries an owner and every read and write goes through one owner-or-permitted-
+role access rule. The organization's identity provider is not yet chosen and will be added later as
+an additional sign-in method on the same accounts.
 
-**Rationale:** [The user's reason — provider not yet chosen / pending IT approval.] Deferring the
-provider avoids blocking the project on a decision outside the team, while building ownership now
-avoids a migration of every table and a rewrite of every query later.
+**Rationale:** [The user's reason — provider not yet chosen / pending IT approval.] Email and
+password needs no approval from anyone outside the team, so the product gets real authentication
+now instead of a placeholder, and the provider decision stops blocking the project.
 
-**Resolves when:** the provider is named. `/peak-workflow:plan-project` carries this as its own
-epic; the stub module is the only code that changes.
+**Candidate provider:** [vendor the user named, or "none named"] — **confirmed by:** [who will ask].
+
+**Resolves when:** the provider is confirmed. `/peak-workflow:plan-project` carries this as its own
+epic. Scope it honestly: the provider brings a callback route, its own session configuration,
+mapping directory groups onto this project's roles, and an update to the end-to-end sign-in helper.
 ```
 
 After all decision sections, add:
@@ -1169,9 +1227,8 @@ Remind the user:
 - *(UI project types only — omit for CLI / Service / Library:)* any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
   `frontend-design` shapes visual execution, and the UX Baseline and design-system tokens take
   precedence over its aesthetic choices.
-- The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:start-epic`
-  during implementation and by `/peak-workflow:wrapup-epic` during independent review. These
-  reminders are not derived as TORs.
+- The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:wrapup-epic`
+  during independent review. These reminders are not derived as TORs.
 - `docs/architecture.md` and `docs/design-notes.md` are read by every `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` for context
 - For any `[MISS]` items in the Repo Hygiene audit (Step 7) that you did not resolve in
   this session — particularly LICENSE, CI configuration, and the lockfile — address them

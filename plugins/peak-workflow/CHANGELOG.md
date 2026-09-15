@@ -30,14 +30,19 @@ answer.
   injected-clock domain functions, and an installable PWA, closing gaps the Stack Summary
   checklist did not cover.
 - **Auth follow-ups in `setup`** — a "yes" to sign-in asks whether an approved identity provider
-  is already known, and whether roles are in play. An unknown provider selects deferred-provider
-  mode instead of stalling the project on an IT decision the user cannot make.
-- **Deferred-provider mode** — data ownership and role checks are built in the walking skeleton;
-  only the identity provider is deferred, behind one "who is the current user?" module that fails
-  closed in production. The provider becomes its own later epic.
-- **Auth-stub security reminder** — projects in deferred-provider mode get a fourth Security
-  Baseline reminder: a stubbed sign-in never reaches production, and ownership checks are never
-  part of the stub.
+  is already known, and whether roles are in play. A likely-but-unconfirmed vendor is recorded with
+  the question to ask IT, rather than discarded.
+- **Deferred mode ships real accounts** — email-and-password sign-in through the sheet's own auth
+  layer from the first epic, with an owner column and one owner-or-permitted-role access rule. Only
+  the organization's provider is deferred, added later as an extra method on the same accounts.
+  No sign-in stub is ever built.
+- **Access-control gate in `wrapup-epic`** — a quality gate that can fail an epic: no sign-in
+  bypass, an owner on every new table, every new route through the access rule, role checks
+  server-side.
+- **`capture-requirements` knows about deferred SSO** — provider-flow TORs route to Coverage Gaps;
+  ownership and role TORs are required and noted as locally assigned until the provider epic lands.
+- **`plan-project` places deferred-decision epics** — it now reads `design-notes.md` and creates an
+  epic in the last phase for each deferred decision, which TOR clustering could never produce.
 
 ### Changed
 
@@ -52,6 +57,20 @@ answer.
 
 ### Fixed
 
+- **Dry-run fixes across the new paths** — the static sheet gained the `index.html`, `index.css`,
+  `app-footer.tsx`, `APP_NAME` and fault-injection files it referenced but never defined; `check`
+  no longer runs Playwright specs under Bun's test runner (which broke every deploy); and a
+  pull-request CI workflow runs the gates before merge.
+- **`discover` Step 4.5 false positives** — a JSON backup export and a one-actor roles table no
+  longer read as contradictions, and a sheet change now re-runs `setup` rather than patching rows,
+  because Test directories, Local Environment, Version exposure and the Security Baseline all move
+  with it.
+- **De-jargoned the project-type question** — it routes the plain-language shape questions, so it
+  gets the same treatment, including that a tablet app reached at a web address is a Web app.
+- **Shape question 5 is conditional** — skipped and recorded as implied when sign-in or uploads are
+  yes, since a lay "no" there is simply wrong. Question 2 now defaults to yes when unsure.
+- **Corrected a false claim** — `CLAUDE.md`'s Security Baseline said `start-epic` reviews it; it
+  does not, and `setup` no longer says so.
 - **Dead test-command carry-forward** — the web/server Local Environment branch now asks for the
   test command that Verification & Quality Gates was told to reuse.
 - **`Test directories` placeholder** — named as a placeholder with per-sheet examples, so the line
