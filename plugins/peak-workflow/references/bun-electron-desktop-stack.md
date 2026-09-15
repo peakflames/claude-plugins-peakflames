@@ -165,6 +165,8 @@ my-app/
 │   ├── unit/                    # bun test
 │   ├── components/              # bun test + happy-dom
 │   └── e2e/                     # Playwright (testDir in playwright.config.ts)
+│       ├── app.spec.ts          # (7)
+│       └── doubles.ts           # test doubles for native dialogs (7)
 └── sidecar/                     # optional, Section 9
 ```
 
@@ -182,9 +184,8 @@ my-app/
   "version": "0.1.0",
   "main": "./out/main/index.js",
   "workspaces": ["packages/*"],
-  "trustedDependencies": ["electron", "better-sqlite3", "@electron/rebuild"],
+  "trustedDependencies": ["electron"],
   "scripts": {
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
@@ -199,7 +200,7 @@ my-app/
     "check": "bun run typecheck && bun run lint && bun run deadcode && bun run test"
   },
   "dependencies": {
-    "better-sqlite3": "^11",
+    "better-sqlite3": "^13",
     "drizzle-orm": "^0.44",
     "electron-log": "^5",
     "electron-updater": "^6",
@@ -215,14 +216,13 @@ my-app/
     "radix-ui": "latest"
   },
   "devDependencies": {
-    "electron": "^3x",
-    "electron-vite": "^3",
-    "electron-builder": "^25",
-    "@electron/rebuild": "^3",
-    "vite": "^6",
-    "@vitejs/plugin-react": "^4",
+    "electron": "^44",
+    "electron-vite": "^5",
+    "electron-builder": "^26",
+    "vite": "^7",
+    "@vitejs/plugin-react": "^5",
     "typescript": "^5",
-    "@types/better-sqlite3": "^7",
+    "@types/better-sqlite3": "^9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/bun": "latest",
@@ -241,8 +241,13 @@ my-app/
 }
 ```
 
-> Pin exact versions with `bun install` (lockfile) and check the Electron release notes for the
-> current stable major before starting. Version ranges above are indicative.
+> Version ranges are indicative. Pin from the lockfile (`bun install`), and check the Electron
+> release notes for the current stable major before starting. `vite` stays `^7`: electron-vite 5
+> does not accept Vite 8.
+
+**No native rebuild.** better-sqlite3 13 is N-API and ships prebuilt `.node` files for
+Windows, macOS and Linux (x64, arm64) inside the npm package, which load under any Electron; so no
+`postinstall`, no `@electron/rebuild`, and only `electron` (binary download) is trusted.
 
 `productName` is the name `app.getName()`, the About dialog, the first log line and the installer
 show. No `"type": "module"`: with it electron-vite emits an ESM `preload/index.mjs`, which a
@@ -308,19 +313,16 @@ GlobalRegistrator.register();
 ### 4.4 `electron.vite.config.mts`
 
 ```ts
-import { defineConfig, externalizeDepsPlugin } from "electron-vite";
+import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
     resolve: { alias: { "@core": resolve("packages/core/src") } },
   },
-  preload: {
-    plugins: [externalizeDepsPlugin()],
-  },
+  preload: {},
   renderer: {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -336,6 +338,8 @@ export default defineConfig({
 
 `.mts` is ESM whatever `package.json` says, so the ESM-only `@tailwindcss/vite` always imports.
 electron-vite finds `electron.vite.config.{js,ts,mjs,cjs,mts,cts}` without a `--config` flag.
+electron-vite 5 externalizes `dependencies` for main and preload by default (`build.externalizeDeps`);
+`externalizeDepsPlugin` is deprecated.
 
 ### 4.5 `biome.json`
 
@@ -386,7 +390,7 @@ output). shadcn components are excluded from linting so upstream updates stay di
   ],
   "project": ["src/**/*.{ts,tsx}", "packages/**/*.ts"],
   "ignore": ["src/renderer/src/components/ui/**", "src/renderer/src/lib/utils.ts"],
-  "ignoreDependencies": ["@electron/rebuild", "shadcn", "tw-animate-css"]
+  "ignoreDependencies": ["shadcn", "tw-animate-css"]
 }
 ```
 
@@ -417,8 +421,8 @@ extraResources:
   - from: drizzle
     to: drizzle
 asarUnpack:
-  - "**/node_modules/better-sqlite3/**"
-npmRebuild: true
+  - "**/node_modules/better-sqlite3/**"   # a .node file cannot be loaded from inside app.asar
+npmRebuild: false                         # N-API prebuilds (4.1); a rebuild would need a C++ toolchain
 
 # ── Windows target only ──
 win:
@@ -447,7 +451,8 @@ publish:
 Keep only the blocks for the OSes in `CLAUDE.md`'s `Target OS` row. When Auto-update is `N/A`,
 write `publish: null`: an omitted `publish` lets electron-builder infer GitHub from the git remote
 and write `app-update.yml` (2.1). Build each OS's installer on that OS (or a CI runner for it);
-cross-building needs extra tooling.
+cross-building needs extra tooling. Set `npmRebuild: true` and add `@electron/rebuild` only when a
+native dependency without N-API prebuilds is added.
 
 ### 4.9 `playwright.config.ts`
 
@@ -631,7 +636,24 @@ export { cn } from "cn";
     @apply bg-background text-foreground;
   }
 }
+
+/* Reduced motion: OS preference disables non-essential animation. Spinners are progress feedback. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 ```
+
+Chromium reads the OS setting, so this block makes shadcn components comply without editing
+`components/ui/`. `0.01ms`, not `none`, keeps `animationend` firing, which Radix waits for before
+unmounting a closing dialog. JS-driven animation must check
+`matchMedia("(prefers-reduced-motion: reduce)")` itself.
 
 ---
 
@@ -724,6 +746,13 @@ export const ipc = {
   "conversations:create": {
     input: z.object({ title: z.string().min(1).max(200) }),
     output: z.object({ id: z.string() }),
+  },
+  "file:saveCsv": {
+    input: z.object({
+      defaultName: z.string().min(1).max(200).regex(/^[^\\/]+\.csv$/), // file name only, no path
+      csv: z.string().max(50_000_000),
+    }),
+    output: z.object({ saved: z.boolean() }),
   },
 } as const;
 
@@ -831,7 +860,8 @@ worker or an E2E run beside `bun run dev` finds the lock taken and quits. No imp
 read `userData` or log at load time.
 
 ```ts
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, dialog } from "electron";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import log from "electron-log/main";
 import { conversations } from "@core/db/schema";
@@ -869,6 +899,20 @@ if (!app.requestSingleInstanceLock()) {
         .all()
         .map((c) => ({ id: c.id, title: c.title, createdAt: c.createdAt.getTime() })),
     );
+    // Native Save dialog with a file-type filter (Export). Called as `dialog.showSaveDialog`,
+    // never destructured, so the E2E double (7) replaces it.
+    handle("file:saveCsv", async ({ defaultName, csv }) => {
+      const options = {
+        defaultPath: join(app.getPath("documents"), defaultName),
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      };
+      const { canceled, filePath } = win
+        ? await dialog.showSaveDialog(win, options) // modal to the main window
+        : await dialog.showSaveDialog(options);
+      if (canceled || !filePath) return { saved: false };
+      await writeFile(filePath, csv, "utf8");
+      return { saved: true };
+    });
 
     setAppMenu(() => win); // 4. native menu before the window (6.8)
 
@@ -1197,6 +1241,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { lastSaveDialogOptions, stubSaveDialog } from "./doubles";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
   productName: string;
@@ -1233,30 +1278,65 @@ async function withApp(
   }
 }
 
-test("app boots and shows sidebar", () =>
-  withApp({}, async (page) => {
-    await expect(page.getByRole("navigation")).toBeVisible();
-  }));
+/** Renderer loaded and app shell painted. */
+async function shellReady(page: Page) {
+  await page.waitForLoadState();
+  await expect(page.getByRole("navigation")).toBeVisible();
+}
 
-test("native menu: platform menus; Help > About shows name and package.json version", () =>
-  withApp({}, async (page, app) => {
-    const labels = await app.evaluate(
-      ({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label) ?? [],
-    );
-    expect(labels).toEqual(
-      process.platform === "darwin"
-        ? [pkg.productName, "File", "Edit", "View", "Window", "Help"]
-        : ["File", "Edit", "View", "Help"],
-    );
+/**
+ * The About listener (6.7) subscribes in an effect after first paint, and a main → renderer
+ * event sent earlier is dropped: wait for the shell, then retry the menu click until it opens.
+ */
+async function openAboutFromMenu(page: Page, app: ElectronApplication) {
+  await shellReady(page);
+  await expect(async () => {
     await app.evaluate(({ Menu }) => {
       Menu.getApplicationMenu()?.getMenuItemById("about")?.click();
     });
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 500 });
+  }).toPass();
+}
+
+test("app boots and shows sidebar", () =>
+  withApp({}, async (page) => {
+    await shellReady(page);
+  }));
+
+test("native menu: platform menus and standard roles; Help > About shows name and version", () =>
+  withApp({}, async (page, app) => {
+    // Top-level label → roles of its submenu items. Electron lowercases roles ("selectall").
+    const menus = await app.evaluate(({ Menu }) =>
+      (Menu.getApplicationMenu()?.items ?? []).map((m) => ({
+        label: m.label,
+        roles: m.submenu?.items.flatMap((i) => (i.role ? [String(i.role)] : [])) ?? [],
+      })),
+    );
+    const roles = Object.fromEntries(menus.map((m) => [m.label, m.roles]));
+    const isMac = process.platform === "darwin";
+    expect(menus.map((m) => m.label)).toEqual(
+      isMac
+        ? [pkg.productName, "File", "Edit", "View", "Window", "Help"]
+        : ["File", "Edit", "View", "Help"],
+    );
+    expect(roles.Edit).toEqual(
+      expect.arrayContaining(["undo", "redo", "cut", "copy", "paste", "selectall"]),
+    );
+    if (isMac) {
+      expect(roles.File).toContain("close");
+      expect(roles.Window).toContain("minimize");
+      expect(roles[pkg.productName]).toContain("quit");
+    } else {
+      expect(roles.File).toEqual(expect.arrayContaining(["minimize", "close", "quit"]));
+    }
+
+    await openAboutFromMenu(page, app);
     await expect(page.getByRole("dialog")).toContainText(`${pkg.productName} v${pkg.version}`);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
   }));
 
-test("a second launch exits and restores the first window", async () => {
+test("a second launch exits within 2 seconds and leaves exactly one main window", async () => {
   const dir = tempDir();
   try {
     await withApp(
@@ -1267,13 +1347,22 @@ test("a second launch exits and restores the first window", async () => {
           .toBe(true); // shown on ready-to-show (6.4)
         await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.minimize());
         const exe = await app.evaluate(() => process.execPath); // the Electron binary
-        const code = await new Promise<number | null>((done) => {
-          spawn(exe, ["."], { env: { ...process.env, APP_DATA_DIR: dir } }).on("exit", done);
+        const second = spawn(exe, ["."], { env: { ...process.env, APP_DATA_DIR: dir } });
+        const code = await new Promise<number | null>((done, fail) => {
+          const timer = setTimeout(() => {
+            second.kill();
+            fail(new Error("second launch still running after 2 s"));
+          }, 2000);
+          second.on("exit", (exitCode) => {
+            clearTimeout(timer);
+            done(exitCode);
+          });
         });
         expect(code).toBe(0); // lock held by the first instance: the second quits
+        expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
         await expect
           .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMinimized()))
-          .toBe(false);
+          .toBe(false); // restored by the second-instance handler (6.4)
       },
       dir,
     );
@@ -1286,19 +1375,84 @@ test("shows an error state when the data source fails", () =>
   withApp({ APP_FAULT_MODE: "fail" }, async (page) => {
     await expect(page.getByRole("alert")).toBeVisible();
   }));
+
+test("Export CSV opens the native Save dialog with a CSV filter and writes the file", async () => {
+  const outDir = tempDir();
+  try {
+    await withApp({}, async (page, app) => {
+      await shellReady(page);
+      const target = join(outDir, "export.csv");
+      await stubSaveDialog(app, target);
+      const csv = "id,title\n1,Lab A\n";
+      // A TOR test clicks the screen's Export control; this example invokes the channel directly.
+      const result = await page.evaluate(
+        (body) => window.api.invoke("file:saveCsv", { defaultName: "export.csv", csv: body }),
+        csv,
+      );
+      expect(result).toEqual({ saved: true });
+      expect((await lastSaveDialogOptions(app))?.filters).toEqual([
+        { name: "CSV", extensions: ["csv"] },
+      ]);
+      expect(readFileSync(target, "utf8")).toBe(csv);
+    });
+  } finally {
+    removeDir(outDir);
+  }
+});
+
+test("reduced motion: with the OS preference set, dialog animation is disabled", () =>
+  withApp({}, async (page, app) => {
+    await page.emulateMedia({ reducedMotion: "reduce" }); // stands in for the OS setting
+    await openAboutFromMenu(page, app);
+    const seconds = await page
+      .getByRole("dialog")
+      .evaluate((el) => parseFloat(getComputedStyle(el).animationDuration));
+    expect(seconds).toBeLessThan(0.001); // 0.01ms from index.css (4.10)
+  }));
 ```
 
 `app.evaluate` runs in the main process with the `electron` module as its argument; it cannot
-close over test-file variables. The second instance is spawned, not launched through Playwright,
-because it exits before a window exists. OS focus-stealing rules make "focused" unassertable, so
-the test checks the `second-instance` handler un-minimized the window.
+close over test-file variables (pass them as the second argument). The second instance is spawned,
+not launched through Playwright, because it exits before a window exists. OS focus-stealing rules
+make "focused" unassertable, so the single-instance test asserts restore from minimized. On Windows
+the `quit` role renders "Exit"; the test asserts roles, not labels. `electron.launch` has no
+`reducedMotion` option; `page.emulateMedia` sets the media feature through the Chromium DevTools
+protocol, as in a browser page.
+
+`tests/e2e/doubles.ts` (test doubles; product code never branches on tests):
+
+```ts
+import type { ElectronApplication } from "@playwright/test";
+
+type SaveOptions = { defaultPath?: string; filters?: { name: string; extensions: string[] }[] };
+
+/** Every later Save dialog returns `filePath` without opening, and records the options it got. */
+export async function stubSaveDialog(app: ElectronApplication, filePath: string) {
+  await app.evaluate(({ dialog }, target) => {
+    const store = globalThis as { lastSaveDialogOptions?: SaveOptions };
+    dialog.showSaveDialog = async (...args: unknown[]) => {
+      store.lastSaveDialogOptions = args.at(-1) as SaveOptions; // (options) or (window, options)
+      return { canceled: false, filePath: target };
+    };
+  }, filePath);
+}
+
+/** Options the app passed to the last Save dialog. */
+export function lastSaveDialogOptions(app: ElectronApplication) {
+  return app.evaluate(
+    () => (globalThis as { lastSaveDialogOptions?: SaveOptions }).lastSaveDialogOptions,
+  );
+}
+```
+
+Stub `showOpenDialog` the same way (`{ canceled: false, filePaths: [target] }`) for Open and Import.
 
 ---
 
 ## 8. Daily Commands
 
 ```bash
-bun install                  # respects trustedDependencies, runs electron-rebuild
+bun install                  # runs only trustedDependencies scripts (Electron binary download)
 bun run dev                  # electron-vite with HMR
 bun run db:generate          # after editing schema.ts; commit the SQL
 bun run check                # typecheck + lint + deadcode + unit/component tests
@@ -1377,8 +1531,8 @@ says it is not configured here.
 
 | Consideration                       | What happens                                                                                                        | Applied fix                                                                                                   |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Bun blocks lifecycle scripts        | Electron and `better-sqlite3` postinstall scripts do not run, so the binary is missing and the app fails to launch. | `trustedDependencies` in `package.json` (4.1).                                                                |
-| Native module ABI mismatch          | `better-sqlite3` compiled for system Node crashes under Electron's Node.                                            | `postinstall` runs `electron-rebuild`; `npmRebuild: true` in electron-builder (4.1, 4.8).                     |
+| Bun blocks lifecycle scripts        | Electron's postinstall does not run, so its binary is missing and the app fails to launch.                          | `trustedDependencies: ["electron"]` in `package.json` (4.1).                                                  |
+| Native module ABI mismatch          | A V8-ABI native module built for system Node crashes under Electron's Node.                                         | better-sqlite3 13 is N-API with bundled prebuilds: no `postinstall` rebuild, `npmRebuild: false`, so packaging needs no C++ toolchain (4.1, 4.8). |
 | Native module inside asar           | Node cannot `dlopen` from inside an asar archive.                                                                   | `asarUnpack` for `better-sqlite3` (4.8).                                                                      |
 | `bun test` cannot load Electron     | Tests importing `electron` fail outside the Electron binary.                                                        | `core` has no Electron imports; Electron-touching code is tested via Playwright (7).                          |
 | Migrations path differs dev vs prod | `migrate()` cannot find the SQL folder in the packaged app.                                                         | Resolved from `process.resourcesPath` when packaged, shipped via `extraResources` (5.3, 4.8).                 |
@@ -1396,6 +1550,9 @@ says it is not configured here.
 | ESM-only Vite plugins               | A config bundled as CommonJS cannot load `@tailwindcss/vite`, which ships only ESM.                                 | `electron.vite.config.mts`: ESM regardless of `package.json` (4.4).                                           |
 | Biome and Tailwind CSS              | Biome's CSS parser rejects `@theme`, `@custom-variant` and `@apply` by default.                                     | `index.css` excluded in `biome.json` (4.5).                                                                   |
 | Default application menu            | Without `Menu.setApplicationMenu`, Electron ships Reload, DevTools and electronjs.org links — no standard-menu TORs. | `src/main/menu.ts`: platform template, standard roles, dev items only when unpackaged (6.8).                  |
+| Menu event before the listener      | A menu click right after launch sends `app:showAbout` before the renderer subscribes; the event is dropped.         | E2E waits for the app shell, then retries the click until the dialog shows (7).                                |
+| Native file dialogs in E2E          | A real Open/Save dialog blocks the test and sits outside the DOM.                                                   | `tests/e2e/doubles.ts` replaces `dialog.showSaveDialog` in main and records the filters it got (6.4, 7).       |
+| Reduced motion                      | shadcn and `tw-animate-css` animate regardless of the OS reduce-motion setting.                                    | `prefers-reduced-motion` block in `index.css` (4.10); E2E emulates it with `page.emulateMedia` (7).            |
 | Dialog focus without a trigger      | A dialog opened from the native menu has no trigger, so closing it drops focus on `<body>`.                        | `onCloseAutoFocus` restores the element focused before opening (6.7).                                         |
 | Main → renderer events              | The sandboxed preload cannot load zod, and a leaked `IpcRendererEvent` exposes `sender`.                            | `send()` validates in main; preload `on()` allowlists events, forwards the payload only, returns unsubscribe (6.2, 6.3). |
 | Launch flash                        | A window shown before first paint flashes blank, then jumps to its restored maximized state.                        | `show: false`; maximize and show on `ready-to-show` (6.4).                                                    |

@@ -178,12 +178,14 @@ Middle step example:
 
   Before reporting, run two mechanical checks against the working tree (nothing is committed
   yet, so `git diff <base-branch>` alone would miss new files):
-  - `for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done` must hit in at least one
+  - `for d in <test-directories>; do grep -rl --exclude-dir={bin,obj,node_modules,dist,out,build} "<TOR-ID>" "$d"; done` must hit in at least one
      directory for every TOR ID. A miss means the test is not traceable — fix the test before
      continuing. A TOR whose scenario carries `# Verification: operator-observed` is traced by a
      checklist `tests/manual/<TOR-ID>.md` (or under `tests/hil/`) that restates its Given / When /
      Then as steps a person performs and what they should see; write it, and report the TOR as
      `PASS (operator-observed pending)` — `/peak-workflow:wrapup-epic` collects the observation.
+     A checklist for anything that switches mains power or heat names a bench setup — the
+     equipment unplugged, the output driving an indicator lamp — never the live equipment.
   - ```bash
     grep -inE --exclude-dir={.venv,node_modules,__pycache__,.pytest_cache,dist,build,out} \
       'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
@@ -211,6 +213,9 @@ Middle step example:
     realized. Cite test file:line and impl file:line.
   - **FAIL** — test fails, or test passes but implementation does not realize the requirement.
     Describe the gap.
+  - **PASS (operator-observed pending)** — only for a TOR tagged `# Verification: operator-observed`:
+    its checklist exists and every automated part it has passes. A `# Safety` TOR with no automated
+    `tests/hil/` test naming it is **FAIL**, whatever its tag.
   - **CANNOT VERIFY** — only if the test environment cannot start after a genuine attempt.
 
   **IPC / dev-server caveat:** if the project uses a dev-server-only render harness (e.g., Vite

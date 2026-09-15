@@ -56,7 +56,8 @@ The user's request / brownfield description: $ARGUMENTS
 
 0. **Sign-in projects.** If `CLAUDE.md`'s `**Product shape:**` block records
    `**Access rule:** owner-or-permitted-role` (named provider or deferred), write, and require, the
-   access TORs: a person sees only the records they own or their role grants, an unauthenticated
+   access TORs: a person sees only the records they own or their role grants (including never
+   seeing another person's identity inside a shared count or summary), an unauthenticated
    request is rejected, and each declared role can do exactly what `CLAUDE.md` says it may.
    - **Named provider:** write the provider round-trip TOR (signing in through the named provider
      lands the person in the product with their role). Automated tests sign in through the
@@ -479,7 +480,7 @@ Scenario: [TOR-01-{XXXXXXX}] The application shall focus the running instance wh
     Given the application is running with its main window minimized
     When the user launches the application executable again
     Then within 2 seconds the second launch should have exited and exactly one main window should exist
-    And the main window should be restored and focused
+    And the main window should be restored from minimized
 ```
 
 **Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
@@ -657,6 +658,8 @@ internal scratch.
 
 **Input sources to enumerate (be granular — one ConOps step that says "X and Y" is two rows):**
 - Every numbered step in every ConOps Section 5 scenario
+- Every row of the ConOps §8 `What Must Never Happen` table (a hazard row → its `# Safety` TOR; an
+  assumption row → the Coverage Gaps entry `hardware safeguard — outside the software, confirmed by the owner`)
 - Every MVP goal, in-scope feature, and success criterion from PV Sections 5–6
 - Every item under "New Capabilities Identified" in the brownfield changelog (if consumed)
 - User-stated priorities from `$ARGUMENTS` (if non-empty)

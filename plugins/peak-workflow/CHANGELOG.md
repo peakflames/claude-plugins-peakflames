@@ -104,6 +104,17 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Fixed
 
+- **Public password sign-up allowed impersonation** — web sheet requires email verification and
+  reset through a new droppable Email delivery row; a verified Google sign-in releases an unverified
+  squatter account.
+- **Desktop dependency ranges** — current Electron and N-API better-sqlite3 prebuilds, no native
+  rebuild; E2E waits for the renderer before menu actions; single-instance, menu-role, CSV save
+  dialog, and reduced-motion tests mirror their TORs.
+- **Safety PASS without automation** — a `# Safety` TOR with no automated `tests/hil/` test is FAIL
+  in both self-assessment and wrapup; mains-power checklists run on the bench.
+- **CI, hosting, and email providers** — `start-epic` confirms them before planning the skeleton;
+  CI is built only when named; the `**Not decided yet:**` line is deleted once resolved.
+
 - **Hardware safeguards became unmeetable Safety TORs** — assumption rows (thermal fuse, limit switch)
   stay ConOps assumptions; the software's detectable counterpart becomes the TOR, with an automated
   HIL check of command and timing.

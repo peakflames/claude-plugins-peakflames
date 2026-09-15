@@ -124,7 +124,7 @@ implement this epic. Do not trust the implementer's self-assessment.
 1. **Read the Given/When/Then** (loaded in Step 1.1 item 4a).
 2. **Locate the test(s)** for this TOR ID by grep only:
    ```bash
-   for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done
+   for d in <test-directories>; do grep -rl --exclude-dir={bin,obj,node_modules,dist,out,build} "<TOR-ID>" "$d"; done
    ```
    where `<test-directories>` is every directory listed under **Test directories** in
    CLAUDE.md's Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if
@@ -189,7 +189,9 @@ Report each TOR ID:
   For an operator-observed TOR: the checklist mirrors the Gherkin, implementation inspection
   confirms the behavior, AND the operator's described observation matches the Then. Cite the
   checklist file, `impl file:line`, and `operator-observed: <their words>`. An observation that
-  does not match is FAIL; one the user cannot make now ends the session (item 7).
+  does not match is FAIL; one the user cannot make now ends the session (item 7). A `# Safety`
+  TOR also needs an automated `tests/hil/` test naming it that passes — without one it is FAIL,
+  whatever its tag; the observation confirms only the physical part.
 - **FAIL** — test fails, OR no test mirrors the Then (e.g., the test only checks a flag is
   accepted when the Then names an outcome), OR test passes but implementation does not realize
   the requirement (describe specifically what is wrong).
@@ -245,7 +247,7 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
 - Console check (if UI was changed) — web: `playwright-cli`; desktop: the renderer console captured by the Playwright Electron harness
 - UX Baseline check (if UI was changed and `CLAUDE.md` has a **UX Baseline** section) — see below
-- Access-control check (if `CLAUDE.md`'s `**Product shape:**` block records
+- Access-control check — on routes that return or change records (if `CLAUDE.md`'s `**Product shape:**` block records
   `**Access rule:** owner-or-permitted-role`, or its Tech Stack records
   `Auth: local accounts now, org SSO deferred`, and this epic touched user data) — see below
 - Deferred-value check (walking-skeleton epic only): `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen|\*\*Not decided yet:\*\*' CLAUDE.md`
