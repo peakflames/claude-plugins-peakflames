@@ -80,6 +80,48 @@ for now — every one of these is easier to add later than to carry unused."* Ad
 a browser-only app is a contained change (the static sheet's Growth Path covers it); carrying an
 unused auth and storage layer through every epic is not.
 
+**If question 2 is "yes", ask two follow-ups.** Sign-in is the answer most likely to stall a
+project: an organization's identity provider is usually someone else's decision, behind an IT
+approval the user cannot give during a planning session.
+
+- *Provider:* "Do you already know how people will sign in — a provider your organization has
+  approved, such as Microsoft, Google, or Okta — or is that still to be worked out?"
+- *Roles:* "Will different people be able to do different things — some can only look, others
+  can change things?"
+
+A "yes" to question 2 routes to the web-app sheet either way. Once anyone other than the owner
+can see the data, the rule about who sees what has to be enforced somewhere the person cannot
+edit, which means a server. Deferring the provider does not restore the static sheet — say this
+plainly rather than letting the user infer that deferral keeps the project small.
+
+| Provider answer | What goes in the stack |
+|---|---|
+| Named and approved | The sheet's auth layer, configured for that provider. Record the provider in the Tech Stack table. |
+| Still to be worked out, or "I don't know" | **Deferred-provider mode** below. |
+
+**Deferred-provider mode.** Defer *who issues the identity*. Never defer *who owns the data* —
+that is the half that is ruinous to retrofit, because it means migrating every table and
+rewriting every query later. Record all five of these:
+
+1. **Ownership is built now.** Every record carries an owner, and every read and write filters by
+   the current user, starting with the walking-skeleton epic. This is not deferred, not stubbed,
+   and not a later epic.
+2. **Roles are modelled now if question 2b was yes** — a role field and one permission-check seam,
+   even when only one role exists today. The provider supplies the real role claim later.
+3. **Sign-in is a development-only stub** behind a single module that answers "who is the current
+   user?". Swapping that module for the real provider is the whole of the later integration.
+4. **The stub fails closed.** A production build with no provider configured refuses to start. It
+   never falls back to a signed-in user, an anonymous user, or a default account.
+5. **The provider is an open decision**, recorded in the Tech Stack table as
+   `Auth: deferred provider — ownership enforced, sign-in stubbed (shape Q2a)` and written into
+   `docs/design-notes.md` as a numbered decision with its rationale (blocked on IT approval /
+   provider not yet chosen). `/peak-workflow:plan-project` turns it into its own epic.
+
+Tell the user, in plain language, what deferral does and does not buy: *"You can build and use the
+whole product this way. Connecting it to your organization's real sign-in is its own piece of work
+later — usually a week or more with your IT people involved. Deferring it means you are not
+blocked on them now; it does not make that work smaller."*
+
 **Route on the answers, not on the project type alone:**
 
 | Answers | Reference sheet — read it before answering |
@@ -96,7 +138,9 @@ does not resolve in this session, locate the sheet under the plugin's own `refer
 
 **Record the answers, not just their consequences.** Write a short `**Product shape:**` block
 above the Tech Stack table listing each question and its answer in the user's terms (e.g.
-*"Same device only — no cross-device sync"*). Any Stack Summary row the answers drop is written
+*"Same device only — no cross-device sync"*). When question 2 was yes, the block also carries the
+provider answer — either the named provider or *"Sign-in: deferred provider — ownership enforced,
+stub fails closed"* — and whether roles are in play. Any Stack Summary row the answers drop is written
 into the table as `N/A — <reason> (shape Q<N>)` rather than omitted. `/peak-workflow:plan-project`
 reads the Stack Summary as a completeness checklist for the walking skeleton, so a row that is
 simply absent reads as an oversight, while `N/A — no file uploads (shape Q3)` reads as a
@@ -486,6 +530,21 @@ be in `.gitignore`. Use environment variables, secret managers, or encrypted fil
 makes them inapplicable.
 ```
 
+**Deferred-provider projects only** — when the Tech Stack records `Auth: deferred provider`,
+append this fourth reminder to the section verbatim. It is the guardrail for the stub the
+Tech Stack step just authorized:
+
+```markdown
+**A stubbed sign-in must never reach production.**
+Until the provider epic lands, the development sign-in stub is the only identity mechanism in
+the codebase. It must be unreachable in a production build: a production build with no identity
+provider configured refuses to start rather than falling back to a signed-in, anonymous, or
+default user. Never widen the stub to "just for this demo" — a temporary auth bypass that ships
+is a breach, not a shortcut. Per-user ownership checks are NOT part of the stub and are enforced
+for real from the first epic; `/peak-workflow:wrapup-epic` reviews both on every epic that
+touches user data.
+```
+
 **Peak Workflow** (if missing):
 - Where does the requirements baseline live? (default: `docs/requirements/`)
 - Where does the implementation plan live? (default: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard)
@@ -804,6 +863,25 @@ Then, for each item in CLAUDE.md's **Key Architecture Decisions** section (or eq
 
 **Rationale:** [If CLAUDE.md provides a rationale, include it. Otherwise:]
 *(Rationale to be documented during implementation.)*
+```
+
+If the Tech Stack records `Auth: deferred provider`, write that decision as a numbered section
+here — it is a real architectural decision with a stated rationale, and Step 3 promised it would
+land in this file:
+
+```markdown
+## N. Identity Provider Deferred
+
+**Decision:** Per-record ownership and permission checks are enforced from the first epic. The
+identity provider is not yet chosen; sign-in is a development-only stub behind a single
+"who is the current user?" module, which fails closed in a production build.
+
+**Rationale:** [The user's reason — provider not yet chosen / pending IT approval.] Deferring the
+provider avoids blocking the project on a decision outside the team, while building ownership now
+avoids a migration of every table and a rewrite of every query later.
+
+**Resolves when:** the provider is named. `/peak-workflow:plan-project` carries this as its own
+epic; the stub module is the only code that changes.
 ```
 
 After all decision sections, add:

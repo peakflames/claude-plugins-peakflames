@@ -29,6 +29,15 @@ answer.
 - **Date and offline layers** — the static sheet adds local civil-day keys (`YYYY-MM-DD`),
   injected-clock domain functions, and an installable PWA, closing gaps the Stack Summary
   checklist did not cover.
+- **Auth follow-ups in `setup`** — a "yes" to sign-in asks whether an approved identity provider
+  is already known, and whether roles are in play. An unknown provider selects deferred-provider
+  mode instead of stalling the project on an IT decision the user cannot make.
+- **Deferred-provider mode** — data ownership and role checks are built in the walking skeleton;
+  only the identity provider is deferred, behind one "who is the current user?" module that fails
+  closed in production. The provider becomes its own later epic.
+- **Auth-stub security reminder** — projects in deferred-provider mode get a fourth Security
+  Baseline reminder: a stubbed sign-in never reaches production, and ownership checks are never
+  part of the stub.
 
 ### Changed
 

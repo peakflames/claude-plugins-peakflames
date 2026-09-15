@@ -65,6 +65,13 @@ a missing layer. `discover` Step 4.5 re-checks the answers against the ConOps sc
 before changing anything; the revision rides the same `docs/` branch merge as the requirements
 baseline.
 
+**Auth defers the provider, never the ownership.** A "yes" to sign-in with no approved identity
+provider selects deferred-provider mode: per-record ownership, role fields and permission checks
+ship in the walking skeleton, while sign-in is a development stub behind one module that fails
+closed in a production build. The provider is its own later epic and a numbered decision in
+`design-notes.md`. Deferring the provider never restores the static sheet — shared data needs a
+server regardless.
+
 **Baseline chains:** `CLAUDE.md` sections written by `setup` become baseline TORs in
 `capture-requirements` — `Tool Hygiene & Operability` (all project types, Step 3A.2.1) and
 `UX Baseline` (Web app / Desktop app / Hybrid with a UI, Step 3A.2.2). Both sets belong to the
