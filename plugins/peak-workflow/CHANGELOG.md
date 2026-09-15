@@ -104,6 +104,9 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Fixed
 
+- **Failed provider sign-in hit a bare error page** — web sheet passes `errorCallbackURL` so the app's
+  plain-language message shows; `discover` stops recommending the next step while planning is blocked.
+
 - **`HIL_BENCH` was unreachable** — the agent adds it to a single command right after the user
   confirms the bench setup; the rule is copied into mains/heat plans only, written into
   `CLAUDE.md` Important Reminders, and honoured by `quick-fix`.

@@ -1237,8 +1237,9 @@ export async function releaseUnverifiedEmail(email: string) {
 ```
 
 The web client turns a refusal into plain words — the email form reads `error.code` from
-`authClient.signUp.email(…)`; a provider callback reloads the page it started from with
-`?error=<code>` (the client's default `errorCallbackURL`). Add to `SIGN_IN_ERRORS`:
+`authClient.signUp.email(…)`; a provider callback returns to the page it started from with
+`?error=<code>` because the app passes `errorCallbackURL: window.location.href` (without it, Better
+Auth sends the person to its own bare `/auth/error` page). Add to `SIGN_IN_ERRORS`:
 
 ```ts
 // apps/web/src/auth-client.ts — added entries
@@ -1281,7 +1282,7 @@ The web client turns a refusal into plain words — the email form reads `error.
   decision reads it except the create hook; authorize on `role` only.
 - **Callback URLs** to register with the provider: `<APP_URL>/auth/callback/google`,
   `<APP_URL>/auth/callback/microsoft`. Sign-in starts with
-  `authClient.signIn.social({ provider: "google", callbackURL: window.location.origin })` — an
+  `authClient.signIn.social({ provider: "google", callbackURL: window.location.origin, errorCallbackURL: window.location.href })` — an
   absolute `callbackURL` returns to the page's own origin (:5173 in dev, trusted above); a relative
   one resolves against APP_URL, which serves no `dist` in dev.
 - **Microsoft:** Entra omits the `email` claim for managed users unless the app registration adds
@@ -1656,7 +1657,7 @@ if (token) await authClient.resetPassword({ token, newPassword });
 
 // Settings screen, Google provider only — "Link Google" for the signed-in person. Google's
 // verified email must equal the account's; a refusal returns with ?error=<code> (signInErrorMessage).
-await authClient.linkSocial({ provider: "google", callbackURL: window.location.href });
+await authClient.linkSocial({ provider: "google", callbackURL: window.location.href, errorCallbackURL: window.location.href });
 ```
 
 ---
