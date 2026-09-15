@@ -63,6 +63,11 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
     the cited feature file and locate the `Scenario: [TOR-NN-XXXXXXX]` block with that exact ID.
     Read the full Given/When/Then. These become the verification specifications — every subsequent
     verification step judges the implementation against these Given/When/Then statements.
+4b. **Load Screens (UI epics only).** If the spec has a `## Screens` section, open each listed
+    wireframe file (`docs/product-vision-planning/ux/wireframes/S-NN-*.html`). Wireframes are
+    planning artifacts approved by the `docs/` branch merge, not the implementer's handoff —
+    safe to read blind. Step 1.3's **Wireframe fidelity** line checks the built screens against
+    them. If the section is absent, skip this item without comment.
 5. **Verify Requirements Anchors.** An independent reviewer loads TOR requirements first so all
    subsequent verification is judged against the requirements baseline, not the implementer's
    self-assessment. For each row in the Requirements Anchors table:
@@ -229,6 +234,9 @@ on it:
 - **Desktop conventions** (desktop apps only) — new commands appear in the application menu
   with accelerators; file choices use native dialogs; window state and single-instance
   behavior still hold.
+- **Wireframe fidelity** (only when the spec has a `## Screens` section — Step 1.1 item 4b) —
+  the screen's regions, control texts, and four states match its wireframe; deviations are
+  Code Review findings unless a TOR's Then requires them.
 - Any project-specific line the section declares (Responsiveness budget, Undo) when not `N/A`.
 
 The skeleton epic's baseline UX TORs proved these behaviors once on the reference screen; this

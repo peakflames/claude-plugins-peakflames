@@ -36,6 +36,7 @@
 /peak-workflow:new-project           → (optional) detect state, dispatches the rest
 /peak-workflow:setup                 → audit CLAUDE.md, stub architecture.md + design-notes.md
 /peak-workflow:discover              → creates docs/ branch, produces vision + ConOps
+/peak-workflow:mockup                → (UI projects) screen inventory, flows, grayscale wireframes; concretizes ConOps steps
 /peak-workflow:capture-requirements  → derives TOR requirements on the same docs/ branch
 /peak-workflow:plan-project          → derives epics from TOR IDs on the same docs/ branch
 [merge docs/ branch]                 → requirements and plan baseline approved
@@ -56,6 +57,7 @@ that vision/ConOps and TOR files already exist (or don't) and adapt accordingly.
 
 ```
 /peak-workflow:discover              → brownfield: creates docs/ branch, updates vision + ConOps
+/peak-workflow:mockup                → (UI projects) screen inventory, flows, grayscale wireframes; concretizes ConOps steps
 /peak-workflow:capture-requirements  → brownfield: appends new TOR IDs, archives changelog
 /peak-workflow:plan-project          → brownfield: new epics for unplanned TOR IDs
 [merge docs/ branch]                 → delta requirements and new epics approved
@@ -135,11 +137,14 @@ same chain through the **UX Baseline** section that `/setup` writes for UI proje
 | `/start-epic` | UI middle steps name each screen and its four states. |
 | `/wrapup-epic` | Runs the UX Baseline check as a quality gate on every screen a UI epic adds or changes — a FAIL is Fix now / Stop, never deferred. |
 
-It is UX, not style: palette, typography, and brand are not TORs. `/setup` also recommends
-companion skills for UI projects — `frontend-design@claude-plugins-official` for visual
-execution and `playwright-cli` for verification (web; desktop apps verify through a Playwright
-Electron harness in `e2e/`) — and records the precedence rule: the UX Baseline and the
-design-system tokens win over `frontend-design`'s aesthetic choices.
+On UI projects `/mockup` runs between `/discover` and `/capture-requirements` — it turns the
+ConOps scenarios into an `S-NN` screen inventory, flows, and wireframes that are grayscale on
+purpose, because visual design lands in the walking-skeleton epic. It is UX, not style:
+palette, typography, and brand are not TORs. `/setup` also recommends companion skills for UI
+projects — `frontend-design@claude-plugins-official` for visual execution and `playwright-cli`
+for verification (web; desktop apps verify through a Playwright Electron harness in `e2e/`) —
+and records the precedence rule: the UX Baseline and the design-system tokens win over
+`frontend-design`'s aesthetic choices.
 
 **Stack defaults.** When the tech-stack answer is thin, `/setup` offers a one-answer default per
 project type: TypeScript end to end, Bun for install / run / test, shadcn/ui + Tailwind v4, and
@@ -162,6 +167,7 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 | Command | Purpose | Branch / Status |
 |---|---|---|
 | `/discover` | Adaptive interview that produces `product-vision.md` + `concept-of-operations.md` | Creates `docs/{task-short-name}` branch |
+| `/mockup [scenario]` | Low-fidelity UX prototyping for Web / Desktop / UI-Hybrid projects — derives an `S-NN` screen inventory, per-scenario flows, and grayscale HTML wireframes from the ConOps, then rewrites ConOps steps to name screens and controls so TORs cite them | Continues on `docs/` branch |
 | `/capture-requirements` | Derives TOR requirements (`.feature.md` files + `.feature.tracing.json` sidecars) from vision + ConOps | Continues on `docs/` branch |
 | `/plan-project` | Derives implementation plan (phases, epics, Requirements Anchors specs) from TOR requirements | Continues on `docs/` branch |
 | `/add <description>` | Adds new epic(s) referencing existing TOR IDs | — (writes planning docs) |
@@ -204,7 +210,7 @@ and a recurring iteration loop for incoming work.
 flowchart TD
     Start[New project /<br/>first time here] --> NP["/new-project<br/>(detects state)"]
     NP --> NPV{Verdict}
-    NPV -->|Greenfield| Setup["/setup → /discover →<br/>/capture-requirements →<br/>/plan-project"]
+    NPV -->|Greenfield| Setup["/setup → /discover →<br/>/mockup (UI) →<br/>/capture-requirements →<br/>/plan-project"]
     NPV -->|Brownfield<br/>epic-workflow| Mig["/migrate-from-epic-workflow"]
     NPV -->|Existing<br/>peak-workflow| Iter
     Setup --> Merge[merge docs/ branch<br/>= requirements approved]
@@ -214,7 +220,7 @@ flowchart TD
     Iter --> Req[GitHub issue<br/>or ad-hoc request]
     Req --> Tri["/triage"]
     Tri --> Verd{Verdict}
-    Verd -->|HEAVY<br/>new TOR IDs needed| Heavy["docs/ branch:<br/>/discover → /capture-requirements<br/>→ /plan-project"]
+    Verd -->|HEAVY<br/>new TOR IDs needed| Heavy["docs/ branch:<br/>/discover → /mockup (UI)<br/>→ /capture-requirements<br/>→ /plan-project"]
     Verd -->|EPIC<br/>implements existing TOR IDs| Epic["/add → /start-epic → /wrapup-epic"]
     Verd -->|TRIVIAL<br/>bug in already-implemented TOR| Quick["/quick-fix"]
     Heavy --> Iter
@@ -228,7 +234,7 @@ flowchart TD
 
 | Branch | Pattern | Scope |
 |---|---|---|
-| Planning | `docs/{task-short-name}` | discover → capture-requirements → plan-project → add (cohesive; merge = approval) |
+| Planning | `docs/{task-short-name}` | discover → mockup → capture-requirements → plan-project → add (cohesive; merge = approval) |
 | Implementation | `feature/epic-<id>-<short-name>` | start-epic → wrapup-epic |
 | Quick fix | `hotfix/<slug>` or `hotfix/issue-<N>-<slug>` | quick-fix |
 
@@ -284,6 +290,10 @@ tool installation and access usage documentation from the command line.
 - `tests/test_cli.py` — TOR-based tests
 ```
 
+On UI projects that ran `/mockup`, a UI epic's spec also carries an optional `## Screens`
+section after Requirements Anchors — one row per `S-NN` the epic delivers, with its wireframe
+path and states; each screen belongs to exactly one epic.
+
 ## Status Sidecar Format
 
 ```
@@ -305,7 +315,10 @@ The `requirements:` field is how `/peak-workflow:status` computes the Requiremen
 ```
 docs/product-vision-planning/
   product-vision.md           ← product intent (written by /discover)
-  concept-of-operations.md    ← user scenarios (written by /discover)
+  concept-of-operations.md    ← user scenarios (written by /discover; steps name screens after /mockup)
+  ux/screens.md               ← S-NN screen inventory, states, per-scenario flows (written by /mockup, UI projects)
+  ux/wireframes/S-NN-*.html   ← grayscale wireframes, one per screen, four states (same)
+  ux/README.md                ← how to open the wireframes (same)
   changelogs/                 ← brownfield discovery changelogs
 
 docs/requirements/

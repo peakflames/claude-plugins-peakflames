@@ -95,7 +95,9 @@ If Step 1 item 13 (E2E audit) surfaced regression specs likely to break, include
 For a UI epic (Step 1 item 11a), each middle step that adds or changes a screen must name the
 screen, state that it composes from the skeleton's app shell and design system, and list the
 loading / empty / error / populated states it renders — the wrapup UX Baseline gate checks
-every one of them.
+every one of them. When the spec has a `## Screens` section (Step 1 item 4c), the step also
+cites the screen's `S-NN`, its wireframe path, and the `data-component` primitives it composes
+— the wrapup Wireframe fidelity line checks regions, control texts, and states against that file.
 
 **Deferral gate.** Copy this paragraph verbatim into the plan as a standing rule ahead of the
 first middle step; it applies to every middle step and to the self-assessment. If at any point

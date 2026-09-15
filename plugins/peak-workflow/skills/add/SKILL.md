@@ -39,6 +39,7 @@ Follow these steps exactly:
    > The requirements baseline is empty. Run `/peak-workflow:capture-requirements` first to
    > establish TOR requirements before adding epics. Epics reference TOR IDs as their acceptance
    > criteria — without a requirements baseline, there are no acceptance criteria to reference.
+5. Read `docs/product-vision-planning/ux/screens.md` if it exists (UI projects — written by `/peak-workflow:mockup`). Capture each `S-NN`, name, and wireframe path, and grep existing specs for `## Screens` sections to note which epic owns each screen. Steps 2.2 and 6 use this.
 
 ## Step 2: Resolve the Request
 
@@ -112,6 +113,11 @@ stays where it is being (or was) delivered.
 
 If every confirmed TOR was dropped via Keep, the set is empty — stop with the "No existing TOR
 requirements match" message above.
+
+**Screens (UI epics, when `ux/screens.md` exists).** A UI epic lists the `S-NN` screens its
+confirmed TORs name in their Given/When — those are its `## Screens` rows in Step 6. A screen
+belongs to exactly one epic: if another epic's spec already lists it, ask the same Keep / Move
+question as for a TOR, with the same Not Started rule for moving.
 
 **Assign the epic ID:** generate a fresh **7-character random alphanumeric ID** for each new epic via:
 
@@ -198,6 +204,12 @@ coverage.}
 | TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` | {Scenario title verbatim from the feature file} |
 | TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` | {Scenario title verbatim from the feature file} |
 
+## Screens
+
+| Screen | Wireframe | States this epic delivers |
+|--------|-----------|---------------------------|
+| S-NN {Name} | `docs/product-vision-planning/ux/wireframes/S-NN-{kebab}.html` | loading / empty / error / populated |
+
 ## Key Components
 
 {List of file paths that will be created or modified, with a brief description of each. Use the
@@ -205,10 +217,11 @@ project's actual directory structure. Separate into ### Backend and ### Frontend
 both are involved.}
 ```
 
-**Conditional lines in the header template above** — do not carry this guidance into the written spec:
+**Conditional lines and sections in the template above** — do not carry this guidance into the written spec:
 
 - Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise.
+- Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name and wireframe path copied verbatim from `ux/screens.md`; a screen marked `n/a — not data-bearing` lists `populated` only. A screen appears in exactly one epic's Screens table.
 
 **Populating Requirements Anchors:**
 
