@@ -55,19 +55,57 @@ For each section that is MISS or WEAK, ask the user targeted questions to popula
 
 If the answers are thin (e.g., "whatever you recommend", "I don't know", or only a language
 is named), ask which project type the product is (the same list as Tool Hygiene item 1 below
-— carry the answer forward so it is not asked twice). For the three project types that have a
-**reference stack sheet**, the sheet *is* the recommendation — read it and take its stack:
+— carry the answer forward so it is not asked twice).
 
-| Project type | Reference sheet — read it before answering |
+**Shape questions — ask before offering any stack.**
+
+A project type does not determine a stack on its own: a Web app that stores everything in the
+browser and a Web app with accounts and file uploads share almost no layers. Ask these five
+questions **before** reading any sheet, for project type **Web app** or **Hybrid with a web UI**.
+
+Ask them in plain language and assume the user has never deployed software. Do not use the words
+client-side, backend, database, authentication, or object storage in the questions — those are
+the answers, not the questions. Ask all five as one block and accept one combined answer.
+
+| # | Ask it like this | What a "yes" pulls in |
+|---|---|---|
+| 1 | "If someone uses this on their laptop and later opens it on their phone, should they see the same information — or is it fine for it to live only on the device they used?" | Server, database, migrations, container |
+| 2 | "Will people need to sign in? Does anyone other than them ever see their information?" | Auth, sessions, per-user access rules |
+| 3 | "Will people attach photos, PDFs, or other files?" | Object storage, presigned uploads, local S3 |
+| 4 | "Does anything on screen need to update by itself while they are watching — like a message arriving from someone else?" | Streaming endpoints, long-lived connections |
+| 5 | "Does the product need to keep any password or key of its own secret from the people using it?" | Server — a browser-only app cannot hold a secret |
+
+If the user is unsure on any question, treat it as **no** and say so plainly: *"I'll assume no
+for now — every one of these is easier to add later than to carry unused."* Adding a server to
+a browser-only app is a contained change (the static sheet's Growth Path covers it); carrying an
+unused auth and storage layer through every epic is not.
+
+**Route on the answers, not on the project type alone:**
+
+| Answers | Reference sheet — read it before answering |
 |---|---|
-| **Web app** | `plugins/peak-workflow/references/bun-web-app-stack.md` |
-| **Service or API** | `plugins/peak-workflow/references/bun-web-app-stack.md` (same sheet; skip Section 7 Frontend Wiring and the SPA half of Section 8) |
-| **Desktop app** | `plugins/peak-workflow/references/bun-electron-desktop-stack.md` |
+| Web app, **all five "no"** | `${CLAUDE_PLUGIN_ROOT}/references/bun-static-spa-stack.md` — browser-only SPA, data in IndexedDB, deployed to GitHub Pages |
+| Web app, **any "yes"** | `${CLAUDE_PLUGIN_ROOT}/references/bun-web-app-stack.md` |
+| **Service or API** | `${CLAUDE_PLUGIN_ROOT}/references/bun-web-app-stack.md` (same sheet; skip Section 7 Frontend Wiring and the SPA half of Section 8) |
+| **Desktop app** | `${CLAUDE_PLUGIN_ROOT}/references/bun-electron-desktop-stack.md` — ask questions 1–3 anyway; a "yes" to any means the desktop app also needs the web sheet's service layers, which makes it a Hybrid |
 | **Hybrid** | The sheet matching the primary interface, plus the other sheet's layers for the secondary one |
 
+Paths are relative to the installed plugin, not the user's repository. If `${CLAUDE_PLUGIN_ROOT}`
+does not resolve in this session, locate the sheet under the plugin's own `references/` directory
+— do not proceed from memory.
+
+**Record the answers, not just their consequences.** Write a short `**Product shape:**` block
+above the Tech Stack table listing each question and its answer in the user's terms (e.g.
+*"Same device only — no cross-device sync"*). Any Stack Summary row the answers drop is written
+into the table as `N/A — <reason> (shape Q<N>)` rather than omitted. `/peak-workflow:plan-project`
+reads the Stack Summary as a completeness checklist for the walking skeleton, so a row that is
+simply absent reads as an oversight, while `N/A — no file uploads (shape Q3)` reads as a
+decision.
+
 Read the matching sheet's **Section 2 Stack Summary** and offer that table as the proposed
-stack, condensed to one line per layer. Do not invent, substitute, or "modernize" a pick, and
-do not paraphrase from memory — the sheet is the single source of truth for what gets offered.
+stack, condensed to one line per layer, with any shape-dropped rows already marked `N/A`. Do not
+invent, substitute, or "modernize" a pick, and do not paraphrase from memory — the sheet is the
+single source of truth for what gets offered.
 The user accepts the whole sheet with one answer or overrides any layer; record the accepted
 picks in `CLAUDE.md`'s Tech Stack table, and note in the section which sheet it came from so
 `plan-project` can read the same one. Sections 3 (Repository Layout), 4 (Configuration Files),
@@ -98,11 +136,21 @@ First, determine the project type from the Tech Stack answers already captured. 
 - How do you run the test suite? (e.g., `pytest tests/`, `go test ./...`, `cargo test`)
 - Skip the frontend/backend/live-data questions — they don't apply.
 
-*For web/server projects:*
+*For web/server projects (a server is part of the stack):*
 - How do you run the backend locally? (e.g., `dotnet run`, `npm start`, etc.)
 - How do you run the frontend locally? (e.g., `bun run dev`, `npm run dev`, etc.)
+- How do you run the test suite? (reference-sheet stack: `bun test` for unit, API and component
+  tests, `bun run test:e2e` for the Playwright suite) — capture it here so the Verification &
+  Quality Gates step can reuse it instead of asking again.
 - Is the backend API live and functional in local dev? (i.e., can it connect to real data sources like databases?)
 - Should verification always use live data instead of mocking API responses?
+
+*For browser-only web projects (static SPA — the shape questions all answered "no"):*
+- How do you start the dev server? (reference-sheet stack: `bun run dev`, Vite on `:5173`)
+- How do you run the test suite? (reference-sheet stack: `bun test` for unit and component
+  tests, `bun run test:e2e`, which builds and previews the production bundle first)
+- Skip the backend / live-API / live-data questions — there is no server. Verification runs
+  against the real app and its real IndexedDB, so there is nothing to mock either.
 
 *For desktop projects:*
 - How do you start the dev build? (reference-sheet stack: `bun run dev`, which runs electron-vite with a live main process and renderer HMR)
@@ -127,8 +175,11 @@ requirements. Ask in order:
    mechanism varies by project type; the requirement that *some mechanism exists* is
    universal. Suggest defaults:
    - CLI: `--version` flag printing `<name> v<semver>` to stdout, exit 0
-   - Web app: GET `/version` endpoint returning JSON, plus version visible in app footer
-     or About page
+   - Web app (with a server): GET `/version` endpoint returning JSON, plus version visible in
+     app footer or About page
+   - Web app (browser-only / static SPA): no endpoint is possible — the version comes from
+     `package.json#version`, injected at build time as `__APP_VERSION__` and rendered in the app
+     footer, plus the version-stamped first console line
    - Desktop app: Help > About menu item (App menu > About on macOS) opens an in-app About
      dialog rendered in the renderer showing `<name> v<semver>` obtained from
      `app.getVersion()` over IPC, plus the startup log line. Native About panels sit outside
@@ -140,7 +191,9 @@ requirements. Ask in order:
 3. *Version stamped at log startup* — confirm the project will emit the tool name and
    semantic version on the first log line at process / app / request-handler startup
    (e.g., `[INFO] myapp v1.2.0 starting`). Desktop app: the main process logs
-   `<name> v<semver> starting` as its first line once the app is ready.
+   `<name> v<semver> starting` as its first line once the app is ready. Static SPA: `main.tsx`
+   writes `<name> v<semver> starting` to the browser console before mounting the router — the
+   console is the only log this shape has.
 
 4. *Version single source of truth* — what is the authoritative file for the version
    number? The version is defined in exactly one place and read everywhere else. Examples:
@@ -151,6 +204,10 @@ requirements. Ask in order:
    - Levels — what set? (default: `DEBUG / INFO / WARN / ERROR`)
    - Format — `structured JSON` / `key=value` / `human-readable plain text`?
    - Where is the logger configured? (file path)
+   - Web app / Service default (reference sheet): Pino via `hono-pino`, structured JSON to
+     stdout, level from a `LOG_LEVEL` env var, configured in `apps/api/src/app.ts`.
+   - Static SPA default: the browser `console` — there is nowhere to ship logs to. Declare the
+     levels in use and keep `console.debug` out of the production path.
    - Desktop app default: electron-log in the main process (`electron-log/main`,
      `log.initialize()`), file under `app.getPath('logs')`, human-readable plain text;
      renderer logs route through `electron-log/renderer`.
@@ -227,8 +284,11 @@ accept / override answer; override line by line only where the user asks.
 1. *Design system* — a declaration consumed by the walking skeleton in
    `/peak-workflow:plan-project`, not a TOR. Default: **shadcn/ui on Tailwind v4**, themed
    only through CSS-variable tokens:
-   - Tokens live in `:root` / `.dark` CSS variables in the global stylesheet
-     (`src/index.css` for Vite), exposed to Tailwind through an `@theme inline` block.
+   - Tokens live in `:root` / `.dark` CSS variables in the global stylesheet, exposed to
+     Tailwind through an `@theme inline` block. The path follows the stack's layout: `src/index.css`
+     for a static SPA or a single-app Vite tree, `apps/web/src/index.css` for the web sheet's
+     workspace layout, `src/renderer/src/index.css` for the desktop sheet. Name the path the
+     project will actually have — the walking skeleton creates it.
    - `--radius` is the single radius knob — the whole radius scale derives from it.
    - Base color is chosen at `bunx shadcn@latest init` (current set: `neutral`, `stone`,
      `zinc`, `mauve`, `olive`, `mist`, `taupe`; default `neutral`) and is not changed casually
@@ -326,7 +386,7 @@ Operability and is not repeated here.
 
 **Design system:** [shadcn/ui on Tailwind v4, or the user's choice] (declaration — installed by
 the walking skeleton, not a TOR)
-- Tokens: `:root` / `.dark` CSS variables in [`src/index.css`], mapped through `@theme inline`.
+- Tokens: `:root` / `.dark` CSS variables in [path from the stack's layout, e.g. `src/index.css`], mapped through `@theme inline`.
 - `--radius` is the single radius knob. Base color: [neutral].
 - Dark mode: `dark` class on the root element, switched by a ThemeProvider (light / dark / system).
 - New semantic colors: define `--x` / `--x-foreground` in `:root` and `.dark`, map in `@theme inline`.
@@ -451,7 +511,13 @@ makes them inapplicable.
   directory on the `Test directories` line, which is **space-separated**, no commas, E2E
   directory last). Omit the `(UI only)` rows for CLI / Service / Library projects; include the
   `Run the tool` row for CLI projects only; drop the second half of the `Tests` row when there
-  is no E2E suite:
+  is no E2E suite.
+
+  `tests/ e2e/` in the template below is a placeholder, not a default — write the directories the
+  project actually has. For a stack taken from a reference sheet, copy the sheet's Section 3
+  layout: web app `tests/unit tests/api tests/components tests/e2e`; static SPA
+  `tests/unit tests/components tests/e2e`; desktop app `tests/ e2e/`. A directory named here that
+  does not exist makes every `start-epic` and `wrapup-epic` grep silently return nothing:
 
 ```markdown
 ## Verification & Quality Gates
@@ -487,9 +553,11 @@ If the second answer is still ambiguous, accept it and add a note in the written
 - Are there architecture docs, design docs, or reference projects Claude should read?
 - Any external resources (Confluence, Linear, Figma) worth pointing to?
 - For a Web app, Service or API, or Desktop app project, offer to add a line pointing at the
-  matching reference stack sheet (`plugins/peak-workflow/references/bun-web-app-stack.md` or
-  `bun-electron-desktop-stack.md`), labelled as reference and layer checklist only — never a
-  target to migrate the project toward.
+  reference stack sheet the Tech Stack step actually used — `bun-web-app-stack.md`,
+  `bun-static-spa-stack.md`, or `bun-electron-desktop-stack.md` under the installed plugin's
+  `references/` directory (`${CLAUDE_PLUGIN_ROOT}/references/`, not a path inside this
+  repository) — labelled as reference and layer checklist only, never a target to migrate the
+  project toward.
 
 **Git Workflow** (if missing):
 - What is the branch strategy? (e.g., `develop` for active work, `main` for releases)
@@ -503,7 +571,7 @@ If the second answer is still ambiguous, accept it and add a note in the written
 - What command builds the project? (e.g., `dotnet build`, `npm run build`, `python -m build` — or skip if no explicit build step)
 - What command runs linting/formatting checks? (e.g., `ruff check .`, `dotnet format --verify-no-changes`, `eslint src/`)
 
-  A thin answer ("whatever you recommend") takes the reference-sheet default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. Both sheets define the same script names, so the gates are identical for Web app, Service or API, and Desktop app: Build `bun run build` (Desktop also has `bun run package` for the electron-builder output); Lint `bun run lint` (Biome); Typecheck `bun run typecheck`; Dead code `bun run deadcode`; Tests `bun test` plus `bun run test:e2e`. `bun run check` runs typecheck + lint + deadcode + tests in one command — record it as the single pre-commit gate when the project took the sheet's `package.json` unchanged.
+  A thin answer ("whatever you recommend") takes the reference-sheet default exactly as the Tech Stack step does — do not route it through the description-vs-command validator below. All three sheets define the same script names, so the gates are identical for Web app, Service or API, static SPA, and Desktop app: Build `bun run build` (Desktop also has `bun run package` for the electron-builder output); Lint `bun run lint` (Biome); Typecheck `bun run typecheck`; Dead code `bun run deadcode`; Tests `bun test` plus `bun run test:e2e`. `bun run check` runs typecheck + lint + deadcode + tests in one command — record it as the single pre-commit gate when the project took the sheet's `package.json` unchanged.
 - What command auto-fixes formatting? (e.g., `ruff format .`, `dotnet format`, `prettier --write .`)
 - How do you verify the tool/app works after build?
   - *CLI/tool projects:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).

@@ -6,6 +6,51 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.11.0] — 2026-09-15
+
+Product shape, not project type, chooses the stack: five plain-language questions route a web
+project to a new browser-only sheet or the existing server sheet, and discovery re-checks the
+answer.
+
+### Added
+
+- **`references/bun-static-spa-stack.md`** — browser-only React SPA: Vite, Dexie on IndexedDB,
+  hash routing, `vite-plugin-pwa`, JSON export/import backup, Playwright against `vite preview`,
+  and a GitHub Pages deploy workflow. No server, no accounts, no secrets.
+- **Shape questions in `setup`** — five questions in layman's terms (cross-device, sign-in, file
+  uploads, live updates, product-held secret) asked before any sheet is read. All five "no" on a
+  Web app routes to the static sheet; any "yes" routes to the web-app sheet.
+- **Recorded product shape** — the answers land in a `Product shape` block in `CLAUDE.md`, and
+  each Stack Summary row they drop is written `N/A — <reason> (shape Q<N>)`, which `plan-project` reads as a decision
+  rather than a missing layer.
+- **`discover` Step 4.5** — re-checks the recorded shape against the ConOps scenarios, names any
+  contradiction in the user's words, and asks before changing the stack. The revision rides the
+  same `docs/` branch merge as the requirements baseline.
+- **Date and offline layers** — the static sheet adds local civil-day keys (`YYYY-MM-DD`),
+  injected-clock domain functions, and an installable PWA, closing gaps the Stack Summary
+  checklist did not cover.
+
+### Changed
+
+- **Sheet paths are plugin-relative** — `setup`, `plan-project`, and the references index now
+  address sheets as `${CLAUDE_PLUGIN_ROOT}/references/<sheet>.md` instead of a repository path
+  that does not exist inside a user's project.
+- **`plan-project` skeleton** — builds static-SPA specifics (hash history, `BASE_PATH`,
+  `__APP_VERSION__`, Dexie versions, `fake-indexeddb`, export/import, deploy workflow) and treats
+  an `N/A` row as a decision, never rebuilding it.
+- **Tool Hygiene defaults** — version exposure, startup log line, and logging convention now have
+  static-SPA and web-app answers instead of desktop-only ones.
+
+### Fixed
+
+- **Dead test-command carry-forward** — the web/server Local Environment branch now asks for the
+  test command that Verification & Quality Gates was told to reuse.
+- **`Test directories` placeholder** — named as a placeholder with per-sheet examples, so the line
+  `start-epic` and `wrapup-epic` grep points at directories that exist.
+- **UX Baseline token path** — follows the stack's layout instead of hard-coding `src/index.css`.
+
+---
+
 ## [1.10.0] — 2026-09-15
 
 Two reference stack sheets become the greenfield stack recommendation for web, service, and

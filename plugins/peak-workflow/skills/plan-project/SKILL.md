@@ -103,9 +103,15 @@ skeleton must:
   files in its **Section 4 Configuration Files** verbatim, substituting the project name, then
   `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
   involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
-  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer (both
-  sheets already carry the `@tailwindcss/vite` plugin and the path aliases in their Vite
-  config). Desktop specifics the sheet supplies and the skeleton must not drop:
+  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer (all
+  three sheets already carry the `@tailwindcss/vite` plugin and the path aliases in their Vite
+  config). Static-SPA specifics the sheet supplies and the skeleton must not drop: hash history
+  on the router (a static host has no rewrite rules), `base` taken from `BASE_PATH` so the
+  GitHub Pages project path resolves, `__APP_VERSION__` injected from `package.json#version`
+  (this is the Version exposure mechanism — the footer and the first console line both read it),
+  the Dexie `version().stores()` block, `fake-indexeddb` preloaded for tests, the JSON
+  export/import pair, and the deploy workflow in `.github/workflows/`. Desktop specifics the
+  sheet supplies and the skeleton must not drop:
   `trustedDependencies` (`electron`, `better-sqlite3`, `@electron/rebuild`) and the
   `electron-rebuild` postinstall, `asarUnpack` for `better-sqlite3`, `contextIsolation` +
   `sandbox` + `nodeIntegration: false`, Zod-validated IPC, and `migrate()` at startup resolving
@@ -123,7 +129,8 @@ skeleton must:
   action on it. The screens the note names are skeleton-owned: a later slice that extends one
   of them does not re-list it. "No domain logic" means no business rules, not no data.
 - Ship a **test-only fault / latency injection switch**: an environment variable read at
-  startup, honored by the E2E harness, ignored in production builds. The error-state and
+  startup (a build-time `import.meta.env` flag for a static SPA, which has no process
+  environment), honored by the E2E harness, ignored in production builds. The error-state and
   Progress feedback TORs cite it in their Givens — a local SQLite app has nothing else to
   throttle or fail. Ship a **test-only data-directory override** beside it: an environment
   variable that redirects the database location (normally `app.getPath('userData')`) to a
@@ -133,19 +140,23 @@ skeleton must:
 - Make the **E2E harness self-contained**: its `globalSetup` (or the `test:e2e` script) runs the
   production build the entry point needs (reference-sheet desktop stack: `bun run build`, whose
   electron-vite output is the `out/main/index.js` the sheet's Section 7 E2E example launches;
-  web: the Vite build) and `_electron.launch` targets the built entry, so the Tests command in
-  `CLAUDE.md` works cold in a fresh wrapup session.
+  static SPA: the sheet's `webServer` command builds and previews the bundle; web: the Vite
+  build) and the launcher targets the built entry, so the Tests command in `CLAUDE.md` works
+  cold in a fresh wrapup session.
 
-**Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack —
-`plugins/peak-workflow/references/bun-web-app-stack.md` for a web app or service,
-`plugins/peak-workflow/references/bun-electron-desktop-stack.md` for a desktop app — is the
-skeleton's build instructions: Section 2 is the stack, Section 3 the tree, Section 4 the config
-files, and the later sections the wiring (data access, IPC or routes, tests, packaging). Its
-*Stack Summary* table is also the checklist for "every layer the product has" — if the skeleton
-does not touch a layer the table names, that layer is missing from the skeleton. Two limits:
-a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md` and wins over
-the sheet, and in **Brownfield mode (Step 3B) the sheets play no part at all** — never plan an
-epic that re-platforms an existing codebase toward a sheet.
+**Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack — under the
+installed plugin's `references/` directory (`${CLAUDE_PLUGIN_ROOT}/references/`, not a path
+inside the user's repository): `bun-web-app-stack.md` for a web app or service,
+`bun-static-spa-stack.md` for a browser-only SPA, `bun-electron-desktop-stack.md` for a desktop
+app — is the skeleton's build instructions: Section 2 is the stack, Section 3 the tree, Section 4
+the config files, and the later sections the wiring (data access, IPC or routes, tests,
+packaging). Its *Stack Summary* table is also the checklist for "every layer the product has" —
+if the skeleton does not touch a layer the table names, that layer is missing from the skeleton.
+Three limits: a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md`
+and wins over the sheet; a row `CLAUDE.md` marks `N/A — <reason> (shape Q<N>)` is a recorded
+decision, so it is **not** a missing layer and the skeleton must not build it back; and in
+**Brownfield mode (Step 3B) the sheets play no part at all** — never plan an epic that
+re-platforms an existing codebase toward a sheet.
 
 No later epic installs a component library, defines tokens, or builds a second shell — a slice
 composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
