@@ -16,7 +16,8 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 >    and offers exactly these picks — there is no separate default list. `/peak-workflow:plan-project`
 >    then builds the walking skeleton from Sections 3 and 4, minus any layer 2.1 drops.
 > 2. **A layer checklist for any project** — the Stack Summary table names every layer an
->    application of this shape has to handle (runtime, HTTP, API style, streaming, auth, build,
+>    application of this shape has to handle (runtime, HTTP, API style, live updates, per-request
+>    streaming, auth, build,
 >    UI, styling, icons, client state, routing, database, migrations, object storage, validation,
 >    config, secrets, versioning, tests, lint, dead code, container, hosting, backups, logging).
 >    Use it to notice a layer the project has not decided yet.
@@ -72,7 +73,8 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 | Runtime | Bun 1.2+ | Single runtime for server, tests, scripts and bundling. Native SQLite and S3 clients. |
 | HTTP framework | Hono | Runs natively on `Bun.serve`, tiny, typed routes, built-in SSE helper, `hc` typed RPC client. |
 | API style | Hono RPC (`hono/client`) + Zod validators | End-to-end types with zero codegen. |
-| Streaming | SSE via Hono `streamSSE`: broadcast `GET /api/events` (`EventSource`) and per-request `POST` streams (`fetch`) | Broadcast makes someone else's change appear live (6.7, 7.5); per-request carries token streaming (6.5, 7.4). 15 s heartbeat under the idle timeout (6.2). |
+| Live updates | Broadcast SSE via Hono `streamSSE` on `GET /api/events`, consumed with `EventSource` | Someone else's change appears without a reload (5.6, 6.7, 7.5). 15 s heartbeat under the idle timeout (6.2). |
+| Per-request streaming | SSE via Hono `streamSSE` on a `POST`, consumed with `fetch` | A long generated response (e.g. an AI reply) renders as it arrives (6.5, 7.4). Kept only when the product streams one (2.1). |
 | Auth | Better Auth | Bun-native, Drizzle adapter, sessions in SQLite. Email/password always; a named provider only when recorded (6.3). One owner-or-permitted-role rule (5.5). |
 | Frontend build | Vite 6 | Fast HMR, Tailwind v4 plugin, output served by Hono in prod. |
 | UI | React 19 + TypeScript 5 (strict) | Boring and correct. |
@@ -102,15 +104,18 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 
 ### 2.1 Dropping a layer
 
-`setup` writes a dropped row as `N/A — <reason> (shape Q<N>)`. `plan-project` still writes
-Sections 3–4 verbatim **minus** what this table lists for each `N/A` row, and skips the listed
-wiring. Anything not listed stays.
+`setup` writes a dropped row as `N/A — <reason> (shape Q<N>)`. *Per-request streaming* has no
+shape question: it is written `N/A — no streamed responses` unless the product streams a long
+generated response (e.g. an AI reply). `plan-project` still writes Sections 3–4 verbatim
+**minus** what this table lists for each `N/A` row, and skips the listed wiring. Anything not
+listed stays.
 
 | Dropped row (shape) | Tree (3) | Config and env (4, 5.1) | Code (5–7) | Compose, tests, commands (8.2, 9, 10) | Section 11 rows | Instead |
 |---|---|---|---|---|---|---|
-| **Auth** (Q2) | `apps/api/src/auth.ts`, `packages/core/src/access.ts`, `apps/web/src/auth-client.ts`, `tests/setup/auth.ts` | 4.1 `better-auth`; 4.2 `BETTER_AUTH_SECRET`; 4.4 `"/auth"` proxy entry; 4.8 `# Auth` block; 5.1 `BETTER_AUTH_SECRET` and provider lines | 5.2 Better Auth tables and `userId` columns; `userId` segment of `attachmentKey` (5.4); 6.1 `./auth` import, `/auth/*` handler, `/api` session middleware, `userId`/`role` in `Variables`; 6.3; `can()` and `userId` filters (6.4, 6.6) | 9 `signInForTest`, cookie headers, access-rule test, E2E sign-in steps | Access rule bypass; Auth tables drift; Session cookie cross-origin in dev | Routes are public; keep `/healthz`, `/version` as-is |
-| **Object storage** + **Local S3** (Q3) | `packages/core/src/storage/`, `apps/api/src/routes/attachments.ts`; "+ minio" in the `docker-compose.yml` comment | 4.2 the four `S3_*` lines; 4.8 `# S3` block; 5.1 every `S3_*` | 5.2 `attachments` table; 5.4; 6.1 `attachments` import and `.route("/attachments", …)`; 6.4; 7.3 | 8.2 `minio`, `minio-init`, the app's `S3_*` environment lines and `depends_on`, `miniodata` volume, both notes under 8.2; 9 S3 wrapper row, upload-slot test, "upload" in the E2E row; 10 `docker compose up -d minio minio-init` | Bulk uploads through the app; Trusting client-reported size; Orphaned S3 objects; Presigned URL host mismatch locally; Missing CORS on bucket; Unsafe object keys; Content type allowlist | **Backups:** the host scheduler runs `sqlite3 <data-volume>/app.db ".backup <backup-volume>/app-<date>.db"` into a mounted backup volume (not S3) |
-| **Streaming** (Q4) | `packages/core/src/events.ts`, `apps/api/src/routes/events.ts`, `apps/api/src/routes/messages.ts`, `apps/web/src/queries/live-updates.ts` | — | 6.1 `events` and `messages` imports and routes; 6.5; 6.7; `publish()` calls (6.6); 7.4; 7.5 | 9 Live updates row and test; "streaming, live updates" in the E2E row | SSE dropped by idle timeout; Abandoned streams waste model calls; Live updates on one process | TanStack Query refetch on focus; `idleTimeout` may stay |
+| **Auth** (Q2) | `apps/api/src/auth.ts`, `packages/core/src/access.ts`, `apps/web/src/auth-client.ts`, `tests/setup/auth.ts` | 4.1 `better-auth`; 4.2 `BETTER_AUTH_SECRET`; 4.4 `"/auth"` proxy entry; 4.8 `# Auth` block, including the `GOOGLE_*`/`MICROSOFT_*` lines; 5.1 `BETTER_AUTH_SECRET` and the `GOOGLE_*`/`MICROSOFT_*` lines | 5.2 Better Auth tables and `userId` columns; `userId` segment of `attachmentKey` (5.4); 6.1 `./auth` import, `/auth/*` handler, `/api` session middleware, `userId`/`role` in `Variables`; 6.3; `can()` calls, actors and `userId` filters (6.4, 6.5, 6.6) | 9 `signInForTest`, cookie headers, access-rule test, E2E sign-in steps | Access rule bypass; Account takeover through provider linking; Org role from user input; Post-login blank page in dev; Provider secrets required everywhere; Auth tables drift; Session cookie cross-origin in dev | Routes are public; keep `/healthz`, `/version` as-is |
+| **Object storage** + **Local S3** (Q3) | `packages/core/src/storage/`, `apps/api/src/routes/attachments.ts`; "+ minio" in the `docker-compose.yml` comment | 4.2 the four `S3_*` lines; 4.8 `# S3` block, including its host-dev `S3_ENDPOINT` comment; 5.1 every `S3_*` | 5.2 `attachments` table; 5.4; 6.1 `attachments` import and `.route("/attachments", …)`; 6.4; 7.3 | 8.2 `minio`, `minio-init`, the app's `S3_*` environment lines and `depends_on`, `miniodata` volume, both notes under 8.2; 9 S3 wrapper row, upload-slot test, "upload" in the E2E row; 10 `docker compose up -d minio minio-init` | Bulk uploads through the app; Trusting client-reported size; Orphaned S3 objects; Presigned URL host mismatch locally; Missing CORS on bucket; Unsafe object keys; Content type allowlist | **Backups:** the host scheduler runs `sqlite3 <data-volume>/app.db ".backup <backup-volume>/app-<date>.db"` into a mounted backup volume (not S3) |
+| **Live updates** (Q4) | `packages/core/src/events.ts`, `apps/api/src/routes/events.ts`, `apps/web/src/queries/live-updates.ts` | — | 6.1 `events` import and `.route("/events", …)`; 6.7; `publish` import and calls (6.6); 7.5 | 9 Live updates row; "live updates" in the E2E row | Live updates on one process; SSE dropped by idle timeout (only when Per-request streaming is also `N/A`) | TanStack Query refetch on window focus; `idleTimeout` may stay |
+| **Per-request streaming** (no shape question — `N/A — no streamed responses`) | `apps/api/src/routes/messages.ts`, `packages/core/src/services/assistant.ts` | — | 6.1 `messages` import and `.route("/messages", …)`; 6.5; 7.4 | "streaming" in the 9 E2E row | Abandoned streams waste model calls; SSE dropped by idle timeout (only when Live updates is also `N/A`) | The response is returned whole by a normal route |
 | **Secrets** (Q5 — reachable only when Auth and Object storage are also N/A) | — | Nothing further: those rows already removed every secret | — | — | — | `.env` stays gitignored (it still holds config); the deploy needs no secret store |
 
 ---
@@ -146,6 +151,7 @@ my-app/
 │           ├── storage/
 │           │   └── s3.ts          # Bun.S3Client wrapper
 │           ├── services/          # business logic, no HTTP
+│           │   └── assistant.ts   # generateReply stub for per-request streaming (6.5)
 │           └── contracts/         # Zod schemas shared by API + web
 ├── apps/
 │   ├── api/
@@ -265,20 +271,23 @@ my-app/
 > `bun test` — a bare run also collects the Playwright specs under `tests/e2e/` and fails.
 > `dev:api:pretty` is the only consumer of `pino-pretty`, which keeps Knip from flagging it.
 
-Workspace manifests — all dependencies stay in the root `package.json`:
+Workspace manifests — all dependencies stay in the root `package.json`.
+
+`packages/core/package.json`:
 
 ```json
-// packages/core/package.json
 { "name": "@my-app/core", "private": true, "type": "module" }
 ```
 
+`apps/api/package.json` — `dev` runs from the root so `.env` and relative paths resolve:
+
 ```json
-// apps/api/package.json — `dev` runs from the root so `.env` and relative paths resolve
 { "name": "@my-app/api", "private": true, "type": "module", "scripts": { "dev": "bun run --cwd ../.. dev:api" } }
 ```
 
+`apps/web/package.json`:
+
 ```json
-// apps/web/package.json
 { "name": "@my-app/web", "private": true, "type": "module", "scripts": { "dev": "vite" } }
 ```
 
@@ -312,8 +321,9 @@ process.env.APP_URL ??= "http://localhost:3000";
 
 ### 4.3 `tsconfig.base.json` and `tsconfig.json`
 
+`tsconfig.base.json`:
+
 ```json
-// tsconfig.base.json
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -328,13 +338,14 @@ process.env.APP_URL ??= "http://localhost:3000";
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "types": ["bun-types"]
+    "types": ["bun"]
   }
 }
 ```
 
+`tsconfig.json`:
+
 ```json
-// tsconfig.json
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
@@ -349,7 +360,9 @@ process.env.APP_URL ??= "http://localhost:3000";
 ```
 
 `paths` lives in `tsconfig.json` itself because Bun resolves the `@core/*` aliases from it at
-runtime — so the runtime image copies both files (8.1).
+runtime — so the runtime image copies both files (8.1). `"types": ["bun"]` resolves `@types/bun`
+(4.1), the one declared package; `bun-types` is only its transitive dependency and is not
+reachable from the root under Bun's isolated installs.
 
 ### 4.4 `apps/web/vite.config.ts`
 
@@ -382,7 +395,9 @@ export default defineConfig({
 {
   "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "ignore": ["dist", "drizzle", "apps/web/src/components/ui", "apps/web/src/routeTree.gen.ts"] },
+  "files": {
+    "includes": ["**", "!!**/dist", "!drizzle", "!apps/web/src/components/ui", "!apps/web/src/routeTree.gen.ts"]
+  },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2 },
   "linter": {
     "enabled": true,
@@ -396,6 +411,9 @@ export default defineConfig({
   "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } }
 }
 ```
+
+Biome 2 has no `files.ignore`: `includes` starts with `"**"` and excludes with `!` (a negated pattern
+cannot stand alone); `!!` force-ignores output folders. `useSortedClasses` is still a nursery rule.
 
 ### 4.6 `knip.json`
 
@@ -454,13 +472,13 @@ APP_URL=http://localhost:3000
 LOG_LEVEL=info
 
 # Database (file path inside the container volume).
-# Host dev (`bun run dev`, outside compose): use DATABASE_PATH=./data/app.db and
-# S3_ENDPOINT=http://localhost:9000 — `/data` and `minio` exist only inside compose.
+# Host dev (`bun run dev`, outside compose): use DATABASE_PATH=./data/app.db — `/data` exists only inside compose.
 DATABASE_PATH=/data/app.db
 
 # Auth
 BETTER_AUTH_SECRET=change-me-to-a-random-32-plus-character-string
-# Named identity provider only (6.3) — uncomment the recorded provider's lines
+# Named identity provider only (6.3) — uncomment the recorded provider's lines.
+# A provider stays off until both its client ID and secret are set.
 # Google callback: <APP_URL>/auth/callback/google
 # GOOGLE_CLIENT_ID=
 # GOOGLE_CLIENT_SECRET=
@@ -471,6 +489,7 @@ BETTER_AUTH_SECRET=change-me-to-a-random-32-plus-character-string
 # MICROSOFT_TENANT_ID=
 
 # S3 (local: MinIO; prod: leave S3_ENDPOINT empty for AWS)
+# Host dev (`bun run dev`, outside compose): use S3_ENDPOINT=http://localhost:9000 — `minio` resolves only inside compose.
 S3_BUCKET=attachments
 S3_REGION=us-east-1
 S3_ENDPOINT=http://minio:9000
@@ -520,17 +539,21 @@ export type Env = typeof env;
 
 Fail fast at boot. A bad env var should crash the container, not surface as a 500 an hour later.
 
-**Named identity provider only.** Absent unless the project records an approved provider; once
-added, the recorded provider's lines are required, so a missing secret crashes at boot:
+**Named identity provider only.** Absent unless the project records an approved provider. The
+lines are optional, so `bun test` (4.2) and compose run without provider secrets; 6.3 turns a
+provider on only when its client ID and secret are both set:
 
 ```ts
-  GOOGLE_CLIENT_ID: z.string(),
-  GOOGLE_CLIENT_SECRET: z.string(),
-  GOOGLE_WORKSPACE_DOMAIN: z.string(),   // only when sign-in is restricted to one Workspace domain
-  MICROSOFT_CLIENT_ID: z.string(),
-  MICROSOFT_CLIENT_SECRET: z.string(),
-  MICROSOFT_TENANT_ID: z.string(),       // the organization's tenant ID, not "common"
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_WORKSPACE_DOMAIN: z.string().optional(), // org-only: the `hd` restriction; mixed: grants the org role (6.3)
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  MICROSOFT_TENANT_ID: z.string().optional(),     // the organization's tenant ID, not "common"
 ```
+
+A deployment that relies on the provider sets the pair; confirm its sign-in once after deploy,
+since a missing pair hides the provider instead of crashing.
 
 ### 5.2 `packages/core/src/db/schema.ts`
 
@@ -657,23 +680,37 @@ One code path for AWS and MinIO. The only difference is `S3_ENDPOINT` and path s
 ### 5.5 `packages/core/src/access.ts` — the one access rule
 
 ```ts
-type Action = "read" | "update" | "delete";
+type Action = "read" | "create" | "update" | "delete";
+type Resource = "conversation" | "attachment";
+type Actor = { id: string; role: string };
+// `any`: every record of the resource. `own`: only records whose userId is the actor's.
+type Grant = { any?: readonly Action[]; own?: readonly Action[] };
 
-// What each role may do to records it does not own. Use the roles the ConOps names.
-const ROLE_GRANTS: Record<string, readonly Action[]> = {
-  admin: ["read", "update", "delete"],
-  member: [],
+// Per role, per resource. Use the roles and resources the ConOps names, e.g. volunteers
+// `shift: { any: ["read"] }, claim: { own: ["read", "create", "delete"] }`. No entry = no access.
+const GRANTS: Record<string, Partial<Record<Resource, Grant>>> = {
+  admin: {
+    conversation: { any: ["read", "create", "update", "delete"] },
+    attachment: { any: ["read", "delete"], own: ["create", "update"] },
+  },
+  member: {
+    conversation: { own: ["read", "create", "update", "delete"] },
+    attachment: { own: ["read", "create", "update", "delete"] },
+  },
 };
 
-export function can(user: { id: string; role: string }, action: Action, record: { userId: string }) {
-  if (record.userId === user.id) return true;               // owner
-  return ROLE_GRANTS[user.role]?.includes(action) ?? false;  // permitted role
+export function can(actor: Actor, action: Action, resource: Resource, record?: { userId: string }) {
+  const grant = GRANTS[actor.role]?.[resource];
+  if (grant?.any?.includes(action)) return true;                  // permitted role
+  if (!record || record.userId !== actor.id) return false;
+  return grant?.own?.includes(action) ?? false;                   // owner
 }
 ```
 
-Every route that reads or changes a record calls `can()` (6.6); list queries apply the same rule
-in their `where` clause. Pure TS, so the web app may import it to hide controls — the server check
-is still the one that counts.
+Every route that reads or changes a record calls `can()` with its resource (6.4–6.6). Without a
+record, `can()` answers "every record?", which a list query uses to choose between all rows and the
+actor's own before passing each row through the same rule (6.6 `GET /`). Pure TS, so the web app may
+import it to hide controls — the server check is still the one that counts.
 
 ### 5.6 `packages/core/src/events.ts` — in-process pub/sub
 
@@ -777,8 +814,8 @@ export const logger = pino({
   level: env.LOG_LEVEL,
   redact: {
     paths: [
-      "password", "token", "secret", "authorization", "cookie",
-      "*.password", "*.token", "*.secret", "*.authorization", "*.cookie",
+      "password", "token", "secret", "authorization", "cookie", "apiKey", "api_key",
+      "*.password", "*.token", "*.secret", "*.authorization", "*.cookie", "*.apiKey", "*.api_key",
       "req.headers.authorization", "req.headers.cookie", 'res.headers["set-cookie"]',
     ],
     censor: "[redacted]",
@@ -868,34 +905,89 @@ export const authClient = createAuthClient({ baseURL: `${window.location.origin}
 ```
 
 **Named identity provider — only when the project records a named, approved provider.** Add the
-recorded provider's block to `betterAuth({ … })`, and its lines to 5.1 and 4.8:
+recorded provider's entries to `betterAuth({ … })` — the `user` block below replaces the one above,
+adding `hostedDomain`; rerun the Better Auth CLI (5.2) — and its lines to 5.1 and 4.8:
 
 ```ts
-  socialProviders: {
-    google: {
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-      hd: env.GOOGLE_WORKSPACE_DOMAIN,   // only when restricted to one Workspace domain
-    },
-    microsoft: {
-      clientId: env.MICROSOFT_CLIENT_ID,
-      clientSecret: env.MICROSOFT_CLIENT_SECRET,
-      tenantId: env.MICROSOFT_TENANT_ID,
-    },
-  },
-  account: { accountLinking: { enabled: true, trustedProviders: ["google", "microsoft"] } },
+// auth.ts — added import
+import type { GoogleProfile } from "better-auth/social-providers";
 ```
 
+```ts
+  user: {
+    additionalFields: {
+      role: { type: "string", required: false, defaultValue: "member", input: false },
+      hostedDomain: { type: "string", required: false }, // written by mapProfileToUser; see the hook
+    },
+  },
+  socialProviders: {
+    // A provider is on only when its credentials are set, so tests and compose run without them (5.1)
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+            // Org-only mode adds: hd: env.GOOGLE_WORKSPACE_DOMAIN,
+            mapProfileToUser: (profile: GoogleProfile) => ({
+              hostedDomain: profile.email_verified ? profile.hd : undefined,
+            }),
+          },
+        }
+      : {}),
+    ...(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET && env.MICROSOFT_TENANT_ID
+      ? {
+          microsoft: {
+            clientId: env.MICROSOFT_CLIENT_ID,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET,
+            tenantId: env.MICROSOFT_TENANT_ID,
+          },
+        }
+      : {}),
+  },
+  // Same-email provider sign-in never attaches to an existing account (pre-account takeover);
+  // a signed-in user adds a provider with authClient.linkSocial(), proving control of both.
+  account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
+  databaseHooks: {
+    user: {
+      create: {
+        // The org role comes only from Google's hd claim on the Google callback, never from request input
+        before: async (user, ctx) => {
+          const fromGoogle = ctx?.path?.startsWith("/callback/") && ctx.params?.id === "google";
+          const domain = env.GOOGLE_WORKSPACE_DOMAIN;
+          const inOrg = Boolean(fromGoogle && domain && user.hostedDomain === domain);
+          return {
+            data: {
+              ...user,
+              role: inOrg ? "admin" : "member", // the org role and default role from 5.5
+              hostedDomain: fromGoogle ? user.hostedDomain : undefined,
+            },
+          };
+        },
+      },
+    },
+  },
+```
+
+- **Only the recorded provider.** Microsoft alone: omit the Google entry, the `GoogleProfile`
+  import, `hostedDomain` and `databaseHooks`. Google alone: omit the Microsoft entry.
+- **Two Google modes — record which.** *Org-only*: add `hd`; Better Auth rejects any token whose
+  verified `hd` claim differs, `GOOGLE_WORKSPACE_DOMAIN` becomes required, and production sets
+  `emailAndPassword.disableSignUp: true` so outsiders cannot register by password. *Mixed audience*
+  (members of the organization plus outsiders on personal Google or email/password): omit `hd`;
+  everyone signs in, and the hook grants the org role only to a verified `hd` equal to
+  `GOOGLE_WORKSPACE_DOMAIN`. Mixed needs the OAuth consent screen's user type set to **External**.
+- **Org role is set at account creation.** An existing account that links Google later keeps its
+  role until an admin changes it. `hostedDomain` is informational — authorize on `role` only.
 - **Callback URLs** to register with the provider: `<APP_URL>/auth/callback/google`,
   `<APP_URL>/auth/callback/microsoft`. Sign-in starts with
-  `authClient.signIn.social({ provider: "google" })`.
-- **Google Workspace domain:** `hd` makes Better Auth require that hosted-domain claim. Still
-  enforce the domain in the access rule for anything the domain gates.
-- **Microsoft:** Entra omits the `email` claim for managed users unless the app registration adds it.
-- **Account linking** lets a provider sign-in attach to the existing email/password account for
-  the same address, so deferred SSO adds a method rather than new accounts.
+  `authClient.signIn.social({ provider: "google", callbackURL: window.location.origin })` — an
+  absolute `callbackURL` returns to the page's own origin (:5173 in dev, trusted above); a relative
+  one resolves against APP_URL, which serves no `dist` in dev.
+- **Microsoft:** Entra omits the `email` claim for managed users unless the app registration adds
+  it, and never verifies it — authorize on `role`, not the email.
 - **Tests never drive the real provider.** API and E2E tests sign in with email/password
-  (`signInForTest`, 9); the provider round-trip is verified manually against the real tenant.
+  (`signInForTest`, 9) and never set provider variables; the provider round-trip is verified
+  manually against the real tenant.
 
 ### 6.4 `apps/api/src/routes/attachments.ts`
 
@@ -904,6 +996,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
+import { can } from "@core/access";
 import { db } from "../db";
 import { attachments as table } from "@core/db/schema";
 import { attachmentKey, presignUpload, presignDownload, objectExists, objectSize } from "@core/storage/s3";
@@ -918,7 +1011,7 @@ export const attachments = new Hono<{ Variables: Variables }>()
     contentType: z.enum(ALLOWED as [string, ...string[]]),
     size: z.number().int().positive().max(50 * 1024 * 1024),
   })), async (c) => {
-    const userId = c.get("userId");
+    const userId = c.get("userId"); // the new row is the actor's own
     const body = c.req.valid("json");
     const id = crypto.randomUUID();
     const key = attachmentKey(userId, id, body.filename);
@@ -937,12 +1030,10 @@ export const attachments = new Hono<{ Variables: Variables }>()
 
   // 2. Client confirms the PUT succeeded; server verifies against S3
   .post("/:id/complete", async (c) => {
-    const userId = c.get("userId");
+    const actor = { id: c.get("userId"), role: c.get("role") };
     const id = c.req.param("id");
-    const row = await db.query.attachments.findFirst({
-      where: and(eq(table.id, id), eq(table.userId, userId)),
-    });
-    if (!row) return c.json({ error: "not found" }, 404);
+    const row = await db.query.attachments.findFirst({ where: eq(table.id, id) });
+    if (!row || !can(actor, "update", "attachment", row)) return c.json({ error: "not found" }, 404);
     if (!(await objectExists(row.key))) return c.json({ error: "object missing" }, 400);
 
     const size = await objectSize(row.key);
@@ -952,11 +1043,11 @@ export const attachments = new Hono<{ Variables: Variables }>()
 
   // 3. Download via short-lived presigned GET
   .get("/:id/url", async (c) => {
-    const userId = c.get("userId");
+    const actor = { id: c.get("userId"), role: c.get("role") };
     const row = await db.query.attachments.findFirst({
-      where: and(eq(table.id, c.req.param("id")), eq(table.userId, userId), eq(table.status, "uploaded")),
+      where: and(eq(table.id, c.req.param("id")), eq(table.status, "uploaded")),
     });
-    if (!row) return c.json({ error: "not found" }, 404);
+    if (!row || !can(actor, "read", "attachment", row)) return c.json({ error: "not found" }, 404);
     return c.json({ url: presignDownload(row.key) });
   });
 ```
@@ -968,20 +1059,26 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import type { Variables } from "../app";
+import { eq } from "drizzle-orm";
+import { can } from "@core/access";
+import { conversations } from "@core/db/schema";
 import { generateReply } from "@core/services/assistant";
+import { db } from "../db";
+import type { Variables } from "../app";
 
 export const messages = new Hono<{ Variables: Variables }>()
   .post("/stream", zValidator("json", z.object({
     conversationId: z.string(),
     content: z.string().min(1).max(32_000),
     attachmentIds: z.array(z.string()).max(10).default([]),
-  })), (c) => {
-    const userId = c.get("userId");
+  })), async (c) => {
+    const actor = { id: c.get("userId"), role: c.get("role") };
     const input = c.req.valid("json");
+    const row = await db.query.conversations.findFirst({ where: eq(conversations.id, input.conversationId) });
+    if (!row || !can(actor, "update", "conversation", row)) return c.json({ error: "not found" }, 404);
 
     return streamSSE(c, async (stream) => {
-      for await (const chunk of generateReply(userId, input, c.req.raw.signal)) {
+      for await (const chunk of generateReply(input, c.req.raw.signal)) {
         await stream.writeSSE({ event: "delta", data: JSON.stringify(chunk) });
       }
       await stream.writeSSE({ event: "done", data: "{}" });
@@ -989,9 +1086,23 @@ export const messages = new Hono<{ Variables: Variables }>()
   });
 ```
 
+`packages/core/src/services/assistant.ts` is the product's own service. The skeleton ships this
+stub so the route compiles and streams; the model call replaces its body:
+
+```ts
+type ReplyInput = { conversationId: string; content: string; attachmentIds: string[] };
+
+export async function* generateReply(input: ReplyInput, signal: AbortSignal) {
+  for (const word of input.content.split(" ")) {
+    signal.throwIfAborted(); // the real call passes `signal` to the model client instead
+    yield { text: `${word} ` };
+  }
+}
+```
+
 One request, one streamed response — for long output such as model tokens. Pass
-`c.req.raw.signal` into the model call so a closed tab cancels the upstream request. Omit this
-route when the product streams no long response; live updates use 6.7.
+`c.req.raw.signal` into the model call so a closed tab cancels the upstream request. Only present
+when the Per-request streaming row is kept (2.1); live updates use 6.7.
 
 ### 6.6 `apps/api/src/routes/conversations.ts` (access rule in use)
 
@@ -1007,10 +1118,19 @@ import { db } from "../db";
 import type { Variables } from "../app";
 
 export const conversations = new Hono<{ Variables: Variables }>()
+  // List: SQL narrows to what the role may see, then every row passes the same rule
+  .get("/", async (c) => {
+    const actor = { id: c.get("userId"), role: c.get("role") };
+    const rows = can(actor, "read", "conversation")
+      ? await db.select().from(table)
+      : await db.select().from(table).where(eq(table.userId, actor.id));
+    return c.json(rows.filter((row) => can(actor, "read", "conversation", row)));
+  })
+
   .patch("/:id", zValidator("json", z.object({ title: z.string().min(1).max(200) })), async (c) => {
     const actor = { id: c.get("userId"), role: c.get("role") };
     const row = await db.query.conversations.findFirst({ where: eq(table.id, c.req.param("id")) });
-    if (!row || !can(actor, "update", row)) return c.json({ error: "not found" }, 404); // 404: don't confirm it exists
+    if (!row || !can(actor, "update", "conversation", row)) return c.json({ error: "not found" }, 404); // 404: don't confirm it exists
 
     await db.update(table).set({ title: c.req.valid("json").title }).where(eq(table.id, row.id));
     publish({ key: ["conversations"] });   // live update for every open tab (6.7)
@@ -1056,10 +1176,13 @@ subscriber learns only that something changed; the refetch goes through `can()`.
 import { hc } from "hono/client";
 import type { AppType } from "@api/app";
 
-export const api = hc<AppType>("/api", { init: { credentials: "include" } });
+export const api = hc<AppType>(window.location.origin, { init: { credentials: "include" } });
 ```
 
-Type imports only, so the server code never lands in the browser bundle.
+Type imports only, so the server code never lands in the browser bundle. `AppType` already carries
+the `/api` base path (6.1), so the client takes the bare origin and calls read
+`api.api.conversations.$get()`; passing `"/api"` would double the prefix. The origin is absolute so
+`$url()` works.
 
 ### 7.2 `apps/web/src/components/app-footer.tsx`
 
@@ -1088,7 +1211,7 @@ export function useUploadAttachment() {
   const qc = useQueryClient();
   return useMutation({
     async mutationFn(file: File) {
-      const slot = await api.attachments.$post({
+      const slot = await api.api.attachments.$post({
         json: { filename: file.name, contentType: file.type, size: file.size },
       }).then((r) => r.json());
 
@@ -1099,7 +1222,7 @@ export function useUploadAttachment() {
       });
       if (!put.ok) throw new Error(`upload failed: ${put.status}`);
 
-      await api.attachments[":id"].complete.$post({ param: { id: slot.id } });
+      await api.api.attachments[":id"].complete.$post({ param: { id: slot.id } });
       return slot.id;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["attachments"] }),
@@ -1141,11 +1264,12 @@ Use `fetch` rather than `EventSource` because the request is a POST with a body.
 ```ts
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { api } from "@web/api";
 
 export function useLiveUpdates() {
   const qc = useQueryClient();
   useEffect(() => {
-    const source = new EventSource("/api/events"); // same origin, so the session cookie is sent
+    const source = new EventSource(api.api.events.$url()); // same origin, so the session cookie is sent
     source.addEventListener("change", (e) => {
       const { key } = JSON.parse(e.data) as { key: string[] };
       void qc.invalidateQueries({ queryKey: key });
@@ -1277,9 +1401,9 @@ presigning. The second option is cleaner and is what `presignUpload` should use.
 
 | Scope | Runner | Notes |
 |---|---|---|
-| `core` services | `bun test`, `DATABASE_PATH=:memory:` | Fresh in-memory DB per test file. |
+| `core` services | `bun test`, `DATABASE_PATH=:memory:` | One in-memory DB for the whole run: `bun test` runs every file in one process and `@api/db` (6.3) opens once. Tests insert rows with random IDs and never assume an empty table. |
 | API routes | `bun test` + `app.request()` | No port, no network. Sign in with `signInForTest` (`tests/setup/auth.ts`). |
-| Access rule | `bun test` + `app.request()` | Owner allowed, non-owner 404, permitted role allowed — for every record route. |
+| Access rule | `bun test` + `app.request()` | Per resource: owner allowed, non-owner 404, permitted role allowed, and list routes return only readable rows — for every record route. |
 | Live updates | `bun test` on `events.ts`; E2E with two browser contexts | A change in one context appears in the other without a reload. |
 | S3 wrapper | `bun test` against MinIO from compose | Real client, real bucket. Skip with `test.skipIf(!process.env.MINIO_UP)` in CI without Docker. |
 | React components | `bun test` + happy-dom + Testing Library | Preloaded via `bunfig.toml`. |
@@ -1338,18 +1462,29 @@ beforeAll(() => {
   ({ app } = createApp());
 });
 
-test("only the owner can rename a conversation", async () => {
+test("members list and rename only their own conversations; admins any", async () => {
   const owner = await signInForTest(app);
   const other = await signInForTest(app);
-  await db.insert(conversations).values({ id: "c1", userId: owner.userId, title: "mine", createdAt: new Date() });
+  const admin = await signInForTest(app, "admin");
+  const id = crypto.randomUUID(); // the DB is shared across test files
+  await db.insert(conversations).values({ id, userId: owner.userId, title: "mine", createdAt: new Date() });
 
-  const rename = (cookie: string) => app.request("/api/conversations/c1", {
+  const listIds = async (cookie: string) => {
+    const res = await app.request("/api/conversations", { headers: { cookie } });
+    return ((await res.json()) as { id: string }[]).map((row) => row.id);
+  };
+  expect(await listIds(owner.cookie)).toContain(id);
+  expect(await listIds(other.cookie)).not.toContain(id);
+  expect(await listIds(admin.cookie)).toContain(id);
+
+  const rename = (cookie: string) => app.request(`/api/conversations/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", cookie },
     body: JSON.stringify({ title: "renamed" }),
   });
   expect((await rename(other.cookie)).status).toBe(404);
   expect((await rename(owner.cookie)).status).toBe(200);
+  expect((await rename(admin.cookie)).status).toBe(200);
 });
 
 test("requests an upload slot", async () => {
@@ -1422,13 +1557,18 @@ Each of these is already handled by the configuration above.
 | Missing CORS on bucket | Browser PUT to S3 blocked. | `mc admin config set ... cors_allow_origin` locally; bucket CORS rule in AWS (8.2). |
 | Unsafe object keys | Path traversal or collisions from user filenames. | Sanitized key under `users/<id>/attachments/<uuid>/` (5.4). |
 | Content type allowlist | Executable or HTML uploads served from your origin. | Zod enum of allowed MIME types; bucket is private (6.4). |
-| SSE dropped by idle timeout | Streams cut off after 120 s of silence. | `idleTimeout: 120` on `Bun.serve` (6.2); `ping` event every 15 s on the broadcast stream (6.7); per-request streams with long gaps send the same. |
+| Provider secrets required everywhere | Tests and compose crash without Google or Microsoft credentials. | Provider variables optional (5.1); each provider on only when its credentials are set (6.3). |
+| SSE dropped by idle timeout | Streams cut off after 120 s of silence. | `idleTimeout: 120` on `Bun.serve` (6.2); `ping` event every 15 s on the Live updates stream (6.7); Per-request streams with long gaps send the same. |
 | Abandoned streams waste model calls | Closed tab keeps upstream generation running. | Propagate `c.req.raw.signal` (6.5). |
 | Live updates on one process | Fan-out is in memory; a second container's clients miss events. | Single container by design (1); shared bus in the Growth Path (12). |
 | SPA deep links 404 | Refresh on `/c/123` hits Hono, not React. | `serveStatic` fallback to `index.html` after API routes (6.1). |
 | Server code leaking to browser | Importing `AppType` pulls in Hono routes. | `import type` only in `api.ts`; Vite tree-shakes types (7.1). |
+| Doubled `/api` prefix | `hc<AppType>("/api")` calls `/api/api/…`. | Client built on the origin; calls go through `api.api.*` (7.1). |
 | Auth path mismatch | Better Auth defaults to `/api/auth`; the mount and proxy use `/auth`. | `basePath: "/auth"` (6.3) matches the mount (6.1), proxy (4.4) and client. |
-| Access rule bypass | A route returns or changes a record for anyone signed in. | Every record route calls `can()`; non-owners get 404 (5.5, 6.6, 9). |
+| Access rule bypass | A route returns or changes a record for anyone signed in. | Every record route calls `can()` with its resource; list rows pass the same rule; non-owners get 404 (5.5, 6.4–6.6, 9). |
+| Account takeover through provider linking | An attacker registers the victim's email by password; the victim's Google sign-in merges into it. | `disableImplicitLinking: true`, no `trustedProviders`; linking only via signed-in `linkSocial()` (6.3). |
+| Org role from user input | A sign-up body or outside Google account claims the organization's role. | Role set in `databaseHooks.user.create.before` from Google's `hd` claim on the Google callback only; `role` is `input: false` (6.3). |
+| Post-login blank page in dev | OAuth returns to APP_URL :3000, which serves no `dist` in dev. | `signIn.social({ callbackURL: window.location.origin })`, :5173 trusted outside production (6.3). |
 | Auth tables drift | Better Auth schema out of sync with Drizzle. | Regenerate with the Better Auth CLI, then `drizzle-kit generate` (5.2). |
 | Session cookie cross-origin in dev | Vite on 5173, API on 3000. | Vite proxy for `/api` and `/auth` so cookies are same-origin (4.4). |
 | Container runs as root | Larger blast radius on compromise. | `USER bun`, `/data` chowned (8.1). |

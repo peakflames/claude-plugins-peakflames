@@ -82,21 +82,21 @@ unless you add a Bun sidecar process (Section 9).
 | Lint + format   | Biome 2                                                             | One tool, one config. Covers React hooks rules and Tailwind class sorting.                       |
 | Type-level lint | `tsc --noEmit` with `noUnusedLocals` and `noUnusedParameters`       | Catches what linters miss.                                                                       |
 | Dead code       | Knip                                                                | Unused files, exports, types and dependencies. Has Vite and Electron plugins.                    |
-| Packaging       | electron-builder                                                    | Installers for the target OSes recorded in `CLAUDE.md` (NSIS, dmg, AppImage/deb). Per-OS signing. |
+| Packaging       | electron-builder                                                    | Installers for the OSes in `CLAUDE.md`'s `Target OS` row (NSIS, dmg, AppImage/deb). Per-OS signing. |
 | Auto-update     | electron-updater                                                    | Delta updates from a publish target (GitHub Releases). Needs network and a publish target.       |
 | Validation      | Zod                                                                 | Shared schemas for IPC, config and settings.                                                     |
 
 ### 2.1 Dropping a layer
 
-When `CLAUDE.md` marks a row `N/A`, or the Packaging row omits an OS, leave out exactly these
-pieces instead of copying Sections 3-4 verbatim. Everything else stays.
+When `CLAUDE.md` marks a row `N/A`, or its Tech Stack `Target OS:` row omits an OS, leave out
+exactly these pieces instead of copying Sections 3-4 verbatim. Everything else stays.
 
 | Dropped                                           | Section 3 tree        | Section 4                                                                    | Other source / sections                                                         | Section 10 rows to omit                |
 | ------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------- |
-| Auto-update — `N/A — computers have no internet (shape Q6)` | `src/main/updater.ts` | 4.1 `electron-updater` dependency; 4.8 `publish` block and `zip` in `mac.target` | `updater.ts` import and call in `src/main/index.ts`                             | Auto-update on macOS                   |
-| Packaging: macOS not a target                     | —                     | 4.8 `mac` block                                                              | 9.3 `bun-darwin-*` build lines (sidecar only)                                   | macOS signing; Auto-update on macOS    |
-| Packaging: Windows not a target                   | —                     | 4.8 `win` and `nsis` blocks                                                  | 9.3 `bun-windows-x64` build line (sidecar only)                                 | Windows code signing and SmartScreen   |
-| Packaging: Linux not a target                     | —                     | 4.8 `linux` block                                                            | 9.3 `bun-linux-x64` build line (sidecar only)                                   | —                                      |
+| Auto-update — `N/A — computers have no internet (shape Q6)` | `src/main/updater.ts` | 4.1 `electron-updater` dependency; 4.8 `publish: provider: github` becomes `publish: null` (else electron-builder infers GitHub from the git remote and writes `app-update.yml`); `zip` in `mac.target` | `startUpdater` import and call in `src/main/index.ts` (6.4)                     | Auto-update on macOS                   |
+| `Target OS` omits macOS                           | —                     | 4.8 `mac` block                                                              | 9.3 `bun-darwin-*` build lines (sidecar only)                                   | macOS signing; Auto-update on macOS    |
+| `Target OS` omits Windows                         | —                     | 4.8 `win` and `nsis` blocks                                                  | 9.3 `bun-windows-x64` build line (sidecar only)                                 | Windows code signing and SmartScreen   |
+| `Target OS` omits Linux                           | —                     | 4.8 `linux` block                                                            | 9.3 `bun-linux-x64` build line (sidecar only)                                   | —                                      |
 
 No row removes a script: every 4.1 script name stays, and `bun run package` builds installers only
 for the OS it runs on.
@@ -118,7 +118,7 @@ my-app/
 ├── knip.json
 ├── tsconfig.base.json
 ├── electron.vite.config.ts
-├── electron-builder.yml         # only the target OSes' blocks (2.1)
+├── electron-builder.yml         # only the Target OS blocks (2.1)
 ├── playwright.config.ts
 ├── drizzle.config.ts
 ├── drizzle/                     # generated SQL migrations (committed)
@@ -135,7 +135,8 @@ my-app/
 │       └── tsconfig.json
 ├── src/
 │   ├── main/
-│   │   ├── index.ts             # app lifecycle, BrowserWindow
+│   │   ├── index.ts             # startup order, single instance, first log line, window (6.4)
+│   │   ├── window-state.ts      # size/position restore, clamped to a display (6.5)
 │   │   ├── db.ts                # better-sqlite3 driver wiring
 │   │   ├── ipc.ts               # ipcMain handlers (validated)
 │   │   ├── test-env.ts          # test-only fault switch + data dir (7)
@@ -147,7 +148,10 @@ my-app/
 │       └── src/
 │           ├── main.tsx
 │           ├── router.tsx
-│           ├── components/ui/   # shadcn components
+│           ├── env.d.ts         # window.api type (6.3)
+│           ├── components/
+│           │   ├── ui/          # shadcn components
+│           │   └── help-menu.tsx # Help > About dialog (6.7)
 │           ├── stores/          # Zustand
 │           └── queries/         # TanStack Query hooks
 ├── tests/
@@ -166,10 +170,10 @@ my-app/
 ```json
 {
   "name": "my-app",
+  "productName": "MyApp",
   "private": true,
   "version": "0.1.0",
   "main": "./out/main/index.js",
-  "type": "module",
   "workspaces": ["packages/*"],
   "trustedDependencies": ["electron", "better-sqlite3", "@electron/rebuild"],
   "scripts": {
@@ -190,6 +194,7 @@ my-app/
   "dependencies": {
     "better-sqlite3": "^11",
     "drizzle-orm": "^0.44",
+    "electron-log": "^5",
     "electron-updater": "^6",
     "zod": "^3",
     "@tanstack/react-query": "^5",
@@ -217,7 +222,7 @@ my-app/
     "tailwindcss": "^4",
     "@tailwindcss/vite": "^4",
     "drizzle-kit": "^0.31",
-    "@biomejs/biome": "^2",
+    "@biomejs/biome": "^2.2",
     "knip": "^5",
     "@happy-dom/global-registrator": "latest",
     "@testing-library/react": "^16",
@@ -229,6 +234,10 @@ my-app/
 
 > Pin exact versions with `bun install` (lockfile) and check the Electron release notes for the
 > current stable major before starting. Version ranges above are indicative.
+
+`productName` is the name `app.getName()`, the About dialog, the first log line and the installer
+show. No `"type": "module"`: with it electron-vite emits an ESM `preload/index.mjs`, which a
+sandboxed window (6.4) cannot load.
 
 ### 4.2 `bunfig.toml`
 
@@ -260,7 +269,7 @@ GlobalRegistrator.register();
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "types": ["bun-types"],
+    "types": ["bun"],
     "paths": {
       "@core/*": ["./packages/core/src/*"],
       "@renderer/*": ["./src/renderer/src/*"]
@@ -301,9 +310,11 @@ export default defineConfig({
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "ignore": ["out", "dist", "drizzle", "src/renderer/src/components/ui"] },
+  "files": {
+    "includes": ["**", "!!**/out", "!!**/dist", "!**/drizzle", "!src/renderer/src/components/ui"]
+  },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2 },
   "linter": {
     "enabled": true,
@@ -318,7 +329,8 @@ export default defineConfig({
 }
 ```
 
-shadcn components are excluded from linting so upstream updates stay diff-clean.
+Biome 2 has no `files.ignore`; `!` excludes from lint and format, `!!` also skips indexing (build
+output). shadcn components are excluded from linting so upstream updates stay diff-clean.
 
 ### 4.6 `knip.json`
 
@@ -353,8 +365,7 @@ export default defineConfig({
 ### 4.8 `electron-builder.yml`
 
 ```yaml
-appId: com.example.myapp
-productName: MyApp
+appId: com.example.myapp       # productName comes from package.json (4.1)
 directories:
   output: dist
 files:
@@ -385,13 +396,14 @@ mac:
 linux:
   target: [AppImage, deb]
 
-# ── Auto-update only ──
+# ── Auto-update kept; when Auto-update is N/A write `publish: null` instead ──
 publish:
   provider: github
 ```
 
-Keep only the blocks for the target OSes recorded in `CLAUDE.md`, and `publish` only when
-Auto-update is kept (2.1). Build each OS's installer on that OS (or a CI runner for it);
+Keep only the blocks for the OSes in `CLAUDE.md`'s `Target OS` row. When Auto-update is `N/A`,
+write `publish: null`: an omitted `publish` lets electron-builder infer GitHub from the git remote
+and write `app-update.yml` (2.1). Build each OS's installer on that OS (or a CI runner for it);
 cross-building needs extra tooling.
 
 ### 4.9 `playwright.config.ts`
@@ -405,7 +417,7 @@ export default defineConfig({
 ```
 
 `testDir` keeps Playwright from collecting the `bun test` files. `test:e2e` runs `bun run build`
-first, so a cold session never launches a missing or stale `out/main/index.js`.
+first, so a cold session never launches a missing or stale `out/`.
 
 ---
 
@@ -487,6 +499,10 @@ export function openDb(): DbDriver {
 import { z } from "zod";
 
 export const ipc = {
+  "app:getVersion": {
+    input: z.void(),
+    output: z.object({ name: z.string(), version: z.string() }),
+  },
   "conversations:list": {
     input: z.void(),
     output: z.array(z.object({ id: z.string(), title: z.string(), createdAt: z.number() })),
@@ -514,8 +530,10 @@ export function handle<C extends IpcChannel>(
   fn: (input: IpcInput<C>) => Promise<IpcOutput<C>> | IpcOutput<C>,
 ) {
   ipcMain.handle(channel, async (_event, raw: unknown) => {
-    await faultDelay(); // test-only switches, no-ops in a packaged app (7)
-    faultThrow();
+    if (!channel.startsWith("app:")) {
+      await faultDelay(); // test-only switches on data-source channels, no-ops when packaged (7)
+      faultThrow();
+    }
     const input = ipc[channel].input.parse(raw);
     const result = await fn(input as IpcInput<C>);
     return ipc[channel].output.parse(result);
@@ -539,22 +557,153 @@ contextBridge.exposeInMainWorld("api", api);
 export type Api = typeof api;
 ```
 
-### 6.4 Window creation (`src/main/index.ts`)
+`src/renderer/src/env.d.ts`:
 
 ```ts
-const win = new BrowserWindow({
-  width: 1200,
-  height: 800,
-  webPreferences: {
-    preload: join(__dirname, "../preload/index.js"),
-    contextIsolation: true,
-    nodeIntegration: false,
-    sandbox: true,
-  },
-});
+import type { Api } from "../../preload";
+
+declare global {
+  interface Window {
+    api: Api;
+  }
+}
 ```
 
-### 6.5 Renderer usage with TanStack Query
+### 6.4 Main entry (`src/main/index.ts`)
+
+Order is load-bearing. `userData` keys the single-instance lock, `app.db` and (Windows, Linux) the
+log folder, so `applyTestDataDir()` is the first statement: after the lock, a parallel Playwright
+worker or an E2E run beside `bun run dev` finds the lock taken and quits. No imported module may
+read `userData` or log at load time.
+
+```ts
+import { app, BrowserWindow } from "electron";
+import { join } from "node:path";
+import log from "electron-log/main";
+import { conversations } from "@core/db/schema";
+import { openDb } from "./db";
+import { handle } from "./ipc";
+import { applyTestDataDir } from "./test-env";
+import { startUpdater } from "./updater"; // Auto-update only (2.1)
+import { restoreWindowState, trackWindowState } from "./window-state";
+
+applyTestDataDir(); // 1. first: test data dir (7)
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit(); // 2. second launch: the first instance gets `second-instance`
+} else {
+  let win: BrowserWindow | null = null;
+  app.on("second-instance", () => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+
+  log.initialize(); // 3. main.log under app.getPath("logs")
+  log.info(`${app.getName()} v${app.getVersion()} starting`);
+
+  void app.whenReady().then(() => {
+    const driver = openDb();
+    app.on("will-quit", () => driver.close());
+
+    handle("app:getVersion", () => ({ name: app.getName(), version: app.getVersion() }));
+    handle("conversations:list", () =>
+      driver.db
+        .select()
+        .from(conversations)
+        .all()
+        .map((c) => ({ id: c.id, title: c.title, createdAt: c.createdAt.getTime() })),
+    );
+
+    const { bounds, maximized } = restoreWindowState(); // 4. window, minimum size, restored state
+    win = new BrowserWindow({
+      ...bounds,
+      minWidth: 800,
+      minHeight: 600,
+      webPreferences: {
+        preload: join(__dirname, "../preload/index.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    if (maximized) win.maximize();
+    trackWindowState(win);
+
+    const devUrl = process.env.ELECTRON_RENDERER_URL; // set by `electron-vite dev` only
+    if (!app.isPackaged && devUrl) void win.loadURL(devUrl);
+    else void win.loadFile(join(__dirname, "../renderer/index.html"));
+
+    startUpdater(); // Auto-update only (2.1)
+  });
+
+  app.on("window-all-closed", () => app.quit());
+}
+```
+
+`src/main/updater.ts` (Auto-update only):
+
+```ts
+import { app } from "electron";
+import { autoUpdater } from "electron-updater";
+
+export function startUpdater() {
+  if (app.isPackaged) void autoUpdater.checkForUpdatesAndNotify();
+}
+```
+
+### 6.5 Window state (`src/main/window-state.ts`)
+
+Saved in `userData/window-state.json`; the restored bounds are clamped into the nearest display's
+work area, so a window last seen on an unplugged monitor comes back visible.
+
+```ts
+import { app, screen, type BrowserWindow, type Rectangle } from "electron";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { z } from "zod";
+
+const Saved = z.object({
+  x: z.number().int(),
+  y: z.number().int(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  maximized: z.boolean(),
+});
+const file = () => join(app.getPath("userData"), "window-state.json");
+
+/** Call after app ready (screen is unavailable before). */
+export function restoreWindowState(): { bounds: Partial<Rectangle>; maximized: boolean } {
+  let saved: z.infer<typeof Saved>;
+  try {
+    saved = Saved.parse(JSON.parse(readFileSync(file(), "utf8")));
+  } catch {
+    return { bounds: { width: 1200, height: 800 }, maximized: false }; // first run or bad file
+  }
+  const { x, y, width, height, maximized } = saved;
+  const area = screen.getDisplayMatching({ x, y, width, height }).workArea;
+  const w = Math.min(width, area.width);
+  const h = Math.min(height, area.height);
+  const bounds = {
+    x: Math.min(Math.max(x, area.x), area.x + area.width - w),
+    y: Math.min(Math.max(y, area.y), area.y + area.height - h),
+    width: w,
+    height: h,
+  };
+  return { bounds, maximized };
+}
+
+export function trackWindowState(win: BrowserWindow) {
+  win.on("close", () => {
+    const state = { ...win.getNormalBounds(), maximized: win.isMaximized() };
+    writeFileSync(file(), JSON.stringify(state));
+  });
+}
+```
+
+`minWidth`/`minHeight` (6.4) stop the window shrinking below 800×600, whatever the saved size.
+
+### 6.6 Renderer usage with TanStack Query
 
 ```ts
 import { useQuery } from "@tanstack/react-query";
@@ -566,6 +715,60 @@ export function useConversations() {
   });
 }
 ```
+
+### 6.7 Help > About (`src/renderer/src/components/help-menu.tsx`)
+
+The version shown in the app. An in-app menu, not a native one, so Playwright can click it (7).
+Needs `bunx shadcn@latest add button dialog dropdown-menu`.
+
+```tsx
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@renderer/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@renderer/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@renderer/components/ui/dropdown-menu";
+
+export function HelpMenu() {
+  const [open, setOpen] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["app", "version"],
+    queryFn: () => window.api.invoke("app:getVersion", undefined),
+  });
+  return (
+    <>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost">Help</Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onSelect={() => setOpen(true)}>About</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>About</DialogTitle>
+            <DialogDescription>{data ? `${data.name} v${data.version}` : "Loading…"}</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+```
+
+Render `<HelpMenu />` in the app shell's header.
 
 ---
 
@@ -599,7 +802,7 @@ test needs its own empty database. The harness runs the unpackaged build, so the
 ```ts
 import { app } from "electron";
 
-const honored = !app.isPackaged; // dev and E2E (out/main/index.js) only
+const honored = !app.isPackaged; // dev and E2E (unpackaged) only
 const mode = honored ? (process.env.APP_FAULT_MODE ?? "") : "";
 
 export const faultDelay = () =>
@@ -609,46 +812,68 @@ export const faultThrow = () => {
   if (mode === "fail") throw new Error("Injected failure (APP_FAULT_MODE=fail)");
 };
 
-/** Call at the top of src/main/index.ts, before app.whenReady() and openDb(). */
+/** First statement of src/main/index.ts (6.4): before requestSingleInstanceLock() and log.initialize(). */
 export function applyTestDataDir() {
   const dir = honored ? process.env.APP_DATA_DIR : undefined;
   if (dir) app.setPath("userData", dir);
 }
 ```
 
-`handle()` (6.2) calls `faultDelay` and `faultThrow` on every channel. `openDb()` (5.3) reads
-`userData`, so a fresh `APP_DATA_DIR` is a fresh `app.db`.
+`handle()` (6.2) calls `faultDelay` and `faultThrow` on data-source channels only; `app:*` channels
+(version) stay live, so About still works in an error-state test. `userData` keys `app.db`
+(5.3), `window-state.json` (6.5), the single-instance lock and the Windows/Linux log folder, so a
+fresh `APP_DATA_DIR` isolates all four and parallel workers never collide.
 
 ### E2E example (`tests/e2e/app.spec.ts`)
 
+Launch with `args: ["."]`: Electron then reads `package.json`, whose `main` is `out/main/index.js`.
+Launched on the file itself, Electron skips `package.json`: `app.getVersion()` returns Electron's
+version, `app.getName()` is `Electron`, and `app.getAppPath()` is `out/main`, so migrations (5.3)
+are not found. The About test asserts the `package.json` version.
+
 ```ts
 import { test, expect, _electron as electron } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
+import type { ElectronApplication, Page } from "@playwright/test";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // Fresh data dir per launch; `env` replaces process.env, so spread it.
-function launch(extra: Record<string, string> = {}) {
+async function withApp(extra: Record<string, string>, body: (page: Page) => Promise<void>) {
   const dataDir = mkdtempSync(join(tmpdir(), "my-app-e2e-"));
-  return electron.launch({
-    args: ["out/main/index.js"],
-    env: { ...process.env, APP_DATA_DIR: dataDir, ...extra } as Record<string, string>,
-  });
+  let app: ElectronApplication | undefined;
+  try {
+    app = await electron.launch({
+      args: ["."],
+      env: { ...process.env, APP_DATA_DIR: dataDir, ...extra } as Record<string, string>,
+    });
+    await body(await app.firstWindow());
+  } finally {
+    await app?.close(); // Windows keeps app.db locked until the app exits
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
 }
 
-test("app boots and shows sidebar", async () => {
-  const app = await launch();
-  const page = await app.firstWindow();
-  await expect(page.getByRole("navigation")).toBeVisible();
-  await app.close();
-});
+test("app boots and shows sidebar", () =>
+  withApp({}, async (page) => {
+    await expect(page.getByRole("navigation")).toBeVisible();
+  }));
 
-test("shows an error state when the data source fails", async () => {
-  const app = await launch({ APP_FAULT_MODE: "fail" });
-  const page = await app.firstWindow();
-  await expect(page.getByRole("alert")).toBeVisible();
-  await app.close();
-});
+test("Help > About shows name and package.json version", () =>
+  withApp({}, async (page) => {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+      productName: string;
+      version: string;
+    };
+    await page.getByRole("button", { name: "Help" }).click();
+    await page.getByRole("menuitem", { name: "About" }).click();
+    await expect(page.getByRole("dialog")).toContainText(`${pkg.productName} v${pkg.version}`);
+  }));
+
+test("shows an error state when the data source fails", () =>
+  withApp({ APP_FAULT_MODE: "fail" }, async (page) => {
+    await expect(page.getByRole("alert")).toBeVisible();
+  }));
 ```
 
 ---
@@ -662,7 +887,7 @@ bun run db:generate          # after editing schema.ts; commit the SQL
 bun run check                # typecheck + lint + deadcode + unit/component tests
 bun run test:e2e             # builds, then Playwright against out/
 bun run package              # installers for this OS in dist/
-bunx shadcn@latest add button dialog   # add UI components
+bunx shadcn@latest add button dialog dropdown-menu   # add UI components
 ```
 
 ---
@@ -730,7 +955,8 @@ manage. Sign and notarize the sidecar binary alongside the app on macOS.
 
 ## 10. Additional Considerations
 
-These are known friction points. The configuration in this sheet already applies each fix.
+These are known friction points. The configuration in this sheet applies each fix unless the row
+says it is not configured here.
 
 | Consideration                       | What happens                                                                                                        | Applied fix                                                                                                   |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -749,12 +975,18 @@ These are known friction points. The configuration in this sheet already applies
 | Routing in `file://` renderer       | Browser history APIs misbehave without a server.                                                                    | TanStack Router with memory history (2).                                                                      |
 | Tailwind v4 + shadcn                | Older shadcn templates assume Tailwind v3 config files.                                                             | Use `@tailwindcss/vite` plugin and CSS-first config; `bunx shadcn@latest init` detects v4 (4.4).              |
 | Sidecar lifecycle (if used)         | Orphaned Bun process after app quit or crash loop.                                                                  | Supervisor with backoff and kill on `before-quit` (9.3).                                                      |
-| Stale E2E build                     | Playwright launches a missing or outdated `out/main/index.js`, or collects `bun test` files.                        | `test:e2e` builds first; `testDir: "./tests/e2e"` (4.1, 4.9).                                                 |
+| Stale E2E build                     | Playwright launches a missing or outdated `out/`, or collects `bun test` files.                                     | `test:e2e` builds first; `testDir: "./tests/e2e"` (4.1, 4.9).                                                 |
+| E2E launched on a file              | `args: ["out/main/index.js"]` skips `package.json`: Electron's version and name, app path `out/main`, no migrations. | `args: ["."]`; the About test asserts the `package.json` version (7).                                         |
+| Startup order                       | Lock and logs bind to the real `userData`, so parallel E2E workers or a run beside `bun run dev` quit on launch.     | `applyTestDataDir()` is the first statement in main (6.4, 7).                                                 |
+| Sandboxed ESM preload               | With `"type": "module"`, electron-vite emits `preload/index.mjs`; a sandboxed window cannot load it.                | No `"type"` field in `package.json` (4.1).                                                                    |
 | Test switches in production         | A fault or data-dir variable left in a user's environment breaks the installed app.                                 | Honored only when `!app.isPackaged` (7).                                                                      |
+| Fault switch breaks the shell       | `APP_FAULT_MODE=fail` on every channel also fails the version call.                                                 | Switches skip `app:*` channels (6.2).                                                                         |
 | E2E tests share data                | One test's rows leak into the next.                                                                                 | Each launch gets a fresh temp `APP_DATA_DIR` via `env` (7).                                                   |
+| Temp data dirs pile up              | A failed test skips cleanup; Windows keeps `app.db` locked while the app runs.                                      | `close()` then `rmSync` with retries in `finally` (7).                                                        |
+| Publishing with Auto-update N/A     | An omitted `publish` lets electron-builder infer GitHub from the git remote and write `app-update.yml`.             | `publish: null` (2.1, 4.8).                                                                                   |
 | macOS signing                       | Gatekeeper blocks an unsigned or unnotarized app.                                                                   | `hardenedRuntime`, `notarize: true`, Apple credentials in CI env (4.8).                                       |
 | Auto-update on macOS                | electron-updater cannot update from a dmg, and macOS refuses updates to an unsigned app.                            | `zip` in `mac.target`, signed build, `publish` block (4.8).                                                   |
-| Windows code signing and SmartScreen | An unsigned NSIS installer shows a SmartScreen / unknown-publisher warning.                                        | Sign in CI with an Authenticode certificate (`WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`). An unsigned installer still installs and runs offline on an internal PC after the user accepts the warning. |
+| Windows code signing and SmartScreen | An unsigned NSIS installer shows a SmartScreen / unknown-publisher warning.                                        | Not configured here; optional for an internal PC, where the unsigned installer runs offline once the user accepts the warning. To sign, add an Authenticode certificate in CI (`WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`). |
 
 ---
 

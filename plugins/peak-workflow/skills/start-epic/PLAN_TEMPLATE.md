@@ -119,6 +119,8 @@ Rules:
   after plan approval, before any middle step.
 - **Only an option the user selects counts.** A free-text reply that does not name one of the
   three options ("ok", "proceed", "go ahead") is not consent to defer — re-ask.
+- **Safety TORs are never deferrable.** A TOR under the `# Safety` banner offers only Fix now or
+  Stop — the epic that drives an output ships its safeguard.
 - **Defer eligibility:** Defer is allowed only when the Then clause depends on code a later
   epic creates (a handler, table, screen, or service that does not exist yet and is not this
   epic's to build). When the user picks Defer, ask `"Which later epic creates the code this Then
@@ -178,7 +180,10 @@ Middle step example:
   yet, so `git diff <base-branch>` alone would miss new files):
   - `for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done` must hit in at least one
      directory for every TOR ID. A miss means the test is not traceable — fix the test before
-     continuing.
+     continuing. A TOR whose scenario carries `# Verification: operator-observed` is traced by a
+     checklist `tests/manual/<TOR-ID>.md` (or under `tests/hil/`) that restates its Given / When /
+     Then as steps a person performs and what they should see; write it, and report the TOR as
+     `PASS (operator-observed pending)` — `/peak-workflow:wrapup-epic` collects the observation.
   - ```bash
     grep -inE --exclude-dir={.venv,node_modules,__pycache__,.pytest_cache,dist,build,out} \
       'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
@@ -189,8 +194,8 @@ Middle step example:
      reason is expected and not a trigger).
      Legitimate uses (e.g., argparse `placeholder`/`metavar`, test doubles for hardware or a
      native dialog under the test directories) are not triggers.
-  - Walking-skeleton epic only: `grep -n 'TBD — set by the walking-skeleton epic' CLAUDE.md` must
-     return nothing. Each hit is a value this epic owns resolving — resolve it before reporting.
+  - Walking-skeleton epic only: `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen' CLAUDE.md`
+     must return nothing. Each hit is a value this epic owns resolving — resolve it before reporting.
 
   **Any TOR reported FAIL or CANNOT VERIFY here that has no Deferrals row fires the deferral
   gate** before the handoff is written — the self-assessment and the Deferrals section must

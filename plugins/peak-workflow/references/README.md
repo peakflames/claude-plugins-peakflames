@@ -17,7 +17,9 @@ secret of its own. All five "no" routes to the static sheet; any "yes" routes to
 sheet. The answers are recorded in `CLAUDE.md` as a `**Product shape:**` block, and each Stack
 Summary row they drop is written as `N/A — <reason> (shape Q<N>)` rather than omitted, so
 `plan-project` reads it as a decision instead of a gap. `/peak-workflow:discover` re-checks those
-answers against the ConOps scenarios once the product is described (its Step 4.5).
+answers against the ConOps scenarios once the product is described (its Step 4.5). A Desktop app
+gets questions 1–3 plus a sixth — do the computers have internet — which can drop the desktop
+sheet's Auto-update row; a Service or API gets questions 2–4 phrased for callers.
 
 ## What these are for
 
@@ -58,15 +60,15 @@ them. Specifically:
 
 The sheets are the single source of truth for the picks, the repository layout, and the script
 names (`dev`, `build`, `typecheck`, `lint`, `deadcode`, `test`, `test:e2e`, `check`; plus
-`package` on the desktop sheet, `preview` on the static sheet, and `lint:fix` on the static and
-web sheets).
+`package` on the desktop sheet, `preview` on the static and desktop sheets, and `lint:fix` on
+all three).
 `setup` and `plan-project` quote those script names in their quality-gate and verification
 defaults, so a change to a sheet's `package.json` section means updating the matching lines in
 `skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit. `check` always calls
 `bun run test`, never bare `bun test`, which would also collect the Playwright specs.
 
 `setup` maps shape answers onto named Stack Summary rows (on the web sheet: Auth, Object storage,
-Local S3, Streaming, Secrets). Renaming or merging one of those rows means updating that mapping
+Local S3, Live updates, Per-request streaming, Secrets; on the desktop sheet: Auto-update). Renaming or merging one of those rows means updating that mapping
 in `skills/setup/SKILL.md` in the same commit — otherwise an `N/A` has nowhere to land.
 
 Each server-bearing sheet (web, desktop) has a **2.1 Dropping a layer** table directly after its

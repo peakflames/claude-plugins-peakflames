@@ -122,11 +122,19 @@ Proceed with the implementation, using git history and the current codebase to d
 
 Check the epic's Dependencies section (from the phase index row loaded in Step 1). For each prerequisite epic, verify that `docs/implementation-plan/status/epic-<dep-id>.md` has `status: Implemented` or `status: Complete` (both mean the code exists). If any dependency is not met, inform the user and suggest which epic to start instead.
 
-**Hardware on the desk (Embedded, or any epic whose TORs are verified through `tests/hil/`).** Before
-planning, confirm the board is connected — the port named by `HIL_PORT` (or the project's
-equivalent in `CLAUDE.md`) exists. If it does not, ask the user to connect it, in plain words, and
-wait. For the walking skeleton, a board still recorded as `Board: candidate … — unconfirmed` or
-`not chosen` is confirmed with the user first; nothing is ordered or installed on a guess.
+**Hardware on the desk (Embedded, or any epic whose TORs are verified through `tests/hil/`).** In
+this order:
+1. **Board chosen?** If `CLAUDE.md` still records `Board: candidate … — unconfirmed` or
+   `Board: not chosen` (walking skeleton), recommend a board in plain words — name, rough price,
+   and any parts the product needs with it (e.g. a thermocouple amplifier, a relay module) — and
+   confirm it with the user. Nothing is ordered or installed on a guess. Record the confirmed
+   board in `CLAUDE.md`.
+2. **Board in hand?** If the user does not have it yet, say so plainly and suggest
+   `/peak-workflow:pause`; the epic resumes when it arrives. Host-side work may continue first
+   only if the user asks.
+3. **Board connected?** Check the port named on the `CLAUDE.md` Local Environment `HIL port:` line
+   (e.g. `HIL_PORT=/dev/ttyUSB0`, `COM3` on Windows) exists. If not, tell the user how to connect
+   it and how to find the port, and wait. The walking skeleton writes that line the first time.
 
 ## Step 3: Create Feature Branch
 

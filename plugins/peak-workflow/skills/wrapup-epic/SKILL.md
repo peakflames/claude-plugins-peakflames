@@ -136,6 +136,12 @@ implement this epic. Do not trust the implementer's self-assessment.
      `git grep --untracked -l "<TOR-ID>" -- ':!docs'` (`--untracked` so a test file created by a
      Step 1.4b Fix now is found on the re-run).
    Read the matching files.
+   **Operator-observed TORs.** A TOR whose feature-file scenario carries the comment
+   `# Verification: operator-observed` is traced by a checklist instead of an automated test:
+   also grep `tests/manual/` (and `tests/hil/` when present) for it, whether or not those are on
+   the Test directories line. The checklist names the TOR ID and restates the Given / When / Then
+   as steps a person performs and what they should see. Items 3–4 apply to the checklist (it
+   mirrors the Gherkin; there is nothing to run), and item 7 collects the observation.
    If the grep returns nothing in any listed directory, no test traces to this requirement —
    the TOR's verdict is **FAIL** ("no test names TOR-…"), even if source inspection finds the
    behavior implemented. Do not go looking
@@ -158,18 +164,24 @@ implement this epic. Do not trust the implementer's self-assessment.
    Playwright Electron harness (`@playwright/test` with `_electron.launch`, in the last entry
    on the Test directories line — setup lists the E2E directory last); `playwright-cli`
    cannot attach to an Electron window.
-7. **For device TOR IDs (Embedded, or any Then observed on physical hardware):** run the project's
-   hardware-in-the-loop harness under `tests/hil/` against the connected board. If the board is not
-   connected, **stop and ask the user to connect it** — a missing board is neither CANNOT VERIFY
-   nor FAIL. When the Then names something no harness can capture (a relay clicks, a light turns
-   on, the provider's real sign-in page appears), ask the user to perform the When and describe
-   what they observe; record the verdict with the evidence `operator-observed: <their words>`.
-   That annotation is carried into the Step 1.5 report's Highlights so the human sees every
-   verdict that rests on an observation rather than a test.
+7. **For device TOR IDs (Embedded, or any Then observed on physical hardware) and every
+   operator-observed TOR:** run the project's hardware-in-the-loop harness under `tests/hil/`
+   against the connected board for everything it can capture. If the board is not connected,
+   **ask the user to connect it**; if they cannot now, end the session with no verdicts recorded
+   and tell them to re-run `/peak-workflow:wrapup-epic <id>` once it is — a missing board is
+   neither CANNOT VERIFY nor FAIL. For each operator-observed TOR, walk the user through its
+   checklist in plain words, ask them to perform the When and describe what they see, and judge
+   it against the Then. Record the evidence as `operator-observed: <their words>`; that annotation
+   is carried into the Step 1.5 report's Highlights so the human sees every verdict that rests on
+   an observation rather than a test.
 
 Report each TOR ID:
 - **PASS** — a test that mirrors the Given/When/Then (item 3) passes AND implementation
   inspection confirms the behavior is realized. Cite: `test file:line` and `impl file:line`.
+  For an operator-observed TOR: the checklist mirrors the Gherkin, implementation inspection
+  confirms the behavior, AND the operator's described observation matches the Then. Cite the
+  checklist file, `impl file:line`, and `operator-observed: <their words>`. An observation that
+  does not match, or that the user cannot make, is FAIL.
 - **FAIL** — test fails, OR no test mirrors the Then (e.g., the test only checks a flag is
   accepted when the Then names an outcome), OR test passes but implementation does not realize
   the requirement (describe specifically what is wrong).
@@ -225,7 +237,7 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Access-control check (if `CLAUDE.md`'s `**Product shape:**` block records
   `**Access rule:** owner-or-permitted-role`, or its Tech Stack records
   `Auth: local accounts now, org SSO deferred`, and this epic touched user data) — see below
-- Deferred-value check (walking-skeleton epic only): `grep -n 'TBD — set by the walking-skeleton epic' CLAUDE.md`
+- Deferred-value check (walking-skeleton epic only): `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen' CLAUDE.md`
   on the feature branch must return nothing. Any hit is a FAIL — the skeleton owns resolving
   every one
 
@@ -351,6 +363,8 @@ three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
   a fixed TOR must not keep two owners. If the fix does not bring the TOR to PASS, re-ask with
   only `Defer` / `Stop`.
 - **Defer** — a waiver. Eligible only when the Then clause depends on code a later epic creates.
+  **Never eligible for a TOR under the `# Safety` banner** — its only options are Fix now or Stop;
+  an epic that drives an output never closes without the safeguard for it.
   Ask `"Which later epic creates the code this Then clause depends on?"` — if the implementer's
   Deferrals row (Step 1.2b) already names a successor, offer it as the default. Judge
   eligibility on that answer: "larger than expected", "tedious", or "out of scope" name no

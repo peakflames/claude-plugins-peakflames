@@ -87,6 +87,10 @@ that says "I think it's an ESP32 but I'm not sure" does not settle the device �
    (questions 2–4, phrased for the software that calls it), and Desktop app (questions 1–3).
 5. *One confirmation* of everything defaulted — below.
 
+The only follow-ups allowed are the ones these five items define: the phone-or-app-store check
+under Project type, the separate-accounts clarifier and the provider / audience / roles follow-ups
+under question 2, and the internet / target-OS question for Desktop apps.
+
 Nothing else is a question. Do not ask how to run, build, test, or lint the project; where tests
 live; the logging format or file; where the version lives; the branch strategy, merge style, or
 push rule; files never to commit; the release branch, tag format, or CI behaviour; whether to
@@ -163,7 +167,7 @@ the answers, not the questions. Ask all five as one block and accept one combine
 | 1 | "If someone uses this on their laptop and later opens it on their phone, should they see the same information — or is it fine for it to live only on the device they used?" | Server, database, migrations, container |
 | 2 | "Will people need to sign in? Does anyone other than them ever see their information?" | Auth, sessions, per-user access rules |
 | 3 | "Will people attach photos, PDFs, or other files?" | Object storage, presigned uploads, local S3 |
-| 4 | "Does anything on screen need to update by itself while they are watching — like a message arriving from someone else?" | Streaming endpoints, long-lived connections |
+| 4 | "Does anything on screen need to update by itself while they are watching — like a message arriving from someone else?" | Live updates — a broadcast stream, long-lived connections |
 | 5 | "Does the product need to keep any password or key of its own secret from the people using it?" — **skip this one and record "yes — implied by sign-in / file uploads" if question 2 or 3 was yes**; it is a consequence of those answers, not an independent choice, and a lay "no" here is simply wrong | Server — a browser-only app cannot hold a secret |
 
 If the user is unsure on questions 1, 3 or 4, treat it as **no** and say so plainly: *"I'll assume
@@ -185,17 +189,21 @@ approval the user cannot give during a planning session.
 - *Roles:* "Will different people be able to do different things — for example, some only look,
   some enter the work, and others review or approve it?"
 
-**Separate accounts, or just a name on each record?** Before treating question 2 as "yes", ask:
-*"Does each person need their own private sign-in, or is it enough to note who entered something —
-for example by typing their initials?"* and, for a Desktop app, *"Does anyone look at the
-information on a different computer, or only on this one (or in a file you hand them)?"* Noting
-who entered something is an **attribution field**, not sign-in. People who share one computer and
-one login, or who only receive an exported file, do not "see the data" in the sense question 2
-means. Record `no — attribution only (entered-by field)` and route as a "no". Only separate
-accounts, or the same data seen from different devices, is a "yes". "Unsure" still means yes —
-but only after this clarifier.
+**Separate accounts, or just a name on each record?** Before treating question 2 as "yes", ask one
+clarifier: *"Does each person need their own private sign-in, or is it enough to note who entered
+something — for example by typing their initials?"* Noting who entered something is an
+**attribution field**, not sign-in. People who share one computer and one login, or who only
+receive an exported file, do not "see the data" in the sense question 2 means. Record
+`no — attribution only (entered-by field)` and route as a "no" (Important Reminders records the
+field so discovery turns it into a requirement). Only separate accounts is a "yes" here —
+*seeing the same data from another device* is question 1's to answer, never re-asked under
+question 2. **"Unsure" means yes only about separate accounts.** A "maybe later" about another
+computer or device follows question 1's rule (unsure means no) and is recorded as a growth note in
+the shape block, not as sign-in.
 
-A "yes" to question 2 routes to the web-app sheet either way (a Desktop app becomes a Hybrid with
+A "yes" to question 2 routes to the web-app sheet either way — unless `code_present = true` or a
+required platform skipped the sheets, in which case it adds the sign-in layers to that stack (a
+Desktop app becomes a Hybrid with
 the web sheet's service layers). Once anyone other than the owner can see the data from another
 device, the rule about who sees what has to be enforced somewhere the person cannot edit, which
 means a server. Deferring the provider does not restore the static sheet — say this plainly rather
@@ -203,7 +211,7 @@ than letting the user infer that deferral keeps the project small.
 
 | Provider answer | What goes in the stack |
 |---|---|
-| Named and approved | The sheet's auth layer with that provider enabled (the web sheet's 6.3 shows Google and Microsoft). Record the provider in the Tech Stack table. Tests still sign in through the email-and-password test helper; the provider round-trip is verified by hand against the real tenant. If people from outside the organization also sign in (volunteers, customers), say so and keep email-and-password on for them. |
+| Named and approved | The sheet's auth layer with that provider enabled (the web sheet's 6.3 shows Google and Microsoft). Record the provider in the Tech Stack table. Tests still sign in through the email-and-password test helper; the provider round-trip is verified by hand against the real tenant. **Ask who signs in:** only people inside the organization (*org-only* — restrict to the organization's domain), or outsiders too — volunteers, customers (*mixed audience* — no domain restriction; the organization's role, e.g. coordinator, is granted only to accounts the provider verifies as inside the organization's domain; outsiders may use the same provider with a personal account or email and password). Record the mode next to the provider. |
 | A vendor is likely but unconfirmed — *"I think we use Microsoft, I'd have to ask IT"* | **Deferred mode** below, and record the candidate and who confirms it. Hand the user the one question to ask: *"Are we on Microsoft Entra ID, and can we register an application?"* A named vendor usually turns the later work into a configuration change, not a rebuild — do not discard the hint. |
 | Still to be worked out, or "I don't know" | **Deferred mode** below. |
 
@@ -273,7 +281,8 @@ does not resolve in this session, locate the sheet under the plugin's own `refer
 **Record the answers, not just their consequences.** Write the block verbatim in this shape above
 the Tech Stack table — `/peak-workflow:discover` Step 4.5 reads it back by these fixed labels, so
 keep `Q1:`–`Q5:` even when an answer is short. A question not asked for this project type is
-written `not asked (<type>)`, never left out. `Q6` appears for Desktop apps only.
+written `not asked (<type>)`, never left out. `Q6` appears for Desktop apps only. CLI tool,
+Library, and Embedded projects get no shape questions and **no `**Product shape:**` block at all**.
 
 ```markdown
 **Product shape:** (questions asked by `/peak-workflow:setup` before the stack was chosen)
@@ -287,6 +296,7 @@ written `not asked (<type>)`, never left out. `Q6` appears for Desktop apps only
 - **Q4 Updates on screen without the person acting:** [yes / no / not asked (<type>)] — [in the user's own words]
 - **Q5 Product holds a secret of its own:** [yes / no — "yes, implied by Q2/Q3" when either was yes / not asked (<type>)]
 - **Q6 Internet on the computers it runs on:** [yes / no] — Desktop app only
+- **Growth notes:** [anything answered "maybe later", e.g. "maybe a second PC later" — not built now]
 ```
 
 The three indented lines under Q2 are written only when Q2 is "yes". Any Stack Summary row the
@@ -296,7 +306,11 @@ simply absent reads as an oversight, while `N/A — no file uploads (shape Q3)` 
 decision.
 
 On the web sheet the rows each answer drops are: Q2 "no" → Auth; Q3 "no" → Object storage and
-Local S3; Q4 "no" → Streaming; Q5 "no" → Secrets (only reachable when Q2 and Q3 are also "no").
+Local S3; Q4 "no" → Live updates; Q5 "no" → Secrets (only reachable when Q2 and Q3 are also "no").
+Per-request streaming is marked `N/A — no streamed responses` unless the product streams a long
+generated reply (an AI answer, a report being written). A Service or API marks the frontend rows
+(Frontend build, UI, Styling, Icons, Client state, Routing, Component tests)
+`N/A — no user interface (Service or API)`.
 On the desktop sheet: Q6 "no" → Auto-update. Each server-bearing sheet's **Section 2.1 Dropping a
 layer** lists what else leaves with the row — `plan-project` applies it. Not every "no" maps onto
 a row — the static sheet has already excluded the server layers, and a Q1 "no" on the web sheet
@@ -306,9 +320,9 @@ block **is** the record; do not invent a row to carry the `N/A`.
 Read the matching sheet's **Section 2 Stack Summary** and take that table as the stack, with any
 shape-dropped rows already marked `N/A`. Do not invent, substitute, or "modernize" a pick, and
 do not paraphrase from memory — the sheet is the single source of truth. The stack is shown to
-the user in the single confirmation at the end of this step, grouped into four or five plain lines
-(where it runs, where data lives, how people sign in, how it is checked — technical names in
-parentheses), not as its own question and not as one line per layer. Record the accepted picks in
+the user in the single confirmation at the end of this step as a few short plain lines (where it
+runs, where data lives, how people sign in, how it is checked — technical names in parentheses),
+not as its own question and not as one line per layer. Record the accepted picks in
 `CLAUDE.md`'s Tech Stack table, and note in the section which sheet it came from so
 `plan-project` can read the same one. Sections 3 (Repository Layout), 4 (Configuration Files),
 and the later sections are for `plan-project` to apply when it builds the walking skeleton —
@@ -326,7 +340,7 @@ confirmation; where no clear standard exists, write `TBD — set by the walking-
 | Rust | `cargo run --` | `cargo test` (`tests/`) | `cargo clippy -- -D warnings` / `cargo fmt` | `cargo build --release` | `Cargo.toml [package.version]` | `tracing` to stderr (`src/main.rs`) |
 | Go | `go run .` | `go test ./...` (`.`) | `go vet ./...` / `gofmt -w .` | `go build ./...` | `const Version` in `version.go` | `log/slog` to stderr (`main.go`) |
 | C# / .NET | `dotnet run --project src/<Name>` | `dotnet test` (`tests/`) | `dotnet format --verify-no-changes` / `dotnet format` | `dotnet build` | `<Version>` in the app's `.csproj` (or `Directory.Build.props`) | `Microsoft.Extensions.Logging` JSON console (`Program.cs`) |
-| Embedded C / C++ | `TBD — set by the walking-skeleton epic` | host-side unit tests in their own build directory, e.g. `cmake -B build-host && ctest --test-dir build-host` (`tests/ tests/hil`) | `TBD — set by the walking-skeleton epic` | `TBD — set by the walking-skeleton epic` (the board's own tools usually decide it — ESP-IDF, PlatformIO, Zephyr, vendor IDE) | `TBD — set by the walking-skeleton epic` | debug / serial console, plain text (`TBD — set by the walking-skeleton epic`) |
+| Embedded C / C++ | `TBD — set by the walking-skeleton epic` | `TBD — set by the walking-skeleton epic` (host-side unit tests in `tests/unit`, hardware-in-the-loop in `tests/hil`) (`tests/unit tests/hil`) | `TBD — set by the walking-skeleton epic` | `TBD — set by the walking-skeleton epic` (the board's own tools usually decide it — ESP-IDF, PlatformIO, Zephyr, vendor IDE) | `TBD — set by the walking-skeleton epic` | debug / serial console, plain text (`TBD — set by the walking-skeleton epic`) |
 
 The toolchain table is the *language* default and exists only for projects no sheet covers; it
 never overrides a sheet or existing code. Embedded values that depend on the board are all `TBD`
@@ -342,8 +356,10 @@ walking-skeleton epic` until the device is known).
 it; this step asks no stack question. Do not compare it against the sheets, do not report
 divergence, and never propose re-platforming, rewriting, or swapping a library to match. The
 sheets apply to an existing project for one thing only: noticing a **layer the project has not
-decided yet** (e.g., no migration tool, no E2E runner, no secrets convention). List such gaps in
-the confirmation as *"not decided yet"* — never as a separate question, never as a rewrite.
+decided yet** (e.g., no database, no migration tool, no E2E runner, no CI, no secrets convention).
+Write them into the Tech Stack section as one line — `**Not decided yet:** database, CI` — which
+`plan-project`'s skeleton reads, and show the same list in the confirmation. Never ask about them
+separately, never propose a rewrite.
 
 When a value the defaults need is missing from existing code — typically the version element
 (`<Version>` absent from a `.csproj`, no `version` in `package.json`) — write
@@ -403,7 +419,8 @@ every one has a correct answer for the project type.
 
 3. *Version stamped at log startup* — confirm the project will emit the tool name and
    semantic version on the first log line at process / app / request-handler startup
-   (e.g., `[INFO] myapp v1.2.0 starting`). Desktop app: the main process logs
+   in the Logging format (`[INFO] myapp v1.2.0 starting` for plain text; a JSON record whose
+   message is `myapp v1.2.0 starting` for a JSON logger). Desktop app: the main process logs
    `<name> v<semver> starting` as its first line once the app is ready. Static SPA: `main.tsx`
    writes `<name> v<semver> starting` to the browser console before mounting the router — the
    console is the only log this shape has. Embedded: the boot banner `<name> v<semver> starting`
@@ -469,12 +486,14 @@ of truth are declarations, not TOR sources.
 
 **Version exposure:** [Mechanism declaration. Example for a CLI: `--version` flag printing
 `myapp v<semver>` to stdout with exit code 0. Example for a Web app: GET `/version` endpoint
-returning JSON `{name, version}` AND version visible in app footer. Example for a Desktop app:
+returning JSON `{name, version}` AND version visible in app footer. Example for a Service or API:
+GET `/version` returning JSON `{name, version}`, reachable without signing in. Example for a Desktop app:
 Help > About opens an in-app About dialog (rendered in the renderer) showing `myapp v<semver>`
 from `app.getVersion()` over IPC.]
 
 **Version stamped at log startup:** The first log line emitted on process / app startup
-includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting`).
+includes the tool name and semantic version, in the Logging format below [plain text:
+`[INFO] myapp v1.2.0 starting` / JSON: a record whose message is `myapp v1.2.0 starting`].
 
 **Version single source of truth:** [Authoritative file path, e.g., `pyproject.toml [project.version]`]
 
@@ -490,7 +509,11 @@ includes the tool name and semantic version (e.g., `[INFO] myapp v1.2.0 starting
 **Error message standard:** User-facing errors name the problem AND the next user action.
 [CLI example: `Error: configuration file not found at <path>. Try --config to specify an
 alternate path.` / Web or Desktop example: `Could not save order #123: the database file is
-locked. Close other copies of the app and try again.` — keep the one that applies]
+locked. Close other copies of the app and try again.` / Service or API example: an RFC 9457
+problem-details body, `{"title": "Pokémon not found", "status": 404, "detail": "No Pokémon named
+'pikchu'. Check the spelling or search with GET /pokemon?name=pik."}` / Embedded example:
+`ERROR E012: temperature sensor not responding. Check the sensor cable, then power-cycle.` — keep
+the one that applies]
 ```
 
 **UX Baseline** (if missing — Project type Web app, Desktop app, or Hybrid with a UI only):
@@ -797,8 +820,9 @@ If the second answer is still ambiguous, accept it and add a note in the written
 
 **Important Reminders** (if missing) — **default, no questions.** Write one line for each
 decision this run recorded that a later session could undo by accident — for example *"Browser-only
-app: there is no server; anything needing one is a Product shape change (see above)"*, or the
-deferred-sign-in rule. With nothing to record, write *"None yet — add project-specific gotchas here
+app: there is no server; anything needing one is a Product shape change (see above)"*, the
+deferred-sign-in rule, or an attribution field — *"Every record carries an Entered by field (typed
+initials); there is no sign-in"*. With nothing to record, write *"None yet — add project-specific gotchas here
 as they are discovered."*; on a new project that line counts as populated, not `[WEAK]`.
 
 **Reference Materials** (if missing) — **default, plus one optional prompt folded into the
@@ -828,8 +852,8 @@ Lint, and Tests commands already filled in for Verification & Quality Gates; do 
 them. Format fix: the sheet's `bun run lint:fix`, or the toolchain table's *format fix*. The
 *Verify* step by project type:
   - *CLI tool:* run the tool with a known input and check stdout (e.g., `python -m fibcalc 10` → expect `55`). For the walking-skeleton epic, which has no domain logic, the known input is the `--version` invocation (`python -m fibcalc --version` → `fibcalc v0.1.0`, exit 0).
-  - *Web app / Service:* `curl` the version endpoint (web sheet: `curl http://localhost:3000/version`) or use `playwright-cli`. Static SPA: `bun run test:e2e`, which builds and previews the bundle.
-  - *Desktop app:* start the dev build (`bun run dev`) and run the Playwright Electron smoke test (`bun run test:e2e`).
+  - *Web app / Service:* `curl` the version endpoint on the port the project actually uses (web sheet: `curl http://localhost:3000/version`; .NET: the port in `Properties/launchSettings.json`) or use `playwright-cli`. Static SPA: `bun run test:e2e`, which builds and previews the bundle.
+  - *Desktop app:* `bun run test:e2e` alone — it builds and launches the app itself; do not also run `bun run dev`.
   - *Embedded:* host-side tests, then flash and read the boot banner on the debug console — or `TBD — set by the walking-skeleton epic`.
 
 When generating the Verification Before Commit section for a CLI tool or Embedded project, omit the `curl` and `playwright` references — replace the "Verify" step with the tool invocation (or flash + boot banner) command, drop the `[stop command]` line from the example, and reword its comments to "Build" and "Run the tool with a known input". For desktop projects replace curl / playwright with the dev-build start command plus the Playwright Electron smoke test.
@@ -870,9 +894,10 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 - *Version file:* the Tool Hygiene **Version single source of truth** — never asked twice.
 - *CHANGELOG:* `CHANGELOG.md` in Keep a Changelog format; Step 7.2 creates it without asking.
 - *Tag format:* `vX.Y.Z`.
-- *CI note:* the existing workflows' behaviour when `code_present = true`; otherwise what the
-  sheet ships (static SPA: tests on pull requests, deploy to GitHub Pages on push to `main`;
-  web sheet: none yet — the walking-skeleton epic adds CI), or `TBD — set by the walking-skeleton
+- *CI note:* the existing workflows' behaviour when `code_present = true` and workflows exist;
+  otherwise what the sheet ships (static SPA: tests on pull requests, deploy to GitHub Pages on
+  push to `main`; web sheet: none yet — the walking-skeleton epic adds CI; desktop sheet with no
+  internet: none — installers are built and copied locally), or `TBD — set by the walking-skeleton
   epic`.
 - Generate the section using this template, filling in the project-specific details:
 
@@ -945,16 +970,17 @@ documents or designs I should point to.
 The summary also carries the housekeeping that used to be separate questions: repo files that
 will be created (README, CHANGELOG), `.gitignore` entries that will be appended (existing
 repositories), recommended add-on skills not yet installed (Step 8), layers an existing project
-has not decided yet, and — when the repository has no commits — that setup will make the first
-commit.
+has not decided yet, and that setup will commit the files it writes (as the first commit when the repository has none).
 
 Adapt the example to the project type. A few lines that matter by type:
 
 - **Desktop app:** *"Runs on: Windows only, no internet needed (no automatic updates). Window:
   never smaller than 800 × 600; standard menus, remembers its size and position; Export uses the
-  normal Save dialog. Version: Help › About. Logs: a file in the app's data folder."*
-- **Web app with sign-in:** *"Sign-in: Google Workspace for coordinators, email and password for
-  volunteers; coordinators see everything, volunteers see open shifts and their own claims.
+  normal Save dialog; only one copy runs at a time. No undo and no speed target unless you want
+  them. Version: Help › About. Logs: a file in the app's data folder."*
+- **Web app with sign-in:** *"Sign-in: Google for everyone — coordinators through your Workspace,
+  volunteers with a personal Google account or an email and password; only Workspace accounts get
+  the coordinator role. Coordinators see everything, volunteers see open shifts and their own claims.
   Needs: Docker installed to run the full app and its browser tests. Where it's hosted: chosen
   with you before the first deploy."*
 - **Service or API (existing code):** *"Found in your code: .NET 8 Web API, xUnit tests in
@@ -1269,6 +1295,9 @@ Check whether `LICENSE` (or `LICENSE.md`, `LICENSE.txt`) exists at the repo root
 
 ### 7.4: .gitignore
 
+Run this check **before the Step 3 confirmation** (like Step 8) so any entries to append are listed
+there. Editor-preference entries (`.vscode/`, `.idea/`) are never listed or appended.
+
 Check whether `.gitignore` exists at the repo root.
 
 - If **missing entirely** and `code_present = false`: report `[N/A] .gitignore — no code yet;
@@ -1432,9 +1461,11 @@ consent. Stage the files this session wrote or modified by path (never `git add 
 declined that line at the confirmation, print: "Commit before running `/peak-workflow:discover` —
 otherwise `main` will not exist to merge the docs/ branch back to."
 
-When the repository already has commits, do not commit; tell the user which files setup wrote
-and that they should be committed before `/peak-workflow:discover` (including root files such as
-`CHANGELOG.md` and `README.md`, which later planning commits do not stage).
+When the repository already has commits, commit the files setup wrote or modified, by path, as
+`chore: peak-workflow setup` on the current branch — the confirmation said so (*"When I'm done I'll
+commit these setup files"*), and accepting it is the consent. Root files such as `CHANGELOG.md` and
+`README.md` are included; later planning commits do not stage them. If the user struck that line,
+tell them to commit before `/peak-workflow:discover`, which will otherwise commit them itself.
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work

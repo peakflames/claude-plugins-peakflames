@@ -95,7 +95,7 @@ architectural pattern only.
 
 **Greenfield with existing code:** the skeleton never re-scaffolds, never runs a project
 generator, and never reads a reference sheet. It extends what is there: adds only the layers
-`CLAUDE.md` lists as not decided yet or `TBD`, replaces template sample code (e.g. a
+`CLAUDE.md`'s `**Not decided yet:**` line lists or marks `TBD`, replaces template sample code (e.g. a
 `WeatherForecast` endpoint) with the tool-hygiene baseline, and adds the version element when the
 manifest lacks it. Name every existing project and file the skeleton will modify in Key Components.
 
@@ -119,8 +119,10 @@ skeleton must:
   than from a generator: create the tree in its **Section 3 Repository Layout** and write the
   files in its **Section 4 Configuration Files** verbatim, substituting the project name — except
   what the sheet's **Section 2.1 Dropping a layer** table removes for every row `CLAUDE.md` marks
-  `N/A` (and, on the desktop sheet, the blocks for operating systems not in `Target OS`) — then
-  `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
+  `N/A` (and, on the desktop sheet, the blocks for operating systems not in `Target OS`; for a
+  Service or API on the web sheet, everything under `apps/web/` and its Vite, router, and
+  component-test configuration, which `setup` marks `N/A — no user interface (Service or API)`)
+  — then `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
   involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
   `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer (all
   three sheets already carry the `@tailwindcss/vite` plugin and the path aliases in their Vite
@@ -175,7 +177,7 @@ skeleton must:
   Components.
 - Make the **E2E harness self-contained**: its `globalSetup` (or the `test:e2e` script) runs the
   production build the entry point needs (reference-sheet desktop stack: `bun run build`, whose
-  electron-vite output is the `out/main/index.js` the sheet's Section 7 E2E example launches;
+  electron-vite output is the `out/main/index.js` that `package.json#main` points at, and the sheet's Section 7 E2E example launches the app directory (`args: ["."]`) so Electron reads that `package.json`;
   static SPA: the sheet's `webServer` command builds and previews the bundle; web: the Vite
   build) and the launcher targets the built entry, so the Tests command in `CLAUDE.md` works
   cold in a fresh wrapup session.
@@ -183,18 +185,28 @@ skeleton must:
 **Every project type — resolve the deferred setup values.** `/peak-workflow:setup` writes
 `TBD — set by the walking-skeleton epic` wherever nothing could decide a value before code existed
 (typical on Embedded: board, build and flash commands, logger location, version channel). Grep
-`CLAUDE.md` for that string. The skeleton spec's Description lists every hit, and the skeleton
+`CLAUDE.md` for `TBD — set by the walking-skeleton epic`, `— unconfirmed`, and `Board: not chosen`,
+and read the `**Not decided yet:**` line. The skeleton spec's Description lists every hit, and the skeleton
 replaces each one in `CLAUDE.md` with the real command, path, or mechanism it established — on its
 own feature branch, so wrapup sees the change. A value that costs money or means buying hardware
 (the board, a hosting provider) is confirmed with the user in the start-epic plan before it is
 resolved — never picked silently. A skeleton that leaves one behind fails wrapup's TBD gate.
 
+**Every project type with data or outputs — the test-only fault switch.** The fault / latency
+switch and data reset described for UI products apply to a Service or API, a CLI tool, and a
+desktop app alike (an environment variable read at startup, ignored in anything a user runs), so
+an error-path TOR such as "database unavailable" has a Given to cite.
+
 **Embedded products — the skeleton also owns the hardware-in-the-loop harness:** a script under
 `tests/hil/` that talks to the connected board over its debug or serial port non-interactively
-(port from an environment variable such as `HIL_PORT`, a timeout, captured output asserted like
-any test), flashing the current build first. The device-side Tool Hygiene TORs (version, boot
-banner) are verified through it. Name it in Key Components; its run command goes on the
-`Verification & Quality Gates` Tests line.
+(port from `HIL_PORT`, a timeout, captured output asserted like any test), flashing the current
+build first. The device-side Tool Hygiene TORs (version, boot banner) are verified through it.
+It also owns **fault injection for Safety TORs**: a debug-build-only console command (compiled out
+of release builds by a build flag, so shipped firmware cannot be told to fake a fault) or a
+physical fault fixture on the bench (e.g. a switch that disconnects the sensor). Record in
+`CLAUDE.md` Local Environment a `HIL port:` line naming the variable and how to find the port on
+the user's OS, label the harness command `(tests/hil)` on the `Verification & Quality Gates` Tests
+line, and name the harness and the fault mechanism in Key Components.
 
 **Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack — under the
 installed plugin's `references/` directory (`${CLAUDE_PLUGIN_ROOT}/references/`, not a path

@@ -81,8 +81,8 @@ resolves it. Defaults must never assume a Bun stack: CLI tools, libraries, embed
 other languages default through the toolchain table, not a sheet.
 
 **Sign-in always means an access rule.** Every sign-in "yes" — named provider or deferred — writes
-`**Access rule:** owner-or-permitted-role` (verbatim, greppable) into the shape block. That line,
-not the deferral string, drives the access TORs in `capture-requirements`, the skeleton's owner
+`**Access rule:** owner-or-permitted-role` (verbatim, greppable) into the shape block. That line
+(or, for older projects, the deferral string) drives the access TORs in `capture-requirements`, the skeleton's owner
 columns and role field in `plan-project`, the sign-in Security Baseline reminders, and
 `wrapup-epic`'s access-control gate. A named provider's round-trip TOR is verified
 operator-observed against the real tenant; automated tests sign in through the email-and-password

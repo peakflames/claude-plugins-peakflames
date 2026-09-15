@@ -21,9 +21,16 @@ The user's request: $ARGUMENTS
 
 1. Run `git branch --show-current`. Capture the result as `<current-branch>`.
 2. If `<current-branch>` is `develop`, `main`, or `master`:
-   - Ask the user for a short task name via `AskUserQuestion`:
-     - Question: `"What short name describes this discovery session? (used as docs/{name} branch — lowercase letters, numbers, and hyphens only; e.g. 'fibcalc-mvp' or 'q2-backend-api')"`
-     - (Free-text answer — not a fixed option list)
+   - **Uncommitted changes first:** if `git status --porcelain` lists files (typically the ones
+     `/peak-workflow:setup` just wrote), tell the user in one line and commit them on
+     `<current-branch>` as `chore: peak-workflow setup` before branching, staging them by path —
+     setup's confirmation already covered that commit. If they include files setup did not write,
+     ask before committing.
+   - Derive a short name from `$ARGUMENTS` or the `CLAUDE.md` Project Overview (e.g. `kiln-mvp`)
+     and ask via `AskUserQuestion`:
+     - Question: `"I'll keep this planning work on its own branch, docs/{derived}. OK?"`
+     - Options: `["Use docs/{derived}", "Let me type a different name"]` — only the second asks for
+       free text
    - **Validate and slugify the user's answer:**
      - Lowercase the answer, replace spaces and underscores with hyphens, strip any character that is not `[a-z0-9-]`, collapse consecutive hyphens into one, strip leading/trailing hyphens, truncate to 40 chars.
      - If the slugified result differs from the user's raw answer, confirm before proceeding:
@@ -127,7 +134,7 @@ This is the heart of the discovery. Produce draft content for Product Vision sec
 - **ConOps Section 2 — Current State ("As-Is"):** Draft a table of current methods and their limitations, plus a numbered list of core pain points.
 - **ConOps Section 3 — Proposed System ("To-Be"):** Draft a 2–3 paragraph system description.
 - **ConOps Section 4 — User Roles & Profiles:** Draft a table of roles and the questions they bring to the app.
-- **ConOps Section 5 — Operational Scenarios:** For each scenario from PV Section 8, expand into the full ConOps format:
+- **ConOps Section 5 — Operational Scenarios:** When `CLAUDE.md`'s shape block records `Q2 … no — attribution only (entered-by field)`, the scenarios that create records name that field (e.g. *"types their initials in Entered by"*) so it becomes a requirement. For each scenario from PV Section 8, expand into the full ConOps format:
   ```
   ### Scenario N: [Title]
   **Actor:** [Role]
@@ -152,7 +159,7 @@ Produce draft content for Product Vision sections 9–11 and ConOps sections 7�
 - **Product Vision Section 11 — Backlog / Future Vision:** Draft a bulleted list of 5–10 deferred items representing the product's growth trajectory.
 - **ConOps Section 7 — Functional Summary:** Draft tables summarizing features by view/area.
 - **ConOps Section 8 — Operational Constraints & Assumptions:** Draft a table of constraints (deployment, users, auth, data freshness, etc.).
-- **ConOps Section 8 — What Must Never Happen** *(Embedded, or any product that switches physical equipment on or off — a heater, motor, valve, relay)*: ask in plain words, *"What must this never do, even if something breaks — a wire comes loose, the power blinks, a reading goes wrong?"* and *"When something does go wrong, what is the safe thing for it to do?"* Draft a `### What Must Never Happen` table under §8: hazard, what could cause it, the safe state, and any limit the user gives (a temperature, a time). `/peak-workflow:capture-requirements` turns each row into a `# Safety` TOR, and `/peak-workflow:plan-project` ships it with the first epic that drives that output. Do not skip this because the user is a hobbyist — they are the people least likely to raise it unprompted.
+- **ConOps Section 8 — What Must Never Happen** *(Embedded, or any product that switches physical equipment on or off — a heater, motor, valve, relay)*: draft first, as for every other section — a `### What Must Never Happen` table under §8 with the hazards this kind of product typically has (hazard, what could cause it, the safe state, the limit), then ask the user to react in plain words: *"Here's what I think this must never do, even if a wire comes loose, the power blinks, or a reading goes wrong — what's missing or wrong?"* For anything that switches mains power or heat, include a row stating that a **hardware** cutoff independent of the software (a thermal fuse, an over-temperature limit switch) is assumed — software cannot protect against a relay that has welded shut — and mark it an assumption for the user to confirm. `/peak-workflow:capture-requirements` turns each row into a `# Safety` TOR, and `/peak-workflow:plan-project` ships it with the first epic that drives that output. Do not skip this because the user is a hobbyist — they are the people least likely to raise it unprompted.
 - **ConOps Section 9 — Glossary:** Draft a table of domain terms and definitions.
 
 ## Step 2B: Brownfield — Delta Discovery Interview
@@ -307,13 +314,13 @@ product does not have. An answer recorded `not asked (<type>)` is never a contra
 | Recorded as "no" | Contradicted by a scenario that… |
 |---|---|
 | Cross-device / sync | uses the product from a second device expecting to find the same data already there |
-| Sign-in / multiple people | names two roles with **different permissions** over the same data, or anything shared, assigned, reviewed, or approved **inside the product, from another device or account** |
+| Sign-in / multiple people | names two roles with **different permissions enforced by separate sign-in** over the same data, or anything shared, assigned, reviewed, or approved **inside the product, from another device or account** |
 | File attachments | attaches or uploads a photo, document, or spreadsheet **the product then has to store** |
 | Live updates from elsewhere | expects something to appear without the person acting — a notification, another person's change |
 | Product-held secret | calls a paid or authenticated third-party service |
 | Internet on the computers it runs on (Q6, desktop) | syncs, emails, checks for updates, or calls any online service |
 
-Two things are **not** contradictions, and firing on them would re-platform a correct stack:
+Three things are **not** contradictions, and firing on them would re-platform a correct stack:
 
 - **A JSON backup export or import.** It is part of the static stack by design (that sheet makes it
   the walking skeleton's job and the cross-device transfer path), so it contradicts neither the
