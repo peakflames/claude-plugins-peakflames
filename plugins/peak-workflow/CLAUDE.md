@@ -65,12 +65,17 @@ a missing layer. `discover` Step 4.5 re-checks the answers against the ConOps sc
 before changing anything; the revision rides the same `docs/` branch merge as the requirements
 baseline.
 
-**Auth defers the provider, never the ownership.** A "yes" to sign-in with no approved identity
-provider selects deferred-provider mode: per-record ownership, role fields and permission checks
-ship in the walking skeleton, while sign-in is a development stub behind one module that fails
-closed in a production build. The provider is its own later epic and a numbered decision in
-`design-notes.md`. Deferring the provider never restores the static sheet — shared data needs a
-server regardless.
+**Auth defers the organization's provider, never authentication itself.** A "yes" to sign-in with
+no approved identity provider selects deferred mode, recorded by the greppable string
+`Auth: local accounts now, org SSO deferred`: the walking skeleton ships the sheet's own auth layer
+with real email-and-password accounts, an owner column on every table, and one
+**owner-or-permitted-role** access rule (owner-only would break the very sharing that made the
+answer "yes"). No sign-in stub is ever built — a hand-rolled placeholder is more work, less safe,
+and makes every access-control test meaningless. The organization's provider is added later as an
+extra method on the same accounts: its own epic, placed by `plan-project` 3A.4 from a numbered
+decision in `design-notes.md`. `capture-requirements` routes provider-flow TORs to Coverage Gaps;
+`wrapup-epic` runs an access-control gate that can fail an epic. Deferring never restores the
+static sheet — shared data needs a server regardless.
 
 **Baseline chains:** `CLAUDE.md` sections written by `setup` become baseline TORs in
 `capture-requirements` — `Tool Hygiene & Operability` (all project types, Step 3A.2.1) and

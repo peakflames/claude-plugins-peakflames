@@ -287,9 +287,14 @@ product was described. Discovery is the first point where those answers can be c
 what the product actually does, and it is the last cheap moment to change them — the walking
 skeleton in `/peak-workflow:plan-project` materializes the stack.
 
-Read the `**Product shape:**` block in `CLAUDE.md`'s Tech Stack section. If there is none (the
-project pre-dates it, or `setup` was never run), skip this step entirely — do not re-derive a
-stack for an existing project.
+Read the `**Product shape:**` block in `CLAUDE.md`'s Tech Stack section, then branch:
+
+- **Block present** — run the re-check below.
+- **No block, and `CLAUDE.md` has a populated Tech Stack** (an existing project, or a greenfield one
+  whose owner named their own stack, so `setup` never asked the shape questions) — do not re-derive
+  a stack. Say in one line that no recorded shape exists to check against, and offer to run the five
+  questions now if the ConOps surfaced something the stack may not cover.
+- **No block and no Tech Stack** — skip silently; `setup` has not run.
 
 Re-read the ConOps scenarios and the Product Vision's §10 Data Strategy against each recorded
 answer. A contradiction is a scenario step that needs something the recorded shape says the
@@ -297,11 +302,24 @@ product does not have:
 
 | Recorded as "no" | Contradicted by a scenario that… |
 |---|---|
-| Cross-device / sync | uses the product from a second device, or expects data on a phone and a laptop |
-| Sign-in / multiple people | names more than one role acting on the same data, or anything shared, assigned, or reviewed |
-| File attachments | attaches, uploads, imports, or exports a photo, document, or spreadsheet |
+| Cross-device / sync | uses the product from a second device expecting to find the same data already there |
+| Sign-in / multiple people | names two roles with **different permissions** over the same data, or anything shared, assigned, reviewed, or approved |
+| File attachments | attaches or uploads a photo, document, or spreadsheet **the product then has to store** |
 | Live updates from elsewhere | expects something to appear without the person acting — a notification, another person's change |
 | Product-held secret | calls a paid or authenticated third-party service |
+
+Two things are **not** contradictions, and firing on them would re-platform a correct stack:
+
+- **A JSON backup export or import.** It is part of the static stack by design (that sheet makes it
+  the walking skeleton's job and the cross-device transfer path), so it contradicts neither the
+  file-attachment row nor the cross-device row.
+- **A roles table with one real actor.** `/peak-workflow:discover` writes ConOps Section 4 for every
+  project, so a single-person product still lists a role or two. Only differing permissions count.
+
+One row tests a recorded **"yes"**: if sign-in is recorded as `Auth: local accounts now, org SSO
+deferred` and a scenario turns on identity carrying weight — an approval, a signature, an audit
+trail, a regulated record — raise it. Local accounts are real authentication, but who vouches for
+the person is still deferred, and that is worth naming before the requirements baseline is written.
 
 **If nothing contradicts,** say so in one line in the Step 5 summary and move on.
 
@@ -315,10 +333,22 @@ ask:
   - `"The stack is right — I'll simplify the scenario"`
   - `"Leave both for now — decide before planning"`
 
-On *"update the stack"*: re-run the Tech Stack step of `/peak-workflow:setup` for the changed
-answers only, rewrite the `**Product shape:**` block and the affected Stack Summary rows, and
-note the change in the Step 5 summary. The edit lands on this `docs/` branch, so the stack change
-is reviewed and approved by the same merge as the requirements baseline.
+On *"update the stack"*: if only a row or two changes, re-run the Tech Stack step of
+`/peak-workflow:setup` for the changed answers, rewrite the `**Product shape:**` block and the
+affected Stack Summary rows. **If the sheet itself changes** (static ↔ web), re-run
+`/peak-workflow:setup` wholesale instead of patching — a sheet change invalidates more than the
+stack table, and each of these is load-bearing:
+
+| Section | Why it changes |
+|---|---|
+| Verification & Quality Gates → `Test directories` | The sheets have different test trees; a stale line makes every `start-epic` and `wrapup-epic` grep silently return nothing |
+| Local Environment | The static branch skips the backend and live-data questions the web branch requires |
+| Tool Hygiene → Version exposure | Footer plus console line on a static SPA; a `/version` endpoint on a served app |
+| Security Baseline | Gains the fourth reminder when sign-in enters the picture |
+| Reference Materials | Its sheet pointer now names the wrong sheet |
+
+Either way, note the change in the Step 5 summary. The edit lands on this `docs/` branch, so the
+stack change is reviewed and approved by the same merge as the requirements baseline.
 
 On *"simplify the scenario"*: edit the ConOps scenario and re-run Step 4's quality check on it.
 
@@ -340,6 +370,9 @@ Show the user what was created:
 - `docs/product-vision-planning/product-vision.md` — [Created / Updated to v{N}]
 - `docs/product-vision-planning/concept-of-operations.md` — [Created / Updated to v{N}]
 [Brownfield only:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` — Delta summary for implementation planning
+
+### Product Shape Re-check
+- [No contradictions — the recorded shape still matches the scenarios / {what contradicted, and what was decided} / No recorded shape to check]
 
 ### By the Numbers
 - [N] target user groups identified

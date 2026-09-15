@@ -31,10 +31,12 @@ answers against the ConOps scenarios once the product is described (its Step 4.5
    then wires up the later sections. No scaffolder is involved — the sheet is the scaffold.
 
 2. **A layer checklist for any project, greenfield or existing.** Each sheet's *Stack Summary*
-   table names every layer an application of that shape has to handle — runtime, build, UI,
-   styling, client state, routing, data access, migrations, unit/component/E2E tests, lint,
-   type checking, dead code, packaging, validation, config, secrets, storage. Use it to notice
-   a layer a project has not decided on yet. The gap is the finding, not the library.
+   table names the layers an application of that shape has to handle — runtime, build, UI, styling,
+   client state, routing, data access, migrations, unit/component/E2E tests, lint, type checking,
+   dead code, and whatever else that shape implies (packaging on the desktop sheet; hosting, config
+   and secrets on the static sheet). Use it to notice a layer a project has not decided on yet. The
+   gap is the finding, not the library — and where a sheet has no row for a layer the project does
+   need, that absence is itself the finding.
 
 ## What these are NOT for
 
@@ -54,7 +56,8 @@ them. Specifically:
 ## Editing these sheets
 
 The sheets are the single source of truth for the picks, the repository layout, and the script
-names (`dev`, `build`, `package`, `typecheck`, `lint`, `deadcode`, `test`, `test:e2e`, `check`).
+names (`dev`, `build`, `typecheck`, `lint`, `deadcode`, `test`, `test:e2e`, `check`; plus
+`package` on the desktop sheet and `preview` / `lint:fix` on the static sheet).
 `setup` and `plan-project` quote those script names in their quality-gate and verification
 defaults, so a change to a sheet's `package.json` section means updating the matching lines in
 `skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit.
