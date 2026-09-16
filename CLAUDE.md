@@ -88,13 +88,15 @@ project's `CLAUDE.md` — accumulate work on `develop`, release from `main`.
 
 | Branch | Role |
 |---|---|
-| `develop` | **Default branch.** Integration line; everything merges here first. Anything on `develop` is approved |
-| `main` | Release line only. Every commit on it is a tagged release merge |
+| `main` | **Default branch**, and the release line. Every commit on it is a tagged release merge. It is the default branch on purpose: `/plugin marketplace add` tracks the repository's default branch, and plugin entries whose `source` is a relative path inside this repo cannot pin a ref of their own, so whatever `main` holds is what an install gets |
+| `develop` | Integration line; everything merges here first. Anything on `develop` is approved. Users who want unreleased work add the marketplace with `#develop` |
 | `feature/<plugin>-<short-name>` | Plugin or skill work, branched from `develop` |
 | `docs/<short-name>` | Documentation-only work, branched from `develop` |
 | `hotfix/<slug>` | Urgent fix, branched from `main`, merged into **both** `main` and `develop` |
 
 - Merges use `--no-ff` so each piece of work stays visible as a merge commit.
+- Pull requests target `develop`, not the default branch: `gh pr create --base develop`. Only a
+  release merge targets `main`.
 - Claude asks before every push to a remote.
 - Never commit: real credentials, `.env`, or anything under `tmp/`.
 
