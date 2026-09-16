@@ -64,7 +64,7 @@ field recorded as an **attribution field**, not sign-in.
 
 **The trap this project sets:** if `setup` treats "the QA lead sees it" or "initials" as sign-in,
 it routes to a server + auth stack and the offline requirement becomes unbuildable. The
-v1.11.0 contract says: an exported file is not "seeing the data", and typed initials are an
+v2.0.0 contract says: an exported file is not "seeing the data", and typed initials are an
 attribution field. Watch for that, and record a Critical finding if it routes to sign-in.
 
 ---
@@ -125,7 +125,7 @@ phase with `requirements: —`.
 6. Asking Theo for an **OAuth client, tenant, client ID or secret** — the whole point is that the
    run completes with no external approval.
 
-> **Coverage note:** deferred mode had **no adversarial dry-run coverage** in the v1.11.0
+> **Coverage note:** deferred mode had **no adversarial dry-run coverage** in the v2.0.0
 > validation cycle — the validated web scenario used a named, approved provider. This run is its
 > first real exercise.
 
