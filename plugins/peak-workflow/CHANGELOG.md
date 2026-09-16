@@ -8,6 +8,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [2.1.0] — UNDER DEVELOPMENT
 
+### Documentation
+
+- **README design process** — new section walks `/mockup` → `/setup` tooling → Design pass →
+  wrapup UX gate; the start-here diagram, skill tables, and Key Files now include `/mockup`, the
+  shadcn tooling, and the setup publish step.
+
 ---
 
 ## [2.0.0] — 2026-09-16
