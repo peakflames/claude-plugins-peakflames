@@ -34,7 +34,7 @@
 
 ```
 /peak-workflow:new-project           → (optional) detect state, dispatches the rest
-/peak-workflow:setup                 → audit CLAUDE.md, stub architecture.md + design-notes.md
+/peak-workflow:setup                 → audit CLAUDE.md, stub docs, create develop, offer to publish to GitHub
 /peak-workflow:discover              → creates docs/ branch, produces vision + ConOps
 /peak-workflow:mockup                → (UI projects) screen inventory, flows, grayscale wireframes; concretizes ConOps steps
 /peak-workflow:capture-requirements  → derives TOR requirements on the same docs/ branch
@@ -267,6 +267,11 @@ flowchart TD
 | Planning | `docs/{task-short-name}` | discover → mockup → capture-requirements → plan-project → add (cohesive; merge = approval) |
 | Implementation | `feature/epic-<id>-<short-name>` | start-epic → wrapup-epic |
 | Quick fix | `hotfix/<slug>` or `hotfix/issue-<N>-<slug>` | quick-fix |
+
+All three branch families are cut from `develop` and merge back into it; `main` receives only
+release merges. `setup` creates `develop`, and when you let it publish the project to GitHub it
+makes `develop` the default branch and protects `main` and `develop` (pull request + 1 approval,
+no force-push, no deletion — administrators may bypass).
 
 **Develop-branch invariant:** anything on `develop` is approved. The merge event (solo merge or team PR) is the approval signature.
 

@@ -67,6 +67,7 @@ Fresh session, then `/peak-workflow:setup <same description>`.
 | 4 | Shape questions **1–3** (desktop asks only these) | "No — each PC keeps its own log. The QA lead gets the CSV. No files attached." |
 | 4a | **The separate-accounts clarifier** | **"They just type their initials. They all share the one Windows login on that PC."** |
 | 5 | One combined confirmation | Read and accept |
+| 6 | **Publish to GitHub** — asked on its own, *after* the setup commit, as one question pair (where / who can see it) | **"Not now — keep it on this computer"** |
 
 ### The trap
 
@@ -86,6 +87,7 @@ to sign-in, stop and file a **Critical** finding naming the exact question and a
 ```bash
 cd ~/uat-workspace/benchlog
 git log --oneline                  # one commit: "chore: initial project setup"
+git branch                         # * develop, main
 grep -n 'Q[1-6] \|Access rule\|Target OS\|N/A' CLAUDE.md
 ```
 
@@ -107,6 +109,8 @@ grep -n 'Q[1-6] \|Access rule\|Target OS\|N/A' CLAUDE.md
 | 3.14 | Local Environment names `bun run dev`, `bun run test`, `bun run test:e2e` (builds, then Playwright Electron against the build) and **names Node.js 22.12+ as a prerequisite** | present |
 | 3.15 | Step 8 reported `frontend-design` `[MISS]` and `playwright-cli` **`[N/A]` — desktop apps verify through the Playwright Electron harness** | the N/A wording matters |
 | 3.16 | First commit made | `git show --stat HEAD` |
+| 3.17 | **`develop` created and checked out**; `main` holds only the setup commit | `git branch` shows `* develop` and `main`, both at the same commit |
+| 3.18 | The publish question came **after** the commit, on its own — not folded into the confirmation — and "Not now" reported `[N/A] GitHub — not published` | nothing was created on GitHub |
 
 ---
 
@@ -133,7 +137,7 @@ sign-in is a finding.
 
 | # | Check | Pass when |
 |---|---|---|
-| 4.1 | On `docs/benchlog`, base branch untouched (G1) | `git log --oneline main` still one commit |
+| 4.1 | On `docs/benchlog`, base branch untouched (G1) | `git log --oneline develop` still one commit |
 | 4.2 | Vision has all 11 sections, ConOps all 9, both substantive | no placeholders |
 | 4.3 | ConOps Section 5 steps are numbered and name specific fields (sample number, measurement, initials) and the export action | present |
 | 4.4 | ConOps Section 8 records the **no-internet constraint** as an operational constraint | present |
@@ -205,7 +209,7 @@ Fresh session, `/peak-workflow:plan-project`.
 
 ```bash
 git status --short
-git checkout main
+git checkout develop
 git merge docs/benchlog --no-ff
 ls docs/requirements/*.feature.md    # must succeed on main
 ```

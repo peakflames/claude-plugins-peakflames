@@ -96,6 +96,7 @@ Fresh session, then `/peak-workflow:setup <same description>`.
 | 2 | Required language or platform | **"It has to be .NET — that's what we standardise on, and it's already started."** |
 | 3 | Shape questions **2–4, phrased for callers** | "No — callers don't identify themselves, it's open read-only data. No uploads. No, callers don't need to be told about changes as they happen." |
 | 4 | One combined confirmation | Read and accept |
+| 5 | **Publish to GitHub** — asked on its own, *after* the setup commit, as one question pair (where / who can see it) | **"Not now — keep it on this computer"** |
 
 `setup` must **not** ask about the stack — the code is the stack.
 
@@ -138,6 +139,8 @@ git log --oneline
 | 3.14 | Step 8 reported `[N/A] Recommended skills — none required for Service or API` | neither `frontend-design` nor `playwright-cli` recommended |
 | 3.15 | A `chore: peak-workflow setup` commit exists (the repo already had commits, so this is **not** "initial project setup") and stages only setup's own files by path | `git show --stat HEAD` |
 | 3.16 | **The existing code is untouched** | `git show --stat HEAD` lists no file under `src/` |
+| 3.17 | **`develop` created from the existing branch and checked out** — the existing branch (`main`, or `master` if `git init` made that) is **not** renamed, because the repository already had commits | `git branch` shows `* develop` plus the original branch; the Release Protocol names the original branch as the release branch |
+| 3.18 | The publish question came **after** the commit, on its own, and "Not now" reported `[N/A] GitHub — not published` | nothing was created on GitHub |
 
 ---
 
@@ -222,7 +225,7 @@ Fresh session, `/peak-workflow:plan-project`.
 
 ```bash
 git status --short
-git checkout main       # or master, whichever git init created
+git checkout develop
 git merge docs/pokemeta --no-ff
 ls docs/requirements/*.feature.md
 ```

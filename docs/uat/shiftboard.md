@@ -34,6 +34,15 @@ template.
 - `bunx playwright install` (one time)
 - **No Google Cloud project, no Okta tenant, no OAuth client.** If the run asks you for any of
   these, that is a finding — deferred mode must not block on an external approval.
+- **For the publish exercise (section 3a):** a GitHub account. Leave `gh` *uninstalled* (or signed
+  out) if you want to watch `setup` install and sign it in. Pick in advance which protection path
+  you want to see:
+  - **Protections applied** — publish *public*, or *private* into an organization or account on a
+    paid plan.
+  - **Graceful fallback** — publish *private* to a personal account on the free plan; GitHub
+    refuses branch protection there and `setup` must warn, not fail.
+
+  Delete the test repository afterwards (`gh repo delete <owner>/shiftboard --yes`).
 
 ## 1. Create the UAT repo
 
@@ -77,6 +86,10 @@ Fresh session, then `/peak-workflow:setup <same description>`.
 | 3a | **Provider follow-up** | **"IT says we're getting Okta but it's not approved. I'd have to ask them and it'll take a month."** |
 | 3b | Roles follow-up | **"Yes — coordinators create and cancel shifts; volunteers only claim and release their own."** |
 | 4 | One combined confirmation | Read and accept |
+| 5 | **Publish to GitHub** (after the commit) — where | **"Yes — in my personal GitHub account"** (or your organization) |
+| 5' | — who can see it | per the protection path you chose in section 0 |
+| 5a | *if `gh` is missing or signed out* | let it install; when asked, type `! gh auth login` and sign in through the browser |
+| 5b | *if you picked organization and belong to several* | pick one |
 
 Q5 should **not** be asked — Q2 was yes, so it is recorded as "yes — implied by sign-in".
 
@@ -112,6 +125,33 @@ That routes to **deferred mode**, and the candidate must not be discarded:
 | 3.20 | Local Environment names `bun run dev` (API `:3000`, web `:5173` proxy), `bun run test`, `bun run test:e2e` **naming Docker and `.env` copied from `.env.example`** | present. With Object storage N/A there should be **no** `docker compose up -d minio minio-init` step |
 | 3.21 | Hosting recorded as chosen with the user, not picked silently | it costs money |
 | 3.22 | First commit made | `git show --stat HEAD` |
+| 3.22a | **`develop` created and checked out**; `main` holds the setup commit | `git branch` shows `* develop` and `main` |
+
+### 3a — Publishing to GitHub
+
+```bash
+gh repo view --json name,visibility,defaultBranchRef --jq '.'
+gh api repos/{owner}/shiftboard/branches/develop/protection --jq '{admins: .enforce_admins.enabled, reviews: .required_pull_request_reviews.required_approving_review_count, force: .allow_force_pushes.enabled, delete: .allow_deletions.enabled}'
+gh api repos/{owner}/shiftboard/branches/main/protection --jq .enforce_admins.enabled
+grep -n 'Remote:' CLAUDE.md
+git log --oneline -3
+```
+
+| # | Check | Pass when |
+|---|---|---|
+| 3.23 | The publish question was asked **once, after the setup commit**, as a where + who-can-see-it pair — **not** folded into the confirmation | two questions, one prompt |
+| 3.24 | "Private" was the recommended visibility; the repo name offered was the directory name | as written |
+| 3.25 | If `gh` was missing, `setup` **said what it was installing and why** before installing; a `sudo` install was handed to you as a `!` command | never a silent install |
+| 3.26 | If signed out, `setup` asked you to type `! gh auth login` and **waited** — it did not try to drive the interactive login itself | as written |
+| 3.27 | Organization path: your organizations were listed from `gh api user/orgs` | not guessed |
+| 3.28 | The repository exists with the visibility you chose, and **both `main` and `develop` were pushed** | `gh repo view` |
+| 3.29 | **Default branch is `develop`** | `defaultBranchRef.name` = `develop` |
+| 3.30 | *Protections path:* `main` and `develop` both protected — 1 required approval, force-push and deletion off, **`enforce_admins` false** | the `jq` output above: `admins:false, reviews:1, force:false, delete:false` |
+| 3.31 | *Fallback path:* `setup` reported `[WARN] Branch protection — not available…` in plain words and **carried on**; the `**Remote:**` line says protection is not available | not a failure |
+| 3.32 | `CLAUDE.md` Git Workflow has a `**Remote:**` line matching reality, and the Release Protocol **Note** mentions the admin bypass (protections path) | `grep` above |
+| 3.33 | A `chore: record GitHub remote` commit on `develop` was pushed; on the protections path the push printed **"Bypassed rule violations"** | proves admins bypass works |
+| 3.34 | A new PR opened from the GitHub UI **defaults its base to `develop`** | try it: `gh pr create --web` from any branch shows `develop` as base |
+| 3.35 | Re-run `/peak-workflow:setup`: it **detects the existing remote**, reports the default branch is already `develop`, and asks nothing about publishing | idempotent |
 
 ### The design-notes section
 
@@ -159,7 +199,7 @@ contradictions**, and expect the deferral to survive untouched.
 
 | # | Check | Pass when |
 |---|---|---|
-| 4.1 | On `docs/shiftboard`; base branch untouched (G1) | verified |
+| 4.1 | On `docs/shiftboard`, cut from `develop`; `develop` untouched (G1) | `git log --oneline develop` |
 | 4.2 | Vision 11 sections, ConOps 9 sections, substantive | no placeholders |
 | 4.3 | ConOps Section 4 names both roles with distinct profiles | coordinator / volunteer |
 | 4.4 | ConOps Section 5 has separate numbered scenarios for the coordinator and volunteer paths, naming fields and actions | present |
@@ -275,8 +315,9 @@ grep -rln 'Organization Sign-In\|Sign-In' docs/implementation-plan/phase-*/
 
 ```bash
 git status --short
-git checkout main
+git checkout develop
 git merge docs/shiftboard --no-ff
+git push                     # protections path: goes through only via the admin bypass
 ls docs/requirements/*.feature.md
 ```
 
@@ -341,6 +382,8 @@ PASS). Then a fresh session.
 | 10.9 | Any verifier fix recorded `FIXED DURING WRAPUP` | disclosed |
 | 10.10 | Sidecar → `status: Complete`; handoff written | verified |
 | 10.11 | Ship mode asked neutrally | choose **Solo** (or **Team** to exercise `gh pr create --base develop`) |
+| 10.12 | *Protections path, Solo:* the completion message warns that `develop` is protected and the push works only for an administrator | the `**Remote:**` line drives this |
+| 10.13 | *Team:* the PR targets `develop` and shows **1 approval required**; you, as admin, can still merge it with the bypass checkbox | protection is live, bypass is intact |
 
 ---
 
@@ -388,6 +431,14 @@ Deferred-mode contract:
 Live updates observed in two browsers?                                YES / NO
 Access-control gate result: PASS / FAIL
 Skeleton build: PASS / FAIL
+Publishing:
+  Path exercised: protections applied / free-plan fallback
+  gh installed by setup? YES / NO / already present
+  Default branch develop on GitHub?                                   YES / NO
+  main + develop protected, enforce_admins false?                     YES / NO / N/A (fallback)
+  Admin bypass observed on push?                                      YES / NO / N/A
+  Test repository deleted afterwards?                                 YES / NO
+
 Findings filed: F-__ … F-__
 Overall: PASS / PASS WITH FINDINGS / FAIL
 ```
