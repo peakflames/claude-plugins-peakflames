@@ -665,7 +665,7 @@ the walking skeleton, not a TOR)
 - Compose through `className` and variants; import `cn` from `@/lib/utils`.
 
 [shadcn stacks only — the line Step 9.0 writes:]
-**shadcn tooling:** the shadcn/ui skill (`.claude/skills/shadcn/`) and the `shadcn` MCP server are part of this project. Any work on shadcn components uses them — look components up through the MCP tools before composing, and follow the skill's patterns — with the UX Baseline and design tokens taking precedence.
+**shadcn tooling:** the shadcn/ui skill (`.claude/skills/shadcn/`) and the `shadcn` MCP server are part of this project. Any work on shadcn components uses them — look components up through the MCP tools before composing, and follow the skill's patterns — with the UX Baseline and design tokens taking precedence. The companion `migrate-radix-to-base` skill (`.claude/skills/migrate-radix-to-base/`) is used only when a task explicitly migrates components from Radix to Base UI.
 
 **Screen states:** (TOR) Every data-bearing screen renders explicit loading, empty, error, and
 populated states, each distinguishable by visible text. (WCAG 2.2 SC 4.1.3)
@@ -1525,8 +1525,8 @@ sheets), or `code_present = true` and a `components.json` exists anywhere outsid
 Embedded projects, or UI stacks without shadcn, skip without comment.
 
 1. **Detect** (read-only):
-   - Skill: `ls -d .claude/skills/shadcn ~/.claude/skills/shadcn 2>/dev/null`, or a skill named
-     `shadcn` in this session's available-skills list.
+   - Skills: `ls -d {.,~}/.claude/skills/{shadcn,migrate-radix-to-base} 2>/dev/null`, or skills with
+     those names in this session's available-skills list. Both are needed.
    - MCP: `claude mcp get shadcn` succeeds, or `.mcp.json` already has a `shadcn` key.
 
    Both present → `[PASS] shadcn skill/MCP — already installed`; go to step 4.
@@ -1534,10 +1534,10 @@ Embedded projects, or UI stacks without shadcn, skip without comment.
    if a flag was renamed.
 3. **Install** whichever is missing, at project scope, copied (not symlinked) so the files are
    committed and teammates get them:
-   - Skill — `-s shadcn` picks the one skill; without it the repository's other skills (e.g. a
-     Radix-to-Base migration skill) come along:
+   - Skills — the repository ships two, and both are installed: `shadcn` (component work) and
+     `migrate-radix-to-base` (for a legacy project that needs that migration):
      ```bash
-     bunx skills add shadcn/ui -s shadcn -a claude-code -y --copy   # → .claude/skills/shadcn/ + skills-lock.json
+     bunx skills add shadcn/ui -a claude-code -y --copy   # → .claude/skills/{shadcn,migrate-radix-to-base}/ + skills-lock.json
      ```
    - MCP server — write `.mcp.json` directly; do **not** run `shadcn mcp init`, which also creates
      `package.json`, an npm lockfile, and `node_modules/` in the repository root. Create the file,
@@ -1555,7 +1555,7 @@ Embedded projects, or UI stacks without shadcn, skip without comment.
    (downstream skills treat that suffix as "not installed"). `/peak-workflow:start-epic` reads this
    line.
 
-Stage `.claude/skills/shadcn/`, `skills-lock.json`, and `.mcp.json` with the setup files. Never
+Stage `.claude/skills/shadcn/`, `.claude/skills/migrate-radix-to-base/`, `skills-lock.json`, and `.mcp.json` with the setup files. Never
 stage `.claude/settings.local.json`. Before committing, `git status --short` must show nothing else
 the install created.
 
