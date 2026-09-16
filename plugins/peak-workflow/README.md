@@ -34,7 +34,7 @@
 
 ```
 /peak-workflow:new-project           → (optional) detect state, dispatches the rest
-/peak-workflow:setup                 → audit CLAUDE.md, stub architecture.md + design-notes.md
+/peak-workflow:setup                 → audit CLAUDE.md, stub docs, create develop, offer to publish to GitHub
 /peak-workflow:discover              → creates docs/ branch, produces vision + ConOps
 /peak-workflow:mockup                → (UI projects) screen inventory, flows, grayscale wireframes; concretizes ConOps steps
 /peak-workflow:capture-requirements  → derives TOR requirements on the same docs/ branch
@@ -142,19 +142,40 @@ ConOps scenarios into an `S-NN` screen inventory, flows, and wireframes that are
 purpose, because visual design lands in the walking-skeleton epic. It is UX, not style:
 palette, typography, and brand are not TORs. `/setup` also recommends companion skills for UI
 projects — `frontend-design@claude-plugins-official` for visual execution and `playwright-cli`
-for verification (web; desktop apps verify through a Playwright Electron harness in `e2e/`) —
+for verification (web; desktop apps verify through a Playwright Electron harness in `tests/e2e/`) —
 and records the precedence rule: the UX Baseline and the design-system tokens win over
-`frontend-design`'s aesthetic choices.
+design-skill choices. On shadcn stacks `/setup` also installs the shadcn/ui skill and MCP server,
+and every UI epic's plan has a **Design pass** step that invokes whichever design skills are
+installed at that moment.
 
-**Stack defaults come from the reference sheets.** Two sheets ship with the plugin under
-[`references/`](references/): [`bun-web-app-stack.md`](references/bun-web-app-stack.md) (web
-apps and services — Bun runtime, Hono, React SPA, SQLite, S3, one Docker container) and
+**Stack defaults come from the reference sheets.** Three sheets ship with the plugin under
+[`references/`](references/): [`bun-static-spa-stack.md`](references/bun-static-spa-stack.md)
+(browser-only apps — React SPA, IndexedDB via Dexie, GitHub Pages, no server),
+[`bun-web-app-stack.md`](references/bun-web-app-stack.md) (web apps and services — Bun runtime,
+Hono, React SPA, SQLite, S3, one Docker container) and
 [`bun-electron-desktop-stack.md`](references/bun-electron-desktop-stack.md) (desktop apps —
 Bun toolchain, Electron shell, electron-vite, React + shadcn/ui, better-sqlite3). When the
-tech-stack answer is thin, `/setup` reads the matching sheet's Stack Summary and offers those
+tech-stack answer is thin, `/setup` reads the matching sheet's Stack Summary and takes those
 picks — there is no separate default list — and `/plan-project` builds the greenfield walking
 skeleton from the sheet's repository layout and config files instead of running a scaffolder.
-The user accepts the sheet wholesale or overrides any layer.
+The user sees the stack in one plain-language confirmation and can override any layer.
+
+**`/setup` asks little and defaults the rest.** It asks only what the user alone knows — what the
+product is, what kind of thing it is (CLI tool, web app, desktop app, service, library, embedded
+device software, or a hybrid), the shape questions, sign-in, and any language or device they must
+use. Commands, test directories, logging, versioning, git, and release conventions come from the
+existing code, the sheet, or a per-language toolchain table, and are shown once for confirmation.
+Anything nothing can decide yet is written `TBD — set by the walking-skeleton epic`, and the
+skeleton resolves it.
+
+**The sheet is chosen by product shape, not project type.** Before reading any sheet, `/setup`
+asks up to five questions in plain language — does the information need to follow the person to another
+device, does anyone sign in, do people attach files, does anything update on its own, does the
+product hold a secret of its own. A Web app answering "no" to all five is a static SPA and gets
+that sheet; any "yes" gets the web-app sheet. The answers are recorded in `CLAUDE.md`, and rows
+they drop are written `N/A — <reason> (shape Q<N>)` so `/plan-project` reads them as decisions
+rather than gaps. `/discover` re-checks the answers against the ConOps scenarios once the product
+is actually described, and asks before changing anything.
 
 For an **existing** project the sheets are reference only: its `CLAUDE.md` Tech Stack always
 wins, differing from a sheet is never a gate failure or a TOR, brownfield planning ignores the
@@ -171,7 +192,7 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 | Command | Purpose |
 |---|---|
 | `/new-project` | **Front door for newcomers.** Detects project state (greenfield, brownfield epic-workflow, or existing peak-workflow) and dispatches to the right entry point. Writes no state files. |
-| `/setup` | Audits `CLAUDE.md` (Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), offers stack defaults by project type, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, and recommends companion skills. **Run once per project, before `/discover`.** |
+| `/setup` | Audits `CLAUDE.md` (Project Overview, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, and recommends companion skills. **Run once per project, before `/discover`.** |
 
 ### Plan
 
@@ -248,6 +269,11 @@ flowchart TD
 | Planning | `docs/{task-short-name}` | discover → mockup → capture-requirements → plan-project → add (cohesive; merge = approval) |
 | Implementation | `feature/epic-<id>-<short-name>` | start-epic → wrapup-epic |
 | Quick fix | `hotfix/<slug>` or `hotfix/issue-<N>-<slug>` | quick-fix |
+
+All three branch families are cut from `develop` and merge back into it; `main` receives only
+release merges. `setup` creates `develop`, and when you let it publish the project to GitHub it
+makes `develop` the default branch and protects `main` and `develop` (pull request + 1 approval,
+no force-push, no deletion — administrators may bypass).
 
 **Develop-branch invariant:** anything on `develop` is approved. The merge event (solo merge or team PR) is the approval signature.
 

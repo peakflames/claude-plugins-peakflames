@@ -22,6 +22,9 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
    ```bash
    /plugin marketplace add https://github.com/peakflames/claude-plugins-peakflames.git
    ```
+   This tracks the repository's default branch, `main`, which holds released plugin versions only.
+   To try unreleased work, add the `develop` branch instead — `…claude-plugins-peakflames.git#develop`
+   — and expect it to change without a release.
 3. Install your plugin:
    ```bash
    /plugin install peak-workflow

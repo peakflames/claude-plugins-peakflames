@@ -30,7 +30,7 @@ Follow these steps exactly:
 
 Glob `docs/implementation-plan/phase-*/index.md`. If no phase index files exist, inform the user:
 
-> No implementation plan found. Run `/epic-workflow:discover` and `/epic-workflow:plan-project` first to create the plan.
+> No implementation plan found. Run `/peak-workflow:discover`, `/peak-workflow:capture-requirements`, and `/peak-workflow:plan-project` first to create the plan.
 
 Stop here if no phase indexes are found.
 

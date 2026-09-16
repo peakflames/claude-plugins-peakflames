@@ -1,6 +1,6 @@
 # Screen Inventory Template — `/peak-workflow:mockup`
 
-Used by `mockup` Step 4.3 (greenfield create, brownfield append). Write the populated template
+Used by `mockup` Step 4.2 (greenfield create, brownfield append). Write the populated template
 to `docs/product-vision-planning/ux/screens.md`. There is exactly one inventory per project —
 `S-NN` IDs are referenced by the ConOps (`/peak-workflow:mockup` Step 7), by TOR Given/When/Then
 clauses (`/peak-workflow:capture-requirements`), and later by epic specs, so they behave like
@@ -41,6 +41,24 @@ feature numbers: **stable and append-only**.
 
 ---
 
+## App Shell
+
+{Which of the three shells in `WIREFRAME_TEMPLATE.md` App Shell Conventions applies — site header,
+sidebar shell, or auth block — and why, in one or two sentences naming the number of top-level
+destinations.} The shell is the same on every signed-in screen:
+
+- **App header** — {brand, primary nav with the current item marked, account control}. Below
+  {breakpoint} the nav and account control collapse into a `Sheet` behind a `≡` trigger.
+- **Page header** — the `h1` left, primary actions right, a count or subtitle line beneath. Stacks
+  to full-width controls at the {floor} layout floor.
+- **Content** — {the primitive the main area uses: `Card` list, `Table`, `Tabs`…}.
+- **Footer strip** — the app version, as thin chrome rather than a boxed region.
+
+{Signed-out screens, if any: which screens use the auth block and at what column width.}
+{Dialog / Sheet screens, if any: which `S-NN` they open over.}
+
+---
+
 ## Screen Inventory
 
 | Screen ID | Name | Wireframe | Purpose | Entry points | Primary actions | Data shown | States | Serves |
@@ -48,7 +66,7 @@ feature numbers: **stable and append-only**.
 | {S-NN} | {Screen Name} | `wireframes/{S-NN}-{kebab-name}.html` | {purpose} | {entry points} | `"{control text}" button`; `"{control text}" menu item` | {data shown} | loading / empty / error / populated | {S1.1}, {S1.2} |
 | {S-NN} | {Screen Name} | `wireframes/{S-NN}-{kebab-name}.html` | {purpose} | {S-NN} `"{control text}" button` | `"{control text}" button` | {data shown} | n/a — not data-bearing | {S1.3} |
 [Desktop only:]
-| {S-NN} | Application menu | — | Platform menu bar | App launch | File: `"New…" Ctrl+N`, `"Open…" Ctrl+O`, `"Save" Ctrl+S`, `"Quit" Ctrl+Q`; Edit: `"Undo"`, `"Redo"`, `"Cut"`, `"Copy"`, `"Paste"`, `"Select All"`; View: …; Window: …; Help: `"About {Product Name}"` | — | n/a — not data-bearing | {S2.1}, {S4.6} |
+| {S-NN} | Application menu | — | Platform menu bar | App launch | File: `"New…" Ctrl+N`, `"Open…" Ctrl+O`, `"Save" Ctrl+S`, `"Quit" Ctrl+Q` (macOS/Linux; `"Exit"` with no shortcut on Windows); Edit: `"Undo"`, `"Redo"`, `"Cut"`, `"Copy"`, `"Paste"`, `"Select All"`; View: …; Window: …; Help: `"About {Product Name}"` | — | n/a — not data-bearing | {S2.1}, {S4.6} |
 | {S-NN} | Window | — | Top-level window behavior | App launch | Resize, move, maximize | Minimum size {W×H}; last bounds and maximized state restored on relaunch; title `{doc name}{unsaved marker} — {Product Name}` | n/a — not data-bearing | {S1.1} |
 
 ---

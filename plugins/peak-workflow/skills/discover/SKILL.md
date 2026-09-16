@@ -21,9 +21,13 @@ The user's request: $ARGUMENTS
 
 1. Run `git branch --show-current`. Capture the result as `<current-branch>`.
 2. If `<current-branch>` is `develop`, `main`, or `master`:
-   - Ask the user for a short task name via `AskUserQuestion`:
-     - Question: `"What short name describes this discovery session? (used as docs/{name} branch — lowercase letters, numbers, and hyphens only; e.g. 'fibcalc-mvp' or 'q2-backend-api')"`
-     - (Free-text answer — not a fixed option list)
+   - **Uncommitted changes:** note whether `git status --porcelain` lists files. They carry over
+     onto the new branch; handle them right after it is created (below).
+   - Derive a short name from `$ARGUMENTS` or the `CLAUDE.md` Project Overview (e.g. `kiln-mvp`)
+     and ask via `AskUserQuestion`:
+     - Question: `"I'll keep this planning work on its own branch, docs/{derived}. OK?"`
+     - Options: `["Use docs/{derived}", "Let me type a different name"]` — only the second asks for
+       free text
    - **Validate and slugify the user's answer:**
      - Lowercase the answer, replace spaces and underscores with hyphens, strip any character that is not `[a-z0-9-]`, collapse consecutive hyphens into one, strip leading/trailing hyphens, truncate to 40 chars.
      - If the slugified result differs from the user's raw answer, confirm before proceeding:
@@ -33,6 +37,10 @@ The user's request: $ARGUMENTS
      ```bash
      git checkout -b docs/{slug}
      ```
+   - If uncommitted files carried over, ask once via `AskUserQuestion`: `"There are uncommitted
+     files from before this session ({list}). Commit them on docs/{slug} as 'chore: peak-workflow
+     setup'?"` — options `["Commit them here", "Leave them uncommitted"]`. Never commit on the base
+     branch from this step.
    - Confirm to the user:
      > Created and switched to branch `docs/{slug}`. All vision, requirements, and planning changes will live here until you merge.
 3. If `<current-branch>` already starts with `docs/`:
@@ -84,9 +92,21 @@ Follow these steps exactly:
 
 **Brownfield** = product-vision.md has substantive content AND at least one epic is complete. Proceed to Step 2B.
 
+**Revise in place** = product-vision.md has substantive content, no epic is complete, and the
+ConOps has no `**Open — blocks planning:**` line — ask once whether to revise the vision and
+ConOps in place (run Step 2B's delta interview without writing a changelog) or stop; never
+silently restart the greenfield interview over existing documents.
+
+**Resolving open blockers** = product-vision.md has substantive content, no epic is complete, and
+the ConOps contains `**Open — blocks planning:**`. Do not re-interview and write no changelog.
+Show each open line, ask what changed (e.g. *"Has an independent thermal fuse or over-temperature
+limit been installed?"*), and edit ConOps §8 in place: flip the row to `— confirmed by the owner`
+and delete the Open line once resolved, or leave it with a note if not. Then continue at Step 4.5
+and Step 6.
+
 Report the detection result to the user before continuing:
 ```
-Mode: [Greenfield / Brownfield]
+Mode: [Greenfield / Brownfield / Revise in place / Resolving open blockers]
 Reason: [1-2 sentences explaining what was found]
 ```
 
@@ -127,7 +147,7 @@ This is the heart of the discovery. Produce draft content for Product Vision sec
 - **ConOps Section 2 — Current State ("As-Is"):** Draft a table of current methods and their limitations, plus a numbered list of core pain points.
 - **ConOps Section 3 — Proposed System ("To-Be"):** Draft a 2–3 paragraph system description.
 - **ConOps Section 4 — User Roles & Profiles:** Draft a table of roles and the questions they bring to the app.
-- **ConOps Section 5 — Operational Scenarios:** For each scenario from PV Section 8, expand into the full ConOps format:
+- **ConOps Section 5 — Operational Scenarios:** When `CLAUDE.md`'s shape block records `Q2 … no — attribution only (entered-by field)`, the scenarios that create records name that field (e.g. *"types their initials in Entered by"*) so it becomes a requirement. For each scenario from PV Section 8, expand into the full ConOps format:
   ```
   ### Scenario N: [Title]
   **Actor:** [Role]
@@ -140,18 +160,19 @@ This is the heart of the discovery. Produce draft content for Product Vision sec
 
   **Outcome:** [What the actor walks away with]
   ```
-  Each scenario should have 4–12 steps that are specific enough to derive acceptance criteria from. Name UI elements, data fields, and user actions explicitly. *(For CLI projects, "UI elements" means flags, arguments, stdin/stdout, and exit codes — e.g., "user runs `fibcalc 10`, tool prints `55` to stdout and exits 0".)*
+  Each scenario should have 4–12 steps that are specific enough to derive acceptance criteria from. Name UI elements, data fields, and user actions explicitly. *(For CLI projects, "UI elements" means flags, arguments, stdin/stdout, and exit codes — e.g., "user runs `fibcalc 10`, tool prints `55` to stdout and exits 0". For a Service or API, it means endpoints, query parameters, request and response fields, and status codes — e.g., "caller sends `GET /pokemon?type=fire&page=2`, receives `200` with 20 items and a `next` link". For Embedded, it means physical controls, indicators, displays, and the debug console — e.g., "potter holds START for 2 seconds, the display shows `FIRING 1/4`".)*
 - **ConOps Section 6 — System Interfaces & Data Flows:** Draft data source tables and a data flow diagram (ASCII or description).
 
 ### Phase 4: Constraints, Data & Future
 
 Produce draft content for Product Vision sections 9–11 and ConOps sections 7–9:
 
-- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction. If `CLAUDE.md` has a **UX Baseline** section, draft §9 within its **Design system** declaration — do not propose another component library, token scheme, or dark-mode mechanism. *(For CLI/terminal projects, "design direction" means output formatting conventions, flag naming style, error message tone, and exit code behavior — not visual/GUI design.)*
+- **Product Vision Section 9 — Design Direction:** Draft 3–6 bullet points on visual and UX direction. If `CLAUDE.md` has a **UX Baseline** section, draft §9 within its **Design system** declaration — do not propose another component library, token scheme, or dark-mode mechanism. *(For CLI/terminal projects, "design direction" means output formatting conventions, flag naming style, error message tone, and exit code behavior — not visual/GUI design. For a Service or API, it means resource naming, pagination and filtering conventions, error body shape, and versioning. For Embedded, it means what the person sees and presses on the device and how it signals trouble.)*
 - **Product Vision Section 10 — Data Strategy:** Draft the data architecture description (sources, freshness, any background processes).
 - **Product Vision Section 11 — Backlog / Future Vision:** Draft a bulleted list of 5–10 deferred items representing the product's growth trajectory.
 - **ConOps Section 7 — Functional Summary:** Draft tables summarizing features by view/area.
 - **ConOps Section 8 — Operational Constraints & Assumptions:** Draft a table of constraints (deployment, users, auth, data freshness, etc.).
+- **ConOps Section 8 — What Must Never Happen** *(Embedded, or any product that switches physical equipment on or off — a heater, motor, valve, relay)*: draft first, as for every other section — a `### What Must Never Happen` table under §8 with the hazards this kind of product typically has (hazard, what could cause it, the safe state, the limit), then ask the user to react in plain words: *"Here's what I think this must never do, even if a wire comes loose, the power blinks, or a reading goes wrong — what's missing or wrong?"* For anything that switches mains power or heat, include a row stating that a **hardware** cutoff independent of the software (a thermal fuse, an over-temperature limit switch) is assumed — software cannot protect against a relay that has welded shut — and mark it `Assumption — hardware, outside the software` for the user to confirm. Record the answer in the row (`— confirmed by the owner` / `— NOT present`). A `NOT present` answer is a stop: warn plainly that software alone cannot make the product safe, name the fix (*"install an independent thermal fuse or over-temperature limit switch, then run `/peak-workflow:discover` again"*), and add under ConOps §8 the line `**Open — blocks planning:** <hazard> has no hardware safeguard` — `/peak-workflow:plan-project` stops on it. `/peak-workflow:capture-requirements` turns each hazard row the software can act on into a `# Safety` TOR (assumption rows stay assumptions), and `/peak-workflow:plan-project` ships it with the first epic that drives that output. Do not skip this because the user is a hobbyist — they are the people least likely to raise it unprompted.
 - **ConOps Section 9 — Glossary:** Draft a table of domain terms and definitions.
 
 ## Step 2B: Brownfield — Delta Discovery Interview
@@ -274,11 +295,99 @@ Before presenting the final documents to the user, verify:
 - [ ] Every Product Vision section (1–11) has substantive content (not placeholders)
 - [ ] Every ConOps section (1–9) has substantive content
 - [ ] ConOps scenarios have specific, numbered steps (not vague descriptions)
-- [ ] ConOps scenarios name specific UI elements, data fields, and user actions
+- [ ] ConOps scenarios name specific UI elements, data fields, and user actions (or the CLI / API / device equivalents)
+- [ ] Embedded or equipment-controlling products: ConOps §8 has a `What Must Never Happen` table with a safe state per hazard
 - [ ] The "As-Is" section describes real current-state pain points (not generic ones)
 - [ ] The Glossary defines all domain-specific terms used in both documents
 - [ ] Cross-references between documents are correct (ConOps references Product Vision as companion)
 - [ ] Brownfield only: the discovery changelog accurately captures all changes
+
+## Step 4.5: Product-Shape Re-check
+
+`/peak-workflow:setup` chose the stack from product-shape questions asked **before** the
+product was described. Discovery is the first point where those answers can be checked against
+what the product actually does, and it is the last cheap moment to change them — the walking
+skeleton in `/peak-workflow:plan-project` materializes the stack.
+
+Read the `**Product shape:**` block in `CLAUDE.md`'s Tech Stack section, then branch:
+
+- **Block present** — run the re-check below.
+- **No block, and the Project type is CLI tool, Library, or Embedded** — these never get shape
+  questions. Skip in one line; offer nothing.
+- **No block, and `CLAUDE.md` has a populated Tech Stack** (an existing project from before shape
+  questions existed) — do not re-derive a stack. Say in one line that no recorded shape exists to
+  check against, and offer to run the shape questions now only if the ConOps surfaced something
+  the stack may not cover.
+- **No block and no Tech Stack** — skip silently; `setup` has not run.
+
+Re-read the ConOps scenarios and the Product Vision's §10 Data Strategy against each recorded
+answer. A contradiction is a scenario step that needs something the recorded shape says the
+product does not have. An answer recorded `not asked (<type>)` is never a contradiction:
+
+| Recorded as "no" | Contradicted by a scenario that… |
+|---|---|
+| Cross-device / sync | uses the product from a second device expecting to find the same data already there |
+| Sign-in / multiple people | names two roles with **different permissions enforced by separate sign-in** over the same data, or anything shared, assigned, reviewed, or approved **inside the product, from another device or account** |
+| File attachments | attaches or uploads a photo, document, or spreadsheet **the product then has to store** |
+| Live updates from elsewhere | expects something to appear without the person acting — a notification, another person's change |
+| Product-held secret | calls a paid or authenticated third-party service |
+| Internet on the computers it runs on (Q6, desktop) | syncs, emails, checks for updates, or calls any online service |
+
+Three things are **not** contradictions, and firing on them would re-platform a correct stack:
+
+- **A JSON backup export or import.** It is part of the static stack by design (that sheet makes it
+  the walking skeleton's job and the cross-device transfer path), so it contradicts neither the
+  file-attachment row nor the cross-device row.
+- **Attribution and hand-offs outside the product.** A typed name or initials on a record
+  (recorded `no — attribution only`), or a person who only receives an exported file, is not
+  sign-in and not "others see the data".
+- **A roles table with one real actor.** `/peak-workflow:discover` writes ConOps Section 4 for every
+  project, so a single-person product still lists a role or two. Only differing permissions count.
+
+One row tests a recorded **"yes"**: if sign-in is recorded as `Auth: local accounts now, org SSO
+deferred` and a scenario turns on identity carrying weight — an approval, a signature, an audit
+trail, a regulated record — raise it. Local accounts are real authentication, but who vouches for
+the person is still deferred, and that is worth naming before the requirements baseline is written.
+
+**If nothing contradicts,** say so in one line in the Step 5 summary and move on.
+
+**If something contradicts,** do not rewrite `CLAUDE.md` silently and do not change the vision or
+ConOps to fit the stack. Name the contradiction in the user's own words, say what it changes, and
+ask:
+
+- Question: `"Scenario {N} says {plain-language quote}. The stack we recorded assumes {recorded answer} — {plain consequence, e.g. 'the information only lives in one browser, so it will not be on their phone'}. Which is right?"`
+- Options:
+  - `"The scenario is right — update the stack"`
+  - `"The stack is right — I'll simplify the scenario"`
+  - `"Leave both for now — decide before planning"`
+
+On *"update the stack"*: if only a row or two changes, re-run the Tech Stack step of
+`/peak-workflow:setup` for the changed answers, rewrite the `**Product shape:**` block and the
+affected Stack Summary rows. **If the sheet itself changes** (static ↔ web, or desktop ↔ Hybrid
+with the web sheet's service layers), re-run
+`/peak-workflow:setup` wholesale instead of patching — a sheet change invalidates more than the
+stack table, and each of these is load-bearing:
+
+| Section | Why it changes |
+|---|---|
+| Verification & Quality Gates → `Test directories` | The sheets have different test trees; a stale line makes every `start-epic` and `wrapup-epic` grep silently return nothing |
+| Local Environment | The static branch skips the backend and live-data questions the web branch requires |
+| Tool Hygiene → Version exposure | Footer plus console line on a static SPA; a `/version` endpoint on a served app |
+| Security Baseline | Gains the sign-in reminders when sign-in enters the picture |
+| Reference Materials | Its sheet pointer now names the wrong sheet |
+
+Either way, note the change in the Step 5 summary. The edit lands on this `docs/` branch, so the
+stack change is reviewed and approved by the same merge as the requirements baseline.
+
+On *"simplify the scenario"*: edit the ConOps scenario and re-run Step 4's quality check on it.
+
+On *"leave both"*: record the open question under ConOps §8 Operational Constraints &
+Assumptions as `**Open — blocks planning:** <the question>` and surface it again in the Step 5
+summary — `/peak-workflow:plan-project` stops on that line.
+
+A shape change from `N/A` to active is never silent: it adds layers that every later epic pays
+for. A change in the other direction (a recorded "yes" that no scenario needs) is worth raising
+too — the same question, inverted.
 
 ## Step 5: Present Summary & Next Steps
 
@@ -292,6 +401,9 @@ Show the user what was created:
 - `docs/product-vision-planning/concept-of-operations.md` — [Created / Updated to v{N}]
 [Brownfield only:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` — Delta summary for implementation planning
 
+### Product Shape Re-check
+- [No contradictions — the recorded shape still matches the scenarios / {what contradicted, and what was decided} / No recorded shape to check]
+
 ### By the Numbers
 - [N] target user groups identified
 - [N] MVP goals with success criteria
@@ -300,6 +412,9 @@ Show the user what was created:
 - [N] glossary terms defined
 
 ### Next Step
+[When the ConOps contains `**Open — blocks planning:**`, replace this whole section with: "Planning is
+blocked: <each open line in plain words>. Resolve it, then run `/peak-workflow:discover` again —
+requirements capture and planning will stop until then."]
 Run `/peak-workflow:capture-requirements` to derive the formal TOR requirements baseline from
 these documents. The requirements capture will run on the same `docs/` branch as this discovery
 session. After that, `/peak-workflow:plan-project` derives the implementation plan.
@@ -310,11 +425,16 @@ concretizes the ConOps steps with screen and control names — and then
 ```
 
 Do NOT commit on your own initiative while writing the documents (Steps 1–4). Committing only
-ever happens via the explicit Commit Gate in Step 6, and only with the user's confirmation.
+ever happens via the explicit Commit Gate in Step 6 — or Step 0's one-time question about files
+left uncommitted from before the session — and only with the user's confirmation.
 
 ## Step 6: Ship or Continue
 
 After presenting the summary, ask the user how to proceed via `AskUserQuestion`:
+
+When the ConOps contains `**Open — blocks planning:**`, do not recommend continuing: offer only
+`"Stop here — I'll resolve the blocker and run /peak-workflow:discover again"` (commit through the
+Commit Gate first if the user wants the work saved) and the merge options without a recommendation.
 
 - Question: `"How would you like to proceed with the docs/ branch?"`
 - Options:

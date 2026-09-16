@@ -89,6 +89,19 @@ grep -l '^## Acceptance Criteria' docs/implementation-plan/phase-*/epic-*.md 2>/
 
 This is the epic-workflow format (peak-workflow specs use `## Requirements Anchors` instead).
 
+### 1.6 — Existing code
+
+```bash
+find . -maxdepth 2 -not -path './node_modules/*' -not -path './.git/*' \( -name package.json -o -name pyproject.toml -o -name Cargo.toml -o -name go.mod -o -name CMakeLists.txt -o -name platformio.ini -o -name Makefile -o -name '*.sln' -o -name '*.csproj' \) 2>/dev/null | head -5
+test -d src && echo "src/"
+```
+
+(`find`, not a glob list — zsh aborts a whole `ls` command when one pattern matches nothing.)
+
+Set `has_code = true` if any match. It does not change the verdict — a repository with code and
+no peak-workflow artifacts still starts with `/peak-workflow:setup` — but it changes the wording,
+and `setup` and `plan-project` both detect it and extend the code rather than scaffold.
+
 ---
 
 ## Step 2: Reach a Verdict
@@ -124,6 +137,7 @@ Signals observed:
 - docs/implementation-plan/status/ present: <yes | no>
 - Sidecars contain `requirements:` field: <yes | no | n/a>
 - Epic specs use `## Acceptance Criteria` (epic-workflow format): <yes | no | n/a>
+- Existing code (build manifest or src/): <yes | no>
 ```
 
 ---
@@ -154,13 +168,18 @@ I'd start with `/peak-workflow:setup`. Each later step benefits from a fresh ses
 clean context.
 ```
 
+When `has_code = true`, replace the first line with: *"There's code here already, but no
+peak-workflow planning yet. Setup reads your existing stack from the code — nothing gets
+re-scaffolded. The path is:"*
+
 Ask:
 - Question: `"Run /peak-workflow:setup now?"`
 - Options: `["Run /peak-workflow:setup now", "I'll run it manually"]`
 
-On confirm, invoke:
+On confirm, invoke — passing the user's description through, so `setup` drafts the Project
+Overview from it instead of asking again:
 ```
-Skill({ skill: "peak-workflow:setup", args: "" })
+Skill({ skill: "peak-workflow:setup", args: "$ARGUMENTS" })
 ```
 
 ### Verdict: MIGRATE FROM EPIC-WORKFLOW
