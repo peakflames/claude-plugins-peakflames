@@ -1,0 +1,1091 @@
+# Bun Static SPA Reference Sheet
+
+A reference stack for a browser-only application: no server, no database of your own, no
+container. All data lives on the person's device, and the built output is a folder of static
+files served by GitHub Pages (or any static host).
+
+Bun is the **toolchain** here — package manager, script runner, test runner. The app itself runs
+in the browser and has no runtime of its own.
+
+> **How to use this sheet — read before acting on it.**
+>
+> This is **reference material, not a migration mandate.** It exists for two purposes:
+>
+> 1. **The recommended stack for a brand-new project of this shape.** When
+>    `/peak-workflow:setup` establishes that the product needs no server (see *When this sheet
+>    applies* below) and is told "whatever you recommend", it reads Section 2 of this sheet and
+>    offers exactly these picks — there is no separate default list. `/peak-workflow:plan-project`
+>    then builds the walking skeleton from Sections 3 and 4.
+> 2. **A layer checklist for any project** — the Stack Summary table names every layer an
+>    application of this shape has to handle (build, UI, state, routing, persistence, schema
+>    versioning, dates, offline, backup, tests, lint, hosting, config). Use it to notice a layer
+>    the project has not decided yet.
+>
+> **Never** propose re-platforming, rewriting, or swapping a library in an existing project
+> because it differs from this sheet. The project's own `CLAUDE.md` Tech Stack is the single
+> source of truth and wins over this sheet every time. Adopt a change from here only when the
+> user asks for it in their own words.
+
+---
+
+## When This Sheet Applies
+
+This sheet is the right one when **all** of the following are true. Any single "no" points at
+[`bun-web-app-stack.md`](bun-web-app-stack.md) instead.
+
+| Question | This sheet needs |
+|---|---|
+| Does the same person's data have to appear on a second device? | **No** — data lives in this browser |
+| Does anyone sign in, or see anyone else's data? | **No** — single person, single device |
+| Do people upload files, photos, or documents? | **No** — no object storage |
+| Does anything on screen update by itself from elsewhere? | **No** — no server to push from |
+| Does anything have to stay secret from the person using it? | **No** — the whole bundle is public |
+
+The last row is the one that is easy to miss: a static app has **no server-side secrets**.
+Anything the code can read, the person can read. An API key for a third-party service cannot be
+hidden here — if the product needs one, it needs the web-app sheet.
+
+**Growth is cheap, so start here when it fits.** Section 11 is the migration path to a server
+when one of these answers changes later; the UI, the domain services, and the Zod contracts all
+survive that move.
+
+---
+
+## 1. Architecture at a Glance
+
+```
+                  ┌────────────────────────────────────────────┐
+   GitHub Pages   │ Browser                                    │
+┌──────────────┐  │                                            │
+│ index.html   │  │  React 19 SPA                              │
+│ assets/*.js  │──┼─►  ├─ TanStack Router (hash history)       │
+│ assets/*.css │  │    ├─ shadcn/ui on Tailwind v4             │
+│ manifest     │  │    ├─ Zustand          (ephemeral UI state)│
+└──────▲───────┘  │    └─ useLiveQuery     (reactive reads)    │
+       │          │                │                           │
+       │ static   │                ▼                           │
+       │ upload   │      Dexie ──► IndexedDB (this device only) │
+       │          │                │                           │
+┌──────┴───────┐  │                ▼                           │
+│ GitHub       │  │      JSON export / import = the backup     │
+│ Actions      │  │                                            │
+└──────────────┘  └────────────────────────────────────────────┘
+```
+
+**Design rules**
+
+- The browser is the whole runtime. There is no origin to call, so there is nothing to mock.
+- IndexedDB is the database. It is **per-browser and per-device**, and the person can clear it —
+  so an export/import path is not a nice-to-have, it is the only backup that exists.
+- Every environment difference is a build-time constant. There is no runtime configuration.
+- The bundle is public. Treat every value in it as published.
+
+---
+
+## 2. Stack Summary
+
+| Layer | Pick | Why |
+|---|---|---|
+| Toolchain | Bun 1.2+ | Package manager, script runner and test runner. One fast binary. |
+| Build | Vite 6 | Fast HMR, Tailwind v4 plugin, static output ready for any host. |
+| UI | React 19 + TypeScript 5 (strict) | Boring and correct. |
+| Styling | Tailwind CSS v4 + shadcn/ui | Components copied into the repo, no version lock. |
+| Icons | lucide-react | The icon set shadcn assumes. |
+| UI state | Zustand | Ephemeral state only — filters, dialogs, theme. Never the source of truth. |
+| Data reads | `dexie-react-hooks` `useLiveQuery` | Components re-render when IndexedDB changes. Replaces a server-cache layer. |
+| Routing | TanStack Router (**hash history**) | Type-safe routes that survive a static host with no rewrite rules. |
+| Persistence | Dexie 4 (IndexedDB) | Structured, async, no size cliff. `localStorage` only for one-off preferences. |
+| Schema versioning | Dexie `version().stores().upgrade()` | Migrations run in the browser on open. Never renumber a released version. |
+| Validation | Zod | Schemas for stored records, imported backups and form input. |
+| Dates | `date-fns` + local civil-day keys | Day-bucketed data is keyed `YYYY-MM-DD` in local time, never by timestamp. |
+| Offline | `vite-plugin-pwa` (`autoUpdate`) | Installable, works with no network. The expected shape for a personal app. |
+| Backup / portability | JSON export + import | The only backup a browser-only app has. Ships in the first epic, not later. |
+| Unit tests | `bun test` | Native, Jest-compatible API. |
+| Component tests | `bun test` + happy-dom + Testing Library | One test runner for everything. |
+| E2E | Playwright against `vite preview` | Tests the real production bundle. No Docker. |
+| Lint + format | Biome 2 | One tool, one config. |
+| Type-level lint | `tsc --noEmit` with unused checks | Catches what linters miss. |
+| Dead code | Knip | Unused files, exports, types and dependencies. |
+| Hosting | GitHub Pages via GitHub Actions | Free, no account to manage, deploy on push to `main` — the release branch, not the default `develop`. |
+| Config | Build-time `import.meta.env` + `__APP_VERSION__` | No runtime config; the build is the configuration. |
+| Secrets | `N/A — the bundle is public, so there is no secret to hold (shape Q5)` | A product that needs to keep a key secret needs a server. |
+| Logging | `console` with a version-stamped first line | No log shipping. The browser console is the log. |
+
+---
+
+## 3. Repository Layout
+
+```
+my-app/
+├── package.json
+├── bunfig.toml
+├── biome.json
+├── knip.json
+├── tsconfig.json
+├── vite.config.ts
+├── playwright.config.ts
+├── components.json                 # shadcn/ui config — see 4.11 before running `shadcn init`
+├── index.html
+├── public/
+│   └── favicon.svg
+├── .github/
+│   └── workflows/
+│       ├── test.yml                # gates + E2E on every pull request
+│       └── deploy.yml              # build + publish to GitHub Pages
+├── src/
+│   ├── main.tsx                    # boot, version log line, router mount
+│   ├── index.css                   # Tailwind v4 + design tokens (:root / .dark)
+│   ├── vite-env.d.ts               # __APP_VERSION__ declaration
+│   ├── routeTree.gen.ts            # generated by the router plugin — never hand-edited
+│   ├── app.ts                      # APP_NAME — the one place the app's name is written
+│   ├── routes/
+│   │   ├── __root.tsx              # app shell: nav, theme provider, <Outlet/>
+│   │   └── index.tsx
+│   ├── components/
+│   │   ├── ui/                     # shadcn/ui — generated, never hand-edited
+│   │   └── app-footer.tsx          # renders __APP_VERSION__
+│   ├── db/
+│   │   ├── client.ts               # the Dexie instance + versioned stores
+│   │   ├── schema.ts               # Zod record schemas + inferred types
+│   │   └── backup.ts               # JSON export / import
+│   ├── services/                   # domain logic — plain functions, no React
+│   ├── stores/                     # Zustand UI state
+│   └── lib/
+│       ├── utils.ts                # cn()
+│       └── day.ts                  # local civil-day helpers
+└── tests/
+    ├── setup/
+    │   └── happy-dom.ts
+    ├── unit/
+    ├── components/
+    └── e2e/
+```
+
+---
+
+## 4. Configuration Files
+
+### 4.1 `package.json`
+
+```json
+{
+  "name": "my-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "deadcode": "knip",
+    "test": "bun test tests/unit tests/components",
+    "test:e2e": "playwright test",
+    "check": "bun run typecheck && bun run lint && bun run deadcode && bun run test"
+  },
+  "dependencies": {
+    "react": "^19",
+    "react-dom": "^19",
+    "@tanstack/react-router": "^1",
+    "dexie": "^4",
+    "dexie-react-hooks": "^1",
+    "zustand": "^5",
+    "zod": "^3",
+    "date-fns": "^4",
+    "lucide-react": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5",
+    "vite": "^6",
+    "@vitejs/plugin-react": "^4",
+    "@tanstack/router-plugin": "^1",
+    "tailwindcss": "^4",
+    "@tailwindcss/vite": "^4",
+    "vite-plugin-pwa": "^0.21",
+    "@biomejs/biome": "^2",
+    "knip": "^5",
+    "@happy-dom/global-registrator": "latest",
+    "@testing-library/react": "^16",
+    "@testing-library/dom": "^10",
+    "@playwright/test": "^1",
+    "fake-indexeddb": "^6"
+  }
+}
+```
+
+> Version ranges are indicative. **Resolve each one against the registry at scaffold time**
+> (`npm view <pkg> version`) rather than pinning from memory — several of these move fast and
+> at least one has changed major series since this sheet was written. Then pin from the lockfile.
+>
+> `shadcn add` installs its own peer dependencies. Current versions pull the **unified
+> `radix-ui` package**, not the per-primitive `@radix-ui/react-*` packages — do not pre-declare
+> the individual ones or `knip` will flag them as unused. See 4.11.
+>
+> `version` is the single source of truth for the app's version — Vite injects it as
+> `__APP_VERSION__` (4.4), the footer renders it, and `main.tsx` stamps it on the first console
+> line. A static app has no `/version` endpoint, so this is the mechanism to declare under
+> **Version exposure** in `CLAUDE.md`'s Tool Hygiene & Operability section.
+
+### 4.2 `bunfig.toml`
+
+```toml
+[test]
+preload = ["./tests/setup/happy-dom.ts"]
+```
+
+`tests/setup/happy-dom.ts`:
+
+```ts
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import "fake-indexeddb/auto";
+
+GlobalRegistrator.register();
+```
+
+`fake-indexeddb/auto` gives every test file a real IndexedDB implementation in memory, so Dexie
+code is tested against the actual API rather than a mock.
+
+### 4.3 `tsconfig.json`
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "types": ["bun", "vite/client", "vite-plugin-pwa/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "cn": ["./src/lib/utils.ts"]
+    }
+  },
+  "include": ["src", "tests", "vite.config.ts", "playwright.config.ts"]
+}
+```
+
+The `cn` alias exists because current shadcn registries emit `import { cn } from "cn"` in every
+generated component. It has a matching entry in `vite.config.ts` (4.4). See 4.11.
+
+### 4.4 `vite.config.ts`
+
+```ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import { VitePWA } from "vite-plugin-pwa";
+import { resolve } from "node:path";
+import pkg from "./package.json";
+
+export default defineConfig({
+  // GitHub project pages serve from /<repo>/. The deploy workflow sets BASE_PATH.
+  // A user/org page or a custom domain leaves it unset.
+  base: process.env.BASE_PATH ?? "/",
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  plugins: [
+    TanStackRouterVite(),
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: "autoUpdate",
+      manifest: {
+        name: pkg.name,
+        short_name: pkg.name,
+        display: "standalone",
+        theme_color: "#000000",
+        icons: [{ src: "favicon.svg", sizes: "any", type: "image/svg+xml" }],
+      },
+    }),
+  ],
+  resolve: {
+    // `__dirname` does not exist in an ESM config file — `import.meta.dirname` is the ESM form.
+    alias: [
+      { find: /^@\//, replacement: `${resolve(import.meta.dirname, "src")}/` },
+      // shadcn's generated components import the class helper as "cn" (4.11).
+      { find: /^cn$/, replacement: resolve(import.meta.dirname, "src/lib/utils.ts") },
+    ],
+  },
+  build: { outDir: "dist", sourcemap: true },
+  server: { port: 5173 },
+});
+```
+
+`src/vite-env.d.ts`:
+
+```ts
+/// <reference types="vite/client" />
+declare const __APP_VERSION__: string;
+```
+
+### 4.5 `biome.json`
+
+```json
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      "**",
+      "!dist",
+      "!dev-dist",
+      "!src/components/ui",
+      "!src/routeTree.gen.ts",
+      "!docs",
+      "!**/*.md"
+    ]
+  },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": { "useExhaustiveDependencies": "error" },
+      "nursery": { "useSortedClasses": "warn" },
+      "suspicious": { "noExplicitAny": "error" }
+    }
+  },
+  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } },
+  "css": { "parser": { "tailwindDirectives": true } }
+}
+```
+
+Three things this config gets right that the defaults do not:
+
+- **`linter.rules.preset`**, not `linter.rules.recommended` — the latter is deprecated from Biome
+  2.5 and emits a `DEPRECATED` diagnostic on every run. `bunx biome migrate --write` converts an
+  older config in place.
+- **`css.parser.tailwindDirectives`** — without it Biome treats `@theme`, `@apply`,
+  `@custom-variant` and `@layer` as parse errors, and then refuses to format `src/index.css` at
+  all ("Code formatting aborted due to parsing errors").
+- **Excluding `docs` and Markdown** keeps planning artifacts and wireframe HTML out of the
+  formatter's reach.
+
+One rule to expect a fight with: `complexity/noImportantStyles` flags the standard
+`prefers-reduced-motion` override, which needs `!important` to win the cascade over each
+component's own animation. Suppress that block rather than weakening it:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  /* biome-ignore-start lint/complexity/noImportantStyles: overriding every component's own
+     animation is the point. */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* biome-ignore-end lint/complexity/noImportantStyles: end of the reduce-motion override */
+}
+```
+
+### 4.6 `knip.json`
+
+```json
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/routes/**/*.tsx",
+    "tests/setup/*.ts",
+    "tests/**/*.test.ts?(x)",
+    "tests/e2e/**/*.spec.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+  "ignore": ["src/components/ui/**"],
+  "ignoreDependencies": ["tailwindcss"]
+}
+```
+
+`knip` exits non-zero on **configuration hints**, not just findings, so a config with dead entries
+fails `bun run check` even when the code is clean. Three of them bite here:
+
+- `tailwindcss` is reached only through `@import "tailwindcss"` in the stylesheet and the
+  `@tailwindcss/vite` plugin, so knip sees it as an unused devDependency — hence
+  `ignoreDependencies`.
+- `src/main.tsx` is already an entry point by default; listing it again is "redundant".
+- `src/routeTree.gen.ts` is detected as generated on its own; listing it under `ignore` is
+  "removable".
+
+Knip is also the reason the first epic should ship `src/db/backup.ts` **with unit tests**: a test
+file counts as an entry point, so `importBackup` and the civil-day helpers register as used
+instead of dead.
+
+### 4.7 `index.html`
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>My App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+```
+
+### 4.8 `src/index.css`
+
+The design tokens live here and nowhere else. `shadcn init` writes the full token set for the
+chosen base color — but see 4.11 first, because that command is not reliably runnable and this
+file is usually written by hand. This is the shape it produces, trimmed to the tokens every app
+uses.
+
+> **The stock defaults are not accessible out of the box**, so the values below are already
+> retuned. Measured as WCAG contrast (achromatic OKLCH, so relative luminance is `L³`):
+>
+> | Token | Stock | Measured | Here | Now |
+> |---|---|---|---|---|
+> | `--muted-foreground` light | `0.556` | 4.73:1 on white but **4.34:1 on `--muted`** | `0.52` | 5.51 / 5.05 |
+> | `--ring` light | `0.708` | **2.59:1** — fails the 3:1 non-text floor | `0.55` | 4.85 |
+> | `--ring` dark | `0.556` | 3.19:1 on `--muted` — bare pass | `0.70` | 5.66 |
+> | `--input` (added) | absent from this trimmed set | control edges fall back to `--border`, **1.26:1** | `0.62` / `0.60` | 3.64 / 3.83 |
+>
+> `--border` stays stock — it is a decorative separator and needs no contrast. `--input` is
+> shadcn's own token for control boundaries; the full stock set gives it the *same* value as
+> `--border`, so inputs, outline `Button`s and `Select` triggers draw an invisible edge. Keep the
+> two separate and make sure controls use `border-input`, not `border-border`. Dark-mode
+> `--muted-foreground` needs no change — it already measures 5.83:1 in its worst case.
+>
+> **Measure, don't estimate** — an E2E test that walks every text node and control boundary is the
+> arbiter; these values are a starting point that passes, not a substitute for the check.
+
+```css
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.52 0 0);      /* retuned: 5.51:1 on white, 5.05:1 on --muted */
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);               /* decorative separators only */
+  --input: oklch(0.62 0 0);                 /* control edges: 3.64:1 on white */
+  --ring: oklch(0.55 0 0);                  /* retuned: 4.85:1 on white */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);     /* already 5.83:1 worst case — unchanged */
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(0.6 0 0);                  /* control edges: 3.83:1 on --muted */
+  --ring: oklch(0.7 0 0);                   /* retuned: 5.66:1 on --muted */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+```
+
+Add a new semantic color by defining `--x` and `--x-foreground` in both `:root` and `.dark` and
+mapping them in `@theme inline`. Never edit a generated file under `src/components/ui/`.
+
+### 4.9 `src/app.ts` — the app's name, in one place
+
+```ts
+export const APP_NAME = "my-app";
+```
+
+The name is used by the Dexie database, the backup envelope, the startup log line and the E2E
+reset. Import it in all four rather than repeating the literal — a missed copy silently breaks
+either backup import or test isolation.
+
+### 4.10 `playwright.config.ts`
+
+```ts
+import { defineConfig } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./tests/e2e",
+  webServer: {
+    command: "bun run build && bun run preview",
+    url: "http://localhost:4173",
+    timeout: 120_000,
+    reuseExistingServer: !process.env.CI,
+  },
+  use: { baseURL: "http://localhost:4173" },
+});
+```
+
+The E2E suite builds the production bundle itself, so `bun run test:e2e` works cold in a fresh
+session with nothing already running.
+
+> If the E2E bundle is built with a flag the normal build does not set (a test-hook or
+> fault-injection flag, 6.5), set `reuseExistingServer: false`. Otherwise a preview server left
+> running from an ordinary `bun run preview` gets reused and the hooks are silently absent.
+
+### 4.11 shadcn/ui: what the CLI actually does today
+
+The shadcn CLI moves faster than this sheet. Treat the two commands below as *shapes*, verify them
+against `bunx shadcn@latest init --help` at scaffold time, and expect these differences:
+
+- **`init` is not the command it used to be.** `--base-color` no longer exists (the flags are now
+  `-t <template>`, `-b base|radix|aria`, `-p <preset>`), and `init` leans toward scaffolding a new
+  project rather than configuring an existing one. In an existing repo it is usually faster and
+  safer to **write `components.json` and `src/index.css` by hand** (4.8) and run only `add`.
+- **`add` emits `import { cn } from "cn"`**, not `@/lib/utils`. If nothing resolves `cn`, the CLI
+  will "helpfully" install an unrelated npm package literally named `cn`. Resolve it with a path
+  alias in `tsconfig.json` (4.3) and `vite.config.ts` (4.4) instead — never by editing the
+  generated file, which the next `--overwrite` would undo.
+- **`add` emits `import { Dialog as DialogPrimitive } from "radix-ui"`** — the unified package.
+  Remove any per-primitive `@radix-ui/react-*` entries from `package.json` afterwards.
+- **Assistant tooling.** `/peak-workflow:setup` installs the shadcn/ui skill (`.claude/skills/`)
+  and the `shadcn` MCP server (`.mcp.json`) on this stack. The skill documents `init`; this sheet's
+  rule — write `components.json` and the token stylesheet by hand, run only `add` — wins.
+
+A `components.json` that works with a hand-written stylesheet:
+
+```json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/index.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  }
+}
+```
+
+**Generated components drift, and requirements written against them go stale.** Two live examples:
+`@radix-ui/react-dialog` 1.1.x stopped emitting `aria-modal="true"` (it relies on inert siblings),
+so a requirement naming that attribute has to set it as a prop on `DialogContent`; and the
+generated `Button` carries `transition-all`, so `getComputedStyle` reads an *interpolated* outline
+for ~200 ms after focus lands — a focus-ring assertion has to wait for the transition to settle or
+it measures a frame of the animation. Assert against the rendered DOM, not against what the
+library used to do.
+
+---
+
+## 5. Persistence
+
+### 5.1 `src/db/schema.ts`
+
+Zod is the contract for anything crossing the IndexedDB boundary — stored records were written
+by an older version of your own code, and imported backups come from a file the person chose.
+
+```ts
+import { z } from "zod";
+
+export const DayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+
+// Example domain — inert on purpose. Substitute your own; do not ship these tables.
+export const Note = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(120),
+  archivedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export const DayMark = z.object({
+  id: z.string().uuid(),
+  noteId: z.string().uuid(),
+  day: DayKey,                       // local civil day, not a timestamp
+});
+
+export type Note = z.infer<typeof Note>;
+export type DayMark = z.infer<typeof DayMark>;
+```
+
+### 5.2 `src/db/client.ts`
+
+```ts
+import Dexie, { type EntityTable } from "dexie";
+import { APP_NAME } from "@/app";
+import type { Note, DayMark } from "./schema";
+
+export const db = new Dexie(APP_NAME) as Dexie & {
+  notes: EntityTable<Note, "id">;
+  dayMarks: EntityTable<DayMark, "id">;
+};
+
+// Each version() block is permanent once released. Add a new one; never edit an old one.
+db.version(1).stores({
+  notes: "id, archivedAt, createdAt",
+  dayMarks: "id, noteId, day, [noteId+day]",
+});
+```
+
+The compound index `[noteId+day]` is what makes "was this marked today?" and consecutive-day
+scans cheap.
+
+### 5.3 Local civil days — `src/lib/day.ts`
+
+Day-bucketed data is the common failure in a personal tracker: a UTC timestamp puts an 11pm
+action on tomorrow for anyone east of Greenwich, and a naive `new Date()` diff breaks across a
+DST boundary. Store the **local calendar day the person experienced**, as a string.
+
+```ts
+import { format, subDays, parseISO } from "date-fns";
+
+/** The local calendar day, as YYYY-MM-DD. */
+export const dayKey = (d: Date = new Date()): string => format(d, "yyyy-MM-dd");
+
+/** The day before a key, on the calendar — DST-safe because it is date arithmetic. */
+export const previousDay = (key: string): string => dayKey(subDays(parseISO(key), 1));
+```
+
+Rules that follow from this:
+
+- Anything the person thinks of as "a day" is a `DayKey`, never a `Date` or an epoch number.
+- Anything that is a real instant (`createdAt`, `archivedAt`) stays an ISO datetime string.
+- Tests inject the day rather than reading the clock: domain functions take `today: string` as a
+  parameter. A streak function that calls `new Date()` internally cannot be tested.
+
+### 5.4 Backup — `src/db/backup.ts`
+
+IndexedDB is wiped by "clear site data", by a browser reinstall, and by some privacy modes. The
+export/import pair is the product's only durable backup and belongs in the walking-skeleton
+epic, not a later one.
+
+```ts
+import { z } from "zod";
+import { db } from "./client";
+import { Note, DayMark } from "./schema";
+
+const Backup = z.object({
+  app: z.literal("my-app"),
+  version: z.number().int(),
+  exportedAt: z.string().datetime(),
+  notes: z.array(Note),
+  dayMarks: z.array(DayMark),
+});
+
+export async function exportBackup(): Promise<Blob> {
+  const payload = {
+    app: "my-app" as const,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    notes: await db.notes.toArray(),
+    dayMarks: await db.dayMarks.toArray(),
+  };
+  return new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+}
+
+const BACKUP_VERSION = 1;
+
+export async function importBackup(file: File): Promise<void> {
+  const parsed = Backup.parse(JSON.parse(await file.text()));
+  if (parsed.version > BACKUP_VERSION) {
+    throw new Error(
+      "This backup was made by a newer version of the app. Update the app, then import again.",
+    );
+  }
+  await db.transaction("rw", db.notes, db.dayMarks, async () => {
+    await Promise.all([db.notes.clear(), db.dayMarks.clear()]);
+    await db.notes.bulkAdd(parsed.notes);
+    await db.dayMarks.bulkAdd(parsed.dayMarks);
+  });
+}
+```
+
+Import replaces everything inside one transaction, so a malformed file cannot leave a half-loaded
+database. It is a destructive action — the UX Baseline confirmation rule applies.
+
+---
+
+## 6. Application Wiring
+
+### 6.1 `src/main.tsx`
+
+```tsx
+import { StrictMode } from "react";
+import { APP_NAME } from "./app";
+import { createRoot } from "react-dom/client";
+import { RouterProvider, createRouter, createHashHistory } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
+import "./index.css";
+
+console.info(`[INFO] ${APP_NAME} v${__APP_VERSION__} starting`);
+
+const router = createRouter({ routeTree, history: createHashHistory() });
+
+declare module "@tanstack/react-router" {
+  interface Register { router: typeof router }
+}
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <RouterProvider router={router} />
+  </StrictMode>,
+);
+```
+
+The version line is the first thing in the console on every load — the static-app equivalent of a
+server's startup log line. Two things keep it first and keep it matchable:
+
+- **No module may log at import scope**, or it beats this line to the console.
+- **If a requirement anchors this line with a regex** (e.g. `/^My App v\d+\.\d+\.\d+ starting$/`),
+  drop the `[INFO]` prefix from *this* line only. Every other record keeps its level prefix. Also
+  set `devOptions: { enabled: false }` on `VitePWA` so service-worker chatter in dev does not
+  precede it.
+
+### 6.2 `src/components/app-footer.tsx`
+
+Half of the Version-exposure mechanism is the console line in 6.1; this is the other half, and it
+is what a Playwright test asserts against.
+
+```tsx
+import { APP_NAME } from "@/app";
+
+export function AppFooter() {
+  return (
+    <footer className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+      <span data-testid="app-version">{`${APP_NAME} v${__APP_VERSION__}`}</span>
+    </footer>
+  );
+}
+```
+
+Mount it once in the shell so every screen carries it — `src/routes/__root.tsx`:
+
+```tsx
+import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { AppFooter } from "@/components/app-footer";
+
+export const Route = createRootRoute({
+  component: () => (
+    <div className="flex min-h-svh flex-col">
+      <main className="flex-1"><Outlet /></main>
+      <AppFooter />
+    </div>
+  ),
+});
+```
+
+### 6.3 Reading data
+
+```tsx
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/db/client";
+
+export function NoteList({ showArchived }: { showArchived: boolean }) {
+  const notes = useLiveQuery(
+    () => (showArchived ? db.notes.toArray() : db.notes.filter((h) => !h.archivedAt).toArray()),
+    [showArchived],
+  );
+
+  if (notes === undefined) return <Spinner />;   // loading
+  if (notes.length === 0) return <EmptyState />; // empty
+  return <ul>{notes.map((h) => <NoteRow key={h.id} note={h} />)}</ul>;
+}
+```
+
+`useLiveQuery` returns `undefined` until the first read resolves, which maps directly onto the
+UX Baseline's **Screen states** requirement: `undefined` is loading, `[]` is empty, a thrown
+error is the error state, and rows are populated.
+
+### 6.4 What goes where
+
+| State | Home |
+|---|---|
+| Anything the person would expect to still be there tomorrow | Dexie |
+| Filters, open dialogs, selected tab, in-progress form input | Zustand |
+| Theme choice | `localStorage`, read once by the ThemeProvider |
+| Derived values (streak counts, totals) | Computed in `services/`, never stored |
+
+Storing a derived value is how a streak count goes wrong: it drifts from the day marks that
+produced it. Compute it.
+
+### 6.5 Test-only fault and latency injection
+
+The error-state and progress-feedback requirements need a way to make something fail or be slow on
+demand. A static SPA has no process environment, so the switch is a build-time flag the E2E harness
+sets when it builds the preview bundle.
+
+```ts
+// src/lib/fault.ts
+const mode = import.meta.env.VITE_FAULT_MODE ?? "";
+
+export const faultDelay = () =>
+  mode === "slow" ? new Promise((r) => setTimeout(r, 3000)) : Promise.resolve();
+
+export const faultThrow = () => {
+  if (mode === "fail") throw new Error("Injected failure (VITE_FAULT_MODE=fail)");
+};
+```
+
+Call both at the top of each data access function in `services/`. The flag is unset in a normal
+build, so the production bundle tree-shakes to nothing. Playwright sets it per project:
+
+```ts
+webServer: {
+  command: "VITE_FAULT_MODE=fail bun run build && bun run preview",
+  url: "http://localhost:4173",
+}
+```
+
+---
+
+## 7. Testing
+
+| Scope | Runner | Notes |
+|---|---|---|
+| Domain services | `bun test` | Pure functions, clock injected as a `DayKey` parameter. |
+| Dexie queries | `bun test` + `fake-indexeddb` | Real IndexedDB semantics in memory; fresh DB per test file. |
+| React components | `bun test` + happy-dom + Testing Library | Preloaded via `bunfig.toml`. |
+| E2E | Playwright against `vite preview` | Real production bundle, real IndexedDB, no Docker. |
+
+```ts
+import { test, expect, beforeEach } from "bun:test";
+import { db } from "@/db/client";
+import { currentStreak } from "@/services/streak";
+
+beforeEach(async () => {
+  await db.dayMarks.clear();
+});
+
+test("counts consecutive days ending today", async () => {
+  await db.dayMarks.bulkAdd([
+    { id: crypto.randomUUID(), noteId: "n1", day: "2026-03-08" },
+    { id: crypto.randomUUID(), noteId: "n1", day: "2026-03-09" },
+  ]);
+  const marks = await db.dayMarks.where({ noteId: "n1" }).toArray();
+  expect(currentStreak(marks, "2026-03-09")).toBe(2);
+});
+```
+
+Note the injected `"2026-03-09"`. A streak test that depends on the real clock passes today and
+fails at a month boundary.
+
+E2E state is reset per test by clearing storage before navigation:
+
+```ts
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate((name) => indexedDB.deleteDatabase(name), APP_NAME);
+  await page.reload();
+});
+```
+
+---
+
+## 8. Deployment: GitHub Pages
+
+`.github/workflows/deploy.yml`:
+
+A second workflow runs the gates on pull requests — `deploy.yml` below only guards `main`, so
+without it nothing checks a branch before merge. `.github/workflows/test.yml`:
+
+```yaml
+name: Test
+
+on: [pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:e2e
+```
+
+`.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+One-time setup: repository **Settings → Pages → Source → GitHub Actions**.
+
+The workflow deploys from `main`, the release branch — not from `develop`, which peak-workflow
+makes the repository's default branch. GitHub guards the `github-pages` environment with a
+deployment-branch rule; if the first release fails with *Branch "main" is not allowed to deploy to
+github-pages due to environment protection rules*, allow `main` under **Settings → Environments →
+github-pages → Deployment branches and tags**, or:
+
+```bash
+gh api -X POST repos/<owner>/<repo>/environments/github-pages/deployment-branch-policies \
+  -f name=main -f type=branch
+```
+
+`bun run check` runs before the build, so a red gate blocks the deploy rather than publishing a
+broken bundle.
+
+**Base path.** Project pages serve from `https://<user>.github.io/<repo>/`, so the workflow sets
+`BASE_PATH`. A user/org page (`<user>.github.io`) or a custom domain serves from the root — drop
+the `env:` block in that case. Getting this wrong shows up as a white page with 404s on the
+`assets/*.js` requests.
+
+**Custom domain.** Add `public/CNAME` containing the domain; Vite copies `public/` verbatim into
+`dist/`.
+
+---
+
+## 9. Daily Commands
+
+```bash
+bun --version                # must be 1.2+; `bun upgrade` if the machine is behind
+bun install
+bunx playwright install chromium   # one time, right after `bun install`
+bun run dev                  # http://localhost:5173
+bun run check                # typecheck + lint + deadcode + tests
+bun run test:e2e             # builds, previews, runs Playwright
+bun run preview              # serve the production bundle locally
+bunx shadcn@latest add button dialog   # see 4.11 — `init` is the one to be careful with
+git push                     # main → Actions → Pages
+```
+
+---
+
+## 10. Additional Considerations
+
+Each of these is already handled by the configuration above.
+
+| Consideration | What happens | Applied fix |
+|---|---|---|
+| Deep link 404s on a static host | `/records` has no file behind it; Pages returns its 404 page. | Hash history (6.1) — the path after `#` never reaches the server. |
+| Wrong base path | White page, 404s on `assets/*.js`. | `BASE_PATH` set by the deploy workflow (4.4, 8). |
+| Data loss on "clear site data" | IndexedDB is gone with no warning and no copy. | Export/import ships in the first epic (5.4). |
+| Data does not follow the person | A second device starts empty; users read this as a bug. | Say so in the UI once, and offer export/import as the transfer path. |
+| Day boundaries and DST | An 11pm action lands on tomorrow; streaks break across DST. | `DayKey` strings in local time (5.3). |
+| Untestable clock | Streak logic reads `new Date()` and fails at month ends. | Domain functions take `today: string` (5.3, 7). |
+| Stored data from an older build | Shapes drift as the schema changes. | Zod parse at the boundary (5.1); Dexie `upgrade()` per version (5.2). |
+| Editing a released Dexie version | Existing installs silently skip the migration. | Versions are append-only — add `version(2)`, never edit `version(1)`. |
+| Stale PWA cache after deploy | The person keeps seeing the old app. | `registerType: "autoUpdate"` (4.4). |
+| Private browsing blocks IndexedDB | `db.open()` throws; the app renders nothing. | Catch at boot and show the error state naming the cause. |
+| Secrets in the bundle | Any key shipped to the browser is public. | No secrets layer exists; a product needing one needs the web-app sheet. |
+| Derived values drifting | A stored streak count disagrees with the day marks. | Compute in `services/`, never persist (6.4). |
+| Lint noise from generated files | shadcn and route tree churn. | Excluded in Biome and Knip (4.5, 4.6). |
+| Generated components drift from the requirement | A TOR names an attribute or behaviour the current library version no longer produces. | Assert against the rendered DOM; set the attribute as a prop rather than editing `components/ui/` (4.11). |
+| Scaffold configs that fail their own gate | `bun run check` is red on a fresh, empty repo. | Biome `preset` + CSS parser options (4.5) and knip configuration hints (4.6) are both exit-code-bearing. |
+| Design-system defaults below the contrast floor | Focus rings, muted text and control edges fail WCAG out of the box. | `--ring`, `--muted-foreground` and `--input` are retuned in 4.8; measure with a test. |
+| Jekyll mangling files | Legacy branch-based Pages ignores `_`-prefixed paths. | Not applicable to the Actions flow (8); add `.nojekyll` only for branch deploys. |
+
+---
+
+## 11. Growth Path
+
+Each row is the first step of a move toward [`bun-web-app-stack.md`](bun-web-app-stack.md). The
+UI, the `services/` functions and the Zod contracts survive all of them — only the data access
+layer changes.
+
+| Trigger | Change | Effort |
+|---|---|---|
+| Data must follow the person across devices | Add the web sheet's API and SQLite; replace `useLiveQuery` with TanStack Query against typed routes. | Medium |
+| Two or more people, or anything private | Add Better Auth per the web sheet. This is the point where the static host is left behind. | Medium |
+| File attachments | Object storage per the web sheet (`Bun.S3Client`). There is no static-host version of this. | Medium |
+| A third-party API key is needed | A server has to hold it. Move to the web sheet. | Medium |
+| The dataset outgrows a browser | Server-side database. Export/import becomes the migration tool you already have. | Medium |
+
+---
+
+## 12. Alternatives Considered
+
+| Option | Verdict |
+|---|---|
+| `localStorage` as the database | Synchronous, ~5 MB, strings only, no indexes. Fine for a theme preference; not for records. |
+| Raw IndexedDB | The API is verbose and easy to misuse. Dexie is a thin, well-typed wrapper over the same thing. |
+| Browser history + a `404.html` copy of `index.html` | Works on Pages and gives cleaner URLs, but deep links return HTTP 404 and it breaks on hosts without that fallback. Hash history has no edge cases. |
+| TanStack Query over Dexie | A cache in front of a local database that is already instant. `useLiveQuery` is fewer moving parts. |
+| A sync service (Firebase, Supabase, PocketBase) | The moment sync matters, the answers in *When This Sheet Applies* have changed — use the web sheet and own the data. |
+| Netlify / Cloudflare Pages / S3 + CloudFront | All work with this bundle unchanged; only Section 8 differs. Pages is the default because the repository already exists. |
+| Vitest | Fine, but a second test runner. `bun test` covers unit and component tests. |
+| Electron wrapper for a desktop feel | If it needs to be a desktop app, use `bun-electron-desktop-stack.md` — an installable PWA covers most of the want. |

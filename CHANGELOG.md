@@ -15,6 +15,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.0] — 2026-09-16
+
+### Changed
+
+- **Bundles `peak-workflow` v2.0.0** — a major release: shape-driven stack selection, a
+  defaults-first `setup`, and design skills invoked in every UI epic. Also bundles
+  `epic-workflow` v2.5.1 and the `claude-code-setup` scripts v0.1.0, both unchanged.
+
 ## [1.0.0] — 2026-09-02
 
 ### Added
