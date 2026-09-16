@@ -6,7 +6,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.11.0] — 2026-09-15
+## [1.11.0] — UNDER DEVELOPMENT
 
 Product shape, not project type, chooses the stack: plain-language questions route a web
 project to a new browser-only sheet or the existing server sheet, and discovery re-checks the
