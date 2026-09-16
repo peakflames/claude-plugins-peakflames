@@ -17,11 +17,12 @@ findings, not surprises; file them with the template at the bottom of this page.
 |---|---------|--------------|------------------|-----|
 | 1 | **Habit Tracker** | Web app, all five shape answers "no" | `bun-static-spa-stack.md` — browser-only SPA, IndexedDB, GitHub Pages. **No dry-run coverage this cycle — highest risk.** | [habit-tracker.md](habit-tracker.md) |
 | 2 | **Benchlog** | Desktop app | `bun-electron-desktop-stack.md` — offline Windows Electron app, attribution field instead of sign-in, `N/A (shape Q6)` on Auto-update | [benchlog.md](benchlog.md) |
-| 3 | **Shiftboard** | Web app, four "yes" answers | `bun-web-app-stack.md` — Google Workspace provider in **mixed audience** mode, roles, live updates, `**Access rule:** owner-or-permitted-role` | [shiftboard.md](shiftboard.md) |
+| 3 | **Shiftboard** | Web app, four "yes" answers | `bun-web-app-stack.md` — sign-in in **deferred mode** (real email-and-password now, Okta pending IT approval), roles, live updates, `**Access rule:** owner-or-permitted-role`. **No dry-run coverage this cycle.** | [shiftboard.md](shiftboard.md) |
 | 4 | **PokeMeta** | Service or API, **existing repo** | No sheet — `code_present = true`, .NET row of the toolchain table, `**Not decided yet:**` line | [pokemeta.md](pokemeta.md) |
 
-Run them in that order if you are running all four: 1 and 2 are the cheapest, 3 needs Docker and a
-Google Cloud console, 4 needs the .NET SDK.
+Run them in that order if you are running all four: 1 and 2 are the cheapest, 3 needs Docker, 4
+needs the .NET SDK. **None of them needs a cloud account or an OAuth client** — Shiftboard's
+deferred mode is specifically the path that does not block on an external approval.
 
 The four product descriptions in one place (paste-ready): [project-descriptions.md](project-descriptions.md).
 
@@ -43,7 +44,7 @@ Per project:
 |---|---|---|
 | Habit Tracker | Playwright browsers (`bunx playwright install`, one time) | `bunx playwright --version` |
 | Benchlog | **Node.js 22.12+ (LTS)** — Playwright's runner and electron-vite both run on Node; without it `bun run test:e2e` can hang | `node --version` |
-| Shiftboard | Docker (running) for `docker compose` and the E2E harness; a Google Cloud project where you can create an OAuth client | `docker info` |
+| Shiftboard | Docker (running) for `docker compose` and the E2E harness | `docker info` |
 | PokeMeta | .NET 8 SDK | `dotnet --version` |
 
 Also set up a scratch workspace outside this repo so nothing lands in the plugin repo by accident:

@@ -209,7 +209,7 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 ### Documentation
 
 - **UAT materials for v1.11.0** — `docs/uat/` adds four paste-ready starter project descriptions
-  (static SPA, Electron desktop, full web app with Google sign-in, existing .NET repo) and a
+  (static SPA, Electron desktop, full web app with deferred org sign-in, existing .NET repo) and a
   step-by-step manual test doc per project covering the whole greenfield lifecycle.
 
 ---
