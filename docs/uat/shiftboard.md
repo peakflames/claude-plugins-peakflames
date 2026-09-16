@@ -127,7 +127,7 @@ That routes to **deferred mode**, and the candidate must not be discarded:
 | 3.22 | First commit made | `git show --stat HEAD` |
 | 3.22a | **`develop` created and checked out**; `main` holds the setup commit | `git branch` shows `* develop` and `main` |
 | 3.22b | `.claude/skills/<shadcn>/` exists and is in the setup commit | `git show --stat HEAD` lists it |
-| 3.22c | `.mcp.json` has a `shadcn` server entry (`bunx --bun shadcn@latest mcp`); `.claude/skills/shadcn/` is the only skill added; `skills-lock.json` is committed; no root `package.json`, `package-lock.json` or `node_modules/` appeared from the install | `grep -n shadcn .mcp.json`; `git status --short` clean after setup |
+| 3.22c | `.mcp.json` has a `shadcn` server entry (`bunx --bun shadcn@latest mcp`); exactly two skills added, `.claude/skills/shadcn/` and `.claude/skills/migrate-radix-to-base/`; `skills-lock.json` is committed; no root `package.json`, `package-lock.json` or `node_modules/` appeared from the install | `grep -n shadcn .mcp.json`; `git status --short` clean after setup |
 | 3.22d | The shadcn skill and MCP server were **not asked about** — shown only in the one confirmation | no separate question |
 | 3.22e | "Restart Claude Code before the next command, and approve the `shadcn` server when asked." was printed | restart, then approve on the next session |
 | 3.22f | UX Baseline has a `**shadcn tooling:**` line | `grep -c 'shadcn tooling:' CLAUDE.md` → 1 |

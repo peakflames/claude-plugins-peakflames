@@ -130,7 +130,7 @@ grep -n '^## ' CLAUDE.md
 | 3.17 | **`develop` created and checked out**; `main` holds only the setup commit | `git branch` shows `* develop` and `main`, both at the same commit |
 | 3.18 | The publish question came **after** the commit, on its own — not folded into the confirmation — and "Not now" reported `[N/A] GitHub — not published` | nothing was created on GitHub |
 | 3.19 | `.claude/skills/<shadcn>/` exists and is in the setup commit | `git show --stat HEAD` lists it |
-| 3.20 | `.mcp.json` has a `shadcn` server entry (`bunx --bun shadcn@latest mcp`); `.claude/skills/shadcn/` is the only skill added; `skills-lock.json` is committed; no root `package.json`, `package-lock.json` or `node_modules/` appeared from the install | `grep -n shadcn .mcp.json`; `git status --short` clean after setup |
+| 3.20 | `.mcp.json` has a `shadcn` server entry (`bunx --bun shadcn@latest mcp`); exactly two skills added, `.claude/skills/shadcn/` and `.claude/skills/migrate-radix-to-base/`; `skills-lock.json` is committed; no root `package.json`, `package-lock.json` or `node_modules/` appeared from the install | `grep -n shadcn .mcp.json`; `git status --short` clean after setup |
 | 3.21 | The shadcn skill and MCP server were **not asked about** — shown only in the one confirmation | no separate question |
 | 3.22 | "Restart Claude Code before the next command, and approve the `shadcn` server when asked." was printed | restart, then approve on the next session |
 | 3.23 | UX Baseline has a `**shadcn tooling:**` line | `grep -c 'shadcn tooling:' CLAUDE.md` → 1 |
