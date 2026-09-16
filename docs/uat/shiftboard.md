@@ -20,7 +20,7 @@ that is the point of deferred mode.
 Read [README.md](README.md) first — prerequisites, plugin loading, global criteria G1–G10, defect
 template.
 
-> **Coverage note:** deferred mode had **no adversarial dry-run coverage** in the v1.11.0
+> **Coverage note:** deferred mode had **no adversarial dry-run coverage** in the v2.0.0
 > validation cycle (the validated web scenario used a named, approved provider). Treat this run as
 > the first real exercise of the deferred path, and be unusually strict about the greppable
 > strings in section 3 — downstream skills key their behavior on them.
@@ -351,7 +351,7 @@ Approve the plan, then let it run unaided.
 | 9.6c | `bun run check` is green on the **scaffold alone**, before domain code | Biome `preset`, the CSS parser and knip's config hints are all exit-code-bearing; red on an empty repo is Critical |
 | 9.6d | Contrast: `--ring`, `--muted-foreground` and `--input` carry the **retuned** values from 4.9 | `grep -E '\-\-(ring|input|muted-foreground):' apps/web/src/index.css` |
 | 9.6e | `bunx playwright install chromium` ran **right after** `bun install` | visible in the transcript |
-| 9.7 | The auth `basePath` and the Vite proxy entry agree | a mismatch was a v1.11.0 fix — a regression is Critical |
+| 9.7 | The auth `basePath` and the Vite proxy entry agree | a mismatch was a v2.0.0 fix — a regression is Critical |
 | 9.8 | The `hc` client does not double-prefix the API path | same |
 | 9.9 | `GOOGLE_*` / `MICROSOFT_*` env vars are **present but commented out / optional** in `.env.example`, and the app **boots with none of them set** | `bun run dev` must not fail an env check for a provider nobody chose |
 | 9.10 | **G5** — the deferred-value grep on `CLAUDE.md` returns nothing on this branch | note: `Auth: local accounts now, org SSO deferred` is **not** one of the strings that gate grep matches — it is an open decision with an epic, not an unresolved setup value. If the skeleton deletes the auth row to satisfy the gate, that is a finding |

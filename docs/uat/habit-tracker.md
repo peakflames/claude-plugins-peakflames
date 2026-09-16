@@ -1,7 +1,7 @@
 # UAT — Habit Tracker (static SPA route)
 
 **Route under test:** `references/bun-static-spa-stack.md` — browser-only React SPA, Dexie /
-IndexedDB, GitHub Pages. **This sheet had no dry-run coverage in the v1.11.0 validation cycle**,
+IndexedDB, GitHub Pages. **This sheet had no dry-run coverage in the v2.0.0 validation cycle**,
 so it is the highest-risk of the four runs.
 
 **Persona:** *Dana*, a freelance illustrator with one laptop, no account, no server, no idea what

@@ -79,7 +79,7 @@ re-scaffolded."*
 | # | Check | Pass when |
 |---|---|---|
 | 2.1 | Verdict GREENFIELD, **`Existing code: yes`** | both |
-| 2.2 | The "nothing gets re-scaffolded" wording appeared | this is the v1.11.0 behavior |
+| 2.2 | The "nothing gets re-scaffolded" wording appeared | this is the v2.0.0 behavior |
 | 2.3 | Nothing written, no branch created | `git status --porcelain` empty, `git branch` shows the initial branch only |
 
 ---
