@@ -6,6 +6,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.1.0] — UNDER DEVELOPMENT
+
+---
+
 ## [2.0.0] — 2026-09-16
 
 Product shape, not project type, chooses the stack: plain-language questions route a web
