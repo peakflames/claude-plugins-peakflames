@@ -106,7 +106,7 @@ survive that move.
 | Lint + format | Biome 2 | One tool, one config. |
 | Type-level lint | `tsc --noEmit` with unused checks | Catches what linters miss. |
 | Dead code | Knip | Unused files, exports, types and dependencies. |
-| Hosting | GitHub Pages via GitHub Actions | Free, no account to manage, deploy on push to the default branch. |
+| Hosting | GitHub Pages via GitHub Actions | Free, no account to manage, deploy on push to `main` — the release branch, not the default `develop`. |
 | Config | Build-time `import.meta.env` + `__APP_VERSION__` | No runtime config; the build is the configuration. |
 | Secrets | `N/A — the bundle is public, so there is no secret to hold (shape Q5)` | A product that needs to keep a key secret needs a server. |
 | Logging | `console` with a version-stamped first line | No log shipping. The browser console is the log. |
@@ -991,6 +991,17 @@ jobs:
 ```
 
 One-time setup: repository **Settings → Pages → Source → GitHub Actions**.
+
+The workflow deploys from `main`, the release branch — not from `develop`, which peak-workflow
+makes the repository's default branch. GitHub guards the `github-pages` environment with a
+deployment-branch rule; if the first release fails with *Branch "main" is not allowed to deploy to
+github-pages due to environment protection rules*, allow `main` under **Settings → Environments →
+github-pages → Deployment branches and tags**, or:
+
+```bash
+gh api -X POST repos/<owner>/<repo>/environments/github-pages/deployment-branch-policies \
+  -f name=main -f type=branch
+```
 
 `bun run check` runs before the build, so a red gate blocks the deploy rather than publishing a
 broken bundle.

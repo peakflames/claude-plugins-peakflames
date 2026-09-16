@@ -17,6 +17,15 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 - **`references/bun-static-spa-stack.md`** — browser-only React SPA: Vite, Dexie on IndexedDB,
   hash routing, `vite-plugin-pwa`, JSON export/import backup, Playwright against `vite preview`,
   and a GitHub Pages deploy workflow. No server, no accounts, no secrets.
+- **`develop` base branch in `setup`** — every project gets `develop` created and checked out;
+  `main` holds releases only. The Git Workflow section says so instead of skipping `develop` for
+  solo projects.
+- **Publish to GitHub in `setup`** — one question after the setup commit (organization or personal
+  account, visibility). On Yes: installs `gh` if needed, creates and pushes the repository, and
+  makes `develop` the default branch.
+- **Branch protection on publish** — `main` and `develop` require a pull request with one approval
+  and block force-push and deletion; administrators bypass. A free-plan private repository gets a
+  warning, not a failure.
 - **Shape questions in `setup`** — five questions in layman's terms (cross-device, sign-in, file
   uploads, live updates, product-held secret) asked before any sheet is read. All five "no" on a
   Web app routes to the static sheet; any "yes" routes to the web-app sheet.
@@ -217,6 +226,10 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 - **Contrast floors** — `--ring`, `--muted-foreground` and `--input` retuned with measured WCAG
   values across all three sheets; `--border` stays decorative and controls use `border-input`.
 - **`__dirname` in an ESM Vite config** — web sheet uses `import.meta.dirname`.
+- **GitHub Pages deploy with `develop` as default** — static sheet notes deploys run from `main`
+  and shows how to allow it in the `github-pages` environment's deployment-branch rule.
+- **Solo-mode push to a protected branch** — `wrapup-epic` warns that it succeeds only for an
+  administrator and points everyone else to team mode.
 - **Stale E2E hooks** — web and static sheets note that `reuseExistingServer` must be `false` when
   the E2E build sets a fault-injection flag the ordinary build does not.
 - **Registry-resolved versions** — all three sheets say to check each dependency at scaffold time

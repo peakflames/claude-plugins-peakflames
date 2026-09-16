@@ -87,6 +87,7 @@ Start a fresh session with the same `--plugin-dir` command, then:
 | 4 | The five shape questions, as **one block** | "No, I only use my laptop. No, it's just mine. No files. Nothing updates by itself." |
 | 4a | *clarifier if it presses on sign-in* | "Nobody else uses it at all. I don't want an account." |
 | 5 | One combined confirmation of everything defaulted | Read it, then accept |
+| 6 | **Publish to GitHub** — asked on its own, *after* the setup commit, as one question pair (where / who can see it) | **"Not now — keep it on this computer"** |
 
 ### What to expect
 
@@ -103,6 +104,7 @@ Start a fresh session with the same `--plugin-dir` command, then:
 ```bash
 cd ~/uat-workspace/habit-tracker
 git log --oneline            # expect one commit: "chore: initial project setup"
+git branch                   # expect: * develop, main
 ls docs/                     # expect requirements/ architecture.md design-notes.md
 grep -n '^## ' CLAUDE.md
 ```
@@ -125,6 +127,8 @@ grep -n '^## ' CLAUDE.md
 | 3.14 | No `TBD — set by the walking-skeleton epic` lines that a sheet could have decided | a few are acceptable; a TBD for a value the sheet supplies is a finding |
 | 3.15 | Step 8 reported `frontend-design` and `playwright-cli` as `[MISS]` with install commands | printed, and recorded on a `**Recommended skills:**` line |
 | 3.16 | The first commit exists and stages only setup's own files | `git show --stat HEAD` |
+| 3.17 | **`develop` created and checked out**; `main` holds only the setup commit | `git branch` shows `* develop` and `main`, both at the same commit |
+| 3.18 | The publish question came **after** the commit, on its own — not folded into the confirmation — and "Not now" reported `[N/A] GitHub — not published` | nothing was created on GitHub |
 
 **Common failure to watch for:** if `setup` routes to `bun-web-app-stack.md` despite five "no"
 answers, that is **Critical** — record which answer it misread.
@@ -170,7 +174,7 @@ grep -n '^## ' docs/product-vision-planning/concept-of-operations.md
 | 4.4 | ConOps Section 5 scenarios have **numbered steps naming specific UI elements and data fields** | not "the user tracks a habit" |
 | 4.5 | Product Shape Re-check reported no contradictions | and did not silently rewrite the block |
 | 4.6 | Next Step recommends `/peak-workflow:mockup` **before** capture-requirements (UI project) | present |
-| 4.7 | **Nothing was committed on the base branch** | `git log --oneline main` still shows one commit |
+| 4.7 | **Nothing was committed on the base branch** | `git log --oneline develop` still shows one commit |
 | 4.8 | No ConOps §8 `What Must Never Happen` table | correct — this product switches no equipment |
 
 ---
@@ -294,7 +298,7 @@ this merge.
 ```bash
 cd ~/uat-workspace/habit-tracker
 git status --short                      # commit anything outstanding first
-git checkout main
+git checkout develop
 git merge docs/habit-tracker --no-ff
 git log --oneline
 ```
