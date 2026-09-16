@@ -205,7 +205,7 @@ Fresh session, `/peak-workflow:plan-project`.
 | 7.6 | **Section 2.1 `Target OS` drops applied** — `Target OS: Windows` means the `mac` and `linux` blocks in 4.8 are omitted, and no script names were removed | check `electron-builder` config |
 | 7.7 | The **offline rule** is honored in the plan: no CDN scripts or stylesheets, no web fonts fetched at launch (system stack or a bundled `@fontsource/*`), icons from bundled `lucide-react` only, no telemetry | stated in the skeleton spec |
 | 7.8 | The skeleton names the **test-only fault/latency switch** (env var read at startup, ignored when `app.isPackaged`) and the **data reset** that redirects `app.getPath('userData')` to a fresh temp dir per test | present in Key Components |
-| 7.9 | The E2E harness is self-contained: `test:e2e` builds first (`bun run build`), and the launcher uses **`args: ["."]`** so Electron reads `package.json` — not a path to `out/main/index.js` | this exact bug was fixed in v1.11.0; a regression is Critical |
+| 7.9 | The E2E harness is self-contained: `test:e2e` builds first (`bun run build`), and the launcher uses **`args: ["."]`** so Electron reads `package.json` — not a path to `out/main/index.js` | this exact bug was fixed in v2.0.0; a regression is Critical |
 | 7.10 | Playwright is scoped to the E2E directory only | `testDir` set |
 | 7.11 | The skeleton spec has a `## Screens` section; the Application menu and Window rows carry `—` | present |
 
