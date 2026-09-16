@@ -10,19 +10,22 @@
               ┌─────────────┴─────────────┐
               │                           │
               ▼                           ▼
-         No (greenfield)           Yes (brownfield)
+       No (greenfield)             Yes (brownfield)
               │                           │
               ▼                           ▼
-       /peak-workflow:setup    Was it built with epic-workflow?
+    /peak-workflow:setup       Was it built with epic-workflow?
               │                           │
               ▼                  ┌────────┴────────┐
-        /discover                ▼                 ▼
-              │                Yes              No (already
-              ▼                  │              peak-workflow
-   /capture-requirements         ▼              or different)
-              │      /peak-workflow:               │
-              ▼      migrate-from-                 ▼
-       /plan-project   epic-workflow         /triage  or  /status
+          /discover              ▼                 ▼
+              │                 Yes          No (already
+              ▼                  │           peak-workflow
+      /mockup (UI apps)          ▼           or different)
+              │            /peak-workflow:         │
+              ▼            migrate-from-           │
+    /capture-requirements  epic-workflow           │
+              │                  │                 │
+              ▼                  │                 ▼
+        /plan-project            │         /triage  or  /status
               │                  │                 │
               ▼                  ▼                 ▼
          iterate via /start-epic / /wrapup-epic / /quick-fix
@@ -134,19 +137,34 @@ same chain through the **UX Baseline** section that `/setup` writes for UI proje
 | `/setup` | Declares the design system (default shadcn/ui on Tailwind v4, themed only through CSS-variable tokens in the global stylesheet) and the interaction conventions every screen must meet — Screen states, Keyboard & focus, Forms, Destructive actions, Progress feedback, Layout floor, Contrast, Reduced motion, Navigation, and for desktop apps the Desktop conventions. Every line has a default a non-technical user can accept. |
 | `/capture-requirements` | Derives one Playwright-observable baseline UX TOR per active line, ahead of the domain TORs. |
 | `/plan-project` | The walking-skeleton epic owns those TORs: it installs the design system, builds the app shell, and ships one reference screen that proves them. Later slices compose from the shell; none installs a second component library. |
-| `/start-epic` | UI middle steps name each screen and its four states. |
+| `/start-epic` | A Design pass invokes the installed design skills; UI middle steps name each screen, its four states, and the design tooling used. |
 | `/wrapup-epic` | Runs the UX Baseline check as a quality gate on every screen a UI epic adds or changes — a FAIL is Fix now / Stop, never deferred. |
 
-On UI projects `/mockup` runs between `/discover` and `/capture-requirements` — it turns the
-ConOps scenarios into an `S-NN` screen inventory, flows, and wireframes that are grayscale on
-purpose, because visual design lands in the walking-skeleton epic. It is UX, not style:
-palette, typography, and brand are not TORs. `/setup` also recommends companion skills for UI
-projects — `frontend-design@claude-plugins-official` for visual execution and `playwright-cli`
-for verification (web; desktop apps verify through a Playwright Electron harness in `tests/e2e/`) —
-and records the precedence rule: the UX Baseline and the design-system tokens win over
-design-skill choices. On shadcn stacks `/setup` also installs the shadcn/ui skill and MCP server,
-and every UI epic's plan has a **Design pass** step that invokes whichever design skills are
-installed at that moment.
+### Design process — from first sketch to shipped screen
+
+Most people building an app have no design background, so design is a planned part of every UI
+project rather than something left to chance:
+
+1. **See the screens first — `/mockup`.** Runs between `/discover` and `/capture-requirements`.
+   It turns the ConOps scenarios into an `S-NN` screen inventory, per-scenario flows, and one
+   grayscale wireframe per screen (loading / empty / error / populated), laid out on standard
+   shadcn app shells. `wireframes/index.html` opens in your browser for up to three rounds of
+   changes. ConOps steps are then rewritten to name each screen and control, so TORs cite them.
+   Wireframes are grayscale on purpose: layout and behavior now, look and feel later.
+2. **Declare the UX rules once — `/setup`.** The UX Baseline above, plus the tooling: on shadcn
+   stacks it installs the shadcn/ui skills and the `shadcn` MCP server (component lookup) and
+   commits them for the team; it also recommends `frontend-design@claude-plugins-official` and,
+   for web UIs, `playwright-cli`. Restart Claude Code afterwards and approve the `shadcn` server.
+3. **Build with the best tools — `/start-epic`.** Every UI epic's plan has a numbered **Design
+   pass** before any screen work. It invokes whichever design skills are installed *at that
+   moment* (`frontend-design`, a brand kit, `dataviz` when charts are involved, shadcn) and looks
+   each component up through the shadcn MCP tools before composing it.
+4. **Check every screen — `/wrapup-epic`.** The UX Baseline gate and wireframe-fidelity check run
+   on every screen the epic touched. The handoff and the report show `Design skills used:`.
+
+**Precedence:** TOR Given/When/Then > wireframe layout > UX Baseline and design tokens >
+design-skill choices. Palette, typography, and brand are never TORs; theme changes go in the
+token file only.
 
 **Stack defaults come from the reference sheets.** Three sheets ship with the plugin under
 [`references/`](references/): [`bun-static-spa-stack.md`](references/bun-static-spa-stack.md)
@@ -192,14 +210,14 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 | Command | Purpose |
 |---|---|
 | `/new-project` | **Front door for newcomers.** Detects project state (greenfield, brownfield epic-workflow, or existing peak-workflow) and dispatches to the right entry point. Writes no state files. |
-| `/setup` | Audits `CLAUDE.md` (Project Overview, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, and recommends companion skills. **Run once per project, before `/discover`.** |
+| `/setup` | Audits `CLAUDE.md` (Project Overview, Product shape, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, installs the shadcn skills and MCP server on shadcn stacks, recommends companion skills, creates `develop`, and offers to publish to GitHub. **Run once per project, before `/discover`** (re-run to pick up new sections). |
 
 ### Plan
 
 | Command | Purpose | Branch / Status |
 |---|---|---|
 | `/discover` | Adaptive interview that produces `product-vision.md` + `concept-of-operations.md` | Creates `docs/{task-short-name}` branch |
-| `/mockup [scenario]` | Low-fidelity UX prototyping for Web / Desktop / UI-Hybrid projects — derives an `S-NN` screen inventory, per-scenario flows, and grayscale HTML wireframes from the ConOps, then rewrites ConOps steps to name screens and controls so TORs cite them | Continues on `docs/` branch |
+| `/mockup [scenario]` | Low-fidelity UX prototyping for Web / Desktop / UI-Hybrid projects — derives an `S-NN` screen inventory, per-scenario flows, and grayscale HTML wireframes (shadcn app-shell layouts, reviewed in the browser) from the ConOps, then rewrites ConOps steps to name screens and controls so TORs cite them | Continues on `docs/` branch |
 | `/capture-requirements` | Derives TOR requirements (`.feature.md` files + `.feature.tracing.json` sidecars) from vision + ConOps | Continues on `docs/` branch |
 | `/plan-project` | Derives implementation plan (phases, epics, Requirements Anchors specs) from TOR requirements | Continues on `docs/` branch |
 | `/add <description>` | Adds new epic(s) referencing existing TOR IDs | — (writes planning docs) |
@@ -355,6 +373,7 @@ docs/product-vision-planning/
   concept-of-operations.md    ← user scenarios (written by /discover; steps name screens after /mockup)
   ux/screens.md               ← S-NN screen inventory, states, per-scenario flows (written by /mockup, UI projects)
   ux/wireframes/S-NN-*.html   ← grayscale wireframes, one per screen, four states (same)
+  ux/wireframes/index.html    ← browser index of every wireframe (same)
   ux/README.md                ← how to open the wireframes (same)
   changelogs/                 ← brownfield discovery changelogs
 
@@ -395,6 +414,7 @@ The key distinction between peak-workflow and a typical Agile workflow:
 | `CLAUDE.md` | Auto-loaded every session — project context, tech stack, quality gates |
 | `docs/product-vision-planning/product-vision.md` | Product vision (written by `/discover`) |
 | `docs/product-vision-planning/concept-of-operations.md` | Operational scenarios (written by `/discover`) |
+| `docs/product-vision-planning/ux/` | Screen inventory and wireframes (written by `/mockup`, UI projects) |
 | `docs/requirements/*.feature.md` | TOR requirements — Gherkin feature files (written by `/capture-requirements`) |
 | `docs/requirements/*.feature.tracing.json` | TOR → vision/ConOps linkage (written by Haiku sub-agent) |
 | `docs/implementation-plan/phase-N-*/index.md` | Per-phase epic registry — append-only |
@@ -403,3 +423,4 @@ The key distinction between peak-workflow and a typical Agile workflow:
 | `docs/implementation-plan/session-handoffs/` | Implemented and complete handoff files |
 | `docs/architecture.md` | System architecture (stubbed by `/setup`, refreshed by `/refresh-docs`) |
 | `docs/design-notes.md` | Design decisions (same as above) |
+| `.claude/skills/`, `.mcp.json` | shadcn/ui skills and the `shadcn` MCP server (installed by `/setup` on shadcn stacks, committed) |
