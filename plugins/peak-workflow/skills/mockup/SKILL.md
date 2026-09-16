@@ -176,9 +176,14 @@ and ask: *which screen is the actor looking at, and which control do they use?* 
 distinct place in the app the user can name ("the Orders list", "the Edit Supplier dialog") —
 not a component and not a state.
 
-Use the discover interview protocol: **draft first**, present, ask the user to *confirm, refine,
-or reject each item*, iterate at most **2 rounds**, then gate. Round 1 presents the inventory
-alone; round 2 presents the revised inventory together with the screen flows from Step 4.
+**Draft this autonomously — hold no inline interview.** The inventory table and the mermaid flows
+are machine-readable artifacts bound for `screens.md`: a nine-column table wraps into mush in a
+terminal and a mermaid block is just source code there, so presenting either for approval asks
+the user to review a format they cannot read. The wireframes are what a person can actually
+judge. This skill therefore drafts the inventory, the states, and the flows in one pass, writes
+`screens.md`, generates the wireframes, and gates **once** — on the wireframes, at Step 6. A
+wrong inventory is cheap to correct there: the rows change and the affected wireframes are
+rewritten.
 
 ### 3.1: Draft the inventory
 
@@ -224,14 +229,17 @@ For every data-bearing screen, draft the four states as one short line each:
 - **error** — the visible text naming the problem *and* the next action, plus the retry control.
 - **populated** — what is rendered when data exists (reference the Data shown column).
 
-### 3.3: Present round 1
+### 3.3: Print the orientation line, not the table
 
-Show the inventory table and the states list. Ask:
+Do not print the inventory table or the states list to the terminal. Print one compact line per
+screen so the user knows what is being drawn and can interrupt if a screen is obviously wrong,
+then continue straight to Step 4:
 
-> Confirm, refine, or reject each screen and state. Say "confirm all" if the draft is right.
-
-Incorporate the feedback. Then proceed to Step 4 — the second round presents inventory and flows
-together.
+```
+Drafting {N} screens, then writing wireframes:
+- S-01 {Screen Name} — {purpose, trimmed to ~8 words}
+- S-02 {Screen Name} — {purpose, trimmed to ~8 words}
+```
 
 ---
 
@@ -259,17 +267,10 @@ flowchart LR
   S01 -->|"No orders — Create first order button"| S02
 ```
 
-### 4.2: Present round 2 and gate
+Do not print the flows to the terminal — mermaid does not render there. They go straight into
+`screens.md`, where the user reads them rendered on the `docs/` branch.
 
-Show the revised inventory, the states, and every flow. Ask once more to confirm, refine, or
-reject each item. Apply the feedback (this is the last refinement round), then gate via
-`AskUserQuestion`:
-- Question: `"Approve this screen inventory and these flows, or adjust before I draw the wireframes?"`
-- Options: `["Approve — draw the wireframes", "Adjust — I'll describe the changes"]`
-
-If Adjust, apply the described changes once and proceed without re-asking.
-
-### 4.3: Write screens.md
+### 4.2: Write screens.md
 
 Write `docs/product-vision-planning/ux/screens.md` following
 `plugins/peak-workflow/skills/mockup/SCREENS_TEMPLATE.md` (`mkdir -p docs/product-vision-planning/ux/wireframes`
@@ -287,6 +288,12 @@ For every screen in scope (not the Application menu and Window rows), write the 
 `Wireframe` column in `ux/screens.md` names —
 `docs/product-vision-planning/ux/wireframes/S-NN-<kebab-name>.html` — following
 `plugins/peak-workflow/skills/mockup/WIREFRAME_TEMPLATE.md`. Each file is self-contained:
+
+**Write these files in parallel.** Every screen's wireframe is independent of every other
+screen's — none reads or depends on another's output — so issue one `Write` tool call per screen
+and send them together in a single message/turn instead of one after another. This holds
+regardless of screen count (2 screens or 20): batch every `Write` call for this step into one
+turn.
 
 - **Inline CSS only** — grayscale palette, system font stack, dashed region boxes with a small
   uppercase label. No external stylesheets, fonts, images, or scripts. No colors, no typefaces,
@@ -314,40 +321,88 @@ For every screen in scope (not the Application menu and Window rows), write the 
 ### 5.2: ux/README.md
 
 Write `docs/product-vision-planning/ux/README.md` — one paragraph: these are low-fidelity
-planning wireframes produced by `/peak-workflow:mockup`; open any `wireframes/*.html` file
-directly in a browser (no server needed) and use the state buttons to switch loading / empty /
-error / populated; they are grayscale on purpose — visual design happens in the walking-skeleton
-epic; `screens.md` is the inventory and the ConOps references screens by their `S-NN` IDs.
-Create it only if it does not exist.
+planning wireframes produced by `/peak-workflow:mockup`; open `wireframes/index.html` in a browser
+(no server needed) to get a clickable list of every screen, then use the state buttons on each to
+switch loading / empty / error / populated; they are grayscale on purpose — visual design happens
+in the walking-skeleton epic; `screens.md` is the inventory and the ConOps references screens by
+their `S-NN` IDs. Create it only if it does not exist.
 
-### 5.3: Optional design-canvas publish
+### 5.3: Write the wireframe index
 
-If a design-canvas skill (e.g., one named `design`) is available in this session, offer **once**
-via `AskUserQuestion`:
-- Question: `"A design-canvas skill is available. Also publish these wireframes there for hand-tweaking? The HTML files under ux/wireframes/ remain the committed artifact either way."`
-- Options: `["Yes — publish to the canvas too", "No — HTML files only"]`
+Write `docs/product-vision-planning/ux/wireframes/index.html` following the **Index Template** in
+`plugins/peak-workflow/skills/mockup/WIREFRAME_TEMPLATE.md` — one linked row per screen in
+`ux/screens.md`, in `S-NN` order. This is the file Step 6 opens in the browser, so it is written
+on every run, greenfield or brownfield, and regenerated in full whenever the screen set changes
+(including after a Step 6 adjustment round that adds, merges, or drops a screen).
 
-If Yes, hand the wireframes to that skill as grayscale artboards, one per screen, and instruct it
-to add no colors, typefaces, or imagery. Do not wait on the canvas to continue; do not invoke
-`frontend-design` under any circumstances. If no such skill is available, skip this sub-step
-silently.
+It is a review aid, not a screen: it gets no `S-NN` ID, no row in `ux/screens.md`, and no entry in
+the Step 9 trace table.
 
 ---
 
 ## Step 6: Review Gate
 
-Tell the user:
+This is the **only** human gate in the skill — Steps 3 and 4 drafted without one, because the
+wireframes are the first artifact the user can actually see. Everything upstream (screen rows,
+states, flows) is in scope for the feedback given here.
 
-> Wireframes are written. Open `docs/product-vision-planning/ux/wireframes/` in a browser
-> (double-click any file) and click through the state buttons on each screen.
+**Open the index in the user's default browser.** Do not rely on the user clicking a path —
+several terminals (Ghostty among them) do not linkify bare paths, and a `file://` *directory* URL
+opens Finder on macOS and renders not at all in Safari. Open the `index.html` file itself, with
+the platform's own opener so the user's default browser is honored:
 
-Use `AskUserQuestion`:
-- Question: `"Approve these wireframes, or tell me what to adjust?"`
-- Options: `["Approve", "Adjust — I'll describe the changes"]`
+```bash
+index="$(git rev-parse --show-toplevel)/docs/product-vision-planning/ux/wireframes/index.html"
+case "$(uname -s)" in
+  Darwin*)              open "$index" ;;
+  Linux*)               if command -v wslview >/dev/null 2>&1; then wslview "$index"
+                        else xdg-open "$index"; fi ;;
+  MINGW*|MSYS*|CYGWIN*) start "" "$index" ;;
+  *)                    echo "No opener for $(uname -s) — open manually: $index" ;;
+esac
+```
+
+The command may fail on a headless, SSH, or container session with no browser — that is not an
+error worth retrying. Either way, print the absolute paths as the fallback so the user can copy
+one into a browser or their file manager:
+
+```
+- /abs/path/to/repo/docs/product-vision-planning/ux/wireframes/index.html   ← opened for you
+- /abs/path/to/repo/docs/product-vision-planning/ux/wireframes/S-01-orders-list.html
+- /abs/path/to/repo/docs/product-vision-planning/ux/wireframes/S-02-order-form.html
+```
+
+Then tell the user:
+
+> The wireframe index is open in your browser — click a screen, then use its state buttons to
+> switch loading / empty / error / populated.
+
+Use `AskUserQuestion` — a **single call**, carrying the second question only when a design-canvas
+skill (e.g., one named `design`) is available in this session:
+- Question 1: `"Approve these wireframes, or tell me what to adjust?"`
+  Options: `["Approve", "Adjust — I'll describe the changes"]`
+- Question 2, only if a design-canvas skill is available: `"Also publish these wireframes to the design canvas for hand-tweaking? The HTML files under ux/wireframes/ remain the committed artifact either way."`
+  Options: `["No — HTML files only", "Yes — publish to the canvas too"]`
+
+If no design-canvas skill is available, ask Question 1 alone and never mention a canvas. Ask
+Question 2 on the first round only — carry its answer across any adjustment rounds rather than
+re-asking.
 
 If Adjust, apply the changes to the affected wireframe files **and** to the matching rows,
-states, or flows in `ux/screens.md` (they must not drift), then ask again. Maximum **2 adjustment
-rounds** — if still adjusting after round 2, apply the most recent changes and proceed.
+states, or flows in `ux/screens.md` (they must not drift), then ask again. Maximum **3 adjustment
+rounds** — if still adjusting after round 3, apply the most recent changes and proceed.
+
+Feedback here may be **structural**, not just cosmetic — a screen is missing, two screens should
+be one, a screen was invented that no ConOps step needs. Handle those by re-running Step 3.1 and
+Step 4.1 for the affected rows only, then rewriting each affected wireframe (in parallel, per
+Step 5.1). Never renumber an `S-NN` that survives the change; a screen dropped before any commit
+frees its ID for reuse in this same run only.
+
+**Design-canvas publish.** If the user answered Yes to Question 2, hand the wireframes to that
+skill once they are **final** — after the last adjustment round, so the canvas receives the
+approved artboards — as grayscale artboards, one per screen, instructed to add no colors,
+typefaces, or imagery. Do not wait on the canvas before continuing to Step 7. Do not invoke
+`frontend-design` under any circumstances.
 
 ---
 
@@ -377,7 +432,7 @@ concrete.
    ```
 3. **Update the header:** bump the ConOps **Document Version** by a minor increment (1.0 → 1.1)
    and set **Date** to today. Also set the `**Companion:**` line in `ux/screens.md` to the bumped
-   ConOps version — Step 4.3 wrote it before the bump.
+   ConOps version — Step 4.2 wrote it before the bump.
 4. Do not touch Sections 1–4 or 6–9, and do not rewrite scenarios out of scope.
 5. **Discovery changelog** — write one only when `feature_files_exist = true` (Step 2), in
    either mode. Otherwise the coming `/peak-workflow:capture-requirements` run is greenfield and
@@ -432,7 +487,10 @@ Before the self-check, verify:
   wireframe and in the rewritten ConOps step.
 - [ ] Every path in the `Wireframe` column of `ux/screens.md` exists under
   `docs/product-vision-planning/ux/` (`wireframes/S-NN-<kebab-name>.html`), and every file in
-  `wireframes/` appears in that column. Only the Application menu and Window rows carry `—`.
+  `wireframes/` **except `index.html`** appears in that column. Only the Application menu and
+  Window rows carry `—`.
+- [ ] `wireframes/index.html` exists and links to every `S-NN` wireframe file, with no dead links
+  and no link to a screen that was dropped during a Step 6 adjustment round.
 - [ ] Every `div.region` carries a `data-component` value from the Step 5.1 list.
 - [ ] Desktop apps: `ux/screens.md` has the Application menu and Window rows; every wireframe
   has the menu-bar strip.
@@ -498,6 +556,7 @@ internal scratch.
 ### Documents Written
 - `docs/product-vision-planning/ux/screens.md` — [Created v1.0 / Updated to v{N.N}]
 - `docs/product-vision-planning/ux/wireframes/S-NN-<name>.html` — [one line per file written]
+- `docs/product-vision-planning/ux/wireframes/index.html` — [Created / Regenerated], {N} screens linked
 - `docs/product-vision-planning/ux/README.md` — [Created / unchanged]
 - `docs/product-vision-planning/concept-of-operations.md` — Section 5 steps concretized, v{N.N}
 [Only when `feature_files_exist = true`:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` — [UX Changes appended / replaced / created]

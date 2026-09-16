@@ -179,11 +179,15 @@ my-app/
 │       ├── package.json
 │       ├── index.html
 │       ├── vite.config.ts
+│       ├── components.json        # shadcn config — see 4.10 before running `shadcn init`
 │       └── src/
 │           ├── main.tsx
 │           ├── router.tsx
 │           ├── api.ts             # hc<AppType> client
 │           ├── auth-client.ts     # Better Auth client on /auth
+│           ├── index.css         # design tokens — the only place they live (4.9)
+│           ├── lib/
+│           │   └── utils.ts       # re-exports `cn` (4.10)
 │           ├── components/
 │           │   ├── app-footer.tsx # renders APP_NAME v<version>
 │           │   └── ui/            # shadcn
@@ -270,7 +274,13 @@ my-app/
 }
 ```
 
-> Version ranges are indicative. Pin from the lockfile.
+> Version ranges are indicative. **Resolve each one against the registry at scaffold time**
+> (`npm view <pkg> version`) rather than pinning from memory — several of these move fast and at
+> least one has changed major series since this sheet was written. Then pin from the lockfile.
+>
+> `shadcn add` installs its own peer dependencies. Current versions pull the **unified `radix-ui`
+> package**, not the per-primitive `@radix-ui/react-*` packages — do not pre-declare the
+> individual ones or `knip` will flag them as unused. See 4.10.
 >
 > `name` and `version` are the single source of truth for the app's identity. `packages/core/src/app.ts`
 > (5.0) reads both; the API serves them at `GET /version` (6.1), the footer renders them (7.2), and
@@ -392,12 +402,17 @@ for (const key of ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT
     "paths": {
       "@core/*": ["./packages/core/src/*"],
       "@api/*": ["./apps/api/src/*"],
-      "@web/*": ["./apps/web/src/*"]
+      "@web/*": ["./apps/web/src/*"],
+      "@/*": ["./apps/web/src/*"],
+      "cn": ["./apps/web/src/lib/utils.ts"]
     }
   },
   "include": ["apps", "packages", "tests", "*.ts"]
 }
 ```
+
+The `@/*` and `cn` entries exist for shadcn: generated components import siblings as `@/…` and the
+class helper as `cn` — see 4.10. Both have matching aliases in `apps/web/vite.config.ts` (4.4).
 
 `paths` lives in `tsconfig.json` itself because Bun resolves the `@core/*` aliases from it at
 runtime — so the runtime image copies both files (8.1). `"types": ["bun"]` resolves `@types/bun`
@@ -416,10 +431,14 @@ import { resolve } from "node:path";
 export default defineConfig({
   plugins: [TanStackRouterVite(), react(), tailwindcss()],
   resolve: {
-    alias: {
-      "@core": resolve(__dirname, "../../packages/core/src"),
-      "@web": resolve(__dirname, "src"),
-    },
+    // `__dirname` does not exist in an ESM config file — `import.meta.dirname` is the ESM form.
+    alias: [
+      { find: /^@core\//, replacement: `${resolve(import.meta.dirname, "../../packages/core/src")}/` },
+      { find: /^@web\//, replacement: `${resolve(import.meta.dirname, "src")}/` },
+      { find: /^@\//, replacement: `${resolve(import.meta.dirname, "src")}/` },
+      // shadcn's generated components import the class helper as "cn" (4.10).
+      { find: /^cn$/, replacement: resolve(import.meta.dirname, "src/lib/utils.ts") },
+    ],
   },
   build: { outDir: "dist", sourcemap: true },
   server: {
@@ -433,27 +452,52 @@ export default defineConfig({
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!!**/dist", "!drizzle", "!apps/web/src/components/ui", "!apps/web/src/routeTree.gen.ts"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!drizzle",
+      "!apps/web/src/components/ui",
+      "!apps/web/src/routeTree.gen.ts",
+      "!docs",
+      "!**/*.md"
+    ]
   },
-  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2 },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "correctness": { "useExhaustiveDependencies": "error" },
       "nursery": { "useSortedClasses": "warn" },
       "suspicious": { "noExplicitAny": "error" }
     }
   },
-  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } }
+  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always" } },
+  "css": { "parser": { "tailwindDirectives": true } }
 }
 ```
 
 Biome 2 has no `files.ignore`: `includes` starts with `"**"` and excludes with `!` (a negated pattern
 cannot stand alone); `!!` force-ignores output folders and needs Biome 2.3+ (hence `^2.3`, 4.1). `useSortedClasses` is still a nursery rule.
+
+Three more things this config gets right that the defaults do not:
+
+- **`linter.rules.preset`**, not `linter.rules.recommended` — the latter is deprecated from Biome
+  2.5 and emits a `DEPRECATED` diagnostic on every run, which is enough to make `bun run check`
+  noisy on a fresh repo. `bunx biome migrate --write` converts an older config in place.
+- **`css.parser.tailwindDirectives`** — without it Biome treats `@theme`, `@apply`,
+  `@custom-variant` and `@layer` in `apps/web/src/index.css` (4.9) as parse errors, and then
+  refuses to format the file at all ("Code formatting aborted due to parsing errors").
+- **Excluding `docs` and Markdown** keeps planning artifacts and wireframe HTML out of the
+  formatter's reach.
+
+One rule to expect a fight with: `complexity/noImportantStyles` flags the standard
+`prefers-reduced-motion` override, which needs `!important` to win the cascade over each
+component's own animation. Suppress that block rather than weakening it, with
+`biome-ignore-start` / `biome-ignore-end` comments around it.
 
 ### 4.6 `knip.json`
 
@@ -474,14 +518,17 @@ configured under `workspaces`, the root as `"."`.
       "paths": { "@core/*": ["../../packages/core/src/*"] }
     },
     "apps/web": {
-      "entry": ["src/main.tsx", "src/routes/**/*.tsx"],
+      "entry": ["src/routes/**/*.tsx"],
       "project": ["src/**/*.{ts,tsx}"],
       "paths": {
         "@core/*": ["../../packages/core/src/*"],
         "@api/*": ["../api/src/*"],
-        "@web/*": ["./src/*"]
+        "@web/*": ["./src/*"],
+        "@/*": ["./src/*"],
+        "cn": ["./src/lib/utils.ts"]
       },
-      "ignore": ["src/components/ui/**", "src/routeTree.gen.ts"]
+      "ignore": ["src/components/ui/**"],
+      "ignoreDependencies": ["tailwindcss"]
     },
     "packages/core": {
       "project": ["src/**/*.ts"]
@@ -489,6 +536,16 @@ configured under `workspaces`, the root as `"."`.
   }
 }
 ```
+
+`knip` exits non-zero on **configuration hints**, not just findings, so a config with dead entries
+fails `bun run check` even when the code is clean. Three of them bite here:
+
+- `tailwindcss` is reached only through `@import "tailwindcss"` in the stylesheet and the
+  `@tailwindcss/vite` plugin, so knip sees it as an unused devDependency — hence
+  `ignoreDependencies`.
+- `src/main.tsx` is already an entry point by default; listing it again is "redundant".
+- `src/routeTree.gen.ts` is detected as generated on its own; listing it under `ignore` is
+  "removable".
 
 ### 4.7 `drizzle.config.ts`
 
@@ -545,6 +602,165 @@ S3_ACCESS_KEY_ID=minioadmin
 S3_SECRET_ACCESS_KEY=minioadmin
 S3_FORCE_PATH_STYLE=true
 ```
+
+### 4.9 `apps/web/src/index.css` — the design tokens
+
+The design tokens live here and nowhere else. `shadcn init` writes the full token set for the
+chosen base color — but see 4.10 first, because that command is not reliably runnable on this
+layout and this file is usually written by hand. `main.tsx` imports it once.
+
+The values below are the stock shadcn `neutral` set **with the three that fail an accessibility
+floor retuned**. Measured as WCAG contrast (achromatic OKLCH, so relative luminance is `L³`):
+
+| Token | Stock | Measured | Here | Now |
+|---|---|---|---|---|
+| `--muted-foreground` light | `0.556` | 4.73:1 on white but **4.34:1 on `--muted`** | `0.52` | 5.51 / 5.05 |
+| `--ring` light | `0.708` | **2.59:1** — fails the 3:1 non-text floor | `0.55` | 4.85 |
+| `--ring` dark | `0.556` | 3.19:1 on `--muted` — bare pass | `0.70` | 5.66 |
+| `--input` | `0.922` (same as `--border`) | **1.26:1** — control edges are invisible | `0.62` / `0.60` | 3.64 / 3.83 |
+
+`--border` itself stays stock: it is a decorative separator and needs no contrast. `--input` is
+shadcn's own token for control boundaries, but the stock set gives it the *same* value as
+`--border` — so inputs, outline `Button`s and `Select` triggers all draw a 1.26:1 edge. Separating
+the two is the fix: keep `--border` decorative, darken `--input` past the 3:1 floor, and make sure
+controls use `border-input` rather than `border-border`.
+
+Dark-mode `--muted-foreground` is left at `0.708` — it already measures 5.83:1 in its worst case.
+
+**Measure, don't estimate.** An E2E test that walks every text node and control boundary is the
+arbiter; these values are a starting point that passes, not a substitute for the check.
+
+```css
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.52 0 0);      /* retuned: 5.51:1 on white, 5.05:1 on --muted */
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);               /* decorative separators only */
+  --input: oklch(0.62 0 0);                 /* retuned: control edges, 3.64:1 on white */
+  --ring: oklch(0.55 0 0);                  /* retuned: 4.85:1 on white */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);     /* already 5.83:1 worst case — unchanged */
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(0.6 0 0);                  /* retuned: opaque, 3.83:1 on --muted */
+  --ring: oklch(0.7 0 0);                   /* retuned: 5.66:1 on --muted */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* biome-ignore-start lint/complexity/noImportantStyles: overriding every component's own
+     animation is the point. */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* biome-ignore-end lint/complexity/noImportantStyles: end of the reduce-motion override */
+}
+```
+
+Add a new semantic color by defining `--x` and `--x-foreground` in both `:root` and `.dark` and
+mapping them in `@theme inline`. Never edit a generated file under `apps/web/src/components/ui/`.
+
+### 4.10 shadcn/ui: what the CLI actually does today
+
+The shadcn CLI moves faster than this sheet. Treat the commands below as *shapes*, verify them
+against `bunx shadcn@latest init --help` at scaffold time, and expect these differences:
+
+- **`init` is not the command it used to be.** `--base-color` no longer exists (the flags are now
+  `-t <template>`, `-b base|radix|aria`, `-p <preset>`), and `init` leans toward scaffolding a new
+  project rather than configuring an existing one — on a workspace layout like this it is prone to
+  writing into the wrong directory. **Write `components.json` and `apps/web/src/index.css` by hand
+  (4.9) and run only `add`.**
+- **`add` emits `import { cn } from "cn"`**, not `@/lib/utils`. If nothing resolves `cn`, the CLI
+  will "helpfully" install an unrelated npm package literally named `cn`. Resolve it with a path
+  alias in `tsconfig.json` (4.3) and `apps/web/vite.config.ts` (4.4), plus the one-line re-export
+  below — never by editing the generated file, which the next `--overwrite` would undo.
+- **`add` emits `import { Dialog as DialogPrimitive } from "radix-ui"`** — the unified package.
+  Declare `"radix-ui"` once in `apps/web/package.json` and remove any per-primitive
+  `@radix-ui/react-*` entries afterwards.
+
+`apps/web/components.json`:
+
+```json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/index.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  }
+}
+```
+
+`apps/web/src/lib/utils.ts` — the shim that makes both import spellings resolve to one helper:
+
+```ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+
+**Generated components drift, and requirements written against them go stale.** Two live examples:
+`@radix-ui/react-dialog` 1.1.x stopped emitting `aria-modal="true"` (it relies on inert siblings),
+so a requirement naming that attribute has to set it as a prop on `DialogContent`; and the
+generated `Button` carries `transition-all`, so `getComputedStyle` reads an *interpolated* outline
+for ~200 ms after focus lands — a focus-ring assertion has to wait for the transition to settle or
+it measures a frame of the animation. Assert against the rendered DOM, not against what the
+library used to do.
 
 ---
 
@@ -2027,6 +2243,11 @@ export default defineConfig({
 });
 ```
 
+> If the E2E stack is brought up with a flag the ordinary stack does not set (the test-only fault
+> / latency switch the walking skeleton ships), set `reuseExistingServer: false`. Otherwise a
+> compose stack left running from an ordinary `bun run compose:up` gets reused and the hooks are
+> silently absent — the error-state and Progress feedback checks then fail for the wrong reason.
+
 `webServer` starts the compose stack, so Docker must be running and `.env` must exist
 (`cp .env.example .env`) — compose reads it through `env_file`.
 
@@ -2035,6 +2256,7 @@ export default defineConfig({
 ## 10. Daily Commands
 
 ```bash
+bun --version                            # must be 1.2+; `bun upgrade` if the machine is behind
 cp .env.example .env
 bun install
 docker compose up -d minio minio-init   # local S3 only
@@ -2044,7 +2266,7 @@ bun run db:generate                      # after schema changes; commit drizzle/
 bun run check                            # typecheck + lint + deadcode + tests
 bun run compose:up                       # full stack as it runs in prod
 bun run test:e2e                         # needs Docker running and .env
-bunx shadcn@latest add button dialog
+bunx shadcn@latest add button dialog     # see 4.10 — `init` is the one to be careful with
 ```
 
 ---
@@ -2103,6 +2325,10 @@ Each of these is already handled by the configuration above.
 | Docker build cache misses | Every code change reinstalls deps. | Lockfile and workspace manifests copied before source (8.1). |
 | Logs unreadable locally | JSON logs in a terminal. | `bun run dev:api:pretty` (4.1). |
 | Lint noise from generated files | shadcn and route tree churn. | Excluded in Biome and Knip (4.5, 4.6). |
+| Generated components drift from the requirement | A TOR names an attribute or behaviour the current library version no longer produces. | Assert against the rendered DOM; set the attribute as a prop rather than editing `components/ui/` (4.10). |
+| Scaffold configs that fail their own gate | `bun run check` is red on a fresh, empty repo. | Biome `preset` + CSS parser options (4.5) and knip configuration hints (4.6) are both exit-code-bearing. |
+| Design-system defaults below the contrast floor | Focus rings, muted text and control edges fail WCAG out of the box. | Retuned `--ring`, `--muted-foreground` and `--input` (4.9); measure with a test. |
+| `shadcn init` writing into the wrong workspace | `init` scaffolds rather than configures, and this is a monorepo. | Write `components.json` and `index.css` by hand; run only `add` (4.10). |
 
 ---
 

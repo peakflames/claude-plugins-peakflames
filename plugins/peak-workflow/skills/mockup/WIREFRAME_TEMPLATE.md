@@ -148,3 +148,63 @@ Rules the populated file must keep:
 </body>
 </html>
 ```
+
+---
+
+## Index Template — `wireframes/index.html`
+
+Written by `mockup` Step 5.3, one per project, regenerated whenever the screen set changes. It is
+the **entry point for review**: Step 6 opens this file in the user's default browser, and every
+screen is one click away from it. Prefer it over a `file://` directory listing — a directory URL
+opens Finder rather than a browser on macOS, and Safari will not render one at all.
+
+Same constraints as a wireframe: inline CSS, grayscale, system font, no external resources, no
+script. One `<tr>` per screen in `ux/screens.md`, in `S-NN` order, including the Application menu
+and Window rows (desktop) — those link to nothing, so their Screen cell is plain text, not a link.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{Product Name} — wireframe index</title>
+<style>
+  /* Low fidelity on purpose: grayscale only, system font, no brand. Do not add colors or typefaces. */
+  :root { --ink: #222; --mid: #777; --line: #999; --fill: #f2f2f2; --paper: #fff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; font-family: system-ui, sans-serif; font-size: 14px; color: var(--ink); background: var(--paper); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--mid); margin: 0 0 20px; }
+  table { border-collapse: collapse; width: 100%; max-width: 940px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mid); border-bottom: 2px solid var(--ink); }
+  td a { color: var(--ink); font-weight: bold; }
+  .meta { color: var(--mid); font-size: 12px; }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  footer { margin-top: 20px; font-size: 12px; color: var(--mid); }
+</style>
+</head>
+<body>
+<h1>{Product Name} — wireframe index</h1>
+<p class="sub">{N} screens &middot; low-fidelity planning wireframes &middot; grayscale on purpose</p>
+<table>
+  <thead>
+    <tr><th>Screen</th><th>Purpose</th><th>States</th><th>Serves</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="{S-NN}-{kebab-name}.html">{S-NN} {Screen Name}</a></td>
+      <td>{purpose}</td>
+      <td class="meta">{states}</td>
+      <td class="meta">{S1.1, S1.2}</td>
+    </tr>
+  </tbody>
+</table>
+<footer>
+  Open a screen and use its state buttons to switch loading / empty / error / populated.
+  The inventory and the per-scenario flows live in <code>../screens.md</code>.
+</footer>
+</body>
+</html>
+```

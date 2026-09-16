@@ -547,10 +547,10 @@ line by line only where the user asks.
      workspace layout, `src/renderer/src/index.css` for the desktop sheet. Name the path the
      project will actually have — the walking skeleton creates it.
    - `--radius` is the single radius knob — the whole radius scale derives from it.
-   - Base color is chosen once — at `bunx shadcn@latest init` on the web and static sheets, in the
-     shipped `components.json` and token stylesheet on the desktop sheet (current set: `neutral`,
-     `stone`, `zinc`, `mauve`, `olive`, `mist`, `taupe`; default `neutral`) — and is not changed
-     casually afterwards.
+   - Base color is chosen once, in the `components.json` and token stylesheet every sheet now
+     ships (current set: `neutral`, `stone`, `zinc`, `mauve`, `olive`, `mist`, `taupe`; default
+     `neutral`), and is not changed casually afterwards. `bunx shadcn@latest init` is never run —
+     see the sheet's shadcn section.
    - Dark mode uses the `dark` class on the root element, switched by a ThemeProvider
      (light / dark / system).
    - New semantic colors are added by defining `--x` / `--x-foreground` in `:root` and `.dark`
