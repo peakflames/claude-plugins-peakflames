@@ -24,6 +24,9 @@ Run them in that order if you are running all four: 1 and 2 are the cheapest, 3 
 needs the .NET SDK. **None of them needs a cloud account or an OAuth client** — Shiftboard's
 deferred mode is specifically the path that does not block on an external approval.
 
+**Publishing to GitHub** is exercised once, on Shiftboard (it needs a GitHub account and `gh`).
+On the other three, answer `setup`'s publish question with **"Not now"**.
+
 The four product descriptions in one place (paste-ready): [project-descriptions.md](project-descriptions.md).
 
 ---
@@ -129,14 +132,15 @@ each project doc:
 
 | # | Criterion | How to check |
 |---|---|---|
-| G1 | Planning work never touched the base branch | `git log --oneline main` (or `develop`) shows no planning commits before the merge |
+| G1 | Planning work never touched the base branch | `git log --oneline develop` shows no planning commits before the merge |
 | G2 | `CLAUDE.md` has all required sections after `setup` | Project Overview, Tech Stack, Local Environment, Tool Hygiene & Operability, Security Baseline, Verification & Quality Gates, Release Protocol (+ UX Baseline on UI projects) |
 | G3 | Every TOR ID matches `TOR-[0-9]{2}-[A-Za-z0-9]{7}` | `grep -rhoE 'TOR-[0-9]{2}-[A-Za-z0-9]{7}' docs/requirements/ \| sort -u \| wc -l` |
 | G4 | Every TOR ID is owned by exactly one epic | compare the union of `requirements:` lines in `docs/implementation-plan/status/epic-*.md` against G3's list — no duplicates, no orphans |
 | G5 | No unresolved deferred values survive the skeleton | on the skeleton's feature branch: `grep -nE 'TBD — set by the walking-skeleton epic\|— unconfirmed\|Board: not chosen\|\*\*Not decided yet:\*\*' CLAUDE.md` returns nothing |
 | G6 | The skeleton actually builds and its tests pass | run the Tests command from `CLAUDE.md`'s Verification & Quality Gates section yourself, cold |
 | G7 | `/peak-workflow:status` reports coverage without errors | run it after the merge; Requirements Coverage should be 100% planned |
-| G8 | The question count is sane | count every question asked across `setup` — the v1.11.0 contract is 2–5 typical. More than ~8 is a finding |
+| G8 | The question count is sane | count every question asked across `setup` — the v1.11.0 contract is 2–5 typical, plus the publish question. More than ~8 is a finding |
+| G9 | `develop` is the base branch | after `setup`: `git branch` shows `* develop` and `main`; every later `docs/` and `feature/` branch is cut from `develop` and merges back into it |
 
 ---
 
