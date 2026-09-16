@@ -34,8 +34,15 @@ Follow these steps exactly:
 1. Read `CLAUDE.md` at the repo root for project context and tech stack. Capture the
    **Project type** from its `Tool Hygiene & Operability` section and, when present, the
    **UX Baseline** section (design system, app shell, screen-state and keyboard conventions) —
-   Step 3A.1 uses both to shape the walking skeleton.
+   Step 3A.1 uses both to shape the walking skeleton. Also capture the `**Product shape:**` block
+   when present — a row it records as `N/A — <reason> (shape Q<N>)` is a decision, not a gap.
+1b. Read `docs/design-notes.md` when it exists. A numbered decision there that names deferred work
+   (for example *Organization Sign-In Deferred*) is an epic this plan must carry — Step 3A.4 places
+   it. A decision with no epic is the failure mode this read exists to prevent.
 2. Read `docs/product-vision-planning/product-vision.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
+2b. **Blockers from discovery.** Grep `docs/product-vision-planning/concept-of-operations.md` for
+   `**Open — blocks planning:**` and `— NOT present`. Any hit stops this skill: quote the line and
+   tell the user it must be resolved (by re-running `/peak-workflow:discover`) before planning.
 3. Read `docs/product-vision-planning/concept-of-operations.md` — if it does not exist or is a placeholder, stop and tell the user to run `/peak-workflow:discover` first.
 4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file:
    - Parse every `Scenario: [TOR-NN-XXXXXXX]` block: capture the TOR ID, scenario title, feature file path, and full Given/When/Then.
@@ -55,9 +62,15 @@ Follow these steps exactly:
 
 **Brownfield** = at least one phase index file exists with one or more epic rows. Proceed to Step 3B.
 
+**Existing code** is a separate signal: a build manifest at the root or one level down
+(`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `*.csproj`, `*.sln`, `CMakeLists.txt`,
+`platformio.ini`, `Makefile`) or a populated `src/`. A repository with code but no epics is
+**Greenfield with existing code** — Step 3A applies, and 3A.1 extends the code instead of
+scaffolding.
+
 Report the detection result:
 ```
-Mode: [Greenfield / Brownfield]
+Mode: [Greenfield / Greenfield with existing code / Brownfield]
 Existing epics: [N epics across M phases / none]
 ```
 
@@ -74,7 +87,8 @@ have to catch. One horizontal epic is the exception, and it always comes first.
 
 Form exactly one horizontal epic that stands the system up end to end with no domain logic:
 project scaffolding (including a tech-stack `.gitignore` — `setup` 7.4 only warns when one is
-missing), build and test tooling, dev environment, CI, and the thinnest possible path through
+missing), build and test tooling, dev environment, CI (only when `CLAUDE.md`'s Release Protocol
+or `**Not decided yet:**` line names one), and the thinnest possible path through
 every layer the product has. The **tool-hygiene baseline TORs** captured in
 `capture-requirements` 3A.2.1 (version exposure, startup log line, logging convention, error
 message standard, and for CLIs exit codes and stdout/stderr discipline) are this epic's
@@ -83,8 +97,18 @@ tool-hygiene nor baseline UX TORs exist (`capture-requirements` skipped 3A.2.1 a
 skeleton has `requirements: —` (5.3b) and its spec Description states that wrapup verifies the
 architectural pattern only.
 
+**Greenfield with existing code:** the skeleton never re-scaffolds, never runs a project
+generator, and never reads a reference sheet. It extends what is there: adds only the layers
+`CLAUDE.md`'s `**Not decided yet:**` line lists or marks `TBD`, replaces template sample code (e.g. a
+`WeatherForecast` endpoint) with the tool-hygiene baseline, and adds the version element when the
+manifest lacks it. Name every existing project and file the skeleton will modify in Key Components.
+
+A sheet's sample domain (the web sheet's `conversations` / `messages`) is illustrative: the
+skeleton replaces it with the entity the reference screen needs, keeping the same file shapes.
+
 The skeleton's job is to establish the architectural pattern every later slice follows (how a
-request reaches a handler, how a screen calls the API, where tests live). Its spec Description
+request reaches a handler, how a screen calls the API, how the firmware reaches the hardware
+abstraction, where tests live). Its spec Description
 must say so, and must state that `docs/architecture.md` records the pattern once the skeleton
 is complete.
 
@@ -100,18 +124,48 @@ skeleton must:
   never by editing generated component files). When `CLAUDE.md`'s Tech Stack came from a
   reference sheet (`/peak-workflow:setup` names which one), scaffold from that sheet rather
   than from a generator: create the tree in its **Section 3 Repository Layout** and write the
-  files in its **Section 4 Configuration Files** verbatim, substituting the project name, then
-  `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
+  files in its **Section 4 Configuration Files** verbatim, substituting the project name — except
+  what the sheet's **Section 2.1 Dropping a layer** table removes for every row `CLAUDE.md` marks
+  `N/A` (and, on the desktop sheet, the blocks for operating systems not in `Target OS`; for a
+  Service or API on the web sheet, everything under `apps/web/` and its Vite, router, and
+  component-test configuration, which `setup` marks `N/A — no user interface (Service or API)`)
+  — then `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
   involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
-  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer (both
-  sheets already carry the `@tailwindcss/vite` plugin and the path aliases in their Vite
-  config). Desktop specifics the sheet supplies and the skeleton must not drop:
-  `trustedDependencies` (`electron`, `better-sqlite3`, `@electron/rebuild`) and the
-  `electron-rebuild` postinstall, `asarUnpack` for `better-sqlite3`, `contextIsolation` +
+  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer on the
+  web and static sheets (both carry the `@tailwindcss/vite` plugin and the path aliases in their
+  Vite config). The desktop sheet ships `components.json`, `lib/utils.ts`, and the token stylesheet
+  itself — `init` does not recognize electron-vite — so run only `bunx shadcn@latest add <name>`
+  there. Static-SPA specifics the sheet supplies and the skeleton must not drop: hash history
+  on the router (a static host has no rewrite rules), `base` taken from `BASE_PATH` so the
+  GitHub Pages project path resolves, `__APP_VERSION__` injected from `package.json#version`
+  (this is the Version exposure mechanism — the footer and the first console line both read it),
+  the Dexie `version().stores()` block, `fake-indexeddb` preloaded for tests, the JSON
+  export/import pair, and the deploy workflow in `.github/workflows/`. Web-sheet specifics the
+  skeleton must not drop: `packages/core/src/app.ts` as the one reader of `package.json#version`,
+  feeding `GET /version`, the footer, and the first log line from `apps/api/src/logger.ts`; the root
+  `tsconfig.json`; the auth `basePath`; and Playwright's `testDir: "tests/e2e"`. Desktop specifics the
+  sheet supplies and the skeleton must not drop:
+  `trustedDependencies` (`electron`), better-sqlite3's N-API prebuilds with no native rebuild
+  (`npmRebuild: false`), `asarUnpack` for `better-sqlite3`, `contextIsolation` +
   `sandbox` + `nodeIntegration: false`, Zod-validated IPC, and `migrate()` at startup resolving
   the SQL folder from `process.resourcesPath` when packaged.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
+- When `CLAUDE.md`'s `**Product shape:**` block records `**Access rule:** owner-or-permitted-role`
+  (every sign-in project), the skeleton owns: the sheet's auth layer with sign-in working for real
+  (no placeholder identity, no anonymous fallback, no header-asserted user), an owner column on
+  every table, one **owner-or-permitted-role** access rule that every route calls, and the role
+  field plus the roles named in `CLAUDE.md` when the roles follow-up was yes. A **named** provider
+  is configured in the skeleton too, with tests signing in through the email-and-password helper,
+  in the audience mode `CLAUDE.md` records (org-only or mixed). The skeleton plan includes a plain
+  checklist for the person who administers the provider — create the OAuth client, register the
+  local and production callback URLs, set the consent screen's audience and publish it (an
+  unpublished app admits only listed test users), and paste the client ID and secret into `.env`.
+  Substitute the role names `CLAUDE.md` records into the sheet's single roles constant — nowhere
+  else.
+  When the Tech Stack records `Auth: local accounts now, org SSO deferred`, the organization's
+  provider is **its own later epic** — see Step 3A.4. Name the access rule, the owner columns, and
+  the auth configuration in Key Components.
 - Ship **one reference screen** that renders the loading, empty, error, and populated states and
   passes every baseline UX TOR. It is the pattern every later screen copies. The reference
   screen is the screen the baseline UX TORs name (the `# Note: reference screen` line under
@@ -123,29 +177,83 @@ skeleton must:
   action on it. The screens the note names are skeleton-owned: a later slice that extends one
   of them does not re-list it. "No domain logic" means no business rules, not no data.
 - Ship a **test-only fault / latency injection switch**: an environment variable read at
-  startup, honored by the E2E harness, ignored in production builds. The error-state and
-  Progress feedback TORs cite it in their Givens — a local SQLite app has nothing else to
-  throttle or fail. Ship a **test-only data-directory override** beside it: an environment
-  variable that redirects the database location (normally `app.getPath('userData')`) to a
-  fresh temp directory the harness creates per test, so empty-state, populated-state, and
-  destructive-action Givens start from an empty database instead of the developer's live data.
-  Name both switches in Key Components.
+  startup (a build-time `import.meta.env` flag for a static SPA, which has no process
+  environment), honored by the E2E harness, and ignored in anything a user runs — a packaged
+  desktop app (`app.isPackaged`), a production server (`NODE_ENV=production`,
+  `ASPNETCORE_ENVIRONMENT=Production`), a deployed static build. The harness runs
+  the production build, so "ignored in production builds" is the wrong gate. The error-state and
+  Progress feedback TORs cite it in their Givens — an app with a local database has nothing else
+  to throttle or fail. Ship a **test-only data reset** beside it, in the form the stack actually
+  has: a desktop app redirects the database location (normally `app.getPath('userData')`) to a
+  fresh temp directory per test via an environment variable; a served web app points at a throwaway
+  database file the same way; a static SPA has no process environment and no data directory, so it
+  deletes and recreates its IndexedDB database in the harness's per-test setup (the static sheet's
+  Section 7 shows this). Either way, empty-state, populated-state, and destructive-action Givens
+  start from an empty database instead of the developer's live data. Name both switches in Key
+  Components.
 - Make the **E2E harness self-contained**: its `globalSetup` (or the `test:e2e` script) runs the
   production build the entry point needs (reference-sheet desktop stack: `bun run build`, whose
-  electron-vite output is the `out/main/index.js` the sheet's Section 7 E2E example launches;
-  web: the Vite build) and `_electron.launch` targets the built entry, so the Tests command in
-  `CLAUDE.md` works cold in a fresh wrapup session.
+  electron-vite output is the `out/main/index.js` that `package.json#main` points at, and the sheet's Section 7 E2E example launches the app directory (`args: ["."]`) so Electron reads that `package.json`;
+  static SPA: the sheet's `webServer` command builds and previews the bundle; web: the Vite
+  build) and the launcher targets the built entry, so the Tests command in `CLAUDE.md` works
+  cold in a fresh wrapup session.
 
-**Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack —
-`plugins/peak-workflow/references/bun-web-app-stack.md` for a web app or service,
-`plugins/peak-workflow/references/bun-electron-desktop-stack.md` for a desktop app — is the
-skeleton's build instructions: Section 2 is the stack, Section 3 the tree, Section 4 the config
-files, and the later sections the wiring (data access, IPC or routes, tests, packaging). Its
-*Stack Summary* table is also the checklist for "every layer the product has" — if the skeleton
-does not touch a layer the table names, that layer is missing from the skeleton. Two limits:
-a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md` and wins over
-the sheet, and in **Brownfield mode (Step 3B) the sheets play no part at all** — never plan an
-epic that re-platforms an existing codebase toward a sheet.
+**Every project type — resolve the deferred setup values.** `/peak-workflow:setup` writes
+`TBD — set by the walking-skeleton epic` wherever nothing could decide a value before code existed
+(typical on Embedded: board, build and flash commands, logger location, version channel). Grep
+`CLAUDE.md` for `TBD — set by the walking-skeleton epic`, `— unconfirmed`, and `Board: not chosen`,
+and read the `**Not decided yet:**` line. Once every layer on that line is a Tech Stack row, the
+skeleton deletes the line. The skeleton spec's Description lists every hit, and the skeleton
+replaces each one in `CLAUDE.md` with the real command, path, or mechanism it established — on its
+own feature branch, so wrapup sees the change. A value that costs money or means buying hardware
+(the board, a hosting provider, an email delivery provider) or depends on a team's accounts and
+policies (a CI provider) is
+confirmed with the user in the start-epic plan before it is resolved — never picked silently. A skeleton that leaves one behind fails wrapup's TBD gate.
+
+**Every project type with data or outputs — the test-only fault switch.** The fault / latency
+switch and data reset described for UI products apply to a Service or API, a CLI tool, and a
+desktop app alike (an environment variable read at startup, ignored in anything a user runs), so
+an error-path TOR such as "database unavailable" has a Given to cite.
+
+**Bench only, for anything that switches mains power or heat.** Every `tests/hil/` run — automated or
+operator-observed — happens on the bench: the equipment unplugged from mains, the output wired to an
+indicator lamp or LED instead of the load. `start-epic` and `wrapup-epic` ask the user before each run to confirm that setup in one
+plain question (*"Is the kiln unplugged, with the relay driving the test lamp?"*); if they cannot
+confirm, do not run it. The same rule covers flashing or running the board. The harness
+itself refuses to run a mains or heat output check unless `HIL_BENCH=1` is on that command line —
+added by the agent only right after the user confirms the bench setup for that run, never exported
+or written into `CLAUDE.md` or a script — so no command line can drive live equipment by accident. Every epic that drives such an output names this refusal in its Key
+Components, and its spec carries the PLAN_TEMPLATE **Bench only** standing rule.
+
+**Embedded products — the skeleton also owns the hardware-in-the-loop harness:** a script under
+`tests/hil/` that talks to the connected board over its debug or serial port non-interactively
+(port from `HIL_PORT`, a timeout, captured output asserted like any test), flashing the current
+build first (the debug build for fault-injection checks, the release build for the version and
+boot-banner checks). The device-side Tool Hygiene TORs (version, boot banner) are verified through it.
+The skeleton keeps every output de-energized — it proves the hardware abstraction reads inputs
+and reports, but never switches a heater, motor, or relay on; the first epic that drives an output
+ships that output's Safety TORs. It also owns **fault injection for Safety TORs**: a debug-build-only console command (compiled out
+of release builds by a build flag, so shipped firmware cannot be told to fake a fault) or a
+physical fault fixture on the bench (e.g. a switch that disconnects the sensor). Record in
+`CLAUDE.md` Local Environment a `HIL port:` line naming the variable and how to find the port on
+the user's OS, label the harness command `(tests/hil)` on the `Verification & Quality Gates` Tests
+line, and name the harness, the `HIL_BENCH` refusal, and the fault mechanism in Key Components.
+
+**Reference stacks (greenfield only).** The sheet named in `CLAUDE.md`'s Tech Stack — under the
+installed plugin's `references/` directory (`${CLAUDE_PLUGIN_ROOT}/references/`, not a path
+inside the user's repository): `bun-web-app-stack.md` for a web app or service,
+`bun-static-spa-stack.md` for a browser-only SPA, `bun-electron-desktop-stack.md` for a desktop
+app — is the skeleton's build instructions: Section 2 is the stack, Section 3 the tree, Section 4
+the config files, and the later sections the wiring (data access, IPC or routes, tests,
+packaging). Its *Stack Summary* table is also the checklist for "every layer the product has" —
+if the skeleton does not touch a layer the table names, that layer is missing from the skeleton.
+Three limits: a pick the user overrode during `/peak-workflow:setup` is recorded in `CLAUDE.md`
+and wins over the sheet; a row `CLAUDE.md` marks `N/A — <reason> (shape Q<N>)` is a recorded
+decision, so it is **not** a missing layer and the skeleton must not build it back (a row marked
+`org SSO deferred` is the exception — the layer is built now, and one later epic adds the
+organization's provider to it); and in
+**Brownfield mode (Step 3B) and Greenfield with existing code the sheets play no part at all** —
+never plan an epic that re-platforms an existing codebase toward a sheet.
 
 No later epic installs a component library, defines tokens, or builds a second shell — a slice
 composes its screens from the skeleton's shell and the reference screen. The skeleton's Key
@@ -175,7 +283,10 @@ screens (`S-NN` in their Given/When) travel with them.
   `### Frontend` subheadings when both are involved.
 - **Cross-cutting TORs** (logging conventions, performance budgets, accessibility baselines)
   belong in the skeleton, or in one small hardening epic at the end of the plan. Never spread
-  them across slices. Baseline UX TORs always go to the skeleton (3A.1) — they are verified on
+  them across slices. **Safety TORs are the exception** (the `# Safety` banner from
+  `capture-requirements`): each belongs to the **first epic that drives the output it protects** —
+  the over-temperature cutoff ships in the same epic that first switches the heater on, never in
+  a later hardening epic. Baseline UX TORs always go to the skeleton (3A.1) — they are verified on
   the reference screen once, and every later screen inherits the pattern.
 
 ### 3A.3: Sizing — the Whole-Capability Rule
@@ -219,6 +330,22 @@ Example IDs: `a3f2K7p`, `B9xQr2z`, `m4Ljf0T`.
 **Do not** use incrementing integers or decimals for new epics. Random IDs eliminate collisions when multiple developers run `/add` or `/plan-project` concurrently, so the concept of "insertion order" no longer applies — ordering within a phase is by insertion time in the index.
 
 ### 3A.4: Phase Structure — Value Milestones
+
+**Deferred-decision epics.** Epics are otherwise formed by clustering TOR IDs (3A.2), so an epic
+with no TOR IDs of its own can never arise that way and would be lost. For each deferred decision
+captured from `docs/design-notes.md` in Step 1, create one epic explicitly:
+
+- Name it for the decision (e.g. `Organization Sign-In`), give it `requirements: —`, and cite the
+  design-notes section in its Description as the reason it exists.
+- Place it in the **last phase**, and record in the phase index that no production release should
+  precede it. Its trigger is external (the user confirming the provider), so it is scheduled, not
+  blocked on other epics.
+- Scope it from the decision's own text rather than assuming a one-line swap — for an identity
+  provider that means the callback route, session configuration, mapping directory groups onto the
+  project's roles, and updating the end-to-end sign-in helper.
+- Because it has no TOR IDs, the "every covered TOR has a passing test" criterion is vacuous for it.
+  State its done-criterion in the spec instead, in terms of the behavior the decision describes.
+
 
 Phases are milestones of user value, not architectural layers. Start from this template and
 adapt:
@@ -658,7 +785,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
 
    **Solo** (no team review needed):
    ```bash
-   git checkout develop        # or main / master
+   git checkout <base-branch>  # develop if it exists, else main, else master
    git merge docs/<task-name> --no-ff -m "docs(plan): merge docs/<task-name> — requirements and plan baseline"
    git branch -d docs/<task-name>
    git push
@@ -666,7 +793,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
    **Team** (PR review required):
    ```bash
    git push -u origin docs/<task-name>
-   gh pr create --base develop --title "docs: requirements and plan baseline for <project>"
+   gh pr create --base <base-branch> --title "docs: requirements and plan baseline for <project>"
    # Await PR approval before starting epics
    ```
 

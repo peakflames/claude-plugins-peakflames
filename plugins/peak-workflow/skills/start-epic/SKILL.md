@@ -44,7 +44,7 @@ Follow these steps exactly:
     >
     > To fix:
     > ```bash
-    > git checkout develop          # or main / master
+    > git checkout <base-branch>    # develop if it exists, else main, else master
     > git merge docs/<task-name> --no-ff
     > git push
     > git checkout feature/epic-<id>-<short-name>   # resume (or re-create) feature branch
@@ -106,7 +106,7 @@ Follow these steps exactly:
 9. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously).
 10. **Conditional read of `docs/architecture.md`.** If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section. If the epic is a localized UI or copy change, skip — recent handoffs and the spec's Key Components section give the needed context.
 11. **Conditional read of `docs/design-notes.md`.** Same conditional applies — read only when the epic raises a decision the design notes might already have addressed.
-11a. **UX Baseline (UI epics only).** Applies only when `CLAUDE.md` has a **UX Baseline** section (Project type Web app, Desktop app, or Hybrid with a UI) **and** the spec's Key Components name screens, pages, UI components, or a renderer. For CLI / Service / Library projects, or when the section is absent, skip this item without comment. Otherwise the **UX Baseline** section of `CLAUDE.md` (already in context) governs every screen this epic touches: compose from the walking skeleton's app shell and design system, render the loading / empty / error / populated states, and keep the keyboard, focus, form, and destructive-action conventions. Screens compose the `data-component` primitives their wireframes name (item 4c) — `Button`, `Dialog`, `Table`, `Form`, and so on from the design system. `/peak-workflow:wrapup-epic` runs the UX Baseline check as a quality gate. If the `frontend-design` skill is installed it shapes the visual execution, but the UX Baseline and the design-system tokens in the global stylesheet take precedence over its aesthetic choices — theme changes go in the token file, never in generated component files. Carry this into the Step 4 middle steps.
+11a. **UX Baseline (UI epics only).** Applies only when `CLAUDE.md` has a **UX Baseline** section (Project type Web app, Desktop app, or Hybrid with a UI) **and** the spec's Key Components name screens, pages, UI components, or a renderer. For CLI / Service / Library / Embedded projects, or when the section is absent, skip this item without comment. Otherwise the **UX Baseline** section of `CLAUDE.md` (already in context) governs every screen this epic touches: compose from the walking skeleton's app shell and design system, render the loading / empty / error / populated states, and keep the keyboard, focus, form, and destructive-action conventions. Screens compose the `data-component` primitives their wireframes name (item 4c) — `Button`, `Dialog`, `Table`, `Form`, and so on from the design system. `/peak-workflow:wrapup-epic` runs the UX Baseline check as a quality gate. If the `frontend-design` skill is installed it shapes the visual execution, but the UX Baseline and the design-system tokens in the global stylesheet take precedence over its aesthetic choices — theme changes go in the token file, never in generated component files. Carry this into the Step 4 middle steps.
 12. **Targeted scan of `docs/reference/`.** Scan the epic spec body for explicit links into `docs/reference/` (markdown links of the form `docs/reference/...md`). Read only those referenced files. If the spec references none, skip this step. Do not bulk-read the directory — many reference files are dense (e.g., 1,300-line algorithm specs) and most epics touch only a slice.
 13. **Pre-flight E2E audit (conditional).** If the project has an end-to-end test directory (the last entry on the `Test directories` line of `CLAUDE.md`'s Verification & Quality Gates section — setup lists the E2E directory last — or commonly `e2e/` / `tests/e2e/` when that line is absent) and the epic's key components include UI components or modules likely referenced there, run `grep -rl "<ComponentName>" <e2e-dir>/` for each and capture the matching specs. Carry the list into Step 4 so the plan's middle section gets an explicit "update regression specs: …" item. UI refactors routinely break E2E specs that encode the old interaction model; pre-flighting this prevents discovery during the verification gate. If no E2E directory exists, skip this step.
 
@@ -121,6 +121,35 @@ Proceed with the implementation, using git history and the current codebase to d
 ## Step 2: Verify Prerequisites
 
 Check the epic's Dependencies section (from the phase index row loaded in Step 1). For each prerequisite epic, verify that `docs/implementation-plan/status/epic-<dep-id>.md` has `status: Implemented` or `status: Complete` (both mean the code exists). If any dependency is not met, inform the user and suggest which epic to start instead.
+
+**Walking skeleton — values that cost money or follow team policy.** Before planning, list the
+`CLAUDE.md` values this epic resolves that are a CI, hosting, or email delivery provider (from the
+`**Not decided yet:**` line or `TBD` rows) and confirm each with the user in one question, with a
+recommended default (e.g. GitHub Actions for a GitHub repository). Never pick one silently.
+
+**Hardware on the desk (Embedded, or any epic whose TORs are verified through `tests/hil/`).** In
+this order:
+1. **Board chosen?** If `CLAUDE.md` still records `Board: candidate … — unconfirmed` or
+   `Board: not chosen` (walking skeleton), recommend a board in plain words — name, rough price,
+   and any parts the product needs with it (e.g. a thermocouple amplifier, a relay module) — and
+   confirm it with the user. Nothing is ordered or installed on a guess. If `CLAUDE.md` still says
+   unconfirmed but the user already bought a board on an earlier run, ask which board they have
+   first. Recording the confirmed board in `CLAUDE.md` is the first plan step after the opening
+   steps, on the feature branch.
+2. **Board in hand?** If the user does not have it yet, print a short parts list to keep (board,
+   add-on parts, cable, and — for anything that switches mains power or heat — a low-voltage
+   indicator lamp or LED module for the bench setup), end the session, and tell them to run `/peak-workflow:start-epic <id>`
+   again when it arrives (nothing is In Progress yet, so there is nothing to pause). Host-side work may start first only if the user asks.
+3. **Board connected?** Check the port named on the `CLAUDE.md` Local Environment `HIL port:` line
+   (e.g. `HIL_PORT=/dev/ttyUSB0`, `COM3` on Windows) exists. If not, tell the user how to connect
+   it and how to find the port, and wait. On the walking skeleton the line does not exist yet: ask
+   the user to plug the board in, find the port with them, and write the line as a plan step.
+
+**Bench only, for anything that switches mains power or heat.** Every `tests/hil/` run — automated or
+operator-observed — happens on the bench: the equipment unplugged from mains, the output wired to an
+indicator lamp or LED instead of the load. Before each run, ask the user to confirm that setup in one
+plain question (*"Is the kiln unplugged, with the relay driving the test lamp?"*); if they cannot
+confirm, do not run it.
 
 ## Step 3: Create Feature Branch
 
@@ -153,7 +182,7 @@ Build the plan from:
 - Any context from previous handoff files (decisions made, patterns established)
 - Any reference materials surfaced by Step 1 item 12
 
-**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
+**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
 
 ## Step 5: Execute the Plan
 

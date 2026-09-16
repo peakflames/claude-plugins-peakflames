@@ -1,18 +1,31 @@
 # Reference Stacks
 
-Reference sheets for the two application shapes peak-workflow builds most often. For a **new**
+Reference sheets for the three application shapes peak-workflow builds most often. For a **new**
 project they are the recommended stack `/setup` offers and the blueprint `/plan-project` builds
 from. For an **existing** project they are reference material only — never a migration mandate.
 
 | Sheet | Shape | Runtime |
 |---|---|---|
+| [`bun-static-spa-stack.md`](bun-static-spa-stack.md) | Browser-only web app — React SPA, data in IndexedDB on the person's device, deployed to GitHub Pages. No server, no accounts, no uploads | Bun is the **toolchain**; the app runs in the browser |
 | [`bun-web-app-stack.md`](bun-web-app-stack.md) | Web app / Service or API — React SPA + Hono, single Docker container, SQLite on a volume, S3-compatible object storage | Bun **is** the runtime |
 | [`bun-electron-desktop-stack.md`](bun-electron-desktop-stack.md) | Desktop app — Electron shell, React + shadcn/ui renderer, SQLite on disk | Bun is the **toolchain**; the app runs on Electron's Node |
 
+**Web app is two sheets, not one.** `/peak-workflow:setup` asks five plain-language product-shape
+questions before reading any sheet — does the data follow the person to another device, does
+anyone sign in, are there file uploads, does anything update on its own, does the product hold a
+secret of its own. All five "no" routes to the static sheet; any "yes" routes to the web-app
+sheet. The answers are recorded in `CLAUDE.md` as a `**Product shape:**` block, and each Stack
+Summary row they drop is written as `N/A — <reason> (shape Q<N>)` rather than omitted, so
+`plan-project` reads it as a decision instead of a gap. `/peak-workflow:discover` re-checks those
+answers against the ConOps scenarios once the product is described (its Step 4.5). A Desktop app
+gets questions 1–3 plus a sixth — do the computers have internet — which can drop the desktop
+sheet's Auto-update row; a Service or API gets questions 2–4 phrased for callers.
+
 ## What these are for
 
-1. **The recommended stack for a new project.** These sheets *are* the recommendation — no
-   condensed default list exists anywhere else in the plugin. When `/peak-workflow:setup` gets
+1. **The recommended stack for a new project.** These sheets *are* the recommendation for the shapes
+   they cover — no copy of their picks exists anywhere else in the plugin (`setup`'s toolchain
+   table covers only stacks no sheet does). When `/peak-workflow:setup` gets
    a thin Tech Stack answer ("whatever you recommend"), it reads the matching sheet's
    **Section 2 Stack Summary** and offers those picks; the user accepts the sheet wholesale or
    overrides individual layers, and what they accept is recorded in `CLAUDE.md`. When
@@ -21,10 +34,12 @@ from. For an **existing** project they are reference material only — never a m
    then wires up the later sections. No scaffolder is involved — the sheet is the scaffold.
 
 2. **A layer checklist for any project, greenfield or existing.** Each sheet's *Stack Summary*
-   table names every layer an application of that shape has to handle — runtime, build, UI,
-   styling, client state, routing, data access, migrations, unit/component/E2E tests, lint,
-   type checking, dead code, packaging, validation, config, secrets, storage. Use it to notice
-   a layer a project has not decided on yet. The gap is the finding, not the library.
+   table names the layers an application of that shape has to handle — runtime, build, UI, styling,
+   client state, routing, data access, migrations, unit/component/E2E tests, lint, type checking,
+   dead code, and whatever else that shape implies (packaging on the desktop sheet; hosting, config
+   and secrets on the static sheet; streaming, config, secrets, and versioning on the web sheet). Use it to notice a layer a project has not decided on yet. The
+   gap is the finding, not the library — and where a sheet has no row for a layer the project does
+   need, that absence is itself the finding.
 
 ## What these are NOT for
 
@@ -44,7 +59,25 @@ them. Specifically:
 ## Editing these sheets
 
 The sheets are the single source of truth for the picks, the repository layout, and the script
-names (`dev`, `build`, `package`, `typecheck`, `lint`, `deadcode`, `test`, `test:e2e`, `check`).
+names (`dev`, `build`, `typecheck`, `lint`, `deadcode`, `test`, `test:e2e`, `check`; plus
+`package` on the desktop sheet, `preview` on the static and desktop sheets, and `lint:fix` on
+all three).
 `setup` and `plan-project` quote those script names in their quality-gate and verification
 defaults, so a change to a sheet's `package.json` section means updating the matching lines in
-`skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit.
+`skills/setup/SKILL.md` and `skills/plan-project/SKILL.md` in the same commit. `check` always calls
+`bun run test`, never bare `bun test`, which would also collect the Playwright specs.
+
+`setup` maps shape answers onto named Stack Summary rows (on the web sheet: Auth, Object storage,
+Local S3, Live updates, Per-request streaming, Secrets; on the desktop sheet: Auto-update). Renaming or merging one of those rows means updating that mapping
+in `skills/setup/SKILL.md` in the same commit — otherwise an `N/A` has nowhere to land.
+
+Each sheet with droppable layers (web, desktop) has a **2.1 Dropping a layer** table directly after its
+Stack Summary. It lists, per droppable row, the tree entries, config lines, env vars, routes,
+services, tests, commands and Additional Considerations rows to omit. `plan-project` applies it for
+every `N/A` row while writing Sections 3–4 verbatim, so a dropped layer is not re-added. Adding a
+file or env var tied to a droppable layer means adding it to that table in the same commit.
+
+A sheet must also be able to satisfy the baseline TORs `setup` derives from it. Every sheet's
+Section 4 `package.json` carries a `version` field, and the sheet shows where that version is
+exposed to the user and stamped on the first log line — otherwise `capture-requirements` writes
+tool-hygiene TORs the skeleton cannot pass.

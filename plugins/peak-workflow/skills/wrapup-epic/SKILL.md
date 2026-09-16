@@ -55,6 +55,9 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
    - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
    - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
+   - After checkout, **re-read `CLAUDE.md`** from the working tree. The copy loaded at session start
+     came from the base branch; an epic that changed `CLAUDE.md` (the walking skeleton resolving
+     `TBD` lines, for one) is only visible after checkout.
 2. Read `docs/implementation-plan/status/epic-$ARGUMENTS.md` to get the epic's current status. Phase 3 (Orient) loads all phase indexes and sidecars when it walks the dependency graph — Step 1.1 only needs this epic's sidecar.
 3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress`, `status: Paused`, or `status: Not Started`, inform the user that `/peak-workflow:start-epic $ARGUMENTS` must finish first and stop. If `status: Complete`, inform the user it has already been wrapped up.
 4. Read the epic spec file located in item 1a. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` / `Refs #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip that line later.
@@ -112,6 +115,14 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 
 ### Step 1.2: Verify Requirements (TOR IDs)
 
+**Bench only (products that switch mains power or heat).** Before any command that flashes the
+board, runs it, or runs anything under `tests/hil/` — in this step's item 4, item 7, or the Step 1.3 Tests gate — ask the user in one plain question to confirm the bench setup: the equipment
+unplugged from mains, the output wired to an indicator lamp instead of the load. If they do not
+confirm, do not run it. `HIL_BENCH=1` goes on that one command line only, right after the user
+confirms for this run (e.g. `HIL_BENCH=1 <harness command>`) — never exported, never written into
+`CLAUDE.md`, a script, or a config file, and never set without the confirmation. Ask it once at the start of this step when
+the epic has `tests/hil/` TORs, and again only if the user changes the setup.
+
 For each TOR ID in the epic spec's Requirements Anchors table, independently verify the
 requirement is satisfied by the implementation. You are the independent reviewer — you did NOT
 implement this epic. Do not trust the implementer's self-assessment.
@@ -121,7 +132,7 @@ implement this epic. Do not trust the implementer's self-assessment.
 1. **Read the Given/When/Then** (loaded in Step 1.1 item 4a).
 2. **Locate the test(s)** for this TOR ID by grep only:
    ```bash
-   for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done
+   for d in <test-directories>; do grep -rl --exclude-dir={bin,obj,node_modules,dist,out,build} "<TOR-ID>" "$d"; done
    ```
    where `<test-directories>` is every directory listed under **Test directories** in
    CLAUDE.md's Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if
@@ -133,6 +144,14 @@ implement this epic. Do not trust the implementer's self-assessment.
      `git grep --untracked -l "<TOR-ID>" -- ':!docs'` (`--untracked` so a test file created by a
      Step 1.4b Fix now is found on the re-run).
    Read the matching files.
+   **Operator-observed TORs.** A TOR whose feature-file scenario carries the comment
+   `# Verification: operator-observed` is traced by a checklist instead of an automated test:
+   also grep `tests/manual/` (and `tests/hil/` when present) for it, whether or not those are on
+   the Test directories line. The checklist names the TOR ID and restates the Given / When / Then
+   as steps a person performs and what they should see. Items 3–4 apply to the checklist (it
+   mirrors the Gherkin), item 7 replaces item 4 for the part only a person can observe, and any
+   automated part the TOR also has (a Safety TOR's command and timing through `tests/hil/`) still
+   runs under item 4.
    If the grep returns nothing in any listed directory, no test traces to this requirement —
    the TOR's verdict is **FAIL** ("no test names TOR-…"), even if source inspection finds the
    behavior implemented. Do not go looking
@@ -155,10 +174,34 @@ implement this epic. Do not trust the implementer's self-assessment.
    Playwright Electron harness (`@playwright/test` with `_electron.launch`, in the last entry
    on the Test directories line — setup lists the E2E directory last); `playwright-cli`
    cannot attach to an Electron window.
+7. **For device TOR IDs (Embedded, or any Then observed on physical hardware) and every
+   operator-observed TOR.**
+   - *Device:* run the project's hardware-in-the-loop harness under `tests/hil/` against the
+     connected board for everything it can capture. If the board is not connected, ask the user
+     to connect it. For anything that switches mains power or heat, first ask the user to confirm
+     the bench setup — equipment unplugged, output driving an indicator lamp — and do not run
+     until they do.
+   - *Named provider sign-in:* the round-trip needs the real provider's credentials configured
+     and the app running where its callback URL points. If they are not set up, ask the user to
+     set them up.
+   - Whatever is missing — board, credentials, a person able to observe — if the user cannot
+     provide it now, **end the session with no verdicts recorded** and tell them to re-run
+     `/peak-workflow:wrapup-epic <id>` once they can. That is neither CANNOT VERIFY nor FAIL, and
+     never an undisclosed deferral.
+   - For each operator-observed TOR, walk the user through its checklist in plain words, ask them
+     to perform the When and describe what they see, and judge it against the Then. Record the evidence as `operator-observed: <their words>`; that annotation
+   is carried into the Step 1.5 report's Highlights so the human sees every verdict that rests on
+   an observation rather than a test.
 
 Report each TOR ID:
 - **PASS** — a test that mirrors the Given/When/Then (item 3) passes AND implementation
   inspection confirms the behavior is realized. Cite: `test file:line` and `impl file:line`.
+  For an operator-observed TOR: the checklist mirrors the Gherkin, implementation inspection
+  confirms the behavior, AND the operator's described observation matches the Then. Cite the
+  checklist file, `impl file:line`, and `operator-observed: <their words>`. An observation that
+  does not match is FAIL; one the user cannot make now ends the session (item 7). A `# Safety`
+  TOR also needs an automated `tests/hil/` test naming it that passes — without one it is FAIL,
+  whatever its tag; the observation confirms only the physical part.
 - **FAIL** — test fails, OR no test mirrors the Then (e.g., the test only checks a flag is
   accepted when the Then names an outcome), OR test passes but implementation does not realize
   the requirement (describe specifically what is wrong).
@@ -192,6 +235,9 @@ Only now, with every per-TOR verdict recorded, read
      Anchors, append ` — ⚠️ successor spec missing or does not list this TOR` to that cell.
    - Else if it appears as a Spec Deviations row, or as FAIL / CANNOT VERIFY in the handoff's
      TOR Coverage → `Disclosed: yes (misfiled)`; note where it was found.
+   - Else if the handoff reported it `PASS (operator-observed pending)` and the observation did not
+     match → `Disclosed: n/a (observation)` — the implementer could not have known; no
+     UNDISCLOSED marker.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
      `FAIL — ❌ UNDISCLOSED DEFERRAL` (or `CANNOT VERIFY — ❌ UNDISCLOSED DEFERRAL`) in the
      Verifier finding column. A mention in Key Decisions or prose ("stub for now") does not
@@ -211,6 +257,28 @@ Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every ap
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
 - Console check (if UI was changed) — web: `playwright-cli`; desktop: the renderer console captured by the Playwright Electron harness
 - UX Baseline check (if UI was changed and `CLAUDE.md` has a **UX Baseline** section) — see below
+- Access-control check — on routes that return or change records (if `CLAUDE.md`'s `**Product shape:**` block records
+  `**Access rule:** owner-or-permitted-role`, or its Tech Stack records
+  `Auth: local accounts now, org SSO deferred`, and this epic touched user data) — see below
+- Deferred-value check (walking-skeleton epic only): `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen|\*\*Not decided yet:\*\*' CLAUDE.md`
+  on the feature branch must return nothing. Any hit is a FAIL — the skeleton owns resolving
+  every one
+
+**Access-control check.** A quality gate, not a code-review note, on any epic that adds or changes
+user data in a project with sign-in — named provider or deferred. Record PASS / FAIL per line with the
+evidence, and treat a FAIL like any other failed gate — Fix now or Stop, never a Known Issue:
+
+- **No sign-in bypass.** Grep the diff and the auth configuration for a development-only login,
+  an anonymous fallback, or a current user taken from a request header, query parameter, or
+  environment variable. Any hit is a FAIL. Tests signing in through the auth layer's own test
+  helper are not a bypass.
+- **Owner on every new table.** Each table this epic added carries an owner column. FAIL if one
+  does not.
+- **Every new read and write goes through the access rule.** Each route this epic added calls the
+  project's single access rule rather than re-deriving access inline or relying on a front-end
+  check. FAIL on any that does not.
+- **Role checks are server-side.** If roles are declared, the permission decision happens on the
+  server. A role read only from client state is a FAIL.
 
 **UX Baseline check.** This is a quality gate, not a code-review note. Web app: `playwright-cli`
 against the running app with real data. Desktop app: the project's Playwright Electron harness
@@ -318,6 +386,8 @@ three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
   a fixed TOR must not keep two owners. If the fix does not bring the TOR to PASS, re-ask with
   only `Defer` / `Stop`.
 - **Defer** — a waiver. Eligible only when the Then clause depends on code a later epic creates.
+  **Never eligible for a TOR under the `# Safety` banner** — its only options are Fix now or Stop;
+  an epic that drives an output never closes without the safeguard for it.
   Ask `"Which later epic creates the code this Then clause depends on?"` — if the implementer's
   Deferrals row (Step 1.2b) already names a successor, offer it as the default. Judge
   eligibility on that answer: "larger than expected", "tedious", or "out of scope" name no

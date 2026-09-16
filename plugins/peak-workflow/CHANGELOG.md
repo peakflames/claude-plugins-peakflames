@@ -6,6 +6,208 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.11.0] — 2026-09-15
+
+Product shape, not project type, chooses the stack: plain-language questions route a web
+project to a new browser-only sheet or the existing server sheet, and discovery re-checks the
+answer. `setup` now asks only what a non-technical user can answer and defaults the rest.
+
+### Added
+
+- **`references/bun-static-spa-stack.md`** — browser-only React SPA: Vite, Dexie on IndexedDB,
+  hash routing, `vite-plugin-pwa`, JSON export/import backup, Playwright against `vite preview`,
+  and a GitHub Pages deploy workflow. No server, no accounts, no secrets.
+- **Shape questions in `setup`** — five questions in layman's terms (cross-device, sign-in, file
+  uploads, live updates, product-held secret) asked before any sheet is read. All five "no" on a
+  Web app routes to the static sheet; any "yes" routes to the web-app sheet.
+- **Recorded product shape** — the answers land in a `Product shape` block in `CLAUDE.md`, and
+  each Stack Summary row they drop is written `N/A — <reason> (shape Q<N>)`, which `plan-project` reads as a decision
+  rather than a missing layer.
+- **`discover` Step 4.5** — re-checks the recorded shape against the ConOps scenarios, names any
+  contradiction in the user's words, and asks before changing the stack. The revision rides the
+  same `docs/` branch merge as the requirements baseline.
+- **Date and offline layers** — the static sheet adds local civil-day keys (`YYYY-MM-DD`),
+  injected-clock domain functions, and an installable PWA, closing gaps the Stack Summary
+  checklist did not cover.
+- **Auth follow-ups in `setup`** — a "yes" to sign-in asks whether an approved identity provider
+  is already known, and whether roles are in play. A likely-but-unconfirmed vendor is recorded with
+  the question to ask IT, rather than discarded.
+- **Deferred mode ships real accounts** — email-and-password sign-in through the sheet's own auth
+  layer from the first epic, with an owner column and one owner-or-permitted-role access rule. Only
+  the organization's provider is deferred, added later as an extra method on the same accounts.
+  No sign-in stub is ever built.
+- **Access-control gate in `wrapup-epic`** — a quality gate that can fail an epic: no sign-in
+  bypass, an owner on every new table, every new route through the access rule, role checks
+  server-side.
+- **`capture-requirements` knows about deferred SSO** — provider-flow TORs route to Coverage Gaps;
+  ownership and role TORs are required and noted as locally assigned until the provider epic lands.
+- **Defaults-first `setup`** — asks only the Project Overview, Project type, shape and sign-in
+  questions, and a required language or device. Commands, test directories, logging, git, and
+  release conventions default from code, sheet, or toolchain table behind one confirmation.
+- **Project Overview section** — drafted from the description `new-project` now passes through;
+  `architecture.md` §1 and the README stub derive from it instead of a section that never existed.
+- **Embedded project type** — device and firmware software gets Tool Hygiene defaults (version on
+  the debug console, boot banner), a CMake toolchain row, and `N/A` for exit codes and UX Baseline.
+- **Toolchain table in `setup`** — run, test, lint, build, and version-file defaults for
+  TypeScript on Bun, Python, Rust, Go, .NET, and embedded C/C++ when no sheet applies.
+- **`TBD — set by the walking-skeleton epic`** — marks values nothing can decide before code
+  exists; `plan-project` makes the skeleton resolve every one in `CLAUDE.md`.
+- **Web sheet Streaming, Config, Secrets, and Versioning rows** — shape answers Q4 and Q5 now have
+  a row to mark `N/A`, and the skeleton checklist covers config and secrets.
+- **Named identity providers in the web sheet** — Google and Microsoft config, env vars, callback
+  URLs, a role field, and a single `can()` access rule; tests sign in via a defined email/password helper.
+- **Live broadcast streaming** — web sheet adds `GET /api/events` with in-process fan-out, heartbeat,
+  and an `EventSource` hook, alongside the per-request token stream.
+- **Hardware-in-the-loop verification** — Embedded skeletons build a `tests/hil/` serial harness;
+  `start-epic` and `wrapup-epic` stop for a missing board and record `operator-observed` evidence.
+- **Safety baseline** — `discover` asks what must never happen for equipment-controlling products;
+  `capture-requirements` writes `# Safety` TORs; `plan-project` ships each with the first epic driving
+  that output.
+- **Operator-observed TORs** — scenarios tagged `# Verification: operator-observed` trace to a
+  `tests/manual/` checklist and PASS on a matching recorded observation, for provider sign-in and
+  physical device behaviour.
+- **Safety TORs are never deferrable** — `start-epic` and `wrapup-epic` offer only Fix now or Stop;
+  embedded skeletons own a debug-build-only or bench fault fixture for their Givens.
+- **Walking-skeleton TBD gate** — `PLAN_TEMPLATE` and `wrapup-epic` fail the skeleton while
+  `TBD — set by the walking-skeleton epic` remains in `CLAUDE.md`.
+- **Desktop Auto-update row and target OS** — updater is its own droppable row (`N/A` offline);
+  `electron-builder.yml` blocks are per target OS with Windows NSIS and signing notes.
+- **`plan-project` places deferred-decision epics** — it now reads `design-notes.md` and creates an
+  epic in the last phase for each deferred decision, which TOR clustering could never produce.
+
+### Changed
+
+- **Sign-in always carries an access rule** — every sign-in "yes", named provider or deferred,
+  records `**Access rule:** owner-or-permitted-role`, which now drives access TORs, skeleton owner
+  columns and roles, Security Baseline reminders, and wrapup's access-control gate.
+- **Sign-in vs attribution** — setup asks whether people need separate accounts or just a name on
+  each record; a shared offline PC with typed initials no longer routes to a server.
+- **Shape questions by project type** — Service or API gets questions 2–4 phrased for callers;
+  Desktop gets 1–3 plus internet access (Q6) and a target-OS field; unasked answers are recorded.
+- **Existing code is extended, never re-scaffolded** — `new-project`, `setup`, and `plan-project`
+  detect build manifests; the skeleton adds missing layers to the existing project and ignores sheets.
+- **Housekeeping folds into the one confirmation** — `.gitignore` entries, add-on skills, repo stubs,
+  and the first commit no longer ask separately; per-type confirmation examples added.
+
+- **Sheet paths are plugin-relative** — `setup`, `plan-project`, and the references index now
+  address sheets as `${CLAUDE_PLUGIN_ROOT}/references/<sheet>.md` instead of a repository path
+  that does not exist inside a user's project.
+- **`plan-project` skeleton** — builds static-SPA specifics (hash history, `BASE_PATH`,
+  `__APP_VERSION__`, Dexie versions, `fake-indexeddb`, export/import, deploy workflow) and treats
+  an `N/A` row as a decision, never rebuilding it.
+- **Tool Hygiene defaults** — version exposure, startup log line, and logging convention now have
+  static-SPA, web-app, CLI, and embedded answers instead of desktop-only ones.
+- **Repo hygiene on a new project** — README and CHANGELOG stubs are created without asking;
+  missing `.gitignore`, CI, and lockfile report `N/A` until the walking skeleton creates them.
+- **Architecture stub variants** — static-SPA and embedded projects get section titles and `N/A`
+  sections that fit their shape instead of permanently empty server sections.
+
+### Fixed
+
+- **Failed provider sign-in hit a bare error page** — web sheet passes `errorCallbackURL` so the app's
+  plain-language message shows; `discover` stops recommending the next step while planning is blocked.
+
+- **`HIL_BENCH` was unreachable** — the agent adds it to a single command right after the user
+  confirms the bench setup; the rule is copied into mains/heat plans only, written into
+  `CLAUDE.md` Important Reminders, and honoured by `quick-fix`.
+- **Reset-token check bypass** — web sheet reads the token with the handler's precedence, so an
+  empty body token cannot slip past the organization-address refusal.
+
+- **Bench-only rule reached only start-epic's pre-check** — it is now a verbatim standing rule in
+  every plan and in wrapup's verification, covers flashing and running the board, and
+  `HIL_BENCH=1` is set only by the user.
+- **Organization accounts could gain a password** — web sheet refuses password sign-in, reset
+  requests, and reset tokens for organization addresses, keeping Workspace sign-in policy in force.
+- **No way back from a planning blocker** — `discover` resolves `**Open — blocks planning:**` lines in
+  place, without a new interview or changelog.
+
+- **Automated HIL runs could drive live equipment** — every `tests/hil/` run on mains power or heat
+  requires a confirmed bench setup, and the harness refuses without `HIL_BENCH=1`.
+- **Discovery blockers never reached planning** — `**Open — blocks planning:**` lines and missing
+  hardware safeguards stop `plan-project`; only owner-confirmed safeguards become Coverage Gaps.
+- **Unverified sign-ups could be locked out** — web sheet resends verification on sign-in, lengthens
+  link expiry, verifies on password reset, warns existing owners on repeat sign-up, and sends mail
+  in the background; test env ignores a local `.env`.
+- **Desktop Node.js prerequisite** — setup and the desktop sheet name Node.js 22.12+ alongside Bun.
+
+- **Public password sign-up allowed impersonation** — web sheet requires email verification and
+  reset through a new droppable Email delivery row; a verified Google sign-in releases an unverified
+  squatter account.
+- **Desktop dependency ranges** — current Electron and N-API better-sqlite3 prebuilds, no native
+  rebuild; E2E waits for the renderer before menu actions; single-instance, menu-role, CSV save
+  dialog, and reduced-motion tests mirror their TORs.
+- **Safety PASS without automation** — a `# Safety` TOR with no automated `tests/hil/` test is FAIL
+  in both self-assessment and wrapup; mains-power checklists run on the bench.
+- **CI, hosting, and email providers** — `start-epic` confirms them before planning the skeleton;
+  CI is built only when named; the `**Not decided yet:**` line is deleted once resolved.
+
+- **Hardware safeguards became unmeetable Safety TORs** — assumption rows (thermal fuse, limit switch)
+  stay ConOps assumptions; the software's detectable counterpart becomes the TOR, with an automated
+  HIL check of command and timing.
+- **Unmet or unavailable observations** — wrapup ends the session instead of failing when the board,
+  provider credentials, or observer is missing; a mismatched pending observation is not an
+  undisclosed deferral.
+- **Web sheet create routes skipped the access rule** — every mutating route calls `can()`; role
+  changes restricted; Workspace-domain password sign-ups refused; org-only mode requires its domain.
+- **Desktop sheet lacked a root tsconfig and native menu** — root `tsconfig.json` with `@/` alias,
+  shipped `components.json`, `menu.ts` with standard roles and Help › About, focus-restoring About
+  dialog, relaunch and single-instance tests.
+- **Setup/discover commits on the base branch** — discover asks before committing leftovers, on the
+  docs branch only; the skeleton gate also catches `**Not decided yet:**`.
+
+- **Desktop E2E launched a file, not the app** — `args: ["."]` so Electron reads `package.json`;
+  main entry now shows startup order, single instance, first log line, window minimum and state,
+  and an About dialog.
+- **Mixed-audience Google sign-in** — web sheet omits the domain restriction when outsiders sign
+  in, grants the org role only from a verified Workspace domain, and disables implicit account linking.
+- **Web sheet compile and config errors** — `"types": ["bun"]`, Biome 2 `files.includes`, optional
+  provider env vars, `hc` client prefix, resource-aware `can()`; Streaming split into Live updates
+  and Per-request streaming rows.
+- **Sign-in clarifier re-asked cross-device** — "unsure means yes" now covers only separate accounts;
+  "maybe another computer later" is a growth note.
+- **Setup files left uncommitted, undecided layers lost** — setup commits its files with the
+  confirmation's consent and writes a `**Not decided yet:**` line the skeleton reads.
+- **zsh aborted code detection** — `new-project` uses `find` instead of a glob list.
+
+- **Web sheet older bugs** — root `tsconfig.json` defined and copied into the image; Better Auth
+  `basePath` matches the `/auth` mount; Vite dev origin trusted outside production; host-dev env
+  values documented; `APP_NAME` read from `package.json`.
+- **Section 4 copied verbatim re-added dropped layers** — web and desktop sheets gain a Section 2.1
+  "Dropping a layer" table that `plan-project` applies for every `N/A` row.
+- **Desktop E2E ran a stale or missing build** — `test:e2e` builds first; Playwright config scoped to
+  `tests/e2e`; test fault switch gated on `app.isPackaged`, not "production builds".
+- **Logging default leaked the Bun sheet into other stacks** — the toolchain table gains a Logging
+  column; a sheet's logger path is written only when the sheet was taken.
+- **Mechanical fixes** — unclosed fence in the shape block, stale `e2e/` paths, the
+  `start-epic` Security Baseline claim, `appsettings` never-commit example, .NET lockfile guidance.
+
+- **Dry-run fixes across the new paths** — the static sheet gained the `index.html`, `index.css`,
+  `app-footer.tsx`, `APP_NAME` and fault-injection files it referenced but never defined; `check`
+  no longer runs Playwright specs under Bun's test runner (which broke every deploy); and a
+  pull-request CI workflow runs the gates before merge.
+- **`discover` Step 4.5 false positives** — a JSON backup export and a one-actor roles table no
+  longer read as contradictions, and a sheet change now re-runs `setup` rather than patching rows,
+  because Test directories, Local Environment, Version exposure and the Security Baseline all move
+  with it.
+- **De-jargoned the project-type question** — it routes the plain-language shape questions, so it
+  gets the same treatment, including that a tablet app reached at a web address is a Web app.
+- **Shape question 5 is conditional** — skipped and recorded as implied when sign-in or uploads are
+  yes, since a lay "no" there is simply wrong. Question 2 now defaults to yes when unsure.
+- **Corrected a false claim** — `CLAUDE.md`'s Security Baseline said `start-epic` reviews it; it
+  does not, and `setup` no longer says so.
+- **Web sheet version exposure** — `package.json` gains `version`, served at `GET /version`,
+  rendered in a footer, and stamped on the first log line, so the baseline Tool Hygiene TORs are
+  satisfiable.
+- **Test runners collecting each other's files** — web and desktop `check` call `bun run test`
+  instead of bare `bun test`; Playwright is scoped to `tests/e2e`.
+- **Desktop Test directories** — `setup` named `tests/ e2e/`, which the desktop sheet never
+  creates; now `tests/unit tests/components tests/e2e`.
+- **`Test directories` placeholder** — named as a placeholder with per-sheet examples, so the line
+  `start-epic` and `wrapup-epic` grep points at directories that exist.
+- **UX Baseline token path** — follows the stack's layout instead of hard-coding `src/index.css`.
+
+---
+
 ## [1.10.0] — 2026-09-15
 
 Two reference stack sheets become the greenfield stack recommendation for web, service, and

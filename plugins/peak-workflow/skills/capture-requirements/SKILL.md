@@ -54,6 +54,53 @@ The user's request / brownfield description: $ARGUMENTS
 
 ## Step 1: Load Context
 
+0. **Sign-in projects.** If `CLAUDE.md`'s `**Product shape:**` block records
+   `**Access rule:** owner-or-permitted-role` (named provider or deferred), write, and require, the
+   access TORs: a person sees only the records they own or their role grants (including never
+   seeing another person's identity inside a shared count or summary), an unauthenticated
+   request is rejected, and each declared role can do exactly what `CLAUDE.md` says it may.
+   - **Named provider:** write the provider round-trip TOR (signing in through the named provider
+     lands the person in the product with their role). Automated tests sign in through the
+     email-and-password test helper; tag the round-trip TOR `# Verification: operator-observed`
+     (item 0c) so `wrapup-epic` asks for the observation instead of failing it.
+   - **Deferred** — Tech Stack records `Auth: local accounts now, org SSO deferred`: the identity
+     provider is not built yet. Do **not** write TORs whose Then clause depends on it — SSO
+     redirects, directory-sourced role claims, account provisioning or deprovisioning, MFA, or
+     organization password policy. Those belong in the **Coverage Gaps (explicitly deferred)**
+     section, named as waiting on the provider epic. Add one line under each role TOR noting that
+     the role is assigned in the product's own accounts until the provider epic maps it from the
+     directory.
+
+0b. **Safety (Embedded, or any product that switches physical equipment on or off).** Read the
+   ConOps **What Must Never Happen** section `/peak-workflow:discover` writes for these products.
+   Each hazard there becomes at least one TOR under a literal `# Safety` section banner, written as
+   the safe outcome the product guarantees — *"The controller shall de-energize the heater relay
+   within 2 seconds when the thermocouple reading is lost"*. Write the Given at the observable
+   level (`Given the thermocouple reading is lost`), never naming the injection mechanism — the
+   skeleton's hardware fault fixture or debug-build fault command decides how. Place the banner
+   in the feature file of the capability that drives the output, directly after any baseline
+   banners and before domain TORs. A hazard with no number the user gave (a limit, a time) gets
+   the TOR anyway: at the 3A.1b grouping gate, ask for the value in plain words and offer a
+   conservative default — never drop the TOR. If the section is missing on such a product, warn
+   at 3A.1b and list the gap under Coverage Gaps. Safety TORs are never deferrable in
+   `start-epic` or `wrapup-epic`, so every one must be something this product's own software can
+   do and a test can check: a row marked `Assumption — hardware, outside the software` (a thermal
+   fuse, a limit switch) is **not** a TOR — when the row is marked `— confirmed by the owner`, list
+   it under Coverage Gaps as `hardware safeguard — outside the software, confirmed by the owner`;
+   when it is marked `— NOT present` or carries no confirmation, stop and send the user back to
+   `/peak-workflow:discover`. For a confirmed row, where the software
+   can detect the failure the hardware guards against, write that detection as the TOR instead
+   (*"The controller shall raise an alarm and keep the relay de-energized when the temperature
+   keeps rising while the relay is commanded off"*). Each Safety TOR needs an automated check of
+   its command and timing through the hardware-in-the-loop harness; tag it operator-observed
+   (0c) only for the physical part a harness cannot sense.
+
+0c. **Operator-observed TORs.** Tag a scenario with the comment line
+   `# Verification: operator-observed` directly under its `Scenario:` line when no automated check
+   can observe its Then — a named provider's real sign-in round-trip, a relay clicking, a display
+   or indicator on a device. Automated tests still cover everything they can; the tag routes only
+   the unobservable part to a person in `wrapup-epic`.
+
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
    already in context. Specifically capture, if present:
@@ -61,7 +108,7 @@ The user's request / brownfield description: $ARGUMENTS
      mechanism declarations. These drive the baseline TORs in Step 3A.2.1. Record the
      Project type; if the section is absent, infer it from the Tech Stack section
      (Electron / Tauri → Desktop app; web framework or "frontend" → Web app; otherwise treat the
-     project as non-UI — CLI tool, Service, or Library — and set
+     project as non-UI — CLI tool, Service, Library, or Embedded — and set
      `ux_baseline_section_present = false` silently).
    - **`UX Baseline` section** — Presence, the **Design system** declaration (a declaration
      for the walking skeleton, not a TOR), and the active (non-`N/A`) TOR lines. These drive
@@ -87,8 +134,8 @@ The user's request / brownfield description: $ARGUMENTS
    `tool_hygiene_section_present = false` and proceed; Step 3A.2.1 will be skipped.
 
    If the `UX Baseline` section is missing **and** the Project type is a UI type (Web app,
-   Desktop app, or Hybrid with a UI), warn but allow continuation. For CLI / Service / Library
-   projects set `ux_baseline_section_present = false` silently — the section does not apply.
+   Desktop app, or Hybrid with a UI), warn but allow continuation. For CLI / Service / Library /
+   Embedded projects set `ux_baseline_section_present = false` silently — the section does not apply.
    > `UX Baseline` section not found in `CLAUDE.md`. Baseline UX TORs (screen states,
    > keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast,
    > reduced motion, navigation, desktop conventions) will NOT be derived. To enable them,
@@ -110,7 +157,7 @@ The user's request / brownfield description: $ARGUMENTS
     `/peak-workflow:mockup` on UI projects). Capture every screen's `S-NN` ID, name, primary
     actions with their control text, and its four states (or `n/a — not data-bearing`). Set
     `screens_present = true`; Steps 3A.2, 3A.2.2, 4, and 5 use it. If absent, set it `false`
-    silently — CLI / Service / Library projects never have one.
+    silently — CLI / Service / Library / Embedded projects never have one.
 4. Glob `docs/requirements/*.feature.md`. For each file found, capture:
    - The feature number `{NN}` from the filename prefix (e.g., `01` from `01-cli.feature.md`)
    - All existing TOR IDs (parse every `Scenario: [TOR-NN-XXXXXXX]` line)
@@ -264,7 +311,8 @@ mechanism declared in `CLAUDE.md`.
 
 Place baseline TORs in the **most appropriate functional-area feature file** (typically
 the first feature file — `01-cli.feature.md` for CLI tools, `01-app.feature.md` for web
-apps, `01-service.feature.md` for services, `01-api.feature.md` for libraries / SDKs).
+apps, `01-service.feature.md` for services, `01-api.feature.md` for libraries / SDKs,
+`01-device.feature.md` for embedded).
 If the natural functional area is not the first file (e.g., logging baseline belongs in a
 dedicated `NN-logging.feature.md`), use that file instead. Write them under a literal
 `# Tool Hygiene & Operability` section banner (`# ---` comment block per
@@ -277,13 +325,24 @@ system** in 3A.2.2). Exclude both from the Step 4 trace table and from the Step 
 Hygiene lines covered" count.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
-override them.
+override them. Project types without a column (Service or API, Library, Embedded) write each
+shall-statement in the mechanism `CLAUDE.md` declares — e.g. Service or API: *"The service shall
+expose its name and semantic version at GET `/version` as JSON `{"name", "version"}` without requiring sign-in"* and
+*"The service shall return error responses as RFC 9457 problem details whose `detail` names the
+problem and the next action"*; the startup log line is asserted in the format the Logging line
+declares (a JSON record, not a `[INFO]` text line, when the logger writes JSON); Embedded: *"The device shall print its
+name and semantic version on the debug console in response to the `version` command"*. A line
+still reading `TBD — set by the walking-skeleton epic` yields a TOR whose title, Given, When, and
+Then all stay at the observable level — *"The device shall report its name and semantic version
+on its reporting channel"*, `When the device is asked for its version over its reporting
+channel` — so the TOR stays true whichever mechanism the skeleton picks and never needs a
+change-control edit once its ID is immutable. The skeleton's tests name the concrete channel.
 
 | Tool Hygiene line | Default TOR shall-statement form (CLI example) | Default TOR shall-statement form (Web app example) | Default TOR shall-statement form (Desktop app example) |
 |---|---|---|---|
 | **Version exposure** | The tool shall report its name and semantic version to standard output when invoked with `--version`, exiting with code 0 | The web application shall expose its name and semantic version at GET `/version` as JSON `{"name", "version"}`, AND shall display the version in the application footer or About page | The application shall display its name and semantic version in an About dialog opened from Help > About |
-| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at INFO level | The web application shall emit a log line on application startup containing its name and semantic version at INFO level | The application shall write a first log line containing its name and semantic version to the electron-log file on startup |
-| **Logging convention** | The tool shall emit log records at the levels DEBUG, INFO, WARN, and ERROR, in the format declared in CLAUDE.md (structured JSON / key=value / human-readable) | (same — substitute "web application") | (same — substitute "application") |
+| **Version stamped at log startup** | The tool shall emit a log line at startup containing its name and semantic version at the logger's info level | The web application shall emit a log line on application startup containing its name and semantic version at the logger's info level | The application shall write a first log line containing its name and semantic version to the electron-log file on startup |
+| **Logging convention** | The tool shall emit log records at the levels declared in CLAUDE.md (default DEBUG, INFO, WARN, and ERROR — use the logger's own level names, e.g. `Information` / `Warning` for .NET, `info` / `warn` for Pino and electron-log), in the format declared there (structured JSON / key=value / human-readable) | (same — substitute "web application") | (same — substitute "application") |
 | **Exit code convention** (CLI / Hybrid only) | The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation | N/A | N/A |
 | **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A | N/A |
 | **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action | The application shall display user-facing error messages on screen that name the problem AND name the next user action |
@@ -321,7 +380,7 @@ vision / ConOps follow.
 ### 3A.2.2: Baseline UX TORs
 
 If `ux_baseline_section_present = false` (Step 1), or the Project type has no user interface
-(CLI tool, Service or API, Library), skip this sub-step entirely.
+(CLI tool, Service or API, Library, Embedded), skip this sub-step entirely.
 
 Otherwise, ensure every **active TOR line** of the `UX Baseline` section of `CLAUDE.md` is
 covered by TOR requirements. Active TOR lines are every bold-labelled line except
@@ -358,7 +417,7 @@ feedback Givens cite the skeleton's test-only fault / latency switch rather than
 failure or slow operation (`Given the test fault switch forces the
 data source to fail`; `Given the test latency switch delays the data source by 3 seconds`).
 For a desktop app, the same assertions run through the project's Playwright Electron harness
-against the dev build with a live main process.
+against the production build (`out/`), which `bun run test:e2e` builds first.
 
 The mappings below are the **default**; project-specific declarations in `CLAUDE.md`
 override them. Where the Web app and Desktop app forms differ, both are given. Rows with
@@ -422,8 +481,8 @@ Scenario: [TOR-01-{XXXXXXX}] The application shall require confirmation before d
 Scenario: [TOR-01-{XXXXXXX}] The application shall focus the running instance when launched a second time
     Given the application is running with its main window minimized
     When the user launches the application executable again
-    Then within 2 seconds exactly one application process should exist
-    And the main window should be restored and focused
+    Then within 2 seconds the second launch should have exited and exactly one main window should exist
+    And the main window should be restored from minimized
 ```
 
 **Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
@@ -476,7 +535,9 @@ After all feature files are written, invoke a Haiku sub-agent using the `Agent` 
 > `# UX Baseline` banner trace to `CLAUDE.md` — record them under `traces_to.claude_md`,
 > citing `section` (`Tool Hygiene & Operability` or `UX Baseline`) and copying the bold label
 > verbatim into `line` (for Desktop conventions, `Desktop conventions — <bullet>`); never
-> record them as `orphan_requirement`. If no credible trace can be found for a requirement,
+> record them as `orphan_requirement`. Scenarios under the `# Safety` banner trace to the ConOps
+> §8 `What Must Never Happen` table — record them under `traces_to.conops` with `scenario: "§8"`,
+> `step: null`, and the hazard row paraphrased; never as `orphan_requirement`. If no credible trace can be found for a requirement,
 > record it under `coverage_gaps` with `gap_type: "orphan_requirement"`. Also enumerate ConOps scenario
 > steps and PV goals not covered by any TOR ID and record those under `coverage_gaps` with
 > `gap_type: "uncovered_source"` in the most relevant feature file's sidecar. Do NOT modify
@@ -599,6 +660,8 @@ internal scratch.
 
 **Input sources to enumerate (be granular — one ConOps step that says "X and Y" is two rows):**
 - Every numbered step in every ConOps Section 5 scenario
+- Every row of the ConOps §8 `What Must Never Happen` table (a hazard row → its `# Safety` TOR; an
+  assumption row marked `— confirmed by the owner` → the Coverage Gaps entry `hardware safeguard — outside the software, confirmed by the owner`)
 - Every MVP goal, in-scope feature, and success criterion from PV Sections 5–6
 - Every item under "New Capabilities Identified" in the brownfield changelog (if consumed)
 - User-stated priorities from `$ARGUMENTS` (if non-empty)
