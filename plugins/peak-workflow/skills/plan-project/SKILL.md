@@ -159,10 +159,11 @@ skeleton must:
 - **shadcn tooling.** If `CLAUDE.md` has no `**shadcn tooling:**` line, or the line says
   `not installed yet` (a project set up before this was added, or setup's install failed), the
   skeleton plan installs it as a named step, exactly as `/peak-workflow:setup` Step 9.0 does:
-  `bunx skills add shadcn/ui -s shadcn -a claude-code -y --copy` (check against `--help` first) and
+  `bunx skills add shadcn/ui -a claude-code -y --copy` (check against `--help` first) and
   the `shadcn` entry written directly into `.mcp.json` (never `shadcn mcp init`, which creates
   root npm files). It writes or corrects the line in the UX Baseline section, commits
-  `.claude/skills/shadcn/`, `skills-lock.json`, and `.mcp.json`, and tells the user to restart
+  `.claude/skills/shadcn/`,
+  `.claude/skills/migrate-radix-to-base/`, `skills-lock.json`, and `.mcp.json`, and tells the user to restart
   Claude Code and approve the `shadcn` server before the next epic.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
