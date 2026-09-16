@@ -1,6 +1,6 @@
 # Screen Inventory Template — `/peak-workflow:mockup`
 
-Used by `mockup` Step 4.3 (greenfield create, brownfield append). Write the populated template
+Used by `mockup` Step 4.2 (greenfield create, brownfield append). Write the populated template
 to `docs/product-vision-planning/ux/screens.md`. There is exactly one inventory per project —
 `S-NN` IDs are referenced by the ConOps (`/peak-workflow:mockup` Step 7), by TOR Given/When/Then
 clauses (`/peak-workflow:capture-requirements`), and later by epic specs, so they behave like

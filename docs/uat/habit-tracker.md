@@ -179,12 +179,16 @@ grep -n '^## ' docs/product-vision-planning/concept-of-operations.md
 
 Fresh session, then `/peak-workflow:mockup`.
 
-**Expect:** it continues on the existing `docs/` branch (no new branch), inventories screens with
-stable `S-NN` IDs, draws grayscale wireframes, has a review gate, then rewrites ConOps Section 5
-steps to name screens and controls.
+**Expect:** it continues on the existing `docs/` branch (no new branch) and **drafts
+autonomously — there is no inline interview**. It prints one short line per screen, writes
+`ux/screens.md` (inventory, states, mermaid flows), writes every wireframe **in parallel**, writes
+`wireframes/index.html`, then **opens that index in your default browser** and gates once. Only
+after that does it rewrite ConOps Section 5.
 
-**Answer as Dana:** approve the screen inventory unless it is obviously wrong. Expect something
-like `S-01 Habit List`, `S-02 Add Habit`, maybe `S-03 Habit Detail / Streak`.
+**Answer as Dana:** click through the index, open a screen, use its state buttons. Approve unless
+something is actually wrong. Feedback here may be **structural** — a missing screen, two that
+should be one — not just cosmetic; up to 3 adjustment rounds. Expect screens like `S-01 Habit
+List`, `S-02 Add Habit`, maybe `S-03 Habit Detail / Streak`.
 
 **Check:**
 
@@ -204,6 +208,10 @@ grep -riE 'color|#[0-9a-f]{6}|font-family' docs/product-vision-planning/ux/wiref
 | 5.5 | ConOps Section 5 steps now name screens (`the Habit List (S-01)`) and controls (`the "Add habit" button`) | the grep finds `S-0` hits in the ConOps |
 | 5.6 | A `# Note: reference screen` line names the screen(s) the skeleton will own | present in `screens.md` or carried to capture-requirements |
 | 5.7 | `frontend-design` was **not** invoked | it is not in the transcript |
+| 5.8 | **`wireframes/index.html` exists**, links every `S-NN`, and has no dead links | it is not itself a screen — no `S-NN` ID, no row in `screens.md` |
+| 5.9 | The index **opened in your browser by itself**; the absolute paths were printed as a fallback | a bare path you have to click is the old behavior |
+| 5.10 | **No inventory table or mermaid block was dumped to the terminal** — just one short line per screen | tables and mermaid are unreadable there; the gate is the wireframes |
+| 5.11 | The wireframes were written **in parallel**, in one turn | visible as batched writes in the transcript |
 
 ---
 
@@ -324,7 +332,11 @@ Fresh session. Get the skeleton's ID from `docs/implementation-plan/phase-1-*/in
 | 9.4 | The tree matches the sheet's **Section 3 Repository Layout** | compare against `bun-static-spa-stack.md` §3 |
 | 9.5 | The config files match **Section 4** verbatim, with only the project name substituted | diff them |
 | 9.6 | `bun install` succeeded | `ls node_modules` |
-| 9.7 | `bunx shadcn@latest init` ran for the renderer (static sheet carries `@tailwindcss/vite` and the path aliases) | `components.json` exists |
+| 9.7 | **`bunx shadcn@latest init` was NOT run** — the sheet ships `components.json`, `src/lib/utils.ts` and the token stylesheet itself (4.8, 4.11); only `bunx shadcn@latest add <name>` is valid | a stray `init` is a finding |
+| 9.7a | The `cn` path alias resolves in both `tsconfig.json` and `vite.config.ts`, and **no npm package literally named `cn`** was installed | `grep '"cn"' package.json` returns nothing |
+| 9.7b | `radix-ui` (unified) is declared; **no** per-primitive `@radix-ui/react-*` entries | `grep '@radix-ui' package.json` returns nothing |
+| 9.7c | `bun run check` is green on the **scaffold alone**, before domain code — Biome `preset`, the CSS parser, and knip's config hints are all exit-code-bearing | a red check on an empty repo is a Critical finding |
+| 9.7d | Contrast: `--ring`, `--muted-foreground` and `--input` carry the **retuned** values from 4.8, not the stock ones | `grep -E '\-\-(ring|input|muted-foreground):' src/index.css` |
 | 9.8 | **G5** — `grep -nE 'TBD — set by the walking-skeleton epic\|— unconfirmed\|\*\*Not decided yet:\*\*' CLAUDE.md` on this branch returns nothing | the skeleton resolved them all |
 | 9.9 | The reference screen renders loading / empty / error / populated | open it with `bun run dev` |
 | 9.10 | **G6** — you run `bun run check` and `bun run test:e2e` yourself, cold, and both pass | this is the first real execution of the sheet |
