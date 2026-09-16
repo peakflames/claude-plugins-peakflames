@@ -6,11 +6,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.11.0] — UNDER DEVELOPMENT
+## [2.0.0] — UNDER DEVELOPMENT
 
 Product shape, not project type, chooses the stack: plain-language questions route a web
 project to a new browser-only sheet or the existing server sheet, and discovery re-checks the
-answer. `setup` now asks only what a non-technical user can answer and defaults the rest.
+answer. `setup` now asks only what a non-technical user can answer and defaults the rest. UI
+epics now invoke the installed design skills and the shadcn MCP server in a planned Design pass.
+
+**BREAKING — skill contracts and project artifacts changed.** Re-run `/peak-workflow:setup` on
+existing projects to pick up these changes:
+- `setup` creates `develop` as the base branch and makes it the default branch when it publishes.
+- `CLAUDE.md` gains a `**Product shape:**` block, and on shadcn stacks a `**shadcn tooling:**`
+  line; shadcn stacks also commit `.claude/skills/` and `.mcp.json`.
+- Epic specs carry a `Design` note instead of `Brand`.
+- Handoffs and wrapup reports carry `Design skills used:`.
 
 ### Added
 
@@ -83,14 +92,18 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
   `electron-builder.yml` blocks are per target OS with Windows NSIS and signing notes.
 - **`plan-project` places deferred-decision epics** — it now reads `design-notes.md` and creates an
   epic in the last phase for each deferred decision, which TOR clustering could never produce.
-- **shadcn skill and MCP server in `setup`** — shadcn stacks get both installed at project scope
-  and committed, plus a `**shadcn tooling:**` line in `CLAUDE.md`. Setup reminds the user to restart
-  and approve the server.
+- **shadcn skills and MCP server in `setup`** — shadcn stacks get the `shadcn` and
+  `migrate-radix-to-base` skills plus `skills-lock.json`, and a `shadcn` entry written directly into
+  `.mcp.json`, all committed. Setup records a `**shadcn tooling:**` line and prints a
+  restart-and-approve reminder.
+- **shadcn tooling backfill** — the walking skeleton installs the skills and MCP entry when
+  `CLAUDE.md` has no `**shadcn tooling:**` line or marks it `not installed yet`.
 - **Design pass in `start-epic`** — UI epic plans get a numbered step before screen work that
   invokes each installed design skill and looks components up through the shadcn MCP tools.
+  Migration skills are skipped unless the spec calls for the migration.
 - **Playwright browser install** — `setup` installs Chromium for existing web and static projects;
-  new projects get it as a skeleton step right after `bun install`. E2E runs check for the browser
-  first and install it instead of reporting CANNOT VERIFY.
+  new projects get it as a skeleton step right after `bun install`. `start-epic` and `wrapup-epic`
+  run the idempotent install before E2E tests instead of reporting CANNOT VERIFY.
 
 ### Changed
 
@@ -266,7 +279,7 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Documentation
 
-- **UAT materials for v1.11.0** — `docs/uat/` adds four paste-ready starter project descriptions
+- **UAT materials for v2.0.0** — `docs/uat/` adds four paste-ready starter project descriptions
   (static SPA, Electron desktop, full web app with deferred org sign-in, existing .NET repo) and a
   step-by-step manual test doc per project covering the whole greenfield lifecycle.
 - **Web-sheet design system documented** — new sections for the token stylesheet and the shadcn

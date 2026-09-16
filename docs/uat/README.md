@@ -1,6 +1,6 @@
 # peak-workflow — User Acceptance Test Materials
 
-**Plugin under test:** `peak-workflow` v1.11.0 (UNDER DEVELOPMENT on `develop`)
+**Plugin under test:** `peak-workflow` v2.0.0 (UNDER DEVELOPMENT on `develop`)
 **Purpose:** exercise the full greenfield lifecycle by hand, on four throwaway projects, and
 record what actually happens.
 
@@ -76,7 +76,7 @@ claude --plugin-dir /Users/schaveyt/github/peakflames/claude-plugins-peakflames/
 - The flag is repeatable (`--plugin-dir A --plugin-dir B.zip`), and pointing it at a *folder of
   plugins* loads each child. There is also `--plugin-url <url>` for a `.zip`.
 - Because it reads the working tree, this route tests **exactly what is on your `develop`
-  checkout**, including uncommitted edits. That is what you want while validating v1.11.0.
+  checkout**, including uncommitted edits. That is what you want while validating v2.0.0.
 
 Confirm it loaded: type `/` in the session and look for the `peak-workflow:*` skills, or run
 `/peak-workflow:new-project` and check it responds.
@@ -139,7 +139,7 @@ each project doc:
 | G5 | No unresolved deferred values survive the skeleton | on the skeleton's feature branch: `grep -nE 'TBD — set by the walking-skeleton epic\|— unconfirmed\|Board: not chosen\|\*\*Not decided yet:\*\*' CLAUDE.md` returns nothing |
 | G6 | The skeleton actually builds and its tests pass | run the Tests command from `CLAUDE.md`'s Verification & Quality Gates section yourself, cold |
 | G7 | `/peak-workflow:status` reports coverage without errors | run it after the merge; Requirements Coverage should be 100% planned |
-| G8 | The question count is sane | count every question asked across `setup` — the v1.11.0 contract is 2–5 typical, plus the publish question. More than ~8 is a finding |
+| G8 | The question count is sane | count every question asked across `setup` — the v2.0.0 contract is 2–5 typical, plus the publish question. More than ~8 is a finding |
 | G9 | `develop` is the base branch | after `setup`: `git branch` shows `* develop` and `main`; every later `docs/` and `feature/` branch is cut from `develop` and merges back into it |
 | G10 | The design pass ran on every UI epic | each UI epic's plan has a Design pass step, and its handoff has a `Design skills used:` line |
 
