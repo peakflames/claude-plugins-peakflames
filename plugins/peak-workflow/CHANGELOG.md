@@ -86,6 +86,14 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Changed
 
+- **`mockup` drafts without an interview** — the screen inventory, states and flows are written
+  in one pass; the terminal shows one line per screen, and the only gate is the wireframes.
+- **Wireframe review in the browser** — `mockup` writes `wireframes/index.html`, opens it in the
+  default browser, and allows up to three adjustment rounds, including structural ones.
+- **Wireframes follow shadcn app shells** — site header by default, sidebar only for four or more
+  destinations, auth block for sign-in; `screens.md` records the chosen shell.
+- **Wireframes carry layout rules** — a required narrow-screen media query, a page-header row, an
+  overlay table (Dialog, Sheet, AlertDialog), and a wider `data-component` list.
 - **Sign-in always carries an access rule** — every sign-in "yes", named provider or deferred,
   records `**Access rule:** owner-or-permitted-role`, which now drives access TORs, skeleton owner
   columns and roles, Security Baseline reminders, and wrapup's access-control gate.
@@ -113,6 +121,12 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 
 ### Fixed
 
+- **Degenerate sidebar in web wireframes** — the template hard-coded a nav rail, so apps with one
+  destination shipped a sidebar holding a single link.
+- **Design Direction never checked** — `mockup` now traces each Product Vision §9 bullet to a
+  region, control or state, or defers it with an owner.
+- **Wireframes written one at a time** — every screen's file is now written in a single parallel
+  turn.
 - **Failed provider sign-in hit a bare error page** — web sheet passes `errorCallbackURL` so the app's
   plain-language message shows; `discover` stops recommending the next step while planning is blocked.
 
