@@ -251,7 +251,11 @@ one into a Highlights bullet or a Known Issue — it gets its own row, marked as
 
 ### Step 1.3: Run Quality Gates
 
-Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently:
+Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently (web and static SPA projects: before `bun run test:e2e`, run
+`bunx playwright install chromium`, which does nothing when the browser is already present; a run
+failing with *Executable doesn't exist* means run it again and continue — a missing browser is not
+CANNOT VERIFY. If `playwright-cli` reports a missing browser, run the install command its
+own `--help` gives):
 - Build check
 - Visual verification (if UI was changed) — web: `playwright-cli`; desktop: the Playwright Electron harness
 - Brand compliance via the project's brand guidelines skill (if UI was changed and a brand skill is configured)
@@ -454,11 +458,21 @@ skipped.)
 <2–3 sentences explaining why this verification is sufficient for the epic's TOR requirements,
 or — if FAIL — what specifically needs to be addressed before re-run>
 
+## Design
+Design skills used: <copied from the implementer handoff's Key Decisions line> (UI epics only — omit otherwise)
+
 ## Code Review Findings
 - [list any concerns, or "No issues found"]
 
 ## Verdict: PASS / FAIL
 ```
+
+**Design line (UI epics only).** Copy the handoff's `Design skills used:` line verbatim (write
+`not recorded` if the handoff has none). It is not a gate. If it says `none installed` but this
+session's available-skills or deferred-tool list shows a design skill or `mcp__shadcn__*` tools,
+add the non-gating note `ℹ️ design tooling is installed but the implementer recorded none — check
+the session was restarted after install`. The verifier does not invoke design skills; its checks
+stay independent of them.
 
 **Requirements Implemented table** (always included below the Verdict):
 

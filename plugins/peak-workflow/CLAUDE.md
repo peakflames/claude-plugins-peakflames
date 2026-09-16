@@ -138,8 +138,14 @@ design lands in the walking-skeleton epic. `mockup` never invokes `frontend-desi
 
 **Companion skills:** `setup` recommends `frontend-design@claude-plugins-official` for UI
 projects and `playwright-cli` for web UIs (desktop apps verify through a Playwright Electron
-harness, a project dependency rather than a skill). `frontend-design` shapes visual execution; the UX Baseline and
-design-system tokens take precedence over its aesthetic choices.
+harness, a project dependency rather than a skill). On shadcn stacks `setup` installs the shadcn/ui
+skill and `shadcn` MCP server at project scope (committed) and writes the greppable
+`**shadcn tooling:**` line into the UX Baseline. Design skills are never read from `CLAUDE.md`:
+`start-epic` 11b discovers them from its own session and the plan's **Design pass** step invokes
+them before any screen work. Precedence: TOR Given/When/Then > wireframe layout > UX Baseline +
+design tokens > design-skill choices. The handoff and wrapup report carry `Design skills used:`;
+the verifier never invokes design skills. Playwright's Chromium is installed only once the pinned
+`@playwright/test` exists (setup for existing code, the skeleton after `bun install` otherwise).
 
 ## Skill File Rules
 

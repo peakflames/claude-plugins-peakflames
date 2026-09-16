@@ -83,9 +83,24 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
   `electron-builder.yml` blocks are per target OS with Windows NSIS and signing notes.
 - **`plan-project` places deferred-decision epics** — it now reads `design-notes.md` and creates an
   epic in the last phase for each deferred decision, which TOR clustering could never produce.
+- **shadcn skill and MCP server in `setup`** — shadcn stacks get both installed at project scope
+  and committed, plus a `**shadcn tooling:**` line in `CLAUDE.md`. Setup reminds the user to restart
+  and approve the server.
+- **Design pass in `start-epic`** — UI epic plans get a numbered step before screen work that
+  invokes each installed design skill and looks components up through the shadcn MCP tools.
+- **Playwright browser install** — `setup` installs Chromium for existing web and static projects;
+  new projects get it as a skeleton step right after `bun install`. E2E runs check for the browser
+  first and install it instead of reporting CANNOT VERIFY.
 
 ### Changed
 
+- **Design-skill discovery at epic time** — `start-epic` 11b reads the session's skills and tools,
+  not `CLAUDE.md`; `**Recommended skills:**` is now a setup-time snapshot. Pre-change shadcn
+  projects get install commands in the plan.
+- **Design-skill visibility** — the handoff records `Design skills used:`; the wrapup report prints
+  it, with a non-gating note when tooling was installed but unused.
+- **Spec `Design` note** — replaces the `Brand` note in `plan-project` and `add` specs, pointing at
+  the Design pass.
 - **`mockup` drafts without an interview** — the screen inventory, states and flows are written
   in one pass; the terminal shows one line per screen, and the only gate is the wireframes.
 - **Wireframe review in the browser** — `mockup` writes `wireframes/index.html`, opens it in the

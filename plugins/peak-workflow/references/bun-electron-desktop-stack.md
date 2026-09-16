@@ -491,6 +491,8 @@ first, so a cold session never launches a missing or stale `out/`.
 `vite.config.*` file, finds none, reports no supported framework and exits. These three files are
 what it would write (Radix base, `neutral` tokens). After `bun install`, only
 `bunx shadcn@latest add <component>` is needed; `add` reads `components.json` and `tsconfig.json`.
+`/peak-workflow:setup` installs the shadcn/ui skill (`.claude/skills/`) and the `shadcn` MCP server
+(`.mcp.json`) on this stack; the skill documents `init`, but this section's rule — only `add` — wins.
 
 `components.json`:
 
