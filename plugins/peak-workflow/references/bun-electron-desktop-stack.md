@@ -241,7 +241,9 @@ my-app/
 }
 ```
 
-> Version ranges are indicative. Pin from the lockfile (`bun install`), and check the Electron
+> Version ranges are indicative. **Resolve each one against the registry at scaffold time**
+> (`npm view <pkg> version`) rather than pinning from memory — several move fast. Then pin from
+> the lockfile (`bun install`), and check the Electron
 > release notes for the current stable major before starting. `vite` stays `^7`: electron-vite 5
 > does not accept Vite 8.
 
@@ -345,7 +347,7 @@ electron-vite 5 externalizes `dependencies` for main and preload by default (`bu
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "includes": [
@@ -361,7 +363,7 @@ electron-vite 5 externalizes `dependencies` for main and preload by default (`bu
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "correctness": { "useExhaustiveDependencies": "error" },
       "nursery": { "useSortedClasses": "warn" },
       "suspicious": { "noExplicitAny": "error" }
@@ -376,6 +378,19 @@ output). shadcn components are excluded from linting so upstream updates stay di
 `index.css` because shadcn rewrites it and Biome's CSS parser rejects Tailwind's `@theme` and
 `@apply` unless told otherwise.
 
+Two things this config gets right that the defaults do not:
+
+- **`linter.rules.preset`**, not `linter.rules.recommended` — the latter is deprecated from Biome
+  2.5 and emits a `DEPRECATED` diagnostic on every run, which is enough to make `bun run check`
+  noisy on a fresh repo. `bunx biome migrate --write` converts an older config in place.
+- **`index.css` is excluded rather than parsed.** The alternative is
+  `"css": { "parser": { "tailwindDirectives": true } }`, which lets Biome format the file instead
+  of skipping it. Either works; excluding it is the choice here because shadcn rewrites the file
+  and a formatter fighting a generator is noise. If you turn the parser on instead, drop the
+  `!src/renderer/src/index.css` line and expect `complexity/noImportantStyles` to flag the
+  `prefers-reduced-motion` block (4.10) — suppress it with `biome-ignore-start` /
+  `biome-ignore-end` rather than weakening the override.
+
 ### 4.6 `knip.json`
 
 ```json
@@ -384,7 +399,6 @@ output). shadcn components are excluded from linting so upstream updates stay di
   "entry": [
     "src/main/index.ts",
     "src/preload/index.ts",
-    "src/renderer/src/main.tsx",
     "tests/**/*.test.ts?(x)",
     "tests/e2e/**/*.spec.ts"
   ],
@@ -396,6 +410,10 @@ output). shadcn components are excluded from linting so upstream updates stay di
 
 `shadcn` and `tw-animate-css` are imported from CSS only; `lib/utils.ts` is shadcn's `utils` alias
 target even before app code imports it.
+
+`knip` exits non-zero on **configuration hints**, not just findings, so a config with dead entries
+fails `bun run check` even when the code is clean. `src/renderer/src/main.tsx` is already an entry
+point by default — listing it again is "redundant", which is why it is absent above.
 
 ### 4.7 `drizzle.config.ts`
 
@@ -572,13 +590,13 @@ export { cn } from "cn";
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.52 0 0); /* retuned: 5.51:1 on white, 5.05:1 on --muted */
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --input: oklch(0.62 0 0); /* retuned: control edges, 3.64:1 on white */
+  --ring: oklch(0.55 0 0); /* retuned: 4.85:1 on white */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -591,7 +609,7 @@ export { cn } from "cn";
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.55 0 0); /* retuned to match --ring */
 }
 
 .dark {
@@ -611,8 +629,8 @@ export { cn } from "cn";
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --input: oklch(0.6 0 0); /* retuned: opaque, 3.83:1 on --muted */
+  --ring: oklch(0.7 0 0); /* retuned: 5.66:1 on --muted */
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -625,7 +643,7 @@ export { cn } from "cn";
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.7 0 0); /* retuned to match --ring */
 }
 
 @layer base {
@@ -649,6 +667,18 @@ export { cn } from "cn";
   }
 }
 ```
+
+> **The stock defaults are not accessible out of the box**, and four values above are retuned for
+> it. Measured as WCAG contrast (achromatic OKLCH, so relative luminance is `L³`):
+> `--muted-foreground` light was `0.556` — 4.73:1 on white but **4.34:1 on `--muted`**, now `0.52`
+> (5.51 / 5.05). `--ring` light was `0.708` — **2.59:1**, below the 3:1 non-text floor — now `0.55`
+> (4.85). `--ring` dark was `0.556` — 3.19:1 on `--muted`, a bare pass — now `0.70` (5.66).
+> `--input` carried the *same* value as `--border` (**1.26:1**), so inputs, outline `Button`s and
+> `Select` triggers drew an invisible edge; it is now `0.62` light / `0.60` dark (3.64 / 3.83),
+> while `--border` stays stock as a decorative separator. Dark `--muted-foreground` is unchanged —
+> it already measures 5.83:1 in its worst case. Controls must use `border-input`, not
+> `border-border`. **Measure, don't estimate** — an E2E test walking every text node and control
+> boundary is the arbiter; these values are a starting point that passes, not a substitute for it.
 
 Chromium reads the OS setting, so this block makes shadcn components comply without editing
 `components/ui/`. `0.01ms`, not `none`, keeps `animationend` firing, which Radix waits for before
@@ -1455,6 +1485,7 @@ Prerequisites on the build computer: Bun, and Node.js 22.12 or later (LTS) — P
 electron-vite both run on Node, and without it `bun run test:e2e` can hang.
 
 ```bash
+bun --version                # must be 1.2+; `bun upgrade` if the machine is behind
 bun install                  # runs only trustedDependencies scripts (Electron binary download)
 bun run dev                  # electron-vite with HMR
 bun run db:generate          # after editing schema.ts; commit the SQL
@@ -1555,6 +1586,8 @@ says it is not configured here.
 | Default application menu            | Without `Menu.setApplicationMenu`, Electron ships Reload, DevTools and electronjs.org links — no standard-menu TORs. | `src/main/menu.ts`: platform template, standard roles, dev items only when unpackaged (6.8).                  |
 | Menu event before the listener      | A menu click right after launch sends `app:showAbout` before the renderer subscribes; the event is dropped.         | E2E waits for the app shell, then retries the click until the dialog shows (7).                                |
 | Native file dialogs in E2E          | A real Open/Save dialog blocks the test and sits outside the DOM.                                                   | `tests/e2e/doubles.ts` replaces `dialog.showSaveDialog` in main and records the filters it got (6.4, 7).       |
+| Scaffold configs that fail their own gate | `bun run check` is red on a fresh, empty repo. | Biome `preset` (4.5) and knip configuration hints (4.6) are both exit-code-bearing. |
+| Design-system defaults below the contrast floor | Focus rings, muted text and control edges fail WCAG out of the box. | Retuned `--ring`, `--muted-foreground` and `--input` (4.10); measure with a test. |
 | Reduced motion                      | shadcn and `tw-animate-css` animate regardless of the OS reduce-motion setting.                                    | `prefers-reduced-motion` block in `index.css` (4.10); E2E emulates it with `page.emulateMedia` (7).            |
 | Dialog focus without a trigger      | A dialog opened from the native menu has no trigger, so closing it drops focus on `<body>`.                        | `onCloseAutoFocus` restores the element focused before opening (6.7).                                         |
 | Main → renderer events              | The sandboxed preload cannot load zod, and a leaked `IpcRendererEvent` exposes `sender`.                            | `send()` validates in main; preload `on()` allowlists events, forwards the payload only, returns unsubscribe (6.2, 6.3). |

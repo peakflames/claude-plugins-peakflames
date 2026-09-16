@@ -131,11 +131,15 @@ skeleton must:
   component-test configuration, which `setup` marks `N/A — no user interface (Service or API)`)
   — then `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
   involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
-  `.gitignore` already in the repo root. Then `bunx shadcn@latest init` for the renderer on the
-  web and static sheets (both carry the `@tailwindcss/vite` plugin and the path aliases in their
-  Vite config). The desktop sheet ships `components.json`, `lib/utils.ts`, and the token stylesheet
-  itself — `init` does not recognize electron-vite — so run only `bunx shadcn@latest add <name>`
-  there. Static-SPA specifics the sheet supplies and the skeleton must not drop: hash history
+  `.gitignore` already in the repo root. **Never run `bunx shadcn@latest init`** — on any of the three
+  sheets. Its flags have changed (`--base-color` is gone), it leans toward scaffolding a new
+  project rather than configuring an existing one, and it does not recognize electron-vite or a
+  workspace layout. All three sheets now ship `components.json`, `lib/utils.ts`, and the token
+  stylesheet themselves (static 4.8/4.11, web 4.9/4.10, desktop 4.10/4.11), so write those files
+  from the sheet and run only `bunx shadcn@latest add <name>`. Two things `add` does that the
+  sheet's aliases exist to absorb: it emits `import { cn } from "cn"` (resolve via the `cn` path
+  alias — if nothing resolves it, the CLI installs an unrelated npm package by that name), and it
+  imports primitives from the unified `radix-ui` package rather than `@radix-ui/react-*`. Static-SPA specifics the sheet supplies and the skeleton must not drop: hash history
   on the router (a static host has no rewrite rules), `base` taken from `BASE_PATH` so the
   GitHub Pages project path resolves, `__APP_VERSION__` injected from `package.json#version`
   (this is the Version exposure mechanism — the footer and the first console line both read it),

@@ -185,6 +185,8 @@ Fresh session, `/peak-workflow:mockup`. Expect screens like `S-01 Shift Board`, 
 | 5.5 | ConOps Section 5 rewritten to name screens and controls | `grep -n 'S-0' docs/product-vision-planning/concept-of-operations.md` |
 | 5.6 | A `# Note: reference screen` line names the skeleton-owned screen(s) | present |
 | 5.7 | `frontend-design` was not invoked | not in the transcript |
+| 5.8 | **`wireframes/index.html` exists**, links every `S-NN`, no dead links, and **opened in your browser by itself** | it is a review aid, not a screen — no `S-NN` ID, no `screens.md` row |
+| 5.9 | **No inventory table or mermaid block was dumped to the terminal**, and the wireframes were written in parallel | `mockup` drafts autonomously and gates once, on the wireframes |
 
 ---
 
@@ -296,7 +298,11 @@ Approve the plan, then let it run unaided.
 | 9.3 | **Nothing asked you for an OAuth client, tenant, client ID or secret** | deferred mode must not block on an external approval |
 | 9.4 | Branch `feature/epic-<id>-<short-name>` off `main` | verified |
 | 9.5 | Tree matches sheet Section 3; configs match Section 4 verbatim minus the 2.1 drops | diff |
-| 9.6 | `bun install` succeeded; `bunx shadcn@latest init` ran for the renderer | `components.json` exists |
+| 9.6 | `bun install` succeeded, and **`bunx shadcn@latest init` was NOT run** — the sheet now ships `apps/web/components.json`, `src/lib/utils.ts` and the token stylesheet itself (4.9, 4.10); only `bunx shadcn@latest add <name>` is valid | `init` on a workspace layout is prone to writing into the wrong directory — a stray `init` is a finding |
+| 9.6a | The `cn` path alias resolves in both `tsconfig.json` and `apps/web/vite.config.ts`, and **no npm package literally named `cn`** was installed | `grep '"cn"' apps/web/package.json package.json` returns nothing |
+| 9.6b | `radix-ui` (unified) is declared; **no** per-primitive `@radix-ui/react-*` entries | `grep '@radix-ui' apps/web/package.json` returns nothing |
+| 9.6c | `bun run check` is green on the **scaffold alone**, before domain code | Biome `preset`, the CSS parser and knip's config hints are all exit-code-bearing; red on an empty repo is Critical |
+| 9.6d | Contrast: `--ring`, `--muted-foreground` and `--input` carry the **retuned** values from 4.9 | `grep -E '\-\-(ring|input|muted-foreground):' apps/web/src/index.css` |
 | 9.7 | The auth `basePath` and the Vite proxy entry agree | a mismatch was a v1.11.0 fix — a regression is Critical |
 | 9.8 | The `hc` client does not double-prefix the API path | same |
 | 9.9 | `GOOGLE_*` / `MICROSOFT_*` env vars are **present but commented out / optional** in `.env.example`, and the app **boots with none of them set** | `bun run dev` must not fail an env check for a provider nobody chose |

@@ -159,6 +159,8 @@ conventions TORs.
 | 5.4 | Each data-bearing screen has loading / empty / error / populated states | present |
 | 5.5 | ConOps Section 5 rewritten to name screens and controls | `grep -n 'S-0' docs/product-vision-planning/concept-of-operations.md` |
 | 5.6 | A `# Note: reference screen` line names the screen(s) the skeleton owns | present |
+| 5.7 | **`wireframes/index.html` exists**, links every `S-NN`, and **opened in your browser by itself**. The Application menu and Window rows appear as **plain text, not links** | they have no wireframe |
+| 5.8 | **No inventory table or mermaid block was dumped to the terminal**, and the wireframes were written in parallel | `mockup` drafts autonomously and gates once, on the wireframes |
 
 ---
 
@@ -221,6 +223,9 @@ Fresh session. Approve the plan, then let it run unaided.
 | 9.3 | Tree matches sheet Section 3; config files match Section 4 verbatim minus the 2.1 drops | diff against the sheet |
 | 9.4 | `bun install` succeeded and downloaded the Electron binary via `trustedDependencies` | `ls node_modules/electron/dist` |
 | 9.5 | **`bunx shadcn@latest init` was NOT run** — the desktop sheet ships `components.json`, `lib/utils.ts` and the token stylesheet itself; only `bunx shadcn@latest add <name>` is valid here | a stray `init` is a finding |
+| 9.5a | `radix-ui` (unified) is declared; **no** per-primitive `@radix-ui/react-*` entries | `grep '@radix-ui' package.json` returns nothing |
+| 9.5b | `bun run check` is green on the **scaffold alone**, before domain code | Biome `preset` and knip's config hints are exit-code-bearing; red on an empty repo is Critical |
+| 9.5c | Contrast: `--ring`, `--muted-foreground` and `--input` carry the **retuned** values from 4.10, not the stock ones | `grep -E '\-\-(ring|input|muted-foreground):' src/renderer/src/index.css` |
 | 9.6 | **G5** — the deferred-value grep on `CLAUDE.md` returns nothing on this branch | skeleton resolved every TBD |
 | 9.7 | `bun run dev` launches an Electron window with the app shell, navigation, theme wiring, native menu, window-state persistence and the About dialog | observe it |
 | 9.8 | Help > About shows `benchlog v0.1.0` from `app.getVersion()` over IPC, rendered **in the DOM** | assertable by Playwright |

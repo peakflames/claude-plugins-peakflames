@@ -205,12 +205,30 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
 - **`Test directories` placeholder** — named as a placeholder with per-sheet examples, so the line
   `start-epic` and `wrapup-epic` grep points at directories that exist.
 - **UX Baseline token path** — follows the stack's layout instead of hard-coding `src/index.css`.
+- **`shadcn init` is never run** — all three sheets now ship `components.json`, `lib/utils.ts` and
+  the token stylesheet themselves; `plan-project` runs only `shadcn add`. `init`'s flags changed
+  and it scaffolds rather than configures.
+- **`cn` and `radix-ui` imports** — web sheet gains the `cn` path alias and a `lib/utils.ts` shim,
+  so `shadcn add` no longer installs an unrelated npm package named `cn`; both sheets declare the
+  unified `radix-ui` package instead of per-primitive ones.
+- **Scaffold configs failed their own gate** — Biome `rules.preset` (`recommended` is deprecated
+  from 2.5), the Tailwind CSS parser option, and knip's exit-code-bearing configuration hints, so
+  `bun run check` is green on a fresh repo. Applied to all three sheets.
+- **Contrast floors** — `--ring`, `--muted-foreground` and `--input` retuned with measured WCAG
+  values across all three sheets; `--border` stays decorative and controls use `border-input`.
+- **`__dirname` in an ESM Vite config** — web sheet uses `import.meta.dirname`.
+- **Stale E2E hooks** — web and static sheets note that `reuseExistingServer` must be `false` when
+  the E2E build sets a fault-injection flag the ordinary build does not.
+- **Registry-resolved versions** — all three sheets say to check each dependency at scaffold time
+  rather than pinning from memory.
 
 ### Documentation
 
 - **UAT materials for v1.11.0** — `docs/uat/` adds four paste-ready starter project descriptions
   (static SPA, Electron desktop, full web app with deferred org sign-in, existing .NET repo) and a
   step-by-step manual test doc per project covering the whole greenfield lifecycle.
+- **Web-sheet design system documented** — new sections for the token stylesheet and the shadcn
+  CLI's current behavior, which the sheet previously left to `shadcn init`.
 
 ---
 
