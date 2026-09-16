@@ -129,10 +129,13 @@ skeleton must:
   `N/A` (and, on the desktop sheet, the blocks for operating systems not in `Target OS`; for a
   Service or API on the web sheet, everything under `apps/web/` and its Vite, router, and
   component-test configuration, which `setup` marks `N/A — no user interface (Service or API)`)
-  — then `bun install`. Writing the files directly is what the sheet is for — no scaffolder is
+  — then `bun install`. On web and static SPA skeletons, the next named plan step is
+  `bunx playwright install chromium` (after `bun install`, so the browser matches the lockfile's
+  `@playwright/test`; Linux also needs `bunx playwright install-deps chromium`, run by the user as a
+  `!` command because it uses sudo). Writing the files directly is what the sheet is for — no scaffolder is
   involved, so nothing collides with the `CLAUDE.md`, `docs/`, `README.md`, `CHANGELOG.md`, and
   `.gitignore` already in the repo root. **Never run `bunx shadcn@latest init`** — on any of the three
-  sheets. Its flags have changed (`--base-color` is gone), it leans toward scaffolding a new
+  sheets, even though the shadcn skill documents `init`; this rule wins over the skill. Its flags have changed (`--base-color` is gone), it leans toward scaffolding a new
   project rather than configuring an existing one, and it does not recognize electron-vite or a
   workspace layout. All three sheets now ship `components.json`, `lib/utils.ts`, and the token
   stylesheet themselves (static 4.8/4.11, web 4.9/4.10, desktop 4.10/4.11), so write those files
@@ -153,6 +156,14 @@ skeleton must:
   (`npmRebuild: false`), `asarUnpack` for `better-sqlite3`, `contextIsolation` +
   `sandbox` + `nodeIntegration: false`, Zod-validated IPC, and `migrate()` at startup resolving
   the SQL folder from `process.resourcesPath` when packaged.
+- **shadcn tooling.** If `CLAUDE.md` has no `**shadcn tooling:**` line, or the line says
+  `not installed yet` (a project set up before this was added, or setup's install failed), the
+  skeleton plan installs it as a named step, exactly as `/peak-workflow:setup` Step 9.0 does:
+  `bunx skills add shadcn/ui -s shadcn -a claude-code -y --copy` (check against `--help` first) and
+  the `shadcn` entry written directly into `.mcp.json` (never `shadcn mcp init`, which creates
+  root npm files). It writes or corrects the line in the UX Baseline section, commits
+  `.claude/skills/shadcn/`, `skills-lock.json`, and `.mcp.json`, and tells the user to restart
+  Claude Code and approve the `shadcn` server before the next epic.
 - Build the app shell: layout, primary navigation, theme / dark-mode wiring, and for desktop
   apps the application menu, window-state persistence, and the About dialog.
 - When `CLAUDE.md`'s `**Product shape:**` block records `**Access rule:** owner-or-permitted-role`
@@ -490,7 +501,7 @@ For each epic, write the spec file following the exact format below (the same fo
 **Dependencies:** Epic {id1} ({short description}), Epic {id2} ({short description})
 **Source:** Issue #{N}
 
-> **Brand:** Use the project's brand guidelines skill for {relevant UI elements} if one is configured.
+> **Design:** UI epic — `/peak-workflow:start-epic` runs a Design pass with the design skills installed at that time (brand kit, `frontend-design`, shadcn) for {relevant UI elements}.
 
 ---
 
@@ -530,7 +541,7 @@ skeleton's app shell and design system — no new component library, no new toke
 
 **Conditional lines and sections in the template above** — do not carry this guidance into the written spec:
 
-- Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
+- Include the **Design** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise.
 - Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it. Copy the name verbatim from `ux/screens.md`, and the wireframe path verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
 

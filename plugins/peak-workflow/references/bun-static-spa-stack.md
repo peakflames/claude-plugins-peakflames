@@ -577,6 +577,9 @@ against `bunx shadcn@latest init --help` at scaffold time, and expect these diff
   generated file, which the next `--overwrite` would undo.
 - **`add` emits `import { Dialog as DialogPrimitive } from "radix-ui"`** — the unified package.
   Remove any per-primitive `@radix-ui/react-*` entries from `package.json` afterwards.
+- **Assistant tooling.** `/peak-workflow:setup` installs the shadcn/ui skill (`.claude/skills/`)
+  and the `shadcn` MCP server (`.mcp.json`) on this stack. The skill documents `init`; this sheet's
+  rule — write `components.json` and the token stylesheet by hand, run only `add` — wins.
 
 A `components.json` that works with a hand-written stylesheet:
 
@@ -1021,7 +1024,7 @@ the `env:` block in that case. Getting this wrong shows up as a white page with 
 ```bash
 bun --version                # must be 1.2+; `bun upgrade` if the machine is behind
 bun install
-bunx playwright install      # one time, before the first `test:e2e`
+bunx playwright install chromium   # one time, right after `bun install`
 bun run dev                  # http://localhost:5173
 bun run check                # typecheck + lint + deadcode + tests
 bun run test:e2e             # builds, previews, runs Playwright

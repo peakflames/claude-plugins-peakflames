@@ -144,7 +144,9 @@ palette, typography, and brand are not TORs. `/setup` also recommends companion 
 projects — `frontend-design@claude-plugins-official` for visual execution and `playwright-cli`
 for verification (web; desktop apps verify through a Playwright Electron harness in `tests/e2e/`) —
 and records the precedence rule: the UX Baseline and the design-system tokens win over
-`frontend-design`'s aesthetic choices.
+design-skill choices. On shadcn stacks `/setup` also installs the shadcn/ui skill and MCP server,
+and every UI epic's plan has a **Design pass** step that invokes whichever design skills are
+installed at that moment.
 
 **Stack defaults come from the reference sheets.** Three sheets ship with the plugin under
 [`references/`](references/): [`bun-static-spa-stack.md`](references/bun-static-spa-stack.md)

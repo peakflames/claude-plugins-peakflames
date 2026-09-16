@@ -98,6 +98,23 @@ loading / empty / error / populated states it renders — the wrapup UX Baseline
 every one of them. When the spec has a `## Screens` section (Step 1 item 4c), the step also
 cites the screen's `S-NN`, its wireframe path, and the `data-component` primitives it composes
 — the wrapup Wireframe fidelity line checks regions, control texts, and states against that file.
+Each such step also says which design skill or component lookup it used (from the Design pass).
+
+**Design pass (UI epics only — Step 1 item 11a applies).** Add this as a numbered middle step
+immediately before the first middle step that adds or changes a screen, so it survives a cleared
+context and runs again when the epic resumes. Substitute the names Step 1 item 11b found:
+```
+N. Design pass [UI]: invoke Skill("<exact name>") for each design skill from Step 1 item 11b
+   (e.g. shadcn, frontend-design:frontend-design); load mcp__shadcn__* via ToolSearch and use
+   them to look up each component's docs/examples before composing it. Add components with the
+   sheet's `bunx shadcn@latest add <name>` — never `init`.
+   Precedence: TOR Given/When/Then > wireframe layout (S-NN) > UX Baseline + design tokens
+   > design-skill choices. Theme/preset changes only in the token file; the Contrast TOR must still pass.
+   If the context was cleared after this step ran, re-run it before the next screen step.
+```
+Drop the clauses for tools 11b did not find. If it found nothing, the step reads
+`N. Design pass [UI]: none installed — UX Baseline and tokens only` plus 11b's install hint; if
+11b reported shadcn tooling missing, add its restart or install line to the step.
 
 **Bench only (products that switch mains power or heat).** Before any command that flashes the
 board, runs it, or runs anything under `tests/hil/` — in a middle step, the self-assessment, or a
@@ -184,7 +201,10 @@ Middle step example:
   4. Also run the project's Verification & Quality Gates from `CLAUDE.md` (build, lint, console
      errors, brand audit if UI, and for a UI epic the UX Baseline check — every active line of
      the UX Baseline section, exactly as `/peak-workflow:wrapup-epic` Step 1.3 lists them).
-     Report each gate as PASS / FAIL / CANNOT VERIFY.
+     Report each gate as PASS / FAIL / CANNOT VERIFY. On a web or static-SPA project, before
+     `bun run test:e2e`, run `bunx playwright install chromium` (it does nothing when the browser
+     is already present); a run failing with *Executable doesn't exist* means run it again and
+     continue — a missing browser is not CANNOT VERIFY.
 
   Before reporting, run two mechanical checks against the working tree (nothing is committed
   yet, so `git diff <base-branch>` alone would miss new files):
@@ -258,7 +278,8 @@ Middle step example:
     (empty if no deviations). A deviation is a Then clause that was *adjusted*; it is also a
     deferral of the TOR as written, so every deviated TOR appears in both tables.
   - **Key Decisions** — design choices future epics should know about. Anything here that
-    describes partial or stubbed behavior must have a matching Deferrals row.
+    describes partial or stubbed behavior must have a matching Deferrals row. For a UI epic,
+    include the line `Design skills used: <names, plus mcp__shadcn__* if used> / none installed`.
   - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / PASS (operator-observed pending) / FAIL / CANNOT VERIFY
     verdict from the self-assessment step
   - **Verification Results (self-assessment)** — quality gate results

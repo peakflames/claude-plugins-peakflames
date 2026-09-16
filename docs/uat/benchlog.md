@@ -9,7 +9,7 @@ on it. The lab PCs have no internet — a rule, not a limitation.
 
 **Time:** ~3 hours including the skeleton build.
 
-Read [README.md](README.md) first — prerequisites, plugin loading, global criteria G1–G8, defect
+Read [README.md](README.md) first — prerequisites, plugin loading, global criteria G1–G10, defect
 template.
 
 ---
@@ -111,6 +111,12 @@ grep -n 'Q[1-6] \|Access rule\|Target OS\|N/A' CLAUDE.md
 | 3.16 | First commit made | `git show --stat HEAD` |
 | 3.17 | **`develop` created and checked out**; `main` holds only the setup commit | `git branch` shows `* develop` and `main`, both at the same commit |
 | 3.18 | The publish question came **after** the commit, on its own — not folded into the confirmation — and "Not now" reported `[N/A] GitHub — not published` | nothing was created on GitHub |
+| 3.19 | `.claude/skills/<shadcn>/` exists and is in the setup commit | `git show --stat HEAD` lists it |
+| 3.20 | `.mcp.json` has a `shadcn` server entry (`bunx --bun shadcn@latest mcp`); `.claude/skills/shadcn/` is the only skill added; `skills-lock.json` is committed; no root `package.json`, `package-lock.json` or `node_modules/` appeared from the install | `grep -n shadcn .mcp.json`; `git status --short` clean after setup |
+| 3.21 | The shadcn skill and MCP server were **not asked about** — shown only in the one confirmation | no separate question |
+| 3.22 | "Restart Claude Code before the next command, and approve the `shadcn` server when asked." was printed | restart, then approve on the next session |
+| 3.23 | UX Baseline has a `**shadcn tooling:**` line | `grep -c 'shadcn tooling:' CLAUDE.md` → 1 |
+| 3.24 | Setup reported `[N/A] Playwright browsers — Electron supplies its own` | no Playwright install step in Local Environment |
 
 ---
 
@@ -236,6 +242,10 @@ Fresh session. Approve the plan, then let it run unaided.
 | 9.9 | The reference screen renders all four states | force them with the fault switch |
 | 9.10 | **G6** — you run `bun run check` and `bun run test:e2e` yourself, cold, and both pass | first real execution of the sheet |
 | 9.11 | `bun run package` produces an installer for the OS you are on | on Windows: an NSIS installer in `dist/`. On macOS, expect it to fail or produce nothing for Windows — that is correct behavior, and `Build: CI runner for Windows` should already be recorded |
+| 9.12 | The plan has a numbered **Design pass** step before screen work, naming the shadcn skill (and `frontend-design` if installed) | present in the plan |
+| 9.13 | `Skill(...)` calls for those design skills appear in the transcript **before** any screen code | visible in order |
+| 9.14 | `mcp__shadcn__*` tools were used | visible in the transcript |
+| 9.15 | The handoff's Key Decisions has a `Design skills used:` line | `grep -n 'Design skills used:' docs/implementation-plan/session-handoffs/*` |
 
 > **Expected failure surface here:** the desktop sheet's npm-verified pins (Electron ^44,
 > better-sqlite3 ^13 N-API) have never been installed. If `bun install` or the native module load
@@ -261,6 +271,7 @@ First, in the **implementer's** session, run `/peak-workflow:wrapup-epic <id>` a
 | 10.8 | Sidecar → `status: Complete`, `completed:` and `handoff:` filled; handoff file written | `cat docs/implementation-plan/status/epic-<id>.md` |
 | 10.9 | Ship mode asked neutrally | choose **Solo** |
 | 10.10 | Solo merged `--no-ff`, deleted the branch, said it did not push | `git log --oneline -5` |
+| 10.11 | The report shows the `Design skills used:` line under a `## Design` heading | matches the handoff |
 
 ---
 
@@ -288,7 +299,7 @@ Project: Benchlog (Electron desktop)
 Plugin ref: <git rev-parse --short HEAD in the plugin repo>
 Date: 
 Node version: ____   Bun version: ____   Build OS: ____
-Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __
+Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __  G9 __  G10 __
 Questions asked by setup: __
 Sign-in trap: did setup correctly record "attribution only"?  YES / NO
 Skeleton build: PASS / FAIL

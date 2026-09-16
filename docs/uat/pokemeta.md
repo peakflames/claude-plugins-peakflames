@@ -10,7 +10,7 @@ standardises on .NET. She does not make architecture decisions.
 
 **Time:** ~2–3 hours.
 
-Read [README.md](README.md) first — prerequisites, plugin loading, global criteria G1–G8, defect
+Read [README.md](README.md) first — prerequisites, plugin loading, global criteria G1–G10, defect
 template.
 
 ---
@@ -141,6 +141,7 @@ git log --oneline
 | 3.16 | **The existing code is untouched** | `git show --stat HEAD` lists no file under `src/` |
 | 3.17 | **`develop` created from the existing branch and checked out** — the existing branch (`main`, or `master` if `git init` made that) is **not** renamed, because the repository already had commits | `git branch` shows `* develop` plus the original branch; the Release Protocol names the original branch as the release branch |
 | 3.18 | The publish question came **after** the commit, on its own, and "Not now" reported `[N/A] GitHub — not published` | nothing was created on GitHub |
+| 3.19 | **No** shadcn skill, `shadcn` MCP server, `**shadcn tooling:**` line, or Playwright install step | `ls .claude/skills .mcp.json` finds no shadcn; `grep -ci 'shadcn\|playwright install' CLAUDE.md` → 0 |
 
 ---
 
@@ -249,6 +250,7 @@ Fresh session. Approve the plan, then let it run unaided.
 | 8.9 | `curl localhost:<port>/version` returns `{"name":…,"version":…}` without authentication | version TOR |
 | 8.10 | An error response is RFC 9457 problem details with a `detail` naming the next action | error standard |
 | 8.11 | **G6** — you run `dotnet build`, `dotnet test` and `dotnet format --verify-no-changes` yourself, cold, and all pass | verify by hand |
+| 8.12 | **No** Design pass step, `mcp__shadcn__*` call, or `bunx playwright install` in the plan or transcript | no UI |
 
 ---
 
@@ -296,7 +298,7 @@ Project: PokeMeta (existing .NET 8 repo, Service or API)
 Plugin ref: <git rev-parse --short HEAD in the plugin repo>
 Date: 
 .NET SDK: ____
-Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __
+Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __  G9 __  G10 __
 Questions asked by setup: __
 Sheet avoided (no Bun stack proposed)?  YES / NO
 Pino avoided (correct .NET logging default)?  YES / NO

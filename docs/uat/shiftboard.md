@@ -17,7 +17,7 @@ it's approved, or when. He is emphatically not going to get an answer this month
 **Time:** ~3–4 hours including the skeleton build. **No cloud account or OAuth client needed** —
 that is the point of deferred mode.
 
-Read [README.md](README.md) first — prerequisites, plugin loading, global criteria G1–G8, defect
+Read [README.md](README.md) first — prerequisites, plugin loading, global criteria G1–G10, defect
 template.
 
 > **Coverage note:** deferred mode had **no adversarial dry-run coverage** in the v1.11.0
@@ -126,6 +126,12 @@ That routes to **deferred mode**, and the candidate must not be discarded:
 | 3.21 | Hosting recorded as chosen with the user, not picked silently | it costs money |
 | 3.22 | First commit made | `git show --stat HEAD` |
 | 3.22a | **`develop` created and checked out**; `main` holds the setup commit | `git branch` shows `* develop` and `main` |
+| 3.22b | `.claude/skills/<shadcn>/` exists and is in the setup commit | `git show --stat HEAD` lists it |
+| 3.22c | `.mcp.json` has a `shadcn` server entry (`bunx --bun shadcn@latest mcp`); `.claude/skills/shadcn/` is the only skill added; `skills-lock.json` is committed; no root `package.json`, `package-lock.json` or `node_modules/` appeared from the install | `grep -n shadcn .mcp.json`; `git status --short` clean after setup |
+| 3.22d | The shadcn skill and MCP server were **not asked about** — shown only in the one confirmation | no separate question |
+| 3.22e | "Restart Claude Code before the next command, and approve the `shadcn` server when asked." was printed | restart, then approve on the next session |
+| 3.22f | UX Baseline has a `**shadcn tooling:**` line | `grep -c 'shadcn tooling:' CLAUDE.md` → 1 |
+| 3.22g | Local Environment names the one-time `bunx playwright install chromium` step | present |
 
 ### 3a — Publishing to GitHub
 
@@ -344,6 +350,7 @@ Approve the plan, then let it run unaided.
 | 9.6b | `radix-ui` (unified) is declared; **no** per-primitive `@radix-ui/react-*` entries | `grep '@radix-ui' apps/web/package.json` returns nothing |
 | 9.6c | `bun run check` is green on the **scaffold alone**, before domain code | Biome `preset`, the CSS parser and knip's config hints are all exit-code-bearing; red on an empty repo is Critical |
 | 9.6d | Contrast: `--ring`, `--muted-foreground` and `--input` carry the **retuned** values from 4.9 | `grep -E '\-\-(ring|input|muted-foreground):' apps/web/src/index.css` |
+| 9.6e | `bunx playwright install chromium` ran **right after** `bun install` | visible in the transcript |
 | 9.7 | The auth `basePath` and the Vite proxy entry agree | a mismatch was a v1.11.0 fix — a regression is Critical |
 | 9.8 | The `hc` client does not double-prefix the API path | same |
 | 9.9 | `GOOGLE_*` / `MICROSOFT_*` env vars are **present but commented out / optional** in `.env.example`, and the app **boots with none of them set** | `bun run dev` must not fail an env check for a provider nobody chose |
@@ -355,6 +362,11 @@ Approve the plan, then let it run unaided.
 | 9.15 | Live updates work: two browser windows, claim in one, watch it disappear in the other | the product's reason for existing |
 | 9.16 | The reference screen renders all four states | force with the fault switch |
 | 9.17 | **G6** — you run `bun run check` and `bun run test:e2e` yourself, cold, with Docker running and `.env` copied, and both pass | first real execution of the sheet |
+| 9.18 | The cold `bun run test:e2e` shows no "Executable doesn't exist" error | Chromium was installed by the skeleton |
+| 9.19 | The plan has a numbered **Design pass** step before screen work, naming the shadcn skill (and `frontend-design` if installed) | present in the plan |
+| 9.20 | `Skill(...)` calls for those design skills appear in the transcript **before** any screen code | visible in order |
+| 9.21 | `mcp__shadcn__*` tools were used | visible in the transcript |
+| 9.22 | The handoff's Key Decisions has a `Design skills used:` line | `grep -n 'Design skills used:' docs/implementation-plan/session-handoffs/*` |
 
 > **Expected failure surface:** Better Auth hook paths and edge cases were never executed, and
 > deferred mode leans on them harder than the named-provider path did — verified-email sign-up,
@@ -384,6 +396,7 @@ PASS). Then a fresh session.
 | 10.11 | Ship mode asked neutrally | choose **Solo** (or **Team** to exercise `gh pr create --base develop`) |
 | 10.12 | *Protections path, Solo:* the completion message warns that `develop` is protected and the push works only for an administrator | the `**Remote:**` line drives this |
 | 10.13 | *Team:* the PR targets `develop` and shows **1 approval required**; you, as admin, can still merge it with the bypass checkbox | protection is live, bypass is intact |
+| 10.14 | The report shows the `Design skills used:` line under a `## Design` heading | matches the handoff |
 
 ---
 
@@ -413,7 +426,7 @@ Project: Shiftboard (web app, deferred org sign-in — Okta pending IT)
 Plugin ref: <git rev-parse --short HEAD in the plugin repo>
 Date: 
 Bun version: ____   Docker: ____
-Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __
+Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __  G9 __  G10 __
 Questions asked by setup: __
 
 Deferred-mode contract:
