@@ -84,7 +84,9 @@ Examples:
 ## Git Workflow
 
 This repo follows the same branching strategy `peak-workflow`'s own `/setup` skill writes into a
-project's `CLAUDE.md` — accumulate work on `develop`, release from `main`.
+project's `CLAUDE.md` — accumulate work on `develop`, release from `main` — with one deliberate
+difference: `/setup` makes `develop` a project's default branch, while this repo keeps `main` as
+its default (see the table).
 
 | Branch | Role |
 |---|---|

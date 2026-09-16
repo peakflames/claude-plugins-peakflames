@@ -48,6 +48,15 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 **Develop-branch invariant:** merge = approval. Anything on `develop` is approved.
 
+**`develop` is the base, `main` is the release line.** `setup` creates `develop` on every project
+(unless existing code declares another strategy) and leaves it checked out. Publishing is always
+asked, never defaulted: on Yes, `setup` installs `gh` if needed, creates the repository in the
+chosen organization or personal account, makes `develop` the default branch, and protects `main`
+and `develop` (pull request + 1 approval, no force-push, no deletion) with `enforce_admins: false`
+so administrators bypass — which is what solo-mode merges and the Release Protocol push rely on.
+A free-plan private repository cannot be protected; that is a warning, not a failure. The outcome
+is recorded as a `**Remote:**` line in the project's Git Workflow section.
+
 **Verification independence:** wrapup runs in a fresh session on a stronger model, blind to
 the implementer handoff until verdicts are recorded. `context: fork` is never used for
 verification. A fix the verifier applies at wrapup is always recorded as `FIXED DURING WRAPUP`
@@ -70,7 +79,8 @@ baseline.
 
 **Setup asks little, defaults the rest.** `setup` asks only what the user alone knows: Project
 Overview (drafted from `new-project`'s description when given), Project type (now including
-Embedded), the shape and sign-in questions, and a required language or device. Every other value
+Embedded), the shape and sign-in questions, a required language or device, and — after the setup
+commit — whether to publish to GitHub. Every other value
 comes from existing code, then a stack the user named, then the sheet, then the toolchain table,
 then a plugin convention, and is shown in one plain-language confirmation — which also carries the
 housekeeping (repo files, `.gitignore`, add-on skills, first commit) instead of separate questions.

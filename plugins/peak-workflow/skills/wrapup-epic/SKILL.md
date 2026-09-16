@@ -647,6 +647,10 @@ be made by the user every invocation.
    > Branch `<branch>` has been merged into `<base-branch>` and deleted.
    > Changes have not been pushed — run `git push` when ready.
 
+   If `CLAUDE.md`'s `**Remote:**` line records branch protection, add: *"`<base-branch>` is
+   protected — the push goes through only for a repository administrator. Without admin rights,
+   use team mode instead."*
+
 ### Step 5b: Team mode
 
 1. Note the current feature branch name.

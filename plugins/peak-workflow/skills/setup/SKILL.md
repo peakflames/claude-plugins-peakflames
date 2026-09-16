@@ -43,7 +43,7 @@ Check for the presence and completeness of each section below. Report a status f
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
-| **Git Workflow** | Documents branch strategy (including epic branch naming convention `feature/epic-<id>-<short-name>` where `<id>` is a legacy integer or 7-character alphanumeric, and quick-fix convention `hotfix/issue-<N>-<slug>` or `hotfix/<slug>`), merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, credential files, `appsettings.*.local.json` — not a template `appsettings.json` with no secrets, which is normally committed) |
+| **Git Workflow** | Documents branch strategy (including epic branch naming convention `feature/epic-<id>-<short-name>` where `<id>` is a legacy integer or 7-character alphanumeric, and quick-fix convention `hotfix/issue-<N>-<slug>` or `hotfix/<slug>`), merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, credential files, `appsettings.*.local.json` — not a template `appsettings.json` with no secrets, which is normally committed). Names `develop` as the base branch and `main` as the release branch; once published, a `**Remote:**` line records the repository, its default branch, and its branch protection |
 | **Verification Before Commit Rule** | Prescribes the implement → lint → build → verify → commit sequence; explains why compiled code ≠ correct behavior |
 | **Release Protocol** | Documents the full release flow: changelog finalization, merge to main, tagging convention, post-release version bump, and where the version lives in the codebase |
 
@@ -86,10 +86,13 @@ that says "I think it's an ESP32 but I'm not sure" does not settle the device �
 4. *Shape questions*, with the sign-in follow-ups — Web app, Hybrid with a web UI, Service or API
    (questions 2–4, phrased for the software that calls it), and Desktop app (questions 1–3).
 5. *One confirmation* of everything defaulted — below.
+6. *Publish to GitHub* — asked once, in Step 9.2, after the setup files are committed. Publishing
+   puts the project on a server other people can reach, so it is always asked, never defaulted.
 
-The only follow-ups allowed are the ones these five items define: the phone-or-app-store check
+The only follow-ups allowed are the ones these six items define: the phone-or-app-store check
 under Project type, the separate-accounts clarifier and the provider / audience / roles follow-ups
-under question 2, and the internet / target-OS question for Desktop apps.
+under question 2, the internet / target-OS question for Desktop apps, and the organization and
+host follow-ups under Step 9.2.
 
 Nothing else is a question. Do not ask how to run, build, test, or lint the project; where tests
 live; the logging format or file; where the version lives; the branch strategy, merge style, or
@@ -848,9 +851,19 @@ confirmation**:
   already has. Record what they give; ask nothing further.
 
 **Git Workflow** (if missing) — **default, no questions.** Write these plugin conventions:
-- *Base branch:* `develop` if it already exists, otherwise `main`. Epic, docs, and quick-fix
-  branches merge into the base branch. Do not create `develop` for a solo project — every skill
-  detects which base exists.
+- *Base branch:* `develop`, always — solo projects included. Epic, docs, and quick-fix branches
+  are cut from it and merge back into it. Step 9.1 creates it when it does not exist and leaves the
+  repository checked out on it. The only exception is existing code whose `CLAUDE.md` already
+  declares a different branch strategy — record that one instead and create nothing.
+- *Release branch:* `main` (or `master` when an existing repository already uses it). It receives
+  only release merges from `develop` and tagged releases — never day-to-day work.
+- *Default branch:* `develop` on the hosting service, so pull requests target it without anyone
+  remembering `--base`. Step 9.2 sets it when the project is published.
+- *Branch protection* (published projects): `main` and `develop` both require a pull request with
+  one approval, and refuse force-pushes and deletion. **Administrators may bypass** — that is what
+  lets a solo owner's local `--no-ff` merge (`/peak-workflow:wrapup-epic` solo mode) and the
+  Release Protocol push go straight to a protected branch. Someone without admin rights uses team
+  mode (a pull request) instead. Once CI exists, add its check as a required status check.
 - Epic feature branches use the naming convention `feature/epic-<id>-<short-name>` where `<id>` is either a legacy integer (pre-v2.0.0 epics, e.g., `7` or `6.5`) or a 7-character alphanumeric ID (v2.0.0+ epics, e.g., `a3f2K7p`), and `<short-name>` is derived from the epic spec filename (e.g., `epic-a3f2K7p-user-auth.md` → `feature/epic-a3f2K7p-user-auth`). Include this convention in the Git Workflow section.
 - Quick-fix branches use the naming convention `hotfix/issue-<N>-<slug>` when tied to a GitHub issue, or `hotfix/<slug>` otherwise. Include this convention too.
 - Merges use `--no-ff` to preserve history.
@@ -905,6 +918,10 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 - *Version file:* the Tool Hygiene **Version single source of truth** — never asked twice.
 - *CHANGELOG:* `CHANGELOG.md` in Keep a Changelog format; Step 7.2 creates it without asking.
 - *Tag format:* `vX.Y.Z`.
+- *Protection note:* when the project is published with branch protection, add to the template's
+  **Note:** that steps 2–6 push directly to protected `main` and `develop` through the
+  administrator bypass, and that a maintainer without admin rights opens a pull request from
+  `develop` to `main` instead.
 - *CI note:* the existing workflows' behaviour when `code_present = true` and workflows exist;
   otherwise what the sheet ships (static SPA: tests on pull requests, deploy to GitHub Pages on
   push to `main`; web sheet: none yet — the walking-skeleton epic adds CI; desktop sheet with no
@@ -970,7 +987,8 @@ How it's checked before each commit (standard for this stack): type check, lint,
 Version: shown in the app footer and the first console line (from package.json).
 Screens: follow standard accessibility rules — keyboard use, readable contrast, clear error
   messages, confirmation before deleting.
-Git (peak-workflow convention): work happens on branches merged into main; I ask before pushing.
+Git (peak-workflow convention): day-to-day work happens on branches off `develop`; `main` only
+  holds releases. I'll create `develop` and switch to it. I ask before pushing.
 Releases: tagged vX.Y.Z with a CHANGELOG.
 Decided later by the first epic: none.
 
@@ -981,7 +999,9 @@ documents or designs I should point to.
 The summary also carries the housekeeping that used to be separate questions: repo files that
 will be created (README, CHANGELOG), `.gitignore` entries that will be appended (existing
 repositories), recommended add-on skills not yet installed (Step 8), layers an existing project
-has not decided yet, and that setup will commit the files it writes (as the first commit when the repository has none).
+has not decided yet, that setup will commit the files it writes (as the first commit when the repository has none),
+and that it will create the `develop` branch. It does **not** carry the publish question — that is
+asked on its own in Step 9.2, after the files are committed.
 
 Adapt the example to the project type. A few lines that matter by type:
 
@@ -1465,17 +1485,19 @@ Also print the precedence rule to the user verbatim: `frontend-design` shapes vi
 execution; the UX Baseline and the design-system tokens take precedence over its aesthetic
 choices.
 
-## Step 9: Final Summary
+## Step 9: Commit, Branch, Publish, and Summarize
 
 **Unborn-HEAD check:** first run `git rev-parse --is-inside-work-tree`; if it fails, this is
 not a git repository — suggest `git init` and skip the rest of this check. Otherwise, if
-`git rev-parse --verify HEAD` fails (no commits yet), commit the setup files as
+`git rev-parse --verify HEAD` fails (no commits yet), and the unborn branch is not named `main`
+(an older git default is `master`), rename it first with `git symbolic-ref HEAD refs/heads/main` —
+safe, because nothing exists on it yet. Then commit the setup files as
 `chore: initial project setup` on the current branch (`main` by default) so
 `/peak-workflow:discover` can branch from a real base — the Step 3 confirmation already said so
 (*"When I'm done I'll save these files as the project's first commit"*), and accepting it is the
 consent. Stage the files this session wrote or modified by path (never `git add -A`). If the user
 declined that line at the confirmation, print: "Commit before running `/peak-workflow:discover` —
-otherwise `main` will not exist to merge the docs/ branch back to."
+otherwise there is no `develop` branch to merge the docs/ branch back to."
 
 When the repository already has commits, commit the files setup wrote or modified, by path, as
 `chore: peak-workflow setup` on the current branch — the confirmation said so (*"When I'm done I'll
@@ -1483,6 +1505,146 @@ commit these setup files"*), and accepting it is the consent. Root files such as
 `README.md` are included; later planning commits do not stage them. If the user struck that line,
 tell them the files are uncommitted; `/peak-workflow:discover` asks once whether to commit them on
 its new docs/ branch.
+
+### 9.1: Create `develop`
+
+Skip this sub-step when `CLAUDE.md` already declared a different branch strategy (Step 3, Git
+Workflow). Otherwise, once the commit above exists:
+
+```bash
+git show-ref --verify --quiet refs/heads/develop || git branch develop
+git checkout develop
+```
+
+Branch from the release branch (`main`, or `master` in an existing repository that uses it) —
+check it out first if the session started elsewhere. Report
+`[PASS] Branches — develop (base, checked out), main (releases)`. If the setup files were left
+uncommitted because the user struck that line, still create `develop` — the files carry over onto
+it — unless the repository has no commits at all: then there is nothing to branch from or
+publish, so skip 9.1 and 9.2 and say that both happen on the next `/peak-workflow:setup` run once
+a first commit exists.
+
+### 9.2: Publish to GitHub (asked)
+
+**Already has a remote.** If `git remote get-url origin` succeeds, do not create anything. When
+`gh` is installed and authenticated and the remote is on GitHub, read
+`gh repo view --json defaultBranchRef,viewerPermission`. If the default branch is already `develop`,
+report it and skip to the reminders. Otherwise the repository is probably shared, and changing its
+default branch changes it for everyone — ask once via `AskUserQuestion`:
+`"This repository's default branch on GitHub is <branch>. Switch it to develop and protect main and develop?"`
+— options `["Yes — switch and protect", "No — leave GitHub as it is"]`. On Yes, push `develop`
+(the answer is the consent for that push), then follow *Default branch* and *Protect* below —
+only when `viewerPermission` is `ADMIN`; otherwise print those commands for an administrator to
+run and continue. A remote that is not on GitHub (GitLab, Azure DevOps, a bare server), or a
+machine without a signed-in `gh`, gets `[N/A] GitHub — existing remote <url> left as it is`; do
+not install `gh` for it.
+
+**No remote.** Ask once, both questions in a single `AskUserQuestion` call. Use the repository
+directory's name, slugified, as `<name>`:
+
+- Question 1: `"Put this project on GitHub now, as <name>? It's how you back it up and share it."`
+  Options: `["Yes — in my organization's GitHub", "Yes — in my personal GitHub account", "Not now — keep it on this computer"]`
+- Question 2: `"Who should be able to see it?"`
+  Options: `["Only people I invite (private) (Recommended)", "Everyone in my organization (internal)", "Anyone on the internet (public)"]`
+
+**Not now** ends this sub-step: report `[N/A] GitHub — not published; run /peak-workflow:setup
+again to publish` and skip to the reminders. Ignore Question 2. Internal needs an organization on
+GitHub Enterprise; if the user picked it with a personal account, say so and use private.
+
+**Get `gh` ready.** Publishing uses the GitHub CLI.
+
+1. `command -v gh`. If it is missing, say in one sentence that you are installing the GitHub
+   command-line tool to publish the project, then install it with the platform's package manager:
+   macOS `brew install gh`; Windows `winget install --id GitHub.cli -e`; Fedora
+   `sudo dnf install gh`; Debian/Ubuntu `sudo apt install gh`. A command needing `sudo`, or a
+   machine with no package manager, is the user's to run — ask them to type `! <command>` (or
+   follow https://github.com/cli/cli#installation) and wait. If `gh` still cannot be installed,
+   report `[MISS] GitHub — gh not installed; nothing published` and skip to the reminders — setup
+   is otherwise complete.
+2. `gh auth status`. If not signed in, `gh auth login` is interactive: ask the user to type
+   `! gh auth login`, choose GitHub.com (or their company's GitHub Enterprise host) and sign in
+   through the browser, then say when it is done. Re-check before continuing.
+3. **Host.** If `gh auth status` lists more than one host, ask which one this project belongs on,
+   and prefix every `gh` command below with `GH_HOST=<host>`.
+
+**Pick the owner.**
+- *Personal account:* `gh api user --jq .login`.
+- *Organization:* `gh api user/orgs --jq '.[].login'`. One organization → use it and say so. Several
+  → ask which via `AskUserQuestion` (up to four as options; "Other" takes a name). None → say that
+  this GitHub account belongs to no organization, and ask whether to use the personal account or
+  stop. An organization that restricts who may create repositories, or that uses single sign-on
+  the token has not been authorized for, makes the create step fail — relay GitHub's message
+  (it names the page to fix it on) and offer the personal account or stop.
+
+**Create and push** — the user's Yes in Question 1 is the consent for every push in this sub-step:
+
+```bash
+gh repo create <owner>/<name> --private|--internal|--public --source . --remote origin \
+  --description "<the first sentence of the Project Overview>"
+git push -u origin main develop
+```
+
+If `<owner>/<name>` already exists, stop and ask for a different name — never push into an
+existing repository.
+
+**Default branch:**
+
+```bash
+gh repo edit <owner>/<name> --default-branch develop
+```
+
+**Protect** `main` and `develop` — the same rules on both. `enforce_admins: false` is what lets
+administrators bypass:
+
+```bash
+for branch in main develop; do
+gh api -X PUT "repos/<owner>/<name>/branches/$branch/protection" --input - <<'JSON'
+{
+  "required_status_checks": null,
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "required_approving_review_count": 1
+  },
+  "restrictions": null,
+  "required_linear_history": false,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}
+JSON
+done
+```
+
+A private repository on a free GitHub plan cannot have branch protection — the call returns 403
+with a message about upgrading or making the repository public. That is not a setup failure:
+report `[WARN] Branch protection — not available for a private repository on this GitHub plan`,
+explain it in one plain sentence, and continue. Any other error: relay it and continue.
+
+**Verify:**
+
+```bash
+gh api repos/<owner>/<name> --jq .default_branch                                       # develop
+gh api repos/<owner>/<name>/branches/develop/protection --jq .enforce_admins.enabled   # false
+```
+
+**Record it.** Add one line to the Git Workflow section of `CLAUDE.md`, reflecting what actually
+happened:
+
+```markdown
+**Remote:** https://github.com/<owner>/<name> (<visibility>) — default branch `develop`; `main` and
+`develop` protected (pull request with 1 approval, no force-push, no deletion; admins may bypass).
+```
+
+(or `— branch protection not available on this plan` in place of the protection clause), add the
+matching protection note to the Release Protocol section, commit both on `develop` as
+`chore: record GitHub remote`, and `git push`. That push goes through the administrator bypass;
+GitHub printing *"Bypassed rule violations"* is expected and confirms the bypass works.
+
+Report `[PASS] GitHub — published to <url>, default branch develop, main and develop protected`
+(or the `[WARN]` variant).
+
+### 9.3: Summary
 
 Remind the user:
 - `CLAUDE.md` is loaded automatically every session — the quality gates will apply to all future epic work
