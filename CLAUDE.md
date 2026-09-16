@@ -80,3 +80,54 @@ Examples:
 - `feat(epic-workflow): plan-as-execution-script (v1.5.0)`
 - `fix(epic-workflow): wrapup merges to develop when present (v1.4.1)`
 - `chore(epic-workflow): bump plugin.json version to 1.5.0`
+
+## Git Workflow
+
+This repo follows the same branching strategy `peak-workflow`'s own `/setup` skill writes into a
+project's `CLAUDE.md` — accumulate work on `develop`, release from `main`.
+
+| Branch | Role |
+|---|---|
+| `develop` | **Default branch.** Integration line; everything merges here first. Anything on `develop` is approved |
+| `main` | Release line only. Every commit on it is a tagged release merge |
+| `feature/<plugin>-<short-name>` | Plugin or skill work, branched from `develop` |
+| `docs/<short-name>` | Documentation-only work, branched from `develop` |
+| `hotfix/<slug>` | Urgent fix, branched from `main`, merged into **both** `main` and `develop` |
+
+- Merges use `--no-ff` so each piece of work stays visible as a merge commit.
+- Claude asks before every push to a remote.
+- Never commit: real credentials, `.env`, or anything under `tmp/`.
+
+## Release Protocol
+
+**Prerequisites:** on `develop` with a clean working tree, and every plugin's `plugin.json`
+version and `CHANGELOG.md` entry already in sync (see Versioning Protocol above).
+
+1. **Finalize the changelogs** — in each plugin or script changed this cycle, change
+   `## [X.Y.Z] — UNDER DEVELOPMENT` to `## [X.Y.Z] — YYYY-MM-DD`. Bump
+   `.claude-plugin/marketplace.json`'s `metadata.version` and add the matching root `CHANGELOG.md`
+   entry naming the bundled plugin and script versions.
+   - Commit: `chore: release marketplace vX.Y.Z`
+2. **Merge to `main`**
+   ```bash
+   git checkout main && git pull origin main
+   git merge develop --no-ff -m "Merge branch 'develop' into main for release vX.Y.Z"
+   ```
+3. **Tag the release** (on `main`)
+   ```bash
+   git tag -a vX.Y.Z -m "Release vX.Y.Z — <brief description>"
+   ```
+4. **Merge back to `develop`**
+   ```bash
+   git checkout develop && git merge main --no-ff
+   ```
+5. **Open the next cycle** (on `develop`) — add `## [X.Y+1.0] — UNDER DEVELOPMENT` to each
+   changelog that will accumulate work.
+   - Commit: `chore: open the next development cycle`
+6. **Push** (ASK USER FIRST)
+   ```bash
+   git push origin main && git push origin develop && git push origin vX.Y.Z
+   ```
+
+**Note:** the marketplace has no CI; a tag on `main` is the release record, and users pick up
+changes when they update the marketplace.
