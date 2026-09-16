@@ -392,6 +392,15 @@ project's own API or database to make a check pass."* Embedded adds: *"Host-side
 fake the hardware (sensors, relays); any requirement about the device itself is verified on the
 connected board."*
 
+**Playwright browsers (web and static SPA sheets, UI project types only)** — also written into Local Environment.
+`bun run test:e2e` needs the Chromium build that matches the project's pinned `@playwright/test`.
+Write: *"One-time step after `bun install`: `bunx playwright install chromium` (Linux also needs
+`bunx playwright install-deps chromium`, which uses sudo). If `bun run test:e2e` fails with
+'Executable doesn't exist', run it again."* The desktop sheet writes nothing here — Playwright
+drives the app's own Electron build. Step 9.0 runs the install when existing code already has
+`@playwright/test` in `node_modules`; on a new project the walking skeleton runs it right after
+its first `bun install`.
+
 **Tool Hygiene & Operability** (if missing):
 
 This section captures the project's chosen mechanisms for the load-bearing tool-hygiene
@@ -633,7 +642,8 @@ line by line only where the user asks.
 
 Generate the section using this template. Keep the bold labels exactly as written — downstream
 skills cite them. Bracketed `[Web app: … / Desktop app: …]` choices are resolved to the one
-that applies; the `[Desktop app only:]` tag is a conditional, not rendered text.
+that applies; the `[Desktop app only:]` and `[shadcn stacks only …]` tags are conditionals, not
+rendered text. The `**shadcn tooling:**` line is written by Step 9.0, not at Step 4.
 
 ```markdown
 ## UX Baseline
@@ -653,6 +663,9 @@ the walking skeleton, not a TOR)
 - New semantic colors: define `--x` / `--x-foreground` in `:root` and `.dark`, map in `@theme inline`.
 - Never edit generated files under `components/ui/`; regenerate with `bunx shadcn@latest add <name> --overwrite`.
 - Compose through `className` and variants; import `cn` from `@/lib/utils`.
+
+[shadcn stacks only — the line Step 9.0 writes:]
+**shadcn tooling:** the shadcn/ui skill (`.claude/skills/shadcn/`) and the `shadcn` MCP server are part of this project. Any work on shadcn components uses them — look components up through the MCP tools before composing, and follow the skill's patterns — with the UX Baseline and design tokens taking precedence.
 
 **Screen states:** (TOR) Every data-bearing screen renders explicit loading, empty, error, and
 populated states, each distinguishable by visible text. (WCAG 2.2 SC 4.1.3)
@@ -792,6 +805,8 @@ the same source as Local Environment (existing code → sheet → toolchain tabl
   last: web sheet `tests/unit tests/api tests/components tests/e2e`; static SPA
   `tests/unit tests/components tests/e2e`; desktop sheet `tests/unit tests/components tests/e2e`;
   otherwise the toolchain table's *Tests* column.
+- *E2E browsers* (web and static SPA sheets, UI only) — keep the Tests row's `[web / static SPA
+  only]` note; drop it for every other project.
 
   The written section must open with this template (keep the bold labels verbatim —
   `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` grep every directory on the
@@ -812,7 +827,7 @@ the same source as Local Environment (existing code → sheet → toolchain tabl
 Run every applicable check before marking an epic Implemented or Complete:
 
 - **Build:** `[build command]`
-- **Tests:** `[unit command]` (tests/); `[e2e command]` (e2e/)
+- **Tests:** `[unit command]` (tests/); `[e2e command]` (e2e/) *[web / static SPA only] (needs the Playwright Chromium browser — on "Executable doesn't exist", run `bunx playwright install chromium`)*
 - **Lint / format:** `[lint command]`
 - **Run the tool:** `[invocation with known input]` → `[expected output]` *(CLI: the walking-skeleton epic uses the `--version` invocation here; Embedded: the boot banner read from the connected board — domain inputs apply once the owning epic ships)*
 - **Visual / console (UI only):** [`playwright-cli` against the running app / the Playwright Electron harness in `tests/e2e/`]
@@ -998,8 +1013,12 @@ documents or designs I should point to.
 
 The summary also carries the housekeeping that used to be separate questions: repo files that
 will be created (README, CHANGELOG), `.gitignore` entries that will be appended (existing
-repositories), recommended add-on skills not yet installed (Step 8), layers an existing project
-has not decided yet, that setup will commit the files it writes (as the first commit when the repository has none),
+repositories), recommended add-on skills not yet installed (Step 8), the shadcn helper on shadcn
+stacks when it is not already present (Step 9.0 — *"I'll add the shadcn/ui helper for Claude — a
+skill and a component-lookup server — so it builds screens with the right components"*), the
+Playwright browser download on web and static SPA stacks (*"I'll download the test browser"* when
+existing code has Playwright installed; otherwise *"the first epic downloads the test browser"*),
+layers an existing project has not decided yet, that setup will commit the files it writes (as the first commit when the repository has none),
 and that it will create the `develop` branch. It does **not** carry the publish question — that is
 asked on its own in Step 9.2, after the files are committed.
 
@@ -1355,6 +1374,10 @@ Check whether `.gitignore` exists at the repo root.
   them — projects often intentionally exclude or include patterns, so never append an entry the
   user was not shown.
 
+  **shadcn stacks:** also check that no pattern excludes `.claude/skills/`, `skills-lock.json`, or `.mcp.json` (e.g. a
+  bare `.claude/` line) — Step 9.0 commits them. List a fix in the confirmation that narrows such a
+  pattern to `.claude/settings.local.json`, which stays ignored.
+
 ### 7.5: CI Configuration
 
 Check whether any of these exist:
@@ -1442,8 +1465,8 @@ declared in Tool Hygiene & Operability:
 
 | Project type | Recommended skills |
 |---|---|
-| Web app / Hybrid with a web UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic` |
-| Desktop app | `frontend-design` (same source) for visual execution. UI verification uses the project's Playwright Electron harness (`@playwright/test`, a project dependency — not a skill); report `[N/A] playwright-cli — desktop apps verify through the Playwright Electron harness` |
+| Web app / Hybrid with a web UI | `frontend-design` (default source: `frontend-design@claude-plugins-official`) for visual execution; `playwright-cli` for UI verification in `/peak-workflow:wrapup-epic`; on shadcn stacks, `shadcn (skill + MCP) — installed by setup` (Step 9.0) |
+| Desktop app | `frontend-design` (same source) for visual execution; `shadcn (skill + MCP) — installed by setup` (Step 9.0). UI verification uses the project's Playwright Electron harness (`@playwright/test`, a project dependency — not a skill); report `[N/A] playwright-cli — desktop apps verify through the Playwright Electron harness` |
 | CLI tool / Service or API / Library / Embedded / Hybrid without a UI | None required — report `[N/A] Recommended skills — none required for {type}` and skip to Step 9 |
 
 For each recommended skill, check whether it appears in this session's available-skills list
@@ -1466,26 +1489,87 @@ For `playwright-cli`, print `/plugin install playwright-cli@<marketplace>` and t
 pick the marketplace that lists it (`/plugin` → Discover) — do not guess a marketplace name.
 
 Record the outcome as a `**Recommended skills:**` line inside the **Peak Workflow** section of
-`CLAUDE.md`, one entry per skill with its status, followed by the precedence rule:
+`CLAUDE.md`, one entry per skill with its status, followed by the precedence rule. The line is a
+setup-time snapshot — `/peak-workflow:start-epic` finds design skills fresh from its own session and
+does not read it:
 
 ```markdown
-**Recommended skills:** `frontend-design@claude-plugins-official` (installed), `playwright-cli`
-(not installed — install before the first UI epic). `frontend-design` shapes visual execution;
-the UX Baseline and the design-system tokens take precedence over its aesthetic choices.
+**Recommended skills (at setup):** `frontend-design@claude-plugins-official` (installed),
+`playwright-cli` (not installed — install before the first UI epic), shadcn (skill + MCP) —
+installed by setup (status: see the `**shadcn tooling:**` line). Each UI epic invokes the installed design skills in its Design pass; the UX
+Baseline and the design-system tokens take precedence over their choices.
 ```
 
 Desktop app variant of the first sentence:
 
 ```markdown
-**Recommended skills:** `frontend-design@claude-plugins-official` (installed); `playwright-cli`
-N/A — desktop apps verify through the Playwright Electron harness in `tests/e2e/`.
+**Recommended skills (at setup):** `frontend-design@claude-plugins-official` (installed); shadcn
+(skill + MCP) — installed by setup (status: see the `**shadcn tooling:**` line); `playwright-cli` N/A — desktop apps verify through the
+Playwright Electron harness in `tests/e2e/`.
 ```
 
-Also print the precedence rule to the user verbatim: `frontend-design` shapes visual
-execution; the UX Baseline and the design-system tokens take precedence over its aesthetic
-choices.
+Drop the shadcn entry for UI stacks without shadcn. Also print the precedence rule to the user
+verbatim: each UI epic invokes the installed design skills in its Design pass; the UX Baseline and
+the design-system tokens take precedence over their choices.
 
 ## Step 9: Commit, Branch, Publish, and Summarize
+
+### 9.0: Project tooling (before the commit)
+
+Runs before the setup commit so the files it writes ride in it. Skip anything the user struck at
+the confirmation.
+
+**shadcn skill and MCP server.** Applies when the chosen stack uses shadcn (any of the three
+sheets), or `code_present = true` and a `components.json` exists anywhere outside `node_modules`
+(e.g. `apps/web/components.json`). For CLI / Service / Library /
+Embedded projects, or UI stacks without shadcn, skip without comment.
+
+1. **Detect** (read-only):
+   - Skill: `ls -d .claude/skills/shadcn ~/.claude/skills/shadcn 2>/dev/null`, or a skill named
+     `shadcn` in this session's available-skills list.
+   - MCP: `claude mcp get shadcn` succeeds, or `.mcp.json` already has a `shadcn` key.
+
+   Both present → `[PASS] shadcn skill/MCP — already installed`; go to step 4.
+2. **Check the flags** — the CLI changes fast: `bunx skills add --help`. Adjust the command below
+   if a flag was renamed.
+3. **Install** whichever is missing, at project scope, copied (not symlinked) so the files are
+   committed and teammates get them:
+   - Skill — `-s shadcn` picks the one skill; without it the repository's other skills (e.g. a
+     Radix-to-Base migration skill) come along:
+     ```bash
+     bunx skills add shadcn/ui -s shadcn -a claude-code -y --copy   # → .claude/skills/shadcn/ + skills-lock.json
+     ```
+   - MCP server — write `.mcp.json` directly; do **not** run `shadcn mcp init`, which also creates
+     `package.json`, an npm lockfile, and `node_modules/` in the repository root. Create the file,
+     or add the `shadcn` key to an existing `mcpServers` object, keeping every other server:
+     ```json
+     { "mcpServers": { "shadcn": { "command": "bunx", "args": ["--bun", "shadcn@latest", "mcp"] } } }
+     ```
+
+   Report `[PASS] shadcn skill/MCP — installed`. On failure (offline, registry error), report
+   `[MISS] shadcn skill/MCP — <reason>`, print the skill command and the `.mcp.json` entry for the
+   user to add later, and continue.
+4. **Record** — unless `CLAUDE.md` already has it, add the `**shadcn tooling:**` line to the UX
+   Baseline section (template in Step 3), with `<name>` = `shadcn`. If the install failed, append
+   `— not installed yet: <the skill command and the .mcp.json entry>` so the gap stays visible
+   (downstream skills treat that suffix as "not installed"). `/peak-workflow:start-epic` reads this
+   line.
+
+Stage `.claude/skills/shadcn/`, `skills-lock.json`, and `.mcp.json` with the setup files. Never
+stage `.claude/settings.local.json`. Before committing, `git status --short` must show nothing else
+the install created.
+
+**Playwright browsers.** Applies to web and static SPA sheets with a user interface only (not a
+Service or API on the web sheet). Desktop sheet: report
+`[N/A] Playwright browsers — Electron supplies its own`. The browser must match the pinned
+`@playwright/test` version, so:
+- **`code_present = true` and `node_modules/@playwright/test` exists:** run
+  `bunx playwright install chromium` and report `[PASS] Playwright browsers`. On Linux, hand the
+  user `! bunx playwright install-deps chromium` (it uses sudo). On failure, report
+  `[MISS] Playwright browsers — <reason>` and continue.
+- **Otherwise (new project):** do not install — `bunx` would fetch the latest Playwright, whose
+  browser the project's pinned version may not find. Report
+  `[N/A] Playwright browsers — the walking skeleton installs them after its first bun install`.
 
 **Unborn-HEAD check:** first run `git rev-parse --is-inside-work-tree`; if it fails, this is
 not a git repository — suggest `git init` and skip the rest of this check. Otherwise, if
@@ -1659,8 +1743,10 @@ Remind the user:
   proves those TORs on one reference screen, and `/peak-workflow:wrapup-epic` runs the UX
   Baseline check as a quality gate on every UI epic. Lines marked `N/A` are skipped.
 - *(UI project types only — omit for CLI / Service / Library / Embedded:)* any `[MISS]` recommended skill from Step 8 should be installed before the first UI epic;
-  `frontend-design` shapes visual execution, and the UX Baseline and design-system tokens take
-  precedence over its aesthetic choices.
+  each UI epic invokes the installed design skills in its Design pass, and the UX Baseline and
+  design-system tokens take precedence over their choices.
+- *(When Step 9.0 installed the shadcn skill or MCP server:)* **"Restart Claude Code before the
+  next command, and approve the `shadcn` server when asked."**
 - The **Security Baseline** section in `CLAUDE.md` is reviewed by `/peak-workflow:wrapup-epic`
   during independent review. These reminders are not derived as TORs.
 - `docs/architecture.md` and `docs/design-notes.md` are read by every `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` for context

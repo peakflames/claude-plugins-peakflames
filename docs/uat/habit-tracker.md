@@ -10,7 +10,7 @@ any of those words mean.
 **Time:** ~2–3 hours including the skeleton build.
 
 Read [README.md](README.md) first — prerequisites, how to load the plugin, the global pass/fail
-criteria (G1–G8), and the defect template.
+criteria (G1–G10), and the defect template.
 
 ---
 
@@ -129,6 +129,12 @@ grep -n '^## ' CLAUDE.md
 | 3.16 | The first commit exists and stages only setup's own files | `git show --stat HEAD` |
 | 3.17 | **`develop` created and checked out**; `main` holds only the setup commit | `git branch` shows `* develop` and `main`, both at the same commit |
 | 3.18 | The publish question came **after** the commit, on its own — not folded into the confirmation — and "Not now" reported `[N/A] GitHub — not published` | nothing was created on GitHub |
+| 3.19 | `.claude/skills/<shadcn>/` exists and is in the setup commit | `git show --stat HEAD` lists it |
+| 3.20 | `.mcp.json` has a `shadcn` server entry (`bunx --bun shadcn@latest mcp`); `.claude/skills/shadcn/` is the only skill added; `skills-lock.json` is committed; no root `package.json`, `package-lock.json` or `node_modules/` appeared from the install | `grep -n shadcn .mcp.json`; `git status --short` clean after setup |
+| 3.21 | The shadcn skill and MCP server were **not asked about** — shown only in the one confirmation | no separate question |
+| 3.22 | "Restart Claude Code before the next command, and approve the `shadcn` server when asked." was printed | restart, then approve on the next session |
+| 3.23 | UX Baseline has a `**shadcn tooling:**` line | `grep -c 'shadcn tooling:' CLAUDE.md` → 1 |
+| 3.24 | Local Environment names the one-time `bunx playwright install chromium` step | present |
 
 **Common failure to watch for:** if `setup` routes to `bun-web-app-stack.md` despite five "no"
 answers, that is **Critical** — record which answer it misread.
@@ -336,6 +342,7 @@ Fresh session. Get the skeleton's ID from `docs/implementation-plan/phase-1-*/in
 | 9.4 | The tree matches the sheet's **Section 3 Repository Layout** | compare against `bun-static-spa-stack.md` §3 |
 | 9.5 | The config files match **Section 4** verbatim, with only the project name substituted | diff them |
 | 9.6 | `bun install` succeeded | `ls node_modules` |
+| 9.6a | `bunx playwright install chromium` ran **right after** `bun install` | visible in the transcript |
 | 9.7 | **`bunx shadcn@latest init` was NOT run** — the sheet ships `components.json`, `src/lib/utils.ts` and the token stylesheet itself (4.8, 4.11); only `bunx shadcn@latest add <name>` is valid | a stray `init` is a finding |
 | 9.7a | The `cn` path alias resolves in both `tsconfig.json` and `vite.config.ts`, and **no npm package literally named `cn`** was installed | `grep '"cn"' package.json` returns nothing |
 | 9.7b | `radix-ui` (unified) is declared; **no** per-primitive `@radix-ui/react-*` entries | `grep '@radix-ui' package.json` returns nothing |
@@ -344,6 +351,11 @@ Fresh session. Get the skeleton's ID from `docs/implementation-plan/phase-1-*/in
 | 9.8 | **G5** — `grep -nE 'TBD — set by the walking-skeleton epic\|— unconfirmed\|\*\*Not decided yet:\*\*' CLAUDE.md` on this branch returns nothing | the skeleton resolved them all |
 | 9.9 | The reference screen renders loading / empty / error / populated | open it with `bun run dev` |
 | 9.10 | **G6** — you run `bun run check` and `bun run test:e2e` yourself, cold, and both pass | this is the first real execution of the sheet |
+| 9.11 | The cold `bun run test:e2e` shows no "Executable doesn't exist" error | Chromium was installed by the skeleton |
+| 9.12 | The plan has a numbered **Design pass** step before screen work, naming the shadcn skill (and `frontend-design` if installed) | present in the plan |
+| 9.13 | `Skill(...)` calls for those design skills appear in the transcript **before** any screen code | visible in order |
+| 9.14 | `mcp__shadcn__*` tools were used | visible in the transcript |
+| 9.15 | The handoff's Key Decisions has a `Design skills used:` line | `grep -n 'Design skills used:' docs/implementation-plan/session-handoffs/*` |
 
 > **If the build fails:** that is the expected highest-value outcome of this run. Capture the
 > exact file, the exact error, and the resolved dependency versions (`bun pm ls`), and file it as
@@ -382,6 +394,7 @@ asks for a ship mode.
 | 10.8 | A handoff file exists under `session-handoffs/` | present |
 | 10.9 | Ship mode was **asked**, with both options presented neutrally and no recommendation | pick **Solo** |
 | 10.10 | Solo mode merged with `--no-ff`, deleted the branch, and told you it did not push | `git log --oneline -5` |
+| 10.11 | The report shows the `Design skills used:` line under a `## Design` heading | matches the handoff |
 
 ---
 
@@ -417,7 +430,7 @@ Plugin ref: <git rev-parse --short HEAD in the plugin repo>
 Date: 
 Sessions completed: new-project / setup / discover / mockup / capture-requirements /
                     plan-project / start-epic / wrapup-epic / status
-Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __
+Global criteria:  G1 __  G2 __  G3 __  G4 __  G5 __  G6 __  G7 __  G8 __  G9 __  G10 __
 Questions asked by setup: __
 Skeleton build: PASS / FAIL (if FAIL, see F-__)
 Findings filed: F-__ … F-__

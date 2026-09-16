@@ -141,6 +141,7 @@ each project doc:
 | G7 | `/peak-workflow:status` reports coverage without errors | run it after the merge; Requirements Coverage should be 100% planned |
 | G8 | The question count is sane | count every question asked across `setup` — the v1.11.0 contract is 2–5 typical, plus the publish question. More than ~8 is a finding |
 | G9 | `develop` is the base branch | after `setup`: `git branch` shows `* develop` and `main`; every later `docs/` and `feature/` branch is cut from `develop` and merges back into it |
+| G10 | The design pass ran on every UI epic | each UI epic's plan has a Design pass step, and its handoff has a `Design skills used:` line |
 
 ---
 
