@@ -41,6 +41,24 @@ feature numbers: **stable and append-only**.
 
 ---
 
+## App Shell
+
+{Which of the three shells in `WIREFRAME_TEMPLATE.md` App Shell Conventions applies — site header,
+sidebar shell, or auth block — and why, in one or two sentences naming the number of top-level
+destinations.} The shell is the same on every signed-in screen:
+
+- **App header** — {brand, primary nav with the current item marked, account control}. Below
+  {breakpoint} the nav and account control collapse into a `Sheet` behind a `≡` trigger.
+- **Page header** — the `h1` left, primary actions right, a count or subtitle line beneath. Stacks
+  to full-width controls at the {floor} layout floor.
+- **Content** — {the primitive the main area uses: `Card` list, `Table`, `Tabs`…}.
+- **Footer strip** — the app version, as thin chrome rather than a boxed region.
+
+{Signed-out screens, if any: which screens use the auth block and at what column width.}
+{Dialog / Sheet screens, if any: which `S-NN` they open over.}
+
+---
+
 ## Screen Inventory
 
 | Screen ID | Name | Wireframe | Purpose | Entry points | Primary actions | Data shown | States | Serves |

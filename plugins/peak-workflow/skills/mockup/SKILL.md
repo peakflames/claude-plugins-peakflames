@@ -215,6 +215,22 @@ Rules:
   the **Destructive actions** baseline TOR in `/peak-workflow:capture-requirements` anchors on.
 - Keep to the design-system primitives the UX Baseline declares (default shadcn/ui). Name nothing
   the walking skeleton cannot compose from them.
+- **Pick the app shell and record it.** Low fidelity governs color, type, and brand — not layout.
+  Choose one of the three shells in `WIREFRAME_TEMPLATE.md`'s **App Shell Conventions** (site
+  header / sidebar shell / auth block) and write a `## App Shell` section into `ux/screens.md`
+  naming which one, why, and how it behaves at the declared layout floor. The site header is the
+  default; the sidebar shell needs 4+ top-level destinations to be justified — a nav rail holding
+  one link and a sign-out action is a defect, not a style choice. Overlays follow the same
+  section's table: `Dialog` for focused forms, `Sheet` for drawers and long mobile-first forms,
+  `AlertDialog` for destructive confirmations.
+- **Match the content primitive to the device and the task.** A `Card` list for phone-first items
+  carrying one primary action each; a `Table` for desk-side scanning across several columns; `Tabs`
+  only when one screen genuinely holds parallel sections. State the choice in the screen's
+  `Data shown` column so the walking skeleton does not re-decide it.
+- **Role-partitioned apps keep one shell.** When roles see different screens through the same app
+  (admin vs. member, coordinator vs. volunteer), the shell is identical and only the nav items and
+  reachable screens differ. Note per-role nav in the `## App Shell` section; do not draw a second
+  shell.
 - **Desktop apps (`is_desktop = true`)** also get two rows that share the ID space but are not
   screens: an **Application menu** row (Primary actions = every menu and its items with
   accelerators, following the platform order the UX Baseline *Desktop conventions* line names)
@@ -303,17 +319,28 @@ turn.
 - **State switcher** — four buttons (Loading / Empty / Error / Populated) toggling four
   `section.state` blocks with plain JS. The Populated state is active on load. A screen marked
   `n/a — not data-bearing` keeps only the Populated section and drops the switcher.
-- **Regions** — one `div.region` per layout area, each carrying `data-component` naming the
-  design-system primitive it will become: `Button`, `Dialog`, `Table`, `Form`, `Input`,
-  `Sidebar`, `Tabs`, `Sheet`, `Toast` (add `Card`, `Select`, `Checkbox`, `Breadcrumb` only if the
-  screen needs them). This is what the walking skeleton and later slices compose from.
+- **App shell** — the chosen shell's header and footer strip, identical on every signed-in screen,
+  rendered as structural chrome (`.chrome` / `.app-header` / `.app-footer`) rather than as dashed
+  regions. Plus a `data-component="PageHeader"` row in every state: `h1` left, primary actions
+  right, count or subtitle beneath.
+- **Layout floor** — the template's `@media` block is required, set from the UX Baseline *Layout
+  floor* line. It must actually work: nav and account control collapse behind the `≡` trigger,
+  page actions stack full-width, and any table reflows to labelled stacked blocks. Asserting the
+  floor in prose without a media query does not satisfy it.
+- **Regions** — one `div.region` per layout area, each carrying a `data-component` value from the
+  table in `WIREFRAME_TEMPLATE.md`'s **`data-component` values** section (`PageHeader`, `Button`,
+  `Dialog`, `AlertDialog`, `Sheet`, `DropdownMenu`, `Table`, `Form`, `Input`, `Select`,
+  `Checkbox`, `Card`, `Tabs`, `Breadcrumb`, `Toast`, `Sidebar`). This is what the walking skeleton
+  and later slices compose from. A missing primitive is added to that table in the same change,
+  never invented in one wireframe.
 - **Every control labeled with its visible text** — the exact text from the Primary actions
   column ("Save", "Delete…", "New order"). Placeholder data uses striped `.placeholder` blocks,
   not lorem ipsum.
 - **Error and empty states carry their real copy** — the text drafted in Step 3.2, naming the
   problem and the next action, with the retry or call-to-action control present.
-- **Destructive actions** show their confirmation dialog inside the Populated state as a
-  `data-component="Dialog"` region whose safe option (Cancel) is listed first.
+- **Destructive actions** show their confirmation inside the Populated state as a
+  `data-component="AlertDialog"` region whose safe option (Cancel) is listed first, with a line
+  noting that Escape closes without acting and the safe option is the default.
 - **Footer** listing the ConOps step refs and the screens this one links to.
 - The `:focus-visible` outline in the template stays — the wireframe itself models keyboard
   focus. Every control must be a real `button`, `a`, `input`, or `select` so Tab reaches it.
@@ -491,7 +518,29 @@ Before the self-check, verify:
   Window rows carry `—`.
 - [ ] `wireframes/index.html` exists and links to every `S-NN` wireframe file, with no dead links
   and no link to a screen that was dropped during a Step 6 adjustment round.
-- [ ] Every `div.region` carries a `data-component` value from the Step 5.1 list.
+- [ ] Every `div.region` carries a `data-component` value from the table in
+  `WIREFRAME_TEMPLATE.md`'s **`data-component` values** section.
+- [ ] `ux/screens.md` has an `## App Shell` section naming the chosen shell and its layout-floor
+  behavior, and no wireframe carries `data-component="Sidebar"` unless that section justifies it
+  with 4+ top-level destinations:
+  ```bash
+  grep -q '^## App Shell' docs/product-vision-planning/ux/screens.md || echo "MISSING App Shell section"
+  grep -rl 'data-component="Sidebar"' docs/product-vision-planning/ux/wireframes/
+  ```
+- [ ] Every wireframe carrying app chrome has an `@media` block at the declared layout floor, and
+  the app header and footer strip are byte-identical across the signed-in screens:
+  ```bash
+  for f in docs/product-vision-planning/ux/wireframes/S-*.html; do
+    grep -q '@media' "$f" || echo "$f: no layout-floor media query"
+  done
+  ```
+- [ ] Every destructive confirmation is `data-component="AlertDialog"` with its safe option first.
+- [ ] **Every Product Vision §9 Design Direction bullet is accounted for** in the Step 9.5 trace —
+  each one either satisfied by a named region, control, or state copy in a specific wireframe, or
+  explicitly deferred to the walking skeleton with a reason. §9 is loaded in Step 1 and is the only
+  statement of what the product's screens are *for*; a wireframe set that ignores it is structurally
+  complete and substantively wrong. An unaddressed bullet is a gap — fix the wireframe, do not
+  reword §9.
 - [ ] Desktop apps: `ux/screens.md` has the Application menu and Window rows; every wireframe
   has the menu-bar strip.
 - [ ] No color names, hex values other than grays, `font-family` other than the system stack,
@@ -548,6 +597,39 @@ internal scratch.
 
 ---
 
+## Step 9.5: Self-Check — Trace Design Direction to Wireframes
+
+Product Vision §9 Design Direction is the only statement of what the screens are *for* — what must
+be legible at a glance, which action dominates, how a failure should read. Step 8's other checks
+prove the wireframes are *complete*; this one proves they are *right*. Build it as a second table
+and print it verbatim.
+
+```
+## Self-Check: Design Direction → Wireframe Trace
+
+| # | PV §9 bullet (trimmed) | Honored by | Addressed? (Y/N) |
+|---|------------------------|------------|------------------|
+| 1 | "Status is the design — legible at a glance, never by color alone" | S-03 `.status` badge: bordered uppercase text on every card, plus the Yours fill | Y |
+| 2 | "One primary action per item" | S-03 shift cards: exactly one of "Claim this shift" / "Release this shift" / no action | Y |
+| 3 | "Typography sets a calm tone" | Deferred — the walking skeleton owns type; wireframes are system-font by rule | Deferred |
+```
+
+**Rules:**
+- One row per §9 bullet, in §9's order. Trim the bullet to its claim, not its whole sentence.
+- `Honored by` names a **specific** wireframe and the region, control, or state copy that satisfies
+  it. "The board is clear" is not an answer; `S-03 .status badge on every card` is.
+- Purely visual bullets (color palette, typeface, motion easing) are legitimately
+  `Deferred` — say so, and name what owns them (normally the walking-skeleton epic). Deferring a
+  *structural* bullet — hierarchy, primary action, what a failure reads like — is a gap, not a
+  deferral.
+- `Addressed? N` → gap. Fix the wireframe and the matching `ux/screens.md` row, then re-run the
+  row. Never resolve a gap by editing §9.
+- If `CLAUDE.md` declares a UX Baseline, §9 was drafted inside it, so a bullet that merely restates
+  a baseline TOR (keyboard, contrast, layout floor) traces to that TOR's own Step 8 check — cite it
+  and move on.
+
+---
+
 ## Step 10: Present Summary & Next Step
 
 ```
@@ -568,9 +650,12 @@ internal scratch.
 - ConOps steps concretized: {X} of {Y} in scope ({Z} split)
 - Trace gaps resolved: {M}
 
-### Self-Check (final passing table)
+### Self-Check (final passing tables)
 [Paste the full trace table from Step 9 — every row Explicit=Y and Ambiguous=N, or an explicit
 n/a / N/A entry]
+
+[Paste the Design Direction trace table from Step 9.5 — every row Y or an explicit Deferred with
+its owner named]
 
 [If the UX Baseline section was absent in Step 1:]
 ### Advisory
