@@ -206,6 +206,12 @@ answer. `setup` now asks only what a non-technical user can answer and defaults 
   `start-epic` and `wrapup-epic` grep points at directories that exist.
 - **UX Baseline token path** — follows the stack's layout instead of hard-coding `src/index.css`.
 
+### Documentation
+
+- **UAT materials for v1.11.0** — `docs/uat/` adds four paste-ready starter project descriptions
+  (static SPA, Electron desktop, full web app with Google sign-in, existing .NET repo) and a
+  step-by-step manual test doc per project covering the whole greenfield lifecycle.
+
 ---
 
 ## [1.10.0] — 2026-09-15
