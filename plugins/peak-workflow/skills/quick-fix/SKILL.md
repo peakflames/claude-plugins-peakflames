@@ -62,7 +62,7 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
 
 1. **Read affected source files** — enumerate the specific files the fix touches.
 2. **Implement the fix** — name the specific files being modified and what changes.
-3. **Run applicable quality gates from `CLAUDE.md`** — build, tests, lint, and `playwright-cli` if the fix is UI-visible. Report each as PASS / FAIL / CANNOT VERIFY (only CANNOT VERIFY if the environment genuinely cannot be stood up).
+3. **Run applicable quality gates from `CLAUDE.md`** — build, tests, lint, and `playwright-cli` if the fix is UI-visible. When `CLAUDE.md`'s Important Reminders carry the **Bench only** rule, follow it before any gate that flashes or runs the board or runs `tests/hil/`. Report each as PASS / FAIL / CANNOT VERIFY (only CANNOT VERIFY if the environment genuinely cannot be stood up).
 4. **Capture manual verification** (asked during execution, after quality gates and before the commit) — ask the user whether they performed any manual verification beyond the automated gates. Claude cannot infer this.
 
    Use `AskUserQuestion`:

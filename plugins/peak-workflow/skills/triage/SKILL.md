@@ -142,7 +142,7 @@ Run the following in a fresh session from your base branch (develop / main / mas
 /peak-workflow:discover creates the docs/ branch automatically — do not create it manually first.
 
 1. /peak-workflow:discover "<request summary>"  — update vision and ConOps; creates docs/ branch
-2. /peak-workflow:mockup                        — (UI projects — skip for CLI / Service / Library) screen inventory, flows, wireframes; concretizes ConOps steps
+2. /peak-workflow:mockup                        — (UI projects — skip for CLI / Service / Library / Embedded) screen inventory, flows, wireframes; concretizes ConOps steps
 3. /peak-workflow:capture-requirements          — derive new TOR IDs from updated vision/ConOps
 4. /peak-workflow:plan-project                  — derive new epics from the new TOR requirements
 

@@ -99,6 +99,16 @@ every one of them. When the spec has a `## Screens` section (Step 1 item 4c), th
 cites the screen's `S-NN`, its wireframe path, and the `data-component` primitives it composes
 — the wrapup Wireframe fidelity line checks regions, control texts, and states against that file.
 
+**Bench only (products that switch mains power or heat).** Before any command that flashes the
+board, runs it, or runs anything under `tests/hil/` — in a middle step, the self-assessment, or a
+quality gate — ask the user in one plain question to confirm the bench setup: the equipment
+unplugged from mains, the output wired to an indicator lamp instead of the load. If they do not
+confirm, do not run it. `HIL_BENCH=1` goes on that one command line only, right after the user
+confirms for this run (e.g. `HIL_BENCH=1 <harness command>`) — never exported, never written into
+`CLAUDE.md`, a script, or a config file, and never set without the confirmation. For a product that
+switches mains power or heat, copy this paragraph verbatim into the plan as a standing rule ahead
+of the first middle step, next to the Deferral gate; omit it for every other product.
+
 **Deferral gate.** Copy this paragraph verbatim into the plan as a standing rule ahead of the
 first middle step; it applies to every middle step and to the self-assessment. If at any point
 a TOR's Given/When/Then cannot be fully met as written in this session (technical constraint,
@@ -119,6 +129,8 @@ Rules:
   after plan approval, before any middle step.
 - **Only an option the user selects counts.** A free-text reply that does not name one of the
   three options ("ok", "proceed", "go ahead") is not consent to defer — re-ask.
+- **Safety TORs are never deferrable.** A TOR under the `# Safety` banner offers only Fix now or
+  Stop — the epic that drives an output ships its safeguard.
 - **Defer eligibility:** Defer is allowed only when the Then clause depends on code a later
   epic creates (a handler, table, screen, or service that does not exist yet and is not this
   epic's to build). When the user picks Defer, ask `"Which later epic creates the code this Then
@@ -176,9 +188,14 @@ Middle step example:
 
   Before reporting, run two mechanical checks against the working tree (nothing is committed
   yet, so `git diff <base-branch>` alone would miss new files):
-  - `for d in <test-directories>; do grep -rl "<TOR-ID>" "$d"; done` must hit in at least one
+  - `for d in <test-directories>; do grep -rl --exclude-dir={bin,obj,node_modules,dist,out,build} "<TOR-ID>" "$d"; done` must hit in at least one
      directory for every TOR ID. A miss means the test is not traceable — fix the test before
-     continuing.
+     continuing. A TOR whose scenario carries `# Verification: operator-observed` is traced by a
+     checklist `tests/manual/<TOR-ID>.md` (or under `tests/hil/`) that restates its Given / When /
+     Then as steps a person performs and what they should see; write it, and report the TOR as
+     `PASS (operator-observed pending)` — `/peak-workflow:wrapup-epic` collects the observation.
+     A checklist for anything that switches mains power or heat names a bench setup — the
+     equipment unplugged, the output driving an indicator lamp — never the live equipment.
   - ```bash
     grep -inE --exclude-dir={.venv,node_modules,__pycache__,.pytest_cache,dist,build,out} \
       'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
@@ -187,7 +204,10 @@ Middle step example:
      Judge each hit: a marker describing incomplete TOR behavior is a deferral-gate trigger for
      that TOR, unless the TOR already has a Deferrals row (a hit inside a `Deferred:` xfail
      reason is expected and not a trigger).
-     Legitimate uses (e.g., argparse `placeholder`/`metavar`) are not triggers.
+     Legitimate uses (e.g., argparse `placeholder`/`metavar`, test doubles for hardware or a
+     native dialog under the test directories) are not triggers.
+  - Walking-skeleton epic only: `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen|\*\*Not decided yet:\*\*' CLAUDE.md`
+     must return nothing. Each hit is a value this epic owns resolving — resolve it before reporting.
 
   **Any TOR reported FAIL or CANNOT VERIFY here that has no Deferrals row fires the deferral
   gate** before the handoff is written — the self-assessment and the Deferrals section must
@@ -203,6 +223,9 @@ Middle step example:
     realized. Cite test file:line and impl file:line.
   - **FAIL** — test fails, or test passes but implementation does not realize the requirement.
     Describe the gap.
+  - **PASS (operator-observed pending)** — only for a TOR tagged `# Verification: operator-observed`:
+    its checklist exists and every automated part it has passes. A `# Safety` TOR with no automated
+    `tests/hil/` test naming it is **FAIL**, whatever its tag.
   - **CANNOT VERIFY** — only if the test environment cannot start after a genuine attempt.
 
   **IPC / dev-server caveat:** if the project uses a dev-server-only render harness (e.g., Vite
@@ -236,7 +259,7 @@ Middle step example:
     deferral of the TOR as written, so every deviated TOR appears in both tables.
   - **Key Decisions** — design choices future epics should know about. Anything here that
     describes partial or stubbed behavior must have a matching Deferrals row.
-  - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / FAIL / CANNOT VERIFY
+  - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / PASS (operator-observed pending) / FAIL / CANNOT VERIFY
     verdict from the self-assessment step
   - **Verification Results (self-assessment)** — quality gate results
 
