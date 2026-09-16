@@ -69,23 +69,27 @@ attribution field. Watch for that, and record a Critical finding if it routes to
 
 ---
 
-## 3. Shiftboard — full web app route
+## 3. Shiftboard — full web app route, **deferred org sign-in**
 
 > Our food bank runs on volunteers. I want a page where volunteers can see the open shifts for the
 > week and claim one. When somebody claims a shift, everyone else looking at the page should see it
 > disappear right away — otherwise two people show up for the same slot, which happens constantly
-> today. The coordinators who create the shifts all sign in with our Google Workspace accounts.
-> The volunteers are just people from the community, they're not on our Google.
+> today. Coordinators create the shifts and need to see who claimed what. IT keeps saying we're
+> moving to Okta but nothing is approved and I can't wait on them.
 
-**Persona:** *Theo*, volunteer coordinator. Comfortable with Google Docs. Has no idea what
-"identity provider" or "OAuth" mean, but he does know his organisation is "on Google".
+**Persona:** *Theo*, volunteer coordinator. Comfortable with Google Docs. Has heard "Okta" in a
+meeting because IT is supposedly rolling it out, but has no idea what it is, whether it is
+approved, or when. He is not getting an answer this month.
 
 **What this should route to:** Project type **Web app**; shape **Q1 yes, Q2 yes, Q3 no, Q4 yes,
-Q5 yes (implied by Q2)**; `references/bun-web-app-stack.md`; provider **Google, named and
-approved**, audience **mixed** (coordinators restricted to the org domain, volunteers not);
+Q5 yes (implied by Q2)**; `references/bun-web-app-stack.md`; provider **deferred** — the middle
+row of the provider table, *"a vendor is likely but unconfirmed"* — recording the greppable
+string `Auth: local accounts now, org SSO deferred` plus the candidate (Okta) and who confirms it;
 roles **coordinator / volunteer**; `**Access rule:** owner-or-permitted-role` written verbatim;
-Object storage + Local S3 rows marked `N/A — no file uploads (shape Q3)`; Per-request streaming
-marked `N/A — no streamed responses`.
+a `## N. Organization Sign-In Deferred` section in `docs/design-notes.md`; Object storage +
+Local S3 marked `N/A — no file uploads (shape Q3)`; Per-request streaming marked
+`N/A — no streamed responses`; Email delivery **kept** (public password sign-up for volunteers
+needs verified addresses and reset).
 
 **Persona answers to expect to give:**
 
@@ -93,17 +97,37 @@ marked `N/A — no streamed responses`.
 |---|---|
 | Q1 — same info on another device? | "Yes, people use their phones and their laptops." |
 | Q2 — sign in / does anyone else see it? | "Yes — coordinators need to see who claimed what." |
-| Provider follow-up | "We're on Google Workspace." |
-| Audience follow-up | "Coordinators are on our Google. Volunteers are just community people, they're not." |
+| Provider follow-up | **"IT says we're getting Okta but it's not approved. I'd have to ask them and it'll take a month."** |
+| Audience follow-up | *(should not be asked — org-only vs mixed is a property of a named provider)* |
 | Roles follow-up | "Yes — coordinators create and cancel shifts; volunteers can only claim and release their own." |
 | Q3 — attach photos or files? | "No." |
 | Q4 — update by itself on screen? | **"Yes — that's the whole point."** |
 | Required language or platform? | "No." |
 
-**What to watch:** `**Access rule:** owner-or-permitted-role` must appear verbatim in the
-`**Product shape:**` block — `wrapup-epic`'s access-control gate greps for it. Owner-**only**
-would break the coordinators' ability to see volunteer claims, which is the product's reason
-for existing.
+**What this project is really testing:** deferred mode defers *who vouches for the identity* and
+nothing else. Authentication is real from epic 1 (Better Auth email-and-password — no stub, no
+bypass, no anonymous fallback), every record carries an owner, and one owner-or-permitted-role
+rule guards every read and write. The organization's provider becomes its own epic in the last
+phase with `requirements: —`.
+
+**The traps this project sets:**
+
+1. Routing to the **static SPA sheet** because "we can keep it simple until Okta lands" —
+   deferring never restores the static sheet; shared data needs a server regardless. **Critical.**
+2. Building a **sign-in stub** or an anonymous-in-development fallback instead of the sheet's real
+   auth layer. **Critical.**
+3. Deferring **ownership** along with the provider — the half that is ruinous to retrofit.
+   **Critical.**
+4. Writing **provider-dependent TORs** (SSO redirect, directory-sourced roles, provisioning, MFA,
+   org password policy) that cannot pass until an epic that does not exist ships. **Critical.**
+5. **Losing the deferral entirely** — no design-notes section, therefore no epic in the plan.
+   **Critical.**
+6. Asking Theo for an **OAuth client, tenant, client ID or secret** — the whole point is that the
+   run completes with no external approval.
+
+> **Coverage note:** deferred mode had **no adversarial dry-run coverage** in the v1.11.0
+> validation cycle — the validated web scenario used a named, approved provider. This run is its
+> first real exercise.
 
 ---
 
