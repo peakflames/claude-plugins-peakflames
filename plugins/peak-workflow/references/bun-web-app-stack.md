@@ -716,6 +716,10 @@ against `bunx shadcn@latest init --help` at scaffold time, and expect these diff
 - **`add` emits `import { Dialog as DialogPrimitive } from "radix-ui"`** — the unified package.
   Declare `"radix-ui"` once in `apps/web/package.json` and remove any per-primitive
   `@radix-ui/react-*` entries afterwards.
+- **Assistant tooling.** `/peak-workflow:setup` installs the shadcn/ui skill (`.claude/skills/`, at
+  the repository root) and the `shadcn` MCP server (`.mcp.json`) on this stack. Run their component
+  commands from `apps/web/`, where `components.json` lives. The skill documents `init`; this
+  section's rule — write `components.json` and `index.css` by hand, run only `add` — wins.
 
 `apps/web/components.json`:
 
@@ -2259,6 +2263,7 @@ export default defineConfig({
 bun --version                            # must be 1.2+; `bun upgrade` if the machine is behind
 cp .env.example .env
 bun install
+bunx playwright install chromium         # one time, right after `bun install`
 docker compose up -d minio minio-init   # local S3 only
 bun run dev                              # api on :3000 (--hot), web on :5173 with proxy
 bun run dev:api:pretty                   # api alone, human-readable logs

@@ -181,7 +181,7 @@ The phase directory must match an existing `phase-N-name/` directory in the impl
 **Dependencies:** Epic {id1} ({short description}), Epic {id2} ({short description})
 **Source:** Issue #{N}
 
-> **Brand:** Use the project's brand guidelines skill for {relevant UI elements} if one is configured.
+> **Design:** UI epic — `/peak-workflow:start-epic` runs a Design pass with the design skills installed at that time (brand kit, `frontend-design`, shadcn) for {relevant UI elements}.
 
 ---
 
@@ -221,7 +221,7 @@ both are involved.}
 
 **Conditional lines and sections in the template above** — do not carry this guidance into the written spec:
 
-- Include the **Brand** note only if the epic involves UI work. Omit it entirely otherwise.
+- Include the **Design** note only if the epic involves UI work. Omit it entirely otherwise.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise.
 - Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name copied verbatim from `ux/screens.md` and wireframe path copied verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. A screen appears in exactly one epic's Screens table.
 
