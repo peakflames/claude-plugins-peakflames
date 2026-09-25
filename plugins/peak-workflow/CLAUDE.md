@@ -46,8 +46,9 @@ ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (w
 `plan-project` and `add`); older specs fall back to the git author and date of the commit that
 added them. `status` fetches and warns when the base is behind origin, shows what teammates
 changed since the user's own last commit, lists ready epics as a table, and **never picks among
-several ready epics**. `start-epic` pulls the base, then shows an epic card and confirms before
-its first side effect, and removes the empty branch if the plan is rejected.
+several ready epics**. `start-epic` pulls the base, then shows an epic card (with `⚑` lines for a
+teammate's epic, phase, owner, or existing origin branch) and confirms before creating the branch,
+and removes an empty branch left by a rejected plan.
 
 **Branch families:**
 - `docs/{task-short-name}` — full planning sequence (discover → mockup [UI] → capture-requirements → plan-project)

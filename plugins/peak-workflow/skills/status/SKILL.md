@@ -146,20 +146,31 @@ For each epic whose sidecar (Step 2) has `status: Paused`:
 A teammate's merged plan is otherwise indistinguishable from your own. Show what changed on
 `<base>` since the user's own last commit there:
 
-1. `me=$(git config user.name)`.
-2. `since=$(git log -1 --format=%H --author="$me" <base>)`. If that is empty (the user has never
-   committed on `<base>`), use the first commit of the last 14 days instead:
-   `since=$(git rev-list -1 --before="14 days ago" <base>)`; if that is also empty, skip this step
-   and omit the panel.
-3. List the planning commits since then, and drop the rows whose author (`%an`) is `me`:
+`me` below is the exact value of `git config user.name`. Shell variables do not persist between
+commands — inline `$(git config user.name)` wherever a command needs it, and compare author names
+exactly (`--author` is a substring match, so filter its output by exact `%an`).
+
+1. Find the starting point `<since>`: the user's own last commit on `<base>`,
+   `git log -1 --format=%H --author="$(git config user.name)" <base>` (keep it only if its `%an` is
+   exactly `me`). If there is none, fall back to the last commit before a 14-day window,
+   `git rev-list -1 --before="14 days ago" <base>`, and label the panel "in the last 14 days"
+   instead of "since your last commit". If that is also empty, skip this step and omit the panel.
+2. List the planning commits since then, dropping rows whose `%an` is `me`:
    `git log --format='%h|%an|%ad|%s' --date=short <since>..<base> -- docs/implementation-plan docs/requirements`
-4. Classify what changed: `git diff --name-status <since> <base> -- docs/implementation-plan/`.
+3. Classify what changed: `git diff --name-status <since> <base> -- docs/implementation-plan/`.
    - An added `phase-*/index.md` → **new phase**.
    - An added `phase-*/epic-*.md` → **new epic**.
    - A modified `status/epic-*.md` → **status change**: read the old value with
-     `git show <since>:<path>` and the new value from the working tree.
-   Attribute each change to the author of the latest commit in item 3 that touched that path;
-   omit changes with no such commit (they are the user's own).
+     `git show <since>:<path>` and the new one with `git show <base>:<path>` (not the working
+     tree, which differs when the user is on a feature branch).
+   - Ignore every other path (added sidecars, READMEs, handoffs).
+   Attribute each change to the last commit touching that path in the range,
+   `git log -1 --format='%an|%ad' --date=short <since>..<base> -- <path>`; omit it when that
+   author is `me`.
+4. **Not pulled yet.** If Step 0.5 found `<behind>` greater than 0, also list
+   `git log --format='%h|%an|%ad|%s' --date=short <base>..origin/<base> -- docs/implementation-plan docs/requirements`
+   as rows marked **not pulled yet** (change = the commit subject). In that case never print
+   "Nothing new from teammates." — the new work is on origin.
 
 Render the result in Step 7's **New Since You Last Looked** panel.
 
@@ -182,15 +193,17 @@ Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2),
 ## New Since You Last Looked
 
 [Skip this panel if Step 5.5 was skipped. Otherwise, heading line:
- "Changes by teammates since your last commit on <base> (<short-sha>, <date>):"]
+ "Changes by teammates since your last commit on <base> (<short-sha>, <date>):" — or
+ "Changes by teammates in the last 14 days:" on the fallback path]
 
 | Change | Epic / Phase | By | Date |
 |--------|--------------|----|------|
 | New phase | Phase 4 — Frontend Migration | Todd | 2026-09-28 |
 | New epic | aBVPpli (svelte-skeleton) — Svelte Skeleton and Integration Branch | Todd | 2026-09-28 |
 | Status change | r8W6j9a (habit-management) — Not Started → In Progress | Todd | 2026-09-29 |
+| Not pulled yet | 9424bd8 docs: frontend migration plan — … | Todd | 2026-09-28 |
 
-[If nothing changed: "Nothing new from teammates."]
+[If nothing changed and nothing is waiting on origin: "Nothing new from teammates."]
 
 ## Overall Progress
 
@@ -253,7 +266,7 @@ Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2),
 | Epic | Name | Phase | Planned by | Added | Unblocks | Purpose |
 |------|------|-------|------------|-------|----------|---------|
 | Uq8QpFa (backup-and-restore) | Backup and Restore | 3 — Extend | Abigail | 2026-08-14 | 0 | Export and import all habit data as a JSON file |
-| ⚑ aBVPpli (svelte-skeleton) | Svelte Skeleton and Integration Branch | 4 — Frontend Migration | Todd | 2026-09-28 | 1 | Stand up SvelteKit static beside the React app |
+| ⚑ aBVPpli (svelte-skeleton) | Svelte Skeleton and Integration Branch | 4 — Frontend Migration | Todd | 2026-09-28 | 2 | Stand up SvelteKit static beside the React app |
 
 [One row per ready epic from Step 6. `⚑` marks an epic planned by someone other than you; `(from
 git)` follows a Planned by / Added value derived from history.]

@@ -27,15 +27,18 @@ read are current — a teammate may have merged plan changes since this clone la
 
 1. Detect the base branch: `git branch --list develop main master` — prefer `develop`, then
    `main`, then `master`.
-2. If `git remote` lists `origin`, run `git fetch --quiet origin`. If there is no remote or the
-   fetch fails (offline), say `Freshness check skipped — no remote reachable` and continue.
-3. Count `git rev-list --count <base>..origin/<base>` (commits the local base is missing).
-   - **On the base branch and behind:** run `git pull --ff-only` and tell the user
-     `Pulled <N> new commit(s) on <base> before starting.` If it fails because the branches have
-     diverged, stop: `Your <base> has diverged from origin/<base> — reconcile it (git pull) before
-     starting an epic.`
+2. If `git remote` does not list `origin`, skip this guard silently. Otherwise run
+   `git fetch --quiet origin`; if the fetch fails (offline), say
+   `Freshness check skipped — origin not reachable` and continue.
+3. If `origin/<base>` exists, count `git rev-list --count <base>..origin/<base>` (commits the
+   local base is missing); otherwise skip this item.
+   - **On the base branch and behind:** run `git pull --ff-only origin <base>` and tell the user
+     `Pulled <N> new commit(s) on <base> before starting.` If the pull fails for any reason
+     (diverged branches, local changes in the way), stop and show git's message:
+     `Your <base> could not be fast-forwarded to origin/<base> — reconcile it before starting an epic.`
    - **On another branch and the base is behind:** continue, and say
-     `Note: <base> is <N> commit(s) behind origin — this epic's branch will be cut from the updated base in Step 3.`
+     `Note: <base> is <N> commit(s) behind origin.` (Step 3 pulls it before cutting a new
+     branch; an existing epic branch is not rebased.)
 
 ---
 
@@ -72,7 +75,7 @@ Follow these steps exactly:
     (plan mode) and the plan's Middle and Closing steps.
 4b. **Resolve the test directories.** Read the `Test directories` line of `CLAUDE.md`'s Verification & Quality Gates section (space-separated, E2E last). If the line is absent, use the single directory the Tests command names. If none can be derived (a legacy Tests row like `pytest`), ask once via `AskUserQuestion`:
     - Question: `"Which directories hold tests? (space-separated, E2E last)"`
-    - Then ask: `"Record this as the Test directories line in CLAUDE.md's Verification & Quality Gates section?"` with options `["Yes — write it now", "No — use a git grep fallback this session"]`. On Yes, write the line now (this is a docs edit, not implementation, so it precedes plan mode). Carry the result forward as `<test-directories>` for the Step 4 plan.
+    - Then ask: `"Record this as the Test directories line in CLAUDE.md's Verification & Quality Gates section?"` with options `["Yes — record it", "No — use a git grep fallback this session"]`. On Yes, write the line once Step 2.5 has confirmed the epic (this is a docs edit, not implementation, so it still precedes plan mode). Carry the result forward as `<test-directories>` for the Step 4 plan.
 4c. **Load Screens (UI epics only).** If the spec has a `## Screens` section, open each listed
     wireframe file (`docs/product-vision-planning/ux/wireframes/S-NN-*.html`, written by
     `/peak-workflow:mockup`) and carry its regions (the `data-component` values), its control
@@ -139,6 +142,8 @@ Follow these steps exactly:
 
 ### Recovery Check
 
+If `owner:` in the sidecar names someone other than `git config user.name`, skip this check — Step 2.5 asks the user first.
+
 If `docs/implementation-plan/status/epic-$ARGUMENTS.md` has `status: In Progress` but there is no pause handoff file (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/peak-workflow:pause`. Inform the user:
 
 > Epic $ARGUMENTS is marked "In Progress" but has no pause handoff — a previous session may have been interrupted. I'll scan the codebase for any partial implementation and pick up from the current state.
@@ -180,7 +185,7 @@ confirm, do not run it.
 
 ## Step 2.5: Confirm the Epic
 
-Before the first side effect (the branch in Step 3), show the user what they are about to start —
+Before creating the branch in Step 3, show the user what they are about to start —
 the epic ID alone is not recognizable, and the epic may belong to a phase a teammate planned.
 Print this card (the slug is the branch short name from Step 1 item 7):
 
@@ -201,15 +206,25 @@ Purpose:       <first sentence of the spec's ## Description>
 - **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-$ARGUMENTS.md`; absent
   means `—`.
 
-Below the card, add one `⚑` line for each that applies (`me` = `git config user.name`):
+Below the card, add one `⚑` line for each that applies. "You" means the exact value of
+`git config user.name` — compare names exactly, and inline `$(git config user.name)` in any
+command (shell variables do not persist between commands).
 - `⚑ Planned by <name>, not you — check this is yours to start.`
+- `⚑ Phase <N> — <Phase Name> was added to the plan by <name>, not you.` — the author of the
+  commit that added the phase index:
+  `git log --diff-filter=A --format='%an' -- docs/implementation-plan/phase-<N>-*/index.md | tail -1`.
 - `⚑ Owned by <owner> — someone else has already started this epic.`
-- `⚑ Different phase from your last epic (<phase>).` — find your last epic with
-  `git log -1 --author="$me" --name-only --format= <base> -- docs/implementation-plan/status/`
-  (the sidecar path names the epic; read its phase from the phase index). Skip if you have none.
+- `⚑ Branch <name> already exists on origin (last commit by <author>, <date>) — someone may be
+  working on it.` — when the Freshness Guard fetched, check
+  `git branch -r --list 'origin/feature/epic-<id>-*'` and read the author with
+  `git log -1 --format='%an|%ad' --date=short <that-ref>`. Skip when the last commit is yours.
+
+`owner:` travels with the feature branch and reaches the base branch only when the epic merges,
+so a teammate's in-flight epic usually shows up through the origin-branch line, not the owner line.
 
 **Resuming your own epic** — sidecar `status: In Progress`, `Paused`, or `Implemented`, and `owner:`
-is you or `—`, with no `⚑` lines: print the card and continue without asking.
+is you or `—`: drop the two "planned by / added by" lines (you already chose this epic). If no `⚑`
+line remains, print the card and continue without asking.
 
 **Otherwise**, ask with `AskUserQuestion`:
 - Question: `"Start Epic <id> (<slug>) — <Name>?"`
@@ -228,14 +243,22 @@ Before entering plan mode, ensure work is isolated on a feature branch. The bran
    git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
    ```
    Exit 0 = exists, nonzero = missing. Do **not** rely on `git branch --list … && echo "exists"` — that pipeline always exits 0 and produces false positives on missing branches.
+
+   **Leftover check.** If the branch exists, detect the base branch (item 5a) and test whether it
+   is an empty branch left by an earlier rejected or abandoned start: the base's sidecar still
+   says `status: Not Started` (`git show <base-branch>:docs/implementation-plan/status/epic-<id>.md`),
+   `git rev-list --count <base-branch>..feature/epic-<id>-<short-name>` returns `0`, and
+   `git status --porcelain` is empty. If all three hold, run `git checkout <base-branch>` and
+   `git branch -d feature/epic-<id>-<short-name>`, say `Removed an empty leftover branch from an
+   earlier start.`, and continue with item 5 as if the branch did not exist.
 3. If already on `feature/epic-<id>-<short-name>`, confirm to the user:
    > Resuming on existing branch: `feature/epic-<id>-<short-name>`
 4. If the branch exists but you are not on it, run `git checkout feature/epic-<id>-<short-name>`.
 5. If the branch does not exist:
    a. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
-   b. Switch to the base branch: `git checkout <base-branch>`, then — if `origin` exists — run
-      `git pull --ff-only` so the branch is cut from the team's latest base (stop if it has
-      diverged, as in the Freshness Guard).
+   b. Switch to the base branch: `git checkout <base-branch>`, then — if `origin/<base-branch>`
+      exists — run `git pull --ff-only origin <base-branch>` so the branch is cut from the team's
+      latest base (stop and show git's message if the pull fails, as in the Freshness Guard).
    c. Create and checkout the feature branch: `git checkout -b feature/epic-<id>-<short-name>`.
    d. Confirm to the user:
    > Created and switched to branch: `feature/epic-<id>-<short-name>` (from `<base-branch>`)
@@ -255,8 +278,9 @@ Build the plan from:
 session created the feature branch in Step 3 item 5, it has no commits beyond the base
 (`git rev-list --count <base-branch>..HEAD` returns `0`), and `git status --porcelain` is empty,
 run `git checkout <base-branch>` and `git branch -d feature/epic-<id>-<short-name>`, and tell the
-user the empty branch was removed. An empty branch left behind would be silently resumed by the
-next `/peak-workflow:start-epic`.
+user the empty branch was removed. If plan mode is still active (git writes are not allowed), print
+those two commands for the user to run instead. Step 3 item 4 also removes such a leftover the next
+time this epic is started, so a closed session does not leave a trap.
 
 **The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), **Design pass** step (UI epics only, with the names from Step 1 item 11b), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
 

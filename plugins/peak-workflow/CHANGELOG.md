@@ -17,8 +17,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   status changes since your own last commit on the base branch.
 - **Freshness guard** — `status`, `start-epic`, `add`, and `wrapup-epic` fetch and warn when the
   base branch is behind origin; `start-epic` and solo wrapup pull it (fast-forward only) first.
-- **Epic card before branching** — `start-epic` shows name, phase, planner, owner, and purpose, flags
-  a teammate's or other-phase epic, and asks before creating the branch.
+- **Epic card before branching** — `start-epic` shows name, phase, planner, owner, and purpose;
+  flags an epic or phase a teammate planned, another owner, or an existing origin branch; and asks
+  before creating the branch.
 
 ### Changed
 
@@ -26,8 +27,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   unblocks count, and purpose per ready epic; `⚑` marks epics someone else planned.
 - **No blind single pick** — with several ready epics, `status` names none and points to the table;
   every epic is printed as `ID (slug) — Name`.
-- **Rejected plan cleans up** — `start-epic` deletes the empty feature branch when the user rejects
-  the plan, so a later run cannot silently resume it.
+- **Empty branches cleaned up** — `start-epic` deletes the empty feature branch when the user
+  rejects the plan, and removes such a leftover on the next start instead of resuming it.
 
 ### Documentation
 
