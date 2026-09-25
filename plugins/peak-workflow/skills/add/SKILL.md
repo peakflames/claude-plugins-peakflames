@@ -31,6 +31,11 @@ Follow these steps exactly:
 
 ## Step 1: Load Context
 
+0. **Freshness check.** If `git remote` lists `origin`, run `git fetch --quiet origin` and count
+   `git rev-list --count <base>..origin/<base>` (base: `develop` > `main` > `master`). If the
+   base is behind, warn before reading anything: `Your <base> is <N> commit(s) behind origin — a
+   teammate may have planned epics or claimed TORs you cannot see. Pull <base> first, then re-run
+   /peak-workflow:add.` Continue only if the user says to. Skip silently with no remote.
 1. Read `CLAUDE.md` at the repo root for project context.
 2. Read the phase indexes: glob `docs/implementation-plan/phase-*/index.md` and read each file to understand the existing epic structure, phase names, and existing epic IDs.
 3. Read `docs/architecture.md` for system context.
@@ -179,6 +184,9 @@ The phase directory must match an existing `phase-N-name/` directory in the impl
 **Phase:** {N} — {Phase Name}
 **Status:** Not Started
 **Dependencies:** Epic {id1} ({short description}), Epic {id2} ({short description})
+**Planned by:** {planner}
+**Planned:** {YYYY-MM-DD}
+**Plan branch:** {plan-branch}
 **Source:** Issue #{N}
 
 > **Design:** UI epic — `/peak-workflow:start-epic` runs a Design pass with the design skills installed at that time (brand kit, `frontend-design`, shadcn) for {relevant UI elements}.
@@ -222,6 +230,7 @@ both are involved.}
 **Conditional lines and sections in the template above** — do not carry this guidance into the written spec:
 
 - Include the **Design** note only if the epic involves UI work. Omit it entirely otherwise.
+- Always include the three provenance lines, filled at write time — never leave a placeholder: `{planner}` is `git config user.name`, `{YYYY-MM-DD}` is today, and `{plan-branch}` is `git branch --show-current`. `/peak-workflow:status` and `/peak-workflow:start-epic` show them so a teammate can tell who planned an epic.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise.
 - Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name copied verbatim from `ux/screens.md` and wireframe path copied verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. A screen appears in exactly one epic's Screens table.
 
@@ -253,9 +262,11 @@ Before writing each spec, verify:
    ```
    Use `—` in the Dependencies column if the epic has no dependencies. Use the epic ID verbatim (7-char alphanumeric or legacy integer).
 
-2. **Status sidecar** — create `docs/implementation-plan/status/epic-{id}.md` with exactly these five lines:
+2. **Status sidecar** — create `docs/implementation-plan/status/epic-{id}.md` with exactly these six lines
+   (`owner:` stays `—` until `/peak-workflow:start-epic` sets it):
    ```
    status: Not Started
+   owner: —
    implemented: —
    completed: —
    handoff: —
@@ -337,8 +348,9 @@ Show the user what was created:
 ```
 ## Added Epic(s)
 
-### Epic {id}: {Name}
+### Epic {id} ({slug}): {Name}
 - **File:** `docs/implementation-plan/{path}`
+- **Planned by:** {planner}, {YYYY-MM-DD}
 - **Phase:** {N} — {Name}
 - **Dependencies:** {list}
 - **Sections:** {count} acceptance criteria, {count} verification items

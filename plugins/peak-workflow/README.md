@@ -227,7 +227,7 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 
 | Command | Purpose | Branch / Status |
 |---|---|---|
-| `/start-epic <id>` | Implement the epic — loads TOR Given/When/Then, creates user-story tasks, implements, verifies | Not Started → In Progress → **Implemented** |
+| `/start-epic <id>` | Implement the epic — shows an epic card (who planned it, phase, owner) and confirms before branching, loads TOR Given/When/Then, creates user-story tasks, implements, verifies | Not Started → In Progress → **Implemented** |
 | `/wrapup-epic <id>` | Independent review — verifies each TOR's Given/When/Then is satisfied, asks fix-now-or-defer on every gap, closes out, ships; runs on Opus in a fresh session | Implemented → **Complete** |
 | `/pause` | Stop mid-epic, save progress | In Progress → **Paused** |
 | `/quick-fix <issue\|description>` | Lightweight path for trivial bugs in already-implemented TORs — creates `hotfix/` branch, implements, ships | Not tracked in implementation plan |
@@ -236,7 +236,7 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 
 | Command | Purpose |
 |---|---|
-| `/status` | Read-only dashboard — epic progress, Requirements Coverage, active work, next actions |
+| `/status` | Read-only dashboard — behind-origin warning, what teammates changed since your last commit, epic progress, Requirements Coverage, active work with owners, a Ready to Start table (never a blind single pick), next actions |
 
 ### Maintain
 
@@ -319,6 +319,9 @@ Epic specs no longer contain prose Acceptance Criteria or Verification sections.
 **Phase:** 1 — Foundation
 **Status:** Not Started
 **Dependencies:** —
+**Planned by:** tschavey
+**Planned:** 2026-09-04
+**Plan branch:** docs/cli-baseline
 
 ---
 
@@ -353,12 +356,19 @@ path and states; each screen belongs to exactly one epic.
 
 ```
 status: Not Started
+owner: —
 implemented: —
 completed: —
 handoff: —
 requirements: TOR-01-Afs657G, TOR-01-Bcd2345
 waived: TOR-01-Bcd2345 → B9xQr2z
 ```
+
+The `owner:` line is set by `start-epic` to the person who starts the epic (`git config user.name`);
+`status` shows it next to In Progress epics, and `start-epic` warns before anyone else starts it.
+The spec's `**Planned by:**` / `**Planned:**` / `**Plan branch:**` header lines record who planned
+the epic; for specs that predate them, `status` and `start-epic` read the same facts from git
+history.
 
 The `waived:` line is optional — `wrapup-epic` writes it when a TOR was waived to a successor
 epic, and `status` credits that TOR's coverage to the successor.

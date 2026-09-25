@@ -20,6 +20,23 @@ You are starting an implementation session for Epic $ARGUMENTS. Use `$ARGUMENTS`
 
 Do not attempt the skill's normal flow on a legacy layout.
 
+## Freshness Guard
+
+**Immediately after the Layout Guard:** make sure the spec, sidecars, and plan you are about to
+read are current — a teammate may have merged plan changes since this clone last synced.
+
+1. Detect the base branch: `git branch --list develop main master` — prefer `develop`, then
+   `main`, then `master`.
+2. If `git remote` lists `origin`, run `git fetch --quiet origin`. If there is no remote or the
+   fetch fails (offline), say `Freshness check skipped — no remote reachable` and continue.
+3. Count `git rev-list --count <base>..origin/<base>` (commits the local base is missing).
+   - **On the base branch and behind:** run `git pull --ff-only` and tell the user
+     `Pulled <N> new commit(s) on <base> before starting.` If it fails because the branches have
+     diverged, stop: `Your <base> has diverged from origin/<base> — reconcile it (git pull) before
+     starting an epic.`
+   - **On another branch and the base is behind:** continue, and say
+     `Note: <base> is <N> commit(s) behind origin — this epic's branch will be cut from the updated base in Step 3.`
+
 ---
 
 Follow these steps exactly:
@@ -161,6 +178,46 @@ indicator lamp or LED instead of the load. Before each run, ask the user to conf
 plain question (*"Is the kiln unplugged, with the relay driving the test lamp?"*); if they cannot
 confirm, do not run it.
 
+## Step 2.5: Confirm the Epic
+
+Before the first side effect (the branch in Step 3), show the user what they are about to start —
+the epic ID alone is not recognizable, and the epic may belong to a phase a teammate planned.
+Print this card (the slug is the branch short name from Step 1 item 7):
+
+```
+Epic <id> (<slug>) — <Name>
+Phase:         <N> — <Phase Name>
+Planned by:    <name> on <date>
+Dependencies:  <dep-id (dep-slug) — status>, … (or —)
+Owner:         <sidecar owner: value, or —>
+Scope:         <N> TOR(s); screens <S-NN list from ## Screens, or —>
+Purpose:       <first sentence of the spec's ## Description>
+```
+
+- **Planned by / date** — the spec's `**Planned by:**` and `**Planned:**` lines. If absent (a spec
+  written before peak-workflow 2.1.0), derive them from the commit that added the spec:
+  `git log --diff-filter=A --follow --format='%an|%ad' --date=short -- <spec-path> | tail -1`, and
+  append `(from git)`.
+- **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-$ARGUMENTS.md`; absent
+  means `—`.
+
+Below the card, add one `⚑` line for each that applies (`me` = `git config user.name`):
+- `⚑ Planned by <name>, not you — check this is yours to start.`
+- `⚑ Owned by <owner> — someone else has already started this epic.`
+- `⚑ Different phase from your last epic (<phase>).` — find your last epic with
+  `git log -1 --author="$me" --name-only --format= <base> -- docs/implementation-plan/status/`
+  (the sidecar path names the epic; read its phase from the phase index). Skip if you have none.
+
+**Resuming your own epic** — sidecar `status: In Progress`, `Paused`, or `Implemented`, and `owner:`
+is you or `—`, with no `⚑` lines: print the card and continue without asking.
+
+**Otherwise**, ask with `AskUserQuestion`:
+- Question: `"Start Epic <id> (<slug>) — <Name>?"`
+- Options: `["Start it", "Show me the ready epics instead", "Stop"]`
+
+On **Show me the ready epics instead**, invoke `Skill({ skill: "peak-workflow:status", args: "" })`
+and end this skill. On **Stop**, end. Only **Start it** continues to Step 3.
+
 ## Step 3: Create Feature Branch
 
 Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric) and `<short-name>` was extracted in Step 1 (e.g., `feature/epic-3-user-auth`, `feature/epic-a3f2K7p-user-auth`). If no short name was available, use `feature/epic-<id>`.
@@ -176,7 +233,9 @@ Before entering plan mode, ensure work is isolated on a feature branch. The bran
 4. If the branch exists but you are not on it, run `git checkout feature/epic-<id>-<short-name>`.
 5. If the branch does not exist:
    a. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
-   b. Switch to the base branch: `git checkout <base-branch>`.
+   b. Switch to the base branch: `git checkout <base-branch>`, then — if `origin` exists — run
+      `git pull --ff-only` so the branch is cut from the team's latest base (stop if it has
+      diverged, as in the Freshness Guard).
    c. Create and checkout the feature branch: `git checkout -b feature/epic-<id>-<short-name>`.
    d. Confirm to the user:
    > Created and switched to branch: `feature/epic-<id>-<short-name>` (from `<base-branch>`)
@@ -191,6 +250,13 @@ Build the plan from:
 - The epic's key components (these are the files you'll create/modify)
 - Any context from previous handoff files (decisions made, patterns established)
 - Any reference materials surfaced by Step 1 item 12
+
+**If the user rejects the plan and ends** (declines rather than asking for revisions): when this
+session created the feature branch in Step 3 item 5, it has no commits beyond the base
+(`git rev-list --count <base-branch>..HEAD` returns `0`), and `git status --porcelain` is empty,
+run `git checkout <base-branch>` and `git branch -d feature/epic-<id>-<short-name>`, and tell the
+user the empty branch was removed. An empty branch left behind would be silently resumed by the
+next `/peak-workflow:start-epic`.
 
 **The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), **Design pass** step (UI epics only, with the names from Step 1 item 11b), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
 

@@ -8,6 +8,27 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [2.1.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **Epic provenance** — `plan-project` and `add` write `**Planned by:**`, `**Planned:**`, and
+  `**Plan branch:**` into every spec, and an `owner: —` sidecar line that `start-epic` fills in.
+  Older specs fall back to git history.
+- **What's new since you last looked** — `status` lists teammates' new phases, new epics, and
+  status changes since your own last commit on the base branch.
+- **Freshness guard** — `status`, `start-epic`, `add`, and `wrapup-epic` fetch and warn when the
+  base branch is behind origin; `start-epic` and solo wrapup pull it (fast-forward only) first.
+- **Epic card before branching** — `start-epic` shows name, phase, planner, owner, and purpose, flags
+  a teammate's or other-phase epic, and asks before creating the branch.
+
+### Changed
+
+- **Ready to Start is a decision table** — `status` shows ID, slug, name, phase, planner, date,
+  unblocks count, and purpose per ready epic; `⚑` marks epics someone else planned.
+- **No blind single pick** — with several ready epics, `status` names none and points to the table;
+  every epic is printed as `ID (slug) — Name`.
+- **Rejected plan cleans up** — `start-epic` deletes the empty feature branch when the user rejects
+  the plan, so a later run cannot silently resume it.
+
 ### Documentation
 
 - **README design process** — new section walks `/mockup` → `/setup` tooling → Design pass →
