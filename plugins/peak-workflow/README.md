@@ -364,8 +364,9 @@ requirements: TOR-01-Afs657G, TOR-01-Bcd2345
 waived: TOR-01-Bcd2345 → B9xQr2z
 ```
 
-The `owner:` line is set by `start-epic` to the person who starts the epic (`git config user.name`);
-`status` shows it next to In Progress epics, and `start-epic` warns before anyone else starts it.
+The `owner:` line is set by `start-epic` to the person who starts the epic (`git config user.name`).
+It travels with the feature branch, so it reaches `develop` when the epic merges; until then,
+`start-epic` warns when the epic's branch already exists on origin under someone else's commits.
 The spec's `**Planned by:**` / `**Planned:**` / `**Plan branch:**` header lines record who planned
 the epic; for specs that predate them, `status` and `start-epic` read the same facts from git
 history.

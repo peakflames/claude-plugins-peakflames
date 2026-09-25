@@ -31,8 +31,9 @@ Follow these steps exactly:
 
 ## Step 1: Load Context
 
-0. **Freshness check.** If `git remote` lists `origin`, run `git fetch --quiet origin` and count
-   `git rev-list --count <base>..origin/<base>` (base: `develop` > `main` > `master`). If the
+0. **Freshness check.** If `git remote` lists `origin`, run `git fetch --quiet origin` and, if
+   `origin/<base>` exists, count `git rev-list --count <base>..origin/<base>` (base: `develop` >
+   `main` > `master`). If the
    base is behind, warn before reading anything: `Your <base> is <N> commit(s) behind origin — a
    teammate may have planned epics or claimed TORs you cannot see. Pull <base> first, then re-run
    /peak-workflow:add.` Continue only if the user says to. Skip silently with no remote.

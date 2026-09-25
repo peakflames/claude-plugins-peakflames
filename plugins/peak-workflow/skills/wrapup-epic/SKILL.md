@@ -57,8 +57,8 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
    - After checkout, if `git remote` lists `origin`, run `git fetch --quiet origin` and count
      `git rev-list --count <base>..origin/<base>` (base: `develop` > `main` > `master`). If the
-     base is behind, note it for the user now (`<base> is <N> commit(s) behind origin — Step 5
-     pulls it before shipping`) and carry it to Step 5. Verification itself runs on the feature
+     base is behind, note it for the user now (`<base> is <N> commit(s) behind origin — solo
+     shipping (Step 5a) pulls it before merging`) and carry it to Step 5. Verification itself runs on the feature
      branch and is unaffected.
    - After checkout, **re-read `CLAUDE.md`** from the working tree. The copy loaded at session start
      came from the base branch; an epic that changed `CLAUDE.md` (the walking skeleton resolving
@@ -659,10 +659,10 @@ be made by the user every invocation.
 
 1. Note the current feature branch name (`feature/epic-<id>-<short-name>` or legacy `feat/epic-N`).
 2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
-3. `git checkout <base-branch>`, then — if `origin` exists — `git pull --ff-only`, so the merge
-   lands on the team's latest base rather than a stale local copy. If the pull fails because the
-   branches have diverged, stop and tell the user to reconcile `<base-branch>` first; the feature
-   branch and its wrapup commit are intact.
+3. `git checkout <base-branch>`, then — if `origin/<base-branch>` exists —
+   `git pull --ff-only origin <base-branch>`, so the merge lands on the team's latest base rather
+   than a stale local copy. If the pull fails for any reason, stop, show git's message, and tell
+   the user to reconcile `<base-branch>` first; the feature branch and its wrapup commit are intact.
 4. `git merge <branch> --no-ff -m "epic(<id>): merge <branch> — <brief summary>"`
 5. `git branch -d <branch>`
 6. Confirm with `git log --oneline -5`

@@ -36,8 +36,8 @@ Placeholder reference:
    - If already on `feature/epic-<id>-<short-name>`, confirm and continue.
    - If the branch exists but you are not on it, run `git checkout feature/epic-<id>-<short-name>`.
    - If the branch does not exist, detect the base branch (`develop` > `main` > `master`),
-     switch to it, run `git pull --ff-only` if `origin` exists (stop if the base has diverged
-     from origin), and run `git checkout -b feature/epic-<id>-<short-name>`.
+     switch to it, run `git pull --ff-only origin <base-branch>` if `origin/<base-branch>` exists
+     (stop and show git's message if the pull fails), and run `git checkout -b feature/epic-<id>-<short-name>`.
 
 2. **Update status to "In Progress"** — edit `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
    change `status: Not Started` (or `status: Paused`) to `status: In Progress`, and set
