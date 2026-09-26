@@ -38,8 +38,8 @@ read are current — a teammate may have merged plan changes since this clone la
      `Your <base> could not be fast-forwarded to origin/<base> — reconcile it before starting an epic.`
    - **On another branch and the base is behind:** fast-forward the base without checking it
      out: `git fetch origin <base>:<base>` (git refuses this unless it is a fast-forward). On
-     success say `Updated <base> to origin (<N> commit(s)).` — Step 3's Leftover check and the
-     sidecar reads then see the team's current base. If it is refused, continue and say
+     success say `Updated <base> to origin (<N> commit(s)).` — Step 3's Leftover check then sees
+     the team's current base. If it is refused, continue and say
      `Note: <base> is <N> commit(s) behind origin and could not be fast-forwarded.` An existing
      epic branch is never rebased.
 
@@ -210,7 +210,8 @@ Purpose:       <first sentence of the spec's ## Description>
   means `—`. `owner:` and an In Progress / Paused / Implemented status live on the feature branch
   until the epic merges, so when the local branch `feature/epic-<id>-<short-name>` exists, read
   this sidecar (for the card and for the resume rule below) from it:
-  `git show feature/epic-<id>-<short-name>:docs/implementation-plan/status/epic-$ARGUMENTS.md`.
+  `git show feature/epic-<id>-<short-name>:docs/implementation-plan/status/epic-$ARGUMENTS.md`
+  (if the path is absent there, use the working-tree sidecar).
 
 Below the card, add one `⚑` line for each that applies. "You" means the exact value of
 `git config user.name` — compare names exactly, and inline `$(git config user.name)` in any
@@ -254,7 +255,8 @@ Before entering plan mode, ensure work is isolated on a feature branch. The bran
    is an empty branch left by an earlier rejected or abandoned start: the base's sidecar still
    says `status: Not Started` (`git show <base-branch>:docs/implementation-plan/status/epic-<id>.md`),
    `git rev-list --count <base-branch>..feature/epic-<id>-<short-name>` returns `0`, and
-   `git status --porcelain` is empty. If all three hold, run `git checkout <base-branch>` and
+   `git status --porcelain` is empty or lists only `CLAUDE.md` (the Step 1 item 4b line — restore
+   it with `git checkout -- CLAUDE.md`). If all three hold, run `git checkout <base-branch>` and
    `git branch -d feature/epic-<id>-<short-name>`, say `Removed an empty leftover branch from an
    earlier start.`, and continue with item 5 as if the branch did not exist.
 3. If already on `feature/epic-<id>-<short-name>`, confirm to the user:
@@ -287,7 +289,7 @@ or lists only `CLAUDE.md` (the Step 1 item 4b line — restore it first with
 `git checkout -- CLAUDE.md`), run `git checkout <base-branch>` and
 `git branch -d feature/epic-<id>-<short-name>`, and tell the
 user the empty branch was removed. If plan mode is still active (git writes are not allowed), print
-those two commands for the user to run instead. Step 3's Leftover check (under item 2) also removes such a leftover the next
+those commands for the user to run instead. Step 3's Leftover check (under item 2) also removes such a leftover the next
 time this epic is started, so a closed session does not leave a trap.
 
 **The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), **Design pass** step (UI epics only, with the names from Step 1 item 11b), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
