@@ -36,9 +36,12 @@ read are current — a teammate may have merged plan changes since this clone la
      `Pulled <N> new commit(s) on <base> before starting.` If the pull fails for any reason
      (diverged branches, local changes in the way), stop and show git's message:
      `Your <base> could not be fast-forwarded to origin/<base> — reconcile it before starting an epic.`
-   - **On another branch and the base is behind:** continue, and say
-     `Note: <base> is <N> commit(s) behind origin.` (Step 3 pulls it before cutting a new
-     branch; an existing epic branch is not rebased.)
+   - **On another branch and the base is behind:** fast-forward the base without checking it
+     out: `git fetch origin <base>:<base>` (git refuses this unless it is a fast-forward). On
+     success say `Updated <base> to origin (<N> commit(s)).` — Step 3's Leftover check and the
+     sidecar reads then see the team's current base. If it is refused, continue and say
+     `Note: <base> is <N> commit(s) behind origin and could not be fast-forwarded.` An existing
+     epic branch is never rebased.
 
 ---
 
@@ -75,7 +78,7 @@ Follow these steps exactly:
     (plan mode) and the plan's Middle and Closing steps.
 4b. **Resolve the test directories.** Read the `Test directories` line of `CLAUDE.md`'s Verification & Quality Gates section (space-separated, E2E last). If the line is absent, use the single directory the Tests command names. If none can be derived (a legacy Tests row like `pytest`), ask once via `AskUserQuestion`:
     - Question: `"Which directories hold tests? (space-separated, E2E last)"`
-    - Then ask: `"Record this as the Test directories line in CLAUDE.md's Verification & Quality Gates section?"` with options `["Yes — record it", "No — use a git grep fallback this session"]`. On Yes, write the line once Step 2.5 has confirmed the epic (this is a docs edit, not implementation, so it still precedes plan mode). Carry the result forward as `<test-directories>` for the Step 4 plan.
+    - Then ask: `"Record this as the Test directories line in CLAUDE.md's Verification & Quality Gates section?"` with options `["Yes — record it", "No — use a git grep fallback this session"]`. On Yes, write the line right after Step 3 has checked out the feature branch (this is a docs edit, not implementation, so it still precedes plan mode, and the base branch stays clean). Carry the result forward as `<test-directories>` for the Step 4 plan.
 4c. **Load Screens (UI epics only).** If the spec has a `## Screens` section, open each listed
     wireframe file (`docs/product-vision-planning/ux/wireframes/S-NN-*.html`, written by
     `/peak-workflow:mockup`) and carry its regions (the `data-component` values), its control
@@ -204,7 +207,10 @@ Purpose:       <first sentence of the spec's ## Description>
   `git log --diff-filter=A --follow --format='%an|%ad' --date=short -- <spec-path> | tail -1`, and
   append `(from git)`.
 - **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-$ARGUMENTS.md`; absent
-  means `—`.
+  means `—`. `owner:` and an In Progress / Paused / Implemented status live on the feature branch
+  until the epic merges, so when the local branch `feature/epic-<id>-<short-name>` exists, read
+  this sidecar (for the card and for the resume rule below) from it:
+  `git show feature/epic-<id>-<short-name>:docs/implementation-plan/status/epic-$ARGUMENTS.md`.
 
 Below the card, add one `⚑` line for each that applies. "You" means the exact value of
 `git config user.name` — compare names exactly, and inline `$(git config user.name)` in any
@@ -276,10 +282,12 @@ Build the plan from:
 
 **If the user rejects the plan and ends** (declines rather than asking for revisions): when this
 session created the feature branch in Step 3 item 5, it has no commits beyond the base
-(`git rev-list --count <base-branch>..HEAD` returns `0`), and `git status --porcelain` is empty,
-run `git checkout <base-branch>` and `git branch -d feature/epic-<id>-<short-name>`, and tell the
+(`git rev-list --count <base-branch>..HEAD` returns `0`), and `git status --porcelain` is empty
+or lists only `CLAUDE.md` (the Step 1 item 4b line — restore it first with
+`git checkout -- CLAUDE.md`), run `git checkout <base-branch>` and
+`git branch -d feature/epic-<id>-<short-name>`, and tell the
 user the empty branch was removed. If plan mode is still active (git writes are not allowed), print
-those two commands for the user to run instead. Step 3 item 4 also removes such a leftover the next
+those two commands for the user to run instead. Step 3's Leftover check (under item 2) also removes such a leftover the next
 time this epic is started, so a closed session does not leave a trap.
 
 **The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), **Design pass** step (UI epics only, with the names from Step 1 item 11b), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.

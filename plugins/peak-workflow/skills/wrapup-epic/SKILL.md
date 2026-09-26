@@ -55,11 +55,12 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
    - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
    - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
-   - After checkout, if `git remote` lists `origin`, run `git fetch --quiet origin` and count
-     `git rev-list --count <base>..origin/<base>` (base: `develop` > `main` > `master`). If the
-     base is behind, note it for the user now (`<base> is <N> commit(s) behind origin — solo
-     shipping (Step 5a) pulls it before merging`) and carry it to Step 5. Verification itself runs on the feature
-     branch and is unaffected.
+   - After checkout, check freshness (base: `develop` > `main` > `master`). If `git remote` does
+     not list `origin`, skip silently. Otherwise run `git fetch --quiet origin`; if the fetch
+     fails, say `Freshness check skipped — origin not reachable`. If `origin/<base>` exists, count
+     `git rev-list --count <base>..origin/<base>`; if the base is behind, note it for the user now
+     (`<base> is <N> commit(s) behind origin — solo shipping (Step 5a) pulls it before merging`)
+     and carry it to Step 5. Verification itself runs on the feature branch and is unaffected.
    - After checkout, **re-read `CLAUDE.md`** from the working tree. The copy loaded at session start
      came from the base branch; an epic that changed `CLAUDE.md` (the walking skeleton resolving
      `TBD` lines, for one) is only visible after checkout.
