@@ -46,7 +46,7 @@ A dashboard read from a stale checkout hides a teammate's work. Before loading a
 4. If `<behind>` is greater than 0, print this banner at the very top of the dashboard:
 
    > ⚠️ Your `<base>` is <behind> commit(s) behind `origin/<base>` — this dashboard shows your
-   > local copy. Run `git pull` on `<base>` to see your teammates' latest work, then re-run
+   > local copy. Run `git checkout <base> && git pull --ff-only origin <base>` to see your teammates' latest work, then re-run
    > `/peak-workflow:status`.
 
 Do not pull — this command stays read-only.
@@ -150,11 +150,12 @@ A teammate's merged plan is otherwise indistinguishable from your own. Show what
 commands — inline `$(git config user.name)` wherever a command needs it, and compare author names
 exactly (`--author` is a substring match, so filter its output by exact `%an`).
 
-1. Find the starting point `<since>`: the user's own last commit on `<base>`,
-   `git log -1 --format=%H --author="$(git config user.name)" <base>` (keep it only if its `%an` is
-   exactly `me`). If there is none, fall back to the last commit before a 14-day window,
-   `git rev-list -1 --before="14 days ago" <base>`, and label the panel "in the last 14 days"
-   instead of "since your last commit". If that is also empty, skip this step and omit the panel.
+1. Find the starting point `<since>`: the user's own last commit on `<base>` — list
+   `git log --format='%H|%an' --author="$(git config user.name)" <base>` and take the first row
+   whose `%an` is exactly `me` (`--author` also matches longer names). If there is none, fall back
+   to the last commit before a 14-day window, `git rev-list -1 --before="14 days ago" <base>`, and
+   label the panel "in the last 14 days" instead of "since your last commit". If the repository is
+   younger than that, use its root commit: `git rev-list --max-parents=0 <base> | tail -1`.
 2. List the planning commits since then, dropping rows whose `%an` is `me`:
    `git log --format='%h|%an|%ad|%s' --date=short <since>..<base> -- docs/implementation-plan docs/requirements`
 3. Classify what changed: `git diff --name-status <since> <base> -- docs/implementation-plan/`.
