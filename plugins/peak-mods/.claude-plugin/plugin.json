@@ -1,0 +1,27 @@
+{
+  "name": "peak-mods",
+  "version": "0.1.0",
+  "description": "A bundle of Claude Code mods (hooks-module plugins). Includes file-tree: an Explorer-style pane over the working directory with a read-only file viewer (/files).",
+  "author": { "name": "Todd Schavey" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enableFileTree": {
+      "type": "boolean",
+      "title": "Enable file-tree",
+      "description": "Turns on the file-tree mod and its /files command.",
+      "default": true
+    },
+    "fileTreeAutoOpen": {
+      "type": "boolean",
+      "title": "file-tree: open at session start",
+      "description": "Opens the Files pane when a session starts, where the terminal is wide enough to dock it as a sidebar.",
+      "default": false
+    },
+    "fileTreeIgnore": {
+      "type": "string",
+      "title": "file-tree: hidden names",
+      "description": "Comma-separated file and folder names the tree hides.",
+      "default": ".git,node_modules,.DS_Store"
+    }
+  }
+}
