@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Claude Code plugins by PeakFlames",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "plugins": [
     {
@@ -18,6 +18,11 @@
       "name": "peak-workflow",
       "description": "Requirements-driven development workflow in the spirit of DO-330 TQL-5. Formal Gherkin-style TOR requirements (TOR-NN-XXXXXXX) serve as the single source of truth — epics implement requirements, tests are derived from Given/When/Then, and wrapup verifies against the requirements baseline. Covers the full lifecycle: discovery, requirements capture, planning, implementation, requirements-based verification, and documentation refresh.",
       "source": "./plugins/peak-workflow"
+    },
+    {
+      "name": "peak-mods",
+      "description": "A bundle of Claude Code mods (hooks-module plugins). First mod: file-tree, an Explorer-style pane over the working directory with a read-only file viewer (/files).",
+      "source": "./plugins/peak-mods"
     }
   ]
 }
