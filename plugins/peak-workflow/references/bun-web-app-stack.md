@@ -53,7 +53,7 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 ┌─────────────────────────────────────────────────────────────┐
 │ S3-compatible object storage                                │
 │   prod:  AWS S3 (or R2 / B2 / Tigris)                        │
-│   local: MinIO via docker compose                            │
+│   local: RustFS via docker compose                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -85,8 +85,8 @@ Unlike the desktop sheet, Bun **is** the runtime here. That unlocks `bun:sqlite`
 | Routing | TanStack Router (browser history) | Type-safe, code-split routes. Hono falls back to `index.html`. |
 | Database | Drizzle ORM + drizzle-kit, driver `bun:sqlite` | Synchronous, zero dependencies, ideal for a single container. |
 | Migrations | drizzle-kit `generate`, Drizzle `migrate()` at boot | SQL committed to the repo and copied into the image. |
-| Object storage | `Bun.S3Client` | Built into Bun. Works with AWS S3 and MinIO via `endpoint`. Presigned URLs included. |
-| Local S3 | MinIO in docker compose | Same API, same code path, no mocks. |
+| Object storage | `Bun.S3Client` | Built into Bun. Works with AWS S3 and local S3 (RustFS) via `endpoint`. Presigned URLs included. |
+| Local S3 | RustFS in docker compose | Same API, same code path, no mocks. |
 | Validation | Zod | Shared schemas for API input, env vars and config. |
 | Config | Environment variables parsed by Zod in `env.ts`, documented in `.env.example` | Every environment difference is a variable; a bad one crashes at boot, not an hour later. |
 | Secrets | Runtime environment variables; `.env` gitignored, never baked into the image | The server holds keys the browser must never see — auth secret, provider client secrets, email API key, storage credentials, a product API key. |
@@ -118,7 +118,7 @@ listed stays.
 |---|---|---|---|---|---|---|
 | **Auth** (Q2) | `apps/api/src/auth.ts`, `apps/api/src/routes/users.ts`, `packages/core/src/access.ts`, `apps/web/src/auth-client.ts`, `tests/setup/auth.ts` | 4.1 `better-auth`; 4.2 `BETTER_AUTH_SECRET` and `GOOGLE_WORKSPACE_DOMAIN`; 4.4 `"/auth"` proxy entry; 4.8 `# Auth` block, including the `GOOGLE_*`/`MICROSOFT_*` lines; 5.1 `BETTER_AUTH_SECRET`, the `GOOGLE_*`/`MICROSOFT_*` lines and `superRefine` | 5.2 Better Auth tables and `userId` columns; `userId` segment of `attachmentKey` (5.4); 6.1 `./auth` and `ROLES` imports, `users` import and `.route("/users", …)`, `/auth/*` handler, `/api` session middleware, `userId`/`role` in `Variables`; 6.3; 6.8; 7.6; `can()` calls, actors and `userId` filters (6.4, 6.5, 6.6) | 9 Access rule, Role change, Unverified sign-up and Organization address squatting rows; `signInForTest`, `json` helper, access-rule, create-refused, role-change, unverified sign-up and squatting tests; E2E sign-in steps | Access rule bypass; Create skips the access rule; Derived data leaks other people's rows; No role change path; Role names scattered; Account takeover through provider linking; Organization address squatting; Org role from user input; Org-only admits any Google account; Provider-written fields editable; Post-login blank page in dev; Provider secrets required everywhere; Auth tables drift; Session cookie cross-origin in dev | Routes are public; keep `/healthz`, `/version` as-is. Email delivery is also `N/A` |
 | **Email delivery** (Q2 — no public password sign-up: Auth `N/A`, Google `org-only`, or every account comes from the named provider) | `apps/api/src/mail.ts` | 4.2 `EMAIL_DELIVERY` line; 4.8 `# Email` block; 5.1 the `EMAIL_*` lines and their `superRefine` check | 6.3 `./mail` import, `requireEmailVerification`, `revokeSessionsOnPasswordReset`, `sendResetPassword`, the `emailVerification` block, the `EMAIL_NOT_VERIFIED` entry, the "or use Forgot password" clause and the `hooks.before` reset branches; 7.6 sign-up `callbackURL` note and the forgot/reset-password lines | 9 Unverified sign-up row and test (keep its `releaseUnverifiedEmail` half when Google is on); the reset clauses of the squatting row and test; `outbox` import, `lastLinkTo`, `mailsTo` and the verification lines in `signInForTest`; "verification link" in the E2E row | Email never delivered; the verification clause of Account takeover through provider linking | Production sets `emailAndPassword.disableSignUp: process.env.NODE_ENV === "production"` (org-only already does, 6.3), so no stranger registers a password account to verify |
-| **Object storage** + **Local S3** (Q3) | `packages/core/src/storage/`, `apps/api/src/routes/attachments.ts`; "+ minio" in the `docker-compose.yml` comment | 4.2 the four `S3_*` lines; 4.8 `# S3` block, including its host-dev `S3_ENDPOINT` comment; 5.1 every `S3_*` | 5.2 `attachments` table; 5.4; 5.5 `"attachment"` in `Resource` and every `attachment` grant; 6.1 `attachments` import and `.route("/attachments", …)`; 6.4; 7.3 | 8.2 `minio`, `minio-init`, the app's `S3_*` environment lines and `depends_on`, `miniodata` volume, both notes under 8.2; 9 S3 wrapper row, `slot` and the upload-slot test, "upload" in the E2E row; 10 `docker compose up -d minio minio-init` — the create-refused test moves to the project's first create route | Bulk uploads through the app; Trusting client-reported size; Orphaned S3 objects; Presigned URL host mismatch locally; Missing CORS on bucket; Unsafe object keys; Content type allowlist | **Backups:** the host scheduler runs `sqlite3 <data-volume>/app.db ".backup <backup-volume>/app-<date>.db"` into a mounted backup volume (not S3) |
+| **Object storage** + **Local S3** (Q3) | `packages/core/src/storage/`, `apps/api/src/routes/attachments.ts`; "+ local S3 (RustFS)" in the `docker-compose.yml` comment | 4.2 the four `S3_*` lines; 4.8 `# S3` block, including its host-dev `S3_ENDPOINT` comment; 5.1 every `S3_*` | 5.2 `attachments` table; 5.4; 5.5 `"attachment"` in `Resource` and every `attachment` grant; 6.1 `attachments` import and `.route("/attachments", …)`; 6.4; 7.3 | 8.2 `s3`, `s3-init`, the app's `S3_*` environment lines and `depends_on`, `s3data` volume, every note under 8.2; 9 S3 wrapper row, `slot` and the upload-slot test, "upload" in the E2E row; 10 `docker compose up -d s3 s3-init` — the create-refused test moves to the project's first create route | Bulk uploads through the app; Trusting client-reported size; Orphaned S3 objects; Presigned URL host mismatch locally; Missing CORS on bucket; Unsafe object keys; Content type allowlist | **Backups:** the host scheduler runs `sqlite3 <data-volume>/app.db ".backup <backup-volume>/app-<date>.db"` into a mounted backup volume (not S3) |
 | **Live updates** (Q4) | `packages/core/src/events.ts`, `apps/api/src/routes/events.ts`, `apps/web/src/queries/live-updates.ts` | 4.2 `FakeEventSource` and its assignment in `tests/setup/happy-dom.ts` | 6.1 `events` import and `.route("/events", …)`; 6.7; `publish` import and calls (6.6); 7.5 | 9 Live updates row; "live updates" in the E2E row | Live updates on one process; SSE dropped by idle timeout (only when Per-request streaming is also `N/A`) | TanStack Query refetch on window focus; `idleTimeout` may stay |
 | **Per-request streaming** (no shape question — `N/A — no streamed responses`) | `apps/api/src/routes/messages.ts`, `packages/core/src/services/assistant.ts` | — | 5.2 `messages` table and the `attachments.messageId` column that references it; 6.1 `messages` import and `.route("/messages", …)`; 6.5; 7.4 | "streaming" in the 9 E2E row | Abandoned streams waste model calls; SSE dropped by idle timeout (only when Live updates is also `N/A`) | The response is returned whole by a normal route |
 | **Secrets** (Q5 — reachable only when Auth and Object storage are also N/A) | — | Nothing further: those rows already removed every secret | — | — | — | `.env` stays gitignored (it still holds config); the deploy needs no secret store |
@@ -139,7 +139,7 @@ my-app/
 ├── playwright.config.ts
 ├── drizzle/                       # generated SQL migrations (committed)
 ├── Dockerfile
-├── docker-compose.yml             # app + minio for local
+├── docker-compose.yml             # app + local S3 (RustFS)
 ├── .env.example
 ├── packages/
 │   └── core/
@@ -350,8 +350,8 @@ process.env.DATABASE_PATH = ":memory:";
 process.env.EMAIL_DELIVERY = "log"; // no mail provider: signInForTest reads the link from the outbox (9)
 process.env.S3_BUCKET ??= "test-bucket";
 process.env.S3_ENDPOINT ??= "http://localhost:9000";
-process.env.S3_ACCESS_KEY_ID ??= "minioadmin";
-process.env.S3_SECRET_ACCESS_KEY ??= "minioadmin";
+process.env.S3_ACCESS_KEY_ID ??= "localdev";
+process.env.S3_SECRET_ACCESS_KEY ??= "localdevsecret";
 process.env.BETTER_AUTH_SECRET ??= "test-secret-at-least-32-characters-long";
 process.env.APP_URL ??= "http://localhost:3000";
 ```
@@ -593,13 +593,13 @@ EMAIL_DELIVERY=log
 # EMAIL_API_KEY=
 # EMAIL_FROM="My App <no-reply@example.com>"
 
-# S3 (local: MinIO; prod: leave S3_ENDPOINT empty for AWS)
-# Host dev (`bun run dev`, outside compose): use S3_ENDPOINT=http://localhost:9000 — `minio` resolves only inside compose.
+# S3 (local: RustFS; prod: leave S3_ENDPOINT empty for AWS)
+# Host dev (`bun run dev`, outside compose): use S3_ENDPOINT=http://localhost:9000 — `s3` resolves only inside compose.
 S3_BUCKET=attachments
 S3_REGION=us-east-1
-S3_ENDPOINT=http://minio:9000
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
+S3_ENDPOINT=http://s3:9000
+S3_ACCESS_KEY_ID=localdev
+S3_SECRET_ACCESS_KEY=localdevsecret
 S3_FORCE_PATH_STYLE=true
 ```
 
@@ -967,7 +967,7 @@ export function deleteObject(key: string) {
 }
 ```
 
-One code path for AWS and MinIO. The only difference is `S3_ENDPOINT` and path style.
+One code path for AWS and local S3. The only difference is `S3_ENDPOINT` and path style.
 
 ### 5.5 `packages/core/src/access.ts` — the one access rule
 
@@ -1945,51 +1945,60 @@ services:
     env_file: .env
     environment:
       DATABASE_PATH: /data/app.db
-      S3_ENDPOINT: http://minio:9000
+      S3_ENDPOINT: http://s3:9000
       S3_FORCE_PATH_STYLE: "true"
     volumes:
       - appdata:/data
     depends_on:
-      minio-init:
+      s3-init:
         condition: service_completed_successfully
 
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
+  s3:
+    image: rustfs/rustfs:1.0.3          # pin a plain numbered tag; never latest, -preview or -glibc
     ports: ["9000:9000", "9001:9001"]
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      RUSTFS_ACCESS_KEY: localdev
+      RUSTFS_SECRET_KEY: localdevsecret
+      RUSTFS_CONSOLE_ENABLE: "true"
     volumes:
-      - miniodata:/data
+      - s3data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
       interval: 5s
       retries: 10
 
-  minio-init:
-    image: minio/mc
+  s3-init:
+    image: amazon/aws-cli:2.31.0
     depends_on:
-      minio:
+      s3:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin &&
-      mc mb --ignore-existing local/attachments &&
-      mc anonymous set none local/attachments &&
-      mc admin config set local api cors_allow_origin='http://localhost:3000,http://localhost:5173' || true
-      "
+    environment:
+      AWS_ACCESS_KEY_ID: localdev
+      AWS_SECRET_ACCESS_KEY: localdevsecret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        aws --endpoint-url http://s3:9000 s3api create-bucket --bucket attachments || true
+        aws --endpoint-url http://s3:9000 s3api put-bucket-cors --bucket attachments --cors-configuration '{"CORSRules":[{"AllowedOrigins":["http://localhost:3000","http://localhost:5173"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3000}]}'
 
 volumes:
   appdata:
-  miniodata:
+  s3data:
 ```
 
-Browser uploads go straight to MinIO on `localhost:9000`, so the bucket needs CORS for the
-app origins. On AWS, set the equivalent CORS rule on the bucket once.
+Local S3 is RustFS (Apache-2.0). Buckets are private by default, so `s3-init` only creates the
+bucket and sets CORS.
 
-**Presigned URL host mismatch:** the server signs with `http://minio:9000` (the compose hostname),
-but the browser cannot resolve `minio`. Either add `127.0.0.1 minio` to `/etc/hosts` locally, or
+Browser uploads go straight to local S3 on `localhost:9000`, so the bucket needs CORS for the
+app origins. On AWS, run the same `put-bucket-cors` rule against the bucket once.
+
+**Bind mounts:** RustFS runs as UID 10001. The named `s3data` volume works as-is; a bind-mounted
+host directory must be writable by that user.
+
+**Presigned URL host mismatch:** the server signs with `http://s3:9000` (the compose hostname),
+but the browser cannot resolve `s3`. Either add `127.0.0.1 s3` to `/etc/hosts` locally, or
 set a separate `S3_PUBLIC_ENDPOINT=http://localhost:9000` and use a second `S3Client` for
 presigning. The second option is cleaner and is what `presignUpload` should use.
 
@@ -2006,7 +2015,7 @@ presigning. The second option is cleaner and is what `presignUpload` should use.
 | Unverified sign-up | `bun test` + `app.request()` | A password sign-up gets no session: sign-in is 403 `EMAIL_NOT_VERIFIED` and emails a fresh link, `/api` is 401. Resend verification link sends a link that verifies. A repeat sign-up emails the owner; a password reset verifies the account and replaces the password. Google provider only: `releaseUnverifiedEmail` removes the row and its credential, so a Google sign-in for that address starts a fresh account. |
 | Organization address squatting | `bun test` + `app.request()` (Google provider only) | At `GOOGLE_WORKSPACE_DOMAIN` or a subdomain, existing address or not: password sign-up and sign-in are refused with `USE_GOOGLE_SIGN_IN` (400); a reset request sends no mail and answers exactly as for an unknown address; a reset token for such an account is refused and creates no password. |
 | Live updates | `bun test` on `events.ts`; E2E with two browser contexts | A change in one context appears in the other without a reload. |
-| S3 wrapper | `bun test` against MinIO from compose | Real client, real bucket. Skip with `test.skipIf(!process.env.MINIO_UP)` in CI without Docker. |
+| S3 wrapper | `bun test` against RustFS from compose | Real client, real bucket. Skip with `test.skipIf(!process.env.S3_UP)` in CI without Docker. |
 | React components | `bun test` + happy-dom + Testing Library | Preloaded via `bunfig.toml` on origin `http://localhost:3000`; `EventSource` is `FakeEventSource` — import it from `tests/setup/happy-dom.ts` and drive it with `FakeEventSource.instances[0]?.emit("change", …)` (4.2). |
 | E2E | Playwright against `docker compose up` | Needs Docker running and a `.env` copied from `.env.example`. Exercises email/password auth (the verification link read from `docker compose logs app`, log mode), upload, streaming, live updates and the served SPA. |
 
@@ -2264,7 +2273,7 @@ bun --version                            # must be 1.2+; `bun upgrade` if the ma
 cp .env.example .env
 bun install
 bunx playwright install chromium         # one time, right after `bun install`
-docker compose up -d minio minio-init   # local S3 only
+docker compose up -d s3 s3-init         # local S3 only
 bun run dev                              # api on :3000 (--hot), web on :5173 with proxy
 bun run dev:api:pretty                   # api alone, human-readable logs
 bun run db:generate                      # after schema changes; commit drizzle/*.sql
@@ -2295,7 +2304,7 @@ Each of these is already handled by the configuration above.
 | Bulk uploads through the app | Server memory and bandwidth become the bottleneck. | Presigned PUT/GET, server handles metadata only (5.4, 6.4). |
 | Trusting client-reported size | Client lies about `size`, quota bypass. | `complete` step verifies with `s3.stat` (6.4). |
 | Orphaned S3 objects | Client gets a slot but never PUTs. | `status: pending` rows; a cron deletes pending rows and objects older than 24 h. |
-| Presigned URL host mismatch locally | Browser cannot reach `minio:9000`. | `S3_PUBLIC_ENDPOINT` with a separate presigning client (8.2). |
+| Presigned URL host mismatch locally | Browser cannot reach `s3:9000`. | `S3_PUBLIC_ENDPOINT` with a separate presigning client (8.2). |
 | Missing CORS on bucket | Browser PUT to S3 blocked. | `mc admin config set ... cors_allow_origin` locally; bucket CORS rule in AWS (8.2). |
 | Unsafe object keys | Path traversal or collisions from user filenames. | Sanitized key under `users/<id>/attachments/<uuid>/` (5.4). |
 | Content type allowlist | Executable or HTML uploads served from your origin. | Zod enum of allowed MIME types; bucket is private (6.4). |
@@ -2359,6 +2368,6 @@ When a single container stops being enough, change one layer at a time:
 | tRPC instead of Hono RPC | Equivalent type safety. Hono RPC has fewer moving parts and no separate router runtime. |
 | Postgres from day one | Correct if you already know you need multiple containers. Otherwise SQLite in WAL mode on a volume is simpler and fast. |
 | AWS SDK v3 instead of `Bun.S3Client` | Needed only for features Bun lacks, such as multipart lifecycle rules or bucket administration. Bun's client covers presign, put, get, stat, delete, and streaming. |
-| LocalStack instead of MinIO | Heavier, slower start. MinIO is enough for S3 semantics. |
+| LocalStack instead of RustFS | Heavier, slower start. RustFS is enough for S3 semantics. |
 | Vitest | Fine, but a second test runner. `bun test` covers unit, API and component tests. |
 | Lucia / Auth.js | Lucia is deprecated as a library; Auth.js is Next-centric. Better Auth is framework-agnostic with a Drizzle adapter. |
