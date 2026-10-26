@@ -136,7 +136,7 @@ class HelperFlagTests(unittest.TestCase):
         for args in (("migrate", "scan"), ("check",), ("states",)):
             result = self.repo.cli(*args)
             self.assertEqual(result.returncode, 2, args)
-            self.assertIn("line 4: `owner:` appears twice (also line 2)", result.stderr)
+            self.assertIn("line 4: `owner:` appears twice (also line 2); delete line 2 (`owner: —`) and keep `owner: Dev Two`", result.stderr)
 
     def test_sidecar_keys_and_finish(self):
         self.repo.sidecar("aEpic01", status="Complete", requirements=["TOR-01-Aaa0001"],

@@ -156,6 +156,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `Modified` and `Removed` changelog rows are mandatory when a capability changes; `Pending`
   rows carry undecided changes.
 
+- **Pre-3.0 edits flagged for a decision** — a requirement changed since verified whose edit only a
+  migration reword explains lists `historical_records`; `check` and `status` ask whether its
+  meaning changed before suggesting reverify.
+- **Duplicate sidecar keys rejected** — a key written twice (e.g. two `owner:` lines after a clean
+  merge) is a data error naming both lines.
+- **`capture-requirements <TOR-ID>` on a disputed, edited requirement** — four options (no Uphold
+  over an unrecorded edit); a supersede or reword asks whether it settles the dispute and carries it
+  to the successor when not. Greenfield context checks are skipped in this mode.
 - **`/upgrade` reaches format 2** — this build ships every step `PLUGIN_FORMAT` needs, so a behind
   project is always upgradable; the interim "later build" messages and `format`'s `upgradable:`
   line are gone. A step may commit per phase and add a Report to the final message.

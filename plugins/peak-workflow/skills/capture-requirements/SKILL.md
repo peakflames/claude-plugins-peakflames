@@ -1025,7 +1025,8 @@ epic's spec or sidecar to make a finding go away.
 
 ## Step 5: Quality Checks
 
-Before presenting the summary, verify:
+Before presenting the summary, verify (in TOR-ID mode only the ID-format, Lifecycle Rules,
+tracing-sidecar, and `validate` / `check` items apply — nothing new was derived):
 
 - [ ] Every TOR ID follows the format `TOR-{NN}-{XXXXXXX}` where `{NN}` matches the feature
   file's numeric prefix.
