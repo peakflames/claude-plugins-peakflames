@@ -14,6 +14,7 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 |--------|-------------|
 | [peak-workflow](plugins/peak-workflow/) ⭐ | Requirements-driven development lifecycle — formal Gherkin TOR requirements serve as the single source of truth for acceptance criteria, test derivation, and verification |
 | [epic-workflow](plugins/epic-workflow/) | Structured epic-based project lifecycle — discovery, planning, implementation, and verification using prose acceptance criteria |
+| [peak-mods](plugins/peak-mods/) | A bundle of Claude Code mods (interface add-ons). First mod: `file-tree`, an Explorer-style Files pane with a read-only viewer (`/files`) |
 
 ## Installation
 
@@ -34,6 +35,7 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 For full documentation, see each plugin's README:
 - [peak-workflow/README.md](plugins/peak-workflow/README.md)
 - [epic-workflow/README.md](plugins/epic-workflow/README.md)
+- [peak-mods/README.md](plugins/peak-mods/README.md)
 
 ## Scripts
 
