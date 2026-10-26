@@ -96,7 +96,6 @@ class FormatGuardTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("verdict: behind", result.stdout)
         self.assertIn("project: 0 (no stamp)", result.stdout)
-        self.assertIn("upgradable: yes", result.stdout)
         self.assertIn("/peak-workflow:upgrade", result.stdout)
 
     def test_current_behind_ahead(self):
@@ -109,24 +108,15 @@ class FormatGuardTests(unittest.TestCase):
         self.assertEqual((code, verdict), (1, "ahead"))
         self.assertIn("Update the plugin", self.repo.cli("format").stdout)
 
-    def test_behind_past_the_shipped_steps_is_not_upgradable(self):
+    def test_shipped_steps_reach_the_plugin_format(self):
+        # Forward-only steps: a released build ships one per format up to PLUGIN_FORMAT, so a
+        # project that is behind can always be upgraded by this build.
         steps = self.repo.root / "steps"
         steps.mkdir()
         (steps / "0001-epic-provenance.md").write_text("x")
         (steps / "README.txt").write_text("x")
         self.assertEqual(tl.shipped_format(steps), 1)
-        self.repo.stamp(0)
-        self.assertTrue(tl.format_status(self.repo.root, steps).upgradable)
-        self.repo.stamp(1)
-        st = tl.format_status(self.repo.root, steps)
-        self.assertEqual((st.verdict, st.upgradable), ("behind", False))
-        self.assertIn("ships upgrade steps only up to format 1", st.message)
-        self.assertNotIn("/peak-workflow:upgrade", st.message)
-
-    def test_shipped_steps_reach_the_plugin_format(self):
-        # Forward-only steps: a released build ships one per format up to PLUGIN_FORMAT.
-        self.assertGreaterEqual(tl.shipped_format(), 1)
-        self.assertLessEqual(tl.shipped_format(), tl.PLUGIN_FORMAT)
+        self.assertEqual(tl.shipped_format(), tl.PLUGIN_FORMAT)
 
     def test_single_index_layout_is_not_peak_workflow(self):
         self.repo.write("docs/implementation-plan/index.md",
