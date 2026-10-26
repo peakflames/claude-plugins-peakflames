@@ -165,8 +165,10 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    verified` or `Verification failed` (and Disputed rows whose `underlying_state` is one of them)
    by `epic`. One group per Complete epic: its `<id> (<slug>) — <Name>`, each requirement as
    `TOR-… — <title>`, and the command `/peak-workflow:wrapup-epic <id> reverify`. A Verification
-   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`". A Changed since
-   verified requirement that also has an A finding (edited without a record) adds "decide first
+   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`" — unless it is
+   Disputed, which adds "known to be wrong (<CR-ID>): decide with
+   `/peak-workflow:capture-requirements <TOR>` first" instead. A requirement in
+   this group (either state) that also has an A finding (edited without a record) adds "decide first
    whether its meaning changed: `/peak-workflow:capture-requirements <TOR>`" — reverify alone
    would ratify an unrecorded edit. The epic stays
    Complete — the Phase Progress and Overall Progress counts do not change.

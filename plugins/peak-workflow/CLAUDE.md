@@ -21,7 +21,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `add` | Add new epic(s) referencing existing TOR IDs |
 | `triage` | Route incoming request → HEAVY / AMEND / EPIC / TRIVIAL |
 | `start-epic` | Implement an epic — TOR-driven plan + tasks + verification; settles superseded or retired anchors; owner-approved in-epic amendment (supersede) |
-| `wrapup-epic` | Independent TOR verification, complete, ship |
+| `wrapup-epic` | Independent TOR verification, complete, ship; owner-approved amend or record-as-pending at Step 1.4b; `reverify` mode re-checks a Complete epic's stale requirements |
 | `pause` | Save progress mid-epic |
 | `status` | Read-only dashboard — phase progress + Requirements Coverage |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |

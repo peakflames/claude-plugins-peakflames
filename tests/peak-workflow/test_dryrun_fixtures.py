@@ -93,5 +93,40 @@ class Plan6FixtureTests(unittest.TestCase):
         self.assertEqual(run(self.root, "validate").returncode, 0)
 
 
+class Plan7FixtureTests(unittest.TestCase):
+    """The Plan 7 fixture: Implemented epics on feature branches and stale Complete-epic requirements."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan7-"))
+        cls.root = cls.tmp / "fx"
+        subprocess.run([sys.executable, str(BUILDER.with_name("plan7_wrapup.py")), str(cls.root)],
+                       check=True, capture_output=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def git(self, *args):
+        subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
+
+    def test_wrapup_and_reverify_cases(self):
+        self.git("checkout", "-q", "develop")
+        rows = {r["tor"]: r for r in json.loads(run(self.root, "states", "--json").stdout)["requirements"]}
+        self.assertEqual((rows["TOR-02-Page010"]["state"], rows["TOR-02-Page010"]["epic"]), ("Changed since verified", "aSkel01"))
+        self.assertEqual((rows["TOR-02-Mail001"]["state"], rows["TOR-02-Mail001"]["epic"]), ("Verification failed", "bShip02"))
+        self.assertEqual((rows["TOR-03-Csv0002"]["state"], rows["TOR-03-Csv0002"]["epic"]), ("Changed since verified", "bShip02"))
+        findings = json.loads(run(self.root, "check", "--json").stdout)["findings"]
+        self.assertNotIn(("A", "TOR-03-Csv0002"), {(f["letter"], f.get("tor")) for f in findings})
+        self.assertIn(("A", "TOR-02-Page010"), {(f["letter"], f.get("tor")) for f in findings})
+        for branch in ("nGft13-gift-messages", "qDsc15-discount-rounding", "rPrv16-email-footer",
+                       "hRmXls7-remove-excel-export"):
+            self.git("checkout", "-q", f"feature/epic-{branch}")
+            check = json.loads(run(self.root, "check", "--base", "develop", "--json").stdout)
+            self.assertEqual(check["blocking"], 0, branch)
+        self.assertEqual(run(self.root, "sweep", "TOR-03-Xls0001").returncode, 1)
+        self.git("checkout", "-q", "develop")
+
+
 if __name__ == "__main__":
     unittest.main()

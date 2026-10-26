@@ -949,7 +949,8 @@ def run_check(project: Project, base: str | None = None) -> dict:
                                     epic=sc.epic, path=f"{STATUS_DIR}/epic-{sc.epic}.md",
                                     own_branch=bool(start) and bad not in start.sidecar_texts.get(sc.epic, "")))
 
-    # D — changed since verified.
+    # D — changed since verified. With an A finding too, reverify would ratify the unrecorded edit.
+    edited = {f.tor for f in findings if f.letter == "A"}
     for sc in p.sidecars.values():
         if sc.status != "Complete":
             continue
@@ -957,8 +958,9 @@ def run_check(project: Project, base: str | None = None) -> dict:
             req = p.live.get(tor)
             if req and saved != req.fingerprint and p.reword_chain(tor, saved, req.fingerprint, True) is None:
                 then = start.live.get(tor) if start else None
-                findings.append(Finding("D", f"{tor} changed after epic {sc.epic} verified it. Re-check "
-                                        f"it: /peak-workflow:wrapup-epic {sc.epic} reverify", tor=tor,
+                nxt = (f"Decide first whether its meaning changed: /peak-workflow:capture-requirements {tor}"
+                       if tor in edited else f"Re-check it: /peak-workflow:wrapup-epic {sc.epic} reverify")
+                findings.append(Finding("D", f"{tor} changed after epic {sc.epic} verified it. {nxt}", tor=tor,
                                         epic=sc.epic, own_branch=bool(then) and then.fingerprint != req.fingerprint,
                                         detail={"verified_fingerprint": saved, "fingerprint": req.fingerprint}))
 
@@ -995,7 +997,10 @@ def housekeeping(p: Project) -> list[Finding]:
         if info:
             due = "overdue" if info["overdue"] else f"due after {info['threshold_days']} days"
             safety = "; a Safety requirement blocks immediately" if info["safety"] else ""
-            out.append(Finding("F", f"{tor} is known to be wrong and still marked done "
+            done = [s for s in p.owners(tor) if s.status == "Complete"]
+            how = (" and failed verification" if any(tor in s.unverified for s in done)
+                   else " and still marked done" if done else "")
+            out.append(Finding("F", f"{tor} is known to be wrong{how} "
                                f"({info['record']}, {info['age_days']} days old, {due}{safety}). Next "
                                f"step: /peak-workflow:capture-requirements {tor}", tor=tor,
                                kind="disputed", detail=info))
@@ -1887,11 +1892,11 @@ def build_parser() -> argparse.ArgumentParser:
     mk = sub.add_parser("mark", help="record verification results in an epic's sidecar (verified:, unverified:, "
                                      "reverified:, requirements: append)")
     mk.add_argument("epic", help="epic ID (docs/implementation-plan/status/epic-<id>.md)")
-    mk.add_argument("--pass", dest="passes", action="append", default=[], metavar="TOR",
+    mk.add_argument("--pass", dest="passes", action="extend", nargs="+", default=[], metavar="TOR",
                     help="write a verified: line with the current fingerprint (drops its unverified: line)")
     mk.add_argument("--fail", action="append", nargs=2, default=[], metavar=("TOR", "REASON"),
                     help="write an unverified: line dated today (drops its verified: line)")
-    mk.add_argument("--append", action="append", default=[], metavar="TOR",
+    mk.add_argument("--append", action="extend", nargs="+", default=[], metavar="TOR",
                     help="add a live requirement to requirements: (never removes one)")
     mk.add_argument("--reverified", action="store_true", help="set reverified: to today")
     mk.add_argument("--today", help=argparse.SUPPRESS)
