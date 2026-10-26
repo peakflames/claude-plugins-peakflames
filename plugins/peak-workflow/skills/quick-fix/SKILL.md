@@ -79,7 +79,7 @@ Follow these steps exactly:
      On **Amend**, run the decision test as `capture-requirements` states it once
      (`${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/SKILL.md`, "Lifecycle Rules", L3) on the current block vs the proposed one: **reword-eligible** → the
      amendment is a **reword**; **meaning change** → a **supersede**. For a supersede, generate the
-     successor ID now, in the same feature number — generate the 7-character suffix with `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7` and regenerate it while it is all digits or `git grep -q <suffix>` finds it anywhere (feature files and `docs/requirements/changes/` included) — so the plan's tests cite it from the
+     successor ID now, in the same feature number — generate the 7-character suffix with `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7` and regenerate it while it is all digits or `git grep --untracked -q <suffix>` finds it anywhere (feature files and `docs/requirements/changes/` included) — so the plan's tests cite it from the
      start.
      Carry the result into the plan (Step 4 items 2a and 5a).
 

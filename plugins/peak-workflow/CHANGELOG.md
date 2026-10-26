@@ -67,6 +67,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`quick-fix` amendment path** — one owner-approved, non-Safety requirement change ships with the
   fix: a reword with test evidence, or a supersede whose successor joins the owning Complete epic
   and is verified on the same branch by a fresh sub-agent.
+- **`/peak-workflow:wrapup-epic <id> reverify [TOR-…]`** — re-checks a Complete epic's stale or
+  failed requirements on `hotfix/verify-epic-<id>-<name>`: Step 1.2 plus the Tests gate, `verified:`
+  or `unverified:` lines via `mark`, a dated reverified handoff, shipped like a quick-fix.
+- **Wrapup amend and record as pending** — for a FAIL where the requirement is wrong, Step 1.4b
+  supersedes it with an owner-approved Change Record (`AMENDED AT WRAPUP`) or writes a `pending`
+  record, replacing the silent Defer. Never for Safety.
+- **Wrapup Removal gate** — a removal epic passes only with zero `sweep` hits for its retired IDs,
+  the named code gone, and its guard requirements passing.
 
 ### Changed
 
@@ -118,6 +126,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`quick-fix` runs `check --base` before committing** — blocks on unrecorded changes, removals,
   or dangling IDs the branch introduced, with a fix offer; refuses to ship a branch touching a
   Disputed Safety requirement.
+- **`wrapup-epic` checks requirements first** — Step 1.1 runs `check --base` and blocks on
+  unrecorded changes, removals, or dangling IDs the branch introduced (Restore / Amend / Stop),
+  and again before shipping.
+- **Disputed block at wrapup** — an epic touching an overdue Disputed requirement is resolved on
+  the branch, renewed, or stopped; a Disputed Safety requirement blocks with no renewal. Under the
+  threshold it is listed in the report and PR body.
+- **Wrapup anchors** — a superseded or retired anchor is a FAIL whose Fix now replaces it with the
+  successor or drops it; the title-mismatch prompt and grandfather clause are gone; no anchors
+  stops with "re-plan it with /add".
+- **Wrapup records fingerprints** — Step 2.2 writes one `verified:` line per PASS via `mark`.
+  Report, handoff, and PR body gain a title column (from `titles`) and a Requirement changes section.
+- **`triage` routes an Implemented epic's requirement change to wrapup** — quick-fix's amendment
+  path covers Complete epics only.
 - **`discover` writes current-state documents** — vision and ConOps are rewritten to the present;
   `Modified` and `Removed` changelog rows are mandatory when a capability changes; `Pending`
   rows carry undecided changes.
