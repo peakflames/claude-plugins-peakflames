@@ -122,7 +122,7 @@ That routes to **deferred mode**, and the candidate must not be discarded:
 | 3.17 | Logging is **Pino, structured JSON to stdout**, `LOG_LEVEL`, configured in `apps/api/src/logger.ts`; the startup record is JSON (`{"level":30,"msg":"shiftboard v0.1.0 starting",…}`), not `[INFO]` text | check the example's form |
 | 3.18 | Exit code + stdout/stderr rows `N/A — not a CLI` | marked |
 | 3.19 | `## UX Baseline` present with bold line labels intact; `## Security Baseline` reflects sign-in | present |
-| 3.20 | Local Environment names `bun run dev` (API `:3000`, web `:5173` proxy), `bun run test`, `bun run test:e2e` **naming Docker and `.env` copied from `.env.example`** | present. With Object storage N/A there should be **no** `docker compose up -d minio minio-init` step |
+| 3.20 | Local Environment names `bun run dev` (API `:3000`, web `:5173` proxy), `bun run test`, `bun run test:e2e` **naming Docker and `.env` copied from `.env.example`** | present. With Object storage N/A there should be **no** `docker compose up -d s3 s3-init` step |
 | 3.21 | Hosting recorded as chosen with the user, not picked silently | it costs money |
 | 3.22 | First commit made | `git show --stat HEAD` |
 | 3.22a | **`develop` created and checked out**; `main` holds the setup commit | `git branch` shows `* develop` and `main` |
@@ -281,7 +281,7 @@ Two things are being tested here: the skeleton builds **real** auth now, and the
 | 7.7 | A **role field** carrying the names `CLAUDE.md` records, substituted into the sheet's **single roles constant** and nowhere else | scattered role strings are a finding |
 | 7.8 | **No OAuth/provider setup checklist** in the skeleton plan | correct — there is no provider to configure. A Google/Okta console checklist here is a finding |
 | 7.9 | Web-sheet specifics not dropped: `packages/core/src/app.ts` as the **one** reader of `package.json#version` feeding `GET /version`, the footer and the first log line; the **root `tsconfig.json`**; the auth **`basePath`** matching the proxy entry; Playwright **`testDir: "tests/e2e"`** | all four |
-| 7.10 | **Section 2.1 Object storage drop applied**: no `packages/core/src/storage/`, no `routes/attachments.ts`, no `S3_*` env vars, no `minio`/`minio-init`/`miniodata` in compose, no MinIO line in the daily commands, and **backups use the mounted backup volume** (`sqlite3 … .backup`), not Litestream | a leftover MinIO service is a finding |
+| 7.10 | **Section 2.1 Object storage drop applied**: no `packages/core/src/storage/`, no `routes/attachments.ts`, no `S3_*` env vars, no `s3`/`s3-init`/`s3data` in compose, no local S3 line in the daily commands, and **backups use the mounted backup volume** (`sqlite3 … .backup`), not Litestream | a leftover local S3 service is a finding |
 | 7.11 | **Section 2.1 Per-request streaming drop applied**: no `routes/messages.ts`, no `assistant.ts`, no `messages` table | present |
 | 7.12 | **Live updates kept**: `packages/core/src/events.ts`, `apps/api/src/routes/events.ts`, `apps/web/src/queries/live-updates.ts`, SSE heartbeat under the idle timeout | present |
 | 7.13 | **Email delivery kept**: `apps/api/src/mail.ts`, `EMAIL_DELIVERY=log` for dev and tests, verified sign-up and password reset. An email provider costs money, so it must be **confirmed with the user** in the start-epic plan | present |
