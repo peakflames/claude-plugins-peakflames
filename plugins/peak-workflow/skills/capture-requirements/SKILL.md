@@ -44,9 +44,11 @@ current format.
 2. **TOR-ID mode** (the first word of `$ARGUMENTS` is a `TOR-NN-XXXXXXX` ID — Step 2) on
    `develop`, `main`, or `master`: this is a one-requirement change, so create its branch
    instead of stopping. If `git status --porcelain` is not empty, stop and ask the user to commit
-   or stash first. Otherwise, if `git rev-parse --abbrev-ref @{u}` succeeds (the branch tracks a
+   or stash first. Otherwise, if `git rev-parse --abbrev-ref @{u} 2>/dev/null` succeeds (the branch tracks a
    remote), run `git pull --ff-only`; then run `git checkout -b docs/amend-<tor-id-lowercased>`
-   and continue at Step 1.
+   and continue at Step 1. If that branch already exists: merged into the base (`git merge-base
+   --is-ancestor`) → `git branch -D` it and create it again; unmerged → ask via `AskUserQuestion`
+   `["Continue on the existing branch", "Stop"]`.
 3. Otherwise, if `<current-branch>` is `develop`, `main`, or `master` — stop immediately:
 
    > `capture-requirements` modifies the requirements baseline (feature files, tracing sidecars).
@@ -126,7 +128,7 @@ requirement and derives nothing new: skip item 1's two missing-section questions
 are derived), and read the vision and ConOps in items 2–3 only as context for L3 and the
 vision/ConOps rewrite in 3C — a missing or thin one is not a stop. If any stop ends this mode
 before a file changed and Step 0 created the branch, run `git checkout <base>` and
-`git branch -D docs/amend-<tor-id>`.
+`git branch -D docs/amend-<tor-id-lowercased>`.
 
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
@@ -298,7 +300,7 @@ question.
 
 Each choice below that writes a record follows `CHANGE_RECORD_TEMPLATE.md` (file name, ID,
 `approved_via = "docs-branch"`, `approved_by` from `git config user.name`) and is checked with
-`tor-lifecycle validate <record file>` until it prints `ok`. One record per decision; a record
+`tor-lifecycle validate <record file>` until it prints `ok` (with no record files at all, `validate` prints nothing and exits 0 — a pass). One record per decision; a record
 that resolves or renews a `pending` record lists that record's ID in `refs`.
 
 1. **Add alongside** — the existing requirement stays true as written; write the new behavior as a
@@ -516,7 +518,10 @@ Change Record once it is merged. The skeleton's tests name the concrete channel.
 | **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A | N/A |
 | **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action | The application shall display user-facing error messages on screen that name the problem AND name the next user action |
 
-For each baseline TOR, write a concrete, observable Given/When/Then. Examples:
+For each baseline TOR, write a concrete, observable Given/When/Then. Baseline TORs belong to the
+walking-skeleton epic (plan-project 3A.1), which has no domain logic, so their Givens and Whens use
+only `--version`, `--help`, `--verbose`, an invalid flag, or the equivalent endpoint or console
+command — never a domain subcommand or domain data. Examples:
 
 ```gherkin
 Scenario: [TOR-01-{XXXXXXX}] The tool shall report its name and semantic version to standard output when invoked with --version, exiting with code 0
@@ -857,7 +862,7 @@ greenfield files.
      instead.
 
    In either stop, if Step 0 created the branch, run `git checkout <base>` and
-   `git branch -D docs/amend-<tor-id>`.
+   `git branch -D docs/amend-<tor-id-lowercased>`.
 2. **Read its state.** Run `tor-lifecycle states --json` and take this ID's row, and
    `tor-lifecycle check --base <base> --json` and take the findings naming it. Print the title,
    state, owning epic, and those findings in plain words.
@@ -875,7 +880,7 @@ greenfield files.
    write the old block back in place, same ID, no record (`check` accepts a requirement returned
    to its text as first merged, and its saved fingerprint matches again). When the description
    asks for exactly the old text (new text = old text), skip L3 and step 4's question: offer
-   only `Restore the verified text` and `"Unsure — re-verify instead"`.
+   only `Restore the verified text` and `"Meaning unchanged or unsure — re-verify instead"`.
 
    A requested change with no description: stop and ask for one
    (`/peak-workflow:capture-requirements <TOR-ID> <what should change>`). A requirement that is
@@ -899,7 +904,7 @@ greenfield files.
    `Pending` row) — and, for the first two cases, with these four
    options instead: `Restore the verified text` (recommended when the vision, ConOps, or
    description matches the old text), `Supersede` (or `Reword` when L3 found it reword-eligible),
-   `Record as pending`, and `"Unsure — re-verify instead"` (it ends this mode: print
+   `Record as pending`, and `"Meaning unchanged or unsure — re-verify instead"` (it ends this mode: print
    `/peak-workflow:wrapup-epic <owning epic> reverify <TOR-ID>`, leave every file as it was, and
    delete the branch if Step 0 created it and nothing else is on it). For **Disputed**, show the
    open record's title, reason, owner, and age, then ask
@@ -986,7 +991,7 @@ internal scratch.
 - An input may map to multiple TOR IDs — list all.
 - `Explicit? N` → gap. `Ambiguous? Y` → gap.
 - Out-of-scope items: mark `N/A — deferred: {rationale}` in the Ambiguous column.
-- For every gap: add or tighten the requirement, then re-run the affected row. Tightening a
+- For every gap: add or tighten the requirement, then re-run the affected row. A TOR added here after 3A.5 is traced by re-running the sub-agent on that one feature file, as in 3B.4. Tightening a
   merged requirement is a change like any other (L1 → L3 → L5). Do not present the summary with
   unresolved gaps (only explicit deferrals are acceptable).
 - `Removed`, `Modified`, and `Pending` changelog rows are inputs too: one row each, captured as

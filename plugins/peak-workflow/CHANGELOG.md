@@ -192,11 +192,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   C message says how to correct it.
 - **`start-epic` nudge matches `status`** — same top requirement action, including
   capture-requirements first for a pre-3.0 or unrecorded edit.
+- **`wrapup-epic` never commits on the base** — when the work sits on `develop`, it branches
+  `feature/epic-<id>-<short-name>` first; an epic with no implementer handoff reads
+  `Disclosed: n/a (no handoff)`.
+- **Baseline TORs stay in the skeleton** — tool-hygiene Givens use only `--version`, `--help`,
+  invalid flags, or the equivalent, never domain commands.
+- **Nudge for a failed requirement** — `status` and `start-epic` name `/quick-fix` first, not a
+  reverify that would fail again.
+- **`status` reads open epics from their branch** — a pause made on `feature/epic-…` shows as
+  Paused and is flagged when stale.
 - **Release Protocol template** — the tag is pushed with the branches in the ask-first step;
   changelog headings use `—` and ISO dates; the version bump is language-neutral.
 - **Small skill fixes** — plan-project's solo merge no longer pushes unasked; pause checks the
   branch before committing; quick-fix pulls the base; start-epic's `<id>` is the first argument
-  word; zsh-safe changelog lookup.
+  word; zsh-safe changelog lookup; quick-fix reproduces the bug first; refresh-docs branches off
+  the base; `docs/amend-*` reuse and naming; removal steps delete an emptied test file.
 
 ### Documentation
 

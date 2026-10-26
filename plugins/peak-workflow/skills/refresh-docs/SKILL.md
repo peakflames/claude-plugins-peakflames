@@ -160,8 +160,13 @@ Report any remaining discrepancies. Fix them before proceeding to Step 8.
 
 **Ask the user if they'd like to commit** the refreshed documents. If the user confirms:
 
-1. Stage only the target document files (`docs/architecture.md` and/or `docs/design-notes.md`)
-2. Commit message: `docs: refresh architecture and design notes to as-built state`
-3. Commit body (1-2 lines): summarize the most significant changes — e.g., *"Corrects .NET version, adds 4 missing endpoints, adds 6 new design decisions from epics 7–10 handoffs."*
+1. Branch: inside wrapup-epic Step 4, commit on the feature branch. Run standalone on the base
+   branch (`develop`, `main`, or `master`), first `git checkout -b docs/refresh-<YYYY-MM-DD>`, and
+   after the commit ask via `AskUserQuestion` `["Merge into <base> locally", "Leave the branch for a
+   PR"]` — Merge: `git checkout <base> && git merge --no-ff docs/refresh-<YYYY-MM-DD> && git branch
+   -d docs/refresh-<YYYY-MM-DD>`. On any other branch, commit there.
+2. Stage only the target document files (`docs/architecture.md` and/or `docs/design-notes.md`)
+3. Commit message: `docs: refresh architecture and design notes to as-built state`
+4. Commit body (1-2 lines): summarize the most significant changes — e.g., *"Corrects .NET version, adds 4 missing endpoints, adds 6 new design decisions from epics 7–10 handoffs."*
 
 Do NOT push — leave that for the user.

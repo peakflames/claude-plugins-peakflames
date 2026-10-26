@@ -113,6 +113,9 @@ Remember the user's choice — Step 4 and Step 5 branch on it.
 Enter plan mode. The plan is the complete execution script for this fix — every step after plan approval must appear as an explicit numbered item. The plan must include these items in order:
 
 1. **Read affected source files** — enumerate the specific files the fix touches.
+1a. **Reproduce** — write or run a test that fails on the reported behavior. If it passes on the
+   base branch, ask via `AskUserQuestion` `"The bug does not reproduce: <evidence>. How to
+   proceed?"` — `["Add a regression test only", "Stop"]`.
 2. **Implement the fix** — name the specific files being modified and what changes. A test or
    comment that cites a retired or superseded ID (`tor-lifecycle sweep <ID>`) may be retargeted to
    its successor or deleted as part of the fix — a test-and-comment-only change.
@@ -192,7 +195,7 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
      `Reverified: <successor> PASS` (or `Unverified: <successor> — <reason>`) — the record solo mode
      keeps. A reword adds its `Amends:` line to its own commit (item 5a).
 5a. **Reword <TOR>** (reword amendments only — omit otherwise). With no uncommitted change outside
-   `docs/`, run the citing tests (`git grep -l -w <TOR> -- . ':!docs/'`). All pass → edit the block
+   `docs/`, run the citing tests (the test-directory files among `git grep -l -w <TOR> -- . ':!docs/'`). All pass → edit the block
    in place, write the `reword` record per item 2a (`from` = the old fingerprint, `to` =
    `tor-lifecycle fingerprint` of the new block, `[evidence]` `commit` = `git rev-parse --short
    HEAD`, `result = "pass"`, `tests` = the citing files, and an `equivalence` sentence — why no
