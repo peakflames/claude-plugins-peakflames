@@ -36,8 +36,7 @@ with `git log --author` (a regex substring match).
 On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
 On exit 1 with `verdict: behind`, print its message as a banner above everything else and continue in
 degraded mode: show what the files hold, and add to the banner that figures may be incomplete
-until the project is brought up to date (by `/peak-workflow:upgrade` when the output says
-`upgradable: yes`, by a plugin update when it says `upgradable: no`). In degraded mode that fix
+until `/peak-workflow:upgrade` brings the project up to date. In degraded mode that fix
 is the top Suggested Next Action — above even an overdue Disputed requirement — and every other
 action is marked "after the fix": the writing skills stop on a behind project. On any other exit, print its output and stop — it
 names the fix (a plugin update or a Python install).

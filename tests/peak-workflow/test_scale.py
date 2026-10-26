@@ -1,6 +1,6 @@
 """Q14 scale fixture: ~800 TORs, ~60 Complete epics, ~400 commits.
 
-Targets: `fingerprint` ≤ 2s; `check` and `seed` ≤ 10s each. The fixture plants a Project A-like
+Targets: `fingerprint` ≤ 2s; `check`, `seed`, and step 0002's detect (`migrate scan`) ≤ 10s each. The fixture plants a Project A-like
 result: after seeding, 16 requirements are Changed since verified (each edit carries a historical
 reword record, as migration writes them) and one test cites a dangling ID (finding C).
 """
@@ -12,7 +12,7 @@ import unittest
 from fixtures import WRAPPER, FixtureRepo, feature_text, scenario, to_toml, record_data
 
 FILES, PER_FILE, EPICS, EDITED = 40, 20, 60, 16
-TARGET = {"fingerprint": 2.0, "check": 10.0, "seed": 10.0}
+TARGET = {"fingerprint": 2.0, "check": 10.0, "seed": 10.0, "migrate scan": 10.0}
 
 
 def tor(f, i):
@@ -107,6 +107,24 @@ class ScaleTests(unittest.TestCase):
         self.assertEqual(by_state, {"Changed since verified": EDITED, "Verified": FILES * PER_FILE - EDITED})
         print(f"\n  scale: fingerprint/seed/check timings within Q14 targets; "
               f"{states['summary']['verified']} Verified / {EDITED} Changed since verified / 1 finding C")
+
+    def test_2_migrate_scan_before_seed(self):
+        # Step 0002's detect on the unseeded fixture: only the seed rows are pending.
+        result, secs = self.timed("migrate", "scan", "--json")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertLessEqual(secs, TARGET["migrate scan"], f"migrate scan took {secs:.2f}s")
+        import json
+        counts = json.loads(result.stdout)["counts"]
+        self.assertEqual({k: v for k, v in counts.items() if v}, {"seed": FILES * PER_FILE})
+
+    def test_4_step_0002_detect_after_seed(self):
+        # After seeding, the scale fixture is what step 0002 leaves behind: nothing pending.
+        result, secs = self.timed("migrate", "scan")
+        self.assertEqual(result.returncode, 0, result.stdout[-500:] + result.stderr)
+        self.assertLessEqual(secs, TARGET["migrate scan"], f"migrate scan took {secs:.2f}s")
+        result, check_secs = self.timed("check", "--by-epic", "--today", "2026-10-26")
+        self.assertLessEqual(check_secs, TARGET["check"], f"check --by-epic took {check_secs:.2f}s")
+        print(f"\n  scale: migrate scan {secs:.2f}s, check --by-epic {check_secs:.2f}s")
 
 
 if __name__ == "__main__":
