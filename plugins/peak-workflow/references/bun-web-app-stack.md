@@ -1976,12 +1976,15 @@ services:
       AWS_ACCESS_KEY_ID: localdev
       AWS_SECRET_ACCESS_KEY: localdevsecret
       AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://s3:9000
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -e
-        aws --endpoint-url http://s3:9000 s3api create-bucket --bucket attachments || true
-        aws --endpoint-url http://s3:9000 s3api put-bucket-cors --bucket attachments --cors-configuration '{"CORSRules":[{"AllowedOrigins":["http://localhost:3000","http://localhost:5173"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3000}]}'
+        aws s3api head-bucket --bucket attachments 2>/dev/null \
+          || aws s3api create-bucket --bucket attachments
+        aws s3api put-bucket-cors --bucket attachments --cors-configuration '{"CORSRules":[{"AllowedOrigins":["http://localhost:3000","http://localhost:5173"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3000}]}'
+        aws s3api get-bucket-cors --bucket attachments > /dev/null
 
 volumes:
   appdata:
