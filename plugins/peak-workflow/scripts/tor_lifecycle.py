@@ -809,6 +809,8 @@ def requirement_state(project: Project, tor: str) -> dict:
                     row["reword_records"] = [r.id for r in chain]
                 else:
                     state = "Changed since verified"
+                    if (hist := p.reword_chain(tor, saved[1], req.fingerprint, proven_only=False)) is not None:
+                        row["historical_records"] = [r.id for r in hist]  # recorded, but unproven
         else:
             state = STATUS_STATE.get(best.status, f"Unknown epic status ({best.status})")
     if row["dispute"]:
@@ -961,8 +963,13 @@ def run_check(project: Project, base: str | None = None) -> dict:
             req = p.live.get(tor)
             if req and saved != req.fingerprint and p.reword_chain(tor, saved, req.fingerprint, True) is None:
                 then = start.live.get(tor) if start else None
+                hist = p.reword_chain(tor, saved, req.fingerprint, False) if tor not in edited else None
                 nxt = (f"Decide first whether its meaning changed: /peak-workflow:capture-requirements {tor}"
-                       if tor in edited else f"Re-check it: /peak-workflow:wrapup-epic {sc.epic} reverify")
+                       if tor in edited else
+                       f"Its rewording ({', '.join(r.id for r in hist)}) has no test evidence. If its meaning "
+                       f"changed: /peak-workflow:capture-requirements {tor}; if not, re-check it: "
+                       f"/peak-workflow:wrapup-epic {sc.epic} reverify" if hist else
+                       f"Re-check it: /peak-workflow:wrapup-epic {sc.epic} reverify")
                 findings.append(Finding("D", f"{tor} changed after epic {sc.epic} verified it. {nxt}", tor=tor,
                                         epic=sc.epic, own_branch=bool(then) and then.fingerprint != req.fingerprint,
                                         detail={"verified_fingerprint": saved, "fingerprint": req.fingerprint}))
@@ -1496,7 +1503,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
     first_scenario = next((i for i, ln in enumerate(lines) if SCEN.match(ln)), len(lines))
     group: list[int] = []
     held_empty: list[int] = []
-    in_banner = banner_text = in_doc = False
+    in_banner = banner_text = in_doc = seen_feature = False
 
     def close() -> None:
         nonlocal group
@@ -1526,7 +1533,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             tor = m.group(1)
         elif FEAT.match(line):
             close()
-            tor = None
+            tor, seen_feature = None, True
         if not stripped.startswith("#"):
             close()
             held_empty = []
@@ -1552,7 +1559,8 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
         if not content:
             (group if group else held_empty).append(i)
             continue
-        if VERIF.match(line) or REFERENCE_SCREEN.match(content) or content.lower() == "safety":
+        if VERIF.match(line) or REFERENCE_SCREEN.match(content) or content.lower() == "safety" or (
+                not seen_feature and not LIFECYCLE_MARKERS.search(content)):  # e.g. a Markdown title
             close()
             held_empty = []
             continue
@@ -1583,8 +1591,9 @@ def load_tracing(path: Path) -> dict:
     return data
 
 
-def dump_tracing(data: dict) -> str:
-    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+def dump_tracing(data: dict, original: str = "") -> str:
+    """JSON as the sidecar writer would have it; a file that was pure ASCII (\\u escapes) stays so."""
+    return json.dumps(data, indent=2, ensure_ascii=original.isascii() if original else False) + "\n"
 
 
 def split_row(line: str) -> list[str]:
@@ -2063,8 +2072,13 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
         e = reasons.get(ev["tor"])
         groups.setdefault((ev["sha"], id(e) if e else 0), []).append(ev)
     for (sha, _), evs in groups.items():
+        subject = evs[0]["subject"]
+        if subject.startswith("Merge") and evs[0]["subject"] != "working tree":
+            inner = git(root, "log", "-1", "--no-merges", "--format=%s", f"{sha}^1..{sha}", "--",
+                        f"{REQ_DIR}/*.feature.md", check=False).strip()
+            subject = inner or subject
         e = reasons.get(evs[0]["tor"]) or {
-            "title": f"Edited in place before 3.0: {evs[0]['subject']}"[:200],
+            "title": f"Edited in place before 3.0: {subject}"[:200],
             "reason": f"Recorded by the 3.0 migration from git history (commit {sha[:12]}, {evs[0]['date']}). "
                       "No note in the feature files explained this edit."}
         rec = new_record("reword", {**e, "sources": e.get("sources", [])},
@@ -2084,7 +2098,8 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
     rows = [{"record": r["id"], "kind": r["kind"], "tors": [c["tor"] for c in r["changes"]], "title": r["title"],
              "path": f"{CHANGES_DIR}/{r['date'].isoformat()}-{r['id'][3:]}.toml"} for r in records]
     rationale = {e["tor"]: e["text"].strip() for e in plan["rationale"]}
-    rows += [{"record": None, "kind": "rationale", "tors": [t], "title": "", "path": None} for t in rationale]
+    rows += [{"record": None, "kind": "rationale", "tors": [t], "title": text, "path": None}
+             for t, text in rationale.items()]
     rows += [{"record": None, "kind": "delete", "tors": [t], "title": "", "path": f"{REQ_DIR}/{p.live[t].feature_file}"}
              for t in sorted(deleting)]
     if not write:
@@ -2129,7 +2144,7 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
             new_reqs.append(entry)
         if new_reqs != reqs:
             data["requirements"] = new_reqs
-            path.write_text(dump_tracing(data), encoding="utf-8")
+            path.write_text(dump_tracing(data, path.read_text(encoding="utf-8")), encoding="utf-8")
     bad = [f"{rel}: {x}" for rel, probs in validate_record_files(root, []) for x in probs]
     if bad:
         raise DataError(bad)
@@ -2192,7 +2207,8 @@ def run_strip(root: Path) -> list[dict]:
             continue
         data.pop("generated", None)
         data["requirements"] = [{k: v for k, v in r.items() if k != "title"} if isinstance(r, dict) else r for r in reqs]
-        rows.append({"kind": "tracing", "path": f"{REQ_DIR}/{path.name}", "lines": titles, "text": dump_tracing(data)})
+        rows.append({"kind": "tracing", "path": f"{REQ_DIR}/{path.name}", "lines": titles,
+                     "text": dump_tracing(data, path.read_text(encoding="utf-8"))})
     for path in spec_paths(root):
         epic = spec_epic_id(path.name)
         if epic in p.sidecars and p.sidecars[epic].status == "Complete":
@@ -2524,9 +2540,15 @@ def finding_epic(project: Project, f: dict) -> str | None:
 
 
 def epic_label(root: Path, epic: str) -> str:
-    """`<id> (<slug>)` from the epic's spec file name, or the bare ID when there is no spec."""
+    """`<id> (<slug>) — <Name>` from the epic's spec (its file name and `# Epic <id>: <Name>` heading),
+    or the bare ID when there is no spec."""
     spec = next(iter(sorted(root.glob(f"docs/implementation-plan/phase-*/epic-{epic}-*.md"))), None)
-    return f"{epic} ({spec.stem[len('epic-') + len(epic) + 1:]})" if spec else epic
+    if spec is None:
+        return epic
+    label = f"{epic} ({spec.stem[len('epic-') + len(epic) + 1:]})"
+    heading = next((ln for ln in spec.read_text(encoding="utf-8").splitlines() if ln.startswith("# ")), "")
+    name = heading.split(":", 1)[1].strip() if ":" in heading else ""
+    return f"{label} — {name}" if name else label
 
 
 def cmd_check(args: argparse.Namespace, root: Path) -> int:
