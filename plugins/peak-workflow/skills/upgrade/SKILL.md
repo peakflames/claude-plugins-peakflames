@@ -38,7 +38,18 @@ Run `git status --porcelain`. If it lists anything, stop: *"Commit or stash your
 each upgrade step is its own commit, and yours must not ride along."*
 
 Then pick the base branch: `git branch --list develop main master` — prefer `develop`, then
-`main`, then `master`. Every `<base>` below is this branch.
+`main`, then `master`. Every `<base>` below is this branch. `B` is the base's own format — `N` as
+read in Step 1 when you are on `<base>`, else `git show <base>:docs/.peak-workflow.toml` (`format
+= …`; no file = 0). The plan heading, the summary, and the Leave message name `B`, not a
+half-upgraded branch's number.
+
+**Resume check.** Unless you are already on one, look for an earlier run's branch:
+`git branch --list 'docs/upgrade-*'`, keeping those that have not merged (`git merge-base
+--is-ancestor <branch> <base>` fails and `git cherry <base> <branch>` prints a `+` line). When
+there is one, say *"Resuming the upgrade on <branch> (started in an earlier session)."*, check it
+out, and re-run Step 1 — the format, and so the work left, are read from that branch. A resumed
+run skips Step 5 (the in-flight question was answered when the branch was made; its skips are
+whatever that run's Detects still report).
 
 ## Step 3: List the Work
 
@@ -59,7 +70,7 @@ Then:
 Read each step file involved. Show the plan:
 
 ```
-Upgrade: format N → <target>     (or: catch-up on format N)
+Upgrade: format B → <target>     (or: catch-up on format N)
 
 | Step | What it does |
 |---|---|
@@ -71,10 +82,8 @@ Upgrade: format N → <target>     (or: catch-up on format N)
 1. The upgrade branch is `docs/upgrade-format-<target>`, or `docs/upgrade-catch-up-<N>` when
    there is only catch-up work — `<target>` and `<N>` as plain integers (`docs/upgrade-format-2`,
    never `-0002`).
-2. If the current branch is already that branch (a resumed run), stay on it and go to Step 5.
-   If another unmerged `docs/upgrade-*` branch exists (`git branch --list 'docs/upgrade-*'`, then
-   the merge test in item 4), it is an earlier run's: check it out and re-run
-   `tor-lifecycle format` instead of starting over from `<base>`.
+2. If the current branch is already that branch (a resumed run, see Step 2), stay on it and go
+   to Step 6.
 3. Otherwise `git checkout <base>`. If `git rev-parse --abbrev-ref @{upstream} 2>/dev/null` succeeds, run
    `git pull --ff-only`; on failure, stop and say the base has diverged from origin.
 4. `git checkout -b <branch>`. If that branch already exists and has merged —
@@ -93,11 +102,15 @@ shell) matches it on every branch. It prints `branch<TAB>path` for each unmerged
 local or remote branch that touches them (exit 0 = none; skip the rest of this step).
 
 When there are rows, show them grouped by branch and explain in one sentence: those branches will
-conflict with this upgrade where they edit the same lines. Then ask via `AskUserQuestion`
-(offer the Skip option only when at least one step you will run says skipping is supported —
-otherwise the first option is `"Rewrite everything anyway (Recommended)"`; when some steps
+conflict with this upgrade where they edit the same lines. For a branch that touches
+`docs/requirements/`, add: after it merges `<base>` in, every requirement it edited needs
+`/peak-workflow:capture-requirements <TOR>` before it can merge (the upgrade turned those edits
+into unrecorded changes against the recorded history). Then ask via `AskUserQuestion`.
+Offer the Skip option only when the listed paths name epics (`status/epic-<id>.md`,
+`phase-*/epic-<id>-*.md`) **and** at least one step you will run says skipping is supported —
+otherwise the first option is `"Rewrite everything anyway (Recommended)"`. When some steps
 support skipping and others do not, name the others in the question — they still rewrite the
-skipped epics' files):
+skipped epics' files:
 
 - Question: `"Some branches in flight touch files this upgrade rewrites. How should I proceed?"`
 - Options:
@@ -145,7 +158,7 @@ oldest first (`git log --reverse --format='%h %s' <base>..HEAD`), marking those 
 made "(earlier run)":
 
 ```
-Upgraded format N → <target> on <branch>
+Upgraded format B → <target> on <branch>
 
 | Commit | Step | Files |
 |---|---|---|
@@ -172,7 +185,7 @@ Merge is approval, as for every `docs/` branch. Ask via `AskUserQuestion`:
   `"chore(upgrade): catch-up on format N"`) with the summary table as the body.
 - **Solo:** `git checkout <base> && git merge --no-ff <branch> && git branch -d <branch>`.
 - **Leave:** print the two commands above for later, and say: *"Until it merges, <base> is still on
-  format N — start no epic and run no other command that changes files there."*
+  format B — start no epic and run no other command that changes files there."*
 
 After a merge, remind the user that branches in flight should merge `<base>` in before they
 continue.

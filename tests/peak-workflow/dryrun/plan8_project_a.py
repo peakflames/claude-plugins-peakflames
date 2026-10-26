@@ -163,6 +163,43 @@ Builds {name}.
 - `app/{slug}.py`
 """
 
+VISION = """# Product Vision — Notes
+
+## 1. Summary
+
+A notes app that captures a thought in one keystroke and keeps it on every device.
+
+## 2. Problem Statement
+
+People lose quick thoughts because capture is slow and notes are stuck on one device.
+
+## 3. Goals
+
+- Capture a note in under two seconds.
+- Every note on every signed-in device within a minute.
+- Never lose a local note.
+"""
+CONOPS = """# Concept of Operations — Notes
+
+## 5. Operational Scenarios
+
+### S1 — Capture
+
+1. The user opens the app.
+2. The user types a thought in the quick-capture box and presses Enter.
+3. The note appears first in the list.
+
+### S2 — Sync
+
+1. The user edits a note on the laptop.
+2. The phone shows the edit shortly after.
+
+## 8. What Must Never Happen
+
+| Hazard | Guarantee |
+|---|---|
+| A sync error deletes local notes | Local notes survive every sync failure |
+"""
 FILES = {"01": "01-notes.feature.md", "02": "02-sync.feature.md", "03": "03-export.feature.md"}
 EPICS = {  # id: (slug, name, phase dir, scenarios)
     "aCore01": ("capture", "Capture", "phase-1-core", [CRT, FMT, PRE_V2, DEL]),
@@ -236,7 +273,8 @@ def build(dest: Path) -> FixtureRepo:
     r.git("config", "commit.gpgsign", "false")
     r.write("README.md", "# Notes\n")
     r.write("CLAUDE.md", "# CLAUDE.md — Notes\n\n## Project Overview\n\nA notes app (fixture).\n")
-    r.write("docs/product-vision-planning/product-vision.md", "# Vision\n\n## §2 — Goals\n\nCapture fast.\n")
+    r.write("docs/product-vision-planning/product-vision.md", VISION)
+    r.write("docs/product-vision-planning/concept-of-operations.md", CONOPS)
     commit(r, "init", "2026-01-05")
 
     req = "docs/requirements"
@@ -298,6 +336,11 @@ def build(dest: Path) -> FixtureRepo:
     # Open epics in every non-Complete status.
     for epic, status in (("eWip05", "In Progress"), ("fImp06", "Implemented"), ("hPau08", "Paused")):
         path, text = sidecar(epic, status)
+        if epic == "hPau08":
+            text = text.replace("handoff: —", "handoff: session-handoffs/epic-hPau08-paused.md")
+            r.write("docs/implementation-plan/session-handoffs/epic-hPau08-paused.md",
+                    "# Epic hPau08 — Share: paused\n\n**Paused:** 2026-07-20\n\n## Where it stands\n\n"
+                    "Link format agreed; nothing built yet.\n")
         r.write(path, text)
         sp, st = spec(epic)
         r.write(sp, st.replace("**Status:** Not Started", f"**Status:** {status}"))

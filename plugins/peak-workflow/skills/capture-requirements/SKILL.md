@@ -121,6 +121,13 @@ current format.
    or indicator on a device. Automated tests still cover everything they can; the tag routes only
    the unobservable part to a person in `wrapup-epic`.
 
+**TOR-ID mode** (the first word of `$ARGUMENTS` is a TOR ID — Step 2) amends one existing
+requirement and derives nothing new: skip item 1's two missing-section questions (no baseline TORs
+are derived), and read the vision and ConOps in items 2–3 only as context for L3 and the
+vision/ConOps rewrite in 3C — a missing or thin one is not a stop. If any stop ends this mode
+before a file changed and Step 0 created the branch, run `git checkout <base>` and
+`git branch -D docs/amend-<tor-id>`.
+
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
    already in context. Specifically capture, if present:
@@ -871,9 +878,14 @@ greenfield files.
    A requested change with no description: stop and ask for one
    (`/peak-workflow:capture-requirements <TOR-ID> <what should change>`). A requirement that is
    not merged (L1) is edited freely — apply the description and skip to Step 5.
-   When a requirement in the first two cases also has an open `pending` record, add `Uphold` to
-   step 4's options and list the pending record's ID in the `refs` of any record written; a
-   Restore writes no record, so say the dispute stays open (`Uphold` then closes it).
+   When a requirement in the first two cases also has an open `pending` record, `Uphold` takes the
+   place of `Record as pending` in step 4's options (it is already pending — four options in all).
+   A Restore writes no record, so say the dispute stays open (`Uphold` then closes it). After a
+   Supersede or Reword, ask `"Does this change settle <CR-ID> (<its title>)?"` —
+   `["Yes — it settles it", "No — the dispute still stands"]`. Yes: the new record's `refs` lists
+   the pending record's ID. No: the new record does not ref it; also write a renewed `pending`
+   record on the requirement that now carries the dispute (the successor for a supersede, the same
+   ID for a reword) that refs the open one and keeps its reason and owner.
 4. **Decide.** For **Disputed**, ask the owner question below first and run L3 only after
    `Change it`. Otherwise run the decision test (L3) on old vs new, then ask the L5 question with the
    "The requirement's text should change" row — and, for the first two cases, with these four

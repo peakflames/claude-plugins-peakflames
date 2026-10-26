@@ -184,8 +184,10 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    plain sentence naming the counts and the next command, for example: "2 requirements are known
    to be wrong, 3 changed after they were verified, and 1 failed verification — start with
    `/peak-workflow:capture-requirements TOR-02-Mail001`." The command is the top requirement
-   action (an overdue Disputed one, else the first Changed Since Verified group's), even in
-   degraded mode — there, add "after the fix".
+   action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
+   group's first requirement carries an A finding or `historical_records`, its
+   `/peak-workflow:capture-requirements <TOR>` decision first), even in degraded mode — there, add
+   "after the fix".
 
 ## Step 5: Flag Stale Paused Epics
 
@@ -322,7 +324,7 @@ with removal pending.
 [Skip when Step 4.5 item 2 found nothing. One block per epic:]
 
 **<id> (<slug>) — <Name>** (Complete) — [N] requirement(s) to re-check
-- TOR-… — <title> [— verification failed: fix the code first with `/peak-workflow:quick-fix`] [— edited without a record: decide first whether its meaning changed with `/peak-workflow:capture-requirements <TOR>`]
+- TOR-… — <title> [— verification failed: fix the code first with `/peak-workflow:quick-fix`] [— edited without a record: decide first whether its meaning changed with `/peak-workflow:capture-requirements <TOR>`] [— edited before 3.0 (<CR-IDs>): if its meaning changed, `/peak-workflow:capture-requirements <TOR>`; if not, re-check]
 - Re-check: `/peak-workflow:wrapup-epic <id> reverify`
 
 ## Requirements Health
@@ -336,7 +338,7 @@ with removal pending.
 | C. Dangling ID | [N] |
 | D. Changed since verified | [N] |
 | E. Retired or superseded ID still cited | [N] |
-| F. Housekeeping | [N] |
+| F. Housekeeping and disputes | [N] |
 
 [Then, per letter with findings, the heading and its messages verbatim (first 8, then "… and N more").]
 
@@ -371,7 +373,7 @@ means the spec records no planner.]
  - **First (after the degraded-mode fix, if any), when Step 4.5 item 4 found one:** the overdue Disputed requirement — "TOR-… — <title> is known to be wrong (<record>, <age_days> days[, a Safety requirement — no branch that touches it can ship]). Resolve it: `/peak-workflow:capture-requirements <TOR>`". When several are overdue, name the oldest (Safety first) and the count of the rest.
  - If there's an "In Progress" epic: "Continue working on Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>`" — when its `owner:` is set and is not you, say whose it is instead ("In progress by <owner> — coordinate before touching it")
  - If there's an "Implemented" epic awaiting review: "Review Epic <id> (<slug>) — <Name> with `/peak-workflow:wrapup-epic <id>`"
- - If any epic has requirements to re-check (Step 4.5 item 2): "Re-check Epic <id> (<slug>) — <Name>: `/peak-workflow:wrapup-epic <id> reverify`" — one line per epic, at most three, each carrying its group's caveat first ("fix the code with `/peak-workflow:quick-fix`, then …" or "decide on TOR-… with `/peak-workflow:capture-requirements TOR-…` first")
+ - If any epic has requirements to re-check (Step 4.5 item 2): "Re-check Epic <id> (<slug>) — <Name>: `/peak-workflow:wrapup-epic <id> reverify`" — one line per epic, at most three, each carrying its group's caveat first ("fix the code with `/peak-workflow:quick-fix`, then …" or "decide on TOR-… with `/peak-workflow:capture-requirements TOR-…` first" — also for an edit from before 3.0)
  - If there's a stale paused epic: "Resume or close paused Epic <id> (<slug>) — <Name> — it's been [X] days"
  - If `check` reported `removal-missing`: "Plan the code removal for <CR-ID>: `/peak-workflow:add removal epic for <CR-ID>`"
  - If there are "Specified" requirements (no epic): "Run `/peak-workflow:add` to assign [N] unplanned TOR requirements to epics"

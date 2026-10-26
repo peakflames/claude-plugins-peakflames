@@ -246,7 +246,7 @@ class ProjectAUpgradeTests(unittest.TestCase):
         self.assertIn("Epic bSync02 (sync) — Sync (2)", by_epic)
         self.assertIn("Epic cExp03 (export) — Export (1)", by_epic)
         # The pre-3.0 edit is recorded but unproven: the owner decides meaning before any reverify.
-        self.assertIn("has no test evidence. If its meaning changed: /peak-workflow:capture-requirements "
+        self.assertIn("recorded without test evidence). If its meaning changed: /peak-workflow:capture-requirements "
                       "TOR-02-Wrd0001; if not, re-check it: /peak-workflow:wrapup-epic bSync02 reverify",
                       findings[1]["message"])
 
