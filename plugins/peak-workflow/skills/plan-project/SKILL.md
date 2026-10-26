@@ -500,6 +500,9 @@ For each epic, write the spec file following the exact format below (the same fo
 **Phase:** {N} — {Phase Name}
 **Status:** Not Started
 **Dependencies:** Epic {id1} ({short description}), Epic {id2} ({short description})
+**Planned by:** {planner}
+**Planned:** {YYYY-MM-DD}
+**Plan branch:** {plan-branch}
 **Source:** Issue #{N}
 
 > **Design:** UI epic — `/peak-workflow:start-epic` runs a Design pass with the design skills installed at that time (brand kit, `frontend-design`, shadcn) for {relevant UI elements}.
@@ -543,6 +546,7 @@ skeleton's app shell and design system — no new component library, no new toke
 **Conditional lines and sections in the template above** — do not carry this guidance into the written spec:
 
 - Include the **Design** note only if the epic involves UI work. Omit it entirely otherwise.
+- Always include the three provenance lines, filled at write time — never leave a placeholder: `{planner}` is `git config user.name`, `{YYYY-MM-DD}` is today, and `{plan-branch}` is `git branch --show-current` (the `docs/` branch). `/peak-workflow:status` and `/peak-workflow:start-epic` show them so a teammate can tell who planned an epic.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise.
 - Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it. Copy the name verbatim from `ux/screens.md`, and the wireframe path verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
 
@@ -588,6 +592,7 @@ b. **Status sidecars** — create `docs/implementation-plan/status/` and write `
 
 ```
 status: Not Started
+owner: —
 implemented: —
 completed: —
 handoff: —
@@ -597,6 +602,8 @@ requirements: TOR-{NN}-{XXXXXXX}, TOR-{NN}-{XXXXXXX}
 The `requirements:` field lists every TOR ID covered by this epic (verbatim from the Requirements
 Anchors table). This is the mechanism by which `/peak-workflow:status` derives requirements
 coverage. For epics with no TOR IDs (rare — implementation-only utility epics), use `requirements: —`.
+The `owner:` field stays `—` until `/peak-workflow:start-epic` sets it to the person who starts the
+epic.
 
 c. **README.md** — create `docs/implementation-plan/README.md` with the project lifecycle prose:
 
