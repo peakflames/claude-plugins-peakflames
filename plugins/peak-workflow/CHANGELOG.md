@@ -8,6 +8,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [2.1.0] — UNDER DEVELOPMENT
 
+### Fixed
+
+- **Local S3 in `bun-web-app-stack`** — RustFS (`rustfs/rustfs:1.0.3`) and an `amazon/aws-cli`
+  init container replace the removed MinIO images, so `docker compose up` works again. Services,
+  volume and skip flag are now `s3`, `s3-init`, `s3data` and `S3_UP`.
+
 ### Documentation
 
 - **README design process** — new section walks `/mockup` → `/setup` tooling → Design pass →
