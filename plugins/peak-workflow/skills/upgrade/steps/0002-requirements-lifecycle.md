@@ -33,12 +33,13 @@ this step — when a helper command refuses, stop and show its output.
 
 ## Preview
 
-Show the counts from the Detect's last line as a table, in plain words:
+When resuming (the branch already has `step 0002` commits — see **Resuming** under Apply), show
+only *"Resuming step 0002 after <last phase committed>"* and the phases left. Otherwise show the counts from the Detect's last line as a table, in plain words:
 
 | What | Count | What happens |
 |---|---|---|
 | Lifecycle notes and markers in feature files | `prose` | Each is classified once (you approve the list), then removed |
-| Requirements edited in place before 3.0 | distinct TORs in `edit` | A `reword` record with `result = "historical"` per edit (counts as unproven) |
+| Requirements edited in place before 3.0 | distinct TORs in `edit` | A `reword` record with `result = "historical"` per edit — no test evidence, so an edit made **after** the owning epic was verified leaves the requirement Changed since verified |
 | Requirements deleted without a record | `removed` | A `supersede` or `retire` record with the text as it last read |
 | Tracing sidecars with titles | `tracing` | `title` and `generated` removed (the Scenario line is the only title) |
 | Open epic specs with a title column | `specs` | The Requirements Anchors table becomes `TOR ID \| Feature File` |
@@ -54,6 +55,9 @@ Then say:
 - Requirements edited after their epic was verified will show as **Changed since verified**, and
   known-wrong ones recorded in prose as **Disputed**. That is the point: the report at the end
   lists them per epic for you to triage.
+- A dispute's age counts from today, the day its `pending` record is written — not from when the
+  note was added — so the threshold (`[lifecycle] disputed_threshold_days`, default 30) gives you
+  that long to settle it before it blocks work. A `# Safety` requirement blocks at once.
 - The records are written in your name (`git config user.name`) with `approved_via = "migration"`.
 
 ## Apply
@@ -63,9 +67,11 @@ upgrade branch only, staging by path (never `git add -A`), with the message
 `chore(upgrade): step 0002 requirements-lifecycle — <phase>`.
 
 **Resuming.** When the branch already has commits from this step
-(`git log --format=%s <base>..HEAD` lists `step 0002`), keep `<scratch>/before.tsv` and, if the
-`change records` commit exists, skip Phases 3–4 (the classification is applied). Every other
-phase is safe to re-run: its command reports nothing to do.
+(`git log --format=%s <base>..HEAD` lists `step 0002`), the Preview says *"Resuming step 0002
+after <last phase committed>"* and lists only the phases left, instead of the table above —
+the classification is not shown or approved again. Keep `<scratch>/before.tsv`; if the `change
+records` commit exists, skip Phases 3–4. Every other phase is safe to re-run: its command reports
+nothing to do.
 
 ### Phase 1 — Prerequisites
 
@@ -170,8 +176,9 @@ commit; Phase 8 removes it.
    output, and run `git checkout -- docs` (nothing from this phase is committed).
 3. **Requirements README.** When `docs/requirements/README.md` holds the 2.1 stub's line
    `- Feature files are **append-only** — feature numbers are stable once assigned.`, replace its
-   whole `## Conventions` section with the one below. Otherwise leave the file alone (the user
-   wrote it) and say so in the report.
+   whole `## Conventions` section with the one below. When the file exists without that line,
+   leave it alone (the user wrote it) and say so in the report. When there is no README, do
+   nothing.
 
    ```markdown
    ## Conventions
@@ -217,15 +224,20 @@ Rewrites globs) plus the stamp.
 
 In the runner's final message — never a file — print the output of
 `tor-lifecycle check --by-epic` verbatim, then the last line of `tor-lifecycle states`, and the
-records this step wrote (`git diff --stat <base> -- docs/requirements/changes`, as a count per
-kind). Then say, in plain words:
+records this step wrote as a count per kind:
+`git diff --name-only --diff-filter=A <base> -- docs/requirements/changes | xargs grep -h '^kind = ' | sort | uniq -c`.
+Then say, in plain words:
 
-- **Changed since verified** (`D`): the requirement's text changed after its epic verified it.
-  Triage each with the decision test: when the meaning changed,
-  `/peak-workflow:capture-requirements <TOR>`; when it did not, `/peak-workflow:wrapup-epic <epic>
-  reverify` re-checks it. That triage is the owner's; nothing here decides it.
+- **Changed since verified** (`D`): the requirement's text changed after its epic verified it,
+  and the upgrade recorded that edit without test evidence. Triage each with the decision test:
+  when the meaning changed, `/peak-workflow:capture-requirements <TOR>`; when it did not,
+  `/peak-workflow:wrapup-epic <epic> reverify` re-checks it. That triage is the owner's; nothing
+  here decides it.
 - **Disputed** (`F`, "known to be wrong"): a pending change-control note became a `pending`
   record; settle it with `/peak-workflow:capture-requirements <TOR>`.
-- **Dangling ID** (`C`) in a sidecar's `requirements:` line: fix that line on a `docs/` branch —
-  the upgrade never rewrites a Complete epic's `requirements:`.
+- **Dangling ID** (`C`) in a sidecar's `requirements:` line: the upgrade never rewrites a Complete
+  epic's `requirements:`. Correct the line by hand on a `docs/` branch — replace the stray text
+  with the TOR IDs it meant, or delete it — and merge it like any planning change.
 - Any other finding: follow its message.
+
+Finally remove the scratch folder: `rm -rf "$(git rev-parse --git-path peak-workflow-0002)"`.

@@ -32,6 +32,8 @@ sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format
 
 Record the first line, `verdict: <word>`, and the exit code. Exit 3 means no suitable Python:
 print its output and stop. Exit 2 means the stamp is unreadable: print its output and stop.
+Exit 1 is not an error here — it is how `format` reports `behind`, `ahead`, and
+`not-peak-workflow`; Step 2 routes on the verdict.
 
 ### 1.2 — Existing code
 

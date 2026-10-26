@@ -52,6 +52,11 @@ class ProseScanTests(unittest.TestCase):
         for gone in ("AMENDED", "TODO", "caches", "MODIFIED", "SUPERSEDED banner"):
             self.assertNotIn(gone, new)
 
+    def test_unfenced_title_before_feature_is_kept(self):
+        text = "# Core requirements\n# SUPERSEDED file banner\n\nFeature: 1.0 Core\n\n" \
+               "Scenario: [TOR-01-Aaa0001] The tool shall do A\n    # stray\n    Then a\n"
+        self.assertEqual([(it.line, it.kind) for it in tl.scan_prose(FILE, text)], [(2, "marker"), (7, "comment")])
+
     def test_strip_drops_a_banner_left_empty(self):
         text = feature_text("01", "Core", [Scenario("TOR-01-Aaa0001", "The tool shall do A")], fenced=False)
         text = text.replace("Scenario:", "# ----\n# MODIFIED v1.2: reorganised\n# ----\n\nScenario:")
@@ -120,7 +125,7 @@ class HelperFlagTests(unittest.TestCase):
         self.repo.write("tests/test_x.py", "# TOR-01-Nope001\n")
         self.repo.commit("x")
         out = self.repo.cli("check", "--by-epic", "--today", TODAY).stdout
-        self.assertIn("Epic aEpic01 (alpha) (1)\n  - D. TOR-01-Aaa0001 changed", out)
+        self.assertIn("Epic aEpic01 (alpha) — Alpha (1)\n  - D. TOR-01-Aaa0001 changed", out)
         self.assertIn("No epic (1)\n  - C. tests/test_x.py:1 cites TOR-01-Nope001", out)
         self.assertTrue(out.rstrip().endswith("2 finding(s) (1 C, 1 D); 0 blocking."))
 
@@ -223,6 +228,7 @@ class ProjectAUpgradeTests(unittest.TestCase):
         self.assertEqual(stale, pa.STALE)
         self.assertEqual(states["TOR-02-Tmo0001"]["state"], "Disputed")
         self.assertEqual(states["TOR-02-Tmo0001"]["underlying_state"], "Verified")
+        self.assertEqual(len(states["TOR-02-Wrd0001"]["historical_records"]), 1)
         self.assertEqual(states["TOR-01-Pre0001"]["state"], "Verified")  # edited before verification
         self.assertEqual({t for t, r in states.items() if r["state"] == "Superseded"},
                          {"TOR-02-Old0001", "TOR-03-Csv0001"})
@@ -237,8 +243,12 @@ class ProjectAUpgradeTests(unittest.TestCase):
                          [("C", "cExp03"), ("D", "TOR-02-Wrd0001"), ("F", "TOR-02-Tmo0001")])
         self.assertIn(pa.DANGLING, findings[0]["message"])
         by_epic = self.repo.cli("check", "--by-epic", "--today", TODAY).stdout
-        self.assertIn("Epic bSync02 (sync) (2)", by_epic)
-        self.assertIn("Epic cExp03 (export) (1)", by_epic)
+        self.assertIn("Epic bSync02 (sync) — Sync (2)", by_epic)
+        self.assertIn("Epic cExp03 (export) — Export (1)", by_epic)
+        # The pre-3.0 edit is recorded but unproven: the owner decides meaning before any reverify.
+        self.assertIn("has no test evidence. If its meaning changed: /peak-workflow:capture-requirements "
+                      "TOR-02-Wrd0001; if not, re-check it: /peak-workflow:wrapup-epic bSync02 reverify",
+                      findings[1]["message"])
 
     def test_06_records_validate_and_carry_no_migration_source(self):
         result = self.repo.cli("validate")
@@ -262,7 +272,9 @@ class ProjectAUpgradeTests(unittest.TestCase):
         scan = self.repo.json_cli("migrate", "scan", "--base", "develop")[1]
         self.assertFalse(scan["pending"], scan["counts"])
         self.assertNotIn("TOR-02-Old0001", (root / "docs/requirements/02-sync.feature.md").read_text())
-        tracing = json.loads((root / "docs/requirements/01-notes.feature.tracing.json").read_text())
+        raw = (root / "docs/requirements/01-notes.feature.tracing.json").read_text()
+        self.assertTrue(raw.isascii() and "\\u00a7" in raw)  # the file's own escaping is kept
+        tracing = json.loads(raw)
         self.assertNotIn("generated", tracing)
         crt = tracing["requirements"][0]
         self.assertEqual(list(crt)[:2], ["id", "rationale"])
@@ -311,6 +323,21 @@ class ProjectAUpgradeTests(unittest.TestCase):
             self.assertIn("not classified", result.stderr)
             self.assertIn("TOR-02-Nope999 is not a live requirement", result.stderr)
             self.assertFalse((fresh.root / "docs/requirements/changes").exists())
+
+    def test_11_an_unexplained_edit_gets_a_generic_historical_reword(self):
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            wrd = plan["history"].pop()  # no History entry for Wrd0001: its note is dropped instead
+            plan["drop"] += wrd["sources"]
+            path = fresh.write(".plan.json", json.dumps(plan))
+            code, rows = fresh.json_cli("migrate", "records", "--plan", str(path), "--write", "--today", TODAY)
+            rec = next(r for r in tl.load_records(fresh.root) if r.tors == ["TOR-02-Wrd0001"])
+            self.assertEqual(rec.data["title"], "Edited in place before 3.0: docs: v1.8 wording cascade")
+            self.assertEqual(rec.data["evidence"]["result"], "historical")
+            self.assertTrue(rec.data["migration_source"].startswith("git "))
+            self.assertEqual([f for f in fresh.check() if f["letter"] == "A"], [])
 
 
 if __name__ == "__main__":

@@ -182,6 +182,11 @@ def spec(epic: str, status: str = "Not Started") -> tuple[str, str]:
             SPEC.format(id=epic, name=name, phase=phase, status=status, rows=rows, slug=slug))
 
 
+def phase_index(title: str, epics: tuple[str, ...]) -> str:
+    rows = "".join(f"| {e} | [{EPICS[e][1]}](epic-{e}-{EPICS[e][0]}.md) | — |\n" for e in epics)
+    return f"# {title}\n\n| Epic | Name | Dependencies |\n|------|------|--------------|\n{rows}"
+
+
 def sidecar(epic: str, status: str, extra: str = "", reqs: str | None = None) -> tuple[str, str]:
     ids = reqs or ", ".join(s.tor for s in EPICS[epic][3])
     done = status in ("Implemented", "Complete")
@@ -251,6 +256,10 @@ def build(dest: Path) -> FixtureRepo:
         plan[path] = text.replace("TOR-01-Pre0001 | `docs/requirements/01-notes.feature.md` | The app shall limit a note to 500",
                                   "TOR-01-Pre0001 | `docs/requirements/01-notes.feature.md` | The app shall limit a note to 100")
         plan.update([sidecar(epic, "Not Started")])
+    plan["docs/implementation-plan/README.md"] = "# Notes — Implementation Plan\n\nRun `/peak-workflow:status`.\n"
+    plan["docs/implementation-plan/phase-1-core/index.md"] = phase_index("Phase 1: Core", ("aCore01", "bSync02"))
+    plan["docs/implementation-plan/phase-2-more/index.md"] = phase_index(
+        "Phase 2: More", ("cExp03", "eWip05", "fImp06", "hPau08"))
     branch(r, "docs/plan", plan, "docs: implementation plan", "2026-01-12", "Pat Planner")
 
     # aCore01: the limit is revised (REVISED note) before the epic is verified.
@@ -271,7 +280,9 @@ def build(dest: Path) -> FixtureRepo:
              f"{req}/02-sync.feature.tracing.json": tracing("02", "sync", [WRD_V1, TMO_V1, OLD_V1, SAF, NEW]),
              f"{req}/03-export.feature.md": f03(2),
              f"{req}/03-export.feature.tracing.json": tracing("03", "export", [CSV2, IMP_V1, PDF, PRN, SHR]),
-             **dict([spec("dNext04"), sidecar("dNext04", "Not Started")])}
+             **dict([spec("dNext04"), sidecar("dNext04", "Not Started")]),
+             "docs/implementation-plan/phase-2-more/index.md": phase_index(
+                 "Phase 2: More", ("cExp03", "dNext04", "eWip05", "fImp06", "hPau08"))}
     path, text = sidecar("cExp03", "Complete", extra="superseded_by: TOR-03-Csv0002\n",
                          reqs="TOR-03-Csv0001, TOR-03-Imp0001, TOR-03-Pdf0001, " + DANGLING)
     files[path] = text

@@ -69,8 +69,12 @@ Upgrade: format N → <target>     (or: catch-up on format N)
 ## Step 4: Branch
 
 1. The upgrade branch is `docs/upgrade-format-<target>`, or `docs/upgrade-catch-up-<N>` when
-   there is only catch-up work.
+   there is only catch-up work — `<target>` and `<N>` as plain integers (`docs/upgrade-format-2`,
+   never `-0002`).
 2. If the current branch is already that branch (a resumed run), stay on it and go to Step 5.
+   If another unmerged `docs/upgrade-*` branch exists (`git branch --list 'docs/upgrade-*'`, then
+   the merge test in item 4), it is an earlier run's: check it out and re-run
+   `tor-lifecycle format` instead of starting over from `<base>`.
 3. Otherwise `git checkout <base>`. If `git rev-parse --abbrev-ref @{upstream} 2>/dev/null` succeeds, run
    `git pull --ff-only`; on failure, stop and say the base has diverged from origin.
 4. `git checkout -b <branch>`. If that branch already exists and has merged —
@@ -91,7 +95,9 @@ local or remote branch that touches them (exit 0 = none; skip the rest of this s
 When there are rows, show them grouped by branch and explain in one sentence: those branches will
 conflict with this upgrade where they edit the same lines. Then ask via `AskUserQuestion`
 (offer the Skip option only when at least one step you will run says skipping is supported —
-otherwise the first option is `"Rewrite everything anyway (Recommended)"`):
+otherwise the first option is `"Rewrite everything anyway (Recommended)"`; when some steps
+support skipping and others do not, name the others in the question — they still rewrite the
+skipped epics' files):
 
 - Question: `"Some branches in flight touch files this upgrade rewrites. How should I proceed?"`
 - Options:
@@ -134,8 +140,9 @@ For each step:
 ## Step 7: Finish
 
 Run `tor-lifecycle format` and print its message (it says `current`). Then summarize (a
-catch-up-only run: heading `Caught up format N on <branch>`), one row per commit this run made, oldest
-first (`git log --reverse --format='%h %s' <base>..HEAD`):
+catch-up-only run: heading `Caught up format N on <branch>`), one row per commit on the branch,
+oldest first (`git log --reverse --format='%h %s' <base>..HEAD`), marking those an earlier session
+made "(earlier run)":
 
 ```
 Upgraded format N → <target> on <branch>
@@ -164,7 +171,8 @@ Merge is approval, as for every `docs/` branch. Ask via `AskUserQuestion`:
   `gh pr create --base <base> --title "chore(upgrade): format N → <target>"` (catch-up only:
   `"chore(upgrade): catch-up on format N"`) with the summary table as the body.
 - **Solo:** `git checkout <base> && git merge --no-ff <branch> && git branch -d <branch>`.
-- **Leave:** print the two commands above for later.
+- **Leave:** print the two commands above for later, and say: *"Until it merges, <base> is still on
+  format N — start no epic and run no other command that changes files there."*
 
 After a merge, remind the user that branches in flight should merge `<base>` in before they
 continue.

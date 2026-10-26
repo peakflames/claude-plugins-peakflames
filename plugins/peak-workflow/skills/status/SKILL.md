@@ -169,7 +169,9 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    `/peak-workflow:capture-requirements <TOR>` first — uphold it if it stands" instead. A requirement in
    this group (either state) that also has an A finding (edited without a record) adds "decide first
    whether its meaning changed: `/peak-workflow:capture-requirements <TOR>`" — reverify alone
-   would ratify an unrecorded edit. The epic stays
+   would ratify an unrecorded edit. A row with `historical_records` (an edit from before 3.0,
+   recorded by the upgrade without test evidence) adds "edited before 3.0 (<CR-IDs>): if its meaning
+   changed, `/peak-workflow:capture-requirements <TOR>`; if not, reverify". The epic stays
    Complete — the Phase Progress and Overall Progress counts do not change.
 3. **Health.** Group `check.findings` by letter A–F with `check.counts`. Print each finding's
    `message` verbatim; when a letter has more than 8 findings, print the first 8 and "… and N
