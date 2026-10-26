@@ -8,6 +8,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [3.0.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **Requirements helper script** — `scripts/tor_lifecycle.py` (Python 3.11+, standard library
+  only) prints per-requirement fingerprints for the working tree or any commit, current titles or
+  the record that retired an ID, and validates Change Records, the project stamp, and status sidecars.
+- **`tor-lifecycle` wrapper** — skills run the helper through a POSIX `sh` wrapper that finds
+  Python 3.11+ (`python3`, `py -3`, `python`) on macOS, Linux, and Windows Git Bash, or prints
+  plain-English install steps.
+
+### Documentation
+
+- **Plugin rules for scripts and upgrade steps** — `scripts/` holds deterministic mechanics;
+  upgrade steps are forward-only and append-only; TOR IDs are never reused and a meaning change
+  takes a new ID; major releases ship an upgrade step and bump the project format.
+
 ---
 
 ## [2.1.0] — 2026-10-26
