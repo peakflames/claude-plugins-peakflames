@@ -25,6 +25,41 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Sweep and seed** — `sweep` lists tests and source citing retired or superseded IDs; `seed`
   fingerprints each Complete epic's requirements at its completion commit and can write
   `verified:` lines.
+- **`/peak-workflow:upgrade`** — brings a project's files to this plugin's format with numbered,
+  forward-only steps on a `docs/upgrade-format-N` branch: detect, preview, apply, one
+  `chore(upgrade): step NNNN <name>` commit each. Warns about unmerged branches touching the
+  rewritten files and can skip their epics; a later run catches those epics up once they merge.
+- **Upgrade step 0001 epic-provenance** — backfills each spec's `**Planned by:**` / `**Planned:**` /
+  `**Plan branch:**` and each sidecar's `owner: —` from git history. Never overwrites a value.
+- **Format stamp** — `docs/.peak-workflow.toml` records the project's `format`. `setup` writes it
+  (format 2, `[lifecycle] disputed_threshold_days = 30`) on new projects, as does `discover` when
+  run before setup; existing projects get it from `/upgrade`.
+- **Helper commands `format`, `provenance`, `inflight`** — the format verdict and stamp writes
+  (`--init`, `--set`), step 0001's backfill, and unmerged branches touching given paths.
+
+### Changed
+
+- **One Format Guard in every skill** — replaces the eleven layout guards. Writing skills stop when
+  the project is behind or ahead of the plugin; `status` and `triage` run degraded with a banner.
+  The pre-2.5 single-index layout is reported as not a peak-workflow layout.
+- **`new-project` routes on the stamp** — fresh project, existing project, upgrade first, or update
+  the plugin. File heuristics are gone.
+- **`setup` probes Python** with `tor-lifecycle version` and reports a missing Python 3.11+ with an
+  install hint.
+- **Requirements README stub** — explains Change Records, that IDs and feature numbers are never
+  reused, and the format stamp.
+- **Epic IDs are opaque** — integer and decimal epic-ID handling and the all-digit regeneration rule
+  are removed.
+- **`wrapup-epic` asks which branch holds the work** when `feature/epic-<id>-…` is missing,
+  replacing the `feat/epic-N` lookup.
+- **`status` takes multi-owner TORs from `check`** (finding F) instead of computing them.
+- **Spec provenance and `owner:` are always present** — the "absent" fallbacks are removed;
+  step 0001 backfills older projects.
+
+### Removed
+
+- **BREAKING: `migrate-2.5` and `migrate-from-epic-workflow`** are deleted, along with
+  `new-project`'s epic-workflow detection and the "epic-workflow may be a better fit" advice.
 
 ### Documentation
 
