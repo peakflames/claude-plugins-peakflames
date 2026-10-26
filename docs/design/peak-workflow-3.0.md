@@ -59,6 +59,8 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | Q22 | (gap) | `mockup` gains a `Removed` change type; Modified/Removed screen rows list the TORs citing that `S-NN` and feed the decision test | Screen removals otherwise leave their TORs silently stale |
 | `states` | Subcommands: `fingerprint`, `titles`, `check`, `sweep`, `seed` | Adds `states --json` (the derived-state table, incl. Q17) | `status` computes nothing itself; the derived-state rules then have one implementation |
 | `version` | (none) | Adds `version`: prints the interpreter and `PLUGIN_FORMAT` | `setup` reuses it as the Python probe (Q12) |
+| `format` | Guard compares `format` with the plugin's; no stamp = format 0 | Adds `format` (verdict + user message, exit 1 unless current/new), `format --init` (setup), `format --set N` (upgrade). No stamp **and** no planning artifacts = `new`, not format 0. `--init` refuses a project that already has artifacts | A fresh repo is not a 2.1 project; setup must never stamp over a project that needs upgrading |
+| `provenance`, `inflight` | Step 0002 backfills provenance with `git log --follow`; runner warns about in-flight branches | Adds `provenance [--write] [--skip]` and `inflight <paths>`. Provenance stops at a copy or a rename from another epic's spec | `--follow` pairs a new templated spec with a look-alike one (`C071`) and reports the wrong author and date |
 
 ## Plan checklist
 
@@ -66,7 +68,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 |---|---|---|---|
 | 1 | **Foundation** — `scripts/tor-lifecycle`, `scripts/tor_lifecycle.py` (`fingerprint`, `titles`, `version`, loaders), `tests/peak-workflow/`, plugin `CLAUDE.md`, this doc | `fingerprint`/`titles`/loaders pass the tests on 3.11 + 3.14 | ✅ Done |
 | 2 | **Script analysis** — `check` A–F (`--base`, `--json`, own-branch marking), `sweep`, `seed`, `states --json` (incl. Q17); process pool for files, thread pool for git | Every row of the decision-test, derived-state, and finding A–F tables has a fixture test; the scale fixture meets Q14 | ✅ Done |
-| 3 | **Format & cleanup** — `upgrade` runner, step `0001-epic-provenance`, format guard in every skill, delete the two migrate skills, new-project routes on the stamp, setup writes the stamp + `[lifecycle]` + Python probe + requirements README stub, Q15 bundle | Format-0 fixture upgrades to 1 idempotently; dry-run of new-project → setup → upgrade | ☐ |
+| 3 | **Format & cleanup** — `upgrade` runner, step `0001-epic-provenance`, format guard in every skill, delete the two migrate skills, new-project routes on the stamp, setup writes the stamp + `[lifecycle]` + Python probe + requirements README stub, Q15 bundle | Format-0 fixture upgrades to 1 idempotently; dry-run of new-project → setup → upgrade | ✅ Done |
 | 4 | **Authoring** — capture-requirements 3B.2 five options, TOR-ID argument mode, re-litigation grep, Step 4 `check --base`, Haiku brief rewrite; FEATURE/TRACING templates; discover Removed/Modified rows; mockup (Q22); triage routes + `check` | Dry-run: brownfield supersede, retire, pending, reword-with-evidence on a docs/ branch | ☐ |
 | 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ☐ |
 | 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ☐ |
@@ -133,3 +135,45 @@ proposal + addendum). Every plan reads this file first and updates it last.
   16 Changed since verified, 1 finding C. Timings on the dev Mac: fingerprint 0.27s, seed 1.10s,
   check 0.35s (0.34s with `--base`), states 0.28s, sweep 0.29s.
 - No skill files changed, so there was no Q13 dry-run.
+
+### Plan 3 — Format & cleanup
+
+- New commands: `format` (`verdict: current|new|behind|ahead|not-peak-workflow`, then the user
+  message; exit 0 only for current/new; 2 for a bad stamp), `format --init`, `format --set N`
+  (forward only, keeps `[lifecycle]`), `provenance [--base] [--skip] [--write] [--json]`,
+  `inflight [--base] <paths…>`. "Artifacts" = feature files, sidecars, specs, vision/ConOps;
+  README stubs do not count.
+- **Format Guard** is one block per skill (12 skills): `tor-lifecycle format`, exit 0 continues,
+  anything else prints the message and stops. `status`/`triage` continue on `behind` with a banner
+  (triage prints `/add` / `/quick-fix` instead of dispatching). discover/mockup/capture-requirements
+  run it before their branch guards. `setup` and `new-project` read the verdict themselves.
+- **Interim state:** `PLUGIN_FORMAT` is 2 but only step 0001 ships until Plan 8, so `/upgrade`
+  reaches format 1 and says the build is incomplete; a format-1 project stays `behind`.
+- **Step 0001** values: author and author date of the commit that added the spec (same-epic renames
+  followed); plan branch = subject of the first-parent trunk merge that brought it in (`Merge
+  branch '…'`, `Merge pull request #N from owner/…`, `Merge remote-tracking branch`), or the trunk
+  name for a commit made on it; `—` otherwise. A `—` value is filled; real values never change.
+- **Runner:** a step whose detect is already satisfied still gets a commit (the stamp alone). An
+  in-flight skip does not hold the stamp back. Every run also re-detects already-applied steps
+  that support `--skip` (**catch-up**, branch `docs/upgrade-catch-up-N`, commit suffix
+  `(catch-up)`, no restamp), so skipped epics are upgraded once they merge. A run that commits
+  nothing deletes its branch. Steps list **Rewrites** as globs, so `inflight` ignores branches that
+  touch only other planning files.
+- **Format guard reads before the tree check:** `upgrade` reports `current` even on a dirty tree.
+  A stamp created by `format --set` gets the default `[lifecycle]` table.
+- **discover before setup:** on `verdict: new`, discover runs `format --init` itself and commits
+  the stamp on its `docs/` branch; otherwise the vision would make a brand-new project "format 0".
+- **`format` knows the shipped steps:** behind but already at the highest shipped step prints
+  `upgradable: no` and a "later build" message instead of "run /upgrade", so no command loops the
+  user back to an upgrade that can do nothing. `inflight` never lists `docs/upgrade-*` branches.
+- **Q13 dry-run:** 3 passes on fixtures (greenfield; format 0 with in-flight epic, new-epic, and
+  phase-index branches; discover before setup; empty repo). Pass 1: 11 findings (2 Critical:
+  skipped epics never caught up; discover-before-setup trap). Pass 2: 11 (1 Critical: stale merged
+  catch-up branch reused). Pass 3: 0 Critical, 5 message fixes. All fixed except one pre-existing
+  PLAN_TEMPLATE wording note (its proposed fix used `git log --author`, which start-epic forbids).
+- **Q15 done:** guards, integer/decimal IDs and all-digit regeneration, `feat/epic-N` (→ ask which
+  branch), provenance/owner "absent" fallbacks (incl. PLAN_TEMPLATE's pre-2.1 owner clause),
+  status multi-owner → `check` F. **Left for Plans 6/7 (Q16):** the pre-v1.0 "no Requirements
+  Anchors" grandfather clauses in start-epic and wrapup-epic.
+- README: migration section → "Upgrading an existing project"; root README drops the
+  epic-workflow migration pointer (removing the plugin itself stays a separate release, Q19a).
