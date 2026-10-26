@@ -912,14 +912,16 @@ def run_check(project: Project, base: str | None = None) -> dict:
         findings.append(Finding("B", f"{tor} was deleted without a record of why. Add one so the "
                                 "idea is not re-proposed later.", tor=tor))
 
-    if start:  # Branch-scoped A and B: every change since the branch start needs a branch record.
+    if start:  # Branch-scoped A and B: every change since the branch start needs a branch record,
+        # except restoring a requirement to its text as first merged (undoing an unrecorded edit).
         by_tor = {}
         for f in findings:
             by_tor.setdefault((f.letter, f.tor), f)
         branch_project = Project(root, p.stamp, p.live, branch_records, p.sidecars, p.today)
         for tor, then in start.live.items():
             now = p.live.get(tor)
-            if now and now.fingerprint != then.fingerprint and branch_project.reword_chain(
+            restored = now and tor in hist.first and hist.first[tor][2] == now.fingerprint
+            if now and not restored and now.fingerprint != then.fingerprint and branch_project.reword_chain(
                     tor, then.fingerprint, now.fingerprint, proven_only=False) is None:
                 f = by_tor.get(("A", tor)) or Finding(
                     "A", f"{tor} was edited on this branch without a change record.", tor=tor,
@@ -1400,6 +1402,107 @@ def find_root(explicit: str | None) -> Path:
     return Path(proc.stdout.strip()).resolve() if proc.returncode == 0 else Path.cwd().resolve()
 
 
+# -- Authoring: record validation, the re-litigation search, scenario text ----------------------
+
+def validate_record_files(root: Path, paths: list[str]) -> list[tuple[str, list[str]]]:
+    """(path, problems) per record file: TOML, schema, and record-ID clashes with every other
+    record in the changes folder. Empty problems = valid."""
+    targets = [Path(p) if Path(p).is_absolute() else root / p for p in paths] or sorted(
+        (root / CHANGES_DIR).glob("*.toml"))
+    by_id: dict[str, list[str]] = {}
+    for path in sorted((root / CHANGES_DIR).glob("*.toml")):
+        try:
+            rid = tomllib.loads(path.read_text(encoding="utf-8")).get("id")
+        except (tomllib.TOMLDecodeError, OSError):
+            continue
+        if isinstance(rid, str):
+            by_id.setdefault(rid, []).append(path.name)
+    out = []
+    for path in targets:
+        rel = _repo_relative(root, str(path))
+        if not path.is_file():
+            out.append((rel, ["no such file"]))
+            continue
+        try:
+            data = tomllib.loads(path.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError as exc:
+            out.append((rel, [f"not valid TOML ({exc})"]))
+            continue
+        problems = validate_record(path.name, data)
+        if not rel.startswith(CHANGES_DIR + "/") or path.parent.name != "changes":
+            problems.append(f"records live in {CHANGES_DIR}/")
+        rid = data.get("id")
+        clashes = [n for n in by_id.get(rid, []) if n != path.name] if isinstance(rid, str) else []
+        if clashes:
+            problems.append(f"record ID {rid} is also used by {', '.join(clashes)}")
+        out.append((rel, problems))
+    return out
+
+
+SEARCH_KINDS = ("supersede", "retire", "pending")
+
+
+def search_records(records: list[Record], terms: list[str]) -> list[dict]:
+    """Re-litigation guard: supersede, retire, and pending records whose title, reason, or
+    keywords mention any of `terms` (case, punctuation, and spacing ignored; whole words)."""
+    wanted = [(t, normalize(t)) for t in terms if normalize(t)]
+    rows = []
+    for r in records:
+        if r.kind not in SEARCH_KINDS:
+            continue
+        hay = " " + normalize(" ".join([r.data["title"], r.data["reason"], *r.data.get("keywords", [])])) + " "
+        hits = [t for t, n in wanted if f" {n} " in hay]
+        if hits:
+            rows.append({"record": r.id, "date": r.date.isoformat(), "kind": r.kind, "tors": r.tors,
+                         "title": r.data["title"], "reason": r.data["reason"].strip(),
+                         "matched": hits, "path": r.path})
+    return rows
+
+
+FENCE = re.compile(r"^\s*```")
+
+
+def scenario_block(text: str, tor: str) -> str | None:
+    """The `Scenario: [tor]` block verbatim: its line through its last step. Stops at the next
+    Scenario or Feature line, a code fence, or a `---` rule; trailing blank and comment lines
+    (the next section's banner) are dropped."""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    start = next((i for i, ln in enumerate(lines) if (m := SCEN.match(ln)) and m.group(1) == tor), None)
+    if start is None:
+        return None
+    end = start + 1
+    while end < len(lines) and not (SCEN.match(lines[end]) or FEAT.match(lines[end]) or FENCE.match(lines[end])
+                                    or lines[end].strip() == "---"):
+        end += 1
+    block = lines[start:end]
+    while block and (not block[-1].strip() or block[-1].lstrip().startswith("#")):
+        block.pop()
+    return "\n".join(ln.rstrip() for ln in block)
+
+
+def verified_version(root: Path, tor: str) -> dict | None:
+    """The scenario text an owning Complete epic verified: the newest version on HEAD's history
+    of the requirement's feature file whose fingerprint equals the saved `verified:` value."""
+    project = load_project(root)
+    saved = next(((s.epic, s.verified[tor]) for s in sorted(project.sidecars.values(), key=lambda s: s.epic)
+                  if s.status == "Complete" and tor in s.verified), None)
+    if saved is None:
+        return None
+    epic, fp = saved
+    req = project.live.get(tor)
+    files = [f"{REQ_DIR}/{req.feature_file}"] if req else [f"{REQ_DIR}/{FEATURE_GLOB}"]
+    log = git(root, "log", "--format=%x01%H", "--name-only", "--no-renames", "HEAD", "--", *files, check=False)
+    plan = []
+    for block in log.split("\x01")[1:]:
+        lines = [ln for ln in block.splitlines() if ln.strip()]
+        plan += [(lines[0], p) for p in lines[1:] if p.endswith(".feature.md")]
+    for (sha, path), text in zip(plan, read_blobs(root, [f"{s}:{p}" for s, p in plan])):
+        if text and any(p.tor == tor and p.fingerprint == fp for p in parse_requirements(text)):
+            return {"tor": tor, "epic": epic, "fingerprint": fp, "commit": sha,
+                    "feature_file": Path(path).name, "text": scenario_block(text, tor)}
+    return {"tor": tor, "epic": epic, "fingerprint": fp, "commit": None, "feature_file": None, "text": None}
+
+
 def cmd_fingerprint(args: argparse.Namespace, root: Path) -> int:
     if args.rev:
         rels = [_repo_relative(root, f) for f in args.files] or feature_files_at(root, args.rev)
@@ -1467,7 +1570,7 @@ def _print_json(data) -> None:
 
 FINDING_HEADINGS = {
     "A": "A. Unrecorded change", "B": "B. Unrecorded removal", "C": "C. Dangling ID",
-    "D": "D. Changed since verified", "E": "E. Retired ID still cited", "F": "F. Housekeeping",
+    "D": "D. Changed since verified", "E": "E. Retired or superseded ID still cited", "F": "F. Housekeeping",
 }
 
 
@@ -1594,6 +1697,64 @@ def cmd_inflight(args: argparse.Namespace, root: Path) -> int:
     return EXIT_FINDINGS if rows else EXIT_OK
 
 
+def cmd_validate(args: argparse.Namespace, root: Path) -> int:
+    rows = validate_record_files(root, args.files)
+    for rel, problems in rows:
+        if problems:
+            for problem in problems:
+                print(f"{rel}\t{problem}")
+        else:
+            print(f"{rel}\tok")
+    return EXIT_FINDINGS if any(problems for _rel, problems in rows) else EXIT_OK
+
+
+def cmd_search(args: argparse.Namespace, root: Path) -> int:
+    rows = search_records(load_records(root), args.terms)
+    if args.json:
+        _print_json(rows)
+    else:
+        for r in rows:
+            print("\t".join([r["record"], r["date"], r["kind"], ", ".join(r["tors"]), r["title"],
+                             "matched: " + ", ".join(r["matched"])]))
+    return EXIT_FINDINGS if rows else EXIT_OK
+
+
+def cmd_text(args: argparse.Namespace, root: Path) -> int:
+    if not TOR_RE.match(args.tor):
+        raise DataError(f"{args.tor}: not a TOR-NN-XXXXXXX ID")
+    if args.verified:
+        row = verified_version(root, args.tor)
+        if row is None:
+            print(f"{args.tor}: no Complete epic has a verified: line for it.", file=sys.stderr)
+            return EXIT_FINDINGS
+        if row["text"] is None:
+            print(f"{args.tor}: no version on this branch's history has the fingerprint epic "
+                  f"{row['epic']} verified ({row['fingerprint']}).", file=sys.stderr)
+            return EXIT_FINDINGS
+    else:
+        rel = None
+        if args.rev:
+            texts = {r: show_at(root, args.rev, r) for r in feature_files_at(root, args.rev)}
+        else:
+            texts = {_repo_relative(root, p): Path(p).read_text(encoding="utf-8") for p in feature_files(root)}
+        for rel_path, text in texts.items():
+            block = scenario_block(text or "", args.tor)
+            if block is not None:
+                rel = rel_path
+                break
+        if rel is None:
+            print(f"{args.tor}: not in any feature file{' at ' + args.rev if args.rev else ''}.", file=sys.stderr)
+            return EXIT_FINDINGS
+        [(_tor, fp)] = [x for x in fingerprint_text(texts[rel]) if x[0] == args.tor]
+        row = {"tor": args.tor, "fingerprint": fp, "commit": args.rev, "feature_file": Path(rel).name,
+               "text": block}
+    if args.json:
+        _print_json(row)
+    else:
+        print(row["text"])
+    return EXIT_OK
+
+
 def cmd_version(args: argparse.Namespace, root: Path) -> int:
     print(f"python\t{'.'.join(map(str, sys.version_info[:3]))}\t{sys.executable}")
     print(f"format\t{PLUGIN_FORMAT}")
@@ -1653,6 +1814,25 @@ def build_parser() -> argparse.ArgumentParser:
     inf.add_argument("paths", nargs="+", help="files or folders")
     inf.add_argument("--base", help="base branch (default: develop, main, master)")
     inf.set_defaults(func=cmd_inflight)
+
+    va = sub.add_parser("validate", help="schema-check Change Records (exit 1 when any problem)")
+    va.add_argument("files", nargs="*", help=f"record files (default: every {CHANGES_DIR}/*.toml)")
+    va.set_defaults(func=cmd_validate)
+
+    sr = sub.add_parser("search", help="re-litigation guard: supersede/retire/pending records whose title, "
+                                        "reason, or keywords mention a term (exit 1 when any)")
+    sr.add_argument("terms", nargs="+", help="words or phrases (quote a phrase)")
+    sr.add_argument("--json", action="store_true")
+    sr.set_defaults(func=cmd_search)
+
+    tx = sub.add_parser("text", help="print a requirement's Scenario block verbatim (exit 1 when not found)")
+    tx.add_argument("tor")
+    where = tx.add_mutually_exclusive_group()
+    where.add_argument("--rev", help="as it was at this commit")
+    where.add_argument("--verified", action="store_true",
+                       help="the version an owning Complete epic verified (matched by its saved fingerprint)")
+    tx.add_argument("--json", action="store_true")
+    tx.set_defaults(func=cmd_text)
 
     ve = sub.add_parser("version", help="print the interpreter and the project format this plugin writes")
     ve.set_defaults(func=cmd_version)
