@@ -204,9 +204,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Release Protocol template** — the tag is pushed with the branches in the ask-first step;
   changelog headings use `—` and ISO dates; the version bump is language-neutral.
 - **Small skill fixes** — plan-project's solo merge no longer pushes unasked; pause checks the
-  branch before committing; quick-fix pulls the base; start-epic's `<id>` is the first argument
-  word; zsh-safe changelog lookup; quick-fix reproduces the bug first; refresh-docs branches off
-  the base; `docs/amend-*` reuse and naming; removal steps delete an emptied test file.
+  branch before committing; start-epic's `<id>` is the first argument word; zsh-safe changelog
+  lookup; `docs/amend-*` reuse and naming; removal steps delete an emptied test file.
+- **`quick-fix` starts from a fresh base** — pulls the base and reproduces the bug before fixing;
+  a bug that does not reproduce offers a regression test only.
+- **`refresh-docs` branches off the base** when run standalone, instead of committing there.
 
 ### Documentation
 
