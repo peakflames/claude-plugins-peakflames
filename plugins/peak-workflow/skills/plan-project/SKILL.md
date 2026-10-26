@@ -443,9 +443,10 @@ Leave two kinds of unassigned row for Step 3C, never for an ordinary epic: a row
 the record's `title` and `keywords`), and a row satisfied only by code being absent.
 
 Also take each live row whose `state` is `Waived`: the epic in `waived_to` was meant to deliver it
-but does not list it. If that epic is Not Started, propose adding the TOR to it — its anchors,
-sidecar `requirements:`, and a Description / Key Components line for the behavior (Step 6.3 item 1
-mechanics); otherwise list it in Step 4 as needing a new owner. The Complete epic that waived it
+but does not list it. If that epic is Not Started and the TOR fits it under the whole-capability
+rule, propose adding the TOR to it — its anchors, sidecar `requirements:`, and a Description /
+Key Components line for the behavior (Step 6.3 item 1 mechanics). Otherwise, or if the user
+declines, plan it like any unassigned row. The Complete epic that waived it
 keeps it in its files; its `waived:` line means it is not an owner.
 
 **Never edit an epic that is not Not Started** — no spec, sidecar, or phase-index change to an In
@@ -486,7 +487,7 @@ reports every record that has none as an F finding with `kind: removal-missing`
    This skill never writes requirements.
 4. Propose the epic: name "Remove <what the record retired>", the retired behavior in the
    Description, a `## Removal` section (Step 5.2), the guard requirements as its anchors, and
-   dependencies on epics whose code it changes that are not yet Complete, plus any order the
+   dependencies on not-yet-Complete epics that own the code `sweep` listed, plus any order the
    changelog's Priority Signal asks for (for example "after the tax epic"). Place it in the
    phase whose capability it removes when that phase still has unfinished epics, otherwise in the
    last phase with unfinished epics.
@@ -634,7 +635,7 @@ skeleton's app shell and design system — no new component library, no new toke
 - Always include the three provenance lines, filled at write time — never leave a placeholder: `{planner}` is `git config user.name`, `{YYYY-MM-DD}` is today, and `{plan-branch}` is `git branch --show-current` (the `docs/` branch). `/peak-workflow:status` and `/peak-workflow:start-epic` show them so a teammate can tell who planned an epic.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise.
 - Include the `## Removal` section only for a removal epic (Step 3C). Omit it entirely otherwise. A removal epic with no guard requirements keeps the Requirements Anchors heading with the line `None — a removal epic; see Removal.` in place of the table.
-- Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it. Copy the name verbatim from `ux/screens.md`, and the wireframe path verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
+- Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it as owner. Brownfield: a slice that extends an existing screen may list it with `extends — <what changes>` in the States column (Step 4); that row is not ownership. Copy the name verbatim from `ux/screens.md`, and the wireframe path verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.
 
 **Populating Requirements Anchors:**
 
@@ -758,7 +759,7 @@ requirements baseline land in exactly one epic, explicitly and unambiguously?**
 ### 6.1: Enumerate TOR IDs
 
 Build a flat list of every live TOR ID — the `live: true` rows of `states` (greenfield: all of
-them; brownfield: the unassigned and Waived ones this run planned). One row per TOR ID. Also include:
+them; brownfield: the unassigned and Waived ones this run planned or deferred). One row per TOR ID. Also include:
 - **Removal records** — one row per Step 3C record, keyed `Removal: <CR-ID>`, captured by the
   epic whose sidecar has `retires: <CR-ID>`.
 - **Brownfield changelog entries** (if Step 3B.1 consumed a changelog) — every new capability
@@ -800,7 +801,8 @@ When `screens_present = true`, print a second table directly below it — `## Se
 Epic Trace` — one row per `S-NN` in `ux/screens.md` (brownfield: only the screens new on this branch, per Step 4) with columns `Screen | Captured in Epic(s)
 (## Screens) | Explicit? (Y/N) | Ambiguous? (Y/N)`. The same rules apply: not in any epic's
 `## Screens` section → `Explicit? N`; in two or more → `Ambiguous? Y`; the Application menu and
-Window rows trace to the skeleton; a retired screen is `N/A — retired`.
+Window rows trace to the skeleton; a retired screen is `N/A — retired`. With no rows (brownfield,
+no new screens), omit the table and say "No new screens".
 
 ### 6.3: Remediate and Re-Run
 
@@ -882,7 +884,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
 ### By the Numbers
 - Phases: [N]
 - Epics: [N]
-- TOR requirements covered: [K] of [total in baseline] — brownfield: [planned this run] of [unassigned at start], then [now owned] of [summary.live] overall
+- TOR requirements covered: [K] of [total in baseline] — brownfield: [planned this run] of [unassigned + Waived at start] ([N] deferred), then [now owned] of [summary.live] overall
 - TOR requirements deferred: [N] (see Self-Check table)
 - Removal epics: [N] (retiring {CR-ID list}) [omit when 0]
 
@@ -939,11 +941,12 @@ findings (A, B, C, E) and pointing to `/peak-workflow:status` for them. Omit whe
 
 **Planning PR body.** For the team path, write the body to a temporary file outside the
 repository (`mktemp`) and print its path in place of `<body-file>`. It lists each new epic as
-`<id> (<slug>) — <Name>` with its anchors as `TOR-… — <title>`, the titles printed by one
+`<id> (<slug>) — <Name>` (slug: the spec filename without `epic-<id>-` and `.md`) with its anchors as `TOR-… — <title>`, the titles printed by one
 `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" titles <all anchor IDs>` run (never copied from
 a spec); each removal epic adds `retires <CR-ID>`. A **Changed epics** list follows: each existing
-Not Started epic this run edited, with the TORs it gained or lost. The summary's Self-Check table uses the same
-titles.
+Not Started epic this run edited, with the TORs it gained or lost; then **Deferred** (each
+`N/A — deferred` row with its reason) and **Needs attention** (above). The summary's Self-Check
+table uses the same titles.
 
 **[Brownfield mode only — adapt the Recommended Next Steps before presenting:]** The three steps above (merge → start → status) apply to brownfield too. Shorten the merge instruction to "Merge the `docs/` branch to approve the delta requirements and new epics" and omit the setup note in step 2 (setup was already done).
 
