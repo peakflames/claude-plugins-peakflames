@@ -65,7 +65,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | # | Plan | Done when | State |
 |---|---|---|---|
 | 1 | **Foundation** — `scripts/tor-lifecycle`, `scripts/tor_lifecycle.py` (`fingerprint`, `titles`, `version`, loaders), `tests/peak-workflow/`, plugin `CLAUDE.md`, this doc | `fingerprint`/`titles`/loaders pass the tests on 3.11 + 3.14 | ✅ Done |
-| 2 | **Script analysis** — `check` A–F (`--base`, `--json`, own-branch marking), `sweep`, `seed`, `states --json` (incl. Q17); process pool for files, thread pool for git | Every row of the decision-test, derived-state, and finding A–F tables has a fixture test; the scale fixture meets Q14 | ☐ |
+| 2 | **Script analysis** — `check` A–F (`--base`, `--json`, own-branch marking), `sweep`, `seed`, `states --json` (incl. Q17); process pool for files, thread pool for git | Every row of the decision-test, derived-state, and finding A–F tables has a fixture test; the scale fixture meets Q14 | ✅ Done |
 | 3 | **Format & cleanup** — `upgrade` runner, step `0001-epic-provenance`, format guard in every skill, delete the two migrate skills, new-project routes on the stamp, setup writes the stamp + `[lifecycle]` + Python probe + requirements README stub, Q15 bundle | Format-0 fixture upgrades to 1 idempotently; dry-run of new-project → setup → upgrade | ☐ |
 | 4 | **Authoring** — capture-requirements 3B.2 five options, TOR-ID argument mode, re-litigation grep, Step 4 `check --base`, Haiku brief rewrite; FEATURE/TRACING templates; discover Removed/Modified rows; mockup (Q22); triage routes + `check` | Dry-run: brownfield supersede, retire, pending, reword-with-evidence on a docs/ branch | ☐ |
 | 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ☐ |
@@ -94,3 +94,42 @@ proposal + addendum). Every plan reads this file first and updates it last.
   accepts `→` or `->`; unknown keys are kept in `extra`. Any malformed line is a data error.
 - `titles` exits 1 when an ID is unknown (neither live nor in a supersede/retire record); records
   are loaded only when a non-live ID is asked about.
+
+### Plan 2 — Script analysis
+
+- New commands: `check [--base REF] [--json]`, `states [--json]`, `sweep [ids] [--json]`,
+  `seed [--write] [--json]`. `check` and `states` take a hidden `--today YYYY-MM-DD` for tests.
+- **Trunk.** "Merged" means on the first-parent history of `--base`, else the first of `develop`,
+  `main`, `master`, `HEAD` that exists. One `git log --first-parent -m` plus one
+  `git cat-file --batch` read every feature-file version on that history.
+- **A** compares each live ID with its text when it first appeared on the trunk; any reword chain
+  explains it (`historical` included). IDs never on the trunk are edited freely.
+- **Branch scope (`--base`).** Compares the working tree with `merge-base(base, HEAD)`. A/B on the
+  branch must be covered by records whose files are new on the branch. C and E are own-branch when
+  the (file, ID) citation is new; D when the branch changed the text. F is never own-branch.
+  `blocking` = own-branch A, B, or C. Skills add the removal-epic E and overdue-Disputed blocks.
+- **Scan scope.** Citations come from `git grep -w` over tracked and untracked (not ignored)
+  files. Change Records, `session-handoffs/`, and `CHANGELOG*` are history and never scanned.
+  E and `sweep` cover tests and source only: everything outside `docs/requirements/`,
+  `docs/implementation-plan/`, and `docs/product-vision-planning/`.
+- **C** also reports malformed `requirements:` entries in sidecars (e.g. `TOR-24 set`); sidecars
+  load leniently for `check` and `states`.
+- **F kinds:** `disputed`, `removal-missing` (retire `removal = "code"` with no epic `retires:` it),
+  `open-epic-retired`, `multiple-records` (two removing records, or two open pendings, on one ID),
+  `feature-number-reused`, `id-reused` (a removed ID is live again), `multi-owner` (the old TOR-split
+  check; a waiver is not a second owner).
+- **Disputed:** a `pending` record no other record refs. A renewal (new pending that refs it)
+  restarts the clock. Overdue = age > threshold; `# Safety` is always overdue. The Safety section
+  is read from banners: a comment line right after a `# ----` rule, or a bare `# Safety`.
+- **States precedence:** Disputed (with `underlying_state`) > Verification failed > fingerprint
+  comparison (Verified / Verified (reworded), `pass` evidence only / Changed since verified) >
+  legacy > open-epic status. Owners exclude epics that waive the TOR; Q17 falls out because only
+  live TORs get live states.
+- **Seed:** the completion commit is the first commit whose diff adds `status: Complete` to the
+  sidecar (full history, not first-parent). Only TORs without a `verified:` line are seeded,
+  waived ones are skipped, and `--write` only adds lines (idempotent).
+- **Scale fixture** (`test_scale.py`, built with `git fast-import`): 800 TORs, 60 Complete epics,
+  400 commits, 16 edits carrying historical rewords, and 1 dangling citation. Result: 784 Verified,
+  16 Changed since verified, 1 finding C. Timings on the dev Mac: fingerprint 0.27s, seed 1.10s,
+  check 0.35s (0.34s with `--base`), states 0.28s, sweep 0.29s.
+- No skill files changed, so there was no Q13 dry-run.
