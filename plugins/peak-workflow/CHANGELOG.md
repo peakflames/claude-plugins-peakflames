@@ -6,6 +6,45 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.1.0] — 2026-10-26
+
+### Added
+
+- **Epic provenance** — `plan-project` and `add` write `**Planned by:**`, `**Planned:**`, and
+  `**Plan branch:**` into every spec, and an `owner: —` sidecar line that `start-epic` fills in.
+  Older specs show `—`.
+- **What's new since you last looked** — `status` lists teammates' new phases, new epics, and
+  status changes since your own last commit on the base branch.
+- **Freshness guard** — `status`, `start-epic`, `add`, and `wrapup-epic` fetch and warn when the
+  base branch is behind origin; `start-epic` and solo wrapup pull it (fast-forward only) first.
+- **Epic card before branching** — `start-epic` shows name, phase, planner, owner, and purpose;
+  flags an epic or phase a teammate planned, another owner, or an existing origin branch; and asks
+  before creating the branch.
+
+### Changed
+
+- **Ready to Start is a decision table** — `status` shows ID, slug, name, phase, planner, date,
+  unblocks count, and purpose per ready epic; `⚑` marks epics someone else planned.
+- **No blind single pick** — with several ready epics, `status` names none and points to the table;
+  every epic is printed as `ID (slug) — Name`.
+- **Empty branches cleaned up** — `start-epic` deletes the empty feature branch when the user
+  rejects the plan, and removes such a leftover on the next start instead of resuming it — only
+  when nothing but its own Test directories line is uncommitted.
+
+### Fixed
+
+- **Local S3 in `bun-web-app-stack`** — RustFS (`rustfs/rustfs:1.0.3`) and an `amazon/aws-cli`
+  init container replace the removed MinIO images, so `docker compose up` works again. Services,
+  volume and skip flag are now `s3`, `s3-init`, `s3data` and `S3_UP`.
+
+### Documentation
+
+- **README design process** — new section walks `/mockup` → `/setup` tooling → Design pass →
+  wrapup UX gate; the start-here diagram, skill tables, and Key Files now include `/mockup`, the
+  shadcn tooling, and the setup publish step.
+
+---
+
 ## [2.0.0] — 2026-09-16
 
 Product shape, not project type, chooses the stack: plain-language questions route a web

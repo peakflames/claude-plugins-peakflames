@@ -39,7 +39,15 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
-**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic) and an optional `waived: TOR-… → <succ>` line written by wrapup
+**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an optional `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup
+
+**Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
+ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by
+`plan-project` and `add`); older specs show `—` — no git-history fallback. `status` fetches and warns when the base is behind origin, shows what teammates
+changed since the user's own last commit, lists ready epics as a table, and **never picks among
+several ready epics**. `start-epic` pulls the base, then shows an epic card (with `⚑` lines for a
+teammate's epic, phase, owner, or existing origin branch) and confirms before creating the branch,
+and removes an empty branch left by a rejected plan.
 
 **Branch families:**
 - `docs/{task-short-name}` — full planning sequence (discover → mockup [UI] → capture-requirements → plan-project)

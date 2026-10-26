@@ -55,6 +55,12 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
    - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
    - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
+   - After checkout, check freshness (base: `develop` > `main` > `master`). If `git remote` does
+     not list `origin`, skip silently. Otherwise run `git fetch --quiet origin`; if the fetch
+     fails, say `Freshness check skipped — origin not reachable`. If `origin/<base>` exists, count
+     `git rev-list --count <base>..origin/<base>`; if the base is behind, note it for the user now
+     (`<base> is <N> commit(s) behind origin — solo shipping (Step 5a) pulls it before merging`)
+     and carry it to Step 5. Verification itself runs on the feature branch and is unaffected.
    - After checkout, **re-read `CLAUDE.md`** from the working tree. The copy loaded at session start
      came from the base branch; an epic that changed `CLAUDE.md` (the walking skeleton resolving
      `TBD` lines, for one) is only visible after checkout.
@@ -533,7 +539,8 @@ Use the template at `plugins/peak-workflow/skills/wrapup-epic/HANDOFF_TEMPLATE.m
 ### Step 2.2: Update Status Sidecar
 
 Update `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
-1. Change `status: Implemented` to `status: Complete`
+1. Change `status: Implemented` to `status: Complete` (leave any `owner:` line as it is — it
+   records who implemented the epic)
 2. Set `completed: <today>` (YYYY-MM-DD)
 3. Set `handoff: session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim)
 4. If any TOR was waived in Step 1.4b, add (or replace) a
@@ -653,7 +660,10 @@ be made by the user every invocation.
 
 1. Note the current feature branch name (`feature/epic-<id>-<short-name>` or legacy `feat/epic-N`).
 2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
-3. `git checkout <base-branch>`
+3. `git checkout <base-branch>`, then — if `origin/<base-branch>` exists —
+   `git pull --ff-only origin <base-branch>`, so the merge lands on the team's latest base rather
+   than a stale local copy. If the pull fails for any reason, stop, show git's message, and tell
+   the user to reconcile `<base-branch>` first; the feature branch and its wrapup commit are intact.
 4. `git merge <branch> --no-ff -m "epic(<id>): merge <branch> — <brief summary>"`
 5. `git branch -d <branch>`
 6. Confirm with `git log --oneline -5`

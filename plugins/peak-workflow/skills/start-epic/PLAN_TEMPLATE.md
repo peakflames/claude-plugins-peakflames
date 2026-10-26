@@ -36,11 +36,17 @@ Placeholder reference:
    - If already on `feature/epic-<id>-<short-name>`, confirm and continue.
    - If the branch exists but you are not on it, run `git checkout feature/epic-<id>-<short-name>`.
    - If the branch does not exist, detect the base branch (`develop` > `main` > `master`),
-     switch to it, and run `git checkout -b feature/epic-<id>-<short-name>`.
+     switch to it, run `git pull --ff-only origin <base-branch>` if `origin/<base-branch>` exists
+     (stop and show git's message if the pull fails), and run `git checkout -b feature/epic-<id>-<short-name>`.
 
 2. **Update status to "In Progress"** — edit `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
-   change `status: Not Started` (or `status: Paused`) to `status: In Progress`. Leave
-   `implemented:`, `completed:`, and `requirements:` unchanged. Capture whether this is a
+   change `status: Not Started` (or `status: Paused`) to `status: In Progress`, and set
+   `owner: <git config user.name>` — add the line directly after `status:` if the sidecar has
+   none (sidecars written before peak-workflow 2.1.0), replace `owner: —`, and keep it if it
+   already names you (case-insensitive; any name you have committed under with your
+   `git config user.email` counts). If it names someone else, the user confirmed taking it over at
+   `start-epic` Step 2.5 — replace it and say so in one line. Leave `implemented:`,
+   `completed:`, and `requirements:` unchanged. Capture whether this is a
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
    (prior status was already In Progress, or was Implemented — rework after a wrapup FAIL).
    Item 3 uses this.
