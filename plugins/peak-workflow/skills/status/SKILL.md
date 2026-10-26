@@ -1,8 +1,8 @@
 ---
 name: status
 description: |
-  Displays a project status dashboard — epic progress, requirements coverage, active work,
-  stale paused epics, and next actions.
+  Displays a project status dashboard — epic progress, requirements coverage and health, active
+  work, stale paused epics, and next actions.
   Strictly read-only — does not modify any files.
   Triggers on: "status", "project status", "what's the progress", "how far along are we",
   "show me the dashboard", "where are we", "what's left to do", "epic status",
@@ -39,6 +39,10 @@ degraded mode: show what the files hold, and add to the
 banner that figures may be incomplete until the upgrade runs. On any other exit, print its output and stop — it
 names the fix (a plugin update or a Python install).
 
+**This skill computes no requirement state itself.** Every requirement figure — states, the
+verified percentage, findings A–F, overdue Disputed requirements — comes from the helper's two
+JSON reports (Step 1.5). Never re-derive a state from feature files, sidecars, or Change Records.
+
 ---
 
 Follow these steps exactly:
@@ -73,12 +77,29 @@ Read every phase index file. For each, capture:
 - Phase number and name (from the `# Phase N: Name` heading)
 - Each epic row: **Epic ID** (verbatim — 7-character alphanumeric ID like `a3f2K7p`), epic name, and the dependency IDs listed in the Dependencies column
 
-Also glob `docs/requirements/*.feature.md` if the directory exists. For each feature file:
-- Parse every `Scenario: [TOR-NN-XXXXXXX]` block — capture the TOR ID and scenario title.
-- Build a flat list of all TOR IDs in the requirements baseline with their feature file source.
+## Step 1.5: Load the Requirements Reports
 
-If `docs/requirements/` does not exist or is empty: note that no requirements baseline has been
-established yet (no Requirements Coverage panel will be shown this run).
+If `docs/requirements/` holds no `*.feature.md` file, no requirements baseline exists yet: skip
+this step, and skip the Requirements Coverage, Changed Since Verified, and Requirements Health
+panels. Otherwise run both, once each:
+
+- `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" states --json` → **`states`**. `summary.live`
+  is the live-requirement count (the denominator), `summary.verified` and
+  `summary.verified_percent` the verified figures, `summary.by_state` the count per state.
+  `requirements` holds one row per ID: `tor`, `state`, `live`, `title`, `epic` (the owning epic
+  the state comes from), `dispute` (for a Disputed row: `record`, `age_days`, `threshold_days`,
+  `safety`, `overdue`), `underlying_state` (what a Disputed row would otherwise be), `waived_to`,
+  `successors`, `record`, and `removal_epics`. Retired and superseded IDs appear with
+  `live: false` and are never in the denominator.
+- `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --json` → **`check`**. Exit 0 (no
+  findings) and exit 1 (findings) are both success. `counts` is the number per letter A–F;
+  each entry of `findings` has `letter`, `message` (plain English, ready to print), `tor`,
+  `epic`, `path`, `kind` (for F), and `detail`.
+
+Either command exiting 2 or 3 is not a dashboard figure: print its output under the
+Requirements Coverage heading, skip the three requirements panels, and render the rest. On a
+project the Format Guard reported `behind` this is expected for older files — the banner already
+says to run the upgrade. Never fall back to counting the files yourself.
 
 ## Step 2: Load Status Sidecars
 
@@ -88,11 +109,11 @@ Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For eac
 - `implemented:` date (if set)
 - `completed:` date (if set)
 - `handoff:` link (if set)
-- `requirements:` field (comma-separated TOR IDs, or `—` if empty). Parse the TOR IDs into a
-  list; this is the set of TOR IDs this epic is responsible for implementing.
-- `waived:` line (optional, written by `wrapup-epic`): comma-separated `TOR-… → <succ>` pairs.
-  Parse into a TOR ID → successor epic ID map.
 - `owner:` line: the person working on it (set by `start-epic`). `—` means unclaimed.
+- `retires:` line (optional): the Change Record(s) a removal epic carries out.
+
+Requirement ownership, `verified:`, `unverified:`, and `waived:` are read by the helper (Step
+1.5), not here.
 
 Take each epic's **Slug** from its spec filename alone — glob
 `docs/implementation-plan/phase-*/epic-*.md`, do not open the specs (see "Epic references" above).
@@ -109,35 +130,50 @@ Using the epic IDs, statuses, and dates loaded from the sidecars (Step 2), calcu
 - **Phase progress** — for each phase (from Step 1), show X/Y epics complete (count both "Implemented" and "Complete" as done)
 - **Overall progress** — percentage of epics that are "Implemented" or "Complete"
 
-## Step 4.5: Compute Requirements Coverage
+## Step 4.5: Requirements Coverage, Health, and the Nudge
 
-If no TOR IDs were found in Step 1 (requirements baseline is empty or missing), skip this step.
+Skip this step when Step 1.5 was skipped or failed. Everything below reads `states` and `check`.
 
-Build a TOR ID → coverage status map. For every TOR ID from the feature files:
+1. **Coverage.** The denominator is `summary.live` — live requirements only; superseded and
+   retired IDs never count. The headline is `summary.verified` of `summary.live`
+   (`summary.verified_percent`). Fill the Requirements Coverage table from `summary.by_state`
+   using the derived-state table:
 
-1. Search all epic sidecars' `requirements:` fields for this TOR ID. Ignore any epic whose
-   `waived:` line also lists this TOR ID — a waived TOR is not satisfied by that epic; its
-   coverage comes from the successor epic named after the arrow. If no other epic lists it,
-   the status is `Waived (→ epic <succ>, successor does not list it)`.
-2. Map the TOR ID's coverage status based on the containing epic's `status:`:
+   | State (from `states`) | Counts as verified | Next step shown for it |
+   |---|---|---|
+   | Verified | Yes | — |
+   | Verified (reworded) | Yes | — |
+   | Verified (legacy, unfingerprinted) | Yes — shown on its own row | — (the upgrade's seed fingerprints these) |
+   | Changed since verified | No | `/peak-workflow:wrapup-epic <epic> reverify` |
+   | Verification failed | No | fix the code with `/peak-workflow:quick-fix`, then reverify |
+   | Disputed | No | `/peak-workflow:capture-requirements <TOR>` |
+   | Implemented | No | `/peak-workflow:wrapup-epic <epic>` |
+   | In Progress / Paused / Planned | No | — |
+   | Waived | No | add it to the successor epic named in `waived_to` |
+   | Specified (no epic assigned) | No | `/peak-workflow:add` |
+   | Superseded | Not in the denominator | — |
+   | Retired | Not in the denominator | — |
+   | Retired, removal pending | Not in the denominator; a warning | the removal epic in `removal_epics`, or `/peak-workflow:add removal epic for <record>` |
 
-   | Epic Status | TOR Coverage Status |
-   |---|---|
-   | No epic contains this TOR ID | `Specified (uncommitted — no epic assigned)` |
-   | Not Started | `Planned` |
-   | In Progress | `In Progress` |
-   | Paused | `Paused (with epic <id>)` |
-   | Implemented | `Implemented (pending independent verification)` |
-   | Complete | `Verified` |
-
-3. If a TOR ID appears in more than one epic's `requirements:` field **after excluding epics
-   that waive it**, use the most advanced status among those epics. Owning a TOR twice is a
-   health finding, reported by `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --json`
-   as finding F with `"kind": "multi-owner"` (`detail.epics` lists the owners) — run it once and
-   keep those findings for the dashboard.
-
-Count totals for each coverage status. Compute overall verified percentage:
-`(Verified count / total TOR count) * 100`
+   Omit rows whose count is 0, except Verified.
+2. **Changed since verified, by epic.** Group the live rows whose `state` is `Changed since
+   verified` or `Verification failed` (and Disputed rows whose `underlying_state` is one of them)
+   by `epic`. One group per Complete epic: its `<id> (<slug>) — <Name>`, each requirement as
+   `TOR-… — <title>`, and the command `/peak-workflow:wrapup-epic <id> reverify`. A Verification
+   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`". The epic stays
+   Complete — the Phase Progress and Overall Progress counts do not change.
+3. **Health.** Group `check.findings` by letter A–F with `check.counts`. Print each finding's
+   `message` verbatim; when a letter has more than 8 findings, print the first 8 and "… and N
+   more". Do not reword, re-rank, or re-check them. F findings with `kind: disputed`,
+   `removal-missing`, `multi-owner`, or `open-epic-retired` also feed Suggested Next Action.
+4. **Disputed past the threshold.** The live rows whose `dispute.overdue` is true. A `# Safety`
+   requirement (`dispute.safety`) is always overdue (its threshold is 0 days). The oldest one —
+   Safety first — becomes the **top** Suggested Next Action.
+5. **The nudge.** If any live row is Disputed or Changed since verified, Step 7 opens with one
+   plain sentence naming the counts and the next command, for example: "2 requirements are known
+   to be wrong and 3 changed after they were verified — start with
+   `/peak-workflow:capture-requirements TOR-02-Mail001`." The command is the top Suggested Next
+   Action's.
 
 ## Step 5: Flag Stale Paused Epics
 
@@ -192,12 +228,14 @@ Flag a ready epic with `⚑` when its **Planned by** is set and is not one of yo
 
 ## Step 7: Present Dashboard
 
-Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2), render:
+Using the data assembled from phase indexes and sidecars (Steps 1–3) and the requirements reports (Steps 1.5 and 4.5), render:
 
 ```
 # Project Status Dashboard
 
+[Format Guard behind banner, if any — degraded mode]
 [Step 0.5 behind-origin banner, if any]
+[Step 4.5 nudge, if any]
 
 ## New Since You Last Looked
 
@@ -235,30 +273,60 @@ Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2),
 
 ## Requirements Coverage
 
-[Skip this panel if no requirements baseline exists. Otherwise:]
+[Skip this panel if no requirements baseline exists. If Step 1.5 failed, print the helper's
+output here instead and skip the next two panels too.]
 
-[N]% of TOR requirements verified — [X] of [Y] total
+[summary.verified_percent]% of live TOR requirements verified — [summary.verified] of [summary.live]
 
-| Coverage Status | Count |
+| Requirement state | Count |
 |---|---|
-| Verified (Complete) | [N] |
+| Verified | [N] |
+| Verified (reworded) | [N] |
+| Verified (legacy, unfingerprinted) | [N] |
+| Changed since verified | [N] |
+| Verification failed | [N] |
+| Disputed | [N] |
 | Implemented (pending verification) | [N] |
 | In Progress | [N] |
-| Planned (Not Started) | [N] |
 | Paused | [N] |
+| Planned (Not Started) | [N] |
 | Waived (successor does not list it) | [N] |
 | Specified (no epic assigned) | [N] |
 
-**Total TOR requirements in baseline:** [Y]
+**Live requirements:** [summary.live]. Not counted: [N] superseded, [N] retired, [N] retired
+with removal pending.
 
-[If any TOR IDs are "Specified (no epic assigned)":]
-> ⚠️ [N] TOR requirements have no epic assigned. Run `/peak-workflow:add` to plan their implementation.
+[If any are Specified:]
+> ⚠️ [N] requirements have no epic assigned. Run `/peak-workflow:add` to plan them.
 
-[If any TOR IDs are "Waived (successor does not list it)":]
-> ⚠️ [N] waived TOR requirements name a successor epic that does not list them: {TOR → epic list}. Add them to the successor's spec and sidecar.
+[If any are Waived:]
+> ⚠️ [N] waived requirements name a successor epic that does not list them: {TOR → epic list}. Add them to the successor's spec and sidecar.
 
-[If `check` reported any `multi-owner` findings (Step 4.5 item 3):]
-> ⚠️ [N] TOR requirements are owned by more than one epic: {TOR (epic, epic) list}. Each TOR should have exactly one owner.
+[If any are Retired, removal pending:]
+> ⚠️ {CR-ID} retired {TOR list} but the code is still there — {removal epic `<id> (<slug>) — <Name>` and its status | no removal epic yet: `/peak-workflow:add removal epic for <CR-ID>`}.
+
+## Changed Since Verified
+
+[Skip when Step 4.5 item 2 found nothing. One block per epic:]
+
+**<id> (<slug>) — <Name>** (Complete) — [N] requirement(s) changed since verification
+- TOR-… — <title> [— verification failed: fix the code first with `/peak-workflow:quick-fix`]
+- Re-check: `/peak-workflow:wrapup-epic <id> reverify`
+
+## Requirements Health
+
+[Skip when no baseline. Otherwise "No findings." when `check` reported none, else:]
+
+| Finding | Count |
+|---|---|
+| A. Unrecorded change | [N] |
+| B. Unrecorded removal | [N] |
+| C. Dangling ID | [N] |
+| D. Changed since verified | [N] |
+| E. Retired or superseded ID still cited | [N] |
+| F. Housekeeping | [N] |
+
+[Then, per letter with findings, the heading and its messages verbatim (first 8, then "… and N more").]
 
 ## Active Work
 
@@ -287,13 +355,16 @@ means the spec records no planner.]
 
 ## Suggested Next Action
 
-[Based on the current state, recommend what to do next. Name every epic as `<id> (<slug>) — <Name>`:
+[Based on the current state, recommend what to do next, in this order. Name every epic as `<id> (<slug>) — <Name>` and every requirement as `TOR-… — <title>`:
+ - **First, always, when Step 4.5 item 4 found one:** the overdue Disputed requirement — "TOR-… — <title> is known to be wrong (<record>, <age_days> days[, a Safety requirement — no branch that touches it can ship]). Resolve it: `/peak-workflow:capture-requirements <TOR>`". When several are overdue, name the oldest (Safety first) and the count of the rest.
  - If there's an "In Progress" epic: "Continue working on Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>`" — when its `owner:` is set and is not you, say whose it is instead ("In progress by <owner> — coordinate before touching it")
  - If there's an "Implemented" epic awaiting review: "Review Epic <id> (<slug>) — <Name> with `/peak-workflow:wrapup-epic <id>`"
+ - If any epic has requirements changed since verification (Step 4.5 item 2): "Re-check Epic <id> (<slug>) — <Name>: `/peak-workflow:wrapup-epic <id> reverify`" — one line per epic, at most three
  - If there's a stale paused epic: "Resume or close paused Epic <id> (<slug>) — <Name> — it's been [X] days"
- - If there are "Specified" TOR IDs (no epic): "Run `/peak-workflow:add` to assign [N] unplanned TOR requirements to epics"
+ - If `check` reported `removal-missing`: "Plan the code removal for <CR-ID>: `/peak-workflow:add removal epic for <CR-ID>`"
+ - If there are "Specified" requirements (no epic): "Run `/peak-workflow:add` to assign [N] unplanned TOR requirements to epics"
  - If exactly one epic is ready to start: "Start Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>` — <one-clause reason, e.g. the only unblocked epic>"
  - If several epics are ready to start: do **not** pick one. Write "[N] epics are ready — choose from the Ready to Start table above", and add one line when the ready epics span more than one phase or more than one planner ("They come from phases 3 and 4; ⚑ rows were planned by someone else — check with them before starting"). Choosing among ready epics is the team's decision, not the dashboard's.
- - If all epics are complete and all TOR IDs are Verified: "All requirements verified! Consider `/peak-workflow:refresh-docs` before release."
- - If all epics are complete but some TOR IDs still show Implemented (not Verified): "Run `/peak-workflow:wrapup-epic <id>` to complete independent verification of remaining epics."]
+ - If all epics are complete and every live requirement counts as verified with no findings: "All requirements verified! Consider `/peak-workflow:refresh-docs` before release."
+ - If all epics are complete but some requirements are still Implemented: "Run `/peak-workflow:wrapup-epic <id>` to complete independent verification of remaining epics."]
 ```

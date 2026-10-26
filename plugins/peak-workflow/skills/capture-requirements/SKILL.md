@@ -1031,7 +1031,8 @@ docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md
   → docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md.processed
 ```
 Preserve the original timestamp. The `.processed` suffix prevents re-consumption on the next
-`capture-requirements` or `plan-project` run.
+`capture-requirements` run; `plan-project` on this same branch still reads its Priority Signal
+(it looks for a changelog the branch archived).
 
 ---
 
