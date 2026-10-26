@@ -17,13 +17,13 @@ concept of operations documents.
 
 The user's request: $ARGUMENTS
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 
@@ -339,7 +339,7 @@ LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7
 
 The `LC_ALL=C` prefix is required for portability — without it, BSD `tr` (macOS) can emit "Illegal byte sequence" on non-UTF8 bytes from `/dev/urandom`.
 
-Validate each ID: if the 7-char string contains only digits, regenerate (this prevents the rare case where a random ID would be ambiguous with the legacy integer format). Also ensure uniqueness across the batch — extremely unlikely, but check.
+Ensure uniqueness across the batch and against existing epic IDs — extremely unlikely to collide, but check.
 
 Example IDs: `a3f2K7p`, `B9xQr2z`, `m4Ljf0T`.
 
@@ -421,7 +421,7 @@ whole-capability rule from 3A.3, exclusive TOR ownership, ~4–20 TOR IDs as a s
 epics are added to the phase whose milestone they extend, or to a new phase when they open a new
 ConOps scenario.
 
-**Assign IDs** using the same generation command as Step 3A.3 — a fresh 7-character random alphanumeric ID per new epic, regenerated if all-digit, unique across the batch. Do not reuse existing integer IDs; do not attempt to slot new epics into the old decimal scheme (e.g., `6.7`). Existing integer-IDed epics in the index remain untouched; new epics always get alphanumeric IDs.
+**Assign IDs** using the same generation command as Step 3A.3 — a fresh 7-character random alphanumeric ID per new epic, unique across the batch and the existing plan. Existing epic IDs are opaque strings: never renumber, reuse, or interpret them.
 
 Proceed to Step 4.
 
@@ -492,7 +492,7 @@ Create `docs/implementation-plan/session-handoffs/` if it doesn't exist.
 
 For each epic, write the spec file following the exact format below (the same format as `/peak-workflow:add`). This format is read by `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic`.
 
-**File:** `docs/implementation-plan/phase-{N}-{name}/epic-{id}-{kebab-case-name}.md` (where `{id}` is the 7-char alphanumeric ID for new epics, or a preserved legacy integer for brownfield rows that already exist)
+**File:** `docs/implementation-plan/phase-{N}-{name}/epic-{id}-{kebab-case-name}.md` (where `{id}` is the 7-char alphanumeric ID)
 
 ```markdown
 # Epic {id}: {Name}
@@ -646,7 +646,7 @@ This project uses the v2.5.0 layout. See:
 
 Skills do not read or write this stub after initial creation — it is a human-readable pointer only.
 
-**Brownfield:** For each new epic, append a row to the relevant `docs/implementation-plan/phase-{N}-{name}/index.md` at the **bottom** of the file (use insertion order — random IDs have no meaningful sort order). Create `docs/implementation-plan/status/epic-{id}.md` for each new epic. Preserve all existing phase index rows and their sidecar files — legacy integer IDs stay exactly as they are.
+**Brownfield:** For each new epic, append a row to the relevant `docs/implementation-plan/phase-{N}-{name}/index.md` at the **bottom** of the file (use insertion order — random IDs have no meaningful sort order). Create `docs/implementation-plan/status/epic-{id}.md` for each new epic. Preserve all existing phase index rows and their sidecar files exactly as they are.
 
 ### 5.4: Brownfield Changelog Archival
 
@@ -831,7 +831,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
 > the project's lifetime. Once the TOR baseline is established, every new request routes
 > through `/triage` to determine whether it needs new TOR IDs (HEAVY), implements existing
 > ones (EPIC), or is a trivial bug (TRIVIAL) — preventing both over-engineering and
-> under-speccing. For a one-off script, `epic-workflow` may be a better fit.
+> under-speccing.
 ```
 
 **[Brownfield mode only — adapt the Recommended Next Steps before presenting:]** The three steps above (merge → start → status) apply to brownfield too. Shorten the merge instruction to "Merge the `docs/` branch to approve the delta requirements and new epics" and omit the setup note in step 2 (setup was already done).

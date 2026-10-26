@@ -31,13 +31,13 @@ TOR requirements into `architecture.md` or `design-notes.md`.
 
 ---
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 
@@ -64,8 +64,6 @@ These become the **claims to verify** in Step 4.
 ## Step 3: Aggregate Session Handoffs
 
 Read all files in `docs/implementation-plan/session-handoffs/` that correspond to Complete or Implemented epics. Skip Paused handoffs — their decisions may not be final.
-
-> **Epic ID formats:** handoff filenames are `epic-<id>-complete.md` or `epic-<id>-implemented.md`, where `<id>` may be a legacy integer (e.g., `7`, `6.5`) or a 7-character alphanumeric ID (e.g., `a3f2K7p`). The `epic-*-complete.md` and `epic-*-implemented.md` glob patterns match both formats — no special handling needed.
 
 For each handoff, collect:
 - **Key Files** — every file path listed in the Key Files table

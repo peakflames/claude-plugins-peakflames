@@ -22,9 +22,17 @@ The user's request / brownfield description: $ARGUMENTS
 
 ---
 
+## Format Guard
+
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
+
 ## Step 0: Branch Guard
 
-**Before any other action:**
+**Right after the Format Guard:**
 
 1. Run `git branch --show-current`. Capture the result as `<current-branch>`.
 2. If `<current-branch>` is `develop`, `main`, or `master` — stop immediately:

@@ -23,9 +23,17 @@ The user's request (scenario title, or blank for all scenarios): $ARGUMENTS
 
 ---
 
+## Format Guard
+
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
+
 ## Project Type Guard
 
-**Before any other action (read-only):** read `CLAUDE.md` at the repo root (do not re-read if
+**Right after the Format Guard (read-only):** read `CLAUDE.md` at the repo root (do not re-read if
 already in context) and take the **Project type** from its `Tool Hygiene & Operability`
 section. If it is `CLI tool`, `Library`, `Service or API`, or a `Hybrid` whose description names
 no UI, print and stop — before the branch guard, so a non-UI project never sees a branch question:
@@ -67,14 +75,6 @@ On "No UI — stop", end here. Otherwise carry the project type into Step 1.
    If the user chooses Stop, end here.
 
 4. If `<current-branch>` starts with `docs/` — continue. No action needed.
-
-## Layout Guard
-
-**Before any other action after the branch guard:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
 
 ---
 

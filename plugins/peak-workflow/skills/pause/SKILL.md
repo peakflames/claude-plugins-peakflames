@@ -11,13 +11,13 @@ description: |
 
 You are pausing the current epic implementation session. This preserves context so the next session can resume exactly where you left off.
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 
@@ -52,7 +52,7 @@ List all tasks from this session with their current status (completed, in_progre
 
 ## Step 3: Write Handoff File
 
-Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID — either a legacy integer like `7` or `6.5`, or a 7-char alphanumeric ID like `a3f2K7p`) with this structure:
+Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` with this structure:
 
 ```markdown
 # Epic <id>: [Name] — Session Handoff (Paused)
@@ -94,7 +94,7 @@ When resuming this epic, start by:
 
 ## Step 4: Update Status Sidecar
 
-Update `docs/implementation-plan/status/epic-<id>.md` (use the epic's actual ID — legacy integer or 7-char alphanumeric):
+Update `docs/implementation-plan/status/epic-<id>.md`:
 1. Change `status: In Progress` to `status: Paused`
 2. Change `handoff: —` to `handoff: session-handoffs/epic-<id>-paused.md`
 
@@ -107,7 +107,7 @@ so the spec stays in sync with the sidecar.
 **Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + index update). If the user confirms:
 
 1. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
-2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>` (use the epic's actual ID — legacy integer or 7-char alphanumeric)
+2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`
 3. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
    ```
    wip(epic-<id>): pause — <brief summary of progress so far>
