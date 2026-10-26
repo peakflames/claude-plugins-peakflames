@@ -4,7 +4,7 @@ description: |
   Derives formal Gherkin-style TOR requirements (.feature.md files) from product-vision.md and
   concept-of-operations.md. Main agent adopts a seasoned-PM persona to author feature files
   autonomously; Haiku sub-agent verifies traceability and writes .feature.tracing.json sidecars.
-  Changes to merged requirements (reword, supersede, retire, record as pending) each leave a
+  Changes to merged requirements (reword, supersede, retire, record as pending, uphold) each leave a
   Change Record in docs/requirements/changes/. With a TOR ID argument it amends that one
   requirement (e.g. one that changed since it was verified, or one known to be wrong).
   User reviews via the docs/ branch and merge — there is no inline interview.
@@ -274,16 +274,19 @@ Before writing a new requirement — greenfield, brownfield, add-alongside, or a
 successor — run `tor-lifecycle search <2–4 key nouns or quoted phrases of the capability>`.
 Exit 0 = no earlier decision; continue. Exit 1 prints the matching records. For each hit that is
 really the same idea, ask with `AskUserQuestion`:
-- Question: `"<capability> was <retired / superseded / recorded as pending> in <CR-ID> (<date>): <reason, one line>. Reintroduce it anyway?"`
+- Question: `"<capability> was <retired / superseded / recorded as pending / upheld> in <CR-ID> (<date>): <reason, one line>. Reintroduce it anyway?"`
 - Options: `["Reintroduce — new requirement, new ID", "Drop it — the earlier decision stands"]`
 
 On Reintroduce, the new requirement gets a **new ID** (never the old one) and its tracing entry's
 `rationale` reads `Reintroduces the idea <kind> in <CR-ID>: <why now>`. On Drop, leave it out and
 list it under the summary's Coverage Gaps as `dropped — <CR-ID> stands`. A hit on a `pending`
-record means the requirement is still live and known wrong: resolve it with Step 3C instead of
-adding a second one.
+record printed `pending (closed by CR-…)` is settled — the closing record is the decision; ask
+about that one. An open `pending` hit means the requirement is still live and known wrong: resolve it with Step 3C instead of
+adding a second one. A hit on an `uphold` record means the requirement was disputed and kept as
+written: a new requirement that contradicts it changes that decision — name the record in the
+question.
 
-### L5: The five choices for a changed merged requirement
+### L5: The choices for a changed merged requirement
 
 Each choice below that writes a record follows `CHANGE_RECORD_TEMPLATE.md` (file name, ID,
 `approved_via = "docs-branch"`, `approved_by` from `git config user.name`) and is checked with
@@ -324,7 +327,15 @@ that resolves or renews a `pending` record lists that record's ID in `refs`.
    `git config user.name`. If `gh` is available and the repository is on GitHub, ask once whether
    to open a tracking issue first; on yes, run `gh issue create` and put its URL in `tracker`.
    **Never offer this for a requirement under a `# Safety` banner** — a known-wrong Safety
-   requirement is resolved on this branch with choice 2, 3, or 4.
+   requirement is resolved on this branch with choice 2, 3, 4, or 6.
+6. **Uphold** — only for a Disputed requirement (an open `pending` record): the owner decides it
+   stands as written. The feature file and tracing sidecar are **not** touched. Write an `uphold`
+   record: `refs` = the open pending record's ID (the latest renewal), `fingerprint` = the current
+   one (`tor-lifecycle fingerprint <feature file>`), `reason` = why it stands (with no
+   description, ask in one line: `Why does <TOR> stand as written? (one sentence — it becomes the
+   record's reason)`), `keywords` from the pending record plus the reason. The dispute closes; the requirement returns to its underlying
+   state — an uphold verifies nothing, so a Verification failed or Changed since verified
+   requirement still needs its code fixed or a reverify.
 
 Ask one `AskUserQuestion` per changed requirement (batch up to four questions per call), with the
 recommended choice first. Which choices appear depends on what the input says and on L3 —
@@ -835,6 +846,9 @@ greenfield files.
    - Exit 1 (unknown) → stop: `"<TOR-ID> is not a requirement in this project."`
    - Superseded or retired → stop and print the line: the ID is history; amend its successor
      instead.
+
+   In either stop, if Step 0 created the branch, run `git checkout <base>` and
+   `git branch -D docs/amend-<tor-id>`.
 2. **Read its state.** Run `tor-lifecycle states --json` and take this ID's row, and
    `tor-lifecycle check --base <base> --json` and take the findings naming it. Print the title,
    state, owning epic, and those findings in plain words.
@@ -844,7 +858,7 @@ greenfield files.
    |---|---|---|---|
    | **Changed since verified** | Finding D, or state `Changed since verified` | `tor-lifecycle text <TOR> --verified --json` | The current block, plus the description's change if one is given |
    | **Edited without a record** | Finding A | `tor-lifecycle text <TOR> --rev <merged_commit> --json` (the finding's `detail.merged_commit`) | Same as above |
-   | **Disputed** | State `Disputed` (an open `pending` record) | The current block | The description's change; with no description, ask what it should say |
+   | **Disputed** | State `Disputed` (an open `pending` record) | The current block | The description's change, if any (step 4 asks first whether it stands) |
    | **Requested change** | Anything else, with a description | The current block | The description's change |
 
    For the first two cases the old text may be the right one — the vision, the ConOps, or the
@@ -857,15 +871,24 @@ greenfield files.
    A requested change with no description: stop and ask for one
    (`/peak-workflow:capture-requirements <TOR-ID> <what should change>`). A requirement that is
    not merged (L1) is edited freely — apply the description and skip to Step 5.
-4. **Decide.** Run the decision test (L3) on old vs new, then ask the L5 question with the
+   When a requirement in the first two cases also has an open `pending` record, add `Uphold` to
+   step 4's options and list the pending record's ID in the `refs` of any record written; a
+   Restore writes no record, so say the dispute stays open (`Uphold` then closes it).
+4. **Decide.** For **Disputed**, ask the owner question below first and run L3 only after
+   `Change it`. Otherwise run the decision test (L3) on old vs new, then ask the L5 question with the
    "The requirement's text should change" row — and, for the first two cases, with these four
    options instead: `Restore the verified text` (recommended when the vision, ConOps, or
    description matches the old text), `Supersede` (or `Reword` when L3 found it reword-eligible),
    `Record as pending`, and `"Unsure — re-verify instead"` (it ends this mode: print
    `/peak-workflow:wrapup-epic <owning epic> reverify <TOR-ID>`, leave every file as it was, and
-   delete the branch if Step 0 created it and nothing else is on it). For **Disputed**, offer
-   Reword / Supersede / Retire, plus `Renew the pending record` (a new `pending` record that refs
-   the open one, with a fresh reason) unless the requirement is under `# Safety`.
+   delete the branch if Step 0 created it and nothing else is on it). For **Disputed**, show the
+   open record's title, reason, owner, and age, then ask
+   `"<TOR-ID> — <title> is disputed (<CR-ID>, <N> days): <reason>. What did the owner decide?"`
+   with `["Uphold — it stands as written", "Change it", "Retire it", "Renew the pending record"]`
+   (recommend from the description: none or "it is right" → Uphold). Drop **Renew** for a
+   requirement under `# Safety`. **Change it** asks what it should say when there is no
+   description, runs L3, and applies Reword or Supersede per L5. **Renew** writes a new `pending`
+   record that refs the open one, with a fresh reason.
 5. **Apply** the answer per L5, with these specifics:
    - **Changed since verified / Edited without a record:** the *old* text is the verified (or
      merged) version, not today's text. With no description, draft the record's `reason` from
@@ -881,14 +904,18 @@ greenfield files.
      (`git grep -n -w <TOR> -- . ':!docs/'`) **and the code those tests exercise** that still
      does the edited behavior, and offer the code fix in Step 7.1.
    - **Disputed:** the record's `refs` lists the open `pending` record's ID — that is what
-     resolves (or renews) it.
+     resolves (or renews) it. After an **Uphold**, say what still applies: `<TOR> now reads
+     <underlying state>` — for Verification failed, `fix the code with /peak-workflow:quick-fix,
+     then /peak-workflow:wrapup-epic <epic> reverify <TOR>`; for Changed since verified, the
+     reverify.
    - **Vision and ConOps:** if a vision or ConOps line states the detail this change replaced
      (e.g. "10 per page"), rewrite that line to the current state on this branch — no record, no
      changelog — and list it in the summary.
 6. **Trace.** Delete the retired or superseded entry from the tracing sidecar yourself, then run
-   the sub-agent as in 3B.4 for that one feature file (skip it for a reword, renewal, restore, or
-   pending record).
-7. Continue at Step 4 with a one-row trace table (the TOR-ID and the description), then Steps 5
+   the sub-agent as in 3B.4 for that one feature file (skip it for a reword, renewal, restore,
+   uphold, or pending record).
+7. Continue at Step 4 with a one-row trace table (the TOR-ID and the description — or, with none,
+   the owner's decision and record, e.g. `Owner decision: uphold (CR-…)`), then Steps 5
    and 7. Step 6 does not apply.
 
 ## Step 4: Self-Check — Trace Inputs to Outputs
@@ -1060,7 +1087,7 @@ Preserve the original timestamp. The `.processed` suffix prevents re-consumption
 - Tool Hygiene lines covered: {T} of {U} [omit row if section absent; Project type and Version single source of truth are declarations and do not count]
 - UX Baseline lines covered: {V} of {W} [omit row if not applicable; each non-`N/A` Desktop conventions bullet counts as its own line]
 - Tracing gaps resolved: {M}
-- Change Records: {R} ({n} reword, {n} supersede, {n} retire, {n} pending) [omit when 0]
+- Change Records: {R} ({n} reword, {n} supersede, {n} retire, {n} pending, {n} uphold) [omit when 0]
 - Health check (`check --base <base>`): 0 own-branch findings; {k} expected from this run's records (pending, removal epic, citations to retarget); {P} predate this branch
 
 ### Coverage Gaps (explicitly deferred)
@@ -1085,7 +1112,7 @@ In TOR-ID mode, replace "Documents Written" and "By the Numbers" with:
 ```
 ## Capture Requirements — <TOR-ID> amended
 
-- Outcome: <Restored / Superseded by … / Reworded / Retired / Recorded as pending / Renewed> — <CR-ID or "no record">
+- Outcome: <Restored / Superseded by … / Reworded / Retired / Recorded as pending / Renewed / Upheld> — <CR-ID or "no record">
 - Files: <feature file, tracing sidecar, record, epic specs and sidecars swapped>
 - Vision / ConOps lines rewritten: <list, or none>
 - Follow-ups: <citing tests to retarget and the epic that will (or "unassigned"); code still following an unrecorded edit → quick-fix>

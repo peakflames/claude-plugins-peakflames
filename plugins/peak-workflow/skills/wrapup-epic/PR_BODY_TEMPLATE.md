@@ -24,7 +24,7 @@ Placeholder reference:
 - Requirement changes — lifted from the Step 1.5 report; omit the section when it is `None`.
   Titles in every table come from the one `tor-lifecycle titles` run
 
-Highlights legend: ✅ pass · ⚠️ waived or recorded as pending · 🔧 fixed or amended during wrapup by the verifier · ❌ fail.
+Highlights legend: ✅ pass (or a dispute closed by uphold) · ⚠️ waived or recorded as pending · 🔧 fixed or amended during wrapup by the verifier · ❌ fail.
 
 ---
 

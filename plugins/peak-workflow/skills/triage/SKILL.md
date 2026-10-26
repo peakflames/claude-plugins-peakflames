@@ -128,7 +128,8 @@ Apply this rubric — pick exactly one verdict:
     session), then quick-fix if the requirement holds and the code fails it.
 - **Request touching a Disputed requirement** (finding F `disputed`) — the requirement is
   already known to be wrong. Recommend resolving it first:
-  `/peak-workflow:capture-requirements <TOR-ID> <description>` (**AMEND**).
+  `/peak-workflow:capture-requirements <TOR-ID> <description>` (**AMEND**) — which can also
+  uphold it when the request shows the requirement is right and the code is what fails.
 - **Re-litigation hit** (3.1 step 2) — the idea was decided against before. Name the record,
   its date, and its reason in the Rationale; the verdict stands, and the user decides whether to
   reopen it.
