@@ -16,10 +16,10 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `setup` | Audit CLAUDE.md — ask only what the user alone knows, default the rest behind one confirmation; stub architecture/design-notes docs (run once before discover) |
 | `discover` | Adaptive interview → product-vision.md + concept-of-operations.md |
 | `mockup` | UI projects only — screen inventory (`S-NN`), per-scenario flows, grayscale wireframes; concretizes ConOps steps |
-| `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json |
+| `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json; amend, retire, or record pending changes with Change Records; `<TOR-ID>` mode amends one requirement |
 | `plan-project` | Derive epics from TOR IDs → phase indexes + epic specs + sidecars |
 | `add` | Add new epic(s) referencing existing TOR IDs |
-| `triage` | Route incoming request → HEAVY / EPIC / TRIVIAL |
+| `triage` | Route incoming request → HEAVY / AMEND / EPIC / TRIVIAL |
 | `start-epic` | Implement an epic — TOR-driven plan + tasks + verification |
 | `wrapup-epic` | Independent TOR verification, complete, ship |
 | `pause` | Save progress mid-epic |
