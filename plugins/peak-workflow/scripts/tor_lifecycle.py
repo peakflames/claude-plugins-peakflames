@@ -1118,6 +1118,275 @@ def write_verified(text: str, lines: dict[str, str]) -> str:
 
 
 # --------------------------------------------------------------------------------------------
+# Project format (the guard every skill runs) and upgrade-step mechanics
+# --------------------------------------------------------------------------------------------
+
+LEGACY_INDEX = "docs/implementation-plan/index.md"
+LEGACY_TABLE = re.compile(r"^\|\s*Phase\s*\|\s*Epic\s*\|", re.M)
+LEGACY_STATUS = re.compile(r"\|\s*Status\s*\|")
+# Files that mean a project already has peak-workflow planning (README stubs do not count).
+ARTIFACT_GLOBS = ("docs/requirements/*.feature.md", f"{STATUS_DIR}/epic-*.md",
+                  "docs/implementation-plan/phase-*/epic-*.md",
+                  "docs/product-vision-planning/product-vision.md",
+                  "docs/product-vision-planning/concept-of-operations.md")
+UPDATE_HINT = "/plugin marketplace update peakflames-plugins"
+STEPS_DIR = Path(__file__).resolve().parent.parent / "skills" / "upgrade" / "steps"
+STEP_NAME = re.compile(r"^(\d{4})-[\w-]+\.md$")
+
+
+def shipped_format(steps_dir: Path = STEPS_DIR) -> int:
+    """The highest format the upgrade steps in this build reach (0 when none ship)."""
+    nums = [int(m.group(1)) for p in steps_dir.glob("*.md") if (m := STEP_NAME.match(p.name))]
+    return max(nums, default=0)
+
+
+@dataclass
+class FormatStatus:
+    verdict: str        # current | new | behind | ahead | not-peak-workflow
+    project: int
+    plugin: int
+    stamped: bool
+    message: str
+    upgradable: bool = False  # behind, and this build ships a step past the project's format
+
+
+def has_artifacts(root: Path) -> bool:
+    return any(next(root.glob(pattern), None) is not None for pattern in ARTIFACT_GLOBS)
+
+
+def is_legacy_layout(root: Path) -> bool:
+    """The single-index layout from before peak-workflow existed: a status table in index.md."""
+    path = root / LEGACY_INDEX
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return bool(LEGACY_TABLE.search(text) and LEGACY_STATUS.search(text))
+
+
+def format_status(root: Path, steps_dir: Path = STEPS_DIR) -> FormatStatus:
+    """Compare the project's stamp with PLUGIN_FORMAT. A missing stamp is format 0, unless the
+    project has no peak-workflow files yet (`new`: setup will stamp it)."""
+    plugin = PLUGIN_FORMAT
+    if is_legacy_layout(root):
+        return FormatStatus("not-peak-workflow", 0, plugin, False,
+                            f"{LEGACY_INDEX} holds a status table — the single-index layout from before "
+                            "peak-workflow — which is not a peak-workflow layout. This plugin cannot "
+                            "read or upgrade it.")
+    stamp = load_stamp(root)
+    n = stamp.format
+    if not stamp.present and not has_artifacts(root):
+        return FormatStatus("new", 0, plugin, False,
+                            f"No peak-workflow files yet. /peak-workflow:setup stamps this project at "
+                            f"format {plugin}.")
+    if n == plugin:
+        return FormatStatus("current", n, plugin, stamp.present, f"Project format {n} — up to date.")
+    if n < plugin:
+        where = (f"This project's files are on format {n}" if stamp.present else
+                 f"This project has no format stamp ({STAMP_PATH}), so its files are on format 0")
+        shipped = shipped_format(steps_dir)
+        if shipped <= n:
+            return FormatStatus("behind", n, plugin, stamp.present,
+                                f"{where}; this plugin needs format {plugin}, but this build ships "
+                                f"upgrade steps only up to format {shipped}. Commands that change files "
+                                "stay stopped until a build with the remaining steps is installed.")
+        return FormatStatus("behind", n, plugin, stamp.present,
+                            f"{where}; this plugin needs format {plugin}.\n"
+                            "Run /peak-workflow:upgrade — it shows each step before applying it.",
+                            upgradable=True)
+    return FormatStatus("ahead", n, plugin, True,
+                        f"This project's files are on format {n}, newer than this plugin understands "
+                        f"(format {plugin}).\nUpdate the plugin ({UPDATE_HINT}), restart Claude Code, "
+                        "and run the command again.")
+
+
+STAMP_FORMAT_LINE = re.compile(r"^format\s*=.*$", re.M)
+
+
+def write_stamp_format(root: Path, n: int, lifecycle: bool = False) -> None:
+    """Set `format = n` in the stamp, keeping everything else. `lifecycle` adds the default
+    `[lifecycle]` table to a new stamp."""
+    path = root / STAMP_PATH
+    if path.is_file():
+        text = path.read_text(encoding="utf-8")
+        if STAMP_FORMAT_LINE.search(text):
+            text = STAMP_FORMAT_LINE.sub(f"format = {n}", text, count=1)
+        else:
+            text = f"format = {n}\n" + text
+    else:
+        text = f"format = {n}\n"
+        if lifecycle:
+            text += f"\n[lifecycle]\ndisputed_threshold_days = {DEFAULT_DISPUTED_DAYS}\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    load_stamp(root)  # what was written must read back
+
+
+# -- Step 0001: epic provenance ---------------------------------------------------------------
+
+PROVENANCE_KEYS = ("Planned by", "Planned", "Plan branch")
+HEADER_LINE = re.compile(r"^\*\*([^*:]+):\*\*\s*(.*?)\s*$")
+# Anchors for inserting a missing provenance line, latest first (the plan-project spec order).
+HEADER_ANCHORS = ("Plan branch", "Planned", "Planned by", "Dependencies", "Status", "Phase")
+MERGE_SUBJECTS = (re.compile(r"^Merge branch '([^']+)'"),
+                  re.compile(r"^Merge remote-tracking branch '(?:[^/']+/)?([^']+)'"),
+                  re.compile(r"^Merge pull request #\d+ from [^/\s]+/(\S+)"))
+EMPTY_VALUES = ("", "—", "-")
+
+
+def spec_epic_id(relpath: str) -> str:
+    """`.../epic-<id>-<slug>.md` → `<id>`."""
+    return Path(relpath).name[len("epic-"):].removesuffix(".md").split("-", 1)[0]
+
+
+def merge_branch(subject: str) -> str | None:
+    for pattern in MERGE_SUBJECTS:
+        m = pattern.match(subject)
+        if m:
+            return m.group(1)
+    return None
+
+
+def spec_added_by(root: Path, relpath: str) -> tuple[str, str, str] | None:
+    """(sha, author, date) of the commit that added the spec, following renames of the same epic.
+    `git log --follow` also pairs a new spec with a similar existing one (a copy, or a rename
+    from another epic's spec — templated specs look alike), so those count as the add."""
+    log = git(root, "log", "--follow", "--name-status", "--format=%x01%H%x09%an%x09%as", "--", relpath,
+              check=False)
+    epic = spec_epic_id(relpath)
+    last = None
+    for block in log.split("\x01")[1:]:
+        lines = [ln for ln in block.splitlines() if ln.strip()]
+        last = tuple(lines[0].split("\t"))
+        status = lines[1].split("\t") if len(lines) > 1 else ["M"]
+        if status[0].startswith("A") or status[0].startswith("C"):
+            return last
+        if status[0].startswith("R") and spec_epic_id(status[1]) != epic:
+            return last
+    return last
+
+
+def spec_origin(root: Path, relpath: str, trunk: str | None, trunk_line: set[str]) -> dict[str, str]:
+    """Who added the spec, when (author date), and the branch it was planned on, from git.
+    The branch is read from the trunk merge that brought the adding commit in; a commit made on
+    the trunk itself names the trunk. Anything git cannot tell is `—`."""
+    origin = spec_added_by(root, relpath)
+    if origin is None:
+        return {k: "—" for k in PROVENANCE_KEYS}
+    sha, author, date = origin
+    branch = "—"
+    if trunk and trunk != "HEAD":
+        if sha in trunk_line:
+            branch = trunk
+        else:
+            path = git(root, "log", "--first-parent", "--ancestry-path", "--format=%s",
+                       f"{sha}..{trunk}", check=False).splitlines()
+            branch = (merge_branch(path[-1]) if path else None) or "—"
+    return {"Planned by": author or "—", "Planned": date or "—", "Plan branch": branch}
+
+
+def backfill_header(text: str, values: dict[str, str]) -> str:
+    """Fill missing or `—` provenance lines in a spec header; never overwrite a real value."""
+    lines = text.split("\n")
+    for key in PROVENANCE_KEYS:
+        end = next((i for i, ln in enumerate(lines)
+                    if ln.startswith("## ") or ln.strip() == "---"), len(lines))
+        present = {}
+        for i in range(end):
+            m = HEADER_LINE.match(lines[i])
+            if m:
+                present.setdefault(m.group(1), (i, m.group(2)))
+        new = f"**{key}:** {values[key]}"
+        if key in present:
+            i, current = present[key]
+            if current in EMPTY_VALUES and values[key] not in EMPTY_VALUES:
+                lines[i] = new
+            continue
+        anchor = next((present[a][0] for a in HEADER_ANCHORS if a in present), None)
+        if anchor is None:
+            title = next((i for i in range(end) if lines[i].startswith("# ")), None)
+            anchor = -1 if title is None else (title + 1 if title + 1 < len(lines) and not lines[title + 1].strip()
+                                               else title)
+        lines.insert(anchor + 1, new)
+    return "\n".join(lines)
+
+
+def header_values(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for ln in text.split("\n"):
+        if ln.startswith("## ") or ln.strip() == "---":
+            break
+        m = HEADER_LINE.match(ln)
+        if m:
+            values.setdefault(m.group(1), m.group(2))
+    return values
+
+
+def backfill_owner(text: str) -> str:
+    """Add `owner: —` after `status:` when the sidecar has no owner line."""
+    rows = text.split("\n")
+    if any(KEY_LINE.match(r) and r.split(":", 1)[0] == "owner" for r in rows):
+        return text
+    at = next((i + 1 for i, r in enumerate(rows) if r.startswith("status:")), 0)
+    rows.insert(at, "owner: —")
+    return "\n".join(rows)
+
+
+def run_provenance(root: Path, base: str | None = None, skip: set[str] | None = None) -> list[dict]:
+    """Every spec and sidecar step 0001 would change, with the new text. Idempotent: a file is
+    listed only when the rewrite differs from what is on disk."""
+    skip = skip or set()
+    trunk = resolve_trunk(root, base)
+    trunk_line = set(git(root, "rev-list", "--first-parent", trunk).split()) if trunk else set()
+    specs = sorted(p.relative_to(root).as_posix()
+                   for p in root.glob("docs/implementation-plan/phase-*/epic-*.md"))
+    specs = [s for s in specs if spec_epic_id(s) not in skip]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        origins = list(pool.map(lambda rel: spec_origin(root, rel, trunk, trunk_line), specs))
+    rows = []
+    for rel, origin in zip(specs, origins):
+        old = (root / rel).read_text(encoding="utf-8")
+        new = backfill_header(old, origin)
+        if new != old:
+            before, after = header_values(old), header_values(new)
+            rows.append({"path": rel, "epic": spec_epic_id(rel), "kind": "spec", "text": new,
+                         "lines": {k: after[k] for k in PROVENANCE_KEYS if before.get(k) != after.get(k)}})
+    for path in sorted((root / STATUS_DIR).glob("epic-*.md")) if (root / STATUS_DIR).is_dir() else []:
+        epic = path.name[len("epic-"):-len(".md")]
+        if epic in skip:
+            continue
+        old = path.read_text(encoding="utf-8")
+        new = backfill_owner(old)
+        if new != old:
+            rows.append({"path": path.relative_to(root).as_posix(), "epic": epic, "kind": "sidecar",
+                         "text": new, "lines": {"owner": "—"}})
+    return rows
+
+
+def inflight_branches(root: Path, base: str | None, paths: list[str]) -> list[tuple[str, str]]:
+    """(branch, path) for each local or remote branch, not yet merged into the base, whose
+    changes since the merge base touch one of `paths`."""
+    trunk = resolve_trunk(root, base)
+    if trunk is None:
+        return []
+    current = git(root, "branch", "--show-current", check=False)
+    tip = git(root, "rev-parse", trunk)
+    refs = git(root, "for-each-ref", "--format=%(refname:short)%09%(objectname)",
+               "refs/heads", "refs/remotes").splitlines()
+    out = []
+    for row in refs:
+        ref, sha = row.split("\t")
+        if ref in (trunk, current, f"origin/{trunk}", "origin") or ref.endswith("/HEAD") or sha == tip:
+            continue
+        if ref.split("/", 1)[-1].startswith("docs/upgrade-") or ref.startswith("docs/upgrade-"):
+            continue  # an upgrade's own branch, merged or not, is not someone's work in flight
+        if _run_git(root, ["merge-base", "--is-ancestor", sha, trunk]).returncode == 0:
+            continue
+        changed = git(root, "diff", "--name-only", f"{trunk}...{sha}", "--", *paths, check=False)
+        out += [(ref, p) for p in changed.splitlines() if p]
+    return out
+
+
+# --------------------------------------------------------------------------------------------
 # Commands
 # --------------------------------------------------------------------------------------------
 
@@ -1268,6 +1537,63 @@ def cmd_seed(args: argparse.Namespace, root: Path) -> int:
     return EXIT_OK
 
 
+def cmd_format(args: argparse.Namespace, root: Path) -> int:
+    if args.init:
+        st = format_status(root)
+        if st.verdict == "new":
+            write_stamp_format(root, PLUGIN_FORMAT, lifecycle=True)
+            print(f"stamped\t{PLUGIN_FORMAT}\t{STAMP_PATH}")
+            return EXIT_OK
+        if st.stamped and st.verdict in ("current", "behind", "ahead"):
+            print(f"already-stamped\t{st.project}\t{STAMP_PATH}")
+            print(st.message)
+            return EXIT_OK if st.verdict == "current" else EXIT_FINDINGS
+        print(f"not-stamped\t{st.project}\t{STAMP_PATH}")
+        print(st.message if st.verdict == "not-peak-workflow" else
+              "This project already has peak-workflow files but no format stamp, so it is on format 0. "
+              "It is not stamped here: run /peak-workflow:upgrade, which checks each step and stamps it.")
+        return EXIT_FINDINGS
+    if args.set is not None:
+        stamp = load_stamp(root)
+        if not 0 <= args.set <= PLUGIN_FORMAT:
+            raise DataError(f"--set {args.set}: this plugin knows formats 0 to {PLUGIN_FORMAT}")
+        if args.set < stamp.format:
+            raise DataError(f"--set {args.set}: the project is already on format {stamp.format}; "
+                            "upgrades only move forward")
+        write_stamp_format(root, args.set, lifecycle=not stamp.present)
+        print(f"stamped\t{args.set}\t{STAMP_PATH}")
+        return EXIT_OK
+    st = format_status(root)
+    print(f"verdict: {st.verdict}")
+    print(f"project: {st.project}{'' if st.stamped else ' (no stamp)'}")
+    print(f"plugin: {st.plugin}")
+    if st.verdict == "behind":
+        print(f"upgradable: {'yes' if st.upgradable else 'no'}")
+    print(st.message)
+    return EXIT_OK if st.verdict in ("current", "new") else EXIT_FINDINGS
+
+
+def cmd_provenance(args: argparse.Namespace, root: Path) -> int:
+    skip = {i for raw in args.skip for i in _id_list(raw)}
+    rows = run_provenance(root, args.base, skip)
+    if args.write:
+        for r in rows:
+            (root / r["path"]).write_text(r["text"], encoding="utf-8")
+    if args.json:
+        _print_json([{k: v for k, v in r.items() if k != "text"} for r in rows])
+    else:
+        for r in rows:
+            print("\t".join([r["path"], "; ".join(f"{k}: {v}" for k, v in r["lines"].items())]))
+    return EXIT_OK if args.write or not rows else EXIT_FINDINGS
+
+
+def cmd_inflight(args: argparse.Namespace, root: Path) -> int:
+    rows = inflight_branches(root, args.base, args.paths)
+    for branch, path in rows:
+        print(f"{branch}\t{path}")
+    return EXIT_FINDINGS if rows else EXIT_OK
+
+
 def cmd_version(args: argparse.Namespace, root: Path) -> int:
     print(f"python\t{'.'.join(map(str, sys.version_info[:3]))}\t{sys.executable}")
     print(f"format\t{PLUGIN_FORMAT}")
@@ -1308,6 +1634,25 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("--write", action="store_true", help="add the results to the sidecars' verified: blocks")
     se.add_argument("--json", action="store_true")
     se.set_defaults(func=cmd_seed)
+
+    fo = sub.add_parser("format", help="compare the project's format stamp with this plugin's (exit 1 unless current or new)")
+    mode = fo.add_mutually_exclusive_group()
+    mode.add_argument("--init", action="store_true",
+                      help="stamp a project that has no peak-workflow files yet (setup)")
+    mode.add_argument("--set", type=int, metavar="N", help="move the stamp forward to format N (upgrade)")
+    fo.set_defaults(func=cmd_format)
+
+    pv = sub.add_parser("provenance", help="step 0001: spec Planned by/Planned/Plan branch and sidecar owner lines to backfill (exit 1 when any)")
+    pv.add_argument("--base", help="base branch (default: develop, main, master)")
+    pv.add_argument("--skip", action="append", default=[], help="epic IDs to leave alone, space- or comma-separated")
+    pv.add_argument("--write", action="store_true", help="apply the backfill")
+    pv.add_argument("--json", action="store_true")
+    pv.set_defaults(func=cmd_provenance)
+
+    inf = sub.add_parser("inflight", help="unmerged branches that touch the given paths (exit 1 when any)")
+    inf.add_argument("paths", nargs="+", help="files or folders")
+    inf.add_argument("--base", help="base branch (default: develop, main, master)")
+    inf.set_defaults(func=cmd_inflight)
 
     ve = sub.add_parser("version", help="print the interpreter and the project format this plugin writes")
     ve.set_defaults(func=cmd_version)

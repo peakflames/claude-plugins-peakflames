@@ -15,10 +15,21 @@ You are conducting an adaptive discovery interview to produce (or refine) the pr
 
 The user's request: $ARGUMENTS
 
+## Format Guard
+
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
+
 ## Step 0: Branch Guard
 
-**Before the Layout Guard or any other action:**
+**Right after the Format Guard:**
 
+0. If `git rev-parse -q --verify HEAD` fails (no commits yet), stop: *"This repository has no commits
+   yet — run /peak-workflow:setup first. It makes the first commit and the `develop` branch this
+   docs/ branch merges into."*
 1. Run `git branch --show-current`. Capture the result as `<current-branch>`.
 2. If `<current-branch>` is `develop`, `main`, or `master`:
    - **Uncommitted changes:** note whether `git status --porcelain` lists files. They carry over
@@ -52,14 +63,6 @@ The user's request: $ARGUMENTS
      - Options: `["Continue on this branch", "Stop — I'll create a docs/ branch first"]`
    - If Stop, end here.
 
-## Layout Guard
-
-**Before any other action after the branch guard:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
-
 ---
 
 ## Setup Advisory Check
@@ -70,13 +73,21 @@ Before the discovery interview, verify that `/peak-workflow:setup` has been run:
    ```bash
    grep -qiE "Verification.*Quality|Quality.*Gates" CLAUDE.md && echo "found" || echo "missing"
    ```
-2. If **missing**, print a non-blocking advisory and continue — discovery can proceed now, but
+2. If `CLAUDE.md` does not exist, print *"There is no CLAUDE.md yet — run /peak-workflow:setup
+   before or right after this session."* and continue. Otherwise, if the section is **missing**,
+   print a non-blocking advisory and continue — discovery can proceed now, but
    setup must be run before the first `/peak-workflow:start-epic`:
    > **Setup Advisory:** `CLAUDE.md` does not have a "Verification & Quality Gates" section.
    > `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` both require this section. Consider
    > running `/peak-workflow:setup` before or immediately after this discovery session — it
    > audits `CLAUDE.md` and stubs `docs/architecture.md` and `docs/design-notes.md` as well.
 3. If **found**, continue without comment.
+4. If the Format Guard's verdict was `new`, nothing has stamped the project yet, and once
+   this session writes the vision it would count as an older project. Stamp it now, on the
+   `docs/` branch: run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format --init` and include
+   `docs/.peak-workflow.toml` in this session's Commit Gate. If it exits 3 (no Python 3.11+), print
+   its install hint and stop — later commands need Python, and running discover again after
+   installing is safe.
 
 ---
 

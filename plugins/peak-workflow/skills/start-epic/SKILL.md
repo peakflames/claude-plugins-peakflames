@@ -12,17 +12,17 @@ argument-hint: "<epic-id>"
 
 You are starting an implementation session for Epic $ARGUMENTS. Use `$ARGUMENTS` verbatim wherever `<id>` appears below.
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ## Freshness Guard
 
-**Immediately after the Layout Guard:** make sure the spec, sidecars, and plan you are about to
+**Immediately after the Format Guard:** make sure the spec, sidecars, and plan you are about to
 read are current — a teammate may have merged plan changes since this clone last synced.
 
 1. Detect the base branch: `git branch --list develop main master` — prefer `develop`, then
@@ -124,7 +124,7 @@ Follow these steps exactly:
    5. **Spec has no Requirements Anchors section** (legacy spec from before peak-workflow v1.0.0):
       note this to the user and continue — legacy specs are grandfathered. Offer to populate
       Requirements Anchors during this epic work.
-7. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
+7. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (`<id>` is `$ARGUMENTS` verbatim — treat it as an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
 8. Parse the epic spec header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 4 commit trailer and GitHub announce. If no `Source:` line exists, the source issue number is unknown — skip the trailer and announce later.
 9. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously).
 10. **Conditional read of `docs/architecture.md`.** If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section. If the epic is a localized UI or copy change, skip — recent handoffs and the spec's Key Components section give the needed context.
@@ -202,10 +202,8 @@ Scope:         <N> TOR(s); screens <S-NN list from ## Screens, or —>
 Purpose:       <first sentence of the spec's ## Description>
 ```
 
-- **Planned by / date** — the spec's `**Planned by:**` and `**Planned:**` lines; `—` when the spec
-  has none. Do not reconstruct them from git history.
-- **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-$ARGUMENTS.md`; absent
-  means `—`. `owner:` and an In Progress / Paused / Implemented status live on the feature branch
+- **Planned by / date** — the spec's `**Planned by:**` and `**Planned:**` lines.
+- **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-$ARGUMENTS.md`. `owner:` and an In Progress / Paused / Implemented status live on the feature branch
   until the epic merges, so when the local branch `feature/epic-<id>-<short-name>` exists, read
   this sidecar (for the card and for the resume rule below) from it:
   `git show feature/epic-<id>-<short-name>:docs/implementation-plan/status/epic-$ARGUMENTS.md`
@@ -255,7 +253,7 @@ branch, touch nothing, and say why in one line.
 
 ## Step 3: Create Feature Branch
 
-Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim (legacy integer or 7-char alphanumeric) and `<short-name>` was extracted in Step 1 (e.g., `feature/epic-3-user-auth`, `feature/epic-a3f2K7p-user-auth`). If no short name was available, use `feature/epic-<id>`.
+Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim and `<short-name>` was extracted in Step 1 (e.g., `feature/epic-a3f2K7p-user-auth`). If no short name was available, use `feature/epic-<id>`.
 
 1. Run `git branch --show-current` to check the current branch.
 2. Check whether the feature branch already exists with a reliable test:
