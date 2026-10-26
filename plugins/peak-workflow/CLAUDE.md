@@ -36,6 +36,10 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 - `{NN}` = 2-digit zero-padded feature file number (stable, never renumbered)
 - `{XXXXXXX}` = 7-char random alphanumeric (`LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7`)
 - Immutable once merged to develop — they are foreign keys
+- Never reused. A retired or superseded ID stays out of every feature file for good, and a
+  feature number named in any Change Record is reserved forever
+- A change in meaning gets a **new ID** (a `supersede` record names the successor); only a
+  same-meaning `reword` with passing test evidence keeps the ID
 
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
@@ -157,7 +161,18 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
 
 ## Skill File Rules
 
-- `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere
+- `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere, with two
+  exceptions below (`scripts/` and upgrade steps)
+- `scripts/` holds deterministic mechanics only — hashing, parsing, and history reads a prompt
+  would get wrong at scale. `tor_lifecycle.py` (Python 3.11+, standard library only) is the
+  **only** implementation of the fingerprint normalization; no skill restates or re-derives it.
+  Skills call it through the POSIX wrapper, `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <cmd>`,
+  which finds a suitable Python or prints an install hint (exit 3). Exit codes: 0 ok, 1 findings,
+  2 usage/data error, 3 interpreter. Decisions (what to ask, what to block) stay in `SKILL.md`
+- `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
+  templates. They are **forward-only and append-only**: a shipped step is never edited; a
+  correction is a new step. Each step starts with a detect check (so re-running is harmless) and
+  is applied as one commit, `chore(upgrade): step NNNN <name>`
 - Template files (`PLAN_TEMPLATE.md`, `HANDOFF_TEMPLATE.md`, etc.) live alongside SKILL.md in the skill directory
 - Sibling template files are referenced by path in SKILL.md; Claude Code makes them available at skill load time
 - `references/` holds the three stack sheets (Bun static SPA, Bun web, Bun + Electron desktop).
@@ -192,7 +207,10 @@ Both `plugin.json` and `CHANGELOG.md` must be updated in the same commit.
 
 - **Patch** — wording, UX clarity, step renumbering, no behavioral change
 - **Minor** — new steps, new skills, changed skill contracts
-- **Major** — breaking changes to artifact formats or skill API
+- **Major** — breaking changes to artifact formats or skill API. A major release that changes
+  project artifacts ships a new upgrade step and bumps `PLUGIN_FORMAT` in `tor_lifecycle.py`
+  (the `format` that `setup` writes to a project's `docs/.peak-workflow.toml`). It may then delete
+  compatibility clauses for formats the `upgrade` runner can bring forward
 - **Changelog entries:** one bullet per change, each ≤ 50 words, no rationale essays —
   see "Changelog entry style" in the repo-level CLAUDE.md.
 
