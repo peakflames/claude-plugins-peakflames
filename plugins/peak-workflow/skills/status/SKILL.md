@@ -21,6 +21,15 @@ where `<slug>` is the spec filename with the `epic-<id>-` prefix and `.md` suffi
 same short name `start-epic` uses for the branch). Never print an epic by ID alone — random IDs
 are unrecognizable to a teammate who did not plan them.
 
+**Who "you" are (`me`).** Compare case-insensitively, trimmed. Your names are
+`git config user.name` plus every author name already used with your email — collect them once:
+`git log --all --format='%ae|%an' | awk -F'|' -v e="$(git config user.email)" 'tolower($1)==tolower(e) {print $2}' | sort -u`.
+A commit is yours when its author email (`%ae`) equals `git config user.email` or its author name
+(`%an`) is one of your names; a bare name (a `**Planned by:**` or `owner:` value) is yours when it
+is one of your names. Shell variables do not persist between commands — inline
+`$(git config user.email)` / `$(git config user.name)` where a command needs them. Never decide
+with `git log --author` (a regex substring match).
+
 ## Layout Guard
 
 **Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
@@ -85,14 +94,9 @@ Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For eac
 - `owner:` line (optional, written by `start-epic` when the epic starts): the person working on
   it. Absent or `—` means unclaimed.
 
-Then, for each epic, read its spec (`docs/implementation-plan/phase-*/epic-<id>-*.md`) and
-capture:
-- **Slug** — from the filename (see "Epic references" above).
-- **Planned by** and **Planned** — the `**Planned by:**` and `**Planned:**` header lines. When a
-  spec has neither (written before peak-workflow 2.1.0), derive both from the commit that added
-  it: `git log --diff-filter=A --follow --format='%an|%ad' --date=short -- <spec-path> | tail -1`,
-  and mark the values `(from git)`.
-- **Purpose** — the first sentence of the `## Description` section, cut to about 90 characters.
+Take each epic's **Slug** from its spec filename alone — glob
+`docs/implementation-plan/phase-*/epic-*.md`, do not open the specs (see "Epic references" above).
+Planner, date, and purpose are read later, in Step 6, for ready epics only.
 
 ## Step 3: Build Dependency Graph
 
@@ -146,18 +150,15 @@ For each epic whose sidecar (Step 2) has `status: Paused`:
 A teammate's merged plan is otherwise indistinguishable from your own. Show what changed on
 `<base>` since the user's own last commit there:
 
-`me` below is the exact value of `git config user.name`. Shell variables do not persist between
-commands — inline `$(git config user.name)` wherever a command needs it, and compare author names
-exactly (`--author` is a substring match, so filter its output by exact `%an`).
+`me` below follows "Who you are" above.
 
 1. Find the starting point `<since>`: the user's own last commit on `<base>` — list
-   `git log --format='%H|%an' --author="$(git config user.name)" <base>` and take the first row
-   whose `%an` is exactly `me` (`--author` also matches longer names). If there is none, fall back
+   `git log --format='%H|%ae|%an' <base>` and take the first row that is yours. If there is none, fall back
    to the last commit before a 14-day window, `git rev-list -1 --before="14 days ago" <base>`, and
    label the panel "in the last 14 days" instead of "since your last commit". If the repository is
    younger than that, use its root commit: `git rev-list --max-parents=0 <base> | tail -1`.
-2. List the planning commits since then, dropping rows whose `%an` is `me`:
-   `git log --format='%h|%an|%ad|%s' --date=short <since>..<base> -- docs/implementation-plan docs/requirements`
+2. List the planning commits since then, dropping rows that are yours:
+   `git log --format='%h|%ae|%an|%ad|%s' --date=short <since>..<base> -- docs/implementation-plan docs/requirements`
 3. Classify what changed: `git diff --name-status <since> <base> -- docs/implementation-plan/`.
    - An added `phase-*/index.md` → **new phase**.
    - An added `phase-*/epic-*.md` → **new epic**.
@@ -166,8 +167,8 @@ exactly (`--author` is a substring match, so filter its output by exact `%an`).
      tree, which differs when the user is on a feature branch).
    - Ignore every other path (added sidecars, READMEs, handoffs).
    Attribute each change to the last commit touching that path in the range,
-   `git log -1 --format='%an|%ad' --date=short <since>..<base> -- <path>`; omit it when that
-   author is `me`.
+   `git log -1 --format='%ae|%an|%ad' --date=short <since>..<base> -- <path>`; omit it when that
+   commit is yours.
 4. **Not pulled yet.** If Step 0.5 found `<behind>` greater than 0, also list
    `git log --format='%h|%an|%ad|%s' --date=short <base>..origin/<base> -- docs/implementation-plan docs/requirements`
    as rows marked **not pulled yet** (change = the commit subject). In that case never print
@@ -180,7 +181,16 @@ Render the result in Step 7's **New Since You Last Looked** panel.
 Using the dependency graph from Step 3 and statuses from Step 2, find epics that are "Not Started" but whose dependencies are ALL satisfied (status "Implemented" or "Complete"). These are unblocked and ready to begin.
 
 For each ready epic, also compute **Unblocks** — the number of Not Started epics that list it as a
-direct dependency — and flag it with `⚑` when its **Planned by** is not `me`.
+direct dependency. Then read the spec facts for the ready epics only — never every spec — with one
+command over their spec paths (no full-file reads):
+`grep -H -E -A3 '^\*\*Planned( by)?:\*\*|^## Description' <ready-spec-paths>`
+- **Planned by** and **Planned** — the `**Planned by:**` and `**Planned:**` lines. For a ready spec
+  with neither (written before peak-workflow 2.1.0), derive both from the commit that added it:
+  `git log --diff-filter=A --follow --format='%an|%ad' --date=short -- <spec-path> | tail -1`,
+  and mark the values `(from git)`.
+- **Purpose** — the first sentence after `## Description`, cut to about 90 characters.
+
+Flag a ready epic with `⚑` when its **Planned by** is not one of your names.
 
 ## Step 7: Present Dashboard
 

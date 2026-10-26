@@ -28,7 +28,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **No blind single pick** — with several ready epics, `status` names none and points to the table;
   every epic is printed as `ID (slug) — Name`.
 - **Empty branches cleaned up** — `start-epic` deletes the empty feature branch when the user
-  rejects the plan, and removes such a leftover on the next start instead of resuming it.
+  rejects the plan, and removes such a leftover on the next start instead of resuming it — only
+  when nothing but its own Test directories line is uncommitted.
 
 ### Fixed
 

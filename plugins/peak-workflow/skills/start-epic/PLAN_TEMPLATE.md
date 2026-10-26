@@ -43,7 +43,8 @@ Placeholder reference:
    change `status: Not Started` (or `status: Paused`) to `status: In Progress`, and set
    `owner: <git config user.name>` — add the line directly after `status:` if the sidecar has
    none (sidecars written before peak-workflow 2.1.0), replace `owner: —`, and keep it if it
-   already names you. If it names someone else, the user confirmed taking it over at
+   already names you (case-insensitive; any name you have committed under with your
+   `git config user.email` counts). If it names someone else, the user confirmed taking it over at
    `start-epic` Step 2.5 — replace it and say so in one line. Leave `implemented:`,
    `completed:`, and `requirements:` unchanged. Capture whether this is a
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
