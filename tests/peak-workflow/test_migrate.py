@@ -129,6 +129,15 @@ class HelperFlagTests(unittest.TestCase):
         self.assertIn("No epic (1)\n  - C. tests/test_x.py:1 cites TOR-01-Nope001", out)
         self.assertTrue(out.rstrip().endswith("2 finding(s) (1 C, 1 D); 0 blocking."))
 
+    def test_duplicate_sidecar_key_is_a_data_error(self):
+        # A clean git merge of an in-flight branch can leave a second `owner:` line.
+        self.repo.write("docs/implementation-plan/status/epic-aEpic01.md",
+                        "status: In Progress\nowner: —\nrequirements: —\nowner: Dev Two\n")
+        for args in (("migrate", "scan"), ("check",), ("states",)):
+            result = self.repo.cli(*args)
+            self.assertEqual(result.returncode, 2, args)
+            self.assertIn("line 4: `owner:` appears twice (also line 2)", result.stderr)
+
     def test_sidecar_keys_and_finish(self):
         self.repo.sidecar("aEpic01", status="Complete", requirements=["TOR-01-Aaa0001"],
                           superseded_by="TOR-01-Bbb0002", reverified="2026-01-01")

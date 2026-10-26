@@ -519,6 +519,7 @@ def parse_sidecar(epic: str, text: str, where: str = "", lenient: bool = False) 
     sc = Sidecar(epic=epic)
     problems: list[str] = []
     block: str | None = None
+    seen_keys: dict[str, int] = {}
     prefix = f"{where}: " if where else ""
     for n, line in enumerate(text.splitlines(), 1):
         if not line.strip():
@@ -540,6 +541,11 @@ def parse_sidecar(epic: str, text: str, where: str = "", lenient: bool = False) 
             problems.append(f"{prefix}line {n}: expected `key: value`, got {line!r}")
             continue
         key, value = m.groups()
+        if key in seen_keys:  # e.g. a clean git merge that added a second `owner:` line
+            problems.append(f"{prefix}line {n}: `{key}:` appears twice (also line {seen_keys[key]}); "
+                            "keep one and delete the other")
+            continue
+        seen_keys[key] = n
         if key in SIDECAR_BLOCKS:
             if value:
                 problems.append(f"{prefix}line {n}: `{key}:` takes one indented `TOR-…: …` line per requirement")

@@ -60,7 +60,10 @@ List `${CLAUDE_PLUGIN_ROOT}/skills/upgrade/steps/*.md`. Two kinds of work:
 - **Catch-up** — steps numbered `N` or below whose **Skip** line says skipping is supported. An
   earlier run may have skipped epics that were in flight; once those merge, the step's Detect
   finds them. Run each such Detect now, without skips; pending output is catch-up work. (Step 6
-  runs it again with any Step 5 skips.)
+  runs it again with any Step 5 skips.) When there are no pending steps and every catch-up path
+  belongs to an epic whose branch is still unmerged (`tor-lifecycle inflight --base <base>
+  <those paths>` lists each one), print *"Catch-up for <epic IDs> waits until <branches> merge."*
+  and stop — there is nothing to apply yet.
 
 Then:
 
@@ -105,7 +108,10 @@ When there are rows, show them grouped by branch and explain in one sentence: th
 conflict with this upgrade where they edit the same lines. For a branch that touches
 `docs/requirements/`, add: after it merges `<base>` in, every requirement it edited needs
 `/peak-workflow:capture-requirements <TOR>` before it can merge (the upgrade turned those edits
-into unrecorded changes against the recorded history). Then ask via `AskUserQuestion`.
+into unrecorded changes against the recorded history). And a clean merge is not proof of a good
+one: a branch that added a line the upgrade also added (a second `owner:`) merges silently, and
+then every command stops with a "`owner:` appears twice" data error until one line is deleted.
+Then ask via `AskUserQuestion`.
 Offer the Skip option only when the listed paths name epics (`status/epic-<id>.md`,
 `phase-*/epic-<id>-*.md`) **and** at least one step you will run says skipping is supported —
 otherwise the first option is `"Rewrite everything anyway (Recommended)"`. When some steps
