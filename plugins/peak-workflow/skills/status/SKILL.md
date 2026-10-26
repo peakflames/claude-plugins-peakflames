@@ -184,13 +184,11 @@ For each ready epic, also compute **Unblocks** — the number of Not Started epi
 direct dependency. Then read the spec facts for the ready epics only — never every spec — with one
 command over their spec paths (no full-file reads):
 `grep -H -E -A3 '^\*\*Planned( by)?:\*\*|^## Description' <ready-spec-paths>`
-- **Planned by** and **Planned** — the `**Planned by:**` and `**Planned:**` lines. For a ready spec
-  with neither (written before peak-workflow 2.1.0), derive both from the commit that added it:
-  `git log --diff-filter=A --follow --format='%an|%ad' --date=short -- <spec-path> | tail -1`,
-  and mark the values `(from git)`.
+- **Planned by** and **Planned** — the `**Planned by:**` and `**Planned:**` lines; `—` when the
+  spec has none. Do not reconstruct them from git history.
 - **Purpose** — the first sentence after `## Description`, cut to about 90 characters.
 
-Flag a ready epic with `⚑` when its **Planned by** is not one of your names.
+Flag a ready epic with `⚑` when its **Planned by** is set and is not one of your names.
 
 ## Step 7: Present Dashboard
 
@@ -279,8 +277,8 @@ Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2),
 | Uq8QpFa (backup-and-restore) | Backup and Restore | 3 — Extend | Abigail | 2026-08-14 | 0 | Export and import all habit data as a JSON file |
 | ⚑ aBVPpli (svelte-skeleton) | Svelte Skeleton and Integration Branch | 4 — Frontend Migration | Todd | 2026-09-28 | 2 | Stand up SvelteKit static beside the React app |
 
-[One row per ready epic from Step 6. `⚑` marks an epic planned by someone other than you; `(from
-git)` follows a Planned by / Added value derived from history.]
+[One row per ready epic from Step 6. `⚑` marks an epic planned by someone other than you; `—`
+means the spec records no planner.]
 [If none: "No unblocked epics ready to start — check the dependency graph."]
 
 ## Recently Completed

@@ -43,8 +43,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 **Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
 ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by
-`plan-project` and `add`); older specs fall back to the git author and date of the commit that
-added them. `status` fetches and warns when the base is behind origin, shows what teammates
+`plan-project` and `add`); older specs show `—` — no git-history fallback. `status` fetches and warns when the base is behind origin, shows what teammates
 changed since the user's own last commit, lists ready epics as a table, and **never picks among
 several ready epics**. `start-epic` pulls the base, then shows an epic card (with `⚑` lines for a
 teammate's epic, phase, owner, or existing origin branch) and confirms before creating the branch,

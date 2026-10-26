@@ -12,7 +12,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Epic provenance** — `plan-project` and `add` write `**Planned by:**`, `**Planned:**`, and
   `**Plan branch:**` into every spec, and an `owner: —` sidecar line that `start-epic` fills in.
-  Older specs fall back to git history.
+  Older specs show `—`.
 - **What's new since you last looked** — `status` lists teammates' new phases, new epics, and
   status changes since your own last commit on the base branch.
 - **Freshness guard** — `status`, `start-epic`, `add`, and `wrapup-epic` fetch and warn when the
