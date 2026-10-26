@@ -966,7 +966,8 @@ def run_check(project: Project, base: str | None = None) -> dict:
                 hist = p.reword_chain(tor, saved, req.fingerprint, False) if tor not in edited else None
                 nxt = (f"Decide first whether its meaning changed: /peak-workflow:capture-requirements {tor}"
                        if tor in edited else
-                       f"Its rewording ({', '.join(r.id for r in hist)}) has no test evidence. If its meaning "
+                       f"It was edited before 3.0 ({', '.join(r.id for r in hist)}, recorded without test "
+                       f"evidence). If its meaning "
                        f"changed: /peak-workflow:capture-requirements {tor}; if not, re-check it: "
                        f"/peak-workflow:wrapup-epic {sc.epic} reverify" if hist else
                        f"Re-check it: /peak-workflow:wrapup-epic {sc.epic} reverify")
@@ -2524,7 +2525,7 @@ def _print_json(data) -> None:
 
 FINDING_HEADINGS = {
     "A": "A. Unrecorded change", "B": "B. Unrecorded removal", "C": "C. Dangling ID",
-    "D": "D. Changed since verified", "E": "E. Retired or superseded ID still cited", "F": "F. Housekeeping",
+    "D": "D. Changed since verified", "E": "E. Retired or superseded ID still cited", "F": "F. Housekeeping and disputes",
 }
 
 
@@ -2532,6 +2533,11 @@ def finding_epic(project: Project, f: dict) -> str | None:
     """The epic a finding belongs to: its own, else the epic that owns (or listed) its requirement."""
     if f.get("epic"):
         return f["epic"]
+    rec = (f.get("detail") or {}).get("record") if f.get("kind") == "removal-missing" else None
+    if rec:  # a retire with no removal epic belongs to the epic that built the retired requirement
+        tors = next((r.tors for r in project.records if r.id == rec), [])
+        owners = [s for s in project.sidecars.values() if any(t in s.requirements for t in tors)]
+        return min((s.epic for s in owners), default=None)
     tor = f.get("tor")
     if not tor:
         return None

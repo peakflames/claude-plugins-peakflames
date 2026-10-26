@@ -177,8 +177,10 @@ commit; Phase 8 removes it.
 3. **Requirements README.** When `docs/requirements/README.md` holds the 2.1 stub's line
    `- Feature files are **append-only** — feature numbers are stable once assigned.`, replace its
    whole `## Conventions` section with the one below. When the file exists without that line,
-   leave it alone (the user wrote it) and say so in the report. When there is no README, do
-   nothing.
+   leave it alone (the user wrote it) and say so in the report. When there is no README, write
+   one: the heading `# Requirements Baseline`, the line *"Formal Gherkin-style requirements
+   (`.feature.md`), their traceability sidecars (`.feature.tracing.json`), and the Change Records
+   (`changes/*.toml`) that explain each change to a merged requirement."*, then the section below.
 
    ```markdown
    ## Conventions
@@ -233,8 +235,8 @@ Then say, in plain words:
   when the meaning changed, `/peak-workflow:capture-requirements <TOR>`; when it did not,
   `/peak-workflow:wrapup-epic <epic> reverify` re-checks it. That triage is the owner's; nothing
   here decides it.
-- **Disputed** (`F`, "known to be wrong"): a pending change-control note became a `pending`
-  record; settle it with `/peak-workflow:capture-requirements <TOR>`.
+- **Disputed** (an `F` finding reading "known to be wrong"): a pending change-control note became
+  a `pending` record; settle it with `/peak-workflow:capture-requirements <TOR>`.
 - **Dangling ID** (`C`) in a sidecar's `requirements:` line: the upgrade never rewrites a Complete
   epic's `requirements:`. Correct the line by hand on a `docs/` branch — replace the stray text
   with the TOR IDs it meant, or delete it — and merge it like any planning change.
