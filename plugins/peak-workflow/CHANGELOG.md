@@ -82,6 +82,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   waived requirements get planned; epics that are not Not Started are never edited.
 - **`plan-project` reads a changelog its branch archived** — `capture-requirements` archives the
   discovery changelog first; plan-project still uses its Priority Signal.
+- **`setup` links the vision and ConOps** in its Peak Workflow section; `plan-project` Step 7
+  adds only missing links to that section as a fallback, never a second section.
 - **`pause` handles removal epics** — an empty anchors table no longer reads as done; the handoff
   records remaining `sweep` citations.
 - **Spec provenance and `owner:` are always present** — the "absent" fallbacks are removed;

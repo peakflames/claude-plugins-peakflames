@@ -56,8 +56,9 @@ new project, moved forward only by `upgrade`; missing = format 0) and `[lifecycl
 disputed_threshold_days`. Every skill starts with one Format Guard, `tor-lifecycle format`:
 writing skills stop unless the project is current (or new); `status` and `triage` run degraded
 with a banner when it is behind; `new-project` routes to `upgrade`. After the guard, skills read
-only the current format — no reader fallbacks for older ones. No skill or step edits the user's
-`CLAUDE.md`.
+only the current format — no reader fallbacks for older ones. No upgrade step edits the user's
+`CLAUDE.md`; `setup` writes it, and `plan-project` Step 7 (document links) and `start-epic` (the
+Test directories line, on Yes) are the only other skills that add to it.
 
 **Branch families:**
 - `docs/{task-short-name}` — full planning sequence (discover → mockup [UI] → capture-requirements → plan-project)
