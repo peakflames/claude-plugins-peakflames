@@ -75,7 +75,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 2 | **Script analysis** — `check` A–F (`--base`, `--json`, own-branch marking), `sweep`, `seed`, `states --json` (incl. Q17); process pool for files, thread pool for git | Every row of the decision-test, derived-state, and finding A–F tables has a fixture test; the scale fixture meets Q14 | ✅ Done |
 | 3 | **Format & cleanup** — `upgrade` runner, step `0001-epic-provenance`, format guard in every skill, delete the two migrate skills, new-project routes on the stamp, setup writes the stamp + `[lifecycle]` + Python probe + requirements README stub, Q15 bundle | Format-0 fixture upgrades to 1 idempotently; dry-run of new-project → setup → upgrade | ✅ Done |
 | 4 | **Authoring** — capture-requirements 3B.2 five options, TOR-ID argument mode, re-litigation grep, Step 4 `check --base`, Haiku brief rewrite; FEATURE/TRACING templates; discover Removed/Modified rows; mockup (Q22); triage routes + `check` | Dry-run: brownfield supersede, retire, pending, reword-with-evidence on a docs/ branch | ✅ Done |
-| 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ☐ |
+| 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ✅ Done |
 | 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ☐ |
 | 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ☐ |
 | 8 | **Step 0002 lifecycle migration** (#20 Migration 1–8, one commit each; strips `migration_source`) + contributor kit (Q9) | A "Project A-like" fixture upgrades with identical fingerprints before/after the strip; seed surfaces exactly the planted stale set | ☐ |
@@ -221,3 +221,48 @@ proposal + addendum). Every plan reads this file first and updates it last.
   Critical (no restore path, triage dead end, no `Pending` changelog row, …). Pass 2: 1 Critical
   (restore left the code doing the edit while the TOR read Verified). Pass 3: 0 Critical, 13
   wording fixes, all applied. `check --base develop` had no own-branch findings in every run.
+
+### Plan 5 — Planning & dashboards
+
+- **No helper changes.** `states --json` and `check --json` already carried what the skills need
+  (`removal_epics`, `dispute.overdue`/`safety`, `underlying_state`, `waived_to`, F
+  `removal-missing`), so no deviation-log row. `test_dryrun_fixtures.py` pins the Plan 5 fixture
+  (every derived state, letters A–F, the docs-branch successor and missing removal epic, `--behind`).
+- **status** runs `states --json` + `check --json` once and computes nothing: coverage over
+  `summary.live`, a Changed Since Verified panel per epic (Verification failed included; an A
+  finding adds "capture-requirements first"), a Requirements Health panel (messages verbatim), the
+  opening nudge, and overdue Disputed (Safety first) as the top action. Exit 2/3 prints the helper
+  output and skips the requirement panels. Degraded mode puts the format fix first (upgrade or
+  plugin update per `upgradable:`) and marks the rest "after the fix".
+- **plan-project / add**: live set and ownership from `states` (unassigned = `Specified`, or
+  Disputed over `Specified`; an epic that waives a TOR is not its owner). Two-column anchors.
+  Removal epics: sidecar `retires: CR-…`, a `## Removal` section (retires / retired IDs / code from
+  `sweep` / done-when), guard-only anchors; a requirement satisfied only by absent code is never an
+  anchor on any epic and is listed as deferred. `/add removal epic for CR-…` (and plain-language
+  removal requests matched on record `title`/`keywords`) stops cleanly for a missing, non-retire,
+  `removal = "none"`, or already-planned record. Non-Not-Started epics are never edited. Planning
+  PR body (team path) and summaries print titles from one `titles` run.
+- **Carry-overs:** (a) plan-project Step 3C proposes the removal epics. (b) Fixed on the
+  plan-project side: 3B.1 reads the changelog the branch archived (`.processed` absent at the
+  merge base); capture-requirements Step 6 is unchanged apart from a pointer.
+- **pause**: a removal epic's empty anchors no longer read as "done"; the handoff records remaining
+  `sweep` citations. **refresh-docs**: nothing in #20 or this doc applies (it reads no TORs or
+  titles); left alone.
+- **For Plan 6/7 (interim):** start-epic 6.3 and wrapup 5.3 still compare anchor titles, which new
+  specs no longer carry — both are deleted in those plans. **For Plan 8:** step 0002 strips the
+  title column from every non-Complete spec (Not Started, In Progress, Paused, Implemented), not
+  only Not Started / In Progress.
+- **Left alone** (pre-existing): plan-project Step 7 adds a "Design & Planning Documents" section
+  to the user's `CLAUDE.md` when missing, which conflicts with the plugin rule "No skill or step
+  edits the user's `CLAUDE.md`" — reconcile in Plan 9. pause commits on whatever branch is checked
+  out; refresh-docs has no Key Files fallback and does not mark decisions about retired behavior.
+  Text-mode `states` omits `removal_epics`; check F's removal-missing message names only `/add`.
+- **Q13 dry-run:** `tests/peak-workflow/dryrun/plan5_states.py` (orders app grown to every derived
+  state and findings A–F; `docs/q4-requirements` with an unassigned successor, a `removal = "code"`
+  retire with no epic, a guard TOR, a "shall remove" TOR, and an archived changelog; `--behind`).
+  Agents ran the real helper. Pass 1 (plan-project; /add removal epic; status current + behind,
+  pause, refresh-docs): 1 Critical (brownfield screen trace could never pass), 8 UX. Pass 2: 2
+  Critical in plan-project (3B.2 consumed the guard rows before 3C; Waived trace forced editing a
+  Complete epic). Pass 3: plan-project 0 Critical; /add 1 Critical (a plain-language request after
+  the removal epic existed could anchor the "shall remove" TOR). Pass 4 (/add, four invocations):
+  0 Critical. UX findings from every pass applied.
