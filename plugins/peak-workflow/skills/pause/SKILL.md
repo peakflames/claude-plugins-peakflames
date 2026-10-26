@@ -44,6 +44,12 @@ table show PASS or CANNOT VERIFY in the TOR Coverage section, the epic may be re
 If no implemented handoff exists yet, use test-file presence for the TOR IDs as a heuristic.
 When in doubt, defer to the user.
 
+A **removal epic** (its sidecar has a `retires:` line, its spec a `## Removal` section) may have
+no anchors at all. Its removal part is done only when
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <the Removal section's retired IDs>`
+reports nothing (exit 0) — check that as well, and never read an empty anchors table as "all
+done".
+
 If the user confirms they want to pause anyway, proceed with Step 2.
 
 ## Step 2: Capture Task State
@@ -70,6 +76,10 @@ Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-pa
 
 ### TOR IDs Not Started
 - [List TOR IDs not yet touched]
+
+[Removal epic only:]
+### Removal
+- [N] citations of the retired IDs remain (`tor-lifecycle sweep <retired IDs>`); code paths still to delete: [list]
 
 ## Files Created/Modified So Far
 

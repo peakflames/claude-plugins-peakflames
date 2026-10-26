@@ -8,7 +8,7 @@ description: |
   Triggers on: "add epic", "new epic", "create epic", "I need to add more work",
   "there's a new feature we need", "can we squeeze in", "add a feature",
   "another thing we need to build".
-argument-hint: "<description of what the epic should accomplish>"
+argument-hint: "<description of what the epic should accomplish> | removal epic for CR-…"
 ---
 
 You are adding one or more new epics to the implementation plan based on the user's description.
@@ -40,7 +40,17 @@ Follow these steps exactly:
 1. Read `CLAUDE.md` at the repo root for project context.
 2. Read the phase indexes: glob `docs/implementation-plan/phase-*/index.md` and read each file to understand the existing epic structure, phase names, and existing epic IDs.
 3. Read `docs/architecture.md` for system context.
-4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file, parse every `Scenario: [TOR-NN-XXXXXXX]` block: capture the TOR ID, scenario title, feature file path, and Given/When/Then. Also note which TOR IDs are already in existing epic sidecars' `requirements:` fields (glob `docs/implementation-plan/status/epic-*.md`, read each `requirements:` line).
+4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file, parse every `Scenario: [TOR-NN-XXXXXXX]` block: capture the TOR ID, feature file path, and Given/When/Then. Then run, once each:
+   - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" states --json` → **`states`**: one row
+     per requirement with its `title`, `state`, and owning `epic`. Only `live: true` rows can be
+     anchors — retired and superseded IDs are never planned. A live row is **unassigned** when
+     its `state` is `Specified`, or `Disputed` with `underlying_state` `Specified`; any other live
+     row is owned by its `epic`. A supersede successor nobody took yet is unassigned like any
+     other.
+   - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --json` → **`check`** (exit 0 and 1
+     are both success). Its F findings with `kind: removal-missing` are the retire records still
+     waiting for a removal epic (`detail.record`).
+   Exit 2 or 3 from either: print the output and stop — it names the fix.
    If `docs/requirements/` is empty or missing, stop:
    > The requirements baseline is empty. Run `/peak-workflow:capture-requirements` first to
    > establish TOR requirements before adding epics. Epics reference TOR IDs as their acceptance
@@ -59,6 +69,32 @@ If `$ARGUMENTS` starts with the pattern `[issue #<N>]` (e.g. `[issue #42] Add CS
 
 If no `[issue #<N>]` prefix is present, the source issue number is unknown — skip the fetch and leave the `Source:` line out of the spec in Step 6.
 
+### 2.0b: Removal epic for a retire record
+
+A request of the form `removal epic for CR-XXXXXXX` (optionally followed by `: <title>` —
+`capture-requirements` Step 7.1 dispatches exactly this), or a description asking to plan the
+removal of something a retire record names, is a **removal epic**. A retire record with
+`removal = "code"` means the code still does what the retired requirements described; the
+removal epic takes it out.
+
+1. Read the record (`docs/requirements/changes/*-<7 chars after "CR-">.toml`). Stop with a plain
+   message when it does not exist, is not `kind = "retire"`, or has `removal = "none"` (nothing
+   to remove). If an epic already carries `retires: <CR-ID>` (the record is not among `check`'s
+   `removal-missing` findings), name that epic and stop — a record gets one removal epic.
+2. Find the code still doing it: `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <retired
+   IDs>` lists the tests and source citing the retired IDs (`changes[].tor`); add the source
+   paths those tests exercise, found in Step 5.
+3. **Guard requirements** are its only possible anchors: live, unassigned requirements that state
+   what must stay true once the code is gone (for example "The service shall answer a CSV export
+   request with HTTP 410 and a message naming the export API"). Offer the candidates in Step 2.2's
+   table — zero is a valid answer. **Never** anchor a requirement that says something "shall be
+   removed": it is dead the day it passes. If one exists, leave it out and recommend rewording it
+   as a guard with `/peak-workflow:capture-requirements <TOR-ID>`. This skill never writes
+   requirements.
+4. Continue at Step 2.2 with the guard candidates, then Steps 3–9. The spec gets the
+   `## Removal` section and the sidecar the `retires:` line (Steps 6 and 7). Skip the
+   whole-capability check — a removal epic owns no new behavior.
+
 ### 2.1: Interpret the description
 
 Interpret the (now prefix-free) description. It may be:
@@ -76,11 +112,14 @@ Based on the description, identify which TOR IDs from the requirements baseline 
 
 Based on your description, these TOR IDs appear relevant:
 
-| TOR ID | Feature File | Scenario Title |
-|--------|--------------|----------------|
-| TOR-01-Afs657G | 01-cli.feature.md | The tool shall report its part number and version... |
-| TOR-02-Xyz5678 | 02-auth.feature.md | The tool shall reject requests with invalid tokens... |
-| ...    | ...          | ...            |
+| TOR ID | Feature File | Title | Owner |
+|--------|--------------|-------|-------|
+| TOR-01-Afs657G | 01-cli.feature.md | The tool shall report its part number and version... | unassigned |
+| TOR-02-Xyz5678 | 02-auth.feature.md | The tool shall reject requests with invalid tokens... | Epic aB3dE5f (Not Started) |
+| ...    | ...          | ...   | ... |
+
+Titles and owners come from `states`, never from an epic spec. Mark a Disputed row "Disputed —
+resolve with `/peak-workflow:capture-requirements <TOR>` before starting".
 
 **Unplanned TOR IDs (not yet in any epic):** [N]
 **Already-planned TOR IDs (owned by another epic):** [N] — each must be moved here or dropped (whole-capability check below)
@@ -92,7 +131,8 @@ Use `AskUserQuestion`:
 
 If the user confirms the list, use it. If the user specifies additions or removals, update accordingly.
 
-**If no existing TOR IDs match the description:** inform the user:
+**If no existing TOR IDs match the description** (except for a removal epic, where an empty set
+is valid — continue with `requirements: —`), inform the user:
 > No existing TOR requirements match this description. To add new requirements, run
 > `/peak-workflow:capture-requirements` (brownfield mode) on a `docs/{task-short-name}` branch
 > to derive and approve new TOR IDs, then re-run `/peak-workflow:add`.
@@ -107,18 +147,19 @@ rather than listing the TOR and deferring it. Code another epic owns, whatever i
 dependency (Step 3), not a reason to widen; a Not Started provider only means this epic is
 blocked until that one is Implemented.
 
-A TOR ID is owned by exactly one epic. For each confirmed TOR already in another epic's
-`requirements:` field, use `AskUserQuestion`:
+A TOR ID is owned by exactly one epic. For each confirmed TOR that `states` shows owned by
+another epic, use `AskUserQuestion`:
 - Question: `"TOR-<NN-XXXXXXX> is already owned by Epic <id> (<status>). Keep it there, or move it here?"`
 - Options: `["Keep it in Epic <id> — drop it from this epic", "Move it here"]`
 
 Moving is allowed only when the other epic is **Not Started**: remove the ID from that epic's
 sidecar `requirements:` line and its spec's Requirements Anchors table (Step 7 item 3).
-If the other epic is In Progress, Implemented, or Complete, offer only the Keep option — the TOR
-stays where it is being (or was) delivered.
+If the other epic is In Progress, Paused, Implemented, or Complete, offer only the Keep option — the TOR
+stays where it is being (or was) delivered. **Never edit an epic that is not Not Started** — no
+spec, sidecar, or phase-index change; a Complete epic keeps the IDs it verified.
 
 If every confirmed TOR was dropped via Keep, the set is empty — stop with the "No existing TOR
-requirements match" message above.
+requirements match" message above (a removal epic continues with no anchors).
 
 **Screens (UI epics, when `ux/screens.md` exists).** A UI epic lists the `S-NN` screens its
 confirmed TORs name in their Given/When — those are its `## Screens` rows in Step 6. A screen
@@ -203,17 +244,24 @@ coverage.}
 ## Requirements Anchors
 
 > The TOR requirement IDs listed below are the acceptance criteria and verification baseline for
-> this epic. Each ID maps to a Gherkin scenario in the referenced feature file.
+> this epic. Each ID maps to a Gherkin scenario in the referenced feature file, which is the only
+> place its title and text live.
 > `/peak-workflow:start-epic` reads each TOR's Given/When/Then to drive implementation and tests.
 > `/peak-workflow:wrapup-epic` independently verifies each TOR's Given/When/Then is satisfied.
-> If a feature file has been updated since this spec was written and a scenario no longer matches
-> its cited TOR ID, stop and surface the discrepancy to the user before proceeding — do not
-> silently implement against stale requirements.
 
-| TOR ID | Feature File | Scenario Title |
-|--------|--------------|----------------|
-| TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` | {Scenario title verbatim from the feature file} |
-| TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` | {Scenario title verbatim from the feature file} |
+| TOR ID | Feature File |
+|--------|--------------|
+| TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` |
+| TOR-{NN}-{XXXXXXX} | `docs/requirements/{NN}-{name}.feature.md` |
+
+## Removal
+
+**Retires:** {CR-ID} — {record title} ({record date})
+**Retired requirements:** {TOR-ID}, {TOR-ID} — no longer requirements; their text is in the record
+**Code to remove:** {paths from `sweep` and the code those tests exercise}
+**Done when:** `tor-lifecycle sweep {retired IDs}` reports nothing, the code above is gone, and
+every guard requirement in Requirements Anchors passes. Tests that only proved the old behavior
+are deleted, not retargeted.
 
 ## Screens
 
@@ -233,6 +281,7 @@ both are involved.}
 - Include the **Design** note only if the epic involves UI work. Omit it entirely otherwise.
 - Always include the three provenance lines, filled at write time — never leave a placeholder: `{planner}` is `git config user.name`, `{YYYY-MM-DD}` is today, and `{plan-branch}` is `git branch --show-current`. `/peak-workflow:status` and `/peak-workflow:start-epic` show them so a teammate can tell who planned an epic.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise.
+- Include the `## Removal` section only for a removal epic (Step 2.0b). Omit it entirely otherwise. A removal epic with no guard requirements keeps the Requirements Anchors heading with the line `None — a removal epic; see Removal.` in place of the table.
 - Include the `## Screens` section only for a UI epic when `ux/screens.md` exists (Step 1 item 5). Omit it entirely otherwise. Rows are the screens confirmed in Step 2.2, name copied verbatim from `ux/screens.md` and wireframe path copied verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. A screen appears in exactly one epic's Screens table.
 
 **Populating Requirements Anchors:**
@@ -240,7 +289,7 @@ both are involved.}
 Use the confirmed TOR ID set from Step 2.2:
 - Copy each TOR ID verbatim.
 - Set Feature File to the relative path from the repo root (e.g., `docs/requirements/01-cli.feature.md`).
-- Copy the Scenario Title verbatim from the `Scenario: [TOR-NN-XXXXXXX] {title}` line in the feature file.
+- Write no title: titles live only in the feature file.
 
 Do not paraphrase or summarize TOR IDs — verbatim accuracy is required for downstream skills
 (`start` and `wrapup`) to locate the scenario in the feature file.
@@ -249,7 +298,7 @@ Do not paraphrase or summarize TOR IDs — verbatim accuracy is required for dow
 
 Before writing each spec, verify:
 - [ ] Every TOR ID in Requirements Anchors exists in the cited feature file with an exact ID match
-- [ ] Scenario titles are copied verbatim from the feature file
+- [ ] The anchors table has exactly two columns, `TOR ID | Feature File`, and every ID is live (no retired or superseded ID)
 - [ ] Feature file paths are correct relative paths from the repo root
 - [ ] Key Components reference real directories and follow the project's naming conventions
 - [ ] The Description explains *why*, not just *what*
@@ -264,7 +313,8 @@ Before writing each spec, verify:
    Use `—` in the Dependencies column if the epic has no dependencies. Use the epic ID verbatim.
 
 2. **Status sidecar** — create `docs/implementation-plan/status/epic-{id}.md` with exactly these six lines
-   (`owner:` stays `—` until `/peak-workflow:start-epic` sets it):
+   (`owner:` stays `—` until `/peak-workflow:start-epic` sets it), plus `retires: CR-{XXXXXXX}` as a
+   seventh line for a removal epic:
    ```
    status: Not Started
    owner: —
@@ -296,6 +346,8 @@ the output explicitly and unambiguously?**
 List every discrete requirement or intent signal that drove this invocation. Sources:
 
 - **Selected TOR IDs** (from Step 2.2) — every TOR ID the user confirmed for this epic.
+- **Removal record** (Step 2.0b) — one row, `Removal: <CR-ID>`, captured by the sidecar's
+  `retires:` line and the spec's `## Removal` section; one more row per `sweep` path.
 - **User description** (`$ARGUMENTS` after Step 2.0 prefix stripping) — each distinct behavior,
   constraint, or deliverable named. Include follow-up clarifications.
 - **GitHub issue body** (if Step 2.0 fetched one) — each acceptance hint, constraint, or user
@@ -314,8 +366,8 @@ Print the table verbatim — it is part of the Step 9 summary.
 
 | # | Input (source:reference) | Captured in Output (spec section) | Explicit? (Y/N) | Ambiguous? (Y/N) |
 |---|--------------------------|-----------------------------------|-----------------|-------------------|
-| 1 | TOR-01-Afs657G: "tool shall report version to stdout" | Requirements Anchors, row 1 | Y | N |
-| 2 | TOR-01-Bcd2345: "tool shall accept --help flag" | Requirements Anchors, row 2 | Y | N |
+| 1 | TOR-01-Afs657G — The tool shall report its version… | Requirements Anchors, row 1 | Y | N |
+| 2 | TOR-01-Bcd2345 — The tool shall accept --help… | Requirements Anchors, row 2 | Y | N |
 | 3 | User description: "must work on Windows and Linux" | Key Components (note on portability) | Y | N |
 | 4 | Issue #42 body: "also validate the exit code" | (not captured) | N | — |
 ```
@@ -354,7 +406,9 @@ Show the user what was created:
 - **Planned by:** {planner}, {YYYY-MM-DD}
 - **Phase:** {N} — {Name}
 - **Dependencies:** {list}
-- **Sections:** {count} acceptance criteria, {count} verification items
+- **Requirements:** one line per anchor, `TOR-… — <title>`, titles from one
+  `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" titles <anchor IDs>` run [or "None — a removal epic"]
+- [Removal epic only:] **Retires:** {CR-ID} — {record title}; {N} `sweep` citations to delete or retarget
 
 {Repeat for each epic if multiple were created}
 
