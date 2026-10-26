@@ -69,6 +69,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | `mark` | wrapup, reverify, and quick-fix write `verified:` / `unverified:` / `reverified:` and append to `requirements:` | Adds `mark <epic> [--append TOR] [--pass TOR] [--fail TOR REASON] [--reverified]`, the only writer of those lines; refuses IDs that are not live, not owned, or waived, and never touches `status:` | Hand-edited sidecars are a strict-parse data error waiting to happen; fingerprints are never typed by a prompt |
 | In-epic amend | start-epic "Amend" runs the decision test and writes the record | In-epic amendment is always a **supersede**; a reword-eligible (wording-only) edit is implemented as written and suggested for a later `capture-requirements <TOR>` | A wording-only edit changes nothing the epic builds, and a reword's test evidence cannot point at uncommitted mid-epic work |
 | quick-fix reword | The record ships "in the same commit as the code" | A quick-fix **reword** is a second commit on the same `hotfix/` branch, after the code commit, so `[evidence] commit` names the tree the citing tests ran on. A supersede stays one commit | A commit cannot cite its own SHA |
+| `uphold` | A `pending` record is resolved only by a reword, supersede, or retire that refs it | A fifth kind, `uphold`, refs the open pending record and closes it with no text change (`keywords` and the current fingerprint required; `validate` checks a pending record in `refs` names the same TOR; `search` finds it). capture-requirements 3C (Disputed: Uphold / Change it / Retire / Renew) and wrapup's overdue question offer it | When the owner decides a disputed requirement was right, nothing could close the dispute; it turned overdue and blocked every epic touching it |
 | Wrapup pending line | Record as pending writes a `pending` record; `unverified:` is only for a reverify FAIL | A TOR recorded as pending at wrapup also gets an `unverified:` line (`RECORDED AS PENDING — CR-…`) from Step 2.2's `mark` | With neither line, a Complete epic's failed requirement reads "Verified (legacy)" under its dispute, and reverify's default scope skips it |
 | Reverify A stop | Reverify re-checks every stale requirement | Reverify stops on a scoped requirement with an A finding (edited without a record) and sends it to `capture-requirements <TOR>`; `check`'s D message says the same when A is present | A reverify PASS would ratify an unrecorded meaning change |
 | Wrapup branch freshness | (none) | Wrapup stops when the base gained Change Records the branch lacks: merge the base first | Dispute ages and record lookups read the branch's own files |
@@ -85,6 +86,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ✅ Done |
 | 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ✅ Done |
 | 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ✅ Done |
+| 7b | **uphold** — fifth record kind closing a dispute when the requirement stands; capture-requirements 3C, wrapup overdue question, status/triage/quick-fix wording | Dry-run: capture-requirements uphold, wrapup uphold, status | ✅ Done |
 | 8 | **Step 0002 lifecycle migration** (#20 Migration 1–8, one commit each; strips `migration_source`) + contributor kit (Q9) | A "Project A-like" fixture upgrades with identical fingerprints before/after the strip; seed surfaces exactly the planted stale set | ☐ |
 | 9 | **Release gate** — README / plugin CLAUDE.md / CHANGELOG (BREAKING, /upgrade), 2-pass full dry-run, live UAT, draft PR → develop, contributor request, release | All four Q10 gates pass | ☐ |
 
@@ -363,11 +365,28 @@ proposal + addendum). Every plan reads this file first and updates it last.
   pending → status → code fixed → reverify PASS → status): every step worked as written; status
   now sends a Disputed failed requirement to capture-requirements before quick-fix, and the
   reverified handoff says a PASS does not resolve a dispute.
-- **Open question (owner decision, not in #20):** nothing closes a dispute when the owner decides
-  the requirement **stands** as written. #20 resolves a `pending` record only by a reword,
-  supersede, or retire that refs it; after the code is fixed and reverified (pass 3), the TOR stays
-  Disputed and turns overdue at 30 days. Options: a fifth record kind (e.g. `uphold`, refs the
-  pending, current fingerprint, no feature-file change) that `open_pending` treats as resolving,
-  or allow a `reword` with `from == to` plus passing evidence. Either touches the record schema,
-  `validate`, and capture-requirements 3C — decide before Plan 8 (step 0002 writes records).
+- **Open question → Plan 7b:** nothing closed a dispute when the owner decided the requirement
+  stands. Owner chose a fifth record kind, `uphold`, done before Plan 8.
+
+### Plan 7b — uphold
+
+- **Helper:** `KINDS` gains `uphold` (`keywords`, `[[changes]]` `tor` / `feature_file` /
+  `fingerprint`, and a `CR-…` in `refs`). `validate` (multi-file) checks that a pending record in
+  `refs` names each upheld TOR. `open_pending` needed no change — any record that refs a pending
+  record resolves it. `search` includes upholds. Tests: `test_uphold.py`; the fixture builder's
+  `record_data` knows the kind.
+- **Skills:** capture-requirements L5 choice 6 (Uphold; Disputed only; verifies nothing — the
+  underlying state then applies), 3C Disputed question (Uphold / Change it / Retire / Renew, Renew
+  dropped for Safety), L4 names upheld decisions; CHANGE_RECORD_TEMPLATE uphold example and
+  `approved_via` per skill. wrapup 1.1 item 3a overdue: Uphold / Amend / Renew / Stop; reverify R6
+  points at Uphold. status, triage, quick-fix name it where they say how to settle a dispute.
+- `search` marks a pending record a later record refs as `pending (closed by CR-…)` (JSON
+  `closed_by`), so the re-litigation check never sends the user to reopen a settled dispute.
+- wrapup's stale-branch stop now merges the base and re-runs item 3a in the same session (nothing
+  read before it is the implementer's handoff).
+- **Q13 dry-run:** Plan 7 fixture; capture-requirements `TOR-02-Cncl001` → Uphold (docs branch,
+  merged), wrapup `qDsc15` → overdue Disc001 → Uphold, status. Both records `validate` ok; both
+  TORs back to Verified, F `disputed` cleared. 0 Critical; UX/Minor fixed (reason prompt, closed
+  pending in `search`, Disputed + D/A cases get Uphold, empty `docs/amend-*` branch removed on a
+  lookup stop).
 

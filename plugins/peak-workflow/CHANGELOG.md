@@ -73,6 +73,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Wrapup amend and record as pending** — for a FAIL where the requirement is wrong, Step 1.4b
   supersedes it with an owner-approved Change Record (`AMENDED AT WRAPUP`) or writes a `pending`
   record, replacing the silent Defer. Never for Safety.
+- **`uphold` Change Records** — close a dispute when the owner decides the requirement stands as
+  written: `capture-requirements <TOR-ID>` offers Uphold for a Disputed requirement, and wrapup's
+  overdue-dispute question can uphold it. The feature file is untouched; `validate` checks the
+  pending record it closes.
 - **Wrapup Removal gate** — a removal epic passes only with zero `sweep` hits for its retired IDs,
   the named code gone, and its guard requirements passing.
 

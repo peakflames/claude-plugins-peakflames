@@ -154,7 +154,8 @@ and deletes the branch, team pushes and opens a PR (title
   then reverify again in a new session` — or, when the requirement (not the code) is what is
   wrong: `/peak-workflow:capture-requirements <TOR>`.
 - For each Disputed requirement in scope: `<TOR> is still disputed (<CR-ID>) — settle it with
-  /peak-workflow:capture-requirements <TOR>.`
+  /peak-workflow:capture-requirements <TOR>` (after a PASS, **Uphold** closes it when the
+  requirement stands).
 - `Run /peak-workflow:status to see the updated Requirements Coverage.`
 
 ---
@@ -198,8 +199,9 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
     `tor-lifecycle sweep --json`. These read the branch's own files: when
     `git diff --name-only HEAD...<base> -- docs/requirements/changes/` lists records the base gained
     after the branch was cut, say `<base> has requirement changes this branch has not seen —
-    merge <base> into the branch first (git merge <base>), then re-run this wrapup in a fresh
-    session.` and stop (nothing written; stay on the branch). Open the report to the user with the nudge when any live
+    merging <base> into the branch first.`, run `git merge --no-edit <base>` (stop and show git's
+    message on a conflict), and re-run item 3a in this session — nothing read so far is the
+    implementer's handoff, so independence holds. Open the report to the user with the nudge when any live
     requirement is Disputed, Changed since verified, or Verification failed — one plain sentence
     with the counts and the next command, as `/peak-workflow:status` words it. Then, in order:
     1. **Blocking findings.** Every finding with `blocking: true` (A, B, or C this branch
@@ -229,14 +231,23 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
          also clears this.
        - **Overdue** (`dispute.overdue: true`) — ask
          `"<TOR> — <title> has been disputed for <N> days (<CR-ID>: <record title>). It must be settled before this epic ships."`
-         with `["Resolve it on this branch (owner approval)", "Renew the pending record", "Stop — epic FAILs"]`.
-         **Resolve** runs Step 1.4b's **Amend requirement** procedure with the pending record's
+         with `["Uphold it — the requirement stands as written", "Amend it on this branch (owner approval)", "Renew the pending record", "Stop — epic FAILs"]`.
+         **Uphold** writes an `uphold` record (`capture-requirements` L5 choice 6; the
+         `CHANGE_RECORD_TEMPLATE.md` uphold shape) with `approved_via = "wrapup"`, `approved_by` =
+         `git config user.name`, `refs = ["<open CR-ID>", "epic <id>"]`, `fingerprint` from
+         `tor-lifecycle text <TOR> --json`, `title` = what stands (one line), the open record's
+         `keywords` plus 1–3 from the reason, a `CR-` suffix generated as in Step 1.4b Amend item 2,
+         and the reason — ask `Why does <TOR> stand as written? (one sentence — it becomes the
+         record's reason)`. Validate it. The dispute closes and the feature file is untouched;
+         an uphold verifies nothing, so when this branch changed a test citing it, add
+         `/peak-workflow:wrapup-epic <owning epic> reverify <TOR>` to Step 3.4.
+         **Amend** runs Step 1.4b's **Amend requirement** procedure with the pending record's
          ID in the new record's `refs`. **Renew** writes a new `pending` record (the
          `CHANGE_RECORD_TEMPLATE.md` pending shape): `refs = ["<open CR-ID>", "epic <id>"]`, `owner`
          = the open record's owner unless the user names another, `approved_by` = `git config
          user.name`, `approved_via = "wrapup"`, `fingerprint` from `tor-lifecycle text <TOR>
          --json`, `title` = `<open title> (renewed)`, the open record's `keywords` topped up to 3–6
-         from the reason, and the `reason` the owner gives; validate it. Either one is listed in Requirement Changes.
+         from the reason, and the `reason` the owner gives; validate it. Each is listed in Requirement Changes.
        - **Under the threshold** — a warning: list it in the report's Requirement changes section
          and the PR body (`Disputed: <TOR> (<CR-ID>, <N> days, due after <threshold> days)`).
     3. Keep `sweep` for the Removal gate (Step 1.3) when the epic is a removal epic.
@@ -763,7 +774,7 @@ column sets exactly as shown.
 
 - Highlights are **selective**, not comprehensive — 3–6 bullets is typical, not one bullet per item. Lead the reviewer to the substantive checks; skip trivialities.
 - Author them from what was actually run in Steps 1.2–1.4.
-- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for waived or recorded as pending, 🔧 for fixed or amended during wrapup, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
+- Lead each bullet with a literal Unicode emoji — ✅ for pass (and for a dispute closed here: `<TOR> — dispute <CR-ID> closed by uphold <CR-ID>`), ⚠️ for waived or recorded as pending, 🔧 for fixed or amended during wrapup, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
 - Deferrals never appear *only* in Highlights — they are already in the Deferrals table at the top. Highlights may reference them but must not be the sole record.
 
 **If the verdict is FAIL:** Stop here, on the feature branch (a stop that wrote nothing, like the

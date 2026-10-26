@@ -54,7 +54,9 @@ Follow these steps exactly:
    - **Disputed under `# Safety`** (`dispute.safety: true`) — stop: `<TOR> is a Safety
      requirement known to be wrong (<CR-ID>). No branch that touches it can ship until it is
      resolved on a docs/ branch: /peak-workflow:capture-requirements <TOR>`.
-   - **Disputed** (other) — warn in one line and list it in the PR body; continue.
+   - **Disputed** (other) — warn in one line and list it in the PR body; continue. If the owner
+     says the requirement stands, say the fix does not close the dispute: `/peak-workflow:capture-requirements
+     <TOR>` (Uphold) does.
    - **Changed since verified** or **Verification failed** — note it for Step 4 item 7 (the
      reverify command after the fix).
 6. **Amendment path?** It applies when `$ARGUMENTS` ends with `— amends <TOR-ID>

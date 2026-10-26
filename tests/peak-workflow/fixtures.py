@@ -113,7 +113,7 @@ def record_data(kind: str, suffix: str, date: str = "2026-10-21", /, tors: list[
         "title": f"A {kind} record", "reason": "Because the fixture says so.",
         "approved_via": "docs-branch", "approved_by": "A. Maintainer", "refs": ["issue #1"],
     }
-    if kind in ("supersede", "retire", "pending"):
+    if kind in ("supersede", "retire", "pending", "uphold"):
         data["keywords"] = ["fixture"]
     if kind == "reword":
         data["equivalence"] = "No plausible implementation passes one version and fails the other."
@@ -128,6 +128,10 @@ def record_data(kind: str, suffix: str, date: str = "2026-10-21", /, tors: list[
                             "traced_to": ["vision G1"], "text": f"Scenario: [{t}] old"} for t in tors]
     elif kind == "pending":
         data["owner"] = "A. Maintainer"
+        data["changes"] = [{"tor": t, "feature_file": "01-core.feature.md", "fingerprint": "c" * 12}
+                           for t in tors]
+    elif kind == "uphold":
+        data["refs"] = ["CR-Pnd0001"]
         data["changes"] = [{"tor": t, "feature_file": "01-core.feature.md", "fingerprint": "c" * 12}
                            for t in tors]
     for key, value in overrides.items():
