@@ -50,6 +50,11 @@ class MarkTests(unittest.TestCase):
         self.assertEqual(self.mark("--append", NEW).returncode, 0)  # idempotent
         self.assertEqual(tl.parse_sidecar("cMpl001", self.read()).requirements, [A1, A2, A3, NEW])
 
+    def test_flags_take_several_ids(self):
+        self.assertEqual(self.mark("--append", NEW, "--pass", A1, A2, NEW).returncode, 0)
+        sc = tl.parse_sidecar("cMpl001", self.read())
+        self.assertEqual(set(sc.verified), {A1, A2, NEW})
+
     def test_pass_replaces_an_existing_line_in_place(self):
         self.mark("--pass", A1)
         self.mark("--pass", A1)
