@@ -609,7 +609,7 @@ epic addresses, drawn from the feature files and tracing sidecars.}
 ## Removal
 
 **Retires:** {CR-ID} — {record title} ({record date})
-**Retired requirements:** {TOR-ID}, {TOR-ID} — no longer requirements; their text is in the record
+**Retired requirements:** {TOR-ID}, {TOR-ID} — no longer requirement(s); their text is in the record
 **Code to remove:** {paths from `sweep` and the code those tests exercise}
 **Done when:** `tor-lifecycle sweep {retired IDs}` reports nothing, the code above is gone, and
 every guard requirement in Requirements Anchors passes. Tests that only proved the old behavior

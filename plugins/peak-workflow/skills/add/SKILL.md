@@ -45,7 +45,10 @@ Follow these steps exactly:
      per requirement with its `title`, `state`, and owning `epic`. Only `live: true` rows can be
      anchors — retired and superseded IDs are never planned. A live row is **unassigned** when
      its `state` is `Specified`, or `Disputed` with `underlying_state` `Specified`; a `Waived`
-     row shows as `Waived → <waived_to>` and is not offered here (plan-project places it);
+     row shows as `Waived → <waived_to>`: when the user asks for one, say "<TOR> was waived to
+     <epic ref>, which does not list it yet — add it there with /peak-workflow:plan-project, or
+     ask me to add it there now" and, on the latter, add it to that epic's anchors table and
+     sidecar `requirements:` — only when that epic is Not Started;
      any other live row is owned by its `epic`. A supersede successor nobody took yet is unassigned like any
      other.
    - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --json` → **`check`** (exit 0 and 1
@@ -96,7 +99,9 @@ removal epic takes it out.
      epic is needed.`
    - Its `states` row (any retired ID) lists `removal_epics`: `<CR-ID> already has a removal
      epic: <id> (<slug>) — <Name> (<status>). A record gets one removal epic.` (Name and slug from
-     the phase index and spec filename, status from the sidecar.)
+     the phase index and spec filename, status from the sidecar.) When the request also matches
+     a live requirement that states a removal, add: `<TOR> — reword it as a guard with
+     /peak-workflow:capture-requirements <TOR>.`
 2. Find the code still doing it: `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <the
    record's retired IDs>` lists the tests and source citing them (exit 1 means citations were
    found — expected here); add the source paths those tests exercise, found in Step 5.
@@ -183,7 +188,7 @@ another epic, use `AskUserQuestion`:
 
 Moving is allowed only when the other epic is **Not Started**: remove the ID from that epic's
 sidecar `requirements:` line and its spec's Requirements Anchors table (Step 7 item 3).
-If the other epic is In Progress, Paused, Implemented, or Complete, offer only the Keep option — the TOR
+If the other epic is In Progress, Paused, Implemented, or Complete, do not ask — tell the user it stays there and drop it from this epic — the TOR
 stays where it is being (or was) delivered. **Never edit an epic that is not Not Started** — no
 spec, sidecar, or phase-index change; a Complete epic keeps the IDs it verified.
 
@@ -290,7 +295,7 @@ coverage.}
 ## Removal
 
 **Retires:** {CR-ID} — {record title} ({record date})
-**Retired requirements:** {TOR-ID}, {TOR-ID} — no longer requirements; their text is in the record
+**Retired requirements:** {TOR-ID}, {TOR-ID} — no longer requirement(s); their text is in the record
 **Code to remove:** {paths from `sweep` and the code those tests exercise}
 **Done when:** `tor-lifecycle sweep {retired IDs}` reports nothing, the code above is gone, and
 every guard requirement in Requirements Anchors passes. Tests that only proved the old behavior
