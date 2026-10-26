@@ -91,6 +91,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: 2.1 projects must run `/peak-workflow:upgrade`** — every writing skill stops until the
+  project reaches format 2; `status` and `triage` run degraded with a banner. The upgrade backfills
+  provenance, converts notes to Change Records, and seeds `verified:` fingerprints.
+- **BREAKING: Python 3.11+ required** — every skill calls the helper; `setup` and the wrapper print
+  an install hint when no suitable Python is found.
+- **BREAKING: titles are gone from tracing sidecars and epic specs** — only feature files carry
+  titles; skills print them via `tor-lifecycle titles`. Step 0002 strips them from older projects.
 - **One Format Guard in every skill** — replaces the eleven layout guards. Writing skills stop when
   the project is behind or ahead of the plugin; `status` and `triage` run degraded with a banner.
   The pre-2.5 single-index layout is reported as not a peak-workflow layout.
@@ -155,7 +162,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`discover` writes current-state documents** — vision and ConOps are rewritten to the present;
   `Modified` and `Removed` changelog rows are mandatory when a capability changes; `Pending`
   rows carry undecided changes.
-
 - **Pre-3.0 edits flagged for a decision** — a requirement changed since verified whose edit only a
   migration reword explains lists `historical_records`; `check` and `status` ask whether its
   meaning changed before suggesting reverify.
@@ -175,6 +181,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- **README requirements lifecycle** — prerequisites (Python 3.11+), a Requirements lifecycle
+  section (the five record kinds, where amendments happen, fingerprints, reverify, findings A–F),
+  the 2.1 → 3.0 upgrade walkthrough, and the triage AMEND, TOR-ID, and reverify rows.
+- **Root README upgrade pointer** — 2.x users are told to run `/peak-workflow:upgrade` and that
+  Python 3.11+ is required.
+- **Plugin CLAUDE.md invariants** — sidecar lifecycle lines written only by `mark`, Change Record
+  kinds, and derived requirement states.
 - **Plugin rules for scripts and upgrade steps** — `scripts/` holds deterministic mechanics;
   upgrade steps are forward-only and append-only; TOR IDs are never reused and a meaning change
   takes a new ID; major releases ship an upgrade step and bump the project format.
