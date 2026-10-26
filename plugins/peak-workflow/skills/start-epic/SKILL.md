@@ -145,7 +145,7 @@ Follow these steps exactly:
 
 ### Recovery Check
 
-If `owner:` in the sidecar names someone other than `git config user.name`, skip this check — Step 2.5 asks the user first.
+If `owner:` in the sidecar names someone other than you (as defined in Step 2.5), defer this check until Step 2.5 confirms **Start it**, then run it.
 
 If `docs/implementation-plan/status/epic-$ARGUMENTS.md` has `status: In Progress` but there is no pause handoff file (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/peak-workflow:pause`. Inform the user:
 
@@ -213,18 +213,24 @@ Purpose:       <first sentence of the spec's ## Description>
   `git show feature/epic-<id>-<short-name>:docs/implementation-plan/status/epic-$ARGUMENTS.md`
   (if the path is absent there, use the working-tree sidecar).
 
-Below the card, add one `⚑` line for each that applies. "You" means the exact value of
-`git config user.name` — compare names exactly, and inline `$(git config user.name)` in any
-command (shell variables do not persist between commands).
+Below the card, add one `⚑` line for each that applies. **Who "you" are:** compare
+case-insensitively, trimmed. Your names are `git config user.name` plus every author name already
+used with your email — collect them once:
+`git log --all --format='%ae|%an' | awk -F'|' -v e="$(git config user.email)" 'tolower($1)==tolower(e) {print $2}' | sort -u`.
+A commit is yours when its author email (`%ae`) equals `git config user.email` or its author name
+is one of your names; a bare name (`**Planned by:**`, `owner:`) is yours when it is one of your
+names. Inline `$(git config user.email)` / `$(git config user.name)` in any command (shell
+variables do not persist between commands), and never decide with `git log --author` (a regex
+substring match).
 - `⚑ Planned by <name>, not you — check this is yours to start.`
 - `⚑ Phase <N> — <Phase Name> was added to the plan by <name>, not you.` — the author of the
   commit that added the phase index:
-  `git log --diff-filter=A --format='%an' -- docs/implementation-plan/phase-<N>-*/index.md | tail -1`.
+  `git log --diff-filter=A --format='%ae|%an' -- docs/implementation-plan/phase-<N>-*/index.md | tail -1`.
 - `⚑ Owned by <owner> — someone else has already started this epic.`
 - `⚑ Branch <name> already exists on origin (last commit by <author>, <date>) — someone may be
   working on it.` — when the Freshness Guard fetched, check
   `git branch -r --list 'origin/feature/epic-<id>-*'` and read the author with
-  `git log -1 --format='%an|%ad' --date=short <that-ref>`. Skip when the last commit is yours.
+  `git log -1 --format='%ae|%an|%ad' --date=short <that-ref>`. Skip when the last commit is yours.
 
 `owner:` travels with the feature branch and reaches the base branch only when the epic merges,
 so a teammate's in-flight epic usually shows up through the origin-branch line, not the owner line.
@@ -238,7 +244,16 @@ line remains, print the card and continue without asking.
 - Options: `["Start it", "Show me the ready epics instead", "Stop"]`
 
 On **Show me the ready epics instead**, invoke `Skill({ skill: "peak-workflow:status", args: "" })`
-and end this skill. On **Stop**, end. Only **Start it** continues to Step 3.
+and end this skill. On **Stop**, end. Only **Start it** continues — first running the Recovery
+Check if it was deferred above, then Step 3.
+
+**Clean-tree rule** (used by Step 3's Leftover check and Step 4's rejected-plan cleanup — both
+delete a branch, so they must never discard work). The working tree counts as clean when
+`git status --porcelain` is empty, or when its only entry is ` M CLAUDE.md` **and**
+`git diff -U0 -- CLAUDE.md` changes nothing but the single `Test directories` line that Step 1
+item 4b writes (blank lines aside). Only in that second case restore it with `git checkout -- CLAUDE.md` before
+deleting. Any other change — including other edits to `CLAUDE.md` — means not clean: keep the
+branch, touch nothing, and say why in one line.
 
 ## Step 3: Create Feature Branch
 
@@ -254,11 +269,12 @@ Before entering plan mode, ensure work is isolated on a feature branch. The bran
    **Leftover check.** If the branch exists, detect the base branch (item 5a) and test whether it
    is an empty branch left by an earlier rejected or abandoned start: the base's sidecar still
    says `status: Not Started` (`git show <base-branch>:docs/implementation-plan/status/epic-<id>.md`),
-   `git rev-list --count <base-branch>..feature/epic-<id>-<short-name>` returns `0`, and
-   `git status --porcelain` is empty or lists only `CLAUDE.md` (the Step 1 item 4b line — restore
-   it with `git checkout -- CLAUDE.md`). If all three hold, run `git checkout <base-branch>` and
-   `git branch -d feature/epic-<id>-<short-name>`, say `Removed an empty leftover branch from an
-   earlier start.`, and continue with item 5 as if the branch did not exist.
+   `git rev-list --count <base-branch>..feature/epic-<id>-<short-name>` returns `0`, and the
+   working tree is clean under Step 2.5's **Clean-tree rule**. If all three hold, run
+   `git checkout <base-branch>` and `git branch -d feature/epic-<id>-<short-name>`, say
+   `Removed an empty leftover branch from an earlier start.`, and continue with item 5 as if the
+   branch did not exist. If only the tree is not clean, say `Kept the existing branch — the working
+   tree has uncommitted changes.` and continue with item 3 or 4.
 3. If already on `feature/epic-<id>-<short-name>`, confirm to the user:
    > Resuming on existing branch: `feature/epic-<id>-<short-name>`
 4. If the branch exists but you are not on it, run `git checkout feature/epic-<id>-<short-name>`.
@@ -284,12 +300,12 @@ Build the plan from:
 
 **If the user rejects the plan and ends** (declines rather than asking for revisions): when this
 session created the feature branch in Step 3 item 5, it has no commits beyond the base
-(`git rev-list --count <base-branch>..HEAD` returns `0`), and `git status --porcelain` is empty
-or lists only `CLAUDE.md` (the Step 1 item 4b line — restore it first with
-`git checkout -- CLAUDE.md`), run `git checkout <base-branch>` and
+(`git rev-list --count <base-branch>..HEAD` returns `0`), and the working tree is clean under
+Step 2.5's **Clean-tree rule**, run `git checkout <base-branch>` and
 `git branch -d feature/epic-<id>-<short-name>`, and tell the
-user the empty branch was removed. If plan mode is still active (git writes are not allowed), print
-those commands for the user to run instead. Step 3's Leftover check (under item 2) also removes such a leftover the next
+user the empty branch was removed. If the tree is not clean, keep the branch and say so. If plan mode is still active (git writes are not allowed), print
+those commands for the user to run instead (with `git checkout -- CLAUDE.md` first when the rule
+called for the restore). Step 3's Leftover check (under item 2) also removes such a leftover the next
 time this epic is started, so a closed session does not leave a trap.
 
 **The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), **Design pass** step (UI epics only, with the names from Step 1 item 11b), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
