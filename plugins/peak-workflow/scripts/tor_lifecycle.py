@@ -1119,6 +1119,52 @@ def write_verified(text: str, lines: dict[str, str]) -> str:
     return "\n".join(rows[:end] + new + rows[end:]) + "\n"
 
 
+def mark_sidecar(text: str, *, append: list[str], verified: dict[str, str], unverified: dict[str, str],
+                 reverified: str | None) -> str:
+    """Rewrite a sidecar's `requirements:` (append only), `verified:`, `unverified:`, and
+    `reverified:` lines; every other line stays as it was. `verified` maps TOR -> fingerprint (a
+    PASS: drops its `unverified:` line); `unverified` maps TOR -> "YYYY-MM-DD reason" (a FAIL:
+    drops its `verified:` line)."""
+    rows = text.rstrip("\n").split("\n")
+    out: list[str] = []
+    blocks: dict[str, dict[str, str]] = {"verified": {}, "unverified": {}}
+    i = 0
+    while i < len(rows):
+        line = rows[i]
+        m = KEY_LINE.match(line) if line[:1] and not line[0].isspace() else None
+        key = m.group(1) if m else None
+        if key in SIDECAR_BLOCKS:  # lift the block out; re-emitted below
+            i += 1
+            while i < len(rows) and rows[i][:1].isspace() and rows[i].strip():
+                bm = BLOCK_LINE.match(rows[i])
+                blocks[key][bm.group(1)] = bm.group(2)
+                i += 1
+            continue
+        if key == "requirements" and append:
+            ids = _id_list(m.group(2))
+            ids += [t for t in append if t not in ids]
+            line = f"requirements: {', '.join(ids)}"
+        if key == "reverified" and reverified:
+            line, reverified = f"reverified: {reverified}", None
+        out.append(line)
+        i += 1
+    while out and not out[-1].strip():
+        out.pop()
+    if reverified:
+        at = next((n + 1 for n, ln in enumerate(out) if ln.startswith("requirements:")), len(out))
+        out.insert(at, f"reverified: {reverified}")
+    for tor, fp in verified.items():
+        blocks["verified"][tor] = fp
+        blocks["unverified"].pop(tor, None)
+    for tor, why in unverified.items():
+        blocks["unverified"][tor] = why
+        blocks["verified"].pop(tor, None)
+    for key in SIDECAR_BLOCKS:
+        if blocks[key]:
+            out += [f"{key}:"] + [f"  {tor}: {value}" for tor, value in blocks[key].items()]
+    return "\n".join(out) + "\n"
+
+
 # --------------------------------------------------------------------------------------------
 # Project format (the guard every skill runs) and upgrade-step mechanics
 # --------------------------------------------------------------------------------------------
@@ -1640,6 +1686,48 @@ def cmd_seed(args: argparse.Namespace, root: Path) -> int:
     return EXIT_OK
 
 
+def cmd_mark(args: argparse.Namespace, root: Path) -> int:
+    """Record verification results in one epic's sidecar (wrapup Step 2.2, reverify, quick-fix)."""
+    epic = args.epic
+    path = root / STATUS_DIR / f"epic-{epic}.md"
+    if not path.is_file():
+        raise DataError(f"{STATUS_DIR}/epic-{epic}.md does not exist")
+    text = path.read_text(encoding="utf-8")
+    sc = parse_sidecar(epic, text, f"{STATUS_DIR}/epic-{epic}.md")
+    ids = lambda raw: [i for r in raw for i in _id_list(r)]  # noqa: E731
+    append, passes = ids(args.append), ids(args.passes)
+    fails = {tor: reason.strip() for tor, reason in args.fail}
+    named = append + passes + list(fails)
+    if not named and not args.reverified:
+        raise DataError("nothing to do: give --append, --pass, --fail, or --reverified")
+    live = live_requirements(root)
+    owned = set(sc.requirements) | set(append)
+    problems = [f"{t}: not a TOR-NN-XXXXXXX ID" for t in named if not TOR_RE.match(t)]
+    problems += [f"{t}: not a live requirement" for t in named if TOR_RE.match(t) and t not in live]
+    problems += [f"{t}: not in epic {epic}'s requirements:" for t in passes + list(fails) if t not in owned]
+    problems += [f"{t}: epic {epic} waives it (waived requirements get no verified: line)"
+                 for t in passes + list(fails) if t in sc.waived]
+    problems += [f"{t}: both --pass and --fail" for t in passes if t in fails]
+    problems += [f"{t}: --fail needs a reason" for t, why in fails.items() if not why]
+    if problems:
+        raise DataError(problems)
+    today = (_today(args) or dt.date.today()).isoformat()
+    new = mark_sidecar(text, append=append, verified={t: live[t].fingerprint for t in passes},
+                       unverified={t: f"{today} {why}" for t, why in fails.items()},
+                       reverified=today if args.reverified else None)
+    parse_sidecar(epic, new, f"{STATUS_DIR}/epic-{epic}.md")  # never write a sidecar we cannot read
+    path.write_text(new, encoding="utf-8")
+    for t in append:
+        print(f"{epic}\trequirements\t+{t}" if t not in sc.requirements else f"{epic}\trequirements\t{t} (already listed)")
+    for t in passes:
+        print(f"{epic}\tverified\t{t}: {live[t].fingerprint}")
+    for t, why in fails.items():
+        print(f"{epic}\tunverified\t{t}: {today} {why}")
+    if args.reverified:
+        print(f"{epic}\treverified\t{today}")
+    return EXIT_OK
+
+
 def cmd_format(args: argparse.Namespace, root: Path) -> int:
     if args.init:
         st = format_status(root)
@@ -1795,6 +1883,19 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("--write", action="store_true", help="add the results to the sidecars' verified: blocks")
     se.add_argument("--json", action="store_true")
     se.set_defaults(func=cmd_seed)
+
+    mk = sub.add_parser("mark", help="record verification results in an epic's sidecar (verified:, unverified:, "
+                                     "reverified:, requirements: append)")
+    mk.add_argument("epic", help="epic ID (docs/implementation-plan/status/epic-<id>.md)")
+    mk.add_argument("--pass", dest="passes", action="append", default=[], metavar="TOR",
+                    help="write a verified: line with the current fingerprint (drops its unverified: line)")
+    mk.add_argument("--fail", action="append", nargs=2, default=[], metavar=("TOR", "REASON"),
+                    help="write an unverified: line dated today (drops its verified: line)")
+    mk.add_argument("--append", action="append", default=[], metavar="TOR",
+                    help="add a live requirement to requirements: (never removes one)")
+    mk.add_argument("--reverified", action="store_true", help="set reverified: to today")
+    mk.add_argument("--today", help=argparse.SUPPRESS)
+    mk.set_defaults(func=cmd_mark)
 
     fo = sub.add_parser("format", help="compare the project's format stamp with this plugin's (exit 1 unless current or new)")
     mode = fo.add_mutually_exclusive_group()

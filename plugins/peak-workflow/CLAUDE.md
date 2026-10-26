@@ -20,11 +20,11 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `plan-project` | Derive epics from TOR IDs → phase indexes + epic specs + sidecars |
 | `add` | Add new epic(s) referencing existing TOR IDs |
 | `triage` | Route incoming request → HEAVY / AMEND / EPIC / TRIVIAL |
-| `start-epic` | Implement an epic — TOR-driven plan + tasks + verification |
+| `start-epic` | Implement an epic — TOR-driven plan + tasks + verification; settles superseded or retired anchors; owner-approved in-epic amendment (supersede) |
 | `wrapup-epic` | Independent TOR verification, complete, ship |
 | `pause` | Save progress mid-epic |
 | `status` | Read-only dashboard — phase progress + Requirements Coverage |
-| `quick-fix` | Trivial bug fix on a hotfix/ branch, no TOR changes |
+| `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps, one commit each |
 
@@ -175,7 +175,9 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
   **only** implementation of the fingerprint normalization; no skill restates or re-derives it.
   Skills call it through the POSIX wrapper, `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <cmd>`,
   which finds a suitable Python or prints an install hint (exit 3). Exit codes: 0 ok, 1 findings,
-  2 usage/data error, 3 interpreter. Decisions (what to ask, what to block) stay in `SKILL.md`
+  2 usage/data error, 3 interpreter. Decisions (what to ask, what to block) stay in `SKILL.md`.
+  `tor-lifecycle mark` is the only writer of a sidecar's `verified:`, `unverified:`, and
+  `reverified:` lines and of an append to a Complete epic's `requirements:`
 - `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
   templates. They are **forward-only and append-only**: a shipped step is never edited; a
   correction is a new step. Each step starts with a detect check (so re-running is harmless) and

@@ -57,6 +57,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `retires: CR-…`, a `## Removal` section, and only permanent guard requirements as anchors.
 - **Requirements Health panel** — `status` lists findings A–F verbatim, groups requirements changed
   since verification (or failed) by epic with the reverify command, and opens with a one-line nudge.
+- **Helper command `mark`** — the one writer of a sidecar's `verified:`, `unverified:`, and
+  `reverified:` lines and of an append to `requirements:`; refuses IDs that are not live, not
+  owned, or waived.
+- **In-epic amendment** — `start-epic`'s plan carries an Amendment gate: "Amend (owner approval)",
+  "Implement as written", or "Stop". Amend supersedes the requirement on the epic branch with a
+  Change Record (`approved_via = "epic-branch"`) and swaps the successor into the epic. Never for
+  Safety.
+- **`quick-fix` amendment path** — one owner-approved, non-Safety requirement change ships with the
+  fix: a reword with test evidence, or a supersede whose successor joins the owning Complete epic
+  and is verified on the same branch by a fresh sub-agent.
 
 ### Changed
 
@@ -97,6 +107,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   rationale moves to the tracing entry's optional `rationale`.
 - **Tracing sidecars cover the live set only** — no `title` or `generated`; retired and
   superseded entries are deleted, their sources copied into the record.
+- **`start-epic` checks requirements before planning** — opens with the nudge (Disputed, changed
+  since verified, failed), offers Replace with successor / Drop / Stop for a superseded or retired
+  anchor, and adds `sweep` retarget steps for tests citing a predecessor.
+- **`start-epic` plans removal epics** — deletes the code and tests the Removal section and `sweep`
+  name; done when `sweep` reports nothing for the retired IDs and guard requirements pass.
+- **`start-epic` stops on an epic without Requirements Anchors** — "re-plan it with /add"; the
+  pre-v1.0 grandfather clause and the anchor title-mismatch prompt are removed. Plan titles come
+  from `tor-lifecycle titles`.
+- **`quick-fix` runs `check --base` before committing** — blocks on unrecorded changes, removals,
+  or dangling IDs the branch introduced, with a fix offer; refuses to ship a branch touching a
+  Disputed Safety requirement.
 - **`discover` writes current-state documents** — vision and ConOps are rewritten to the present;
   `Modified` and `Removed` changelog rows are mandatory when a capability changes; `Pending`
   rows carry undecided changes.
