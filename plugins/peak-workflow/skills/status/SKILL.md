@@ -35,8 +35,11 @@ with `git log --author` (a regex substring match).
 **Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
 On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
 On `verdict: behind`, print its message as a banner above everything else and continue in
-degraded mode: show what the files hold, and add to the
-banner that figures may be incomplete until the upgrade runs. On any other exit, print its output and stop — it
+degraded mode: show what the files hold, and add to the banner that figures may be incomplete
+until the project is brought up to date (by `/peak-workflow:upgrade` when the output says
+`upgradable: yes`, by a plugin update when it says `upgradable: no`). In degraded mode the top
+Suggested Next Action is that fix, and every other action is marked "after the upgrade" — the
+writing skills stop on a behind project. On any other exit, print its output and stop — it
 names the fix (a plugin update or a Python install).
 
 **This skill computes no requirement state itself.** Every requirement figure — states, the
@@ -99,7 +102,7 @@ panels. Otherwise run both, once each:
 Either command exiting 2 or 3 is not a dashboard figure: print its output under the
 Requirements Coverage heading, skip the three requirements panels, and render the rest. On a
 project the Format Guard reported `behind` this is expected for older files — the banner already
-says to run the upgrade. Never fall back to counting the files yourself.
+names the fix. Never fall back to counting the files yourself.
 
 ## Step 2: Load Status Sidecars
 
@@ -155,12 +158,17 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    | Retired | Not in the denominator | — |
    | Retired, removal pending | Not in the denominator; a warning | the removal epic in `removal_epics`, or `/peak-workflow:add removal epic for <record>` |
 
-   Omit rows whose count is 0, except Verified.
+   Omit rows whose count is 0, except Verified. Labels: `Planned` → "Planned (Not Started)",
+   `Implemented` → "Implemented (pending verification)", `Waived` → "Waived (successor does not
+   list it)", `Specified` → "Specified (no epic assigned)"; every other state prints as its key.
 2. **Changed since verified, by epic.** Group the live rows whose `state` is `Changed since
    verified` or `Verification failed` (and Disputed rows whose `underlying_state` is one of them)
    by `epic`. One group per Complete epic: its `<id> (<slug>) — <Name>`, each requirement as
    `TOR-… — <title>`, and the command `/peak-workflow:wrapup-epic <id> reverify`. A Verification
-   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`". The epic stays
+   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`". A Changed since
+   verified requirement that also has an A finding (edited without a record) adds "decide first
+   whether its meaning changed: `/peak-workflow:capture-requirements <TOR>`" — reverify alone
+   would ratify an unrecorded edit. The epic stays
    Complete — the Phase Progress and Overall Progress counts do not change.
 3. **Health.** Group `check.findings` by letter A–F with `check.counts`. Print each finding's
    `message` verbatim; when a letter has more than 8 findings, print the first 8 and "… and N
@@ -169,7 +177,7 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
 4. **Disputed past the threshold.** The live rows whose `dispute.overdue` is true. A `# Safety`
    requirement (`dispute.safety`) is always overdue (its threshold is 0 days). The oldest one —
    Safety first — becomes the **top** Suggested Next Action.
-5. **The nudge.** If any live row is Disputed or Changed since verified, Step 7 opens with one
+5. **The nudge.** If any live row is Disputed, Changed since verified, or Verification failed, Step 7 opens with one
    plain sentence naming the counts and the next command, for example: "2 requirements are known
    to be wrong and 3 changed after they were verified — start with
    `/peak-workflow:capture-requirements TOR-02-Mail001`." The command is the top Suggested Next
@@ -309,7 +317,7 @@ with removal pending.
 
 [Skip when Step 4.5 item 2 found nothing. One block per epic:]
 
-**<id> (<slug>) — <Name>** (Complete) — [N] requirement(s) changed since verification
+**<id> (<slug>) — <Name>** (Complete) — [N] requirement(s) to re-check
 - TOR-… — <title> [— verification failed: fix the code first with `/peak-workflow:quick-fix`]
 - Re-check: `/peak-workflow:wrapup-epic <id> reverify`
 

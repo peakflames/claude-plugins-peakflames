@@ -401,7 +401,7 @@ Proceed to Step 3C.
 
 **Primary source — unprocessed discovery changelog:**
 ```bash
-ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null | grep -v '\.processed$'
+find docs/product-vision-planning/changelogs -name 'discovery-changelog-*.md' 2>/dev/null
 ```
 
 - **Exactly one unprocessed changelog:** Read it. The "New Capabilities Identified" section is
@@ -438,6 +438,10 @@ epic specs to understand what has already been planned. For each unplanned TOR I
   says, the epic can be small: verify the successor and retarget the tests that cite the old ID.
 - Is it genuinely new capability in a new area? → Add to the new epic list.
 
+Also take each live row whose `state` is `Waived`: the epic in `waived_to` was meant to deliver it
+but does not list it. If that epic is Not Started, propose adding the TOR to it (Step 6.3 item 1
+mechanics); otherwise list it in Step 4 as needing a new owner.
+
 **Never edit an epic that is not Not Started** — no spec, sidecar, or phase-index change to an In
 Progress, Paused, Implemented, or Complete epic. A Complete epic keeps the IDs it verified, even
 superseded ones.
@@ -445,9 +449,10 @@ superseded ones.
 ### 3B.3: Form New Epics
 
 Apply the same epic formation rules as greenfield (vertical slice per capability, the
-whole-capability rule from 3A.3, exclusive TOR ownership, ~4–20 TOR IDs as a sanity check). New
+whole-capability rule from 3A.3, exclusive TOR ownership, ~4–20 TOR IDs as a sanity check — in
+brownfield a smaller epic is fine when no Not Started epic can take its requirements). New
 epics are added to the phase whose milestone they extend, or to a new phase when they open a new
-ConOps scenario.
+ConOps scenario. Appending rows to a phase index is always allowed; existing rows stay as they are.
 
 **Assign IDs** using the same generation command as Step 3A.3 — a fresh 7-character random alphanumeric ID per new epic, unique across the batch and the existing plan. Existing epic IDs are opaque strings: never renumber, reuse, or interpret them.
 
@@ -469,11 +474,13 @@ reports every record that has none as an F finding with `kind: removal-missing`
    with HTTP 410 and a message naming the export API"). Zero is fine. **Never** a requirement
    that says the thing "shall be removed" — it is dead the day it passes. If such a TOR exists,
    leave it out and recommend rewording it as a guard with `/peak-workflow:capture-requirements
-   <TOR-ID>`. This skill never writes requirements.
+   <TOR-ID>`; its Step 6 row reads `N/A — deferred: states a removal; reword as a guard (Step 3C)`.
+   This skill never writes requirements.
 4. Propose the epic: name "Remove <what the record retired>", the retired behavior in the
    Description, a `## Removal` section (Step 5.2), the guard requirements as its anchors, and
    dependencies only on epics whose code it changes that are not yet Complete. Place it in the
-   phase whose capability it removes, or the last phase with unfinished epics.
+   phase whose capability it removes when that phase still has unfinished epics, otherwise in the
+   last phase with unfinished epics.
 
 A record whose removal epic already exists (any status) needs nothing here. Retire records with
 `removal = "none"` never get an epic.
@@ -514,9 +521,11 @@ from the tech stack in `CLAUDE.md` (e.g., `db, api, ui`). For a single-process p
 tool, library) write `single-process` for every epic; the vertical check does not apply.
 
 The "Screens" column appears only when `screens_present = true` — omit it otherwise. List the
-`S-NN` IDs the epic delivers, or `—` for an epic with no screen. Every screen in `ux/screens.md`
+`S-NN` IDs the epic delivers, or `—` for an epic with no screen. Greenfield: every screen in `ux/screens.md`
 appears in exactly one row (the Application menu and Window rows go to the skeleton; `mockup`
-draws no wireframe for them).
+draws no wireframe for them). Brownfield: only screens new on this branch (rows of `ux/screens.md`
+absent at `git merge-base <base> HEAD`) need an owner; a new epic that extends an existing screen
+does not list it.
 
 ### Dependency Graph
 
@@ -776,7 +785,7 @@ Rules:
 - Out-of-scope items: `Explicit? N/A — deferred: {rationale}`. List explicitly; do not hide.
 
 When `screens_present = true`, print a second table directly below it — `## Self-Check: Screen →
-Epic Trace` — one row per `S-NN` in `ux/screens.md` with columns `Screen | Captured in Epic(s)
+Epic Trace` — one row per `S-NN` in `ux/screens.md` (brownfield: only the screens new on this branch, per Step 4) with columns `Screen | Captured in Epic(s)
 (## Screens) | Explicit? (Y/N) | Ambiguous? (Y/N)`. The same rules apply: not in any epic's
 `## Screens` section → `Explicit? N`; in two or more → `Ambiguous? Y`; the Application menu and
 Window rows trace to the skeleton; a retired screen is `N/A — retired`.
@@ -861,7 +870,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
 ### By the Numbers
 - Phases: [N]
 - Epics: [N]
-- TOR requirements covered: [K] of [total in baseline]
+- TOR requirements covered: [K] of [total in baseline] — brownfield: [planned this run] of [unassigned at start], then [now owned] of [summary.live] overall
 - TOR requirements deferred: [N] (see Self-Check table)
 - Removal epics: [N] (retiring {CR-ID list}) [omit when 0]
 
@@ -909,6 +918,11 @@ instructions are printed), not a silent action taken on the skill's own initiati
 > ones (EPIC), or is a trivial bug (TRIVIAL) — preventing both over-engineering and
 > under-speccing.
 ```
+
+**Needs attention (not planned here).** Under Recommended Next Steps, list what `states` and
+`check` show that planning cannot fix: each F finding with `kind: disputed` (its message; a
+Safety one first) and each `Verification failed` or `Changed since verified` row with its epic
+and `/peak-workflow:wrapup-epic <id> reverify`. Omit when there are none.
 
 **Planning PR body.** For the team path, write the body to a temporary file outside the
 repository (`mktemp`) and print its path in place of `<body-file>`. It lists each new epic as
