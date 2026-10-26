@@ -114,7 +114,7 @@ so the spec stays in sync with the sidecar.
 
 ## Step 5: Commit
 
-**Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + index update). If the user confirms:
+**Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + sidecar and spec Status line). If the user confirms:
 
 1. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
 2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`

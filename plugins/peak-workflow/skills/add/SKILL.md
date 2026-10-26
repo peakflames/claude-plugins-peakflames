@@ -77,23 +77,30 @@ removal of something a retire record names, is a **removal epic**. A retire reco
 `removal = "code"` means the code still does what the retired requirements described; the
 removal epic takes it out.
 
-1. Read the record (`docs/requirements/changes/*-<7 chars after "CR-">.toml`). Stop with a plain
-   message when it does not exist, is not `kind = "retire"`, or has `removal = "none"` (nothing
-   to remove). If an epic already carries `retires: <CR-ID>` (the record is not among `check`'s
-   `removal-missing` findings), name that epic and stop — a record gets one removal epic.
-2. Find the code still doing it: `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <retired
-   IDs>` lists the tests and source citing the retired IDs (`changes[].tor`); add the source
-   paths those tests exercise, found in Step 5.
+1. Read the record (`docs/requirements/changes/*-<7 chars after "CR-">.toml`) and stop, in this
+   order, with the matching message:
+   - No such file, or not `kind = "retire"`: `<CR-ID> is not a retire record — a removal epic
+     carries out a retirement. Check the ID with /peak-workflow:status.`
+   - `removal = "none"`: `<CR-ID> retired <TOR-IDs> with nothing left in the code — no removal
+     epic is needed.`
+   - Its `states` row (any retired ID) lists `removal_epics`: `<CR-ID> already has a removal
+     epic: <id> (<slug>) — <Name> (<status>). A record gets one removal epic.`
+2. Find the code still doing it: `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <the
+   record's retired IDs>` lists the tests and source citing them; add the source paths those
+   tests exercise, found in Step 5.
 3. **Guard requirements** are its only possible anchors: live, unassigned requirements that state
    what must stay true once the code is gone (for example "The service shall answer a CSV export
-   request with HTTP 410 and a message naming the export API"). Offer the candidates in Step 2.2's
-   table — zero is a valid answer. **Never** anchor a requirement that says something "shall be
+   request with HTTP 410 and a message naming the export API"). Find candidates by matching the
+   record's `keywords` and `title` against unassigned titles in `states`. Offer them in Step
+   2.2's table — zero is a valid answer. **Never** anchor a requirement that says something "shall be
    removed": it is dead the day it passes. If one exists, leave it out and recommend rewording it
    as a guard with `/peak-workflow:capture-requirements <TOR-ID>`. This skill never writes
    requirements.
 4. Continue at Step 2.2 with the guard candidates, then Steps 3–9. The spec gets the
    `## Removal` section and the sidecar the `retires:` line (Steps 6 and 7). Skip the
-   whole-capability check — a removal epic owns no new behavior.
+   whole-capability check; code a guard needs that another epic owns (a server to answer 404) is
+   a dependency (Step 3). A removal epic has no `## Screens` section and no Design note — a
+   screen its retired requirement named stays with the epic that owns it.
 
 ### 2.1: Interpret the description
 
@@ -194,7 +201,7 @@ If dependencies are ambiguous, ask the user.
 
 ## Step 4: Read Existing Epics for Context
 
-1. Read 1-2 completed or well-defined epic specs from the same phase to match the level of detail, tone, and specificity. These are the quality bar — the new epic must be at least as detailed.
+1. Read 1-2 completed or well-defined epic specs from the same phase to match the level of detail, tone, and specificity. These are the quality bar — the new epic must be at least as detailed. Match their detail, not their format: a Complete spec may keep an older anchors table, and the Step 6 template wins.
 2. Identify which phase directory the new epic belongs in based on the dependency and the existing phase structure in the phase indexes.
 
 ## Step 5: Explore Relevant Codebase
@@ -279,6 +286,7 @@ both are involved.}
 **Conditional lines and sections in the template above** — do not carry this guidance into the written spec:
 
 - Include the **Design** note only if the epic involves UI work. Omit it entirely otherwise.
+- Write `**Dependencies:** —` when there are none.
 - Always include the three provenance lines, filled at write time — never leave a placeholder: `{planner}` is `git config user.name`, `{YYYY-MM-DD}` is today, and `{plan-branch}` is `git branch --show-current`. `/peak-workflow:status` and `/peak-workflow:start-epic` show them so a teammate can tell who planned an epic.
 - Include the `**Source:** Issue #{N}` line only when a source issue number is known — i.e., `$ARGUMENTS` arrived with an `[issue #<N>]` prefix in Step 2.0. Omit the line entirely otherwise.
 - Include the `## Removal` section only for a removal epic (Step 2.0b). Omit it entirely otherwise. A removal epic with no guard requirements keeps the Requirements Anchors heading with the line `None — a removal epic; see Removal.` in place of the table.
@@ -408,7 +416,7 @@ Show the user what was created:
 - **Dependencies:** {list}
 - **Requirements:** one line per anchor, `TOR-… — <title>`, titles from one
   `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" titles <anchor IDs>` run [or "None — a removal epic"]
-- [Removal epic only:] **Retires:** {CR-ID} — {record title}; {N} `sweep` citations to delete or retarget
+- [Removal epic only:] **Retires:** {CR-ID} — {record title}; {N} `sweep` citations to delete
 
 {Repeat for each epic if multiple were created}
 

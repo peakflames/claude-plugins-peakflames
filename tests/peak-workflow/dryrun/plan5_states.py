@@ -452,7 +452,7 @@ def tracing(nn, name, tors):
         "coverage_gaps": []}, indent=2) + "\n"
 
 
-def spec(epic, name, phase, tors, status, deps="none", extra=""):
+def spec(epic, name, phase, tors, status, deps="—", extra=""):
     """Complete specs keep the pre-3.0 title column (history); open ones are two-column."""
     if status == "Complete":
         rows = "\n".join(f"| {t.tor} | `docs/requirements/{ff}` | {t.title} |" for t, ff in tors)
@@ -630,7 +630,7 @@ removal = f"""
 guard requirement in Requirements Anchors passes.
 """
 r.write("docs/implementation-plan/phase-2-extend/epic-hRmXls7-remove-excel-export.md",
-        spec("hRmXls7", "Remove Excel export", "2 — Extend", [], "Not Started", "none", extra=removal))
+        spec("hRmXls7", "Remove Excel export", "2 — Extend", [], "Not Started", "—", extra=removal))
 r.sidecar("gExp06", status="Not Started", requirements=[CSV3.tor])
 r.sidecar("hRmXls7", status="Not Started", requirements=None, retires="CR-Rt0Xls1")
 r.write("app/__init__.py", APP)
