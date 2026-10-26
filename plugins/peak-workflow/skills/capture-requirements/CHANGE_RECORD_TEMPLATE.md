@@ -20,7 +20,7 @@ Fix every problem it prints (exit 1) and run it again until it prints `ok`.
 | `refs` | Issues, epics (`"epic <id>"`), and other records (`"CR-…"`) this one answers. A record that resolves or renews a `pending` record **must** list that record's ID. May be empty |
 | `keywords` | 3–6 nouns and phrases someone would use to propose the idea again — the re-litigation search reads them with `title` and `reason` |
 | `fingerprint`, `from`, `to` | Never computed by hand. The old text is `tor-lifecycle text <TOR> --verified --json` for a requirement changed since it was verified, `--rev <merged commit>` for one edited without a record (capture-requirements 3C step 3), and `--rev <base>` otherwise; the current text is `tor-lifecycle fingerprint` |
-| `text` | The old Scenario block verbatim, from the same `text` command |
+| `text` | The old Scenario block verbatim, from the same `text` command. A block ending in `"` needs that quote escaped (`\"`) before the closing `"""` |
 | `traced_to` | The deleted tracing entry's sources as short strings (`"vision §6"`, `"conops S2.3"`, `"CLAUDE.md UX Baseline: Forms"`) |
 
 Records are write-once after merge. Before merge, on this branch, a record this run wrote may be

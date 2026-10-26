@@ -63,5 +63,35 @@ class Plan5FixtureTests(unittest.TestCase):
         self.assertEqual(run(dest, "states", "--json").returncode, 0)
 
 
+class Plan6FixtureTests(unittest.TestCase):
+    """The Plan 6 fixture: a superseded anchor on an open epic, a Specified anchor to amend, an
+    epic with no anchors, and the Plan 5 removal epic."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan6-"))
+        cls.root = cls.tmp / "fx"
+        subprocess.run([sys.executable, str(BUILDER.with_name("plan6_execution.py")), str(cls.root)],
+                       check=True, capture_output=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_execution_cases(self):
+        rows = {r["tor"]: r for r in json.loads(run(self.root, "states", "--json").stdout)["requirements"]}
+        self.assertEqual(rows["TOR-02-Rfnd001"]["state"], "Superseded")
+        self.assertEqual(rows["TOR-02-Rfnd002"]["state"], "Specified")
+        self.assertEqual((rows["TOR-02-Due0001"]["state"], rows["TOR-02-Due0001"]["epic"]), ("Planned", "lDue11"))
+        self.assertEqual((rows["TOR-01-Ver0001"]["state"], rows["TOR-01-Ver0001"]["epic"]), ("Verified", "aSkel01"))
+        check = json.loads(run(self.root, "check", "--json").stdout)
+        self.assertIn("open-epic-retired", {f.get("kind") for f in check["findings"]})
+        sweep = json.loads(run(self.root, "sweep", "--json").stdout)
+        self.assertIn(("TOR-02-Rfnd001", "tests/test_refund.py"), {(r["tor"], r["path"]) for r in sweep})
+        sidecar = (self.root / "docs/implementation-plan/status/epic-mNoA12.md").read_text()
+        self.assertIn("requirements: —", sidecar)
+        self.assertEqual(run(self.root, "validate").returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
