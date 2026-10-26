@@ -23,7 +23,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `start-epic` | Implement an epic — TOR-driven plan + tasks + verification; settles superseded or retired anchors; owner-approved in-epic amendment (supersede) |
 | `wrapup-epic` | Independent TOR verification, complete, ship; owner-approved amend or record-as-pending at Step 1.4b; `reverify` mode re-checks a Complete epic's stale requirements |
 | `pause` | Save progress mid-epic |
-| `status` | Read-only dashboard — phase progress + Requirements Coverage |
+| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Requirements Health (findings A–F, Disputed) |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
@@ -41,7 +41,17 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
-**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup
+**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup.
+Removal epics add `retires: CR-…`. `verified:` (TOR → fingerprint), `unverified:` (TOR → date and
+reason), and `reverified:` are written only by `tor-lifecycle mark`. A Complete sidecar's `status:`
+never changes and its `requirements:` is append-only
+
+**Change Records:** `docs/requirements/changes/<YYYY-MM-DD>-<suffix>.toml`, one write-once record per
+lifecycle decision — `reword` (same meaning, test evidence), `supersede` (new ID), `retire`,
+`pending` (Disputed), `uphold` (closes a dispute). Feature files hold no notes or history; titles
+live only in the feature file (tracing sidecars and specs carry IDs). Requirement states (Verified,
+Verified (reworded), Changed since verified, Verification failed, Disputed, …) are derived by
+`tor-lifecycle states`, never stored
 
 **Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
 ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by
