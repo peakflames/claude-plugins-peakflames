@@ -116,9 +116,10 @@ so the spec stays in sync with the sidecar.
 
 **Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + sidecar and spec Status line). If the user confirms:
 
-1. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
-2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`
-3. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
+1. Run `git branch --show-current`; it must be the epic's `feature/epic-<id>-<short-name>` branch. If it is not, stop and say which branch is checked out — a pause commit belongs on the epic branch.
+2. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
+3. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`
+4. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
    ```
    wip(epic-<id>): pause — <brief summary of progress so far>
 

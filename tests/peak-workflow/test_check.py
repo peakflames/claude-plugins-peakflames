@@ -182,6 +182,7 @@ class FindingC(CheckCase):
         self.repo.sidecar("Epic003", "Not Started", ["TOR-24 set"])
         [c] = letters(self.repo.check(), "C")
         self.assertIn("'TOR-24 set', which is not a requirement ID", c["message"])
+        self.assertIn("by hand on a docs/ branch", c["message"])
 
     def test_history_files_are_not_scanned(self):
         self.repo.write("docs/implementation-plan/session-handoffs/epic-x-complete.md", "TOR-09-Nowhere\n")

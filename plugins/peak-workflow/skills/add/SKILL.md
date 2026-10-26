@@ -39,7 +39,7 @@ Follow these steps exactly:
    /peak-workflow:add.` Continue only if the user says to. Skip silently with no remote.
 1. Read `CLAUDE.md` at the repo root for project context.
 2. Read the phase indexes: glob `docs/implementation-plan/phase-*/index.md` and read each file to understand the existing epic structure, phase names, and existing epic IDs.
-3. Read `docs/architecture.md` for system context.
+3. Read `docs/architecture.md` for system context (skip silently if it does not exist).
 4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file, parse every `Scenario: [TOR-NN-XXXXXXX]` block: capture the TOR ID, feature file path, and Given/When/Then. Then run, once each:
    - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" states --json` → **`states`**: one row
      per requirement with its `title`, `state`, and owning `epic`. Only `live: true` rows can be

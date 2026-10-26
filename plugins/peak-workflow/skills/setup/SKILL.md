@@ -8,7 +8,7 @@ description: |
   "configure CLAUDE.md", "get the project ready".
 ---
 
-You are auditing the project's `CLAUDE.md` file to ensure it contains the sections that the epic workflow depends on, and ensuring the documentation stubs exist for the architecture and design documents that the workflow reads and maintains.
+You are auditing the project's `CLAUDE.md` file to ensure it contains the sections that peak-workflow depends on, and ensuring the documentation stubs exist for the architecture and design documents that the workflow reads and maintains.
 
 The user's description of the product (may be empty — `/peak-workflow:new-project` passes it
 through): $ARGUMENTS
@@ -965,7 +965,7 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 
 **Steps:**
 
-1. **Finalize CHANGELOG** — Change `[X.Y.Z] - UNDER DEVELOPMENT` → `[X.Y.Z] - DD-MMM-YYYY` in `CHANGELOG.md`
+1. **Finalize CHANGELOG** — Change `## [X.Y.Z] — UNDER DEVELOPMENT` → `## [X.Y.Z] — YYYY-MM-DD` in `CHANGELOG.md`
    - Commit: `chore: release vX.Y.Z`
 
 2. **Merge to [main branch]**
@@ -977,7 +977,6 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 3. **Tag the release** (on [main branch])
    ```​bash
    git tag -a vX.Y.Z -m "Release vX.Y.Z - Brief description"
-   git push origin vX.Y.Z
    ```​
 
 4. **Merge back to [dev branch]**
@@ -986,13 +985,13 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
    ```​
 
 5. **Post-release version bump** (on [dev branch])
-   - Bump `[version file path]`: `<Version>X.Y.Z</Version>` → next version
-   - Add `## [X.Y+1.0] - UNDER DEVELOPMENT` to `CHANGELOG.md`
+   - Bump the version in `[version file path]` → next version
+   - Add `## [X.Y+1.0] — UNDER DEVELOPMENT` to `CHANGELOG.md`
    - Commit: `chore: bump version for next development cycle`
 
 6. **Push** (ASK USER FIRST)
    ```​bash
-   git push origin [main branch] && git push origin [dev branch]
+   git push origin [main branch] && git push origin [dev branch] && git push origin vX.Y.Z
    ```​
 
 **Note:** [Describe CI/CD behavior for branch pushes vs tags]

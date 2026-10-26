@@ -44,7 +44,9 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 **Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup.
 Removal epics add `retires: CR-…`. `verified:` (TOR → fingerprint), `unverified:` (TOR → date and
 reason), and `reverified:` are written only by `tor-lifecycle mark`. A Complete sidecar's `status:`
-never changes and its `requirements:` is append-only
+never changes and its `requirements:` is append-only — except deleting or correcting a non-ID
+entry that `check` reports as finding C, by hand on a `docs/` branch (`mark` refuses a sidecar
+holding one)
 
 **Change Records:** `docs/requirements/changes/<YYYY-MM-DD>-<suffix>.toml`, one write-once record per
 lifecycle decision — `reword` (same meaning, test evidence), `supersede` (new ID), `retire`,

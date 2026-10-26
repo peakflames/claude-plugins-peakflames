@@ -105,11 +105,12 @@ def parse_requirements(text: str) -> list[ParsedScenario]:
     title = ""
     body: list[str] = []
     section: str | None = None
+    scen_section: str | None = None  # the banner in force at the Scenario line, not at its flush
     after_rule = False
 
     def flush() -> None:
         if tor:
-            out.append(ParsedScenario(tor, title, _digest(body), section))
+            out.append(ParsedScenario(tor, title, _digest(body), scen_section))
 
     # Split on newlines only (as universal-newline file reading does), not str.splitlines(),
     # which also breaks on form feeds and U+2028 and would change the hash.
@@ -128,6 +129,7 @@ def parse_requirements(text: str) -> list[ParsedScenario]:
         if m := SCEN.match(line):
             flush()
             tor, title, body = m.group(1), m.group(2).strip(), [m.group(2)]
+            scen_section = section
         elif FEAT.match(line):
             flush()
             tor, title, body = None, "", []
@@ -962,7 +964,9 @@ def run_check(project: Project, base: str | None = None) -> dict:
                                     own_branch=bool(start) and (c.path, c.tor) not in start.citations))
     for sc in p.sidecars.values():
         for bad in sc.malformed:
-            findings.append(Finding("C", f"Epic {sc.epic} lists '{bad}', which is not a requirement ID.",
+            findings.append(Finding("C", f"Epic {sc.epic} lists '{bad}', which is not a requirement ID. "
+                                    "Correct it by hand on a docs/ branch (replace it with the TOR IDs it "
+                                    "meant, or delete it) and merge it.",
                                     epic=sc.epic, path=f"{STATUS_DIR}/epic-{sc.epic}.md",
                                     own_branch=bool(start) and bad not in start.sidecar_texts.get(sc.epic, "")))
 
@@ -1040,7 +1044,7 @@ def housekeeping(p: Project) -> list[Finding]:
         if r.kind == "retire" and r.data.get("removal") == "code" and not any(
                 r.id in s.retires for s in p.sidecars.values()):
             out.append(Finding("F", f"{r.id} retired {', '.join(r.tors)} but the code is still there "
-                               "and no epic removes it. Plan a removal epic with /peak-workflow:add.",
+                               f"and no epic removes it. Plan a removal epic with /peak-workflow:add removal epic for {r.id}.",
                                kind="removal-missing", detail={"record": r.id}))
     for sc in p.sidecars.values():
         if sc.status == "Complete":
