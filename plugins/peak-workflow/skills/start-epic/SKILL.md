@@ -43,6 +43,30 @@ read are current — a teammate may have merged plan changes since this clone la
      `Note: <base> is <N> commit(s) behind origin and could not be fast-forwarded.` An existing
      epic branch is never rebased.
 
+## Requirements Health
+
+**After the Freshness Guard, before any planning.** The helper is always called as
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <command>` (written `tor-lifecycle` below).
+Run, once each, and keep the output for Step 1:
+
+- `tor-lifecycle states --json` — every requirement's derived state and owning epic.
+- `tor-lifecycle check --base <base> --json` (`<base>` from the Freshness Guard).
+- `tor-lifecycle sweep --json` — tests and source still citing superseded or retired IDs.
+
+Exit 2 or 3 from any of them is a data or install problem: print its output and stop. Exit 1
+means findings — this skill warns and never blocks on them.
+
+**The nudge.** If any live `states` row is Disputed, Changed since verified, or Verification
+failed, open the session with one plain sentence naming the counts and the next command, e.g.
+`3 requirements are known to be wrong, 1 changed after it was verified, and 1 failed
+verification — start with /peak-workflow:capture-requirements TOR-04-Priv001 (it does not touch
+this epic's anchors).` The command is, first match: an overdue Disputed requirement's
+(`/peak-workflow:capture-requirements <TOR>`, a Safety one — `dispute.safety` true — first), the
+first Changed since verified one's (`/peak-workflow:wrapup-epic <owning epic> reverify`), the
+first Verification failed one's (`/peak-workflow:quick-fix`, then the reverify). Say whether it
+touches this epic's anchors (Step 1 item 6 handles those). When Step 1 stops the skill before
+the Step 2.5 card, print the nudge after the stop message as one `Also:` line instead.
+
 ---
 
 Follow these steps exactly:
@@ -53,29 +77,33 @@ Follow these steps exactly:
 2. Locate the epic's phase index: run `grep -rl "epic-$ARGUMENTS" docs/implementation-plan/phase-*/index.md` to find which phase index contains this epic. Read that phase index to get the epic's row (name, dependencies). For each dependency ID listed, read `docs/implementation-plan/status/epic-<dep-id>.md` to capture the dependency's status.
 3. Identify which phase and file corresponds to Epic $ARGUMENTS
 4. Read the epic spec file (e.g., `docs/implementation-plan/phase-N-*/epic-$ARGUMENTS-*.md`).
-4a. **Load TOR Requirements.** Parse the epic spec's `## Requirements Anchors` table. For each
-    row, extract the TOR ID, feature file path, and scenario title. **Before opening any feature
-    file, verify it exists on the current branch:**
-    ```bash
-    ls <feature-file-path>
-    ```
-    If any cited feature file is missing, stop immediately:
-    > Feature file `{path}` is not present on branch `{current-branch}`. If you ran
-    > `/peak-workflow:capture-requirements` on a `docs/` branch, that branch must be merged to
-    > the base branch (`develop` / `main`) before running `/peak-workflow:start-epic` — TOR files
-    > travel with the docs/ branch and are only available after the merge.
-    >
-    > To fix:
-    > ```bash
-    > git checkout <base-branch>    # develop if it exists, else main, else master
-    > git merge docs/<task-name> --no-ff
-    > git push
-    > git checkout feature/epic-<id>-<short-name>   # resume (or re-create) feature branch
-    > ```
-    After verifying all feature files exist, open each one and locate the
-    `Scenario: [TOR-NN-XXXXXXX]` block with the exact TOR ID. Read the full Given/When/Then.
+4a. **Load TOR Requirements.** Read the epic's sidecar (`docs/implementation-plan/status/epic-$ARGUMENTS.md`,
+    from the feature branch when it exists — Step 2.5 says how). It is a **removal epic** when it
+    has a `retires:` line.
+    - **No Requirements Anchors** — the epic is not a removal epic, and its spec has no
+      `## Requirements Anchors` section or the section lists no TOR ID: stop.
+      > Epic <id> (<slug>) — <Name> has no Requirements Anchors, so there is nothing to build
+      > against or verify. Re-plan it with `/peak-workflow:add <description>` (it picks the
+      > requirements) and delete this epic's spec, sidecar, and phase-index row in the same
+      > commit — or add the missing requirements first with `/peak-workflow:capture-requirements`.
+
+      Fill `<description>` from the spec's `## Description`, plus each `## Acceptance Criteria`
+      bullet when that section exists. If no live requirement covers it (check the live titles
+      and `tor-lifecycle search <2–3 key nouns>`), put the `/peak-workflow:capture-requirements`
+      option first.
+    - **Removal epic** — read its `## Removal` section (the record it retires, the retired IDs,
+      the code to remove, and the done-when line) and carry it into Step 4. Its Requirements
+      Anchors hold only guard requirements, or the line `None — a removal epic; see Removal.`
+      (zero anchors is valid here).
+
+    Parse the `## Requirements Anchors` table (`TOR ID | Feature File`). For each row, extract
+    the TOR ID and feature file path, then settle every ID with item 6 **before** reading any
+    Given/When/Then. For each ID item 6 leaves in the anchors, open its feature file and locate
+    the `Scenario: [TOR-NN-XXXXXXX]` block with the exact TOR ID. Read the full Given/When/Then.
     These become the implementation specifications for this epic — carry them forward into Step 4
-    (plan mode) and the plan's Middle and Closing steps.
+    (plan mode) and the plan's Middle and Closing steps. Titles shown in the card and the plan come
+    from one `tor-lifecycle titles` run over the anchors item 6 leaves (skip it when none remain) —
+    the spec carries none.
 4b. **Resolve the test directories.** Read the `Test directories` line of `CLAUDE.md`'s Verification & Quality Gates section (space-separated, E2E last). If the line is absent, use the single directory the Tests command names. If none can be derived (a legacy Tests row like `pytest`), ask once via `AskUserQuestion`:
     - Question: `"Which directories hold tests? (space-separated, E2E last)"`
     - Then ask: `"Record this as the Test directories line in CLAUDE.md's Verification & Quality Gates section?"` with options `["Yes — record it", "No — use a git grep fallback this session"]`. On Yes, write the line right after Step 3 has checked out the feature branch (this is a docs edit, not implementation, so it still precedes plan mode, and the base branch stays clean). Carry the result forward as `<test-directories>` for the Step 4 plan.
@@ -93,37 +121,64 @@ Follow these steps exactly:
     a skeleton-owned screen — and carry it into the middle steps the same way. If neither the
     section nor `ux/screens.md` exists, skip this item without comment.
 5. **Pre-flight scan for new artifacts.** After reading the spec, grep its body for the literal strings `NEW component` and `NEW spec`. Surface any matches in your plan as explicit "create file X" steps so the plan names every new file upfront, rather than discovering them mid-implementation.
-6. **Verify the Requirements Anchors.** The epic spec contains a `## Requirements Anchors` table
-   listing TOR IDs and their feature files. Before planning or implementation, perform this
-   reconciliation for every row:
-   1. Open the cited feature file. Search for `Scenario: [TOR-NN-XXXXXXX]` with the exact TOR
-      ID from the spec row.
-   2. **TOR ID not found in the feature file:** STOP. The requirement has been removed, renamed,
-      or the spec has a copy-paste error. Surface this to the user:
-      > TOR ID `{TOR-NN-XXXXXXX}` cited in the Requirements Anchors table was not found in
-      > `{feature-file-path}`. This may be a removed requirement or a stale spec. Options:
-      > (1) Update the spec to remove or replace this TOR ID, (2) Check whether the feature file
-      > was updated and the ID was superseded, (3) Stop and run `/peak-workflow:capture-requirements`
-      > (brownfield) to reconcile the requirements baseline before continuing.
-      Wait for the user's answer before proceeding.
-   3. **TOR ID found but scenario title in the spec doesn't match the feature file:** the spec's
-      Requirements Anchors row may be stale (scenario was updated after the spec was written).
-      Present both titles side by side:
-      > Requirements Anchor mismatch for `{TOR-ID}`:
-      > - **Epic spec title:** "{spec-title}"
-      > - **Feature file title:** "{feature-file-title}"
-      Use `AskUserQuestion`:
-      - Question: `"TOR mismatch for {TOR-ID} — which title is the implementation baseline?"`
-      - Options:
-        - `"Feature file (authoritative) — implement against '{feature-file-title}'"`
-        - `"Epic spec (intentional override) — implement against '{spec-title}'"`
-        - `"Stop — I'll reconcile the requirements baseline first"`
-      Proceed only after the user selects an option. If Stop, end here.
-   4. **TOR ID found and titles match:** record "Requirements Anchor verified: TOR-NN-XXXXXXX"
-      and continue.
-   5. **Spec has no Requirements Anchors section** (legacy spec from before peak-workflow v1.0.0):
-      note this to the user and continue — legacy specs are grandfathered. Offer to populate
-      Requirements Anchors during this epic work.
+6. **Verify the Requirements Anchors.** For every anchor ID, take its `states` row (Requirements
+   Health). Decisions here are applied on the feature branch by the plan's opening step 2, so the
+   base branch stays clean and the decisions survive a cleared context. Run the lookups here, but
+   ask this item's questions only after Step 2.5 continues (its **Start it**, or a resumed epic's
+   card) — an answer is wasted if the user then stops. **Feature file paths:** a `states` row's
+   `feature_file` is a bare file name (`02-orders.feature.md`); compare it with the spec cell's
+   file name, and write a cell as `` `docs/requirements/<feature_file>` ``.
+   1. **Live** — record `Requirements Anchor verified: TOR-NN-XXXXXXX` and continue. If the row's
+      `feature_file` differs from the spec's Feature File cell, use the row's and correct the cell
+      in the same opening step. Then by state:
+      - **Disputed** — say `TOR-… is known to be wrong (<CR-ID>, <N> days): <record title>.` If
+        `dispute.overdue` or `dispute.safety`, add `/peak-workflow:wrapup-epic will refuse to ship
+        this epic until it is resolved.` and recommend resolving it first
+        (`/peak-workflow:capture-requirements <TOR>` on a `docs/` branch). The in-epic Amendment
+        gate (`PLAN_TEMPLATE.md`) can also resolve a non-Safety one on this branch.
+      - **Owned by another epic** (`epic` is set and is not `$ARGUMENTS`) — warn that two epics
+        list it; `check` reports it as F `multi-owner`. Continue.
+   2. **Not live** — run `tor-lifecycle titles <TOR>` and act on what it prints:
+      - **Superseded** (`superseded in CR-… by TOR-…`) — follow the chain: run `titles` on each
+        successor until every one is live. Ask with `AskUserQuestion`:
+        - Question: `"<TOR> was superseded in <CR-ID> (<date>) by <successor(s)> — <successor title(s)>. Update this epic's anchors?"`
+        - Options: `["Replace with successor (recommended)", "Drop (superseded in <CR-ID>)", "Stop"]`
+
+        **Replace** puts every live successor in the old ID's place — the spec's anchors row (same
+        position, the successor's feature file) and the sidecar's `requirements:` line. A
+        successor whose `states` row names another epic is not this epic's to take: drop the old
+        ID instead and say `<successor> belongs to Epic <id> (<slug>) — <Name>.` **Drop** removes
+        the row and the ID from `requirements:`. **Stop** ends the skill with
+        `/peak-workflow:capture-requirements <TOR>` or `/peak-workflow:add` as the next step.
+      - **Retired** (`retired in CR-…`) — ask: `"<TOR> was retired in <CR-ID> (<date>): <record title>. Drop it from this epic?"`
+        with options `["Drop (retired in <CR-ID>)", "Stop"]`.
+      - **Unknown** (exit 1) — when the cited feature file is not on this branch, stop:
+        > `{TOR}` and its feature file `{path}` are not on branch `{current-branch}`. If you ran
+        > `/peak-workflow:capture-requirements` on a `docs/` branch, merge it to `<base>` first —
+        > requirements travel with the docs/ branch:
+        > ```bash
+        > git checkout <base>
+        > git merge docs/<task-name> --no-ff
+        > git checkout feature/epic-<id>-<short-name>   # if it already exists
+        > ```
+        Otherwise (`check` finding C — a typo or a deleted ID), ask
+        `"<TOR> is not a requirement and no change record names it. Drop it from this epic?"`
+        with options `["Drop it", "Stop"]`.
+
+      These edits touch only this epic's own spec anchors and sidecar, and only while its status
+      is **Not Started, In Progress, or Paused**. An **Implemented** epic is not edited here: stop
+      with `Epic <id> is Implemented — /peak-workflow:wrapup-epic <id> checks its anchors and offers
+      the successor swap there.` After a Replace or Drop, the remaining anchors (plus the guard
+      requirements of a removal epic) must not be empty — if they are and this is not a removal
+      epic, stop with the item 4a "No Requirements Anchors" message.
+   3. **Retargets.** For each `sweep` row whose `successors` include one of this epic's anchors
+      (after the item above), carry a plan step `Retarget or delete tests citing <old TOR>
+      (successor <new TOR>): <path:line, …>` into Step 4 — a test that checks behavior the
+      successor keeps is rewritten to the successor's Given/When/Then and cites the new ID; one
+      that only proved the old behavior is deleted.
+   4. **Removal epic.** Run `tor-lifecycle sweep <retired IDs from the Removal section>` and carry
+      its hits, with the Removal section's **Code to remove**, into Step 4 (the code may have
+      moved since the epic was planned — the sweep is current, the section is the plan-time list).
 7. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (`<id>` is `$ARGUMENTS` verbatim — treat it as an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
 8. Parse the epic spec header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 4 commit trailer and GitHub announce. If no `Source:` line exists, the source issue number is unknown — skip the trailer and announce later.
 9. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously).
@@ -199,6 +254,9 @@ Planned by:    <name> on <date>
 Dependencies:  <dep-id (dep-slug) — status>, … (or —)
 Owner:         <sidecar owner: value, or —>
 Scope:         <N> TOR(s); screens <S-NN list from ## Screens, or —>
+               (removal epic: removal — retires <retired IDs> (<CR-ID>); <N> guard TOR(s))
+               (<N> counts the anchors as listed now; append "(<M> superseded/retired — settled
+               next)" when Step 1 item 6 has questions)
 Purpose:       <first sentence of the spec's ## Description>
 ```
 
@@ -241,7 +299,8 @@ line remains, print the card and continue without asking.
 
 On **Show me the ready epics instead**, invoke `Skill({ skill: "peak-workflow:status", args: "" })`
 and end this skill. On **Stop**, end. Only **Start it** continues — first running the Recovery
-Check if it was deferred above, then Step 3.
+Check if it was deferred above, then Step 1 item 6's questions (when it has any), then Step 3. A
+resumed epic that prints its card without asking goes straight to those questions.
 
 **Clean-tree rule** (used by Step 3's Leftover check and Step 4's rejected-plan cleanup — both
 delete a branch, so they must never discard work). The working tree counts as clean when
@@ -293,6 +352,9 @@ Build the plan from:
 - The epic's key components (these are the files you'll create/modify)
 - Any context from previous handoff files (decisions made, patterns established)
 - Any reference materials surfaced by Step 1 item 12
+- Step 1 item 6: the anchor decisions (applied in opening step 2), the retarget steps, and — for
+  a removal epic — the code and tests to delete
+- The scenario titles from the one `tor-lifecycle titles` run (Step 1 item 4a)
 
 **If the user rejects the plan and ends** (declines rather than asking for revisions): when this
 session created the feature branch in Step 3 item 5, it has no commits beyond the base
@@ -304,7 +366,7 @@ those commands for the user to run instead (with `git checkout -- CLAUDE.md` fir
 called for the restore). Step 3's Leftover check (under item 2) also removes such a leftover the next
 time this epic is started, so a closed session does not leave a trap.
 
-**The plan must follow the lifecycle template at `plugins/peak-workflow/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** paragraph, **Bench only** paragraph (products that switch mains power or heat only), **Design pass** step (UI epics only, with the names from Step 1 item 11b), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
+**The plan must follow the lifecycle template at `${CLAUDE_PLUGIN_ROOT}/skills/start-epic/PLAN_TEMPLATE.md`.** Read that file once, copy its **Opening steps**, **Deferral gate** and **Amendment gate** paragraphs, **Removal** step (removal epics only), **Bench only** paragraph (products that switch mains power or heat only), **Design pass** step (UI epics only, with the names from Step 1 item 11b), and **Closing steps** sections into your plan verbatim — substituting every placeholder in the template's Placeholder reference list (`<id>`, `<short-name>`, `<N>`, `<base-branch>`, `<TOR-list>`, `<test-directories>`, `<deferral-count>`, `<handoff-path>`, `<anchor-decisions>`, `<retired-IDs>`) with values derived in Step 1 — and author the **Middle steps** from the TOR requirements' Given/When/Then (loaded in Step 1 item 4a). The template is the single source of truth for lifecycle wording; do not paraphrase it.
 
 ## Step 5: Execute the Plan
 

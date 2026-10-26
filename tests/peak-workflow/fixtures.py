@@ -148,6 +148,13 @@ class FixtureRepo:
         self.git("config", "user.email", "fixture@example.com")
         self.git("config", "commit.gpgsign", "false")
 
+    @classmethod
+    def open(cls, path: Path) -> "FixtureRepo":
+        """Wrap an existing fixture repository (e.g. one a dry-run builder made) to add history."""
+        repo = cls.__new__(cls)
+        repo.root = Path(path).resolve()
+        return repo
+
     def __enter__(self) -> "FixtureRepo":
         return self
 

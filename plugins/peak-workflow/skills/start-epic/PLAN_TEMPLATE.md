@@ -7,11 +7,15 @@ steps are authored.
 
 Placeholder reference:
 
-- `<id>` — `$ARGUMENTS` verbatim (7-char alphanumeric)
+- `<id>` — the epic ID, `$ARGUMENTS` verbatim (7-char alphanumeric)
 - `<short-name>` — extracted from the spec filename in Step 1
 - `<N>` — source issue number from Step 1 (omit announce/trailer if unknown)
 - `<base-branch>` — `develop` if it exists, else `main`, else `master`
-- `<TOR-list>` — comma-separated list of TOR IDs from the Requirements Anchors table
+- `<TOR-list>` — comma-separated list of TOR IDs from the Requirements Anchors table, after
+  `start-epic` Step 1 item 6's decisions
+- `<anchor-decisions>` — Step 1 item 6's answers, one per line (`Replace TOR-old with TOR-new
+  (CR-…)`, `Drop TOR-old (retired in CR-…)`, `Correct the Feature File cell of TOR-…`), or `none`
+- `<retired-IDs>` — removal epics only: the retired IDs from the spec's `## Removal` section
 - `<test-directories>` — every directory listed under Test directories in CLAUDE.md's
   Verification & Quality Gates section, space-separated (e.g., `tests/ e2e/`; if the line is
   absent, the single test directory that section names). If no directory can be derived (a
@@ -19,8 +23,12 @@ Placeholder reference:
   user and resolved this value before plan mode; if the user declined to record it, replace
   the per-directory grep loop with `git grep --untracked -l "<TOR-ID>" -- ':!docs'` (the
   `--untracked` flag matters — new test files are not yet staged at self-assessment time).
-- `<deferral-count>` — the `Count:` value from the handoff's Deferrals section
+- `<deferral-count>` — the `Count:` value from the handoff's Deferrals section (filled at
+  execution time, like `<record title>` and the TOR lists in the commit message — not at plan time)
 - `<handoff-path>` — `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md`
+
+When copying, drop notes addressed to the plan author ("omit this paragraph when…", "Copy this
+paragraph verbatim…"); keep every rule.
 
 ---
 
@@ -39,13 +47,13 @@ Placeholder reference:
      switch to it, run `git pull --ff-only origin <base-branch>` if `origin/<base-branch>` exists
      (stop and show git's message if the pull fails), and run `git checkout -b feature/epic-<id>-<short-name>`.
 
-2. **Update status to "In Progress"** — edit `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
+2. **Update status to "In Progress"** — edit `docs/implementation-plan/status/epic-<id>.md`:
    change `status: Not Started` (or `status: Paused`) to `status: In Progress`, and set
    `owner: <git config user.name>` — replace `owner: —` (insert the line after `status:` if an
    epic skipped by `/peak-workflow:upgrade` has none), and keep it if it already names you (case-insensitive; any name you have committed under with your
    `git config user.email` counts). If it names someone else, the user confirmed taking it over at
    `start-epic` Step 2.5 — replace it and say so in one line. Leave `implemented:`,
-   `completed:`, and `requirements:` unchanged. Capture whether this is a
+   `completed:`, and `requirements:` unchanged except for the anchor decisions below. Capture whether this is a
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
    (prior status was already In Progress, or was Implemented — rework after a wrapup FAIL).
    Item 3 uses this.
@@ -53,6 +61,12 @@ Placeholder reference:
    Also update the epic spec file's `**Status:**` header line (the spec path was already
    identified in Step 1, at `docs/implementation-plan/phase-*/epic-<id>-*.md`) to
    `**Status:** In Progress` (no date), so the spec stays in sync with the sidecar.
+
+   Then apply these anchor decisions (omit this paragraph when `<anchor-decisions>` is `none`):
+   <anchor-decisions, one bullet each>. In the spec's
+   Requirements Anchors table, put each successor in its predecessor's row (same position, the
+   successor's feature file) or delete the dropped row; in the sidecar's `requirements:` line,
+   make the same swap or removal. Touch no other epic's files.
 
 3. **Announce work-started on GitHub** — if Step 1 captured no source issue, replace this plan
    item with: `GitHub announce: SKIP — no source issue`. Otherwise, run only if (a) this is a
@@ -65,12 +79,15 @@ Placeholder reference:
 4. **Create tasks (user stories)** — create one task per TOR ID in the Requirements Anchors
    table, or one task per small group of closely-related TOR IDs from the same feature file
    (typically 5–10 tasks for a normal epic). Each task is a **user story** whose:
-   - **Subject** = the TOR ID + scenario title (e.g., "TOR-01-Afs657G: tool shall report version to stdout")
+   - **Subject** = the TOR ID + its title from the `tor-lifecycle titles` run (e.g., "TOR-01-Afs657G: tool shall report version to stdout")
    - **Description** = the full Given/When/Then from the feature file, verbatim
 
    Grouping guidance: TOR IDs that touch the same source file or module can be in one task.
    TOR IDs that address entirely different surfaces (e.g., one CLI flag vs. one API endpoint)
    should be separate tasks.
+
+   A removal epic adds one task, `<record title> (<CR-ID>)`, whose description is the
+   spec's `## Removal` section.
 
    Issue a single batched `TaskCreate` call (one tool use creating all tasks) rather than
    sequential calls — this is faster and keeps the task list atomic.
@@ -131,11 +148,27 @@ confirms for this run (e.g. `HIL_BENCH=1 <harness command>`) — never exported,
 switches mains power or heat, copy this paragraph verbatim into the plan as a standing rule ahead
 of the first middle step, next to the Deferral gate; omit it for every other product.
 
+**Removal (removal epics only).** Add this as the first middle step of a removal epic:
+```
+N. <record title> [<CR-ID>; retires <retired-IDs>]
+   - Delete the code the Removal section's **Code to remove** names (the symbols in parentheses;
+     a whole file only when it names the file with no symbol), and each test that
+     `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <retired-IDs>` lists — the whole test
+     function containing the hit: <path:line, …>
+   - Remove every remaining reference to the deleted symbols (imports, call sites):
+     `git grep -n -w <symbol> -- . ':!docs/'` must return nothing
+   - A test that only proved the old behavior is deleted, not retargeted; a guard requirement
+     gets its own test in a later step
+   - Done when `tor-lifecycle sweep <retired-IDs>` exits 0, those symbols are gone, and every
+     guard requirement's test passes
+```
+
 **Deferral gate.** Copy this paragraph verbatim into the plan as a standing rule ahead of the
 first middle step; it applies to every middle step and to the self-assessment. If at any point
 a TOR's Given/When/Then cannot be fully met as written in this session (technical constraint,
 missing dependency, scope larger than estimated, a Then clause that would need adjusting, or
-anything else), stop implementation and use `AskUserQuestion`:
+anything else), stop implementation and use `AskUserQuestion` — unless the cause is that the
+requirement itself is wrong, which is the Amendment gate below:
 - Question: `"TOR-<NN-XXXXXXX> cannot be fully met: <reason>. Recommendation: <Fix now | Defer | Stop> — <one clause why>. How to proceed?"`
 - Options: `["Fix now", "Defer — depends on a later epic", "Stop — I'll take it from here"]`
 
@@ -163,7 +196,7 @@ Rules:
 - **Defer — successor check:** with `<succ>` = the epic ID the user named, run
   `ls docs/implementation-plan/phase-*/epic-<succ>-*.md`. If no spec exists, Defer is not
   available — re-ask as above. If the spec exists but its Requirements Anchors
-  table does not list this TOR, append the row (TOR ID, feature file, scenario title verbatim)
+  table does not list this TOR, append the row (TOR ID, feature file)
   and add the TOR ID to `docs/implementation-plan/status/epic-<succ>.md`'s `requirements:`
   field before continuing. Record `<succ>` in the Deferrals row's `Successor epic` column.
 - **Defer — record:** write the Deferrals row immediately to
@@ -181,6 +214,53 @@ Rules:
   the skip/xfail marking.
 - **Stop:** run `/peak-workflow:pause` so the sidecar and handoff reflect the stopping point.
 - Plan approval does not pre-authorize any deferral.
+
+**Amendment gate.** Copy this paragraph verbatim into the plan as a standing rule, next to the
+Deferral gate. It applies when implementation shows that one of this epic's anchor requirements is
+itself wrong — building it as written would ship the wrong behavior — not merely hard or slow to
+build. The helper is `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"` (written `tor-lifecycle`).
+Stop implementation and use `AskUserQuestion`:
+- Question: `"TOR-<NN-XXXXXXX> — <title> looks wrong: <what implementation showed, one line>. Proposed: <new title> / <changed step(s)>. How to proceed?"`
+  — before asking, check the proposed literals against the Given (dates, totals, counts) so the
+  owner approves text an implementation can meet.
+- Options: `["Amend TOR-<NN-XXXXXXX> (owner approval)", "Implement as written", "Stop — I'll take it from here"]`
+
+Rules:
+- **Never for Safety.** For a requirement under the `# Safety` banner (its `tor-lifecycle states
+  --json` row has `safety: true`) offer only `Implement as written` and `Stop`; a Safety
+  requirement changes only on a `docs/` branch (`/peak-workflow:capture-requirements <TOR>`).
+- **Only an option the user selects counts**, as for the Deferral gate. Plan approval does not
+  pre-authorize an amendment.
+- **Amend** is a supersede, decided and written as `capture-requirements` states it once
+  (`${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/SKILL.md`, "Lifecycle Rules": L3 decision test, L4 re-litigation check, L5 choice 3; and
+  `${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/CHANGE_RECORD_TEMPLATE.md`), with these
+  differences:
+  1. Run L3 on the current block vs the proposed one. **Reword-eligible** (same meaning) → this is
+     not an amendment the code needs: say so, implement as written, and suggest
+     `/peak-workflow:capture-requirements <TOR> <wording>` after the epic. **Meaning change** →
+     continue.
+  2. Run L4 (`tor-lifecycle search <key nouns>`) for the successor. Generate its ID in the same
+     feature number — generate the 7-character suffix with `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7` and regenerate it while it is all digits or `git grep -q <suffix>` finds it anywhere (feature files and `docs/requirements/changes/` included) — and write its block in place of the old one. Generate the record's
+     `CR-` suffix the same way. Read the old tracing entry's sources first (they become the
+     record's `traced_to`). Write the `supersede` record with `approved_via = "epic-branch"`, `approved_by` =
+     `git config user.name`, `refs` = `["epic <id>"]` plus the open `pending` record's ID when
+     the requirement was Disputed (that resolves it), and the old `text` and `fingerprint` from
+     `tor-lifecycle text <TOR> --rev <base-branch> --json`. Run `tor-lifecycle validate <record>`
+     until it prints `ok`.
+  3. In the tracing sidecar, delete the old entry (its sources go into the record's
+     `traced_to`) and add one for the successor with the same `traces_to` and
+     `"rationale": "Supersedes <old TOR> (<CR-ID>): <reason>"`.
+  4. Swap the old ID for the successor in this epic's Requirements Anchors row and sidecar
+     `requirements:` line — no other epic's files (another open epic still listing the old ID
+     shows as `check` F `open-epic-retired`; its own start-epic settles it). Update the task's
+     subject and description.
+  5. Retarget this epic's tests from the old ID to the successor, then run
+     `tor-lifecycle check --base <base-branch>`: no finding may be marked `[this branch, blocking]`.
+  6. Continue the middle steps against the successor's Given/When/Then; the self-assessment checks
+     the successor. Reconcile spec records a Spec Deviations row citing the record.
+- **Implement as written** — continue; never narrow the Then clause to fit what was built (that
+  is a Deferral gate event).
+- **Stop** — run `/peak-workflow:pause`.
 
 Middle step example:
 ```
@@ -231,6 +311,13 @@ Middle step example:
      reason is expected and not a trigger).
      Legitimate uses (e.g., argparse `placeholder`/`metavar`, test doubles for hardware or a
      native dialog under the test directories) are not triggers.
+  - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <IDs>` must exit 0, where `<IDs>` are
+     the retarget steps' old IDs, an Amendment gate's superseded IDs, and — removal epics — the
+     `<retired-IDs>`. A hit is a test or source line still citing them: retarget or delete it. A
+     removal epic also confirms each symbol named under **Code to remove** is gone
+     (`git grep -n -w <symbol> -- . ':!docs/'` returns nothing). Always copy this bullet; at
+     self-assessment time skip it only when `<IDs>` is still empty — a bare `sweep` reports every
+     citation in the project, not this epic's.
   - Walking-skeleton epic only: `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen|\*\*Not decided yet:\*\*' CLAUDE.md`
      must return nothing. Each hit is a value this epic owns resolving — resolve it before reporting.
 
@@ -263,9 +350,11 @@ Middle step example:
   - If the implementation deviated (e.g., the Then clause needed adjustment for a technical
     constraint): the deferral gate must already have fired for this TOR. Record the deviation
     in the handoff file as a "Spec Deviation" row **and** a Deferrals row (the TOR as written
-    is not met). Do NOT silently update the feature file — deviations that require changing a
-    TOR requirement are change-control events and must go through
-    `/peak-workflow:capture-requirements` on a `docs/` branch.
+    is not met). Never edit the feature file outside the Amendment gate — any other requirement
+    change goes through `/peak-workflow:capture-requirements` on a `docs/` branch.
+  - If the Amendment gate superseded it: a Spec Deviations row `<old TOR> → <successor> |
+    <old Then> | <new Then> | Amended in <CR-ID> (owner-approved)` — not a Deferrals row, since
+    the successor is met.
 
   Write (or update) `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` with
   these sections in this order:
@@ -281,12 +370,15 @@ Middle step example:
   - **Key Files** table — files created or modified
   - **Spec Deviations** table — `TOR ID | As-Written | As-Implemented | Reason`
     (empty if no deviations). A deviation is a Then clause that was *adjusted*; it is also a
-    deferral of the TOR as written, so every deviated TOR appears in both tables.
+    deferral of the TOR as written, so every deviated TOR appears in both tables — except an
+    Amendment gate row, which cites its Change Record and needs no Deferrals row.
   - **Key Decisions** — design choices future epics should know about. Anything here that
     describes partial or stubbed behavior must have a matching Deferrals row. For a UI epic,
     include the line `Design skills used: <names, plus mcp__shadcn__* if used> / none installed`.
   - **TOR Coverage (self-assessment)** — list each TOR ID with its PASS / PASS (operator-observed pending) / FAIL / CANNOT VERIFY
-    verdict from the self-assessment step
+    verdict from the self-assessment step. A removal epic lists its guard requirements (or
+    `None — removal epic`), then `Removal (<CR-ID>): PASS/FAIL — sweep <retired-IDs> exit <n>;
+    symbols gone: yes/no`
   - **Verification Results (self-assessment)** — quality gate results
 
   After writing the handoff, run
@@ -298,10 +390,11 @@ Middle step example:
   Plan approval already authorizes both the handoff write and any spec-level notation —
   do not re-prompt.
 
-- **Mark as Implemented** — edit `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
-  change `status: In Progress` to `status: Implemented`. Set `implemented: <today>` (YYYY-MM-DD).
-  Leave `completed:` as `—`. The `requirements:` field is NOT changed — it stays as set by
-  `plan-project` or `add`.
+- **Mark as Implemented** — edit `docs/implementation-plan/status/epic-<id>.md`:
+  change `status: In Progress` to `status: Implemented`. Set `implemented: <today>` (YYYY-MM-DD) and
+  `handoff: session-handoffs/epic-<id>-implemented.md`.
+  Leave `completed:` as `—`. The `requirements:` field is NOT changed here — it stays as set by
+  `plan-project` or `add`, plus opening step 2's anchor decisions and any Amendment gate swap.
 
   Also rewrite the epic spec file's `**Status:**` header line to
   `**Status:** Implemented — <today>` (same date just written to the sidecar's `implemented:`
@@ -310,15 +403,19 @@ Middle step example:
 - **Commit** — run `git branch --show-current` and confirm you are on
   `feature/epic-<id>-<short-name>`; if not, switch before staging anything. Stage all files
   created or modified during this epic by specific path (not `git add -A`), including the
-  handoff file, updated status sidecar, updated spec file, and — if a Defer edited them — the
-  successor epic's spec and sidecar. Commit without asking for permission.
+  handoff file, updated status sidecar, updated spec file, — if a Defer edited them — the
+  successor epic's spec and sidecar, and — if the Amendment gate fired — the Change Record, the
+  feature file, and its tracing sidecar. Commit without asking for permission.
   Message format:
   ```
   feat(epic-<id>): <short summary>
 
-  Implements <TOR-list of TORs self-assessed PASS> — <1 sentence describing what the user can now do>.
+  Implements <TOR-list of TORs self-assessed PASS, or "none (removal epic)"> — <1 sentence describing what the user can now do>.
   Deferred: <TOR-list of deferred TORs, or "none">
   Deferrals: <deferral-count>
+  Amends: <old TOR → successor (CR-…), one per amendment — omit the line when none>
+  Anchors: <Replace TOR-old → TOR-new (CR-…) / Drop TOR-old (CR-…), one per anchor decision — omit when none>
+  Removes: <retired-IDs> (<CR-ID>) — removal epics only
 
   Refs #<N>
   ```
@@ -331,9 +428,9 @@ Middle step example:
   > ---
   > **Next steps**
   > - Open a **new** session (wrapup refuses to run in this one) and run
-  >   `/peak-workflow:wrapup-epic $ARGUMENTS` to independently verify each TOR requirement's
+  >   `/peak-workflow:wrapup-epic <id>` to independently verify each TOR requirement's
   >   Given/When/Then and close out this epic
   > - Or run `/peak-workflow:status` to review overall project progress and requirements coverage
   > - If something needs fixing before wrapup, make the changes and re-run
-  >   `/peak-workflow:start-epic $ARGUMENTS` to continue on the same branch
+  >   `/peak-workflow:start-epic <id>` to continue on the same branch
   > ---

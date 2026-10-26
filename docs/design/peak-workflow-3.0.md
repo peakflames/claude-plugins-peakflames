@@ -66,6 +66,10 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | `# Note: reference screen` | Feature files allow no `# Note:` blocks | The `# Note: reference screen(s) — …` line under `# UX Baseline` stays, as the one named exception | plan-project and add read it to pick the skeleton's screens; renaming it needs an upgrade step |
 | Restore | Re-verification offers three paths: supersede, reword, or reverify | `capture-requirements <TOR-ID>` also offers **Restore the verified text** (same ID, no record); `check`'s branch-scoped A accepts a requirement returned to its first-merged text | When the unrecorded edit is the mistake, supersede and reword could only ratify it |
 | discover `Pending` | Changelog rows are Added / Modified / Removed | Adds a `Pending` change type (an undecided change → "Record as pending") and `Wording only:` Modified rows (→ reword candidates) | An undecided change otherwise never reaches capture-requirements' pending option |
+| `mark` | wrapup, reverify, and quick-fix write `verified:` / `unverified:` / `reverified:` and append to `requirements:` | Adds `mark <epic> [--append TOR] [--pass TOR] [--fail TOR REASON] [--reverified]`, the only writer of those lines; refuses IDs that are not live, not owned, or waived, and never touches `status:` | Hand-edited sidecars are a strict-parse data error waiting to happen; fingerprints are never typed by a prompt |
+| In-epic amend | start-epic "Amend" runs the decision test and writes the record | In-epic amendment is always a **supersede**; a reword-eligible (wording-only) edit is implemented as written and suggested for a later `capture-requirements <TOR>` | A wording-only edit changes nothing the epic builds, and a reword's test evidence cannot point at uncommitted mid-epic work |
+| quick-fix reword | The record ships "in the same commit as the code" | A quick-fix **reword** is a second commit on the same `hotfix/` branch, after the code commit, so `[evidence] commit` names the tree the citing tests ran on. A supersede stays one commit | A commit cannot cite its own SHA |
+| quick-fix reverify | quick-fix "runs the reverify step for that successor on the same branch" | A fresh `general-purpose` sub-agent (never a fork) verifies the successor blind; the result and the `requirements:` append are one `mark` call. FAIL offers fix again / ship marked unverified / Stop | Keeps verification independent of the implementing session, and a successor never sits in a Complete epic with neither line (it would read as Verified) |
 
 ## Plan checklist
 
@@ -76,7 +80,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 3 | **Format & cleanup** — `upgrade` runner, step `0001-epic-provenance`, format guard in every skill, delete the two migrate skills, new-project routes on the stamp, setup writes the stamp + `[lifecycle]` + Python probe + requirements README stub, Q15 bundle | Format-0 fixture upgrades to 1 idempotently; dry-run of new-project → setup → upgrade | ✅ Done |
 | 4 | **Authoring** — capture-requirements 3B.2 five options, TOR-ID argument mode, re-litigation grep, Step 4 `check --base`, Haiku brief rewrite; FEATURE/TRACING templates; discover Removed/Modified rows; mockup (Q22); triage routes + `check` | Dry-run: brownfield supersede, retire, pending, reword-with-evidence on a docs/ branch | ✅ Done |
 | 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ✅ Done |
-| 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ☐ |
+| 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ✅ Done |
 | 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ☐ |
 | 8 | **Step 0002 lifecycle migration** (#20 Migration 1–8, one commit each; strips `migration_source`) + contributor kit (Q9) | A "Project A-like" fixture upgrades with identical fingerprints before/after the strip; seed surfaces exactly the planted stale set | ☐ |
 | 9 | **Release gate** — README / plugin CLAUDE.md / CHANGELOG (BREAKING, /upgrade), 2-pass full dry-run, live UAT, draft PR → develop, contributor request, release | All four Q10 gates pass | ☐ |
@@ -269,3 +273,46 @@ proposal + addendum). Every plan reads this file first and updates it last.
   Complete epic). Pass 3: plan-project 0 Critical; /add 1 Critical (a plain-language request after
   the removal epic existed could anchor the "shall remove" TOR). Pass 4 (/add, four invocations):
   0 Critical. UX findings from every pass applied.
+
+### Plan 6 — Execution
+
+- **New helper command `mark`** (deviation-log row, `test_mark.py`). wrapup Step 2.2, reverify,
+  and quick-fix call it; Plan 7 uses it as is.
+- **start-epic** opens with a Requirements Health block (`states`, `check --base`, `sweep` once
+  each; the nudge with Safety-overdue first; never blocks). 4a: Q16 stop (removal epics exempt);
+  anchors are `TOR ID | Feature File`, titles from one `titles` run. Item 6: live anchors
+  (Disputed / multi-owner warnings), superseded → Replace (chain followed; a successor another
+  epic owns is not taken) / Drop / Stop, retired → Drop / Stop, unknown → merge-the-docs-branch
+  stop or Drop. Questions come after Step 2.5's Start it; edits apply in the plan's opening step
+  2 on the feature branch, only for Not Started / In Progress / Paused (Implemented → wrapup).
+  `sweep` rows whose successor is an anchor become retarget steps. 6.3 and the grandfather clause
+  are gone.
+- **PLAN_TEMPLATE**: `<anchor-decisions>` / `<retired-IDs>` placeholders; a Removal middle step
+  (symbols, whole test functions, imports; done = `sweep` exits 0); the **Amendment gate** next
+  to the Deferral gate (supersede only, `approved_via = "epic-branch"`, refs the open pending
+  when Disputed, tracing swap, `check --base` clean, Spec Deviations row citing the record);
+  self-assessment `sweep <IDs>` check; commit `Amends:` / `Anchors:` / `Removes:` lines;
+  `$ARGUMENTS` → `<id>` throughout; Mark as Implemented sets `handoff:`.
+- **quick-fix**: Step 1 item 5 (requirements in play: Safety-Disputed stop, In Progress owner +
+  `inflight` warning), item 6 (amendment eligibility: never Safety; owner Complete or none;
+  Implemented → wrapup; open epic → capture-requirements; ~2 hours; always asks). Plan items 2a
+  (supersede), 2b (blind sub-agent reverify + one `mark --append --pass|--fail`), 5 (`check
+  --base`, blocking A/B/C with Restore / Amend / Stop — the A/B Amend is the one permitted plan
+  insertion), 5a (reword commit with evidence). PR body "Requirement changes"; reverify command
+  in next steps.
+- Cross-skill rules are referenced as `${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/…`
+  (L3–L5, the record template); start-epic's template path is now `${CLAUDE_PLUGIN_ROOT}`-based.
+- **Left alone** (pre-existing): "E2E last" with a one-entry Test directories line; "most recent
+  handoff" ties; author instructions copied verbatim into plans; `validate` does not cross-check a
+  supersede record's `fingerprint` against its `text`.
+- **Q13 dry-run:** `tests/peak-workflow/dryrun/plan6_execution.py` (Plan 5 develop + jRfd09 with a
+  superseded anchor and a prototype test citing it, lDue11, mNoA12 with no anchors) and
+  `plan7_wrapup.py` for Plan 7. Pass 1 (3 agents: start-epic Replace + Q16; in-epic amend +
+  removal epic; quick-fix supersede + own-branch A): 5 Critical — bare `feature_file` compared to
+  a path, removal step named files not symbols and missed imports, no ID-generation command, the
+  A-block Amend offered where eligibility then refused it, a successor reading Verified between
+  `--append` and the verdict. All fixed. Pass 2 (start-epic: Replace, amend, removal, Q16;
+  quick-fix: supersede with a sub-agent PASS, reword as a second commit, own-branch A restored):
+  0 Critical; UX/Minor fixes applied (record `equivalence`, the `Closes` trailer's home, a fix
+  that changes an in-progress epic's requirement stops).
+
