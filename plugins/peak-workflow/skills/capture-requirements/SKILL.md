@@ -223,7 +223,7 @@ changelog lookup below.
 
 Look for an unprocessed discovery changelog:
 ```bash
-ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null | grep -v '\.processed$'
+find docs/product-vision-planning/changelogs -name 'discovery-changelog-*.md' 2>/dev/null
 ```
 
 Report detection:
@@ -839,7 +839,8 @@ in 3A.5, but instruct it to **update only the affected `.feature.tracing.json` f
 summary, not written), and: add
 entries for new and successor TOR IDs at the bottom of the `requirements` array, keep every
 other existing entry unchanged, and drop `coverage_gaps` entries naming an ID that is no longer
-in the feature file. A whole-file retirement has no sidecar left to update.
+in the feature file. A whole-file retirement has no sidecar left to update. Skip the sub-agent
+when this run added no new or successor ID (only rewords, retires, or pending records).
 
 ---
 
@@ -892,7 +893,10 @@ greenfield files.
    keeps its reason with `Carried to <successor> by <new CR-ID>.` appended.
 4. **Decide.** For **Disputed**, ask the owner question below first and run L3 only after
    `Change it`. Otherwise run the decision test (L3) on old vs new, then ask the L5 question with the
-   "The requirement's text should change" row — and, for the first two cases, with these four
+   "The requirement's text should change" row — except for a **Requested change** whose
+   description withdraws the capability (skip L3; use the `Removed` row, Retire recommended) or
+   raises a change without deciding it ("not sure", "maybe", "ops wants"; skip L3; use the
+   `Pending` row) — and, for the first two cases, with these four
    options instead: `Restore the verified text` (recommended when the vision, ConOps, or
    description matches the old text), `Supersede` (or `Reword` when L3 found it reword-eligible),
    `Record as pending`, and `"Unsure — re-verify instead"` (it ends this mode: print
@@ -904,7 +908,8 @@ greenfield files.
    (recommend from the description: none or "it is right" → Uphold). Drop **Renew** for a
    requirement under `# Safety`. **Change it** asks what it should say when there is no
    description, runs L3, and applies Reword or Supersede per L5. **Renew** writes a new `pending`
-   record that refs the open one, with a fresh reason.
+   record that refs the open one, with a fresh reason. After **Change it** applies a Supersede or
+   Reword, ask the settle question from step 3 too; on No, follow its renewal rule.
 5. **Apply** the answer per L5, with these specifics:
    - **Changed since verified / Edited without a record:** the *old* text is the verified (or
      merged) version, not today's text. When the state row has `historical_records` (an edit
@@ -931,8 +936,8 @@ greenfield files.
      (e.g. "10 per page"), rewrite that line to the current state on this branch — no record, no
      changelog — and list it in the summary.
 6. **Trace.** Delete the retired or superseded entry from the tracing sidecar yourself, then run
-   the sub-agent as in 3B.4 for that one feature file (skip it for a reword, renewal, restore,
-   uphold, or pending record).
+   the sub-agent as in 3B.4 for that one feature file (skip it for a reword, retire, renewal,
+   restore, uphold, or pending record).
 7. Continue at Step 4 with a one-row trace table (the TOR-ID and the description — or, with none,
    the owner's decision and record, e.g. `Owner decision: uphold (CR-…)`), then Steps 5
    and 7. Step 6 does not apply.
@@ -1122,6 +1127,10 @@ or have an explicit N/A deferral]
 Run `/peak-workflow:plan-project` to derive the implementation plan from these requirements.
 Epic specs will reference TOR IDs as their Requirements Anchors — the TOR Given/When/Then
 becomes the acceptance criterion and verification procedure.
+[Brownfield, when this run added no new or successor requirement — only Change Records, plus any
+`/add` epics from 7.1:]
+plan-project has nothing new to plan. Review the diff, commit it on this branch, and merge it into
+<base> (solo or team PR) — the merge approves the Change Records.
 [TOR-ID mode:]
 Review the diff, commit it on this branch, and merge it into <base> (solo or team PR) — the
 merge approves the Change Record.

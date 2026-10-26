@@ -7,7 +7,7 @@ steps are authored.
 
 Placeholder reference:
 
-- `<id>` — the epic ID, `$ARGUMENTS` verbatim (7-char alphanumeric)
+- `<id>` — the epic ID: the first word of `$ARGUMENTS`, verbatim (7-char alphanumeric)
 - `<short-name>` — extracted from the spec filename in Step 1
 - `<N>` — source issue number from Step 1 (omit announce/trailer if unknown)
 - `<base-branch>` — `develop` if it exists, else `main`, else `master`

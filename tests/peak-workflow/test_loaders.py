@@ -101,3 +101,19 @@ class SidecarTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SectionTests(unittest.TestCase):
+    """A Scenario's section is the banner in force at its Scenario line (Plan 9 dry-run finding)."""
+
+    TEXT = "\n".join([
+        "Feature: Sync", "",
+        "# " + "-" * 40, "# Sync", "# " + "-" * 40, "",
+        "Scenario: [TOR-02-Syn0001] The app shall sync", "    Given a", "    Then b", "",
+        "# " + "-" * 40, "# Safety", "# " + "-" * 40, "",
+        "Scenario: [TOR-02-Saf0001] The app shall stop", "    Given c", "    Then d", "",
+    ])
+
+    def test_last_scenario_before_a_banner_keeps_its_own_section(self):
+        sections = {p.tor: p.section for p in tl.parse_requirements(self.TEXT)}
+        self.assertEqual(sections, {"TOR-02-Syn0001": "Sync", "TOR-02-Saf0001": "Safety"})

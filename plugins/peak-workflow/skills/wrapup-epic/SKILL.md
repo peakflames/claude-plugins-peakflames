@@ -80,6 +80,9 @@ has findings). Run these steps instead of Phases
      Record) → stop: `<TOR> was edited without a Change Record — decide whether its meaning changed
      with /peak-workflow:capture-requirements <TOR> first; a reverify PASS would ratify the edit.`
      (Name the other scoped IDs so the user can re-run with just those.)
+   - A **C** finding whose `path` is this epic's sidecar (a non-ID entry in `requirements:`) →
+     stop and print its message: `tor-lifecycle mark` refuses that sidecar, so R4 could not record
+     the verdicts. Re-run reverify after that `docs/` branch merges.
 3. Print the scope as `TOR-… — <title> (<state>)` from one `tor-lifecycle titles` run, with the
    epic as `<id> (<slug>) — <Name>`.
 
@@ -923,7 +926,7 @@ Use the Agent tool with model `haiku` (the shorthand resolves to the current Hai
 > Do NOT push to the remote.
 
 **Wait for the subagent to complete before proceeding.** The refreshed documents must be
-committed on the feature branch before it is merged into main.
+committed on the feature branch before it is merged into the base branch.
 
 ---
 

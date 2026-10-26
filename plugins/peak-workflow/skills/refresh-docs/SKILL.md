@@ -41,7 +41,7 @@ current format.
 
 ---
 
-## Step 1: Load Epic Workflow Context
+## Step 1: Load Project Context
 
 1. Read `CLAUDE.md` — extract the Tech Stack table, Key Architecture Decisions, Important Reminders, and note any custom paths to architecture or design docs (if different from `docs/architecture.md` / `docs/design-notes.md`)
 2. Glob `docs/implementation-plan/status/epic-*.md` and grep for `status: Complete` or `status: Implemented` to identify which epics have finished. These are the epics whose handoffs are relevant to the documentation refresh.

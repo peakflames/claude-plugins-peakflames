@@ -69,6 +69,10 @@ Follow these steps exactly:
      /peak-workflow:capture-requirements <TOR> <description>.` **Implemented** → stop: `Epic <id>
      is waiting for wrapup — run /peak-workflow:wrapup-epic <id>; its Step 1.4b can amend the
      requirement there.`
+   - **Owning epic's sidecar is malformed** — a `check --json` finding C whose `path` is that
+     epic's sidecar (`docs/implementation-plan/status/epic-<epic>.md`) → stop and print its
+     message: `tor-lifecycle mark` refuses that sidecar, so the fix could not record its
+     requirement change. The user corrects the line on a `docs/` branch, merges it, and re-runs.
    - **Size** — the requirement change plus the code fix must be about two hours or less; if
      not, stop and recommend `/peak-workflow:triage <request>`.
 
@@ -97,7 +101,7 @@ Remember the user's choice — Step 4 and Step 5 branch on it.
 ## Step 3: Create the Hotfix Branch
 
 1. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
-2. `git checkout <base-branch>`
+2. `git checkout <base-branch>`, then — if `origin/<base-branch>` exists — `git pull --ff-only origin <base-branch>`
 3. Create the hotfix branch:
    - If you have a GitHub issue number: `git checkout -b hotfix/issue-<N>-<slug>`
    - Otherwise: `git checkout -b hotfix/<slug>`
@@ -282,5 +286,6 @@ Exit plan mode and execute every item in the plan in order. Do not add, skip, or
   one requirement, never a Safety one, with the owner's approval and a Change Record. A larger
   requirements change is not a quick fix — re-triage it with `/peak-workflow:triage`.
 - Do **NOT** change a Complete epic's `status:` line, or remove anything from its `requirements:`
-  line. Only `tor-lifecycle mark` writes its `requirements:` (append), `verified:`, and
+  line (the one exception: a non-ID entry `check` reports as finding C is corrected by hand on a
+  `docs/` branch, never on the hotfix branch). Only `tor-lifecycle mark` writes its `requirements:` (append), `verified:`, and
   `unverified:` lines.
