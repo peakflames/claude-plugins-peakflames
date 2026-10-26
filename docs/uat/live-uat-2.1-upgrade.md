@@ -1,10 +1,13 @@
 # peak-workflow 3.0 — live UAT: upgrade a real 2.1.0 project (Q10 gate 3)
 
-The maintainer runs this on the Habit Tracker built with released peak-workflow 2.1.0 (3–4
-Complete epics, one verified TOR edited in place afterwards, one "pending change-control" note).
+The maintainer runs this on Summit (`peakflames/summit`, a habit tracker built with peak-workflow
+1.5.0, format 0, 6 Complete epics), with two edits planted on its `develop` the way 2.x users made
+them: TOR-03-s6tFG4V (epic WKhBuVK) edited in place after verification, and a "CHANGE-CONTROL
+pending" note on TOR-02-K6frDEV (epic Yz4JE9Z). Expected: `<STALE>` = TOR-03-s6tFG4V,
+`<EPIC>` = WKhBuVK, `<PENDING-TOR>` = TOR-02-K6frDEV.
 Everything happens on a copy; the original project is never touched.
 
-Placeholders: `<HABIT>` = the 2.1.0 project, `<REPO>` = this repository on
+Placeholders: `<HABIT>` = `/Users/schaveyt/github/peakflames/summit`, `<REPO>` = this repository on
 `feature/peak-workflow-3.0`, `<UAT>` = `/tmp/habit-uat`. Record each result in the table at the
 end (✅ / ❌ + a note).
 
