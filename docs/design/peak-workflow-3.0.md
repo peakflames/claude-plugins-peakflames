@@ -5,8 +5,9 @@ proposal + addendum). Every plan reads this file first and updates it last.
 
 - **Spec:** issue #20 v2 + R1–R6 + the versioned-upgrades addendum. Deviations are logged below
   and posted once on #20 after approval.
-  Posted so far: rows through Plan 4 (Plan 4 comment) and Plans 5–7b
-  (issuecomment-6428372050). Post rows added from Plan 8 on in one follow-up at the merge gate.
+  Posted so far: rows through Plan 4 (Plan 4 comment), Plans 5–7b (issuecomment-6428372050),
+  and Plan 8 (issuecomment-6429562613). Post rows added from Plan 9 on in one follow-up at the
+  merge gate.
 - **Integration branch:** `feature/peak-workflow-3.0` (off `develop`). Each plan works on
   `feature/peak-workflow-3.0-pN-<name>` and merges back `--no-ff`. The integration branch merges to
   `develop` only after the merge gate (Q10).
