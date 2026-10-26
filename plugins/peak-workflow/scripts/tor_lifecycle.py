@@ -317,7 +317,7 @@ def _is_int(value: object) -> bool:
 # Change Records
 # --------------------------------------------------------------------------------------------
 
-KINDS = ("reword", "supersede", "retire", "pending")
+KINDS = ("reword", "supersede", "retire", "pending", "uphold")
 APPROVED_VIA = ("docs-branch", "epic-branch", "wrapup", "quick-fix", "migration")
 EVIDENCE_RESULTS = ("pass", "fail", "historical")
 
@@ -422,7 +422,7 @@ def validate_record(filename: str, data: dict) -> list[str]:
     need_str(data, "approved_by")
     need_str_list(data, "refs", allow_empty=True)
 
-    if kind in ("supersede", "retire", "pending"):
+    if kind in ("supersede", "retire", "pending", "uphold"):
         need_str_list(data, "keywords")
     if kind == "reword":
         need_str(data, "equivalence")
@@ -437,6 +437,9 @@ def validate_record(filename: str, data: dict) -> list[str]:
                 need_str_list(ev, "tests", "[evidence] ")
     if kind == "retire" and data.get("removal") not in ("code", "none"):
         p.append('a retire needs `removal = "code"` (still in code) or `removal = "none"` (already gone)')
+    if kind == "uphold" and isinstance(data.get("refs"), list) and not any(
+            isinstance(r, str) and CR_ANY.search(r) for r in data["refs"]):
+        p.append("an uphold must list the pending record it closes in `refs` (CR-…)")
     if kind == "pending":
         need_str(data, "owner")
         if "tracker" in data and not isinstance(data["tracker"], str):
@@ -459,7 +462,7 @@ def validate_record(filename: str, data: dict) -> list[str]:
         if kind == "reword":
             need_fp(ch, "from", where)
             need_fp(ch, "to", where)
-        elif kind in ("supersede", "retire", "pending"):
+        elif kind in ("supersede", "retire", "pending", "uphold"):
             need_str(ch, "feature_file", where)
             need_fp(ch, "fingerprint", where)
         if kind == "supersede":
@@ -1461,13 +1464,17 @@ def validate_record_files(root: Path, paths: list[str]) -> list[tuple[str, list[
     targets = [Path(p) if Path(p).is_absolute() else root / p for p in paths] or sorted(
         (root / CHANGES_DIR).glob("*.toml"))
     by_id: dict[str, list[str]] = {}
+    pending_tors: dict[str, set[str]] = {}  # pending record ID -> the TORs it names
     for path in sorted((root / CHANGES_DIR).glob("*.toml")):
         try:
-            rid = tomllib.loads(path.read_text(encoding="utf-8")).get("id")
+            other = tomllib.loads(path.read_text(encoding="utf-8"))
         except (tomllib.TOMLDecodeError, OSError):
             continue
+        rid = other.get("id")
         if isinstance(rid, str):
             by_id.setdefault(rid, []).append(path.name)
+            if other.get("kind") == "pending" and isinstance(other.get("changes"), list):
+                pending_tors[rid] = {c.get("tor") for c in other["changes"] if isinstance(c, dict)}
     out = []
     for path in targets:
         rel = _repo_relative(root, str(path))
@@ -1486,17 +1493,29 @@ def validate_record_files(root: Path, paths: list[str]) -> list[tuple[str, list[
         clashes = [n for n in by_id.get(rid, []) if n != path.name] if isinstance(rid, str) else []
         if clashes:
             problems.append(f"record ID {rid} is also used by {', '.join(clashes)}")
+        if data.get("kind") == "uphold" and not problems:
+            named = {cr for ref in data["refs"] if isinstance(ref, str) for cr in CR_ANY.findall(ref)}
+            for ch in data["changes"]:
+                if not any(ch["tor"] in pending_tors.get(cr, ()) for cr in named):
+                    problems.append(f"{ch['tor']}: no pending record in `refs` names it — an uphold "
+                                    "closes a pending record on the same requirement")
         out.append((rel, problems))
     return out
 
 
-SEARCH_KINDS = ("supersede", "retire", "pending")
+SEARCH_KINDS = ("supersede", "retire", "pending", "uphold")
 
 
 def search_records(records: list[Record], terms: list[str]) -> list[dict]:
-    """Re-litigation guard: supersede, retire, and pending records whose title, reason, or
+    """Re-litigation guard: supersede, retire, pending, and uphold records whose title, reason, or
     keywords mention any of `terms` (case, punctuation, and spacing ignored; whole words)."""
     wanted = [(t, normalize(t)) for t in terms if normalize(t)]
+    closed_by: dict[str, str] = {}  # pending record ID -> the later record that refs it
+    for r in records:
+        for ref in r.data.get("refs", []):
+            for cr in CR_ANY.findall(ref):
+                if cr != r.id:
+                    closed_by.setdefault(cr, r.id)
     rows = []
     for r in records:
         if r.kind not in SEARCH_KINDS:
@@ -1506,7 +1525,8 @@ def search_records(records: list[Record], terms: list[str]) -> list[dict]:
         if hits:
             rows.append({"record": r.id, "date": r.date.isoformat(), "kind": r.kind, "tors": r.tors,
                          "title": r.data["title"], "reason": r.data["reason"].strip(),
-                         "matched": hits, "path": r.path})
+                         "matched": hits, "path": r.path,
+                         "closed_by": closed_by.get(r.id) if r.kind == "pending" else None})
     return rows
 
 
@@ -1807,7 +1827,8 @@ def cmd_search(args: argparse.Namespace, root: Path) -> int:
         _print_json(rows)
     else:
         for r in rows:
-            print("\t".join([r["record"], r["date"], r["kind"], ", ".join(r["tors"]), r["title"],
+            kind = f"{r['kind']} (closed by {r['closed_by']})" if r["closed_by"] else r["kind"]
+            print("\t".join([r["record"], r["date"], kind, ", ".join(r["tors"]), r["title"],
                              "matched: " + ", ".join(r["matched"])]))
     return EXIT_FINDINGS if rows else EXIT_OK
 
@@ -1925,7 +1946,7 @@ def build_parser() -> argparse.ArgumentParser:
     va.add_argument("files", nargs="*", help=f"record files (default: every {CHANGES_DIR}/*.toml)")
     va.set_defaults(func=cmd_validate)
 
-    sr = sub.add_parser("search", help="re-litigation guard: supersede/retire/pending records whose title, "
+    sr = sub.add_parser("search", help="re-litigation guard: supersede/retire/pending/uphold records whose title, "
                                         "reason, or keywords mention a term (exit 1 when any)")
     sr.add_argument("terms", nargs="+", help="words or phrases (quote a phrase)")
     sr.add_argument("--json", action="store_true")

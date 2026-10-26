@@ -20,7 +20,7 @@ Placeholder reference:
 - Manual verification — from the Step 2.0 disclosure prompt (literal `Yes` / `No` plus
   user-authored description if `Yes`)
 
-Highlights legend: ✅ pass · ⚠️ waived (a non-PASS TOR a human explicitly waived) or recorded as
+Highlights legend: ✅ pass (or a dispute closed by uphold) · ⚠️ waived (a non-PASS TOR a human explicitly waived) or recorded as
 pending · 🔧 fixed or amended during wrapup by the verifier (Step 1.4b) · ❌ fail.
 
 ---
