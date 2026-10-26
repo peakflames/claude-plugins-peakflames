@@ -186,8 +186,8 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    `/peak-workflow:capture-requirements TOR-02-Mail001`." The command is the top requirement
    action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
    group's first requirement carries an A finding or `historical_records`, its
-   `/peak-workflow:capture-requirements <TOR>` decision first), even in degraded mode — there, add
-   "after the fix".
+   `/peak-workflow:capture-requirements <TOR>` decision first — else the oldest Disputed one's
+   `/peak-workflow:capture-requirements <TOR>`), even in degraded mode — there, add "after the fix".
 
 ## Step 5: Flag Stale Paused Epics
 
@@ -371,7 +371,7 @@ means the spec records no planner.]
 
 [Based on the current state, recommend what to do next, in this order. Name every epic as `<id> (<slug>) — <Name>` and every requirement as `TOR-… — <title>`:
  - **First (after the degraded-mode fix, if any), when Step 4.5 item 4 found one:** the overdue Disputed requirement — "TOR-… — <title> is known to be wrong (<record>, <age_days> days[, a Safety requirement — no branch that touches it can ship]). Resolve it: `/peak-workflow:capture-requirements <TOR>`". When several are overdue, name the oldest (Safety first) and the count of the rest.
- - If there's an "In Progress" epic: "Continue working on Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>`" — when its `owner:` is set and is not you, say whose it is instead ("In progress by <owner> — coordinate before touching it")
+ - If there's an "In Progress" epic: "Continue working on Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>`" — when its `owner:` is set and is not you, say whose it is instead ("In progress by <owner> — coordinate before touching it"); when `owner:` is `—` or missing and a `feature/epic-<id>-*` branch exists locally or on origin (`git branch -a --list '*feature/epic-<id>-*'`), say "In progress on <branch> — owner unknown; check with whoever pushed it before touching it"
  - If there's an "Implemented" epic awaiting review: "Review Epic <id> (<slug>) — <Name> with `/peak-workflow:wrapup-epic <id>`"
  - If any epic has requirements to re-check (Step 4.5 item 2): "Re-check Epic <id> (<slug>) — <Name>: `/peak-workflow:wrapup-epic <id> reverify`" — one line per epic, at most three, each carrying its group's caveat first ("fix the code with `/peak-workflow:quick-fix`, then …" or "decide on TOR-… with `/peak-workflow:capture-requirements TOR-…` first" — also for an edit from before 3.0)
  - If there's a stale paused epic: "Resume or close paused Epic <id> (<slug>) — <Name> — it's been [X] days"
