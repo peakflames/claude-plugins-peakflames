@@ -114,6 +114,12 @@ Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For eac
 - `owner:` line: the person working on it (set by `start-epic`). `—` means unclaimed.
 - `retires:` line (optional): the Change Record(s) a removal epic carries out.
 
+An epic's `status:` and `owner:` move on its feature branch until it merges. For a sidecar reading
+In Progress whose `feature/epic-<id>-*` branch exists locally (`git branch --list
+'feature/epic-<id>-*'`), read `status:`, `owner:`, and `handoff:` from that branch instead
+(`git show <branch>:docs/implementation-plan/status/epic-<id>.md`), as start-epic Step 2.5 does —
+so a pause made there shows as Paused, and Step 5 can flag it.
+
 Requirement ownership, `verified:`, `unverified:`, and `waived:` are read by the helper (Step
 1.5), not here.
 
@@ -186,7 +192,8 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    `/peak-workflow:capture-requirements TOR-02-Mail001`." The command is the top requirement
    action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
    group's first requirement carries an A finding or `historical_records`, its
-   `/peak-workflow:capture-requirements <TOR>` decision first — else the oldest Disputed one's
+   `/peak-workflow:capture-requirements <TOR>` decision first; when it is Verification failed,
+   `/peak-workflow:quick-fix` for the code first — else the oldest Disputed one's
    `/peak-workflow:capture-requirements <TOR>`), even in degraded mode — there, add "after the fix".
 
 ## Step 5: Flag Stale Paused Epics

@@ -154,7 +154,8 @@ N. <record title> [<CR-ID>; retires <retired-IDs>]
    - Delete the code the Removal section's **Code to remove** names (the symbols in parentheses;
      a whole file only when it names the file with no symbol), and each test that
      `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <retired-IDs>` lists — the whole test
-     function containing the hit: <path:line, …>
+     function containing the hit: <path:line, …> (when it was the last test in its file, delete
+     the file)
    - Remove every remaining reference to the deleted symbols (imports, call sites):
      `git grep -n -w <symbol> -- . ':!docs/'` must return nothing
    - A test that only proved the old behavior is deleted, not retargeted; a guard requirement
@@ -304,7 +305,7 @@ Middle step example:
   - ```bash
     grep -inE --exclude-dir={.venv,node_modules,__pycache__,.pytest_cache,dist,build,out} \
       'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
-      $(git diff --name-only <base-branch>; git ls-files --others --exclude-standard)
+      $(git diff --name-only --diff-filter=d <base-branch>; git ls-files --others --exclude-standard)
     ```
      Judge each hit: a marker describing incomplete TOR behavior is a deferral-gate trigger for
      that TOR, unless the TOR already has a Deferrals row (a hit inside a `Deferred:` xfail

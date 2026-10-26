@@ -156,7 +156,7 @@ Print the `format` command's message, then:
 
 ```
 This project's peak-workflow files are older than this plugin reads. The upgrade shows each step
-before applying it, works on its own docs/upgrade-format-… branch, and makes one commit per step.
+before applying it, works on its own docs/upgrade-format-… branch, and makes one commit per step (or per phase, when a step says so).
 Commands that change files wait until it is merged; status and triage still run, with a warning.
 ```
 

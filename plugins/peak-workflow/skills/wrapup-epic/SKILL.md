@@ -72,7 +72,7 @@ has findings). Run these steps instead of Phases
    - A named ID that is not live → stop with its `tor-lifecycle titles` line: superseded or
      retired requirements are history — the successor is re-checked through its own epic.
    - Default scope empty → stop: `Every requirement Epic <id> owns is verified — nothing to
-     re-check.`
+     re-check.` (Run the sidecar C check below first; when it fires, print its message instead.)
    - A named ID that is Verified is allowed: re-checking it records a past false PASS as data.
    - A Disputed requirement in scope → say it is known to be wrong (`<CR-ID>`, `<N>` days) and
      that a PASS does not resolve the dispute.
@@ -181,7 +181,10 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If it does not exist, ask via `AskUserQuestion` which branch holds the work — question
      `"There is no feature/epic-<id>-<short-name> branch. Which branch holds this epic's work?"`,
      options: the current branch, `"Let me type a branch name"`, `"Stop"`. Check out the branch
-     the user names (stop if it does not exist), and call it the feature branch from here on.
+     the user names (stop if it does not exist), and call it the feature branch from here on. If
+     the named branch is the base (`develop`, `main`, or `master`), run
+     `git checkout -b feature/epic-<id>-<short-name>` from it instead and call that the feature
+     branch — wrapup never commits on the base.
    - After checkout, check freshness (base: `develop` > `main` > `master`). If `git remote` does
      not list `origin`, skip silently. Otherwise run `git fetch --quiet origin`; if the fetch
      fails, say `Freshness check skipped — origin not reachable`. If `origin/<base>` exists, count
@@ -436,6 +439,9 @@ Only now, with every per-TOR verdict recorded, read
    - Else if the handoff reported it `PASS (operator-observed pending)` and the observation did not
      match → `Disclosed: n/a (observation)` — the implementer could not have known; no
      UNDISCLOSED marker.
+   - Else, when the epic has no implementer handoff at all (`handoff: —` and no
+     `session-handoffs/epic-<id>-implemented.md`) → `Disclosed: n/a (no handoff)`; no UNDISCLOSED
+     marker, but say in Highlights that the epic reached Implemented without a handoff.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
      `FAIL — ❌ UNDISCLOSED DEFERRAL` (or `CANNOT VERIFY — ❌ UNDISCLOSED DEFERRAL`) in the
      Verifier finding column. A mention in Key Decisions or prose ("stub for now") does not

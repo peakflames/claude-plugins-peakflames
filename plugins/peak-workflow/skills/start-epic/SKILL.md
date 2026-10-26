@@ -62,8 +62,9 @@ failed, open the session with one plain sentence naming the counts and the next 
 verification — start with /peak-workflow:capture-requirements TOR-04-Priv001 (it does not touch
 this epic's anchors).` The command is the top requirement action exactly as
 `/peak-workflow:status` Step 4.5 item 5 picks it (an overdue Disputed one, Safety first; else the
-first Changed since verified one — `capture-requirements <TOR>` first when it carries an A finding
-or `historical_records`, otherwise its reverify; else the oldest Disputed one). Say whether it
+first Changed since verified or Verification failed one — `capture-requirements <TOR>` first when
+it carries an A finding or `historical_records`, `quick-fix` first when it failed verification,
+otherwise its reverify; else the oldest Disputed one). Say whether it
 touches this epic's anchors (Step 1 item 6 handles those). When Step 1 stops the skill before
 the Step 2.5 card, print the nudge after the stop message as one `Also:` line instead.
 
