@@ -167,6 +167,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   meaning changed before suggesting reverify.
 - **Duplicate sidecar keys rejected** — a key written twice (e.g. two `owner:` lines after a clean
   merge) is a data error naming both lines.
+- **`capture-requirements <TOR-ID>` routing** — a request that withdraws a capability goes to the
+  Removed row (Retire first), an undecided one to the Pending row; Disputed → Change it asks the
+  settle question; a records-only brownfield run merges without plan-project.
 - **`capture-requirements <TOR-ID>` on a disputed, edited requirement** — four options (no Uphold
   over an unrecorded edit); a supersede or reword asks whether it settles the dispute and carries it
   to the successor when not. Greenfield context checks are skipped in this mode.
@@ -178,6 +181,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **BREAKING: `migrate-2.5` and `migrate-from-epic-workflow`** are deleted, along with
   `new-project`'s epic-workflow detection and the "epic-workflow may be a better fit" advice.
+
+### Fixed
+
+- **Section of the last Scenario before a banner** — the helper read the next banner's name, so a
+  requirement just above `# Safety` was treated as Safety (no Defer or Amend; disputes overdue at
+  once).
+- **Malformed `requirements:` entries stop early** — quick-fix's amendment path and reverify stop
+  before branching when the owning epic's sidecar has a finding C, which `mark` would refuse; the
+  C message says how to correct it.
+- **`start-epic` nudge matches `status`** — same top requirement action, including
+  capture-requirements first for a pre-3.0 or unrecorded edit.
+- **Release Protocol template** — the tag is pushed with the branches in the ask-first step;
+  changelog headings use `—` and ISO dates; the version bump is language-neutral.
+- **Small skill fixes** — plan-project's solo merge no longer pushes unasked; pause checks the
+  branch before committing; quick-fix pulls the base; start-epic's `<id>` is the first argument
+  word; zsh-safe changelog lookup.
 
 ### Documentation
 
