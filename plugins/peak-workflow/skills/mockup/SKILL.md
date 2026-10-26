@@ -189,7 +189,7 @@ rewritten.
 ### 3.1: Draft the inventory
 
 One row per screen, with these columns (the table format is in
-`plugins/peak-workflow/skills/mockup/SCREENS_TEMPLATE.md`):
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/SCREENS_TEMPLATE.md`):
 
 | Column | Rule |
 |---|---|
@@ -290,7 +290,7 @@ Do not print the flows to the terminal — mermaid does not render there. They g
 ### 4.2: Write screens.md
 
 Write `docs/product-vision-planning/ux/screens.md` following
-`plugins/peak-workflow/skills/mockup/SCREENS_TEMPLATE.md` (`mkdir -p docs/product-vision-planning/ux/wireframes`
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/SCREENS_TEMPLATE.md` (`mkdir -p docs/product-vision-planning/ux/wireframes`
 first). Greenfield: create it at version 1.0. Brownfield: append new rows, `## States`
 subsections, and `## Flows` blocks per the template's append note; replace a changed screen's
 row and states in place, keeping the existing state copy verbatim unless this change alters
@@ -313,7 +313,7 @@ For every screen in scope — greenfield: every screen; brownfield: every screen
 this run (not the Application menu and Window rows) — write the file its
 `Wireframe` column in `ux/screens.md` names —
 `docs/product-vision-planning/ux/wireframes/S-NN-<kebab-name>.html` — following
-`plugins/peak-workflow/skills/mockup/WIREFRAME_TEMPLATE.md`. Each file is self-contained:
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/WIREFRAME_TEMPLATE.md`. Each file is self-contained:
 
 **Write these files in parallel.** Every screen's wireframe is independent of every other
 screen's — none reads or depends on another's output — so issue one `Write` tool call per screen
@@ -367,7 +367,7 @@ their `S-NN` IDs. Create it only if it does not exist.
 ### 5.3: Write the wireframe index
 
 Write `docs/product-vision-planning/ux/wireframes/index.html` following the **Index Template** in
-`plugins/peak-workflow/skills/mockup/WIREFRAME_TEMPLATE.md` — one linked row per screen in
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/WIREFRAME_TEMPLATE.md` — one linked row per screen in
 `ux/screens.md`, in `S-NN` order. A removed screen's row has no link: its Screen cell is plain
 text followed by its `retired …` purpose. This is the file Step 6 opens in the browser, so it is written
 on every run, greenfield or brownfield, and regenerated in full whenever the screen set changes

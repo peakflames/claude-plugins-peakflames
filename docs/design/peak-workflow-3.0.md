@@ -76,6 +76,15 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | Reverify A stop | Reverify re-checks every stale requirement | Reverify stops on a scoped requirement with an A finding (edited without a record) and sends it to `capture-requirements <TOR>`; `check`'s D message says the same when A is present | A reverify PASS would ratify an unrecorded meaning change |
 | Wrapup branch freshness | (none) | When the base gained Change Records the branch lacks, wrapup merges the base into the branch and re-runs its health check in the same session (nothing read before it is the implementer's handoff) | Dispute ages and record lookups read the branch's own files |
 | quick-fix reverify | quick-fix "runs the reverify step for that successor on the same branch" | A fresh `general-purpose` sub-agent (never a fork) verifies the successor blind; the result and the `requirements:` append are one `mark` call. FAIL offers fix again / ship marked unverified / Stop | Keeps verification independent of the implementing session, and a successor never sits in a Complete epic with neither line (it would read as Verified) |
+| Step 0002 commits | Migration is one commit per phase; the addendum says one commit per step | Step 0002 commits Phases 4–7 itself (`… — change records`, `— strip notes and titles`, `— seed verified fingerprints`, `— normalize sidecar keys`); the runner commits Phase 8 (`migration_source` stripped) with the stamp. Phases 1–3 and the report write no files | Keeps each phase reviewable and revertable while the runner keeps "the stamp moves in the step's own commit" |
+| `migrate` | Migration phases are prompt work over `fingerprint` and `seed` | Adds `migrate scan` (prerequisites + prose inventory + unrecorded edits/removals + seedable rows; the step's detect), `migrate records --plan <json>` (writes the owner-approved classification), `migrate strip`, `migrate sidecars`, `migrate finish`; plus `fingerprint --against FILE` and `check --by-epic` | Record files, fingerprints, verbatim texts, and table rewrites are mechanics a prompt gets wrong at Project C's scale (145 notes); the classification stays the agent's, approved at one gate |
+| Historical rewords | One migration record per historical event, `refs` = commit SHA from `git log -S` | Every unrecorded trunk edit of a live requirement (finding A) becomes a `reword` with `result = "historical"`, one record per trunk commit, its `from`/`to` chained along first-parent history, whether or not a note explains it; a note only supplies title and reason. `refs` name the edit's commit and the note's | An edit nobody noted would otherwise stay an A finding forever; chaining by commit makes the A check pass exactly |
+| Migration record dates | (unstated) | Migration records are dated the upgrade day; a `pending` record's dispute clock starts then, not at the note's commit | A years-old "pending change-control" note would otherwise block every epic touching it the moment the upgrade merges |
+| Kept prose | Feature files allow no notes or markers | Comment-line prose is removed; a marker line in Markdown **after** the first Scenario (outside the Gherkin fence) is left in place and reported `kept` | Such lines are inside the last Scenario's fingerprint body; removing them would make a verified requirement read Changed since verified |
+| Sidecar keys on Complete epics | Ad hoc keys become records | On a Complete sidecar the only lines the step removes are the ad hoc keys (`superseded_by`, `supersession_note`, `revised`, `revision-reason`); `status:` and every other line stay, and `verified:` lines are only added | Complete sidecars are history; the keys' content now lives in the records |
+| Historical D message | (none) | `states` adds `historical_records` to a Changed-since-verified row whose edit only a historical reword explains; `check`'s D message then names both routes (meaning changed → `capture-requirements <TOR>`; else reverify), and status's panel and nudge put the decision first | A reverify would otherwise ratify a pre-3.0 meaning change the migration could record only as a reword |
+| Duplicate sidecar keys | (none) | The sidecar parser rejects a key that appears twice (`owner:` twice → data error naming both lines), so `check`, `states`, and step 0002's prerequisites stop on it | A clean git merge of an in-flight branch after step 0001 can add a second `owner:` line silently; step 0001 is frozen, so the parser catches it |
+| Requirements README | Migration rewrites `docs/requirements/README.md` | Step 0002 replaces the `## Conventions` section only when the file is still the 2.1 setup stub, writes one when there is none, and leaves a user-written README alone (named in the report) | An upgrade step never overwrites prose a user wrote |
 
 ## Plan checklist
 
@@ -89,7 +98,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ✅ Done |
 | 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ✅ Done |
 | 7b | **uphold** — fifth record kind closing a dispute when the requirement stands; capture-requirements 3C, wrapup overdue question, status/triage/quick-fix wording | Dry-run: capture-requirements uphold, wrapup uphold, status | ✅ Done |
-| 8 | **Step 0002 lifecycle migration** (#20 Migration 1–8, one commit each; strips `migration_source`) + contributor kit (Q9) | A "Project A-like" fixture upgrades with identical fingerprints before/after the strip; seed surfaces exactly the planted stale set | ☐ |
+| 8 | **Step 0002 lifecycle migration** (#20 Migration 1–8, one commit each; strips `migration_source`) + contributor kit (Q9) | A "Project A-like" fixture upgrades with identical fingerprints before/after the strip; seed surfaces exactly the planted stale set | ✅ Done |
 | 9 | **Release gate** — README / plugin CLAUDE.md / CHANGELOG (BREAKING, /upgrade), 2-pass full dry-run, live UAT, draft PR → develop, contributor request, release | All four Q10 gates pass | ☐ |
 
 ## Plan notes
@@ -391,4 +400,71 @@ proposal + addendum). Every plan reads this file first and updates it last.
   TORs back to Verified, F `disputed` cleared. 0 Critical; UX/Minor fixed (reason prompt, closed
   pending in `search`, Disputed + D/A cases get Uphold, empty `docs/amend-*` branch removed on a
   lookup stop).
+
+### Plan 8 — Step 0002 lifecycle migration + contributor kit
+
+- **Step `0002-requirements-lifecycle.md`** maps #20 Migration 1–8 onto the runner: Detect =
+  `migrate scan` (exit 2 = a prerequisite failed: invalid tracing JSON, a duplicated Scenario ID,
+  an unreadable sidecar or record); Phase 2 saves `fingerprint` to `.git/peak-workflow-0002/`;
+  Phase 4 is the one owner gate (Rationale / History / Supersede / Retire / Pending / Drop per
+  prose item and ad hoc key, written as `plan.json`, applied by `migrate records`); Phase 5
+  `migrate strip` + `fingerprint --against` (survivors identical, removals recorded) + README;
+  Phase 6 `seed --write`; Phase 7 `migrate sidecars`; Phase 8 `migrate finish` (committed by the
+  runner with the stamp); Report = `check --by-epic` in the final message. One commit per phase
+  (deviation row). Resuming skips Phases 3–4 once `change records` is committed.
+- **Helper** (deviation rows `migrate`, historical rewords, kept prose, historical D message,
+  duplicate keys): `migrate scan|records|strip|sidecars|finish`, `fingerprint --against`,
+  `check --by-epic`, `states` `historical_records`, `F. Housekeeping and disputes` heading.
+  Prose = every comment line in the Gherkin except rules, banners, `# Verification:`, the
+  reference-screen note, a bare `# Safety`, doc-string content, and Markdown titles before
+  `Feature:`; marker lines in Markdown before the first Scenario are prose too. `strip` refuses any
+  change to a fingerprint or a section. Records are validated before anything is written.
+- **Format 2 reached:** `PLUGIN_FORMAT` = shipped steps = 2. The interim `upgradable:` line and
+  every "later build" message (format, upgrade, status, new-project) are gone; a test holds the
+  shipped steps equal to `PLUGIN_FORMAT`.
+- **Runner:** steps may commit per phase (**Commits** line) and add a **Report**; a resume check
+  finds an unmerged `docs/upgrade-*` branch before planning; the plan, summary, and Leave text name
+  the base's format; Skip is offered only when the in-flight paths name epics and a step supports
+  it; requirements branches in flight are told they will need `capture-requirements`; a catch-up
+  whose epics are all still in flight stops early.
+- **Fixtures/tests:** `dryrun/plan8_project_a.py` (importable `build()` + `classification()`),
+  pinned in `test_dryrun_fixtures.py`; `test_migrate.py` (scanner, tables, flags, the format 0 → 2
+  upgrade twice); `test_acceptance.py`; scale fixture adds `migrate scan` before and after seed
+  (0.55s) and `check --by-epic` (0.37s).
+- **Contributor kit:** `docs/uat/lifecycle-acceptance.md`; `tests/peak-workflow/acceptance/run.py`
+  `baseline` (a scratch clone: inventory, then seed to preview the stale set) and `after` (format,
+  re-run no-op, fingerprints vs the pre-upgrade commit, validate, records by kind, states, check,
+  timings). Output is IDs, counts, letters, timings; a redaction check refuses to print (exit 4)
+  when any title, step, note, paraphrase, or record text would appear.
+- **Done-when on the fixture:** fingerprints identical for the 13 survivors (Old0001 and Imp0001
+  removed with records); `seed` → exactly {TOR-02-Wrd0001} Changed since verified (TOR-01-Pre0001,
+  edited before verification, stays Verified); `check` = C (`TOR-24 set`, the only C) + D (Wrd0001)
+  + F (`disputed`, the planted pending note); A = B = E = 0; a re-run is a no-op.
+- **Q13 dry-run** on `plan8_project_a.py` copies, agents running the real helper. Pass 1 (2
+  agents: new-project → upgrade → re-run → status; in-flight epic + stop/resume + start-epic
+  guard + constraint checks 4a–4e, all passing): 3 Critical — D message prescribed reverify for a
+  pre-3.0 meaning change, an ambiguous `docs/upgrade-format-<target>` broke resume, and the fixture
+  lacked phase indexes. Pass 2 (Change-some-rows to `removal = "code"`, status, triage AMEND;
+  resume from develop + in-flight requirements branch + redaction check — no leak): 2 Critical —
+  capture-requirements 3C asked 5 options for an edited, disputed requirement, and TOR-ID mode hit
+  greenfield stops. Pass 3 (amend with supersede, catch-up after the epic merged; resume + dispute
+  carried to a successor): 1 Critical — a clean merge after "Rewrite everything anyway" left two
+  `owner:` lines unnoticed (now a parser error). Pass 4 (that path end to end, status, uphold back
+  to Verified): **0 Critical**; its UX fixes applied (which `owner:` line to delete, a status line
+  for a non-overdue dispute, TOR-ID checklist scope).
+- **Also fixed while dry-running** (outside step 0002): capture-requirements TOR-ID mode skips the
+  greenfield context stops and cleans up its branch; 3C with an open pending on an edited
+  requirement drops Uphold/Record as pending (four options), asks whether a supersede or reword
+  settles the dispute and carries it to the successor when not, and cites `historical_records`;
+  L4 ignores the amended requirement's own pending hit; template paths are
+  `${CLAUDE_PLUGIN_ROOT}`-based (capture-requirements, mockup). status: historical caveat slot,
+  nudge falls back to the oldest Disputed, an ownerless In Progress epic with a branch says
+  "coordinate". new-project: exit 1 is a verdict, not an error.
+- **Left alone:** a supersede/retire record's `text` keeps the 2.1 note lines (verbatim, as #20
+  says); retire records carry `traced_to`, supersedes do not (schema); `migration_source` is
+  removed from records committed earlier on the same unmerged branch; capture-requirements TOR-ID
+  mode still leaves committing to the user (no commit-message convention); a superseded ID's
+  successor shows only as Specified; step 0001 inserts `owner: —` after `status:` (a frozen step,
+  so the duplicate-key parse error covers the merge case); the runner's in-flight warning about a
+  duplicated `owner:` stays generic.
 

@@ -76,9 +76,12 @@ format, every command stops and points to:
 /peak-workflow:upgrade
 ```
 
-It applies numbered, forward-only steps on a `docs/upgrade-format-N` branch, one commit per step,
-shows each step before applying it, and warns about feature branches in flight that touch the
-files a step rewrites. `status` and `triage` still run, with a banner, while a project is behind.
+It applies numbered, forward-only steps on a `docs/upgrade-format-N` branch, one commit per step
+(or per phase), shows each step before applying it, and warns about feature branches in flight that
+touch the files a step rewrites. `status` and `triage` still run, with a banner, while a project is
+behind. A 2.1 project gets two steps: **0001** backfills epic provenance from git; **0002** turns
+lifecycle notes into Change Records (you approve one classification table), strips notes and
+titles, seeds `verified:` fingerprints, and ends with a health report grouped by epic.
 
 ## Philosophy
 

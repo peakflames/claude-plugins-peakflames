@@ -4,7 +4,7 @@ description: |
   Brings a project's peak-workflow files forward to the format this plugin version reads, one
   numbered step at a time. Reads the format stamp (docs/.peak-workflow.toml; missing = format 0),
   runs each pending step's detect check, previews and applies it on a docs/upgrade-format-N
-  branch with one commit per step, and stamps the new format. Warns about feature branches in
+  branch with one commit per step (or per phase, when the step says so), and stamps the new format. Warns about feature branches in
   flight that touch files a step rewrites. Never edits CLAUDE.md.
   Use when any peak-workflow command says the project is behind this plugin's format.
   Triggers on: "upgrade", "upgrade project", "project is behind", "format stamp", "run the upgrade",
@@ -13,8 +13,8 @@ description: |
 
 You are upgrading this project's peak-workflow files to the format this plugin reads. The steps
 live in `${CLAUDE_PLUGIN_ROOT}/skills/upgrade/steps/NNNN-<name>.md`. Each one is forward-only:
-it has a **Detect** check, a **Preview** to show the user, and an **Apply**. Applying step `NNNN`
-moves the project to format `NNNN`. You run the steps; you do not improvise changes they do not
+it has a **Detect** check, a **Preview** to show the user, an **Apply**, and optionally a
+**Report** for the final message. Applying step `NNNN` moves the project to format `NNNN`. You run the steps; you do not improvise changes they do not
 describe, and no step ever edits the user's `CLAUDE.md`.
 
 `tor-lifecycle` below means `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"`. Exit codes: 0 ok,
@@ -38,7 +38,18 @@ Run `git status --porcelain`. If it lists anything, stop: *"Commit or stash your
 each upgrade step is its own commit, and yours must not ride along."*
 
 Then pick the base branch: `git branch --list develop main master` — prefer `develop`, then
-`main`, then `master`. Every `<base>` below is this branch.
+`main`, then `master`. Every `<base>` below is this branch. `B` is the base's own format — `N` as
+read in Step 1 when you are on `<base>`, else `git show <base>:docs/.peak-workflow.toml` (`format
+= …`; no file = 0). The plan heading, the summary, and the Leave message name `B`, not a
+half-upgraded branch's number.
+
+**Resume check.** Unless you are already on one, look for an earlier run's branch:
+`git branch --list 'docs/upgrade-*'`, keeping those that have not merged (`git merge-base
+--is-ancestor <branch> <base>` fails and `git cherry <base> <branch>` prints a `+` line). When
+there is one, say *"Resuming the upgrade on <branch> (started in an earlier session)."*, check it
+out, and re-run Step 1 — the format, and so the work left, are read from that branch. A resumed
+run skips Step 5 (the in-flight question was answered when the branch was made; its skips are
+whatever that run's Detects still report).
 
 ## Step 3: List the Work
 
@@ -49,23 +60,20 @@ List `${CLAUDE_PLUGIN_ROOT}/skills/upgrade/steps/*.md`. Two kinds of work:
 - **Catch-up** — steps numbered `N` or below whose **Skip** line says skipping is supported. An
   earlier run may have skipped epics that were in flight; once those merge, the step's Detect
   finds them. Run each such Detect now, without skips; pending output is catch-up work. (Step 6
-  runs it again with any Step 5 skips.)
+  runs it again with any Step 5 skips.) When there are no pending steps and every catch-up path
+  belongs to an epic whose branch is still unmerged (`tor-lifecycle inflight --base <base>
+  <those paths>` lists each one), print *"Catch-up for <epic IDs> waits until <branches> merge."*
+  and stop — there is nothing to apply yet.
 
 Then:
 
-- **Nothing pending and no catch-up:** when the verdict was `current`, print *"This project is on
-  format N — nothing to upgrade."* Otherwise print *"This build of peak-workflow ships upgrade steps
-  up to format N, and your project is there. Format <plugin> needs steps from a later build; once
-  one ships, update with /plugin marketplace update peakflames-plugins and run the upgrade."*
-  Stop either way.
-- **Otherwise, when the shipped steps end below `plugin:`** (pending or catch-up work alike), say
-  once — the **later-build line**: *"This plugin build ships steps up to <last step>; format
-  <plugin> arrives in a later build. Commands that change files will keep stopping until then."*
+- **Nothing pending and no catch-up:** print *"This project is on format N — nothing to upgrade."*
+  and stop.
 
 Read each step file involved. Show the plan:
 
 ```
-Upgrade: format N → <target>     (or: catch-up on format N)
+Upgrade: format B → <target>     (or: catch-up on format N)
 
 | Step | What it does |
 |---|---|
@@ -75,8 +83,10 @@ Upgrade: format N → <target>     (or: catch-up on format N)
 ## Step 4: Branch
 
 1. The upgrade branch is `docs/upgrade-format-<target>`, or `docs/upgrade-catch-up-<N>` when
-   there is only catch-up work.
-2. If the current branch is already that branch (a resumed run), stay on it and go to Step 5.
+   there is only catch-up work — `<target>` and `<N>` as plain integers (`docs/upgrade-format-2`,
+   never `-0002`).
+2. If the current branch is already that branch (a resumed run, see Step 2), stay on it and go
+   to Step 6.
 3. Otherwise `git checkout <base>`. If `git rev-parse --abbrev-ref @{upstream} 2>/dev/null` succeeds, run
    `git pull --ff-only`; on failure, stop and say the base has diverged from origin.
 4. `git checkout -b <branch>`. If that branch already exists and has merged —
@@ -95,7 +105,18 @@ shell) matches it on every branch. It prints `branch<TAB>path` for each unmerged
 local or remote branch that touches them (exit 0 = none; skip the rest of this step).
 
 When there are rows, show them grouped by branch and explain in one sentence: those branches will
-conflict with this upgrade where they edit the same lines. Then ask via `AskUserQuestion`:
+conflict with this upgrade where they edit the same lines. For a branch that touches
+`docs/requirements/`, add: after it merges `<base>` in, every requirement it edited needs
+`/peak-workflow:capture-requirements <TOR>` before it can merge (the upgrade turned those edits
+into unrecorded changes against the recorded history). And a clean merge is not proof of a good
+one: a branch that added a line the upgrade also added (a second `owner:`) merges silently, and
+then every command stops with a "`owner:` appears twice" data error until one line is deleted.
+Then ask via `AskUserQuestion`.
+Offer the Skip option only when the listed paths name epics (`status/epic-<id>.md`,
+`phase-*/epic-<id>-*.md`) **and** at least one step you will run says skipping is supported —
+otherwise the first option is `"Rewrite everything anyway (Recommended)"`. When some steps
+support skipping and others do not, name the others in the question — they still rewrite the
+skipped epics' files:
 
 - Question: `"Some branches in flight touch files this upgrade rewrites. How should I proceed?"`
 - Options:
@@ -125,30 +146,36 @@ For each step:
 2. **Preview.** Show what the step's **Preview** section asks for. Ask via `AskUserQuestion`:
    `"Apply step NNNN <name>?"` — `["Apply", "Stop here"]`. On Stop, end the session: the branch
    keeps the steps already committed, and a later run resumes from the stamp.
-3. **Apply.** Run the step's Apply exactly as written.
+3. **Apply.** Run the step's Apply exactly as written. A step whose **Commits** line says it
+   commits per phase makes those commits itself, on this branch, as its Apply describes.
 4. **Stamp.** `tor-lifecycle format --set NNNN`.
 5. **Commit** on the upgrade branch (check `git branch --show-current` first). Stage the
-   files the step changed and `docs/.peak-workflow.toml` by path, never `git add -A`:
-   `git commit -m "chore(upgrade): step NNNN <name>"`. Then `git status --porcelain` must be empty;
-   if anything is left over, stop and show it.
+   files the step changed since its last commit and `docs/.peak-workflow.toml` by path, never
+   `git add -A`: `git commit -m "chore(upgrade): step NNNN <name>"`. Then `git status --porcelain`
+   must be empty; if anything is left over, stop and show it.
 6. **Re-detect.** Run the Detect command again (with the same skips). It must report satisfied. If
    it does not, stop: *"Step NNNN did not fully apply"* plus its output. Do not run later steps.
 
 ## Step 7: Finish
 
-Run `tor-lifecycle format`. When it says `current`, print its message; when it says `behind`,
-print the Step 3 later-build line instead — never send the user back to `/peak-workflow:upgrade`
-right after it ran. Then summarize (a catch-up-only run: heading `Caught up format N on <branch>`):
+Run `tor-lifecycle format` and print its message (it says `current`). Then summarize (a
+catch-up-only run: heading `Caught up format N on <branch>`), one row per commit on the branch,
+oldest first (`git log --reverse --format='%h %s' <base>..HEAD`), marking those an earlier session
+made "(earlier run)":
 
 ```
-Upgraded format N → <target> on <branch>
+Upgraded format B → <target> on <branch>
 
 | Commit | Step | Files |
 |---|---|---|
 | <sha7> | 0001 epic-provenance | <count> |
+| <sha7> | 0002 requirements-lifecycle — change records | <count> |
 ```
 
 `<count>` is the number of files in the commit, the stamp included (`git show --name-only --format= <sha>`).
+
+Then, for each step applied in this run that has a **Report** section, do what it says — in this
+message, never in a file.
 
 List any skipped epics with *"re-run /peak-workflow:upgrade after these merge"*. If the run made
 no commit at all, delete the empty branch (`git checkout <base> && git branch -d <branch>`), say
@@ -163,7 +190,8 @@ Merge is approval, as for every `docs/` branch. Ask via `AskUserQuestion`:
   `gh pr create --base <base> --title "chore(upgrade): format N → <target>"` (catch-up only:
   `"chore(upgrade): catch-up on format N"`) with the summary table as the body.
 - **Solo:** `git checkout <base> && git merge --no-ff <branch> && git branch -d <branch>`.
-- **Leave:** print the two commands above for later.
+- **Leave:** print the two commands above for later, and say: *"Until it merges, <base> is still on
+  format B — start no epic and run no other command that changes files there."*
 
 After a merge, remind the user that branches in flight should merge `<base>` in before they
 continue.

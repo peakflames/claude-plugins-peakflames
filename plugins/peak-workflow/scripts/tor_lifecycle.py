@@ -519,6 +519,7 @@ def parse_sidecar(epic: str, text: str, where: str = "", lenient: bool = False) 
     sc = Sidecar(epic=epic)
     problems: list[str] = []
     block: str | None = None
+    seen_keys: dict[str, tuple[int, str]] = {}
     prefix = f"{where}: " if where else ""
     for n, line in enumerate(text.splitlines(), 1):
         if not line.strip():
@@ -540,6 +541,17 @@ def parse_sidecar(epic: str, text: str, where: str = "", lenient: bool = False) 
             problems.append(f"{prefix}line {n}: expected `key: value`, got {line!r}")
             continue
         key, value = m.groups()
+        if key in seen_keys:  # e.g. a clean git merge that added a second `owner:` line
+            first_n, first_v = seen_keys[key]
+            if first_v in EMPTY_VALUES and value not in EMPTY_VALUES:
+                hint = f"delete line {first_n} (`{key}: {first_v}`) and keep `{key}: {value}`"
+            elif value in EMPTY_VALUES and first_v not in EMPTY_VALUES:
+                hint = f"delete line {n} (`{key}: {value}`) and keep `{key}: {first_v}`"
+            else:
+                hint = "keep the right one and delete the other"
+            problems.append(f"{prefix}line {n}: `{key}:` appears twice (also line {first_n}); {hint}")
+            continue
+        seen_keys[key] = (n, value)
         if key in SIDECAR_BLOCKS:
             if value:
                 problems.append(f"{prefix}line {n}: `{key}:` takes one indented `TOR-…: …` line per requirement")
@@ -809,6 +821,8 @@ def requirement_state(project: Project, tor: str) -> dict:
                     row["reword_records"] = [r.id for r in chain]
                 else:
                     state = "Changed since verified"
+                    if (hist := p.reword_chain(tor, saved[1], req.fingerprint, proven_only=False)) is not None:
+                        row["historical_records"] = [r.id for r in hist]  # recorded, but unproven
         else:
             state = STATUS_STATE.get(best.status, f"Unknown epic status ({best.status})")
     if row["dispute"]:
@@ -961,8 +975,14 @@ def run_check(project: Project, base: str | None = None) -> dict:
             req = p.live.get(tor)
             if req and saved != req.fingerprint and p.reword_chain(tor, saved, req.fingerprint, True) is None:
                 then = start.live.get(tor) if start else None
+                hist = p.reword_chain(tor, saved, req.fingerprint, False) if tor not in edited else None
                 nxt = (f"Decide first whether its meaning changed: /peak-workflow:capture-requirements {tor}"
-                       if tor in edited else f"Re-check it: /peak-workflow:wrapup-epic {sc.epic} reverify")
+                       if tor in edited else
+                       f"It was edited before 3.0 ({', '.join(r.id for r in hist)}, recorded without test "
+                       f"evidence). If its meaning "
+                       f"changed: /peak-workflow:capture-requirements {tor}; if not, re-check it: "
+                       f"/peak-workflow:wrapup-epic {sc.epic} reverify" if hist else
+                       f"Re-check it: /peak-workflow:wrapup-epic {sc.epic} reverify")
                 findings.append(Finding("D", f"{tor} changed after epic {sc.epic} verified it. {nxt}", tor=tor,
                                         epic=sc.epic, own_branch=bool(then) and then.fingerprint != req.fingerprint,
                                         detail={"verified_fingerprint": saved, "fingerprint": req.fingerprint}))
@@ -1191,7 +1211,8 @@ STEP_NAME = re.compile(r"^(\d{4})-[\w-]+\.md$")
 
 
 def shipped_format(steps_dir: Path = STEPS_DIR) -> int:
-    """The highest format the upgrade steps in this build reach (0 when none ship)."""
+    """The highest format the upgrade steps in this build reach (0 when none ship). A released
+    build ships one step per format up to PLUGIN_FORMAT (the tests hold it to that)."""
     nums = [int(m.group(1)) for p in steps_dir.glob("*.md") if (m := STEP_NAME.match(p.name))]
     return max(nums, default=0)
 
@@ -1203,7 +1224,6 @@ class FormatStatus:
     plugin: int
     stamped: bool
     message: str
-    upgradable: bool = False  # behind, and this build ships a step past the project's format
 
 
 def has_artifacts(root: Path) -> bool:
@@ -1219,7 +1239,7 @@ def is_legacy_layout(root: Path) -> bool:
     return bool(LEGACY_TABLE.search(text) and LEGACY_STATUS.search(text))
 
 
-def format_status(root: Path, steps_dir: Path = STEPS_DIR) -> FormatStatus:
+def format_status(root: Path) -> FormatStatus:
     """Compare the project's stamp with PLUGIN_FORMAT. A missing stamp is format 0, unless the
     project has no peak-workflow files yet (`new`: setup will stamp it)."""
     plugin = PLUGIN_FORMAT
@@ -1239,16 +1259,9 @@ def format_status(root: Path, steps_dir: Path = STEPS_DIR) -> FormatStatus:
     if n < plugin:
         where = (f"This project's files are on format {n}" if stamp.present else
                  f"This project has no format stamp ({STAMP_PATH}), so its files are on format 0")
-        shipped = shipped_format(steps_dir)
-        if shipped <= n:
-            return FormatStatus("behind", n, plugin, stamp.present,
-                                f"{where}; this plugin needs format {plugin}, but this build ships "
-                                f"upgrade steps only up to format {shipped}. Commands that change files "
-                                "stay stopped until a build with the remaining steps is installed.")
         return FormatStatus("behind", n, plugin, stamp.present,
                             f"{where}; this plugin needs format {plugin}.\n"
-                            "Run /peak-workflow:upgrade — it shows each step before applying it.",
-                            upgradable=True)
+                            "Run /peak-workflow:upgrade — it shows each step before applying it.")
     return FormatStatus("ahead", n, plugin, True,
                         f"This project's files are on format {n}, newer than this plugin understands "
                         f"(format {plugin}).\nUpdate the plugin ({UPDATE_HINT}), restart Claude Code, "
@@ -1442,6 +1455,869 @@ def inflight_branches(root: Path, base: str | None, paths: list[str]) -> list[tu
     return out
 
 
+# -- Step 0002: requirements lifecycle --------------------------------------------------------
+
+LIFECYCLE_MARKERS = re.compile(r"\b(AMENDED|REVISED|SUPERSEDED|MODIFIED|CHANGE[- ]CONTROL)\b", re.I)
+RULE_LINE = re.compile(r"^[-=]{3,}$")
+REFERENCE_SCREEN = re.compile(r"^Note:\s*reference screens?\b", re.I)
+AD_HOC_KEYS = ("superseded_by", "supersession_note", "revised", "revision-reason", "revision_reason")
+SPEC_GLOB = "docs/implementation-plan/phase-*/epic-*.md"
+ANCHORS_HEADING = "## Requirements Anchors"
+MIGRATION_SOURCE_LINE = re.compile(r"^migration_source\s*=.*\n?", re.M)
+HISTORICAL_EQUIVALENCE = ("Not assessed: an edit made before 3.0, recorded by the migration from git history. "
+                          "Historical evidence counts as unproven.")
+ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+
+@dataclass
+class ProseItem:
+    """A run of lifecycle prose in a feature file: `# Note:` blocks, change markers, other comments."""
+    file: str          # repo-relative path
+    line: int          # first line (1-based)
+    end: int           # last line
+    kind: str          # marker | note | comment | banner | outside
+    tor: str | None    # the requirement it sits in (None = file level)
+    text: str
+    strip: bool = True  # False: left in place (removing it would change a fingerprint)
+
+    @property
+    def id(self) -> str:
+        return f"{self.file}:{self.line}"
+
+    @property
+    def summary(self) -> str:
+        """The first line that says something (a bare `Note:` heading is skipped)."""
+        lines = [ln for ln in self.text.split("\n") if ln.strip()]
+        return next((ln for ln in lines if ln.strip().lower() != "note:"), lines[0] if lines else "")
+
+
+def _gherkin_mask(lines: list[str]) -> list[bool]:
+    """True for lines inside the Gherkin: inside ```gherkin fences, or every line of an unfenced file."""
+    if not any(ln.strip().startswith("```gherkin") for ln in lines):
+        return [True] * len(lines)
+    mask, inside = [], False
+    for ln in lines:
+        s = ln.strip()
+        if s.startswith("```"):
+            mask.append(False)
+            inside = s.startswith("```gherkin") and not inside
+            continue
+        mask.append(inside)
+    return mask
+
+
+def scan_prose(rel: str, text: str) -> list[ProseItem]:
+    """Lifecycle prose in one feature file. Kept: section banners and their rules, `# Verification:`,
+    the `# Note: reference screen` line, a bare `# Safety`, and comment lines inside doc strings."""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    mask = _gherkin_mask(lines)
+    items: list[ProseItem] = []
+    tor: str | None = None
+    first_scenario = next((i for i, ln in enumerate(lines) if SCEN.match(ln)), len(lines))
+    group: list[int] = []
+    held_empty: list[int] = []
+    in_banner = banner_text = in_doc = seen_feature = False
+
+    def close() -> None:
+        nonlocal group
+        if group:
+            body = [lines[i].strip().lstrip("#").strip() for i in group]
+            kind = ("marker" if any(LIFECYCLE_MARKERS.search(b) for b in body) else
+                    "note" if any(b.lower().startswith("note:") for b in body) else "comment")
+            items.append(ProseItem(rel, group[0] + 1, group[-1] + 1, kind, tor,
+                                   "\n".join(b for b in body if b)))
+        group = []
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not mask[i]:
+            close()
+            held_empty = []
+            if stripped and LIFECYCLE_MARKERS.search(stripped):
+                items.append(ProseItem(rel, i + 1, i + 1, "outside", None, stripped, strip=i < first_scenario))
+            continue
+        if stripped.startswith('"""'):
+            in_doc = not in_doc
+        if in_doc or stripped.startswith('"""'):
+            close()
+            continue
+        if m := SCEN.match(line):
+            close()
+            tor = m.group(1)
+        elif FEAT.match(line):
+            close()
+            tor, seen_feature = None, True
+        if not stripped.startswith("#"):
+            close()
+            held_empty = []
+            if stripped:
+                in_banner = False
+            elif banner_text:
+                in_banner = banner_text = False
+            continue
+        content = stripped.lstrip("#").strip()
+        if RULE_LINE.match(content):
+            close()
+            held_empty = []
+            if in_banner and banner_text:
+                in_banner = banner_text = False
+            else:
+                in_banner, banner_text = True, False
+            continue
+        if in_banner:
+            banner_text = True
+            if LIFECYCLE_MARKERS.search(content):
+                items.append(ProseItem(rel, i + 1, i + 1, "banner", None, content))
+            continue
+        if not content:
+            (group if group else held_empty).append(i)
+            continue
+        if VERIF.match(line) or REFERENCE_SCREEN.match(content) or content.lower() == "safety" or (
+                not seen_feature and not LIFECYCLE_MARKERS.search(content)):  # e.g. a Markdown title
+            close()
+            held_empty = []
+            continue
+        if not group:
+            group = held_empty
+        held_empty = []
+        group.append(i)
+    close()
+    # A note directly above a Scenario line (no blank line between) belongs to that Scenario.
+    for item in items:
+        nxt = item.end  # 0-based index of the line after the item
+        if nxt < len(lines) and (m := SCEN.match(lines[nxt])):
+            item.tor = m.group(1)
+    return items
+
+
+def tracing_files(root: Path) -> list[Path]:
+    return sorted((root / REQ_DIR).glob("*.feature.tracing.json"))
+
+
+def load_tracing(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise DataError(f"{REQ_DIR}/{path.name}: not valid JSON ({exc})") from None
+    if not isinstance(data, dict) or not isinstance(data.get("requirements", []), list):
+        raise DataError(f"{REQ_DIR}/{path.name}: expected an object with a `requirements` list")
+    return data
+
+
+def dump_tracing(data: dict, original: str = "") -> str:
+    """JSON as the sidecar writer would have it; a file that was pure ASCII (\\u escapes) stays so."""
+    return json.dumps(data, indent=2, ensure_ascii=original.isascii() if original else False) + "\n"
+
+
+def split_row(line: str) -> list[str]:
+    """Cells of a Markdown table row (escaped pipes stay in their cell)."""
+    body = line.strip()
+    body = body[1:] if body.startswith("|") else body
+    body = body[:-1] if body.endswith("|") and not body.endswith("\\|") else body
+    return [c.strip() for c in re.split(r"(?<!\\)\|", body)]
+
+
+def strip_anchor_titles(text: str, live: dict[str, LiveRequirement]) -> str:
+    """Drop title columns from a spec's Requirements Anchors table; add a Feature File column when
+    the table has none. Every other line is kept."""
+    lines = text.split("\n")
+    try:
+        start = next(i for i, ln in enumerate(lines) if ln.strip() == ANCHORS_HEADING)
+    except StopIteration:
+        return text
+    head = next((i for i in range(start + 1, len(lines))
+                 if lines[i].startswith("## ") or lines[i].lstrip().startswith("|")), None)
+    if head is None or lines[head].startswith("## ") or head + 1 >= len(lines):
+        return text
+    cols = split_row(lines[head])
+    idcol = next((n for n, c in enumerate(cols) if "tor" in c.lower()), 0)
+    titles = [n for n, c in enumerate(cols) if n != idcol and re.search(r"title|scenario", c, re.I)
+              and "feature" not in c.lower()]
+    has_ff = any("feature" in c.lower() for c in cols)
+    if not titles and has_ff:
+        return text
+    end = head + 2
+    while end < len(lines) and lines[end].lstrip().startswith("|"):
+        end += 1
+    keep = [n for n in range(len(cols)) if n not in titles]
+
+    def row(cells: list[str]) -> str:
+        return "| " + " | ".join(cells) + " |"
+
+    new_head = [cols[n] for n in keep]
+    rows = [split_row(ln) for ln in lines[head + 2:end]]
+    new_rows = [[r[n] if n < len(r) else "" for n in keep] for r in rows]
+    if not has_ff:
+        at = keep.index(idcol) + 1
+        new_head.insert(at, "Feature File")
+        for r, orig in zip(new_rows, rows):
+            ids = TOR_ANY.findall(orig[idcol] if idcol < len(orig) else "")
+            req = live.get(ids[0]) if ids else None
+            r.insert(at, f"`{REQ_DIR}/{req.feature_file}`" if req else "—")
+    sep = "|" + "|".join("-" * (len(c) + 2) for c in new_head) + "|"
+    lines[head:end] = [row(new_head), sep] + [row(r) for r in new_rows]
+    return "\n".join(lines)
+
+
+def spec_paths(root: Path) -> list[Path]:
+    return sorted(root.glob(SPEC_GLOB))
+
+
+@dataclass
+class TrunkVersions:
+    """Every fingerprint change of every requirement along the trunk's first-parent history."""
+    events: dict[str, list[dict]] = field(default_factory=dict)   # tor -> [{sha, date, subject, from, to}]
+    first: dict[str, str] = field(default_factory=dict)           # tor -> first fingerprint
+    last: dict[str, tuple[str, str]] = field(default_factory=dict)  # tor -> (sha, path) last seen
+    removed: dict[str, dict] = field(default_factory=dict)        # tor -> {sha, date, subject}
+
+
+def trunk_versions(root: Path, trunk: str | None) -> TrunkVersions:
+    out = TrunkVersions()
+    if trunk is None:
+        return out
+    log = git(root, "log", "--first-parent", "-m", "--reverse", "--no-renames",
+              "--format=%x01%H %cs %s", "--name-status", trunk, "--", f"{REQ_DIR}/*.feature.md")
+    commits: list[tuple[str, str, str, list[tuple[str, str]]]] = []
+    for block in log.split("\x01")[1:]:
+        lines = [ln for ln in block.splitlines() if ln.strip()]
+        sha, date, *rest = lines[0].split(" ", 2)
+        files = []
+        for ln in lines[1:]:
+            status, _, path = ln.partition("\t")
+            if path.endswith(".feature.md"):
+                files.append((status[:1], path))
+        commits.append((sha, date, rest[0] if rest else "", files))
+    specs = [f"{sha}:{path}" for sha, _d, _s, files in commits for st, path in files if st in "AM"]
+    texts = iter(read_blobs(root, specs))
+    file_tors: dict[str, dict[str, str]] = {}  # path -> {tor: fp}
+    where: dict[str, set[str]] = {}            # tor -> paths holding it
+    current: dict[str, str] = {}               # tor -> fp
+    for sha, date, subject, files in commits:
+        touched: set[str] = set()
+        for status, path in files:
+            new = {} if status not in "AM" else {
+                p.tor: p.fingerprint for p in parse_requirements(next(texts) or "")}
+            old = file_tors.get(path, {})
+            for tor in old.keys() - new.keys():
+                where.get(tor, set()).discard(path)
+                touched.add(tor)
+            for tor, fp in new.items():
+                where.setdefault(tor, set()).add(path)
+                out.last[tor] = (sha, path)
+                out.removed.pop(tor, None)
+                if tor not in out.first:
+                    out.first[tor] = fp
+                elif current.get(tor) not in (None, fp):
+                    out.events.setdefault(tor, []).append(
+                        {"sha": sha, "date": date, "subject": subject, "from": current[tor], "to": fp})
+                current[tor] = fp
+            file_tors[path] = new
+        for tor in touched:
+            if not where.get(tor):
+                out.removed[tor] = {"sha": sha, "date": date, "subject": subject}
+                current.pop(tor, None)
+    return out
+
+
+@dataclass
+class MigrationScan:
+    trunk: str | None
+    prose: list[ProseItem]
+    tracing: list[dict]       # {path, titles, generated}
+    specs: list[dict]         # {path, epic, status}
+    sidecar_keys: list[dict]  # {path, epic, key, value, source}
+    edits: list[dict]         # {tor, sha, date, subject, from, to}
+    removed: list[dict]       # {tor, sha, date, feature_file}
+    seed: list[dict]          # seedable rows
+    sources: list[str]        # records still carrying migration_source
+
+    @property
+    def pending(self) -> bool:
+        return bool([p for p in self.prose if p.strip] or self.tracing or self.specs or self.sidecar_keys
+                    or self.edits or self.removed or self.seed or self.sources)
+
+    def counts(self) -> dict[str, int]:
+        return {"prose": sum(p.strip for p in self.prose), "kept": sum(not p.strip for p in self.prose),
+                "tracing": len(self.tracing), "specs": len(self.specs), "sidecar_keys": len(self.sidecar_keys),
+                "edits": len(self.edits), "removed": len(self.removed), "seed": len(self.seed),
+                "migration_source": len(self.sources)}
+
+
+def migration_prerequisites(root: Path) -> list[str]:
+    """#20 Migration 1: tracing JSON parses, Scenario IDs are unique, records and sidecars load."""
+    problems: list[str] = []
+    for path in tracing_files(root):
+        try:
+            load_tracing(path)
+        except DataError as exc:
+            problems += exc.problems
+    for loader in (live_requirements, load_records, lambda r: load_sidecars(r, lenient=True)):
+        try:
+            loader(root)
+        except DataError as exc:
+            problems += exc.problems
+    return problems
+
+
+def unexplained_edits(p: Project, tv: TrunkVersions) -> list[dict]:
+    """Trunk edits of live requirements whose first-merged text no record chain explains (finding A)."""
+    rows = []
+    for tor, req in sorted(p.live.items()):
+        first = tv.first.get(tor)
+        if first is None or first == req.fingerprint or p.reword_chain(tor, first, req.fingerprint, False) is not None:
+            continue
+        events = list(tv.events.get(tor, []))
+        last = events[-1]["to"] if events else first
+        if last != req.fingerprint:  # edited on this branch after the trunk tip
+            head = git(p.root, "rev-parse", "HEAD").strip()
+            events.append({"sha": head, "date": p.today.isoformat(), "subject": "working tree",
+                           "from": last, "to": req.fingerprint})
+        rows += [{"tor": tor, **e} for e in events]
+    return rows
+
+
+def scan_migration(root: Path, base: str | None = None, today: dt.date | None = None) -> MigrationScan:
+    problems = migration_prerequisites(root)
+    if problems:
+        raise DataError(problems)
+    p = load_project(root, today)
+    trunk = resolve_trunk(root, base)
+    tv = trunk_versions(root, trunk)
+    prose = []
+    for path in feature_files(root):
+        prose += scan_prose(_repo_relative(root, path), Path(path).read_text(encoding="utf-8"))
+    tracing = []
+    for path in tracing_files(root):
+        data = load_tracing(path)
+        titles = sum(isinstance(r, dict) and "title" in r for r in data.get("requirements", []))
+        if titles or "generated" in data:
+            tracing.append({"path": f"{REQ_DIR}/{path.name}", "titles": titles, "generated": "generated" in data})
+    specs = []
+    for path in spec_paths(root):
+        epic = spec_epic_id(path.name)
+        status = p.sidecars[epic].status if epic in p.sidecars else "—"
+        text = path.read_text(encoding="utf-8")
+        if status != "Complete" and strip_anchor_titles(text, p.live) != text:
+            specs.append({"path": path.relative_to(root).as_posix(), "epic": epic, "status": status})
+    keys = []
+    for epic, sc in sorted(p.sidecars.items()):
+        for key in AD_HOC_KEYS:
+            if key in sc.extra:
+                rel = f"{STATUS_DIR}/epic-{epic}.md"
+                keys.append({"path": rel, "epic": epic, "key": key, "value": sc.extra[key], "source": f"{rel}:{key}"})
+    removed = []
+    for tor in sorted(set(tv.removed) - set(p.live) - set(p.gone)):
+        removed.append({"tor": tor, **tv.removed[tor], "feature_file": Path(tv.last[tor][1]).name})
+    seed = [r for r in run_seed(p) if r["fingerprint"]]
+    sources = [r.path for r in p.records if "migration_source" in r.data]
+    return MigrationScan(trunk, prose, tracing, specs, keys, unexplained_edits(p, tv), removed, seed, sources)
+
+
+def _toml_str(value: str, multiline: bool = False) -> str:
+    esc = value.replace("\\", "\\\\").replace('"', '\\"')
+    if multiline and "\n" in value:
+        return '"""\n' + esc + '"""'
+    esc = esc.replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r")
+    return '"' + re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", lambda m: f"\\u{ord(m.group()):04x}", esc) + '"'
+
+
+def _toml_value(value, multiline: bool = False) -> str:
+    if isinstance(value, dt.date):
+        return value.isoformat()
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
+    return _toml_str(str(value), multiline)
+
+
+def record_toml(data: dict) -> str:
+    """A Change Record as TOML: scalars, then [evidence], then [[changes]]."""
+    out = []
+    for key, value in data.items():
+        if key not in ("evidence", "changes"):
+            out.append(f"{key} = {_toml_value(value, key in ('reason',))}")
+    if "evidence" in data:
+        out += ["", "[evidence]"] + [f"{k} = {_toml_value(v)}" for k, v in data["evidence"].items()]
+    for ch in data["changes"]:
+        out += ["", "[[changes]]"] + [f"{k} = {_toml_value(v, k == 'text')}" for k, v in ch.items()]
+    text = "\n".join(out) + "\n"
+    if tomllib.loads(text) != data:  # what we write must read back exactly
+        raise DataError(f"record {data.get('id')}: TOML round trip failed")
+    return text
+
+
+def _traced_to(entry: dict | None) -> list[str]:
+    if not entry:
+        return []
+    t = entry.get("traces_to") or {}
+    out = [f"vision {v.get('section')}" for v in t.get("vision", []) if isinstance(v, dict) and v.get("section")]
+    for c in t.get("conops", []):
+        if isinstance(c, dict) and c.get("scenario"):
+            out.append(f"conops {c['scenario']}" + (f".{c['step']}" if c.get("step") is not None else ""))
+    out += [f"CLAUDE.md {c.get('section')} — {c.get('line')}" for c in t.get("claude_md", [])
+            if isinstance(c, dict) and c.get("section")]
+    return out
+
+
+def _note_commit(root: Path, item: ProseItem) -> str | None:
+    """The commit that introduced a note's first line (`git log -S`)."""
+    needle = item.summary.removeprefix("Note:").strip()
+    if not needle:
+        return None
+    out = git(root, "log", "--reverse", "--format=%H", "-S", needle, "HEAD", "--", item.file, check=False).split()
+    return out[0] if out else None
+
+
+PLAN_LISTS = ("rationale", "history", "supersede", "retire", "pending")
+
+
+def load_plan(path: str) -> dict:
+    try:
+        plan = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DataError(f"{path}: cannot read the classification ({exc})") from None
+    if not isinstance(plan, dict):
+        raise DataError(f"{path}: expected a JSON object")
+    problems = []
+    for key in plan:
+        if key not in (*PLAN_LISTS, "drop"):
+            problems.append(f"plan: unknown key `{key}` (expected {', '.join(PLAN_LISTS)}, drop)")
+    for key in PLAN_LISTS:
+        if not isinstance(plan.get(key, []), list) or not all(isinstance(e, dict) for e in plan.get(key, [])):
+            problems.append(f"plan: `{key}` must be a list of objects")
+    if not isinstance(plan.get("drop", []), list):
+        problems.append("plan: `drop` must be a list of source IDs")
+    if problems:
+        raise DataError(problems)
+    return {k: plan.get(k, []) for k in (*PLAN_LISTS, "drop")}
+
+
+def _new_suffix(taken: set[str]) -> str:
+    import secrets
+    while True:
+        s = "".join(secrets.choice(ALNUM) for _ in range(7))
+        if s not in taken:
+            taken.add(s)
+            return s
+
+
+def delete_scenario(text: str, tor: str, prose: list[ProseItem]) -> str:
+    """Remove a Scenario block, the prose attached to it, and one separating blank line."""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    start = next(i for i, ln in enumerate(lines) if (m := SCEN.match(ln)) and m.group(1) == tor)
+    block = scenario_block(text, tor) or ""
+    end = start + len(block.split("\n"))  # exclusive
+    attached = [p for p in prose if p.tor == tor and p.end == start]  # directly above the Scenario line
+    if attached:
+        start = attached[0].line - 1
+    if start > 0 and not lines[start - 1].strip() and (end >= len(lines) or not lines[end].strip()):
+        start -= 1
+    return "\n".join(lines[:start] + lines[end:])
+
+
+def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.date, write: bool) -> list[dict]:
+    """#20 Migration 4: write the owner-approved classification as Change Records (approved_via =
+    "migration", each carrying `migration_source`), move rationale into tracing entries, delete
+    already-retired requirements, and record every unexplained trunk edit as a historical reword.
+    Idempotent: requirements already recorded are skipped."""
+    scan = scan_migration(root, base, today)
+    p = load_project(root, today)
+    tv = trunk_versions(root, scan.trunk)
+    approver = git(root, "config", "user.name", check=False).strip()
+    if not approver:
+        raise DataError("git config user.name is not set; records name their approver (approved_by)")
+    problems: list[str] = []
+
+    # Every source must be classified: strippable prose, ad hoc sidecar keys, unrecorded removals.
+    cited = set(plan["drop"]) | {s for key in PLAN_LISTS for e in plan[key] for s in e.get("sources", [])}
+    by_id = {it.id: it for it in scan.prose}
+    for it in scan.prose:
+        if it.strip and it.id not in cited:
+            problems.append(f"{it.id}: {it.kind} not classified (cite it in an entry's `sources` or in `drop`)")
+    for k in scan.sidecar_keys:
+        if k["source"] not in cited:
+            problems.append(f"{k['source']}: ad hoc sidecar key not classified")
+    removing = {t for key in ("supersede", "retire") for e in plan[key] for t in e.get("tors", [])}
+    for r in scan.removed:
+        if r["tor"] not in removing:
+            problems.append(f"{r['tor']}: deleted before 3.0 without a record — add a supersede or retire entry")
+
+    removed_ids = {r["tor"]: r for r in scan.removed}
+    deleting: set[str] = set()
+    for key in PLAN_LISTS:
+        for n, e in enumerate(plan[key], 1):
+            where = f"plan {key} #{n}"
+            tors = [e["tor"]] if key == "rationale" else e.get("tors", [])
+            if key == "rationale":
+                if not isinstance(e.get("tor"), str) or not isinstance(e.get("text"), str) or not e["text"].strip():
+                    problems.append(f"{where}: needs `tor` and `text`")
+                    continue
+            elif not tors or not all(isinstance(t, str) for t in tors):
+                problems.append(f"{where}: needs a non-empty `tors` list")
+                continue
+            for t in tors:
+                gone = t in p.gone and t not in p.live
+                if key in ("supersede", "retire"):
+                    if t not in p.live and t not in removed_ids and not gone:
+                        problems.append(f"{where}: {t} is neither live nor a requirement deleted from the trunk")
+                    if t in p.live:
+                        deleting.add(t)
+                elif t not in p.live:
+                    problems.append(f"{where}: {t} is not a live requirement")
+            if key in ("history", "supersede", "retire", "pending"):
+                for field_ in ("title", "reason"):
+                    if not isinstance(e.get(field_), str) or not e[field_].strip():
+                        problems.append(f"{where}: `{field_}` is required")
+            if key in ("supersede", "retire", "pending"):
+                kw = e.get("keywords")
+                if not isinstance(kw, list) or not kw or not all(isinstance(k, str) and k.strip() for k in kw):
+                    problems.append(f"{where}: `keywords` must be a non-empty list")
+            if key == "supersede":
+                succ = e.get("successors")
+                if not isinstance(succ, list) or not succ:
+                    problems.append(f"{where}: `successors` must be a non-empty list")
+                else:
+                    problems += [f"{where}: successor {s} is not a live requirement" for s in succ if s not in p.live]
+            if key == "retire" and e.get("removal") not in ("code", "none"):
+                problems.append(f'{where}: `removal` must be "code" or "none"')
+    for key in ("rationale", "history", "pending"):
+        for e in plan[key]:
+            for t in ([e.get("tor")] if key == "rationale" else e.get("tors", [])):
+                if t in deleting:
+                    problems.append(f"plan {key}: {t} is being superseded or retired")
+    for e in plan["supersede"]:
+        problems += [f"plan supersede: successor {s} is itself being removed" for s in e.get("successors", [])
+                     if s in deleting]
+    if problems:
+        raise DataError(problems)
+
+    taken = {r.id[3:] for r in p.records}
+    records: list[dict] = []
+    common = {"approved_via": "migration", "approved_by": approver}
+
+    def source_of(e: dict) -> str:
+        parts = []
+        for s in e.get("sources", []):
+            it = by_id.get(s)
+            first = it.summary if it else ""
+            parts.append(f"{s}: {first}" if first else s)
+        return "; ".join(parts) or "git history"
+
+    def refs_of(e: dict, extra: list[str] = ()) -> list[str]:
+        shas = list(extra)
+        for s in e.get("sources", []):
+            if s in by_id and (sha := _note_commit(root, by_id[s])):
+                shas.append(sha)
+        return list(dict.fromkeys(f"commit {s[:12]}" for s in shas)) + [r for r in e.get("refs", []) if isinstance(r, str)]
+
+    def new_record(kind: str, e: dict, changes: list[dict], extra_refs: list[str] = (), **fields) -> dict:
+        suffix = _new_suffix(taken)
+        data = {"id": f"CR-{suffix}", "date": today, "kind": kind, "title": e["title"].strip(),
+                "reason": e["reason"].strip(), **fields, **common, "refs": refs_of(e, extra_refs)}
+        if kind in ("supersede", "retire", "pending"):
+            data["keywords"] = [k.strip() for k in e["keywords"]]
+        if kind == "retire":
+            data["removal"] = e["removal"]
+        data["migration_source"] = source_of(e)
+        data["changes"] = changes
+        return data
+
+    texts: dict[str, str] = {}  # feature file name -> current text (edited in memory)
+
+    def current_text(name: str) -> str:
+        if name not in texts:
+            texts[name] = (root / REQ_DIR / name).read_text(encoding="utf-8")
+        return texts[name]
+
+    def old_version(tor: str) -> tuple[str, str, str]:
+        """(feature file, fingerprint, verbatim block) as the requirement last read."""
+        if tor in p.live:
+            req = p.live[tor]
+            return req.feature_file, req.fingerprint, scenario_block(current_text(req.feature_file), tor) or ""
+        sha, path = tv.last[tor]
+        text = show_at(root, sha, path) or ""
+        fp = next(x.fingerprint for x in parse_requirements(text) if x.tor == tor)
+        return Path(path).name, fp, scenario_block(text, tor) or ""
+
+    tracing_entries: dict[str, dict] = {}
+    for path in tracing_files(root):
+        for entry in load_tracing(path).get("requirements", []):
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                tracing_entries.setdefault(entry["id"], entry)
+
+    # Supersede and retire: requirements already retired in prose, or deleted before 3.0.
+    for key in ("supersede", "retire"):
+        for e in plan[key]:
+            changes, extra = [], []
+            for t in e["tors"]:
+                if t in p.gone and t not in p.live:
+                    continue  # already recorded (a re-run)
+                ff, fp, block = old_version(t)
+                ch = {"tor": t, "feature_file": ff, "fingerprint": fp}
+                if key == "supersede":
+                    ch["successors"] = list(e["successors"])
+                else:
+                    ch["traced_to"] = _traced_to(tracing_entries.get(t))
+                ch["text"] = block
+                changes.append(ch)
+                if t in removed_ids:
+                    extra.append(removed_ids[t]["sha"])
+            if changes:
+                records.append(new_record(key, e, changes, extra))
+
+    # Pending: open change-control prose becomes a dispute.
+    open_named = {t for r in p.open_pending for t in r.tors}
+    for e in plan["pending"]:
+        tors = [t for t in e["tors"] if t not in open_named]
+        if not tors:
+            continue
+        fields = {"owner": (e.get("owner") or approver).strip()}
+        if isinstance(e.get("tracker"), str) and e["tracker"].strip():
+            fields["tracker"] = e["tracker"].strip()
+        changes = [{"tor": t, "feature_file": p.live[t].feature_file, "fingerprint": p.live[t].fingerprint}
+                   for t in tors]
+        records.append(new_record("pending", e, changes, **fields))
+
+    # Historical rewords: one record per trunk commit (and history entry) that edited requirements.
+    reasons = {t: e for e in plan["history"] for t in e["tors"]}
+    groups: dict[tuple[str, int], list[dict]] = {}
+    for ev in scan.edits:
+        e = reasons.get(ev["tor"])
+        groups.setdefault((ev["sha"], id(e) if e else 0), []).append(ev)
+    for (sha, _), evs in groups.items():
+        subject = evs[0]["subject"]
+        if subject.startswith("Merge") and evs[0]["subject"] != "working tree":
+            inner = git(root, "log", "-1", "--no-merges", "--format=%s", f"{sha}^1..{sha}", "--",
+                        f"{REQ_DIR}/*.feature.md", check=False).strip()
+            subject = inner or subject
+        e = reasons.get(evs[0]["tor"]) or {
+            "title": f"Edited in place before 3.0: {subject}"[:200],
+            "reason": f"Recorded by the 3.0 migration from git history (commit {sha[:12]}, {evs[0]['date']}). "
+                      "No note in the feature files explained this edit."}
+        rec = new_record("reword", {**e, "sources": e.get("sources", [])},
+                         [{"tor": ev["tor"], "from": ev["from"], "to": ev["to"]} for ev in evs], [sha],
+                         equivalence=HISTORICAL_EQUIVALENCE, evidence={"commit": sha[:12], "result": "historical"})
+        if not e.get("sources"):
+            rec["migration_source"] = f"git {sha[:12]}"
+        records.append(rec)
+
+    # Validate everything before writing anything.
+    problems = []
+    for rec in records:
+        name = f"{rec['date'].isoformat()}-{rec['id'][3:]}.toml"
+        problems += [f"{rec['id']}: {x}" for x in validate_record(name, rec)]
+    if problems:
+        raise DataError(problems)
+    rows = [{"record": r["id"], "kind": r["kind"], "tors": [c["tor"] for c in r["changes"]], "title": r["title"],
+             "path": f"{CHANGES_DIR}/{r['date'].isoformat()}-{r['id'][3:]}.toml"} for r in records]
+    rationale = {e["tor"]: e["text"].strip() for e in plan["rationale"]}
+    rows += [{"record": None, "kind": "rationale", "tors": [t], "title": text, "path": None}
+             for t, text in rationale.items()]
+    rows += [{"record": None, "kind": "delete", "tors": [t], "title": "", "path": f"{REQ_DIR}/{p.live[t].feature_file}"}
+             for t in sorted(deleting)]
+    if not write:
+        return [{**r, "record": "new" if r["record"] else None, "path": None if r["record"] else r["path"]}
+                for r in rows]
+
+    for rec, row in zip(records, rows):
+        path = root / row["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(record_toml(rec), encoding="utf-8")
+    for t in sorted(deleting):
+        name = p.live[t].feature_file
+        texts[name] = delete_scenario(current_text(name), t,
+                                      [it for it in scan.prose if it.file == f"{REQ_DIR}/{name}"])
+        # later deletions in the same file re-scan the edited text
+        scan.prose = [it for it in scan.prose if it.file != f"{REQ_DIR}/{name}"] + scan_prose(
+            f"{REQ_DIR}/{name}", texts[name])
+    for name, text in texts.items():
+        path = root / REQ_DIR / name
+        if not parse_requirements(text):  # whole-file retirement: the file and its tracing go
+            path.unlink()
+            tracing = path.with_name(name.removesuffix(".md") + ".tracing.json")
+            if tracing.exists():
+                tracing.unlink()
+        else:
+            path.write_text(text, encoding="utf-8")
+    gone = {c["tor"] for r in records if r["kind"] in ("supersede", "retire") for c in r["changes"]}
+    for path in tracing_files(root):
+        data = load_tracing(path)
+        reqs = data.get("requirements", [])
+        new_reqs = []
+        for entry in reqs:
+            tid = entry.get("id") if isinstance(entry, dict) else None
+            if tid in gone:
+                continue
+            if tid in rationale:
+                entry = {k: v for k, v in entry.items() if k != "rationale"}
+                items = list(entry.items())
+                at = next((n + 1 for n, (k, _v) in enumerate(items) if k == "id"), 0)
+                items.insert(at, ("rationale", rationale[tid]))
+                entry = dict(items)
+            new_reqs.append(entry)
+        if new_reqs != reqs:
+            data["requirements"] = new_reqs
+            path.write_text(dump_tracing(data, path.read_text(encoding="utf-8")), encoding="utf-8")
+    bad = [f"{rel}: {x}" for rel, probs in validate_record_files(root, []) for x in probs]
+    if bad:
+        raise DataError(bad)
+    return rows
+
+
+def strip_feature_text(rel: str, text: str) -> tuple[str, int]:
+    """Remove strippable lifecycle prose; drop a banner left empty. Returns (text, lines removed)."""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    drop: set[int] = set()
+    for it in scan_prose(rel, text):
+        if not it.strip:
+            continue
+        a, b = it.line - 1, it.end - 1
+        drop.update(range(a, b + 1))
+        if it.kind != "banner" and a > 0 and not lines[a - 1].strip() and b + 1 < len(lines) and not lines[b + 1].strip():
+            drop.add(b + 1)
+    kept = [ln for i, ln in enumerate(lines) if i not in drop]
+    # A banner whose only text was a marker leaves two rules side by side: drop them.
+    out: list[str] = []
+    i = 0
+    while i < len(kept):
+        a, b = kept[i].strip(), kept[i + 1].strip() if i + 1 < len(kept) else ""
+        if a.startswith("#") and b.startswith("#") and RULE_LINE.match(a.lstrip("#").strip()) \
+                and RULE_LINE.match(b.lstrip("#").strip()):
+            i += 2
+            if i < len(kept) and not kept[i].strip() and out and not out[-1].strip():
+                i += 1
+            continue
+        out.append(kept[i])
+        i += 1
+    return "\n".join(out), len(lines) - len(out)
+
+
+def run_strip(root: Path) -> list[dict]:
+    """#20 Migration 5: notes out of feature files, `title`/`generated` out of tracing, title columns
+    out of every non-Complete spec. Refuses when any requirement's fingerprint or section would change."""
+    p = load_project(root)
+    rows = []
+    problems = []
+    for path in feature_files(root):
+        rel = _repo_relative(root, path)
+        old = Path(path).read_text(encoding="utf-8")
+        new, n = strip_feature_text(rel, old)
+        if new == old:
+            continue
+        before = [(x.tor, x.fingerprint, x.section) for x in parse_requirements(old)]
+        after = [(x.tor, x.fingerprint, x.section) for x in parse_requirements(new)]
+        if before != after:
+            changed = sorted({b[0] for b, a in zip(before, after) if b != a} | ({b[0] for b in before} ^ {a[0] for a in after}))
+            problems.append(f"{rel}: stripping would change {', '.join(changed) or 'the requirements'} — "
+                            "edit the prose by hand, then re-run")
+            continue
+        rows.append({"kind": "feature", "path": rel, "lines": n, "text": new})
+    for path in tracing_files(root):
+        data = load_tracing(path)
+        reqs = data.get("requirements", [])
+        titles = sum(isinstance(r, dict) and "title" in r for r in reqs)
+        if not titles and "generated" not in data:
+            continue
+        data.pop("generated", None)
+        data["requirements"] = [{k: v for k, v in r.items() if k != "title"} if isinstance(r, dict) else r for r in reqs]
+        rows.append({"kind": "tracing", "path": f"{REQ_DIR}/{path.name}", "lines": titles,
+                     "text": dump_tracing(data, path.read_text(encoding="utf-8"))})
+    for path in spec_paths(root):
+        epic = spec_epic_id(path.name)
+        if epic in p.sidecars and p.sidecars[epic].status == "Complete":
+            continue  # Complete specs are history
+        old = path.read_text(encoding="utf-8")
+        new = strip_anchor_titles(old, p.live)
+        if new != old:
+            rows.append({"kind": "spec", "path": path.relative_to(root).as_posix(), "lines": 0, "text": new})
+    if problems:
+        raise DataError(problems)
+    return rows
+
+
+def strip_sidecar_keys(text: str) -> str:
+    return "\n".join(ln for ln in text.split("\n")
+                     if not ((m := KEY_LINE.match(ln)) and not ln[:1].isspace() and m.group(1) in AD_HOC_KEYS))
+
+
+def cmd_migrate(args: argparse.Namespace, root: Path) -> int:
+    today = _today(args) or dt.date.today()
+    if args.action == "scan":
+        scan = scan_migration(root, args.base, today)
+        if args.json:
+            _print_json({"trunk": scan.trunk, "pending": scan.pending, "counts": scan.counts(),
+                         "prose": [{**it.__dict__, "id": it.id} for it in scan.prose],
+                         "tracing": scan.tracing, "specs": scan.specs, "sidecar_keys": scan.sidecar_keys,
+                         "edits": scan.edits, "removed": scan.removed,
+                         "seed": [{k: r[k] for k in ("epic", "tor", "fingerprint")} for r in scan.seed],
+                         "migration_source": scan.sources})
+        else:
+            for it in scan.prose:
+                print("\t".join(["prose" if it.strip else "kept", it.id, it.kind, it.tor or "—", it.summary]))
+            for t in scan.tracing:
+                print(f"tracing\t{t['path']}\ttitles: {t['titles']}{'; generated' if t['generated'] else ''}")
+            for s in scan.specs:
+                print(f"spec\t{s['path']}\t{s['epic']}\t{s['status']}")
+            for k in scan.sidecar_keys:
+                print(f"sidecar-key\t{k['source']}\t{k['value']}")
+            for e in scan.edits:
+                print(f"edit\t{e['tor']}\t{e['sha'][:12]}\t{e['date']}\t{e['subject']}")
+            for r in scan.removed:
+                print(f"removed\t{r['tor']}\t{r['feature_file']}\t{r['sha'][:12]}\t{r['date']}\t{r['subject']}")
+            for r in scan.seed:
+                print(f"seed\t{r['epic']}\t{r['tor']}")
+            for s in scan.sources:
+                print(f"migration-source\t{s}")
+            c = scan.counts()
+            print("pending: " + ", ".join(f"{k} {v}" for k, v in c.items() if v and k != "kept") if scan.pending
+                  else "satisfied")
+        return EXIT_FINDINGS if scan.pending else EXIT_OK
+    if args.action == "records":
+        if not args.plan:
+            raise DataError("migrate records needs the classification file: --plan <file>")
+        rows = apply_migration_records(root, load_plan(args.plan), args.base, today, args.write)
+        if args.json:
+            _print_json(rows)
+        else:
+            for r in rows:
+                print("\t".join([r["kind"], r["record"] or "—", ", ".join(r["tors"]), r["title"]]))
+        return EXIT_OK
+    if args.action == "strip":
+        rows = run_strip(root)
+    elif args.action == "sidecars":
+        rows = []
+        for path in sorted((root / STATUS_DIR).glob("epic-*.md")) if (root / STATUS_DIR).is_dir() else []:
+            old = path.read_text(encoding="utf-8")
+            new = strip_sidecar_keys(old)
+            if new != old:
+                gone = [ln.split(":", 1)[0] for ln in old.split("\n") if ln not in new.split("\n") and ln.strip()]
+                rows.append({"kind": "sidecar", "path": path.relative_to(root).as_posix(),
+                             "lines": len(gone), "keys": gone, "text": new})
+    else:  # finish
+        rows = []
+        for path in sorted((root / CHANGES_DIR).glob("*.toml")) if (root / CHANGES_DIR).is_dir() else []:
+            old = path.read_text(encoding="utf-8")
+            new = MIGRATION_SOURCE_LINE.sub("", old)
+            if new != old:
+                rows.append({"kind": "record", "path": f"{CHANGES_DIR}/{path.name}", "lines": 1, "text": new})
+    if args.write:
+        for r in rows:
+            (root / r["path"]).write_text(r["text"], encoding="utf-8")
+        if args.action == "finish":
+            bad = [f"{rel}: {x}" for rel, probs in validate_record_files(root, []) for x in probs]
+            if bad:
+                raise DataError(bad)
+    if args.json:
+        _print_json([{k: v for k, v in r.items() if k != "text"} for r in rows])
+    else:
+        for r in rows:
+            detail = (", ".join(r["keys"]) if "keys" in r else "title column" if r["kind"] == "spec" else
+                      f"{r['lines']} title(s)" + ("" if r["lines"] else ", generated") if r["kind"] == "tracing" else
+                      "migration_source" if r["kind"] == "record" else f"{r['lines']} line(s)")
+            print(f"{r['kind']}\t{r['path']}\t{detail}")
+    return EXIT_OK if args.write or not rows else EXIT_FINDINGS
+
+
 # --------------------------------------------------------------------------------------------
 # Commands
 # --------------------------------------------------------------------------------------------
@@ -1580,6 +2456,26 @@ def cmd_fingerprint(args: argparse.Namespace, root: Path) -> int:
         results = parse_files_at(root, args.rev, rels)
     else:
         results = parse_files(args.files or feature_files(root))
+    now = {tor: fp for scenarios in results for tor, _title, fp in scenarios}
+    if args.against:
+        try:
+            before = dict(row.split("\t")[:2] for row in Path(args.against).read_text(encoding="utf-8").splitlines()
+                          if row.strip())
+        except (OSError, ValueError) as exc:
+            raise DataError(f"--against {args.against}: expected `fingerprint` output ({exc})") from None
+        gone = {t: r for r in load_records(root) if r.kind in ("supersede", "retire") for t in r.tors}
+        bad = 0
+        for tor, fp in before.items():
+            if tor not in now:
+                rec = gone.get(tor)
+                bad += rec is None
+                print(f"{tor}\tremoved\t{rec.id if rec else 'no change record'}")
+            elif now[tor] != fp:
+                bad += 1
+                print(f"{tor}\tchanged\t{fp}\t{now[tor]}")
+        same = sum(1 for t, fp in before.items() if now.get(t) == fp)
+        print(f"identical\t{same}")
+        return EXIT_FINDINGS if bad else EXIT_OK
     for scenarios in results:
         for tor, _title, fp in scenarios:
             print(f"{tor}\t{fp}")
@@ -1641,14 +2537,52 @@ def _print_json(data) -> None:
 
 FINDING_HEADINGS = {
     "A": "A. Unrecorded change", "B": "B. Unrecorded removal", "C": "C. Dangling ID",
-    "D": "D. Changed since verified", "E": "E. Retired or superseded ID still cited", "F": "F. Housekeeping",
+    "D": "D. Changed since verified", "E": "E. Retired or superseded ID still cited", "F": "F. Housekeeping and disputes",
 }
 
 
+def finding_epic(project: Project, f: dict) -> str | None:
+    """The epic a finding belongs to: its own, else the epic that owns (or listed) its requirement."""
+    if f.get("epic"):
+        return f["epic"]
+    rec = (f.get("detail") or {}).get("record") if f.get("kind") == "removal-missing" else None
+    if rec:  # a retire with no removal epic belongs to the epic that built the retired requirement
+        tors = next((r.tors for r in project.records if r.id == rec), [])
+        owners = [s for s in project.sidecars.values() if any(t in s.requirements for t in tors)]
+        return min((s.epic for s in owners), default=None)
+    tor = f.get("tor")
+    if not tor:
+        return None
+    owners = project.owners(tor) or [s for s in project.sidecars.values() if tor in s.requirements]
+    return min((s.epic for s in owners), default=None)
+
+
+def epic_label(root: Path, epic: str) -> str:
+    """`<id> (<slug>) — <Name>` from the epic's spec (its file name and `# Epic <id>: <Name>` heading),
+    or the bare ID when there is no spec."""
+    spec = next(iter(sorted(root.glob(f"docs/implementation-plan/phase-*/epic-{epic}-*.md"))), None)
+    if spec is None:
+        return epic
+    label = f"{epic} ({spec.stem[len('epic-') + len(epic) + 1:]})"
+    heading = next((ln for ln in spec.read_text(encoding="utf-8").splitlines() if ln.startswith("# ")), "")
+    name = heading.split(":", 1)[1].strip() if ":" in heading else ""
+    return f"{label} — {name}" if name else label
+
+
 def cmd_check(args: argparse.Namespace, root: Path) -> int:
-    report = run_check(load_project(root, _today(args)), args.base)
+    project = load_project(root, _today(args))
+    report = run_check(project, args.base)
     if args.json:
         _print_json(report)
+    elif args.by_epic:
+        groups: dict[str | None, list[dict]] = {}
+        for f in report["findings"]:
+            groups.setdefault(finding_epic(project, f), []).append(f)
+        for epic in sorted(groups, key=lambda e: (e is None, e or "")):
+            rows = groups[epic]
+            print(f"Epic {epic_label(root, epic)} ({len(rows)})" if epic else f"No epic ({len(rows)})")
+            for f in rows:
+                print(f"  - {f['letter']}. {f['message']}")
     else:
         for letter, heading in FINDING_HEADINGS.items():
             rows = [f for f in report["findings"] if f["letter"] == letter]
@@ -1658,9 +2592,11 @@ def cmd_check(args: argparse.Namespace, root: Path) -> int:
                     mark = "[this branch, blocking] " if f["blocking"] else (
                         "[this branch] " if f["own_branch"] else "")
                     print(f"  - {mark}{f['message']}")
+    if not args.json:
         total = sum(report["counts"].values())
         scope = f" (branch since {report['merge_base'][:7]})" if report["merge_base"] else ""
-        print(f"{total} finding(s){scope}; {report['blocking']} blocking." if total
+        letters = ", ".join(f"{n} {k}" for k, n in report["counts"].items() if n)
+        print(f"{total} finding(s){scope} ({letters}); {report['blocking']} blocking." if total
               else f"No findings{scope}.")
     return EXIT_FINDINGS if report["findings"] else EXIT_OK
 
@@ -1783,8 +2719,6 @@ def cmd_format(args: argparse.Namespace, root: Path) -> int:
     print(f"verdict: {st.verdict}")
     print(f"project: {st.project}{'' if st.stamped else ' (no stamp)'}")
     print(f"plugin: {st.plugin}")
-    if st.verdict == "behind":
-        print(f"upgradable: {'yes' if st.upgradable else 'no'}")
     print(st.message)
     return EXIT_OK if st.verdict in ("current", "new") else EXIT_FINDINGS
 
@@ -1883,6 +2817,9 @@ def build_parser() -> argparse.ArgumentParser:
     fp = sub.add_parser("fingerprint", help="print TOR-ID<TAB>fingerprint per scenario")
     fp.add_argument("files", nargs="*", help=f"feature files (default: {REQ_DIR}/{FEATURE_GLOB})")
     fp.add_argument("--rev", help="read the files as they were at this commit")
+    fp.add_argument("--against", metavar="FILE",
+                    help="compare with an earlier `fingerprint` output; exit 1 when a surviving requirement "
+                         "changed or one disappeared without a change record")
     fp.set_defaults(func=cmd_fingerprint)
 
     ti = sub.add_parser("titles", help="print TOR-ID<TAB>current title (or what retired it)")
@@ -1892,6 +2829,7 @@ def build_parser() -> argparse.ArgumentParser:
     ch = sub.add_parser("check", help="health check: findings A-F (exit 1 when any)")
     ch.add_argument("--base", help="base branch; marks findings this branch introduced (since the merge base)")
     ch.add_argument("--json", action="store_true")
+    ch.add_argument("--by-epic", action="store_true", help="group the findings by epic (text output)")
     ch.add_argument("--today", help=argparse.SUPPRESS)
     ch.set_defaults(func=cmd_check)
 
@@ -1960,6 +2898,18 @@ def build_parser() -> argparse.ArgumentParser:
                        help="the version an owning Complete epic verified (matched by its saved fingerprint)")
     tx.add_argument("--json", action="store_true")
     tx.set_defaults(func=cmd_text)
+
+    mg = sub.add_parser("migrate", help="step 0002 (requirements lifecycle) mechanics; exit 1 when work is pending")
+    mg.add_argument("action", choices=("scan", "records", "strip", "sidecars", "finish"),
+                    help="scan: prerequisites + inventory (the detect); records: write the classified Change "
+                         "Records (--plan); strip: notes, tracing titles, spec title columns; sidecars: ad hoc "
+                         "keys; finish: drop migration_source from records")
+    mg.add_argument("--plan", help="records: the owner-approved classification (JSON)")
+    mg.add_argument("--base", help="base branch (default: develop, main, master)")
+    mg.add_argument("--write", action="store_true", help="apply (default: preview)")
+    mg.add_argument("--json", action="store_true")
+    mg.add_argument("--today", help=argparse.SUPPRESS)
+    mg.set_defaults(func=cmd_migrate)
 
     ve = sub.add_parser("version", help="print the interpreter and the project format this plugin writes")
     ve.set_defaults(func=cmd_version)
