@@ -32,6 +32,8 @@ sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format
 
 Record the first line, `verdict: <word>`, and the exit code. Exit 3 means no suitable Python:
 print its output and stop. Exit 2 means the stamp is unreadable: print its output and stop.
+Exit 1 is not an error here — it is how `format` reports `behind`, `ahead`, and
+`not-peak-workflow`; Step 2 routes on the verdict.
 
 ### 1.2 — Existing code
 
@@ -56,8 +58,7 @@ The stamp decides — no file heuristics:
 |---|---|
 | `new` | **GREENFIELD** |
 | `current` | **EXISTING PEAK-WORKFLOW** |
-| `behind`, `upgradable: yes` | **UPGRADE FIRST** |
-| `behind`, `upgradable: no` | **WAIT FOR A LATER BUILD** — print the `format` message and end |
+| `behind` | **UPGRADE FIRST** |
 | `ahead` | **UPDATE THE PLUGIN** |
 | `not-peak-workflow` | **NOT A PEAK-WORKFLOW LAYOUT** |
 
@@ -66,7 +67,7 @@ Print the verdict with what was observed:
 ```
 ## Project State Detection
 
-Verdict: <GREENFIELD | EXISTING PEAK-WORKFLOW | UPGRADE FIRST | WAIT FOR A LATER BUILD | UPDATE THE PLUGIN | NOT A PEAK-WORKFLOW LAYOUT>
+Verdict: <GREENFIELD | EXISTING PEAK-WORKFLOW | UPGRADE FIRST | UPDATE THE PLUGIN | NOT A PEAK-WORKFLOW LAYOUT>
 
 Signals observed:
 - Format: <project format, or "no stamp"> (this plugin: <plugin format>)
@@ -168,7 +169,7 @@ On confirm, invoke:
 Skill({ skill: "peak-workflow:upgrade", args: "" })
 ```
 
-### Verdict: WAIT FOR A LATER BUILD, UPDATE THE PLUGIN, or NOT A PEAK-WORKFLOW LAYOUT
+### Verdict: UPDATE THE PLUGIN or NOT A PEAK-WORKFLOW LAYOUT
 
 Print the `format` command's message and end. Dispatch nothing.
 

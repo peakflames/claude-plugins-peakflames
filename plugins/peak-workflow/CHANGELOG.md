@@ -79,6 +79,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   pending record it closes.
 - **Wrapup Removal gate** — a removal epic passes only with zero `sweep` hits for its retired IDs,
   the named code gone, and its guard requirements passing.
+- **Upgrade step 0002 requirements-lifecycle** — turns 2.1-era notes, markers, and ad hoc sidecar
+  keys into migration Change Records at one owner-approved table, strips notes and titles with
+  fingerprints proven identical, seeds `verified:`, and reports `check` grouped by epic. One commit
+  per phase.
+- **Helper command `migrate`** — step 0002's mechanics: `scan` (prerequisites, prose inventory, the
+  detect), `records --plan` (writes the classified records; every pre-3.0 edit becomes a historical
+  reword), `strip`, `sidecars`, and `finish`.
+- **`fingerprint --against`, `check --by-epic`** — compare fingerprints with an earlier run
+  (survivors identical, removals recorded); group findings under the epic that owns them.
 
 ### Changed
 
@@ -147,6 +156,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `Modified` and `Removed` changelog rows are mandatory when a capability changes; `Pending`
   rows carry undecided changes.
 
+- **Pre-3.0 edits flagged for a decision** — a requirement changed since verified whose edit only a
+  migration reword explains lists `historical_records`; `check` and `status` ask whether its
+  meaning changed before suggesting reverify.
+- **Duplicate sidecar keys rejected** — a key written twice (e.g. two `owner:` lines after a clean
+  merge) is a data error naming both lines.
+- **`capture-requirements <TOR-ID>` on a disputed, edited requirement** — four options (no Uphold
+  over an unrecorded edit); a supersede or reword asks whether it settles the dispute and carries it
+  to the successor when not. Greenfield context checks are skipped in this mode.
+- **`/upgrade` reaches format 2** — this build ships every step `PLUGIN_FORMAT` needs, so a behind
+  project is always upgradable; the interim "later build" messages and `format`'s `upgradable:`
+  line are gone. A step may commit per phase and add a Report to the final message.
+
 ### Removed
 
 - **BREAKING: `migrate-2.5` and `migrate-from-epic-workflow`** are deleted, along with
@@ -157,6 +178,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Plugin rules for scripts and upgrade steps** — `scripts/` holds deterministic mechanics;
   upgrade steps are forward-only and append-only; TOR IDs are never reused and a meaning change
   takes a new ID; major releases ship an upgrade step and bump the project format.
+- **Contributor acceptance kit** — `docs/uat/lifecycle-acceptance.md` and the redacting runner
+  `tests/peak-workflow/acceptance/run.py` (`baseline` / `after`): counts, IDs, finding letters, and
+  timings from a real project, never requirement text.
 
 ---
 

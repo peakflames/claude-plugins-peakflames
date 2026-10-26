@@ -128,5 +128,35 @@ class Plan7FixtureTests(unittest.TestCase):
         self.git("checkout", "-q", "develop")
 
 
+class Plan8FixtureTests(unittest.TestCase):
+    """The Plan 8 "Project A-like" fixture: a format-0 2.1 project holding everything step 0002 migrates."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan8-"))
+        cls.root = cls.tmp / "fx"
+        subprocess.run([sys.executable, str(BUILDER.with_name("plan8_project_a.py")), str(cls.root)],
+                       check=True, capture_output=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_format_0_with_every_migration_input(self):
+        result = run(self.root, "format")
+        self.assertIn("project: 0 (no stamp)", result.stdout)
+        scan = json.loads(run(self.root, "migrate", "scan", "--json", "--base", "develop").stdout)
+        self.assertEqual(scan["counts"], {"prose": 9, "kept": 0, "tracing": 3, "specs": 4, "sidecar_keys": 1,
+                                          "edits": 2, "removed": 1, "seed": 11, "migration_source": 0})
+        kinds = sorted(p["kind"] for p in scan["prose"])
+        self.assertEqual(kinds, ["banner", "comment", "marker", "marker", "marker", "marker", "marker", "note", "note"])
+        self.assertEqual({e["tor"] for e in scan["edits"]}, {"TOR-01-Pre0001", "TOR-02-Wrd0001"})
+        self.assertEqual([r["tor"] for r in scan["removed"]], ["TOR-03-Csv0001"])
+        self.assertEqual([k["key"] for k in scan["sidecar_keys"]], ["superseded_by"])
+        check = json.loads(run(self.root, "check", "--json").stdout)
+        self.assertIn("Epic cExp03 lists 'TOR-24 set'", "\n".join(f["message"] for f in check["findings"]))
+        self.assertEqual(run(self.root, "provenance").returncode, 1)  # step 0001 has work too
+
+
 if __name__ == "__main__":
     unittest.main()

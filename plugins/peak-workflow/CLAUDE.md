@@ -26,7 +26,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `status` | Read-only dashboard — phase progress + Requirements Coverage |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
-| `upgrade` | Bring a project's files to this plugin's format — numbered steps, one commit each |
+| `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
 
 ## Key Design Invariants
 
@@ -181,7 +181,8 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
 - `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
   templates. They are **forward-only and append-only**: a shipped step is never edited; a
   correction is a new step. Each step starts with a detect check (so re-running is harmless) and
-  is applied as one commit, `chore(upgrade): step NNNN <name>`
+  is applied as one commit, `chore(upgrade): step NNNN <name>` — or, when its **Commits** line says
+  so, one commit per phase (`… — <phase>`) with the last phase committed together with the stamp
 - Template files (`PLAN_TEMPLATE.md`, `HANDOFF_TEMPLATE.md`, etc.) live alongside SKILL.md in the skill directory
 - Sibling template files are referenced by path in SKILL.md; Claude Code makes them available at skill load time
 - `references/` holds the three stack sheets (Bun static SPA, Bun web, Bun + Electron desktop).

@@ -121,6 +121,13 @@ current format.
    or indicator on a device. Automated tests still cover everything they can; the tag routes only
    the unobservable part to a person in `wrapup-epic`.
 
+**TOR-ID mode** (the first word of `$ARGUMENTS` is a TOR ID — Step 2) amends one existing
+requirement and derives nothing new: skip item 1's two missing-section questions (no baseline TORs
+are derived), and read the vision and ConOps in items 2–3 only as context for L3 and the
+vision/ConOps rewrite in 3C — a missing or thin one is not a stop. If any stop ends this mode
+before a file changed and Step 0 created the branch, run `git checkout <base>` and
+`git branch -D docs/amend-<tor-id>`.
+
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
    already in context. Specifically capture, if present:
@@ -282,7 +289,8 @@ On Reintroduce, the new requirement gets a **new ID** (never the old one) and it
 list it under the summary's Coverage Gaps as `dropped — <CR-ID> stands`. A hit on a `pending`
 record printed `pending (closed by CR-…)` is settled — the closing record is the decision; ask
 about that one. An open `pending` hit means the requirement is still live and known wrong: resolve it with Step 3C instead of
-adding a second one. A hit on an `uphold` record means the requirement was disputed and kept as
+adding a second one — except in Step 3C itself, where a hit on the pending record of the
+requirement being amended is already decided by 3C's settle question; skip it. A hit on an `uphold` record means the requirement was disputed and kept as
 written: a new requirement that contradicts it changes that decision — name the record in the
 question.
 
@@ -676,7 +684,7 @@ Example valid IDs: `TOR-01-Afs657G`, `TOR-02-Xyz5678`, `TOR-01-Bcd2345`
 ### 3A.4: Write Feature Files
 
 For each functional area, write `docs/requirements/{NN}-{short-name}.feature.md` following
-the template at `plugins/peak-workflow/skills/capture-requirements/FEATURE_TEMPLATE.md`.
+the template at `${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/FEATURE_TEMPLATE.md`.
 
 Create the directory if it does not exist: `mkdir -p docs/requirements/`
 
@@ -687,7 +695,7 @@ After all feature files are written, invoke a Haiku sub-agent using the `Agent` 
 
 > Read every `.feature.md` file in `docs/requirements/`. For each, produce a corresponding
 > `.feature.tracing.json` sidecar following the template at
-> `plugins/peak-workflow/skills/capture-requirements/TRACING_TEMPLATE.md`. The sidecar has
+> `${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/TRACING_TEMPLATE.md`. The sidecar has
 > exactly one entry per `Scenario:` in its feature file — trace only those IDs, never read
 > `docs/requirements/changes/`, and never write a `title` field or a top-level `generated` key.
 > Keep any existing `rationale` value exactly as it is and never write one yourself. For each TOR
@@ -871,9 +879,17 @@ greenfield files.
    A requested change with no description: stop and ask for one
    (`/peak-workflow:capture-requirements <TOR-ID> <what should change>`). A requirement that is
    not merged (L1) is edited freely — apply the description and skip to Step 5.
-   When a requirement in the first two cases also has an open `pending` record, add `Uphold` to
-   step 4's options and list the pending record's ID in the `refs` of any record written; a
-   Restore writes no record, so say the dispute stays open (`Uphold` then closes it).
+   When a requirement in the first two cases also has an open `pending` record, drop `Record as
+   pending` from step 4's options (it is already pending) and do not offer `Uphold` — an uphold
+   keeps today's text, which would endorse the unrecorded edit. A Restore writes no record, so say
+   the dispute stays open: once the restore merges, `/peak-workflow:capture-requirements <TOR>`
+   reaches the Disputed case, where Uphold closes it. After a
+   Supersede or Reword, ask `"Does this change settle <CR-ID> (<its title>)?"` —
+   `["Yes — it settles it", "No — the dispute still stands"]`. Yes: the new record's `refs` lists
+   the pending record's ID. No: the new record does not ref it; also write a renewed `pending`
+   record on the requirement that now carries the dispute (the successor for a supersede, the same
+   ID for a reword) that refs the open one, copies its title, keywords, owner, and `tracker`, and
+   keeps its reason with `Carried to <successor> by <new CR-ID>.` appended.
 4. **Decide.** For **Disputed**, ask the owner question below first and run L3 only after
    `Change it`. Otherwise run the decision test (L3) on old vs new, then ask the L5 question with the
    "The requirement's text should change" row — and, for the first two cases, with these four
@@ -891,9 +907,12 @@ greenfield files.
    record that refs the open one, with a fresh reason.
 5. **Apply** the answer per L5, with these specifics:
    - **Changed since verified / Edited without a record:** the *old* text is the verified (or
-     merged) version, not today's text. With no description, draft the record's `reason` from
-     the commit that made the unrecorded edit
-     (`git log --format='%h %s' <merged_commit>..HEAD -- docs/requirements/<feature file>`) and
+     merged) version, not today's text. When the state row has `historical_records` (an edit
+     before 3.0, recorded by the upgrade), the new record's `refs` lists them and, with no
+     description, its `reason` starts from theirs. Otherwise, with no description, draft the
+     record's `reason` from the commit that made the unrecorded edit — for Changed since
+     verified, `<merged_commit>` is the `commit` from step 3's `text --verified --json`
+     (`git log --no-merges --invert-grep --grep='^chore(upgrade)' --format='%h %s' <merged_commit>..HEAD -- docs/requirements/<feature file>`) and
      show it in the L5 question so the user can correct it. A supersede gives today's block (with any described
      change) the new ID in place and writes the record with the old text and its fingerprint
      from step 3; the owning Complete epic keeps the old ID. A reword records `from` = the old
@@ -1006,7 +1025,8 @@ epic's spec or sidecar to make a finding go away.
 
 ## Step 5: Quality Checks
 
-Before presenting the summary, verify:
+Before presenting the summary, verify (in TOR-ID mode only the ID-format, Lifecycle Rules,
+tracing-sidecar, and `validate` / `check` items apply — nothing new was derived):
 
 - [ ] Every TOR ID follows the format `TOR-{NN}-{XXXXXXX}` where `{NN}` matches the feature
   file's numeric prefix.
