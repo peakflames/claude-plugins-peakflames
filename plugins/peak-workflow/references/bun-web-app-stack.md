@@ -2305,7 +2305,7 @@ Each of these is already handled by the configuration above.
 | Trusting client-reported size | Client lies about `size`, quota bypass. | `complete` step verifies with `s3.stat` (6.4). |
 | Orphaned S3 objects | Client gets a slot but never PUTs. | `status: pending` rows; a cron deletes pending rows and objects older than 24 h. |
 | Presigned URL host mismatch locally | Browser cannot reach `s3:9000`. | `S3_PUBLIC_ENDPOINT` with a separate presigning client (8.2). |
-| Missing CORS on bucket | Browser PUT to S3 blocked. | `mc admin config set ... cors_allow_origin` locally; bucket CORS rule in AWS (8.2). |
+| Missing CORS on bucket | Browser PUT to S3 blocked. | `s3-init` runs `put-bucket-cors` locally; the same rule on the AWS bucket (8.2). |
 | Unsafe object keys | Path traversal or collisions from user filenames. | Sanitized key under `users/<id>/attachments/<uuid>/` (5.4). |
 | Content type allowlist | Executable or HTML uploads served from your origin. | Zod enum of allowed MIME types; bucket is private (6.4). |
 | Provider secrets required everywhere | Tests and compose crash without Google or Microsoft credentials. | Provider variables optional (5.1); each provider on only when its credentials are set (6.3). |
