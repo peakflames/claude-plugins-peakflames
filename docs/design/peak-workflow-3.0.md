@@ -252,9 +252,12 @@ proposal + addendum). Every plan reads this file first and updates it last.
   specs no longer carry — both are deleted in those plans. **For Plan 8:** step 0002 strips the
   title column from every non-Complete spec (Not Started, In Progress, Paused, Implemented), not
   only Not Started / In Progress.
-- **Left alone** (pre-existing): plan-project Step 7 adds a "Design & Planning Documents" section
-  to the user's `CLAUDE.md` when missing, which conflicts with the plugin rule "No skill or step
-  edits the user's `CLAUDE.md`" — reconcile in Plan 9. pause commits on whatever branch is checked
+- **`CLAUDE.md` document links (owner decision):** setup's Peak Workflow section now links the
+  vision and ConOps too; plan-project Step 7 stays as the fallback for projects set up earlier,
+  adds only a missing link to whichever section holds the others, and never a second section. The
+  plugin rule now reads "No upgrade step edits the user's `CLAUDE.md`" and names the skills that
+  may add to it.
+- **Left alone** (pre-existing): pause commits on whatever branch is checked
   out; refresh-docs has no Key Files fallback and does not mark decisions about retired behavior.
   Text-mode `states` omits `removal_epics`; check F's removal-missing message names only `/add`.
 - **Q13 dry-run:** `tests/peak-workflow/dryrun/plan5_states.py` (orders app grown to every derived

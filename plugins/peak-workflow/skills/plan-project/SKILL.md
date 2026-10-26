@@ -825,7 +825,9 @@ and so future `/start-epic` and `/wrapup-epic` sessions can cross-reference whic
 
 ## Step 7: Update CLAUDE.md References
 
-Check whether `CLAUDE.md` has a "Design & Planning Documents" section (or similar) that references the vision, ConOps, and requirements files.
+Check whether `CLAUDE.md` references the vision, ConOps, and requirements files — in setup's
+"Peak Workflow" section or a "Design & Planning Documents" section. `setup` normally writes these
+links; this step is the fallback for a project set up before it did, so it runs on every plan.
 
 - **If missing:** Add a section pointing to the documents:
   ```markdown
@@ -835,7 +837,7 @@ Check whether `CLAUDE.md` has a "Design & Planning Documents" section (or simila
   - [Concept of Operations](docs/product-vision-planning/concept-of-operations.md)
   - [Requirements Baseline](docs/requirements/) — TOR feature files and tracing sidecars
   ```
-- **If present:** Verify the links are correct. Add the requirements link if not already present. Update any stale paths.
+- **If present** (in either section): Verify the links are correct. Add only a missing link, in the section that already holds the others. Update any stale paths. Never add a second section.
 
 Do NOT perform a full CLAUDE.md audit — that is `/peak-workflow:setup`'s job. Only add or verify the document references.
 

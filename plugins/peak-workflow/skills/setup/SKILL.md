@@ -794,6 +794,9 @@ touches user data.
 ```
 
 **Peak Workflow** (if missing) — **default, no questions**:
+- Product vision: `docs/product-vision-planning/product-vision.md` and concept of operations:
+  `docs/product-vision-planning/concept-of-operations.md` — written by `/peak-workflow:discover`
+  (link them even before they exist; `plan-project` Step 7 reads this section)
 - Requirements baseline: `docs/requirements/`
 - Implementation plan: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard
 - List the peak commands: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
