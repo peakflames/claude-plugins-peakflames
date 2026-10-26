@@ -16,13 +16,13 @@ You are implementing a small fix via the lightweight quick-fix path. Unlike `/pe
 
 The user's request: $ARGUMENTS
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 

@@ -6,14 +6,13 @@ Requirements-driven development lifecycle in the spirit of DO-330 TQL-5. Formal
 Gherkin-style TOR requirements (`TOR-NN-XXXXXXX`) are the single source of truth —
 epics implement them, tests derive from Given/When/Then, wrapup verifies against them.
 
-Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
-`/peak-workflow:migrate-from-epic-workflow` to migrate an existing epic-workflow project.
+Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflow projects.
 
 ## Skill Inventory
 
 | Skill | Purpose |
 |-------|---------|
-| `new-project` | Front-door router — detects project state and dispatches to the right entry point |
+| `new-project` | Front-door router — routes on the format stamp and dispatches to the right entry point |
 | `setup` | Audit CLAUDE.md — ask only what the user alone knows, default the rest behind one confirmation; stub architecture/design-notes docs (run once before discover) |
 | `discover` | Adaptive interview → product-vision.md + concept-of-operations.md |
 | `mockup` | UI projects only — screen inventory (`S-NN`), per-scenario flows, grayscale wireframes; concretizes ConOps steps |
@@ -27,8 +26,7 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 | `status` | Read-only dashboard — phase progress + Requirements Coverage |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch, no TOR changes |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
-| `migrate-2.5` | One-shot migration from legacy index.md layout |
-| `migrate-from-epic-workflow` | One-shot migration from an epic-workflow project to peak-workflow |
+| `upgrade` | Bring a project's files to this plugin's format — numbered steps, one commit each |
 
 ## Key Design Invariants
 
@@ -43,15 +41,23 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
-**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an optional `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup
+**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup
 
 **Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
 ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by
-`plan-project` and `add`); older specs show `—` — no git-history fallback. `status` fetches and warns when the base is behind origin, shows what teammates
+`plan-project` and `add`; upgrade step 0001 backfills older specs from git, `—` where git cannot tell). `status` fetches and warns when the base is behind origin, shows what teammates
 changed since the user's own last commit, lists ready epics as a table, and **never picks among
 several ready epics**. `start-epic` pulls the base, then shows an epic card (with `⚑` lines for a
 teammate's epic, phase, owner, or existing origin branch) and confirms before creating the branch,
 and removes an empty branch left by a rejected plan.
+
+**Format stamp and guard:** `docs/.peak-workflow.toml` holds `format = N` (written by `setup` on a
+new project, moved forward only by `upgrade`; missing = format 0) and `[lifecycle]
+disputed_threshold_days`. Every skill starts with one Format Guard, `tor-lifecycle format`:
+writing skills stop unless the project is current (or new); `status` and `triage` run degraded
+with a banner when it is behind; `new-project` routes to `upgrade`. After the guard, skills read
+only the current format — no reader fallbacks for older ones. No skill or step edits the user's
+`CLAUDE.md`.
 
 **Branch families:**
 - `docs/{task-short-name}` — full planning sequence (discover → mockup [UI] → capture-requirements → plan-project)

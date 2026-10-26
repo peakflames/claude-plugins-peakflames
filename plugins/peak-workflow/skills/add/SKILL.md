@@ -17,13 +17,13 @@ baseline — not prose checkboxes.
 
 The user's request: $ARGUMENTS
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 
@@ -135,13 +135,13 @@ LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7
 
 The `LC_ALL=C` prefix is required for portability — without it, BSD `tr` (macOS) can emit "Illegal byte sequence" on non-UTF8 bytes from `/dev/urandom`.
 
-Validate each ID: if the 7-char string contains only digits, regenerate (this prevents ambiguity with the legacy integer format). If adding multiple epics in a single invocation, ensure uniqueness across the batch.
+Ensure each ID is unique across the batch and the existing plan.
 
 If the user tried to specify an ID or number up front (e.g., "as Epic 6.6"), politely override:
 
-> Epic IDs are now auto-generated random 7-character strings; this new epic will be `<generated-id>`. The phase you chose will be honored.
+> Epic IDs are auto-generated random 7-character strings; this new epic will be `<generated-id>`. The phase you chose will be honored.
 
-Do not attempt to slot new epics into the old decimal scheme (e.g., `6.7`, `6.8`). With random IDs, there's no "insert between X and Y" concept — epics are appended at the bottom of their phase block in the index.
+With random IDs there is no "insert between X and Y" — epics are appended at the bottom of their phase block in the index.
 
 ## Step 3: Determine Dependencies
 
@@ -261,7 +261,7 @@ Before writing each spec, verify:
    ```
    | {id} | [{Name}](epic-{id}-{kebab-name}.md) | {dep-id-1}, {dep-id-2} |
    ```
-   Use `—` in the Dependencies column if the epic has no dependencies. Use the epic ID verbatim (7-char alphanumeric or legacy integer).
+   Use `—` in the Dependencies column if the epic has no dependencies. Use the epic ID verbatim.
 
 2. **Status sidecar** — create `docs/implementation-plan/status/epic-{id}.md` with exactly these six lines
    (`owner:` stays `—` until `/peak-workflow:start-epic` sets it):

@@ -10,24 +10,24 @@
               ┌─────────────┴─────────────┐
               │                           │
               ▼                           ▼
-       No (greenfield)             Yes (brownfield)
+       No (greenfield)          Yes — on peak-workflow
               │                           │
               ▼                           ▼
-    /peak-workflow:setup       Was it built with epic-workflow?
+    /peak-workflow:setup        older format? → /peak-workflow:upgrade
               │                           │
-              ▼                  ┌────────┴────────┐
-          /discover              ▼                 ▼
-              │                 Yes          No (already
-              ▼                  │           peak-workflow
-      /mockup (UI apps)          ▼           or different)
-              │            /peak-workflow:         │
-              ▼            migrate-from-           │
-    /capture-requirements  epic-workflow           │
-              │                  │                 │
-              ▼                  │                 ▼
-        /plan-project            │         /triage  or  /status
-              │                  │                 │
-              ▼                  ▼                 ▼
+              ▼                           ▼
+          /discover               /triage  or  /status
+              │                           │
+              ▼                           │
+      /mockup (UI apps)                   │
+              │                           │
+              ▼                           │
+    /capture-requirements                 │
+              │                           │
+              ▼                           │
+        /plan-project                     │
+              │                           │
+              ▼                           ▼
          iterate via /start-epic / /wrapup-epic / /quick-fix
 ```
 
@@ -54,8 +54,7 @@
 
 ## Brownfield — existing project, no peak-workflow yet
 
-If your project pre-dates peak-workflow but was **not** built with epic-workflow, run the
-greenfield path in **brownfield mode**: `/discover` and `/capture-requirements` both detect
+If your project pre-dates peak-workflow, run the greenfield path in **brownfield mode**: `/discover` and `/capture-requirements` both detect
 that vision/ConOps and TOR files already exist (or don't) and adapt accordingly.
 
 ```
@@ -67,27 +66,19 @@ that vision/ConOps and TOR files already exist (or don't) and adapt accordingly.
 /peak-workflow:start-epic <id>       → implement new epics
 ```
 
-## Migration from epic-workflow
+## Upgrading an existing project
 
-If your project was built with `epic-workflow` (epic specs use `## Acceptance Criteria`,
-no `docs/requirements/*.feature.md` files), run the one-shot migration:
+Each project records the format of its peak-workflow files in `docs/.peak-workflow.toml`
+(`setup` writes it; a project without one is on format 0). When a plugin update needs a newer
+format, every command stops and points to:
 
 ```
-/peak-workflow:migrate-from-epic-workflow
+/peak-workflow:upgrade
 ```
 
-The skill is non-destructive, atomic (single revertable commit), and idempotent:
-
-1. **Derives a TOR requirements baseline** from existing vision/ConOps and epic acceptance
-   criteria (hybrid strategy — ConOps-first, refined by epic content).
-2. **Transforms Not-Started epic specs** from Acceptance Criteria format to Requirements
-   Anchors format.
-3. **Updates all status sidecars** with the `requirements:` field.
-4. **Updates CLAUDE.md** to reference peak-workflow commands.
-5. **Lands everything in one commit** — `git revert HEAD` rolls the migration back.
-
-In-Progress, Paused, Implemented, and Complete epics are left untouched and their sidecars
-get `requirements: —`.
+It applies numbered, forward-only steps on a `docs/upgrade-format-N` branch, one commit per step,
+shows each step before applying it, and warns about feature branches in flight that touch the
+files a step rewrites. `status` and `triage` still run, with a banner, while a project is behind.
 
 ## Philosophy
 
@@ -100,8 +91,7 @@ The formal requirements baseline lives in Gherkin-style `.feature.md` files with
 
 > **On ceremony overhead:** the discover → requirements → planning sequence amortizes as the
 > project grows — every new request routes through `/triage`, which tells you whether it needs
-> new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL). For a
-> one-off script, `epic-workflow` may be a better fit.
+> new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL).
 
 ### Vertical slices — one capability per epic
 
@@ -209,8 +199,8 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 
 | Command | Purpose |
 |---|---|
-| `/new-project` | **Front door for newcomers.** Detects project state (greenfield, brownfield epic-workflow, or existing peak-workflow) and dispatches to the right entry point. Writes no state files. |
-| `/setup` | Audits `CLAUDE.md` (Project Overview, Product shape, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, installs the shadcn skills and MCP server on shadcn stacks, recommends companion skills, creates `develop`, and offers to publish to GitHub. **Run once per project, before `/discover`** (re-run to pick up new sections). |
+| `/new-project` | **Front door for newcomers.** Reads the format stamp (fresh project, existing peak-workflow project, or one that needs `/upgrade`) and dispatches to the right entry point. Writes no state files. |
+| `/setup` | Audits `CLAUDE.md` (Project Overview, Product shape, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, writes the format stamp `docs/.peak-workflow.toml` and checks for Python 3.11+, installs the shadcn skills and MCP server on shadcn stacks, recommends companion skills, creates `develop`, and offers to publish to GitHub. **Run once per project, before `/discover`** (re-run to pick up new sections). |
 
 ### Plan
 
@@ -244,12 +234,11 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 |---|---|
 | `/refresh-docs` | Refresh `architecture.md` + `design-notes.md` to match the as-built codebase |
 
-### Migrate
+### Upgrade
 
 | Command | Purpose |
 |---|---|
-| `/migrate-2.5` | One-shot migration from the legacy single-`index.md` layout to per-phase indexes + status sidecars |
-| `/migrate-from-epic-workflow` | One-shot migration from an epic-workflow project — derives TOR baseline, transforms Not-Started specs, updates sidecars and CLAUDE.md |
+| `/upgrade` | Brings an older project's files to this plugin's format — numbered steps, each previewed, one commit per step on a `docs/upgrade-format-N` branch |
 
 ## Choosing a Path
 
@@ -261,10 +250,10 @@ flowchart TD
     Start[New project /<br/>first time here] --> NP["/new-project<br/>(detects state)"]
     NP --> NPV{Verdict}
     NPV -->|Greenfield| Setup["/setup → /discover →<br/>/mockup (UI) →<br/>/capture-requirements →<br/>/plan-project"]
-    NPV -->|Brownfield<br/>epic-workflow| Mig["/migrate-from-epic-workflow"]
+    NPV -->|Older format| Up["/upgrade"]
     NPV -->|Existing<br/>peak-workflow| Iter
     Setup --> Merge[merge docs/ branch<br/>= requirements approved]
-    Mig --> Iter
+    Up --> Iter
     Merge --> Iter[Iteration loop]
 
     Iter --> Req[GitHub issue<br/>or ad-hoc request]

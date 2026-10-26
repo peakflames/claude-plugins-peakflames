@@ -28,13 +28,13 @@ This command has three phases: **Verify**, **Complete**, and **Orient**. Do not 
 
 Do not proceed. A verifier that shares the implementer's context inherits the implementer's rationalizations, which defeats the purpose of independent verification.
 
-## Layout Guard
+## Format Guard
 
-**Immediately after the Session Guard:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Immediately after the Session Guard:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 
@@ -47,14 +47,16 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 ### Step 1.1: Load Context
 
 1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
-1a. **Check out the feature branch before reading any sidecar or spec content.** The sidecar and spec on `develop`/`main` may still say `Not Started` or `In Progress` — only the feature branch carries the implementer's updates. Locate the spec by filename only (no content read): `ls docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md`. Extract the **branch short name** from that filename: strip the directory path, the `epic-<id>-` prefix (where `<id>` is either a legacy integer, a decimal like `6.5`, or a 7-char alphanumeric ID), and the `.md` suffix. For example, `epic-3-user-auth.md` → `user-auth`, and `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it. Then detect the branch with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
+1a. **Check out the feature branch before reading any sidecar or spec content.** The sidecar and spec on `develop`/`main` may still say `Not Started` or `In Progress` — only the feature branch carries the implementer's updates. Locate the spec by filename only (no content read): `ls docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md`. Extract the **branch short name** from that filename: strip the directory path, the `epic-<id>-` prefix (`<id>` is `$ARGUMENTS` verbatim — treat it as an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it. Then detect the branch with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
    ```bash
    git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
    ```
    Exit 0 = branch exists; nonzero = missing. Then:
    - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
-   - If it does not exist, repeat the existence test against the legacy name `feat/epic-N` (applies to integer IDs only — sessions started before v1.3.0). If the legacy branch exists, check it out.
-   - If neither branch exists, inform the user and proceed on the current branch (the work may have been done directly on main in an older session).
+   - If it does not exist, ask via `AskUserQuestion` which branch holds the work — question
+     `"There is no feature/epic-<id>-<short-name> branch. Which branch holds this epic's work?"`,
+     options: the current branch, `"Let me type a branch name"`, `"Stop"`. Check out the branch
+     the user names (stop if it does not exist), and call it the feature branch from here on.
    - After checkout, check freshness (base: `develop` > `main` > `master`). If `git remote` does
      not list `origin`, skip silently. Otherwise run `git fetch --quiet origin`; if the fetch
      fails, say `Freshness check skipped — origin not reachable`. If `origin/<base>` exists, count
@@ -532,7 +534,7 @@ This is a disclosure, not a gate — `No` is a perfectly acceptable answer. The 
 
 ### Step 2.1: Write the Handoff File
 
-Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim — legacy integer or 7-char alphanumeric).
+Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim).
 
 Use the template at `plugins/peak-workflow/skills/wrapup-epic/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure.
 
@@ -577,7 +579,7 @@ Your goal is to help the user decide what to work on next. Glob `docs/implementa
 ### Step 3.1: What's Now Unblocked
 
 List any epics whose dependencies are now fully satisfied thanks to this epic's completion. For each, include:
-- Epic ID (legacy integer or 7-char alphanumeric) and name
+- Epic ID and name
 - Its dependencies (and whether they're all met)
 - A one-line summary of what it involves
 
@@ -658,7 +660,7 @@ be made by the user every invocation.
 
 ### Step 5a: Solo mode
 
-1. Note the current feature branch name (`feature/epic-<id>-<short-name>` or legacy `feat/epic-N`).
+1. Note the current feature branch name (the feature branch from Step 1.1 item 1a).
 2. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
 3. `git checkout <base-branch>`, then — if `origin/<base-branch>` exists —
    `git pull --ff-only origin <base-branch>`, so the merge lands on the team's latest base rather
