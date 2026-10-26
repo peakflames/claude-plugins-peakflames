@@ -382,7 +382,7 @@ that has them:
 |---|---|---|---|
 | Existing code | The manifest's scripts / the README; where they are silent, the toolchain-table row for the detected language | The manifest's test script, else the toolchain row | Whatever the code already does |
 | Toolchain table row (named language, or CLI tool / Library / Embedded) | Its *Run / start* column | Its *Tests* column | Embedded: host-side tests run on the computer; `tests/hil` and on-device runs need the board connected and are `TBD — set by the walking-skeleton epic` until it is chosen |
-| Web sheet | `bun run dev` (API on `:3000`, web on `:5173` with proxy); `docker compose up -d minio minio-init` first when object storage is in the stack | `bun run test`; `bun run test:e2e` (needs Docker running and `.env` copied from `.env.example`) | The sheet's Section 10 Daily Commands. Name Docker as a prerequisite |
+| Web sheet | `bun run dev` (API on `:3000`, web on `:5173` with proxy); `docker compose up -d s3 s3-init` first when object storage is in the stack | `bun run test`; `bun run test:e2e` (needs Docker running and `.env` copied from `.env.example`) | The sheet's Section 10 Daily Commands. Name Docker as a prerequisite |
 | Static SPA sheet | `bun run dev` (Vite on `:5173`) | `bun run test`; `bun run test:e2e` (builds and previews the production bundle first) | No server — nothing to mock; verification uses the real app and its real IndexedDB |
 | Desktop sheet | `bun run dev` (electron-vite, live main process, renderer HMR) | `bun run test`; `bun run test:e2e` (builds, then Playwright Electron against the build) | Needs Bun and Node.js 22.12+ (LTS) installed — Playwright and electron-vite run on Node. Add the web sheet's rows only if the app also runs a service of its own |
 
