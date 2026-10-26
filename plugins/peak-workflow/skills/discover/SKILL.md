@@ -190,7 +190,7 @@ Produce draft content for Product Vision sections 9–11 and ConOps sections 7�
 
 1. Read the existing `docs/product-vision-planning/product-vision.md` and `docs/product-vision-planning/concept-of-operations.md` in full.
 2. Read the phase indexes (`docs/implementation-plan/phase-*/index.md`) and spot-check sidecars in `docs/implementation-plan/status/` to understand what phases and epics have been planned and built.
-3. Read `docs/architecture.md` and `docs/design-notes.md` for current system context.
+3. Read `docs/architecture.md` and `docs/design-notes.md` for current system context (skip either silently if absent).
 
 Present a summary to the user:
 ```
@@ -207,6 +207,23 @@ Based on your description, here's what I think has changed or needs to be added:
 Then conduct a focused interview covering ONLY what is new or changed. Use the same adaptive protocol (draft → react → iterate → gate) but skip sections that don't need updates.
 
 For each existing section that needs changes, show the current content alongside the proposed update so the user can see exactly what's changing.
+
+**Re-litigation check.** Before drafting a proposed capability into the vision or ConOps, run
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" search <2–4 key nouns or quoted phrases>`.
+Exit 0 = no earlier decision. Exit 1 prints the Change Records that retired, superseded, or
+recorded the idea as pending. For each hit that is really the same idea, ask with
+`AskUserQuestion`:
+- Question: `"<capability> was <retired / superseded / recorded as pending> in <CR-ID> (<date>): <reason, one line>. Bring it back anyway?"`
+- Options: `["Bring it back — note why in the changelog", "Drop it — the earlier decision stands"]`
+
+On "Bring it back", carry on and name the record in the capability's line under "New
+Capabilities Identified" (`reintroduces the idea in <CR-ID>: <why now>`) so
+`/peak-workflow:capture-requirements` gives it a new ID. On "Drop it", leave it out and list it
+under "Deferred Items" with the record ID.
+
+**A capability that changes or goes away** is captured, not just discussed: every section edit
+that changes what an existing capability does is a `Modified` row in the changelog, and every
+capability withdrawn is a `Removed` row (Step 3).
 
 ## Step 3: Write Documents
 
@@ -263,8 +280,8 @@ After all phases are complete, write the documents.
 
 ### Brownfield Output
 
-1. Update `docs/product-vision-planning/product-vision.md` in place — increment the document version, update the date, and modify only the sections that changed.
-2. Update `docs/product-vision-planning/concept-of-operations.md` in place — same approach.
+1. Update `docs/product-vision-planning/product-vision.md` in place — increment the document version, update the date, and rewrite only the sections that changed **to the current state**: the document reads as if it had always said this. No "previously", "was", "removed in vN", strike-through, or change notes — the history lives in the changelog and git. A withdrawn capability is deleted from scope, scenarios, and the functional summary (move it to §7 Out of Scope or §11 Backlog only if it is genuinely still out of scope or future work).
+2. Update `docs/product-vision-planning/concept-of-operations.md` in place — same approach. Renumber nothing that requirements cite: keep scenario numbers and step numbers stable, and leave a withdrawn scenario's number unused rather than shifting later ones. Product Vision §8 uses the same scenario numbers — leave a withdrawn one unused there too.
 3. Write `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` with content. `{TIMESTAMP}` is a second-granularity UTC timestamp — second granularity is required because parallel discovery sessions on different machines may produce changelogs within the same minute, and day-granularity would collide. Generate it with:
 
    ```bash
@@ -284,8 +301,8 @@ After all phases are complete, write the documents.
 
 | Document | Section | Change Type | Summary |
 |----------|---------|-------------|---------|
-| product-vision.md | [section] | [Added / Modified / Removed] | [1-line summary] |
-| concept-of-operations.md | [section] | [Added / Modified / Removed] | [1-line summary] |
+| product-vision.md | [section] | [Added / Modified / Removed / Pending] | [1-line summary] |
+| concept-of-operations.md | [section] | [Added / Modified / Removed / Pending] | [1-line summary] |
 
 ## New Capabilities Identified
 
@@ -300,6 +317,21 @@ After all phases are complete, write the documents.
 [Items discussed but explicitly pushed to a future cycle.]
 ```
 
+`Modified` and `Removed` rows are **mandatory** whenever an existing capability's behavior
+changes or the capability is withdrawn — one row per affected section, with the Summary naming
+the capability and what changed (`Modified`) or that it is withdrawn and why (`Removed`). A
+wording change to a term the requirements use (no behavior change) is a `Modified` row whose
+Summary starts `Wording only:`. A capability that **may** change but the user has not decided is
+a `Pending` row (the documents keep describing today's behavior), naming the capability and
+the open question. A change to an **existing** capability is written only as a `Modified` row —
+never also under "New Capabilities Identified", which is for capabilities with no requirements
+yet.
+`/peak-workflow:capture-requirements` reads them: `Modified` rows send the requirements tracing
+to that section through its decision test (reword, supersede, or record as pending),
+`Removed` rows make those requirements retire candidates, and `Pending` rows make them
+record-as-pending candidates. A change left out of this table
+leaves its requirements silently stale.
+
 ## Step 4: Quality Check
 
 Before presenting the final documents to the user, verify:
@@ -309,9 +341,10 @@ Before presenting the final documents to the user, verify:
 - [ ] ConOps scenarios name specific UI elements, data fields, and user actions (or the CLI / API / device equivalents)
 - [ ] Embedded or equipment-controlling products: ConOps §8 has a `What Must Never Happen` table with a safe state per hazard
 - [ ] The "As-Is" section describes real current-state pain points (not generic ones)
-- [ ] The Glossary defines all domain-specific terms used in both documents
+- [ ] The Glossary defines all domain-specific terms used in both documents (brownfield: the checks in this list apply to the sections this run changed)
 - [ ] Cross-references between documents are correct (ConOps references Product Vision as companion)
-- [ ] Brownfield only: the discovery changelog accurately captures all changes
+- [ ] Brownfield only: the discovery changelog accurately captures all changes — every changed capability has a `Modified` row and every withdrawn one a `Removed` row
+- [ ] Brownfield only: the vision and ConOps read as the current state — no change notes, "previously" wording, or struck-through text, and no scenario or step renumbered
 
 ## Step 4.5: Product-Shape Re-check
 
