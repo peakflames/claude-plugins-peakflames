@@ -26,9 +26,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   fingerprints each Complete epic's requirements at its completion commit and can write
   `verified:` lines.
 - **`/peak-workflow:upgrade`** — brings a project's files to this plugin's format with numbered,
-  forward-only steps on a `docs/upgrade-format-N` branch: detect, preview, apply, one
-  `chore(upgrade): step NNNN <name>` commit each. Warns about unmerged branches touching the
-  rewritten files and can skip their epics; a later run catches those epics up once they merge.
+  forward-only steps on a `docs/upgrade-format-N` branch: detect, preview, apply, one commit per
+  step (or phase). Warns about unmerged branches touching the rewritten files and can skip their
+  epics; a later run catches them up once they merge.
 - **Upgrade step 0001 epic-provenance** — backfills each spec's `**Planned by:**` / `**Planned:**` /
   `**Plan branch:**` and each sidecar's `owner: —` from git history. Never overwrites a value.
 - **Format stamp** — `docs/.peak-workflow.toml` records the project's `format`. `setup` writes it
