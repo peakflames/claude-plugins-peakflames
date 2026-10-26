@@ -52,6 +52,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   UX Changes rows list the TORs citing that screen.
 - **Helper commands `validate`, `search`, `text`** — Change Record schema check, the re-litigation
   search, and a requirement's block as it is, was at a commit, or was verified.
+- **Removal epics** — `plan-project` proposes one for each `removal = "code"` retire record that
+  has none; `/add removal epic for CR-…` (or a plain-language removal request) writes one. Sidecar
+  `retires: CR-…`, a `## Removal` section, and only permanent guard requirements as anchors.
+- **Requirements Health panel** — `status` lists findings A–F verbatim, groups requirements changed
+  since verification (or failed) by epic with the reverify command, and opens with a one-line nudge.
 
 ### Changed
 
@@ -68,7 +73,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   are removed.
 - **`wrapup-epic` asks which branch holds the work** when `feature/epic-<id>-…` is missing,
   replacing the `feat/epic-N` lookup.
-- **`status` takes multi-owner TORs from `check`** (finding F) instead of computing them.
+- **`status` computes no requirement state** — coverage comes from `states --json` over the live
+  set (superseded and retired IDs leave the denominator), findings from `check --json`. An overdue
+  Disputed requirement (Safety: immediately) is the top Suggested Next Action.
+- **Anchors tables are `TOR ID | Feature File`** — `plan-project` and `add` write no titles; titles
+  print via `tor-lifecycle titles`, including in planning summaries and the planning PR body.
+- **`plan-project` / `add` plan the live set from `states`** — unassigned supersede successors and
+  waived requirements get planned; epics that are not Not Started are never edited.
+- **`plan-project` reads a changelog its branch archived** — `capture-requirements` archives the
+  discovery changelog first; plan-project still uses its Priority Signal.
+- **`pause` handles removal epics** — an empty anchors table no longer reads as done; the handoff
+  records remaining `sweep` citations.
 - **Spec provenance and `owner:` are always present** — the "absent" fallbacks are removed;
   step 0001 backfills older projects.
 - **`capture-requirements` checks its branch** — Step 4.2 runs `validate` and

@@ -44,8 +44,9 @@ Follow these steps exactly:
    - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" states --json` → **`states`**: one row
      per requirement with its `title`, `state`, and owning `epic`. Only `live: true` rows can be
      anchors — retired and superseded IDs are never planned. A live row is **unassigned** when
-     its `state` is `Specified`, or `Disputed` with `underlying_state` `Specified`; any other live
-     row is owned by its `epic`. A supersede successor nobody took yet is unassigned like any
+     its `state` is `Specified`, or `Disputed` with `underlying_state` `Specified`; a `Waived`
+     row shows as `Waived → <waived_to>` and is not offered here (plan-project places it);
+     any other live row is owned by its `epic`. A supersede successor nobody took yet is unassigned like any
      other.
    - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --json` → **`check`** (exit 0 and 1
      are both success). Its F findings with `kind: removal-missing` are the retire records still
@@ -78,8 +79,10 @@ removal of something a retire record names, is a **removal epic**. A retire reco
 removal epic takes it out.
 
 0. **No CR-ID given** (a plain-language removal request): match the description against the
-   `title` and `keywords` of the records in `check`'s `removal-missing` findings. One match → use
-   it; several → ask which; none → this is a normal epic, continue at 2.1.
+   `title` and `keywords` of every retire record with `removal = "code"` (the `states` rows in
+   `Retired, removal pending` name them in `record`). One match → use it, and item 1's stops
+   apply (it may already have a removal epic); several → ask which; none → this is a normal
+   epic, continue at 2.1.
 1. Read the record (`docs/requirements/changes/*-<7 chars after "CR-">.toml`) and stop, in this
    order, with the matching message (when `$ARGUMENTS` names the ID, do this right after loading
    `states` and `check`, before the rest of Step 1):
@@ -156,6 +159,15 @@ is valid — continue with `requirements: —`), inform the user:
 
 Wait for the user's answer. The confirmed TOR ID set is the Requirements Anchors list for this epic.
 
+**Never anchor a removal statement.** On any epic, a requirement satisfied only by code being
+absent ("shall be removed", "shall remove X", "X does not exist") is never an anchor — it is dead
+the day it passes. Leave it out, name it under **Left out** in Step 9, and recommend
+`/peak-workflow:capture-requirements <TOR-ID>` to reword it as a guard.
+
+**Supersede successors.** For a confirmed TOR that `states` shows as a successor (a `live: false`
+row lists it in `successors`), run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep
+<predecessor>` and list the tests it finds in Key Components — retarget or replace them.
+
 **Whole-capability check.** An epic is a vertical slice: every TOR it lists must be fully
 realizable inside it — schema, service, endpoint, and screen together, whatever the Then clause
 needs to be observable. If a confirmed TOR needs code that no other epic — of any status — owns
@@ -207,7 +219,9 @@ With random IDs there is no "insert between X and Y" — epics are appended at t
 
 From the user's description and the existing phase indexes, determine:
 - Which existing epics this new epic depends on
-- Whether any existing epics should be noted as depending on this one (update the graph if so)
+- Whether any existing **Not Started** epics should depend on this one (if so, update that
+  epic's phase-index Dependencies cell and its spec's `**Dependencies:**` line). Phase-index row
+  order is insertion order, not build order.
 
 If dependencies are ambiguous, ask the user.
 
