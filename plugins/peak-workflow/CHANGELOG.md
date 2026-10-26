@@ -6,7 +6,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [2.2.0] — UNDER DEVELOPMENT
+## [3.0.0] — UNDER DEVELOPMENT
 
 ---
 
