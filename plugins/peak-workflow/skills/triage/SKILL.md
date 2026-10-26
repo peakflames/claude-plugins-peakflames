@@ -108,12 +108,14 @@ Apply this rubric — pick exactly one verdict:
 - If the request changes one existing TOR's Given/When/Then (3.2) and the vision and ConOps
   still hold → **AMEND**. If it changes the vision or ConOps, or several requirements across
   capabilities → **HEAVY**.
-- **Amendment with a small code fix** — the requirement's owning epic is Complete or
-  Implemented (or it has none but the code exists), the owner approves changing it, and the code
-  change is about two hours or less → **TRIVIAL**, routed to quick-fix's **amendment path**. When
-  the owning epic is Not Started, In Progress, or Paused → **AMEND**: that epic builds the
-  successor (the requirement change and the code ship together on the `hotfix/` branch). Never for
-  a Safety requirement: a Safety requirement changes only on a `docs/` branch → **AMEND**.
+- **Amendment with a small code fix** — the requirement's owning epic is Complete (or it has
+  none but the code exists), the owner approves changing it, and the code change is about two
+  hours or less → **TRIVIAL**, routed to quick-fix's **amendment path** (the requirement change
+  and the code ship together on the `hotfix/` branch). When the owning epic is Implemented, the
+  change belongs to its wrapup: recommend `/peak-workflow:wrapup-epic <epic-id>` (fresh session),
+  whose Step 1.4b can amend the requirement. When it is Not Started, In Progress, or Paused →
+  **AMEND**: that epic builds the successor. Never for a Safety requirement: a Safety requirement
+  changes only on a `docs/` branch → **AMEND**.
 - **Request on a requirement edited after verification** (finding D or A) — this rule takes
   precedence over the AMEND row's exclusion and the amendment path. Compare the request
   with both texts (`tor-lifecycle text <TOR-ID> --verified`, and the current block):

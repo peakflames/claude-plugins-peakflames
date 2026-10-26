@@ -6,13 +6,16 @@ description: |
   Use after an epic is implemented and needs independent review.
   Triggers on: "wrapup epic", "verify epic", "review epic", "close epic",
   "is epic N done?", "check my work on epic N", "review what I built",
-  "sign off on epic N", "close out epic N".
+  "sign off on epic N", "close out epic N". With `reverify`, re-checks requirements of a Complete
+  epic that changed since verification or failed it ("reverify epic N", "re-check TOR-…").
   Note: If the user says "I'm done with epic N", check whether the epic is "Implemented" (use wrapup) or "In Progress" (suggest /peak-workflow:pause instead).
-argument-hint: "<epic-id>"
+argument-hint: "<epic-id> [reverify [TOR-… …]]"
 model: opus
 ---
 
-You are performing an independent verification and completion of Epic $ARGUMENTS.
+You are performing an independent verification and completion of an epic. `<id>` is the first word
+of `$ARGUMENTS`. When the second word is `reverify`, run **Reverify Mode** (after the guards below)
+instead of Phases 1–3 and Steps 4–5; any further words are the TOR IDs to re-check.
 
 You are acting as an independent reviewer — you did NOT implement this epic. Your job is to verify the implementation against the spec, close out the epic if it passes, and orient the team toward what's next.
 
@@ -22,7 +25,7 @@ This command has three phases: **Verify**, **Complete**, and **Orient**. Do not 
 
 ## Session Guard
 
-**Before any other action:** check whether this conversation has already executed `/peak-workflow:start-epic $ARGUMENTS`, or has done any implementation work on Epic $ARGUMENTS (edited its source files, written its tests, or authored its `epic-$ARGUMENTS-implemented.md` handoff). If so, stop immediately and print:
+**Before any other action:** check whether this conversation has already executed `/peak-workflow:start-epic <id>` or `/peak-workflow:quick-fix`, or has done any implementation work on Epic <id> (edited its source files, written its tests, or authored its `epic-<id>-implemented.md` handoff). If so, stop immediately and print:
 
 > Wrapup must run in a fresh session so verification is independent of the implementer's context. Close this session and run `/peak-workflow:wrapup-epic $ARGUMENTS` in a new one.
 
@@ -38,6 +41,124 @@ current format.
 
 ---
 
+## Reverify Mode
+
+`/peak-workflow:wrapup-epic <id> reverify [TOR-… …]` re-checks requirements of an epic that is
+already **Complete** — after a requirement changed since it was verified (finding D), after a
+failed reverify (Verification failed) once the code is fixed, or to record that an earlier PASS
+was wrong. It never reopens the epic: the sidecar's `status:` line does not change.
+
+The Session Guard and Format Guard above apply unchanged (verification stays independent: a
+fresh session, blind to the implementer handoff — reverify never reads one). The helper is called
+as `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <command>` (written `tor-lifecycle`); exit 2
+or 3 is a data or install problem — print its output and stop (exit 1 from `check` only means it
+has findings). Run these steps instead of Phases
+1–3 and Steps 4–5.
+
+### R1: Scope
+
+1. Read `docs/implementation-plan/status/epic-<id>.md` on the base branch (`develop` > `main` >
+   `master`, after `git checkout <base>` and — if `origin/<base>` exists —
+   `git pull --ff-only origin <base>`).
+   - Not `status: Complete` → stop: `Reverify is for Complete epics. Epic <id> is <status> —
+     reverify applies only after /peak-workflow:wrapup-epic <id> has completed it.`
+   - `requirements: —` → stop: `Epic <id> lists no requirements, so there is nothing to
+     re-verify. Re-plan the work with /peak-workflow:add.`
+2. Run `tor-lifecycle states --json`. The **scope** is the TOR IDs given after `reverify`, else
+   every requirement this epic owns (`epic` = `<id>`) whose state is **Changed since verified**
+   or **Verification failed** (a Disputed one counts by its `underlying_state`).
+   - A named ID the epic does not list in `requirements:`, or lists but waives → stop and say
+     which epic owns it (`states` row `epic`).
+   - A named ID that is not live → stop with its `tor-lifecycle titles` line: superseded or
+     retired requirements are history — the successor is re-checked through its own epic.
+   - Default scope empty → stop: `Every requirement Epic <id> owns is verified — nothing to
+     re-check.`
+   - A named ID that is Verified is allowed: re-checking it records a past false PASS as data.
+   - A Disputed requirement in scope → say it is known to be wrong (`<CR-ID>`, `<N>` days) and
+     that a PASS does not resolve the dispute.
+   - Run `tor-lifecycle check --json`. A scoped ID with an **A** finding (edited without a Change
+     Record) → stop: `<TOR> was edited without a Change Record — decide whether its meaning changed
+     with /peak-workflow:capture-requirements <TOR> first; a reverify PASS would ratify the edit.`
+     (Name the other scoped IDs so the user can re-run with just those.)
+3. Print the scope as `TOR-… — <title> (<state>)` from one `tor-lifecycle titles` run, with the
+   epic as `<id> (<slug>) — <Name>`.
+
+### R2: Branch
+
+Create `hotfix/verify-epic-<id>-<short-name>` from the base (`<short-name>` from the spec file
+name, as in Step 1.1 item 1a). If it already exists with commits the base does not have
+(`git rev-list --count <base>..<branch>` > 0), stop: `An earlier reverify of Epic <id> is not merged
+yet (<branch>) — merge or delete it first.` An existing branch with no such commits is a leftover:
+delete it and create it fresh.
+
+### R3: Verify
+
+- Load each scoped requirement's Given/When/Then with `tor-lifecycle text <TOR>`, and resolve
+  `<test-directories>` as Step 1.2 item 2 does. In Step 1.2, read "the Requirements Anchors" as
+  this scope, and its "re-run `/peak-workflow:wrapup-epic <id>`" as
+  `/peak-workflow:wrapup-epic <id> reverify <scope>`.
+- Run **Step 1.2** for each (tests by grep, mirror check, run, source inspection, UI and device
+  rules) — no other Phase 1 step. Record PASS / FAIL / CANNOT VERIFY.
+- Run the **Tests** gate from Step 1.3 (the full test command `CLAUDE.md` lists), and the **UX
+  Baseline check** only when a scoped requirement names a screen (`S-NN`) or sits under the
+  `# UX Baseline` banner — checked on the `S-NN` screens the scoped requirements name, not every
+  screen of the epic. No code review, no docs refresh, no Fix now — reverify records results;
+  code fixes go through `/peak-workflow:quick-fix`.
+
+### R4: Record
+
+Run `mark` once, repeating the flag per ID — `--pass` for each PASS, `--fail <TOR> "<reason>"` for
+each FAIL or CANNOT VERIFY (a CANNOT VERIFY reason starts `CANNOT VERIFY:`):
+
+```bash
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" mark <id> --pass TOR-A --pass TOR-B --fail TOR-C "<reason>" --reverified
+```
+
+- **PASS** writes the requirement's `verified:` line at its current fingerprint and drops any
+  `unverified:` line. **FAIL** removes its `verified:` line and writes
+  `unverified: TOR: <today> <reason>`. `reverified:` is set to today either way.
+- A failed Tests gate makes every scoped requirement whose tests failed a FAIL.
+
+Before running it, note each scoped requirement's previous sidecar line (its `unverified:` date and
+reason, if any) for the handoff's **Was** column — `mark` replaces it. Then write
+`docs/implementation-plan/session-handoffs/epic-<id>-reverified-<today>.md`; if that file already
+exists (a second reverify today), append a `---` line and a new section — never overwrite it:
+
+```markdown
+# Epic <id>: <Name> — Reverified <today>
+
+**Verified by:** `/peak-workflow:wrapup-epic <id> reverify` (model: <model>, fresh session)
+
+| TOR ID | Title | Was | Verdict | Evidence |
+|--------|-------|-----|---------|----------|
+| TOR-… | <title> | Changed since verified | PASS | tests/test_x.py:12, src/x.py:40 |
+| TOR-… | <title> | Verification failed (<old date>: <old reason>) | FAIL | <one-line reason> |
+
+Tests gate: PASS / FAIL (<summary>). UX Baseline: <PASS / N/A — no UI requirement in scope>.
+<per Disputed requirement in scope:> Disputed: <TOR> (<CR-ID>, <N> days) — this PASS does not resolve it.
+```
+
+### R5: Ship
+
+Commit the sidecar and the reverified handoff:
+`chore(epic-<id>): reverify <TOR-list> — <N> PASS, <M> FAIL`. Then ship exactly as
+`/peak-workflow:quick-fix` Step 4 item 6 does — ask solo or team (neutrally, every time); solo
+merges `--no-ff` into the base (message `chore(epic-<id>): merge <branch> — reverify <TOR-list>`)
+and deletes the branch, team pushes and opens a PR (title
+`verify(epic-<id>): <TOR-list>`, body = the handoff's table plus `🤖 Generated via
+/peak-workflow:wrapup-epic reverify`). Never push in solo mode.
+
+### R6: Next steps
+
+- For each FAIL: `The code does not meet <TOR>: fix it with /peak-workflow:quick-fix <request>,
+  then reverify again in a new session` — or, when the requirement (not the code) is what is
+  wrong: `/peak-workflow:capture-requirements <TOR>`.
+- For each Disputed requirement in scope: `<TOR> is still disputed (<CR-ID>) — settle it with
+  /peak-workflow:capture-requirements <TOR>.`
+- `Run /peak-workflow:status to see the updated Requirements Coverage.`
+
+---
+
 ## Phase 1: Verify
 
 Your goal is to independently confirm the implementation meets the spec. Do not trust the implementer's self-assessment — inspect the code yourself.
@@ -47,12 +168,12 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 ### Step 1.1: Load Context
 
 1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
-1a. **Check out the feature branch before reading any sidecar or spec content.** The sidecar and spec on `develop`/`main` may still say `Not Started` or `In Progress` — only the feature branch carries the implementer's updates. Locate the spec by filename only (no content read): `ls docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md`. Extract the **branch short name** from that filename: strip the directory path, the `epic-<id>-` prefix (`<id>` is `$ARGUMENTS` verbatim — treat it as an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it. Then detect the branch with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
+1a. **Check out the feature branch before reading any sidecar or spec content.** The sidecar and spec on `develop`/`main` may still say `Not Started` or `In Progress` — only the feature branch carries the implementer's updates. Locate the spec by filename only (no content read): `ls docs/implementation-plan/phase-*/epic-<id>-*.md`. Extract the **branch short name** from that filename: strip the directory path, the `epic-<id>-` prefix (`<id>` is an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it. Then detect the branch with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
    ```bash
    git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
    ```
    Exit 0 = branch exists; nonzero = missing. Then:
-   - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` (where `<id>` is `$ARGUMENTS` verbatim).
+   - If `feature/epic-<id>-<short-name>` exists, run `git checkout feature/epic-<id>-<short-name>` .
    - If it does not exist, ask via `AskUserQuestion` which branch holds the work — question
      `"There is no feature/epic-<id>-<short-name> branch. Which branch holds this epic's work?"`,
      options: the current branch, `"Let me type a branch name"`, `"Stop"`. Check out the branch
@@ -66,14 +187,76 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - After checkout, **re-read `CLAUDE.md`** from the working tree. The copy loaded at session start
      came from the base branch; an epic that changed `CLAUDE.md` (the walking skeleton resolving
      `TBD` lines, for one) is only visible after checkout.
-2. Read `docs/implementation-plan/status/epic-$ARGUMENTS.md` to get the epic's current status. Phase 3 (Orient) loads all phase indexes and sidecars when it walks the dependency graph — Step 1.1 only needs this epic's sidecar.
-3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress`, `status: Paused`, or `status: Not Started`, inform the user that `/peak-workflow:start-epic $ARGUMENTS` must finish first and stop. If `status: Complete`, inform the user it has already been wrapped up.
+2. Read `docs/implementation-plan/status/epic-<id>.md` to get the epic's current status. Phase 3 (Orient) loads all phase indexes and sidecars when it walks the dependency graph — Step 1.1 only needs this epic's sidecar.
+3. Check the sidecar: if `status: Implemented`, proceed. If `status: In Progress`, `status: Paused`, or `status: Not Started`, inform the user that `/peak-workflow:start-epic <id>` must finish first and stop. If `status: Complete`, inform the user it has already been wrapped up — and, when any requirement it owns changed since verification or failed it, that `/peak-workflow:wrapup-epic <id> reverify` re-checks those.
+3a. **Requirements Health.** The helper is always called as
+    `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <command>` (written `tor-lifecycle` below);
+    exit 2 or 3 from it is a data or install problem — print its output and stop (exit 1 from
+    `check` or `sweep` only means findings). Run once each
+    and keep the output: `tor-lifecycle states --json`,
+    `tor-lifecycle check --base <base> --json` (base: `develop` > `main` > `master`), and
+    `tor-lifecycle sweep --json`. These read the branch's own files: when
+    `git diff --name-only HEAD...<base> -- docs/requirements/changes/` lists records the base gained
+    after the branch was cut, say `<base> has requirement changes this branch has not seen —
+    merge <base> into the branch first (git merge <base>), then re-run this wrapup in a fresh
+    session.` and stop (nothing written; stay on the branch). Open the report to the user with the nudge when any live
+    requirement is Disputed, Changed since verified, or Verification failed — one plain sentence
+    with the counts and the next command, as `/peak-workflow:status` words it. Then, in order:
+    1. **Blocking findings.** Every finding with `blocking: true` (A, B, or C this branch
+       introduced) blocks the wrapup. For each, ask with a fix offer, plus `Stop — epic FAILs`:
+       - **A / B** — a merged requirement was edited or deleted on this branch without a record:
+         `["Restore <TOR> from <base>", "Amend <TOR> (owner approval)", "Stop — epic FAILs"]`.
+         Restore writes the block back from `tor-lifecycle text <TOR> --rev <base>`. Amend runs
+         Step 1.4b's **Amend requirement** procedure against the edit (not for Safety — drop the
+         option). Each fix is recorded in Code Review Findings (`fixed at wrapup`).
+       - **C** — an ID this branch cites is neither live nor in a record: correct it to the live or
+         successor ID, or remove the citation (`["Fix now", "Stop — epic FAILs"]`).
+
+       Re-run `check --base <base>` after each fix. Other findings are warnings: count them in
+       Code Review Findings.
+    2. **Disputed requirements this epic touches.** It *touches* a requirement when its sidecar
+       `requirements:` lists it, or the branch changed a test that cites it
+       — a line the branch added cites it:
+       `git diff -U0 <base>...HEAD -- <test-directories> | grep '^+' | grep -oE 'TOR-[0-9]{2}-[A-Za-z0-9]{7}' | sort -u`
+       (`<test-directories>` as in Step 1.2 item 2).
+       For each touched requirement whose `states` row is Disputed:
+       - **Safety** (`dispute.safety: true`) — stop, epic FAILs: `<TOR> is a Safety requirement
+         known to be wrong (<CR-ID>). This branch touches it, so it cannot ship until the
+         requirement is resolved on a docs/ branch: /peak-workflow:capture-requirements <TOR>.`
+         Renewal does not lift this, and no in-branch amendment is offered. No report is rendered
+         and nothing is written; run `git checkout <base>`. If the branch only cites it in passing,
+         removing that citation in an implementer commit and re-running wrapup in a fresh session
+         also clears this.
+       - **Overdue** (`dispute.overdue: true`) — ask
+         `"<TOR> — <title> has been disputed for <N> days (<CR-ID>: <record title>). It must be settled before this epic ships."`
+         with `["Resolve it on this branch (owner approval)", "Renew the pending record", "Stop — epic FAILs"]`.
+         **Resolve** runs Step 1.4b's **Amend requirement** procedure with the pending record's
+         ID in the new record's `refs`. **Renew** writes a new `pending` record (the
+         `CHANGE_RECORD_TEMPLATE.md` pending shape): `refs = ["<open CR-ID>", "epic <id>"]`, `owner`
+         = the open record's owner unless the user names another, `approved_by` = `git config
+         user.name`, `approved_via = "wrapup"`, `fingerprint` from `tor-lifecycle text <TOR>
+         --json`, `title` = `<open title> (renewed)`, the open record's `keywords` topped up to 3–6
+         from the reason, and the `reason` the owner gives; validate it. Either one is listed in Requirement Changes.
+       - **Under the threshold** — a warning: list it in the report's Requirement changes section
+         and the PR body (`Disputed: <TOR> (<CR-ID>, <N> days, due after <threshold> days)`).
+    3. Keep `sweep` for the Removal gate (Step 1.3) when the epic is a removal epic.
 4. Read the epic spec file located in item 1a. While reading, parse the header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** — it drives the Step 5b PR body `Closes #<N>` / `Refs #<N>` line. If no `Source:` line exists, the source issue number is unknown; skip that line later.
-4a. **Load TOR Requirements.** Parse the epic spec's `## Requirements Anchors` table. For each
-    row, extract the TOR ID, feature file path, and scenario title. Then, for each TOR ID, open
-    the cited feature file and locate the `Scenario: [TOR-NN-XXXXXXX]` block with that exact ID.
-    Read the full Given/When/Then. These become the verification specifications — every subsequent
-    verification step judges the implementation against these Given/When/Then statements.
+4a. **Load TOR Requirements.** The epic is a **removal epic** when its sidecar has a `retires:`
+    line: read its `## Removal` section (record, retired IDs, code to remove, done-when) for the
+    Removal gate (Step 1.3); its anchors hold only guard requirements, or the line
+    `None — a removal epic; see Removal.`
+    - **No Requirements Anchors** — not a removal epic, and the spec has no
+      `## Requirements Anchors` section or the section lists no TOR ID: stop. `Epic <id> (<slug>) —
+      <Name> has no Requirements Anchors, so there is nothing to verify it against. Re-plan it with
+      /peak-workflow:add <description> (or add the requirements first with
+      /peak-workflow:capture-requirements).`
+
+    Parse the `## Requirements Anchors` table (`TOR ID | Feature File`). Settle every ID with item 5
+    first; then, for each anchor, open its feature file and locate the `Scenario: [TOR-NN-XXXXXXX]`
+    block with that exact ID. Read the full Given/When/Then. These become the verification
+    specifications — every subsequent verification step judges the implementation against these
+    Given/When/Then statements. Titles in the report, handoff, and PR body come from one
+    `tor-lifecycle titles` run over the final anchors (plus any superseded ID), never from the spec.
 4b. **Load Screens (UI epics only).** If the spec has a `## Screens` section, open each listed
     wireframe file (`docs/product-vision-planning/ux/wireframes/S-NN-*.html`); skip rows whose
     Wireframe is `—` (the Application menu and Window rows — their contract is the
@@ -87,34 +270,27 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
     this item without comment.
 5. **Verify Requirements Anchors.** An independent reviewer loads TOR requirements first so all
    subsequent verification is judged against the requirements baseline, not the implementer's
-   self-assessment. For each row in the Requirements Anchors table:
-   1. Confirm the TOR ID exists in the cited feature file with an exact ID match.
-   2. **TOR ID not found:** record as a Requirements Anchor gap in the Step 1.5 report. This is
-      a FAIL for that TOR — the epic spec referenced a requirement that no longer exists or was
-      never in the cited file. Surface to the user:
-      > TOR ID `{TOR-NN-XXXXXXX}` from the Requirements Anchors table was not found in
-      > `{feature-file-path}`. This is a verification FAIL for this TOR. Options: (1) the
-      > requirement was removed — update the epic spec to reflect this, (2) the feature file path
-      > is wrong — correct the spec row, (3) stop and reconcile the requirements baseline via
-      > `/peak-workflow:capture-requirements`.
-   3. **TOR ID found but scenario title in the spec row doesn't match the feature file:** the
-      spec's Requirements Anchors row may be stale (scenario was updated after the spec was
-      written). Present both titles side by side:
-      > Requirements Anchor mismatch for `{TOR-ID}`:
-      > - **Epic spec title:** "{spec-title}"
-      > - **Feature file title:** "{feature-file-title}"
-      Use `AskUserQuestion`:
-      - Question: `"TOR mismatch for {TOR-ID} — which title is the correct verification baseline?"`
-      - Options:
-        - `"Feature file (authoritative) — verify against '{feature-file-title}'"`
-        - `"Epic spec (intentional override) — verify against '{spec-title}'"`
-        - `"Stop — I'll reconcile the requirements baseline first"`
-      Proceed only after the user selects an option. If Stop, end here and do not proceed to
-      Step 1.2. Note in the Step 1.5 Anchor Reconciliation section which text was used.
-   4. **TOR ID found and titles match:** record "Requirements Anchor verified: TOR-NN-XXXXXXX".
-   5. **Spec has no Requirements Anchors section** (legacy spec from before peak-workflow v1.0.0):
-      note this in the verification report and continue — legacy specs are grandfathered.
-6. **Do NOT read the implementer handoff yet.** `docs/implementation-plan/session-handoffs/epic-$ARGUMENTS-implemented.md` is the implementer's self-assessment. Reading it before you have formed your own per-TOR verdicts contaminates the review. It is read in Step 1.2b, after every verdict is recorded. (Any `epic-$ARGUMENTS-paused.md` handoff is likewise off-limits until then.)
+   self-assessment. For each anchor ID, take its `states` row (item 3a):
+   1. **Live** — record "Requirements Anchor verified: TOR-NN-XXXXXXX". (A row's `feature_file`
+      is a bare file name; compare it with the spec cell's file name, and correct a wrong cell as
+      `` `docs/requirements/<feature_file>` `` in the wrapup commit.)
+   2. **Not live** — this TOR is a **FAIL** (an anchor gap); run `tor-lifecycle titles <TOR>` and
+      put it to Step 1.4b with the matching **Fix now**:
+      - **Superseded** (`superseded in CR-… by TOR-…`; follow the chain to live successors) —
+        `Fix now` = **replace with successor** (recommended): put the successor(s) in its place in
+        this epic's spec anchors and sidecar `requirements:` line (unless a successor's `states`
+        row names another epic — then Fix now is unavailable: say so and offer Stop), then run
+        Step 1.2 against the successor and record it as `FIXED DURING WRAPUP — anchor replaced:
+        <old> → <successor> (<CR-ID>)`.
+      - **Retired** (`retired in CR-…`) — `Fix now` = drop it from the anchors and `requirements:`
+        (`FIXED DURING WRAPUP — retired anchor dropped (<CR-ID>)`). If no anchor would remain and
+        this is not a removal epic, Fix now is unavailable — Stop.
+      - **Unknown** (exit 1, finding C) — `Fix now` = correct the ID to the requirement the epic
+        built (then verify that one) or drop it.
+
+      These edits touch only this epic's own spec and sidecar. A Defer is never offered for an
+      anchor gap.
+6. **Do NOT read the implementer handoff yet.** `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` is the implementer's self-assessment. Reading it before you have formed your own per-TOR verdicts contaminates the review. It is read in Step 1.2b, after every verdict is recorded. (Any `epic-<id>-paused.md` handoff is likewise off-limits until then.)
 7. **Conditional architecture / design-notes reads.** The Step 1.4 code review checks consistency with `docs/architecture.md` and `docs/design-notes.md` — load only what is relevant to this epic:
    - If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section.
    - If the epic raises a decision the design notes might already have addressed, read `docs/design-notes.md`.
@@ -131,7 +307,7 @@ confirms for this run (e.g. `HIL_BENCH=1 <harness command>`) — never exported,
 `CLAUDE.md`, a script, or a config file, and never set without the confirmation. Ask it once at the start of this step when
 the epic has `tests/hil/` TORs, and again only if the user changes the setup.
 
-For each TOR ID in the epic spec's Requirements Anchors table, independently verify the
+For each TOR ID in the epic spec's Requirements Anchors table (after Step 1.1 item 5), independently verify the
 requirement is satisfied by the implementation. You are the independent reviewer — you did NOT
 implement this epic. Do not trust the implementer's self-assessment.
 
@@ -226,7 +402,7 @@ of this step for that TOR.
 ### Step 1.2b: Compare to Implementer's Deferrals
 
 Only now, with every per-TOR verdict recorded, read
-`docs/implementation-plan/session-handoffs/epic-$ARGUMENTS-implemented.md` and locate its
+`docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` and locate its
 `## Deferrals` section.
 
 1. **If the handoff has no `## Deferrals` section** (or no handoff exists): add a warning line
@@ -259,7 +435,7 @@ one into a Highlights bullet or a Known Issue — it gets its own row, marked as
 
 ### Step 1.3: Run Quality Gates
 
-Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently (web and static SPA projects: before `bun run test:e2e`, run
+Read the **Verification & Quality Gates** section from `CLAUDE.md`. Run every applicable check independently — first the **Tests** gate, the full test command `CLAUDE.md` lists (web and static SPA projects: before `bun run test:e2e`, run
 `bunx playwright install chromium`, which does nothing when the browser is already present; a run
 failing with *Executable doesn't exist* means run it again and continue — a missing browser is not
 CANNOT VERIFY. If `playwright-cli` reports a missing browser, run the install command its
@@ -272,9 +448,22 @@ own `--help` gives):
 - Access-control check — on routes that return or change records (if `CLAUDE.md`'s `**Product shape:**` block records
   `**Access rule:** owner-or-permitted-role`, or its Tech Stack records
   `Auth: local accounts now, org SSO deferred`, and this epic touched user data) — see below
+- Removal gate (removal epics only) — see below
 - Deferred-value check (walking-skeleton epic only): `grep -nE 'TBD — set by the walking-skeleton epic|— unconfirmed|Board: not chosen|\*\*Not decided yet:\*\*' CLAUDE.md`
   on the feature branch must return nothing. Any hit is a FAIL — the skeleton owns resolving
   every one
+
+**Removal gate.** A removal epic's definition of done (Step 1.1 item 4a); a quality gate like the
+others — Fix now or Stop, never deferred. Report PASS / FAIL per line with the evidence:
+
+- **No citations left** — `tor-lifecycle sweep <retired IDs>` exits 0. Each hit is a FAIL (this
+  is the one case where `check` finding E blocks): a test or source line still citing a retired ID.
+- **Code gone** — every symbol the Removal section's **Code to remove** names returns nothing
+  from `git grep -n -w <symbol> -- . ':!docs/'` other than lines that assert its absence (a test
+  checking the symbol no longer exists); list each such line as evidence. A file the section names
+  with no symbol no longer exists.
+- **Guard requirements pass** — every anchor's Step 1.2 verdict is PASS (none → `N/A — no guard
+  requirements`).
 
 **Access-control check.** A quality gate, not a code-review note, on any epic that adds or changes
 user data in a project with sign-in — named provider or deferred. Record PASS / FAIL per line with the
@@ -365,26 +554,34 @@ Review the implementation for:
 
 **Verdict rule.** Per-TOR verdicts are **PASS / FAIL / CANNOT VERIFY** only — there is no
 "pass with exceptions". The epic verdict is **PASS** if and only if every TOR is PASS (including
-TORs fixed during this wrapup) or every remaining non-PASS TOR carries a **human waiver**, AND
-every quality gate from Step 1.3 passes (including any `GATE DISCREPANCY`). Otherwise the epic
-verdict is **FAIL**.
+TORs fixed or amended during this wrapup) or every remaining non-PASS TOR carries a **human
+waiver** or a **pending record** written here, AND every quality gate from Step 1.3 passes
+(including any `GATE DISCREPANCY` and the Removal gate), AND Step 1.1 item 3a left no blocking
+finding or unresolved overdue Disputed requirement. Otherwise the epic verdict is **FAIL**.
 
-**Failing quality gates first.** For each gate that failed in Step 1.3, ask the same question
-below with options `["Fix now", "Stop — epic FAILs"]` only — a gate cannot be deferred. On Fix
+**Failing quality gates first.** For each gate that failed in Step 1.3, ask
+`"<gate> failed: <line>: <evidence>. Recommendation: <Fix now | Stop> — <one clause why>. How to proceed?"`
+with options `["Fix now", "Stop — epic FAILs"]` only — a gate cannot be deferred. On Fix
 now, apply the fix and re-run that gate; if it still fails, the epic verdict is FAIL. Record the
 outcome in Code Review Findings (`fixed at wrapup` or `unfixed — epic FAILs`).
 
 A substantive finding is never filed as a follow-up by default — it is put to the user as a
 decision, at the moment it is cheapest to act on. For each TOR whose verdict is FAIL or CANNOT
 VERIFY, use `AskUserQuestion` (one question per TOR, all asked before the report is rendered):
-- Question: `"TOR-<NN-XXXXXXX> is <FAIL | CANNOT VERIFY>: <what is unmet>. Recommendation: <Fix now | Defer | Stop> — <one clause why>. How to proceed?"`
-- Options: `["Fix now", "Defer — depends on a later epic", "Stop — epic FAILs"]`
+- Question: `"TOR-<NN-XXXXXXX> is <FAIL | CANNOT VERIFY>: <what is unmet>. Recommendation: <Fix now | Defer | Requirement is wrong | Stop> — <one clause why>. How to proceed?"`
+- Options: `["Fix now", "Defer — depends on a later epic", "The requirement may be wrong, not the code", "Stop — epic FAILs"]`
+
+`The requirement may be wrong, not the code` is never offered for a requirement under the `# Safety`
+banner (its `states` row has `safety: true`), nor for an anchor gap (Step 1.1 item 5). When chosen,
+ask `"How should TOR-<NN-XXXXXXX> change?"` with
+`["Amend requirement (owner-approved)", "Record as pending", "Back"]` (Back re-asks the first
+question).
 
 The recommendation is mandatory — never ask without one. Recommend **Defer** only when the
 eligibility rule below is met.
 
 **Only an option the user selects counts.** A free-text reply that does not name one of the
-three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
+offered options ("ok", "proceed", "fine") is not consent to defer — re-ask.
 
 - **Fix now** — always offered; the human decides. Apply the fix, remove any
   `Deferred: <TOR-ID>` skip/xfail marking the implementer left on the test, re-run Step 1.3
@@ -413,10 +610,50 @@ three options ("ok", "proceed", "fine") is not consent to defer — re-ask.
   TOR's `Waived by / Date / Reason` cell (`Waived by` is `git config user.name`; `Reason` ends
   with `→ epic <succ>`). The TOR displays as `WAIVED` in the Requirements Implemented table —
   a display state for a waived FAIL / CANNOT VERIFY, not a fourth verdict.
+- **Amend requirement (owner-approved)** — the owner's answer is the approval the record cites.
+  Ask what the requirement should say (draft it from the finding, and check its literals against
+  the Given), then decide and write it as `capture-requirements` states it once (`${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/SKILL.md`,
+  "Lifecycle Rules": L3 decision test, L4 re-litigation check, L5 choice 3; `${CLAUDE_PLUGIN_ROOT}/skills/capture-requirements/CHANGE_RECORD_TEMPLATE.md`):
+  Where these steps differ from L5 choice 3, these win: this epic is edited although Implemented,
+  its tests are retargeted, and the tracing entry is replaced here. As L5 says, also swap the old ID
+  in any other Not Started / In Progress / Paused epic that lists it. Ask the owner for one line on
+  why the requirement is wrong (the record's `reason`); write `title` and 3–6 `keywords` from it.
+  1. Run L3 on the current block vs the proposed one. **Reword-eligible** → the wording is not what
+     failed: say so and re-ask the first question without this option. **Meaning change** →
+     continue.
+  2. Run L4 for the successor. Generate its ID in the same feature number — generate each 7-character suffix with `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7` and regenerate it while it is all digits or `git grep --untracked -q <suffix>` finds it anywhere (feature files and `docs/requirements/changes/` included) — and write its
+     block in place of the old one. Write a `supersede` record (`CR-` suffix generated the same
+     way) with `approved_via = "wrapup"`, `approved_by` = `git config user.name`, `refs` =
+     `["epic <id>"]` plus the open `pending` record's ID when the requirement is Disputed, the old
+     `text` and `fingerprint` from `tor-lifecycle text <TOR> --rev <base> --json`, and the old
+     tracing entry's sources as `traced_to`. Run `tor-lifecycle validate <record>` until it prints
+     `ok`.
+  3. In the tracing sidecar, replace the old entry with the successor's (same `traces_to`,
+     `"rationale": "Supersedes <old TOR> (<CR-ID>): <reason>"`).
+  4. If this epic lists the old ID, swap the successor into its spec anchors and sidecar
+     `requirements:` line; otherwise (a Disputed requirement this branch only touches) the
+     successor is unassigned — list it for `/peak-workflow:add` in Step 3.4. Retarget the tests
+     that cite the old ID to the successor.
+  5. Re-run Step 1.2 for the successor and use its verdict. The Deferrals row reads
+     `AMENDED AT WRAPUP — <CR-ID>: <old> → <successor>; successor <verdict>`. A successor that is
+     not PASS goes back to the first question, without `The requirement may be wrong, not the code`.
+     A successor brought to PASS by Fix now keeps that one row:
+     `AMENDED AT WRAPUP — <CR-ID>: <old> → <successor>; successor PASS after FIXED DURING WRAPUP — <what changed>`,
+     counted in both `amended` and `fixed at wrapup`.
+- **Record as pending** — the owner agrees the requirement is wrong but not how to fix it. Write a
+  `pending` record (L5 choice 5: the feature file is not touched; `reason` = the owner's one line
+  on why it is wrong, with `title` and 3–6 `keywords` written from it; `fingerprint` = the current
+  one; `owner` = `git config user.name`; `approved_via = "wrapup"`; `approved_by` = `git config
+  user.name`; `refs` = `["epic <id>"]`; offer a tracking issue when `gh` is available and the
+  repository is on GitHub), and validate it. The TOR displays as
+  `PENDING (<CR-ID>)`; the Deferrals row reads `RECORDED AS PENDING — <CR-ID>`, and Step 2.2
+  writes its `unverified:` line. This is also the choice for an owner who cannot yet say whether
+  the requirement or the code is right. It reads Disputed
+  from now on, and an epic that later touches it is held to the Disputed rules (Step 1.1 item 3a).
 - **Stop** — the epic FAILs. Still ask about every remaining non-PASS TOR so the report is
   complete.
 
-An undisclosed deferral **may** be fixed or waived, but its `Disclosed: **no**` mark stays in
+An undisclosed deferral **may** be fixed, waived, amended, or recorded as pending, but its `Disclosed: **no**` mark stays in
 the table permanently — fixing or waiving forgives the gap, not the silence.
 
 ### Step 1.5: Present Verification Report
@@ -427,7 +664,7 @@ Present a consolidated report to the user. The report has three jobs: deferrals 
 # Epic <id>: [Name] — Verification Report
 
 ## Deferrals
-Count: N (undisclosed: M, waived: W, fixed at wrapup: F)
+Count: N (undisclosed: M, waived: W, fixed at wrapup: F, amended: A, pending: P)
 
 | TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding | Waived by / Date / Reason |
 |--------|-------|-----------|----------------------|------------------|---------------------------|
@@ -440,18 +677,33 @@ implementer handoff had no Deferrals section. `Count:` is the number of rows; a 
 its row.)
 
 ## Counts
-- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup)
+- TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup, A amended, P pending)
 - Quality Gates: X/Y PASS
 - Tests: X passed, Y skipped, Z failed
 
-(X includes TORs fixed at wrapup; Z and C include waived TORs; xfail/skip results count as
+(Y is the final anchors — a SUPERSEDED row is not counted; Z includes pending TORs. P counts Step 1.4b pending records only; renewals from Step 1.1 item 3a appear under Requirement
+Changes. X includes TORs fixed at wrapup; Z and C include waived TORs; xfail/skip results count as
 skipped.)
 
 ## Requirements Anchor Reconciliation
-- [One of: "All TOR IDs verified in feature files — no discrepancies" /
-  "Anchors grandfathered — spec pre-dates peak-workflow v1.0.0" /
-  specific discrepancies resolved, each with a one-line note on which text was
-  used as the verification baseline]
+- [One of: "All TOR IDs are live requirements — no discrepancies" /
+  each anchor gap from Step 1.1 item 5 with its outcome (replaced with <successor> (<CR-ID>),
+  dropped (<CR-ID>), corrected, or unfixed — FAIL)]
+
+## Requirement Changes
+- [Every Change Record this branch adds — committed ones from
+  `git diff --name-only --diff-filter=A <base>...HEAD -- docs/requirements/changes/`, plus those
+  written in this session and not committed yet
+  (`git ls-files --others --exclude-standard docs/requirements/changes/`) — one line each:
+  `<CR-ID> <kind> — <TOR(s), old → new for a supersede> — <record title> (approved via <approved_via>, by <approved_by>)`;
+  then `Disputed: <TOR> — <title> (<CR-ID>, <N> days)` for each touched Disputed requirement under
+  the threshold (one renewed or resolved here is listed once, by its record line); or "None"]
+
+## Removal (removal epics only — omit otherwise)
+Retires <CR-ID> — <record title>
+- No citations left: PASS (sweep <retired IDs> exit 0) / FAIL — <path:line, …>
+- Code gone: PASS (<absence-test lines, if any>) / FAIL — <path:line, …>
+- Guard requirements: PASS / N/A — no guard requirements / FAIL — <TOR, …>
 
 ## Verification Narrative
 
@@ -487,14 +739,21 @@ stay independent of them.
 ```
 ## Requirements Implemented
 
-| TOR ID | Feature File | Verdict | Test Reference |
-|--------|--------------|---------|----------------|
-| TOR-01-Afs657G | 01-cli.feature.md | PASS | tests/test_cli.py:42 |
-| TOR-01-Bcd2345 | 01-cli.feature.md | PASS | tests/test_cli.py:67 |
-| TOR-02-Xyz5678 | 02-auth.feature.md | WAIVED | tests/test_auth.py:91 |
-| TOR-03-Mno9012 | 03-parts.feature.md | PASS | tests/test_parts.py:15 |
-| TOR-03-Pqr3456 | 03-parts.feature.md | FAIL | tests/test_parts.py:28 |
+| TOR ID | Title | Feature File | Verdict | Test Reference |
+|--------|-------|--------------|---------|----------------|
+| TOR-01-Afs657G | Tool shall report its version | docs/requirements/01-cli.feature.md | PASS | tests/test_cli.py:42 |
+| TOR-01-Bcd2345 | Tool shall print help | docs/requirements/01-cli.feature.md | PASS | tests/test_cli.py:67 |
+| TOR-02-Xyz5678 | Expired token is rejected | docs/requirements/02-auth.feature.md | WAIVED | tests/test_auth.py:91 |
+| TOR-03-Mno9012 | Create returns 201 | docs/requirements/03-parts.feature.md | PASS | tests/test_parts.py:15 |
+| TOR-03-Pqr3456 | Empty name is rejected | docs/requirements/03-parts.feature.md | FAIL | tests/test_parts.py:28 |
 ```
+
+Titles come from the one `tor-lifecycle titles` run (Step 1.1 item 4a). An amended requirement
+shows its successor (with its own verdict) plus a row for the old ID reading
+`SUPERSEDED → <successor> (<CR-ID>)`, whose Title is the `titles` line as printed and whose Test
+Reference is `—`; a pending one reads `PENDING (<CR-ID>)`. A removal epic with no guard
+requirements writes `None — a removal epic with no guard requirements`. Feature File is the path
+as `docs/requirements/NN-name.feature.md` in the report, handoff, and PR body alike.
 
 The Verdict line follows the rule in Step 1.4b. The Deferrals table, Counts, and Requirements
 Implemented table are lifted verbatim into the completion handoff and PR body — keep their
@@ -504,10 +763,11 @@ column sets exactly as shown.
 
 - Highlights are **selective**, not comprehensive — 3–6 bullets is typical, not one bullet per item. Lead the reviewer to the substantive checks; skip trivialities.
 - Author them from what was actually run in Steps 1.2–1.4.
-- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for waived, 🔧 for fixed during wrapup, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
+- Lead each bullet with a literal Unicode emoji — ✅ for pass, ⚠️ for waived or recorded as pending, 🔧 for fixed or amended during wrapup, ❌ for fail. Do **not** use shortcodes like `:white_check_mark:` — they don't render in git commits or many markdown viewers.
 - Deferrals never appear *only* in Highlights — they are already in the Deferrals table at the top. Highlights may reference them but must not be the sole record.
 
-**If the verdict is FAIL:** Stop here. List the specific items that need to be fixed — TORs already fixed during this wrapup are re-verified and not on that list. Do NOT proceed to Phase 2. Tell the user: make the fixes (re-run `/peak-workflow:start-epic $ARGUMENTS` on the same branch, or fix by hand), then run `/peak-workflow:wrapup-epic $ARGUMENTS` again in a fresh session. Any fix applied during this wrapup is uncommitted on the feature branch — say so, so it is not lost.
+**If the verdict is FAIL:** Stop here, on the feature branch (a stop that wrote nothing, like the
+Step 1.1 item 3a stops, says where it leaves the session). List the specific items that need to be fixed — TORs already fixed during this wrapup are re-verified and not on that list. Do NOT proceed to Phase 2. Tell the user: make the fixes (re-run `/peak-workflow:start-epic <id>` on the same branch, or fix by hand), then run `/peak-workflow:wrapup-epic <id>` again in a fresh session. Any fix or Change Record written during this wrapup is uncommitted on the feature branch — say so, so it is not lost.
 
 **If the verdict is PASS:** Ask the user to confirm before proceeding to Phase 2.
 
@@ -534,36 +794,44 @@ This is a disclosure, not a gate — `No` is a perfectly acceptable answer. The 
 
 ### Step 2.1: Write the Handoff File
 
-Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim).
+Write the completion handoff to `docs/implementation-plan/session-handoffs/epic-<id>-complete.md` .
 
-Use the template at `plugins/peak-workflow/skills/wrapup-epic/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure.
+Use the template at `${CLAUDE_PLUGIN_ROOT}/skills/wrapup-epic/HANDOFF_TEMPLATE.md`. Read that file once, copy its template body verbatim into the handoff file, and fill in placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure.
 
 ### Step 2.2: Update Status Sidecar
 
-Update `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
+Update `docs/implementation-plan/status/epic-<id>.md`:
 1. Change `status: Implemented` to `status: Complete` (leave any `owner:` line as it is — it
    records who implemented the epic)
 2. Set `completed: <today>` (YYYY-MM-DD)
-3. Set `handoff: session-handoffs/epic-<id>-complete.md` (where `<id>` is `$ARGUMENTS` verbatim)
+3. Set `handoff: session-handoffs/epic-<id>-complete.md` 
 4. If any TOR was waived in Step 1.4b, add (or replace) a
    `waived: TOR-… → <succ>, TOR-… → <succ>` line after `requirements:`, where `<succ>` is the
    successor epic ID recorded in the waiver. `/peak-workflow:status` treats a waived TOR as not
    satisfied by this epic — its coverage comes from the successor. Omit the line when nothing
    was waived.
+5. Record the results: run `tor-lifecycle mark <id> --pass <TOR> <TOR> … --fail <TOR> "RECORDED AS PENDING — <CR-ID>: <unmet>"`
+   — `--pass` for every TOR whose final verdict is PASS (fixed and amended ones included), one
+   `--fail` per TOR recorded as pending; waived and superseded TORs are left out. It writes one
+   `verified:` line per PASS from the current fingerprint (never type a fingerprint) and an
+   `unverified:` line per pending TOR — without one, a failed requirement would read as verified
+   underneath its dispute. Skip it when there is nothing to record (a removal epic with no guard
+   requirements).
 
-Then locate the epic spec file — `grep -rl "epic-$ARGUMENTS" docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` (or the glob `docs/implementation-plan/phase-*/epic-$ARGUMENTS-*.md` directly) — and rewrite its `**Status:**` header line to `**Status:** Complete — <today>` (same date just written to `completed:`), so the spec stays in sync with the sidecar.
+Then locate the epic spec file — `grep -rl "epic-<id>" docs/implementation-plan/phase-*/epic-<id>-*.md` (or the glob `docs/implementation-plan/phase-*/epic-<id>-*.md` directly) — and rewrite its `**Status:**` header line to `**Status:** Complete — <today>` (same date just written to `completed:`), so the spec stays in sync with the sidecar.
 
 ### Step 2.3: Commit
 
 Automatically commit all changes made during verification and completion without
 asking the user for permission:
 
-1. Stage the handoff file, updated `docs/implementation-plan/status/epic-$ARGUMENTS.md`, the updated epic spec file, and any other files modified during verification (specific file paths, not `git add -A`)
-2. Commit message format (where `<id>` is `$ARGUMENTS` verbatim):
+1. Stage the handoff file, updated `docs/implementation-plan/status/epic-<id>.md`, the updated epic spec file, any Change Record written here with the feature file and tracing sidecar it changed, and any other files modified during verification (specific file paths, not `git add -A`)
+2. Commit message format:
    ```
    chore(epic-<id>): verify and complete — <brief summary>
 
    Deferrals: <deferral-count>, waived: <waived-count>, fixed at wrapup: <fixed-count>.
+   Amended: <A>, pending: <P>. Requirement changes: <CR-ID kind TOR, …, or "none">
    Refs #<N>
    ```
    `<deferral-count>` / `<waived-count>` / `<fixed-count>` come from the Step 1.5 Deferrals `Count:` line. Include the `Refs #<N>` line only if a source issue number was captured in Step 1.1 item 4. Files changed by a Step 1.4b fix are part of this commit — stage them by path.
@@ -589,12 +857,15 @@ If multiple epics are now unblocked, call out which ones can be worked on in par
 
 ### Step 3.3: Recommended Next Action
 
-Based on the dependency graph and project state, recommend which epic to start next (or which set to run in parallel), with a brief rationale.
+If exactly one epic is ready, recommend it with a brief rationale. If several are, list them and say that choosing is the team's decision (as `/peak-workflow:status` does) — never pick one.
 
 ### Step 3.4: Outstanding Items
 
 This section is a record, not a decision point. It may list only:
 - TORs already waived in Step 1.4b, each with its successor epic (`TOR-… → epic <succ>`)
+- Pending records written here (`TOR-… — recorded as pending in <CR-ID>; resolve with
+  /peak-workflow:capture-requirements TOR-…`) and unassigned successors (`TOR-… — plan it with
+  /peak-workflow:add`)
 - Non-TOR observations from the Step 1.4 code review (tech debt, refactors)
 
 It must not originate a deferral. If a substantive finding first surfaces here, go back to the
@@ -648,7 +919,9 @@ committed on the feature branch before it is merged into main.
 ## Step 5: Ship to Base Branch
 
 After Phase 3 orientation is complete and the Step 4 doc refresh subagent has
-committed on the feature branch, ship the branch. Ask the user which mode to use
+committed on the feature branch, run `tor-lifecycle check --base <base>` once more: a finding
+marked `[this branch, blocking]` stops the ship (the doc refresh or a late fix introduced it) —
+fix it as in Step 1.1 item 3a and commit before continuing. Then ship the branch. Ask the user which mode to use
 via `AskUserQuestion`. Present both options neutrally — do **not** auto-detect a
 default, do **not** recommend one mode over the other. There is no reliable signal
 to determine which mode is correct for the user's context (repo permissions, team
@@ -684,7 +957,7 @@ be made by the user every invocation.
 3. `git push -u origin <branch>`
 4. `gh pr create --base <base-branch> --title "epic(<id>): <epic name>" --body "<body>"`
 
-   The body follows the template at `plugins/peak-workflow/skills/wrapup-epic/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
+   The body follows the template at `${CLAUDE_PLUGIN_ROOT}/skills/wrapup-epic/PR_BODY_TEMPLATE.md`. Read that file once, copy its template body verbatim into the `--body` argument, and substitute placeholders from the Step 1.5 verification report and the Step 2.0 manual-verification disclosure. Reuse the "What Was Built" content **already in memory** from Step 2.1 — do not re-read the handoff file from disk.
 
    The issue-link line is driven by the spec's `**Source:** Issue #<N>` header captured in Step 1.1 item 4 and by the Step 1.5 Deferrals **waived count** (`W`). If no source issue is known, omit the line entirely (existing integer-IDed epics without a `Source:` line render cleanly this way). If `W` is 0, write `Closes #<N>` — rows marked `FIXED DURING WRAPUP` are delivered and do not block closing. If `W` is greater than 0, write `Refs #<N>` — a waived TOR means the issue's requirement is not fully delivered, so merging must not auto-close it. Only the PR body may close the issue; the start-epic and wrapup commits always use `Refs`.
 

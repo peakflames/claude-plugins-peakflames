@@ -204,8 +204,20 @@ class FindingD(CheckCase):
         self.repo.commit("edit")
         [d] = letters(self.repo.check(), "D")
         self.assertEqual((d["tor"], d["epic"]), (A2, "Epic001"))
-        self.assertIn("/peak-workflow:wrapup-epic Epic001 reverify", d["message"])
+        # Edited without a record (A) too: reverify would ratify it, so D points at capture-requirements.
+        self.assertIn(f"/peak-workflow:capture-requirements {A2}", d["message"])
         self.assertFalse(d["blocking"])
+
+    def test_recorded_but_unproven_change_points_at_reverify(self):
+        new = self.edited(A2, "The tool shall print brief help")
+        self.rewrite(*new)
+        self.repo.record("reword", "Rw00005", changes=[{"tor": A2, "from": self.scen[1].fp(), "to": new[1].fp()}],
+                         evidence={"commit": "1a2b3c4", "result": "historical"})
+        self.repo.commit("edit with a historical reword")
+        found = self.repo.check()
+        self.assertEqual(letters(found, "A"), [])
+        [d] = letters(found, "D")
+        self.assertIn("/peak-workflow:wrapup-epic Epic001 reverify", d["message"])
 
     def test_proven_reword_clears_d(self):
         new = self.edited(A2, "The tool shall print brief help")

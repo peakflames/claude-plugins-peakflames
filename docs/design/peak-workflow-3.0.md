@@ -69,6 +69,9 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | `mark` | wrapup, reverify, and quick-fix write `verified:` / `unverified:` / `reverified:` and append to `requirements:` | Adds `mark <epic> [--append TOR] [--pass TOR] [--fail TOR REASON] [--reverified]`, the only writer of those lines; refuses IDs that are not live, not owned, or waived, and never touches `status:` | Hand-edited sidecars are a strict-parse data error waiting to happen; fingerprints are never typed by a prompt |
 | In-epic amend | start-epic "Amend" runs the decision test and writes the record | In-epic amendment is always a **supersede**; a reword-eligible (wording-only) edit is implemented as written and suggested for a later `capture-requirements <TOR>` | A wording-only edit changes nothing the epic builds, and a reword's test evidence cannot point at uncommitted mid-epic work |
 | quick-fix reword | The record ships "in the same commit as the code" | A quick-fix **reword** is a second commit on the same `hotfix/` branch, after the code commit, so `[evidence] commit` names the tree the citing tests ran on. A supersede stays one commit | A commit cannot cite its own SHA |
+| Wrapup pending line | Record as pending writes a `pending` record; `unverified:` is only for a reverify FAIL | A TOR recorded as pending at wrapup also gets an `unverified:` line (`RECORDED AS PENDING — CR-…`) from Step 2.2's `mark` | With neither line, a Complete epic's failed requirement reads "Verified (legacy)" under its dispute, and reverify's default scope skips it |
+| Reverify A stop | Reverify re-checks every stale requirement | Reverify stops on a scoped requirement with an A finding (edited without a record) and sends it to `capture-requirements <TOR>`; `check`'s D message says the same when A is present | A reverify PASS would ratify an unrecorded meaning change |
+| Wrapup branch freshness | (none) | Wrapup stops when the base gained Change Records the branch lacks: merge the base first | Dispute ages and record lookups read the branch's own files |
 | quick-fix reverify | quick-fix "runs the reverify step for that successor on the same branch" | A fresh `general-purpose` sub-agent (never a fork) verifies the successor blind; the result and the `requirements:` append are one `mark` call. FAIL offers fix again / ship marked unverified / Stop | Keeps verification independent of the implementing session, and a successor never sits in a Complete epic with neither line (it would read as Verified) |
 
 ## Plan checklist
@@ -81,7 +84,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 4 | **Authoring** — capture-requirements 3B.2 five options, TOR-ID argument mode, re-litigation grep, Step 4 `check --base`, Haiku brief rewrite; FEATURE/TRACING templates; discover Removed/Modified rows; mockup (Q22); triage routes + `check` | Dry-run: brownfield supersede, retire, pending, reword-with-evidence on a docs/ branch | ✅ Done |
 | 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ✅ Done |
 | 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ✅ Done |
-| 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ☐ |
+| 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ✅ Done |
 | 8 | **Step 0002 lifecycle migration** (#20 Migration 1–8, one commit each; strips `migration_source`) + contributor kit (Q9) | A "Project A-like" fixture upgrades with identical fingerprints before/after the strip; seed surfaces exactly the planted stale set | ☐ |
 | 9 | **Release gate** — README / plugin CLAUDE.md / CHANGELOG (BREAKING, /upgrade), 2-pass full dry-run, live UAT, draft PR → develop, contributor request, release | All four Q10 gates pass | ☐ |
 
@@ -315,4 +318,56 @@ proposal + addendum). Every plan reads this file first and updates it last.
   quick-fix: supersede with a sub-agent PASS, reword as a second commit, own-branch A restored):
   0 Critical; UX/Minor fixes applied (record `equivalence`, the `Closes` trailer's home, a fix
   that changes an in-progress epic's requirement stops).
+
+### Plan 7 — wrapup-epic
+
+- **Helper:** `mark --pass` / `--append` take several IDs (`extend`); `check`'s D message points at
+  `capture-requirements <TOR>` when the same TOR has an A finding; F `disputed` says "failed
+  verification" / "still marked done" / nothing, by the owning Complete epic's lines. No new command.
+- **wrapup-epic:** `<id>` = first word of `$ARGUMENTS`; Session Guard also refuses after quick-fix.
+  Step 1.1 item 3a (Requirements Health): stop when the base has records the branch lacks;
+  blocking own-branch A/B/C (Restore / Amend / Stop, C fix); Disputed touched (sidecar or an
+  *added* test line): Safety stops with no renewal, overdue → resolve on the branch / renew
+  (fields spelled out) / Stop, under threshold → listed. 4a: Q16 stop (removal epics exempt),
+  two-column anchors, titles from one `titles` run. Item 5: superseded / retired / unknown anchor
+  = FAIL whose Fix now replaces, drops, or corrects (no Defer). 1.3: Tests gate named; Removal gate
+  (sweep exit 0, symbols gone except absence tests, guards pass). 1.4b: fourth option "The
+  requirement may be wrong, not the code" → Amend (supersede, `approved_via = "wrapup"`,
+  `AMENDED AT WRAPUP`) / Record as pending / Back; never for Safety or an anchor gap. Verdict rule
+  admits pending records. Report: Counts with amended/pending, Requirement Changes (committed +
+  untracked records), Removal block, title column. 2.2: one `mark` (`--pass` PASS, `--fail`
+  pending). Pre-ship `check --base` re-run. 3.3 never picks among several ready epics.
+- **Reverify mode** (R1–R6): Complete only; `requirements: —` refused (Q16); scope = named IDs or
+  owned Changed since verified / Verification failed (by `underlying_state`); stops on an A
+  finding; `hotfix/verify-epic-<id>-<short-name>` (an unmerged earlier one stops); Step 1.2 + Tests
+  gate (+ UX Baseline on named screens); one `mark … --reverified`; dated handoff (appended on a
+  same-day re-run, Was column keeps the old line); ships like quick-fix.
+- **Templates:** HANDOFF / PR_BODY gain Requirement Changes, Removal, the title column, amended /
+  pending counts and legend. Template paths are `${CLAUDE_PLUGIN_ROOT}`-based.
+- **Interim names made real:** every `wrapup-epic <id> reverify` and quick-fix amendment-path
+  mention (triage, capture-requirements, status, plan-project, start-epic, quick-fix) matches what
+  shipped. triage now routes an Implemented epic's requirement change to wrapup (quick-fix's path
+  is Complete-only); status adds the "decide first" caveat to any A-flagged requirement in the
+  re-check panel, not only Changed since verified ones.
+- **Left alone** (pre-existing): Step 1.2's verdict for a test that mirrors the Then but skips the
+  Given/When; "UNDISCLOSED DEFERRAL" for a claimed PASS that was never deferred; `check` E
+  `own_branch` on a rewritten line; `validate` does not enforce that a second pending on a TOR refs
+  the open one (`check` F `multiple-records` reports it).
+- **Q13 dry-run:** `tests/peak-workflow/dryrun/plan7_wrapup.py` (Plan 6 + nGft13, qDsc15, rPrv16,
+  hRmXls7 Implemented on feature branches; a historical-evidence reword for an honest reverify
+  PASS; Page010 with A + D). Pass 1 (3 agents): 5 Critical — `mark --pass A B` exit 2, Requirement
+  Changes missed uncommitted records, "code gone" grep hit absence tests, reverify could ratify an
+  unrecorded edit, status lost the A caveat after a FAIL. Pass 2 (3 agents: amend, pending,
+  renew, Safety stop, removal FAIL→PASS, reverify PASS+FAIL in one run, A stop, status): 1
+  Critical (a pending TOR read legacy-verified) — fixed, checked by hand. Pass 3 (record as
+  pending → status → code fixed → reverify PASS → status): every step worked as written; status
+  now sends a Disputed failed requirement to capture-requirements before quick-fix, and the
+  reverified handoff says a PASS does not resolve a dispute.
+- **Open question (owner decision, not in #20):** nothing closes a dispute when the owner decides
+  the requirement **stands** as written. #20 resolves a `pending` record only by a reword,
+  supersede, or retire that refs it; after the code is fixed and reverified (pass 3), the TOR stays
+  Disputed and turns overdue at 30 days. Options: a fifth record kind (e.g. `uphold`, refs the
+  pending, current fingerprint, no feature-file change) that `open_pending` treats as resolving,
+  or allow a `reword` with `from == to` plus passing evidence. Either touches the record schema,
+  `validate`, and capture-requirements 3C — decide before Plan 8 (step 0002 writes records).
 
