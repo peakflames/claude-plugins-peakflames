@@ -44,6 +44,12 @@ table show PASS or CANNOT VERIFY in the TOR Coverage section, the epic may be re
 If no implemented handoff exists yet, use test-file presence for the TOR IDs as a heuristic.
 When in doubt, defer to the user.
 
+A **removal epic** (its sidecar has a `retires:` line, its spec a `## Removal` section) may have
+no anchors at all. Its removal part is done only when
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <the Removal section's retired IDs>`
+reports nothing (exit 0) — check that as well, and never read an empty anchors table as "all
+done".
+
 If the user confirms they want to pause anyway, proceed with Step 2.
 
 ## Step 2: Capture Task State
@@ -70,6 +76,10 @@ Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-pa
 
 ### TOR IDs Not Started
 - [List TOR IDs not yet touched]
+
+[Removal epic only:]
+### Removal
+- [N] citations of the retired IDs remain (`tor-lifecycle sweep <retired IDs>`); code paths still to delete: [list]
 
 ## Files Created/Modified So Far
 
@@ -104,7 +114,7 @@ so the spec stays in sync with the sidecar.
 
 ## Step 5: Commit
 
-**Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + index update). If the user confirms:
+**Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + sidecar and spec Status line). If the user confirms:
 
 1. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
 2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`
