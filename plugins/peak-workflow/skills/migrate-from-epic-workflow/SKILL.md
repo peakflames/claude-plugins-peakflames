@@ -612,7 +612,7 @@ Verify all of the following before committing:
   TOR ID in the table
 - [ ] Every TOR ID in every Requirements Anchors table exists in the cited `.feature.md` file
   (verify with grep)
-- [ ] All status sidecars have a `requirements:` line (5-line format)
+- [ ] All status sidecars have a `requirements:` line (5-line format, or 6 lines when an optional `owner:` line is present)
 - [ ] CLAUDE.md contains a `## Peak Workflow` section with peak-workflow command references
 - [ ] CLAUDE.md has no remaining `/epic-workflow:` command references
 - [ ] `docs/requirements/` exists and contains at least one `.feature.md` file

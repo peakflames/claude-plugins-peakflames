@@ -15,6 +15,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] — 2026-10-26
+
+### Changed
+
+- **Bundles `peak-workflow` v2.1.0** — team orientation (epic provenance, "new since you last
+  looked", Ready to Start table, epic card before branching, freshness guard) and the RustFS fix
+  for local S3. Also bundles `epic-workflow` v2.5.1 and the `claude-code-setup` scripts v0.1.0,
+  both unchanged.
+
 ## [1.1.0] — 2026-09-16
 
 ### Changed
