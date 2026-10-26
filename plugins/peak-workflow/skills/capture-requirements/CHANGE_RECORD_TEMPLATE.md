@@ -15,7 +15,7 @@ Fix every problem it prints (exit 1) and run it again until it prints `ok`.
 | Field | Where the value comes from |
 |---|---|
 | file name, `id`, `date` | `date` = today (`date +%Y-%m-%d`); `<suffix>` = 7 characters generated exactly like a TOR suffix (capture-requirements Step 3A.3; regenerate when all digits or already used in `changes/`); `id = "CR-<suffix>"` |
-| `approved_via` | `"docs-branch"` for every record this skill writes |
+| `approved_via` | `"docs-branch"` for every record capture-requirements writes (start-epic writes `"epic-branch"`, wrapup-epic `"wrapup"`, quick-fix `"quick-fix"`) |
 | `approved_by` | `git config user.name` — never ask the user to type a name |
 | `refs` | Issues, epics (`"epic <id>"`), and other records (`"CR-…"`) this one answers. A record that resolves or renews a `pending` record **must** list that record's ID. May be empty |
 | `keywords` | 3–6 nouns and phrases someone would use to propose the idea again — the re-litigation search reads them with `title` and `reason` |
@@ -122,4 +122,28 @@ keywords = ["item type", "rename"]
 tor = "TOR-26-CEadAmF"
 feature_file = "26-item-type-rename.feature.md"
 fingerprint = "5e2c0a9b7d14"        # the current text's fingerprint
+```
+
+## uphold — a disputed requirement stands as written
+
+Closes an open `pending` record without changing the requirement. The feature file and tracing
+sidecar are not touched. `refs` must name the open pending record (the latest renewal, if any);
+`validate` checks that it names this requirement.
+
+```toml
+id = "CR-Up4hLd2"
+date = 2026-10-26
+kind = "uphold"
+title = "Item type rename stays required"
+reason = """
+The owner checked with support: customers still ask for the rename, so the requirement stands."""
+approved_via = "docs-branch"
+approved_by = "A. Maintainer"
+refs = ["CR-Wq7nR2c"]
+keywords = ["item type", "rename", "upheld"]
+
+[[changes]]
+tor = "TOR-26-CEadAmF"
+feature_file = "26-item-type-rename.feature.md"
+fingerprint = "5e2c0a9b7d14"        # the current text's fingerprint (tor-lifecycle fingerprint)
 ```

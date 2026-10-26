@@ -167,7 +167,7 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    `TOR-… — <title>`, and the command `/peak-workflow:wrapup-epic <id> reverify`. A Verification
    failed requirement adds "fix the code first with `/peak-workflow:quick-fix`" — unless it is
    Disputed, which adds "known to be wrong (<CR-ID>): decide with
-   `/peak-workflow:capture-requirements <TOR>` first" instead. A requirement in
+   `/peak-workflow:capture-requirements <TOR>` first — uphold it if it stands" instead. A requirement in
    this group (either state) that also has an A finding (edited without a record) adds "decide first
    whether its meaning changed: `/peak-workflow:capture-requirements <TOR>`" — reverify alone
    would ratify an unrecorded edit. The epic stays
