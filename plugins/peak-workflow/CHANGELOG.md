@@ -36,6 +36,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   run before setup; existing projects get it from `/upgrade`.
 - **Helper commands `format`, `provenance`, `inflight`** — the format verdict and stamp writes
   (`--init`, `--set`), step 0001's backfill, and unmerged branches touching given paths.
+- **Amending merged requirements** — `capture-requirements` offers add alongside, reword (with
+  passing test evidence), supersede (new ID in place), retire, or record as pending for each
+  changed requirement, writing a validated Change Record. Pending replaces the silent Defer.
+- **`capture-requirements <TOR-ID> [description]`** — amends one requirement on its own `docs/`
+  branch: a stale or unrecorded edit, a disputed requirement, or a requested change. Can restore
+  the verified text, or supersede with it recovered from git.
+- **Re-litigation check** — `capture-requirements`, `discover`, and `triage` search Change Records
+  before adding an idea, and ask before reintroducing one that was retired, superseded, or
+  disputed.
+- **`triage` AMEND verdict** — a change to one existing requirement dispatches
+  `capture-requirements <TOR-ID>`; a small owner-approved amendment with a code fix routes to
+  quick-fix's amendment path; a bug on a stale requirement recommends reverify first.
+- **`mockup` Removed screens** — a withdrawn screen keeps its row as retired; Modified and Removed
+  UX Changes rows list the TORs citing that screen.
+- **Helper commands `validate`, `search`, `text`** — Change Record schema check, the re-litigation
+  search, and a requirement's block as it is, was at a commit, or was verified.
 
 ### Changed
 
@@ -55,6 +71,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`status` takes multi-owner TORs from `check`** (finding F) instead of computing them.
 - **Spec provenance and `owner:` are always present** — the "absent" fallbacks are removed;
   step 0001 backfills older projects.
+- **`capture-requirements` checks its branch** — Step 4.2 runs `validate` and
+  `check --base`; every finding the branch introduced is fixed before the summary, which then
+  offers `/add` for unassigned successors and removal epics.
+- **`check` accepts a restored requirement** — returning a requirement to its text as first merged
+  needs no Change Record on the branch; finding E is labelled "Retired or superseded ID still cited".
+- **Feature files show only present truth** — no `# Note:` blocks or change markers; requirement
+  rationale moves to the tracing entry's optional `rationale`.
+- **Tracing sidecars cover the live set only** — no `title` or `generated`; retired and
+  superseded entries are deleted, their sources copied into the record.
+- **`discover` writes current-state documents** — vision and ConOps are rewritten to the present;
+  `Modified` and `Removed` changelog rows are mandatory when a capability changes; `Pending`
+  rows carry undecided changes.
 
 ### Removed
 
