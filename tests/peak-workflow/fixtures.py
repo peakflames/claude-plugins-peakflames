@@ -46,6 +46,11 @@ class Scenario:
         lines += [f"    {s}" for s in self.steps]
         return "\n".join(lines)
 
+    def fp(self) -> str:
+        """This Scenario's fingerprint, computed by the helper under test."""
+        [(_tor, fp)] = tor_lifecycle.fingerprint_text(self.render())
+        return fp
+
 
 def scenario(tor: str, title: str, *steps: str, **kw) -> Scenario:
     return Scenario(tor, title, list(steps), **kw) if steps else Scenario(tor, title, **kw)
@@ -115,15 +120,15 @@ def record_data(kind: str, suffix: str, date: str = "2026-10-21", /, tors: list[
         data["evidence"] = {"commit": "1a2b3c4", "result": "pass", "tests": ["test/a.test.ts"]}
         data["changes"] = [{"tor": t, "from": "0" * 12, "to": "1" * 12} for t in tors]
     elif kind == "supersede":
-        data["changes"] = [{"tor": t, "feature_file": "01-cli.feature.md", "fingerprint": "a" * 12,
+        data["changes"] = [{"tor": t, "feature_file": "01-core.feature.md", "fingerprint": "a" * 12,
                             "successors": ["TOR-01-Succ001"], "text": f"Scenario: [{t}] old"} for t in tors]
     elif kind == "retire":
         data["removal"] = "none"
-        data["changes"] = [{"tor": t, "feature_file": "01-cli.feature.md", "fingerprint": "b" * 12,
+        data["changes"] = [{"tor": t, "feature_file": "01-core.feature.md", "fingerprint": "b" * 12,
                             "traced_to": ["vision G1"], "text": f"Scenario: [{t}] old"} for t in tors]
     elif kind == "pending":
         data["owner"] = "A. Maintainer"
-        data["changes"] = [{"tor": t, "feature_file": "01-cli.feature.md", "fingerprint": "c" * 12}
+        data["changes"] = [{"tor": t, "feature_file": "01-core.feature.md", "fingerprint": "c" * 12}
                            for t in tors]
     for key, value in overrides.items():
         if value is None:
@@ -168,7 +173,8 @@ class FixtureRepo:
                           feature_text(nn, name.replace("-", " ").title(), scenarios, **kw))
 
     def sidecar(self, epic: str, status: str = "Not Started", requirements: list[str] | None = None,
-                verified: dict[str, str] | None = None, **lines: str) -> Path:
+                verified: dict[str, str] | None = None, unverified: dict[str, str] | None = None,
+                **lines: str) -> Path:
         """Write status/epic-<epic>.md. Extra keyword lines (owner=, waived=, retires=, ...) follow."""
         out = [f"status: {status}", f"owner: {lines.pop('owner', '—')}",
                f"implemented: {lines.pop('implemented', '—')}",
@@ -178,6 +184,9 @@ class FixtureRepo:
         if verified:
             out.append("verified:")
             out += [f"  {tor}: {fp}" for tor, fp in verified.items()]
+        if unverified:
+            out.append("unverified:")
+            out += [f"  {tor}: {why}" for tor, why in unverified.items()]
         return self.write(f"docs/implementation-plan/status/epic-{epic}.md", "\n".join(out) + "\n")
 
     def record(self, kind: str, suffix: str, date: str = "2026-10-21", /, **kw) -> Path:
@@ -211,8 +220,45 @@ class FixtureRepo:
                 del os.environ["GIT_AUTHOR_DATE"], os.environ["GIT_COMMITTER_DATE"]
         return self.git("rev-parse", "HEAD")
 
+    def fast_import(self, commits: list[tuple[str, dict[str, str | None]]], start: int = 1767225600) -> None:
+        """Build a linear history on `develop` quickly: one (message, {path: text or None}) per
+        commit, one day apart from `start` (epoch seconds). The working tree is reset to the tip."""
+        out = bytearray()
+        for n, (message, files) in enumerate(commits, 1):
+            msg = message.encode()
+            out += (f"commit refs/heads/develop\nmark :{n}\n"
+                    f"committer Fixture Author <fixture@example.com> {start + n * 86400} +0000\n"
+                    f"data {len(msg)}\n").encode() + msg + b"\n"
+            for path, text in files.items():
+                if text is None:
+                    out += f"D {path}\n".encode()
+                else:
+                    data = text.encode()
+                    out += f"M 100644 inline {path}\ndata {len(data)}\n".encode() + data + b"\n"
+        subprocess.run(["git", "-C", str(self.root), "fast-import", "--quiet"], input=bytes(out), check=True)
+        self.git("reset", "-q", "--hard", "develop")
+
     def checkout(self, branch: str, create: bool = False) -> None:
         self.git("checkout", "-q", *(["-b"] if create else []), branch)
+
+    def merge(self, branch: str, message: str | None = None) -> str:
+        """`git merge --no-ff` into the current branch; returns the merge commit SHA."""
+        self.git("merge", "-q", "--no-ff", "-m", message or f"Merge {branch}", branch)
+        return self.git("rev-parse", "HEAD")
+
+    def json_cli(self, *args: str) -> tuple[int, object]:
+        """Run a `--json` command; returns (exit code, parsed output)."""
+        import json
+        result = self.cli(*args, "--json")
+        if result.returncode not in (0, 1):
+            raise AssertionError(f"{args} exited {result.returncode}: {result.stderr}")
+        return result.returncode, json.loads(result.stdout)
+
+    def check(self, *args: str, today: str = "2026-10-26") -> list[dict]:
+        return self.json_cli("check", "--today", today, *args)[1]["findings"]
+
+    def states(self, today: str = "2026-10-26") -> dict[str, dict]:
+        return {r["tor"]: r for r in self.json_cli("states", "--today", today)[1]["requirements"]}
 
     # -- running the helper ----------------------------------------------------------------
 
