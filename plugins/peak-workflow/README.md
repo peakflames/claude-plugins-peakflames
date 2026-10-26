@@ -368,8 +368,7 @@ The `owner:` line is set by `start-epic` to the person who starts the epic (`git
 It travels with the feature branch, so it reaches `develop` when the epic merges; until then,
 `start-epic` warns when the epic's branch already exists on origin under someone else's commits.
 The spec's `**Planned by:**` / `**Planned:**` / `**Plan branch:**` header lines record who planned
-the epic; for specs that predate them, `status` and `start-epic` read the same facts from git
-history.
+the epic; specs that predate them show `—`.
 
 The `waived:` line is optional — `wrapup-epic` writes it when a TOR was waived to a successor
 epic, and `status` credits that TOR's coverage to the successor.

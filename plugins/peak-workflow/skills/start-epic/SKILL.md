@@ -202,10 +202,8 @@ Scope:         <N> TOR(s); screens <S-NN list from ## Screens, or —>
 Purpose:       <first sentence of the spec's ## Description>
 ```
 
-- **Planned by / date** — the spec's `**Planned by:**` and `**Planned:**` lines. If absent (a spec
-  written before peak-workflow 2.1.0), derive them from the commit that added the spec:
-  `git log --diff-filter=A --follow --format='%an|%ad' --date=short -- <spec-path> | tail -1`, and
-  append `(from git)`.
+- **Planned by / date** — the spec's `**Planned by:**` and `**Planned:**` lines; `—` when the spec
+  has none. Do not reconstruct them from git history.
 - **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-$ARGUMENTS.md`; absent
   means `—`. `owner:` and an In Progress / Paused / Implemented status live on the feature branch
   until the epic merges, so when the local branch `feature/epic-<id>-<short-name>` exists, read
@@ -222,7 +220,7 @@ is one of your names; a bare name (`**Planned by:**`, `owner:`) is yours when it
 names. Inline `$(git config user.email)` / `$(git config user.name)` in any command (shell
 variables do not persist between commands), and never decide with `git log --author` (a regex
 substring match).
-- `⚑ Planned by <name>, not you — check this is yours to start.`
+- `⚑ Planned by <name>, not you — check this is yours to start.` (skip when Planned by is `—`)
 - `⚑ Phase <N> — <Phase Name> was added to the plan by <name>, not you.` — the author of the
   commit that added the phase index:
   `git log --diff-filter=A --format='%ae|%an' -- docs/implementation-plan/phase-<N>-*/index.md | tail -1`.
