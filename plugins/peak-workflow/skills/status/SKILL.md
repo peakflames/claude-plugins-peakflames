@@ -30,13 +30,14 @@ is one of your names. Shell variables do not persist between commands — inline
 `$(git config user.email)` / `$(git config user.name)` where a command needs them. Never decide
 with `git log --author` (a regex substring match).
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On `verdict: behind`, print its message as a banner above everything else and continue in
+degraded mode: show what the files hold, and add to the
+banner that figures may be incomplete until the upgrade runs. On any other exit, print its output and stop — it
+names the fix (a plugin update or a Python install).
 
 ---
 
@@ -91,8 +92,7 @@ Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For eac
   list; this is the set of TOR IDs this epic is responsible for implementing.
 - `waived:` line (optional, written by `wrapup-epic`): comma-separated `TOR-… → <succ>` pairs.
   Parse into a TOR ID → successor epic ID map.
-- `owner:` line (optional, written by `start-epic` when the epic starts): the person working on
-  it. Absent or `—` means unclaimed.
+- `owner:` line: the person working on it (set by `start-epic`). `—` means unclaimed.
 
 Take each epic's **Slug** from its spec filename alone — glob
 `docs/implementation-plan/phase-*/epic-*.md`, do not open the specs (see "Epic references" above).
@@ -130,10 +130,11 @@ Build a TOR ID → coverage status map. For every TOR ID from the feature files:
    | Implemented | `Implemented (pending independent verification)` |
    | Complete | `Verified` |
 
-3. If a TOR ID appears in multiple epics' `requirements:` fields **after excluding epics that
-   waive it**, use the most advanced status among those epics and record the TOR ID in a
-   multi-owner list for the dashboard — since peak-workflow 1.7.0 each TOR is owned by exactly
-   one epic (legacy plans may still have splits).
+3. If a TOR ID appears in more than one epic's `requirements:` field **after excluding epics
+   that waive it**, use the most advanced status among those epics. Owning a TOR twice is a
+   health finding, reported by `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --json`
+   as finding F with `"kind": "multi-owner"` (`detail.epics` lists the owners) — run it once and
+   keep those findings for the dashboard.
 
 Count totals for each coverage status. Compute overall verified percentage:
 `(Verified count / total TOR count) * 100`
@@ -141,7 +142,7 @@ Count totals for each coverage status. Compute overall verified percentage:
 ## Step 5: Flag Stale Paused Epics
 
 For each epic whose sidecar (Step 2) has `status: Paused`:
-1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID — legacy integer or 7-char alphanumeric)
+1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` 
 2. Check the **Paused** date
 3. If the pause date is more than 7 days ago, flag it as stale
 
@@ -184,8 +185,7 @@ For each ready epic, also compute **Unblocks** — the number of Not Started epi
 direct dependency. Then read the spec facts for the ready epics only — never every spec — with one
 command over their spec paths (no full-file reads):
 `grep -H -E -A3 '^\*\*Planned( by)?:\*\*|^## Description' <ready-spec-paths>`
-- **Planned by** and **Planned** — the `**Planned by:**` and `**Planned:**` lines; `—` when the
-  spec has none. Do not reconstruct them from git history.
+- **Planned by** and **Planned** — the `**Planned by:**` and `**Planned:**` lines.
 - **Purpose** — the first sentence after `## Description`, cut to about 90 characters.
 
 Flag a ready epic with `⚑` when its **Planned by** is set and is not one of your names.
@@ -257,7 +257,7 @@ Using the data assembled from phase indexes (Steps 1–3) and sidecars (Step 2),
 [If any TOR IDs are "Waived (successor does not list it)":]
 > ⚠️ [N] waived TOR requirements name a successor epic that does not list them: {TOR → epic list}. Add them to the successor's spec and sidecar.
 
-[If the multi-owner list from Step 4.5 item 3 is non-empty:]
+[If `check` reported any `multi-owner` findings (Step 4.5 item 3):]
 > ⚠️ [N] TOR requirements are owned by more than one epic: {TOR (epic, epic) list}. Each TOR should have exactly one owner.
 
 ## Active Work

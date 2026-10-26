@@ -41,9 +41,8 @@ Placeholder reference:
 
 2. **Update status to "In Progress"** — edit `docs/implementation-plan/status/epic-$ARGUMENTS.md`:
    change `status: Not Started` (or `status: Paused`) to `status: In Progress`, and set
-   `owner: <git config user.name>` — add the line directly after `status:` if the sidecar has
-   none (sidecars written before peak-workflow 2.1.0), replace `owner: —`, and keep it if it
-   already names you (case-insensitive; any name you have committed under with your
+   `owner: <git config user.name>` — replace `owner: —` (insert the line after `status:` if an
+   epic skipped by `/peak-workflow:upgrade` has none), and keep it if it already names you (case-insensitive; any name you have committed under with your
    `git config user.email` counts). If it names someone else, the user confirmed taking it over at
    `start-epic` Step 2.5 — replace it and say so in one line. Leave `implemented:`,
    `completed:`, and `requirements:` unchanged. Capture whether this is a

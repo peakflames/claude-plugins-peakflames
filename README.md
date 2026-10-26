@@ -7,8 +7,7 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 > **Recommended:** `peak-workflow` is the preferred plugin for new projects. It introduces a
 > formal requirements baseline (Gherkin-style TOR requirements) that makes acceptance criteria
 > explicit, immutable, and independently verifiable — eliminating the ambiguity of prose
-> checklists. Existing `epic-workflow` projects can migrate using
-> `/peak-workflow:migrate-from-epic-workflow`.
+> checklists. From peak-workflow 3.0.0 there is no migration path from `epic-workflow` projects.
 
 | Plugin | Description |
 |--------|-------------|
