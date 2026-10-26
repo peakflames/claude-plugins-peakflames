@@ -80,7 +80,7 @@ where they add clarity:
 | `Feature:` heading + `As a / I want / So that` | Always — even one line each is enough on a small feature |
 | Section banner comments (`# ---`) | Group Scenarios by sub-area when the file has more than ~5 of them |
 | `Scenario:` block | One per TOR requirement |
-| Inline `# Note:` blocks inside a Scenario | When the requirement carries non-obvious context (file format expectations, parsing rules, edge-case rationale) — keep next to the Scenario, not in design docs |
+| `# Verification: <method>` directly under a `Scenario:` line | Only `# Verification: operator-observed` (capture-requirements item 0c) — `wrapup-epic` reads it, and it counts toward the requirement's fingerprint |
 | Data Tables (`\| col \| col \|`) under a step | Tabular expected outputs and structured given inputs (records to import, key/value pairs to verify) |
 | Doc Strings (`"""`) under a step | Multi-line literal content — file bodies, JSON / YAML payloads, log excerpts, expected stdout/stderr blocks |
 
@@ -131,11 +131,6 @@ Scenario: [{TOR-NN-XXXXXXX}] The {subject} shall {a different observable behavio
 # --------------------------------------------------------------------------------------------------
 
 Scenario: [{TOR-NN-XXXXXXX}] The {subject} shall {requirement involving structured input or output}
-    #
-    # Note:
-    #   1. {Non-obvious context for a future reader — parsing rule, edge case rationale, ...}
-    #   2. {Reference to architecture.md or design-notes.md when the contract is documented elsewhere.}
-    #
     Given a file at '{relative/path}' with content:
         """
         {literal multi-line content goes here — exactly as the system will see it}
@@ -189,11 +184,6 @@ Scenario: [TOR-01-Bcd2345] The tool shall accept -v as a short alias for --versi
 # --------------------------------------------------------------------------------------------------
 
 Scenario: [TOR-01-Def4567] The tool shall load configuration from a YAML file specified by --config and apply each declared key
-    #
-    # Note:
-    #   1. The YAML file is parsed in strict mode — unknown top-level keys log a Warning with Id 12.
-    #   2. Type-checking of values is documented in docs/architecture.md §3.2.
-    #
     Given a file at 'config.yaml' with content:
         """
         verbosity: 2
@@ -227,13 +217,12 @@ Scenario: [TOR-01-Cde3456] The tool shall reject unknown commandline flags with 
 ## Brownfield Append Note
 
 When adding new scenarios to an existing feature file in brownfield mode, append at the
-**bottom** of the file under a new section banner that names the sub-area and date of the
-addition:
+**bottom** of the file under a new section banner that names the sub-area:
 
 ```gherkin
 
 # --------------------------------------------------------------------------------------------------
-# {Sub-area or delta description — e.g., "CSV Export (added YYYY-MM-DD)"}
+# {Sub-area or delta description — e.g., "CSV Export"}
 # --------------------------------------------------------------------------------------------------
 
 Scenario: [{TOR-NN-XXXXXXX}] The {subject} shall {new requirement in shall form}
@@ -242,6 +231,35 @@ Scenario: [{TOR-NN-XXXXXXX}] The {subject} shall {new requirement in shall form}
     Then ...
 ```
 
-**Never reorder, modify, or delete existing Scenarios or TOR IDs.** Existing TOR IDs are
-immutable once the feature file has been merged to develop — they are foreign keys referenced
-by epic specs, handoffs, and test code.
+A supersede successor is not appended: it takes its predecessor's place (below).
+
+---
+
+## Lifecycle Rules: the File Shows Only Present Truth
+
+A feature file holds the `Feature:` header and its As a / I want / So that lines, section
+banners, `Scenario:` lines, steps with their Data Tables and Doc Strings, and the
+`# Verification:` tag. Nothing else:
+
+- **No notes and no history.** No `# Note:` blocks, no AMENDED / REVISED / SUPERSEDED /
+  MODIFIED / CHANGE-CONTROL markers, no version tags, no dates in banners, no file-level
+  supersede banners. Rationale for a current requirement goes in its tracing entry's
+  `rationale` field (`TRACING_TEMPLATE.md`); the reason for a change goes in its Change Record
+  under `docs/requirements/changes/`. The one marker kept is the `# Note: reference screen(s) —
+  …` line under the `# UX Baseline` banner (capture-requirements 3A.2.2): `/plan-project` and
+  `/add` read it to pick the skeleton's screens.
+- **Not yet merged** — a Scenario whose TOR ID is not on the base branch (created on this
+  branch) is edited or deleted freely, with no record.
+- **Merged** — every edit or deletion goes through capture-requirements' decision test and
+  leaves a Change Record in the same branch:
+  - **reword** — same meaning, same ID, edited in place; needs passing test evidence.
+  - **supersede** — a meaning change. The new block gets a **new ID** in the same feature
+    number and takes the old block's place, at the same position. Splits list several
+    successors.
+  - **retire** — the behavior is withdrawn. The block is deleted. Retiring every Scenario in a
+    file deletes the file and its tracing sidecar.
+  - **pending** — known to be wrong, not changed yet. The file is not touched.
+- **Never reorder** Scenarios, and never move one to another file.
+- **IDs and feature numbers are never reused.** A retired or superseded ID never comes back
+  (a reintroduction is a new ID whose record refs the old one), and a feature number named in
+  any Change Record stays reserved after its file is deleted.

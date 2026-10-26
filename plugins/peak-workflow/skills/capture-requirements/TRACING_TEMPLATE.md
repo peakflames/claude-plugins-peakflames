@@ -12,10 +12,13 @@ at the time the requirement was written. It answers: "Why does this requirement 
 pointing back to the product vision section and ConOps scenario step it serves, or — for
 baseline TORs — to the `CLAUDE.md` Tool Hygiene & Operability or UX Baseline line it implements.
 
-**The sidecar is static after written.** It is updated only when the requirement itself changes
-(a change-control event managed on a `docs/` branch), not as epics implement or verify the
-requirement. Implementation status is tracked separately via the epic sidecar `requirements:`
-field.
+**The sidecar covers the live set only.** It has one entry per Scenario in its feature file —
+no more, no less. An entry is added when a requirement is added (including a supersede
+successor) and deleted when its requirement is retired or superseded; the deleted entry's
+traces are copied into that Change Record's `traced_to`, so nothing is lost. A reworded
+requirement keeps its entry. Titles live only in the feature file's `Scenario:` line, so the
+sidecar never repeats them. Implementation status is tracked separately via the epic sidecar
+`requirements:` field.
 
 Dynamic coverage (which epics implement which TOR IDs, and in what status) is computed at
 runtime by `/peak-workflow:status` from the epic sidecars — it is not stored here.
@@ -26,7 +29,9 @@ runtime by `/peak-workflow:status` from the epic sidecars — it is not stored h
 
 For each TOR ID in the feature file:
 
-1. Read the Scenario block: the ID (`TOR-NN-XXXXXXX`), title, Given, When, Then.
+1. Read the Scenario block: the ID (`TOR-NN-XXXXXXX`), title, Given, When, Then. Trace only
+   the Scenarios in the feature file — never add an entry for an ID that is not in it, and never
+   read `docs/requirements/changes/` (Change Records are history, not sources).
 2. Search `docs/product-vision-planning/product-vision.md` for the most specific section
    (heading + content) that the requirement traces to. Write a 1–2 sentence paraphrase in
    your own words explaining **why this requirement serves the vision** — do not copy source
@@ -52,7 +57,10 @@ For each TOR ID in the feature file:
    `gap_type: "uncovered_source"`. Place uncovered-source gaps in the feature file whose
    functional area is the closest match to the uncovered source.
 
-**Do NOT modify any `.feature.md` file.**
+**Do NOT modify any `.feature.md` file.** If a feature file holds a `# Note:` block (other than
+the `# Note: reference screen(s)` line under `# UX Baseline`) or an AMENDED / REVISED /
+SUPERSEDED / MODIFIED / CHANGE-CONTROL marker, report it by file and line instead — the main
+agent removes it.
 **Do NOT commit any files.**
 
 ---
@@ -65,12 +73,11 @@ Write the sidecar as valid JSON to `docs/requirements/{NN}-{name}.feature.tracin
 {
   "feature_id": "{NN}",
   "feature_file": "{NN}-{name}.feature.md",
-  "generated": "{YYYY-MM-DD}",
   "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
   "requirements": [
     {
       "id": "TOR-{NN}-{XXXXXXX}",
-      "title": "{Scenario title verbatim from the .feature.md Scenario line}",
+      "rationale": "{optional — why the requirement reads the way it does; written by the main agent, never by the sub-agent}",
       "traces_to": {
         "vision": [
           {
@@ -119,13 +126,20 @@ Write the sidecar as valid JSON to `docs/requirements/{NN}-{name}.feature.tracin
 
 ---
 
-## Brownfield Append
+`rationale` is optional: omit the key when there is nothing non-obvious to say. It is the home for
+context that used to sit in a `# Note:` block (a parsing rule, an edge-case reason). The
+sub-agent never writes or rewrites it.
 
-When updating an existing sidecar in brownfield mode (Step 3B.4):
+---
 
-- Append new TOR ID entries at the **bottom** of the `requirements` array.
-- Preserve all existing entries unchanged — do not re-derive or rewrite existing paraphrases.
-- Add any new gaps to the `coverage_gaps` array; remove gap entries for TOR IDs that have
-  been resolved by the new requirements.
-- Update `"generated"` to today's date (the sidecar reflects the state as of the most recent
-  `capture-requirements` run).
+## Brownfield Update
+
+When updating an existing sidecar in brownfield mode (Step 3B.4 and the TOR-ID mode):
+
+- Append entries for new TOR IDs and supersede successors at the **bottom** of the
+  `requirements` array.
+- Preserve every other existing entry unchanged — its paraphrases and its `rationale`.
+- The main agent has already deleted the entries of retired and superseded IDs; never restore
+  them. Remove `coverage_gaps` entries that name an ID no longer in the feature file, and those
+  resolved by the new requirements; add any new gaps.
+- Never add `title` or a top-level `generated` key.

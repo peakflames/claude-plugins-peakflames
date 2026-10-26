@@ -61,6 +61,9 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | `version` | (none) | Adds `version`: prints the interpreter and `PLUGIN_FORMAT` | `setup` reuses it as the Python probe (Q12) |
 | `format` | Guard compares `format` with the plugin's; no stamp = format 0 | Adds `format` (verdict + user message, exit 1 unless current/new), `format --init` (setup), `format --set N` (upgrade). No stamp **and** no planning artifacts = `new`, not format 0. `--init` refuses a project that already has artifacts | A fresh repo is not a 2.1 project; setup must never stamp over a project that needs upgrading |
 | `provenance`, `inflight` | Step 0002 backfills provenance with `git log --follow`; runner warns about in-flight branches | Adds `provenance [--write] [--skip]` and `inflight <paths>`. Provenance stops at a copy or a rename from another epic's spec | `--follow` pairs a new templated spec with a look-alike one (`C071`) and reports the wrong author and date |
+| `validate`, `search`, `text` | Skills validate records, grep `title`/`reason`/`keywords`, and recover the verified text from git | Adds `validate [files]` (schema + record-ID clashes, exit 1 on problems), `search <terms>` (supersede/retire/pending records, whole-word, normalized), `text <TOR> [--rev REF \| --verified] [--json]` (block verbatim; `--verified` matches the owning Complete epic's saved fingerprint in the file's history) | Skills call only the wrapper; a raw grep also hits `text` fields, and "the commit that saved the fingerprint" is a seed or wrapup commit, not the text's commit |
+| triage `AMEND` | A meaning change with no vision/ConOps impact dispatches `capture-requirements <TOR-ID>` | A fourth verdict, `AMEND`, carries that route (dispatched in-session) | HEAVY prints commands for a fresh session; this route is one short run |
+| `# Note: reference screen` | Feature files allow no `# Note:` blocks | The `# Note: reference screen(s) — …` line under `# UX Baseline` stays, as the one named exception | plan-project and add read it to pick the skeleton's screens; renaming it needs an upgrade step |
 
 ## Plan checklist
 
@@ -69,7 +72,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 1 | **Foundation** — `scripts/tor-lifecycle`, `scripts/tor_lifecycle.py` (`fingerprint`, `titles`, `version`, loaders), `tests/peak-workflow/`, plugin `CLAUDE.md`, this doc | `fingerprint`/`titles`/loaders pass the tests on 3.11 + 3.14 | ✅ Done |
 | 2 | **Script analysis** — `check` A–F (`--base`, `--json`, own-branch marking), `sweep`, `seed`, `states --json` (incl. Q17); process pool for files, thread pool for git | Every row of the decision-test, derived-state, and finding A–F tables has a fixture test; the scale fixture meets Q14 | ✅ Done |
 | 3 | **Format & cleanup** — `upgrade` runner, step `0001-epic-provenance`, format guard in every skill, delete the two migrate skills, new-project routes on the stamp, setup writes the stamp + `[lifecycle]` + Python probe + requirements README stub, Q15 bundle | Format-0 fixture upgrades to 1 idempotently; dry-run of new-project → setup → upgrade | ✅ Done |
-| 4 | **Authoring** — capture-requirements 3B.2 five options, TOR-ID argument mode, re-litigation grep, Step 4 `check --base`, Haiku brief rewrite; FEATURE/TRACING templates; discover Removed/Modified rows; mockup (Q22); triage routes + `check` | Dry-run: brownfield supersede, retire, pending, reword-with-evidence on a docs/ branch | ☐ |
+| 4 | **Authoring** — capture-requirements 3B.2 five options, TOR-ID argument mode, re-litigation grep, Step 4 `check --base`, Haiku brief rewrite; FEATURE/TRACING templates; discover Removed/Modified rows; mockup (Q22); triage routes + `check` | Dry-run: brownfield supersede, retire, pending, reword-with-evidence on a docs/ branch | ✅ Done |
 | 5 | **Planning & dashboards** — plan-project/add (ID-only anchors, live-set delta, removal epics with `retires:`); status (Requirements Health, live denominator, degraded mode, overdue-Disputed action); pause; refresh-docs | Dry-run on a fixture holding every derived state | ☐ |
 | 6 | **Execution** — start-epic (`check` + nudge, 6.2 successor/drop/stop, 6.3 removed, `sweep` retarget, in-epic amendment, `titles`, Q16 stop); PLAN_TEMPLATE; quick-fix amendment path | Dry-run: in-epic amend, quick-fix supersede | ☐ |
 | 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ☐ |
@@ -177,3 +180,42 @@ proposal + addendum). Every plan reads this file first and updates it last.
   Anchors" grandfather clauses in start-epic and wrapup-epic.
 - README: migration section → "Upgrading an existing project"; root README drops the
   epic-workflow migration pointer (removing the plugin itself stays a separate release, Q19a).
+
+### Plan 4 — Authoring
+
+- New commands: `validate [files]`, `search <terms> [--json]`, `text <TOR> [--rev REF | --verified]
+  [--json]` (deviation-log row). `check`'s branch-scoped A now accepts a requirement restored to
+  its text as first merged (undoing an unrecorded edit needs no record); E's heading reads
+  "Retired or superseded ID still cited".
+- **capture-requirements** gains a "Lifecycle Rules" section stated once (L1 where the rule starts,
+  L2 fingerprints — plain-words summary, `tor_lifecycle.py` the only implementation, L3 decision
+  test, L4 re-litigation, L5 the five choices with a ≤4-option menu per input type). Answers are
+  applied after the 3B.3b gate. Step 4.2 runs `validate` + `check --base`; findings tied to this
+  run's records (E citations, `disputed`, `removal-missing`) are reported as follow-ups, not
+  predating debt. Step 7.1 offers `/add` for unassigned successors and removal epics.
+- **TOR-ID mode (3C)** cases: Changed since verified, Edited without a record, Disputed (resolve or
+  renew), Requested change. Adds **Restore the verified text** (same ID, no record) — the dry-run
+  showed supersede/reword alone could only ratify the unrecorded edit. Creates
+  `docs/amend-<tor-id>` from the base on its own; rewrites vision/ConOps lines that state a
+  replaced detail; never commits (the user commits and merges).
+- `CHANGE_RECORD_TEMPLATE.md` holds one example per kind; `validate` is the schema's authority.
+- **discover** adds a `Pending` change type (an undecided change → Record as pending) and
+  `Wording only:` Modified rows (→ reword candidates). **triage** adds the `AMEND` verdict;
+  "edited after verification" requests route AMEND (restore) when they match the verified text,
+  else reverify first.
+- **Interim state:** triage and capture-requirements name `/peak-workflow:wrapup-epic <id>
+  reverify` (Plan 7) and quick-fix's amendment path (Plan 6) before those exist.
+- **For Plan 5:** plan-project must propose removal epics for `removal = "code"` records (Step 7.1
+  offers "Leave it for plan-project"), and capture-requirements Step 6 archives the changelog
+  before plan-project reads its Priority Signal. Fix one of the two sides.
+- Left alone (pre-existing, not lifecycle): mockup's design-canvas wording, the AlertDialog
+  "Cancel" label when the action is itself a cancel, the greenfield row-level Delete rule in
+  brownfield, and a second ConOps version bump on one branch. README triage row (Plan 9).
+- **Q13 dry-run:** synthetic orders web app (`tests/peak-workflow/dryrun/plan4_orders.py`: format 2, two Complete epics, a
+  verified TOR edited in place on develop). Two agents per pass — (A) triage → AMEND →
+  TOR-ID supersede with open-epic swap; triage → AMEND → restore; TOR-ID supersede of a stale
+  TOR with the `/add` offer; (B) discover → mockup (`Removed` screen) → capture-requirements:
+  retire (whole file, `removal = "code"`), supersede, pending, reword with evidence. Pass 1: 6
+  Critical (no restore path, triage dead end, no `Pending` changelog row, …). Pass 2: 1 Critical
+  (restore left the code doing the edit while the TOR read Verified). Pass 3: 0 Critical, 13
+  wording fixes, all applied. `check --base develop` had no own-branch findings in every run.

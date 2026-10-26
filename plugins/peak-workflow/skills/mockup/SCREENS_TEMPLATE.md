@@ -124,8 +124,11 @@ When `ux/screens.md` already exists:
 - **Append** new rows at the bottom of the Screen Inventory table, new `### {S-NN}` blocks at
   the bottom of `## States`, and new `### {Scenario N}` blocks at the bottom of `## Flows`.
 - A **changed** screen keeps its ID: replace its row, its `## States` block, and any flow that
-  cites it in place. Add `(updated {date})` after the name in the States heading.
+  cites it in place. Keep existing state copy verbatim unless the change alters what that state
+  shows — requirements quote it. Add `(updated {date})` after the name in the States heading.
 - **Never renumber, reuse, or delete an existing `S-NN` ID.** They are referenced by ConOps
-  steps, TOR Given/When/Then clauses, and epic specs. A screen that is retired keeps its row
-  with `Purpose: retired {date} — superseded by {S-NN}`.
+  steps, TOR Given/When/Then clauses, and epic specs. A removed screen keeps its row with
+  `Purpose: retired {date} — {reason}` (plus `— superseded by {S-NN}` when another screen took
+  over), `Wireframe` and `Serves` set to `—`; its `## States` block, flow nodes, and wireframe
+  file are deleted.
 - Bump **Document Version** by a minor increment and set **Date** to today.

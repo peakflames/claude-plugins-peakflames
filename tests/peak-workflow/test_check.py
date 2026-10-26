@@ -124,6 +124,16 @@ class FindingA(CheckCase):
         text = self.repo.cli("check", "--base", "develop").stdout
         self.assertIn("[this branch, blocking]", text)
 
+    def test_restoring_the_merged_text_needs_no_record(self):
+        """Undoing an unrecorded edit (back to the text as first merged) is not a branch change."""
+        self.rewrite(*self.edited(A2, "The tool shall print long help"))
+        self.repo.commit("unrecorded edit on develop")
+        self.repo.checkout("docs/restore", create=True)
+        self.rewrite(*self.scen)
+        found = self.repo.check("--base", "develop")
+        self.assertEqual(letters(found, "A"), [])
+        self.assertEqual(letters(found, "D"), [])
+
     def test_branch_reword_record_clears_own_branch_finding(self):
         self.repo.checkout("hotfix/x", create=True)
         new = self.edited(A3, "The tool shall print the version")
