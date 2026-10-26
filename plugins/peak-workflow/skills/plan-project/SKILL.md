@@ -438,9 +438,15 @@ epic specs to understand what has already been planned. For each unplanned TOR I
   says, the epic can be small: verify the successor and retarget the tests that cite the old ID.
 - Is it genuinely new capability in a new area? → Add to the new epic list.
 
+Leave two kinds of unassigned row for Step 3C, never for an ordinary epic: a row that guards a
+`removal-missing` record (it states what must stay true once that record's code is gone — match
+the record's `title` and `keywords`), and a row satisfied only by code being absent.
+
 Also take each live row whose `state` is `Waived`: the epic in `waived_to` was meant to deliver it
-but does not list it. If that epic is Not Started, propose adding the TOR to it (Step 6.3 item 1
-mechanics); otherwise list it in Step 4 as needing a new owner.
+but does not list it. If that epic is Not Started, propose adding the TOR to it — its anchors,
+sidecar `requirements:`, and a Description / Key Components line for the behavior (Step 6.3 item 1
+mechanics); otherwise list it in Step 4 as needing a new owner. The Complete epic that waived it
+keeps it in its files; its `waived:` line means it is not an owner.
 
 **Never edit an epic that is not Not Started** — no spec, sidecar, or phase-index change to an In
 Progress, Paused, Implemented, or Complete epic. A Complete epic keeps the IDs it verified, even
@@ -468,17 +474,20 @@ reports every record that has none as an F finding with `kind: removal-missing`
 1. Read the record (`docs/requirements/changes/*-<7 chars after "CR-">.toml`): its `title`,
    `reason`, retired IDs (`changes[].tor`), and their verbatim `text`.
 2. Find the code still doing it: `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <retired
-   IDs>` lists the tests and source citing them; add the source paths those tests exercise.
+   IDs>` lists the tests and source citing them (exit 1 means citations were found — expected
+   here); add the source paths those tests exercise.
 3. Pick its **guard requirements**: live, unassigned requirements that state what must be true
    permanently once the code is gone (for example "The service shall answer a CSV export request
    with HTTP 410 and a message naming the export API"). Zero is fine. **Never** a requirement
-   that says the thing "shall be removed" — it is dead the day it passes. If such a TOR exists,
+   satisfied only by code being absent ("shall be removed", "shall remove X", "X does not exist")
+   — it is dead the day it passes. If such a TOR exists,
    leave it out and recommend rewording it as a guard with `/peak-workflow:capture-requirements
    <TOR-ID>`; its Step 6 row reads `N/A — deferred: states a removal; reword as a guard (Step 3C)`.
    This skill never writes requirements.
 4. Propose the epic: name "Remove <what the record retired>", the retired behavior in the
    Description, a `## Removal` section (Step 5.2), the guard requirements as its anchors, and
-   dependencies only on epics whose code it changes that are not yet Complete. Place it in the
+   dependencies on epics whose code it changes that are not yet Complete, plus any order the
+   changelog's Priority Signal asks for (for example "after the tax epic"). Place it in the
    phase whose capability it removes when that phase still has unfinished epics, otherwise in the
    last phase with unfinished epics.
 
@@ -524,8 +533,9 @@ The "Screens" column appears only when `screens_present = true` — omit it othe
 `S-NN` IDs the epic delivers, or `—` for an epic with no screen. Greenfield: every screen in `ux/screens.md`
 appears in exactly one row (the Application menu and Window rows go to the skeleton; `mockup`
 draws no wireframe for them). Brownfield: only screens new on this branch (rows of `ux/screens.md`
-absent at `git merge-base <base> HEAD`) need an owner; a new epic that extends an existing screen
-does not list it.
+absent at `git merge-base <base> HEAD`) need an owner. A new epic that extends an existing screen
+may list it with `extends — <what changes>` in the States column, so start-epic gets the wireframe;
+an `extends` row is not ownership and the screen trace ignores it.
 
 ### Dependency Graph
 
@@ -748,7 +758,7 @@ requirements baseline land in exactly one epic, explicitly and unambiguously?**
 ### 6.1: Enumerate TOR IDs
 
 Build a flat list of every live TOR ID — the `live: true` rows of `states` (greenfield: all of
-them; brownfield: the unassigned ones this run planned). One row per TOR ID. Also include:
+them; brownfield: the unassigned and Waived ones this run planned). One row per TOR ID. Also include:
 - **Removal records** — one row per Step 3C record, keyed `Removal: <CR-ID>`, captured by the
   epic whose sidecar has `retires: <CR-ID>`.
 - **Brownfield changelog entries** (if Step 3B.1 consumed a changelog) — every new capability
@@ -775,9 +785,11 @@ The Title column comes from `states` (or `tor-lifecycle titles <ids>`), never fr
 
 Rules:
 
-- A TOR ID must appear in **exactly one epic**. If it appears in two or more, list all and mark
-  `Ambiguous? Y` — that is a gap: the slice was split across layers. Remediate by widening one
-  epic to own the whole behavior and removing the TOR from the others (3A.3).
+- Fill the Captured column from a fresh `states --json` run after Step 5: a row's `epics` lists
+  its owners (an epic that waives a TOR is not an owner). A TOR ID must have **exactly one owner**.
+  If it has two or more, list all and mark `Ambiguous? Y` — that is a gap: the slice was split
+  across layers. Remediate by widening one epic to own the whole behavior and removing the TOR
+  from the others (3A.3) — only ever from epics this run wrote or a Not Started one.
 - **Explicit? N** — the TOR ID is not in any epic's Requirements Anchors. Gap.
 - **Ambiguous? Y** — the TOR ID appears in more than one epic, or an anchors row cites the
   wrong feature file. Gap.
@@ -922,13 +934,15 @@ instructions are printed), not a silent action taken on the skill's own initiati
 **Needs attention (not planned here).** Under Recommended Next Steps, list what `states` and
 `check` show that planning cannot fix: each F finding with `kind: disputed` (its message; a
 Safety one first) and each `Verification failed` or `Changed since verified` row with its epic
-and `/peak-workflow:wrapup-epic <id> reverify`. Omit when there are none.
+and `/peak-workflow:wrapup-epic <id> reverify`. End with one line counting the other `check`
+findings (A, B, C, E) and pointing to `/peak-workflow:status` for them. Omit when there are none.
 
 **Planning PR body.** For the team path, write the body to a temporary file outside the
 repository (`mktemp`) and print its path in place of `<body-file>`. It lists each new epic as
 `<id> (<slug>) — <Name>` with its anchors as `TOR-… — <title>`, the titles printed by one
 `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" titles <all anchor IDs>` run (never copied from
-a spec); each removal epic adds `retires <CR-ID>`. The summary's Self-Check table uses the same
+a spec); each removal epic adds `retires <CR-ID>`. A **Changed epics** list follows: each existing
+Not Started epic this run edited, with the TORs it gained or lost. The summary's Self-Check table uses the same
 titles.
 
 **[Brownfield mode only — adapt the Recommended Next Steps before presenting:]** The three steps above (merge → start → status) apply to brownfield too. Shorten the merge instruction to "Merge the `docs/` branch to approve the delta requirements and new epics" and omit the setup note in step 2 (setup was already done).

@@ -77,25 +77,35 @@ removal of something a retire record names, is a **removal epic**. A retire reco
 `removal = "code"` means the code still does what the retired requirements described; the
 removal epic takes it out.
 
+0. **No CR-ID given** (a plain-language removal request): match the description against the
+   `title` and `keywords` of the records in `check`'s `removal-missing` findings. One match → use
+   it; several → ask which; none → this is a normal epic, continue at 2.1.
 1. Read the record (`docs/requirements/changes/*-<7 chars after "CR-">.toml`) and stop, in this
-   order, with the matching message:
-   - No such file, or not `kind = "retire"`: `<CR-ID> is not a retire record — a removal epic
-     carries out a retirement. Check the ID with /peak-workflow:status.`
+   order, with the matching message (when `$ARGUMENTS` names the ID, do this right after loading
+   `states` and `check`, before the rest of Step 1):
+   - No such file: `<CR-ID> is not a Change Record in docs/requirements/changes/. Check the ID
+     with /peak-workflow:status.`
+   - A `supersede` record: `<CR-ID> is a supersede record — nothing to remove. Plan its
+     successor(s) <IDs> with /peak-workflow:add <description>.`
+   - Any other kind but `retire`: `<CR-ID> is a <kind> record — only a retire record gets a
+     removal epic.`
    - `removal = "none"`: `<CR-ID> retired <TOR-IDs> with nothing left in the code — no removal
      epic is needed.`
    - Its `states` row (any retired ID) lists `removal_epics`: `<CR-ID> already has a removal
-     epic: <id> (<slug>) — <Name> (<status>). A record gets one removal epic.`
+     epic: <id> (<slug>) — <Name> (<status>). A record gets one removal epic.` (Name and slug from
+     the phase index and spec filename, status from the sidecar.)
 2. Find the code still doing it: `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <the
-   record's retired IDs>` lists the tests and source citing them; add the source paths those
-   tests exercise, found in Step 5.
+   record's retired IDs>` lists the tests and source citing them (exit 1 means citations were
+   found — expected here); add the source paths those tests exercise, found in Step 5.
 3. **Guard requirements** are its only possible anchors: live, unassigned requirements that state
    what must stay true once the code is gone (for example "The service shall answer a CSV export
    request with HTTP 410 and a message naming the export API"). Find candidates by matching the
    record's `keywords` and `title` against unassigned titles in `states`. Offer them in Step
-   2.2's table — zero is a valid answer. **Never** anchor a requirement that says something "shall be
-   removed": it is dead the day it passes. If one exists, leave it out and recommend rewording it
-   as a guard with `/peak-workflow:capture-requirements <TOR-ID>`. This skill never writes
-   requirements.
+   2.2's table — zero is a valid answer. **Never** anchor a requirement satisfied only by code
+   being absent ("shall be removed", "shall remove X", "X does not exist"): it is dead the day it
+   passes. If one exists, leave it out, list it in the Step 8 trace as `N/A — deferred: states a
+   removal; reword as a guard` and in the Step 9 summary as **Left out**, and recommend
+   `/peak-workflow:capture-requirements <TOR-ID>`. This skill never writes requirements.
 4. Continue at Step 2.2 with the guard candidates, then Steps 3–9. The spec gets the
    `## Removal` section and the sidecar the `retires:` line (Steps 6 and 7). Skip the
    whole-capability check; code a guard needs that another epic owns (a server to answer 404) is
@@ -129,7 +139,7 @@ Titles and owners come from `states`, never from an epic spec. Mark a Disputed r
 resolve with `/peak-workflow:capture-requirements <TOR>` before starting".
 
 **Unplanned TOR IDs (not yet in any epic):** [N]
-**Already-planned TOR IDs (owned by another epic):** [N] — each must be moved here or dropped (whole-capability check below)
+**Already-planned TOR IDs (owned by another epic):** [N] — each must be moved here or dropped [omit for a removal epic]
 ```
 
 Use `AskUserQuestion`:
@@ -170,7 +180,9 @@ requirements match" message above (a removal epic continues with no anchors).
 
 **Screens (UI epics, when `ux/screens.md` exists).** A UI epic lists the `S-NN` screens its
 confirmed TORs name in their Given/When — those are its `## Screens` rows in Step 6. A screen
-belongs to exactly one epic: if another epic's spec already lists it, ask the same Keep / Move
+belongs to exactly one epic: a screen an existing epic already built (its anchors' TORs name
+it) is not owned here even when no Screens table lists it — list it with `extends — <what
+changes>` in the States column so start-epic gets the wireframe. If another epic's spec already lists it, ask the same Keep / Move
 question as for a TOR, with the same Not Started rule for moving. Never offer Move for an `S-NN`
 the `# Note: reference screen` / `reference screens` line in the first feature file names — those
 are skeleton-owned; offer Keep only, and the new epic extends the screen without re-listing it.
@@ -417,6 +429,7 @@ Show the user what was created:
 - **Requirements:** one line per anchor, `TOR-… — <title>`, titles from one
   `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" titles <anchor IDs>` run [or "None — a removal epic"]
 - [Removal epic only:] **Retires:** {CR-ID} — {record title}; {N} `sweep` citations to delete
+- [Removal epic only, when one was left out:] **Left out:** TOR-… — states a removal; reword it as a guard with `/peak-workflow:capture-requirements TOR-…`
 
 {Repeat for each epic if multiple were created}
 
