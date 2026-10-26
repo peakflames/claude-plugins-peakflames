@@ -16,6 +16,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`tor-lifecycle` wrapper** — skills run the helper through a POSIX `sh` wrapper that finds
   Python 3.11+ (`python3`, `py -3`, `python`) on macOS, Linux, and Windows Git Bash, or prints
   plain-English install steps.
+- **Requirements health check** — `tor-lifecycle check` reports unrecorded changes and removals,
+  dangling IDs, changes since verification, retired IDs still cited, and housekeeping. With
+  `--base` it marks what the current branch introduced and which findings block.
+- **Derived requirement states** — `tor-lifecycle states` computes each requirement's state
+  (Verified, Changed since verified, Disputed, Superseded, Retired, …) over the live set, so
+  dashboards compute nothing themselves.
+- **Sweep and seed** — `sweep` lists tests and source citing retired or superseded IDs; `seed`
+  fingerprints each Complete epic's requirements at its completion commit and can write
+  `verified:` lines.
 
 ### Documentation
 
