@@ -121,7 +121,7 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
 1a. **Reproduce** (omit on an amendment-path fix that changes no behavior — item 5a's citing tests are its evidence) — write or run a test that fails on the reported behavior. If it passes on the
    base branch, ask via `AskUserQuestion` `"The bug does not reproduce: <evidence>. How to
    proceed?"` — `["Add a regression test only", "Stop"]`.
-2. **Implement the fix** — name the specific files being modified and what changes. A test or
+2. **Implement the fix** — name the specific files being modified and what changes (on item 1a's regression-test-only path, this item is the test alone — no source change). A test or
    comment that cites a retired or superseded ID (`tor-lifecycle sweep <ID>`) may be retargeted to
    its successor or deleted as part of the fix — a test-and-comment-only change.
 2a. **Amend the requirement** (amendment path only — omit otherwise). Written as
@@ -224,7 +224,7 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
 
    ### If ship mode is SOLO
    - `git checkout <base-branch>`
-   - `git merge <hotfix-branch> --no-ff -m "<fix|test>: merge <hotfix-branch> — <one-line summary>"`
+   - `git merge <hotfix-branch> --no-ff -m "<fix|test|docs>: merge <hotfix-branch> — <one-line summary>"`
    - `git branch -d <hotfix-branch>`
    - Do **not** push.
    - Report: `Branch <hotfix-branch> merged into <base-branch> and deleted. Changes not pushed — run 'git push' when ready.`

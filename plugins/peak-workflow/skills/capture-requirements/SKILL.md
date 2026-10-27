@@ -1162,8 +1162,12 @@ becomes the acceptance criterion and verification procedure.
 plan-project has nothing new to plan. Review the diff, commit it on this branch, and merge it into
 <base> (solo or team PR) — the merge approves the Change Records.
 [TOR-ID mode:]
-Review the diff, commit it on this branch (`docs(requirements): <outcome> <TOR-ID> (<CR-ID>)`; a Restore, which writes no record: `docs(requirements): restore <TOR-ID>`; plan files `/add` wrote go in a separate `docs(plan): add epic <id> (<slug>)` commit), and merge it into <base> (solo or team PR) — the
-merge approves the Change Record.
+Review the diff, commit it on this branch (`docs(requirements): <outcome> <TOR-ID> (<CR-ID>)`, `<outcome>`
+one of `supersede`, `reword`, `retire`, `record pending`, `renew`, `uphold`; a Restore, which writes no record: `docs(requirements): restore <TOR-ID>`; plan files `/add` wrote go in a separate `docs(plan): add epic <id> (<slug>)` commit), and merge it into <base> (solo or team PR) — the
+merge approves the Change Record. Solo: `git checkout <base> && git merge --no-ff <branch> -m
+"docs(requirements): merge <branch> — <outcome> <TOR-ID>" && git branch -d <branch>`. Tests or
+source still citing a replaced ID (Follow-ups) show as `check` finding E on <base> until the
+successor's epic retargets them — expected.
 ```
 
 In TOR-ID mode, replace "Documents Written" and "By the Numbers" with:
@@ -1196,8 +1200,10 @@ summary):
 
 - **After a Restore whose code or tests still follow the unrecorded edit**:
   - Question: `"<TOR-ID> is back to its verified text, but <files> still do <edited behavior>. Fix the code with /peak-workflow:quick-fix after this branch merges?"`
-  - Options: `["Print the quick-fix command", "I'll handle it"]` — print
-    `/peak-workflow:quick-fix <TOR-ID>: make the code match the restored requirement (<detail>)`;
+  - Options: `["Print the quick-fix and reverify commands", "I'll handle it"]` — print
+    `/peak-workflow:quick-fix <TOR-ID>: make the code match the restored requirement (<detail>)`,
+    then `/peak-workflow:wrapup-epic <epic> reverify <TOR-ID>` to run after it merges (a Restore
+    writes no record, so nothing else will remind anyone);
     it runs on `develop` after this branch merges, so never dispatch it from here.
 
 On "Run /peak-workflow:add now", invoke `Skill({ skill: "peak-workflow:add", args: "<args>" })`

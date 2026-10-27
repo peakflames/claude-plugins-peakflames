@@ -77,7 +77,7 @@ has findings). Run these steps instead of Phases
    - A scoped ID whose `states` row has `historical_records` → say `<TOR> was edited before 3.0
      (<CR-IDs>) without test evidence; a PASS accepts that edit as same meaning` and ask via
      `AskUserQuestion` `["Meaning unchanged — re-verify", "Stop — decide it with
-     /peak-workflow:capture-requirements <TOR>"]` (skip the question when the user came from
+     /peak-workflow:capture-requirements <TOR>"]` (skip the question when this session ran, for that TOR,
      capture-requirements' "Meaning unchanged or unsure — re-verify instead").
    - A Disputed requirement in scope → say it is known to be wrong (`<CR-ID>`, `<N>` days) and
      that a PASS does not resolve the dispute.
@@ -432,7 +432,7 @@ Only now, with every per-TOR verdict recorded, read
 `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` and locate its
 `## Deferrals` section.
 
-1. **If the handoff has no `## Deferrals` section** (or no handoff exists): add a warning line
+1. **If the handoff exists but has no `## Deferrals` section**: add a warning line
    to the Step 1.5 Deferrals section — `⚠️ implementer handoff has no Deferrals section —
    disclosure could not be checked` — and proceed to item 2 with an empty Deferrals table (the
    misfiled branch still applies). The warning itself does not affect the epic verdict (legacy
@@ -942,7 +942,10 @@ Use the Agent tool with model `haiku` (the shorthand resolves to the current Hai
 > Do NOT push to the remote.
 
 **Wait for the subagent to complete before proceeding.** The refreshed documents must be
-committed on the feature branch before it is merged into the base branch.
+committed on the feature branch before it is merged into the base branch. When it has committed,
+read its diff (`git show --stat HEAD` and the changed lines): correct any statement that contradicts
+a Phase 1 verdict (e.g. a Known Issue for a requirement that passed) and commit the correction
+before Step 5.
 
 ---
 

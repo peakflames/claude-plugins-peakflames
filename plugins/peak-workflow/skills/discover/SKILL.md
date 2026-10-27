@@ -327,7 +327,8 @@ Summary starts `Wording only:`. A capability that **may** change but the user ha
 a `Pending` row (the documents keep describing today's behavior), naming the capability and
 the open question. A change to an **existing** capability is written only as a `Modified` row —
 never also under "New Capabilities Identified", which is for capabilities with no requirements
-yet.
+yet. Promoting an out-of-scope or backlog item into scope is an `Added` row (`promoted from
+backlog`) on the section that now describes it — never a `Removed` row for the backlog line.
 `/peak-workflow:capture-requirements` reads them: `Modified` rows send the requirements tracing
 to that section through its decision test (reword, supersede, or record as pending),
 `Removed` rows make those requirements retire candidates, and `Pending` rows make them
