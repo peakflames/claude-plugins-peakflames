@@ -77,8 +77,8 @@ has findings). Run these steps instead of Phases
    - A scoped ID whose `states` row has `historical_records` → say `<TOR> was edited before 3.0
      (<CR-IDs>) without test evidence; a PASS accepts that edit as same meaning` and ask via
      `AskUserQuestion` `["Meaning unchanged — re-verify", "Stop — decide it with
-     /peak-workflow:capture-requirements <TOR>"]` (skip the question when this session ran, for that TOR,
-     capture-requirements' "Meaning unchanged or unsure — re-verify instead").
+     /peak-workflow:capture-requirements <TOR>"]` (skip the question when capture-requirements' "Meaning unchanged — re-verify
+     instead" was chosen for that TOR — in this session, or as the command the user is running).
    - A Disputed requirement in scope → say it is known to be wrong (`<CR-ID>`, `<N>` days) and
      that a PASS does not resolve the dispute.
    - Run `tor-lifecycle check --json`. A scoped ID with an **A** finding (edited without a Change
@@ -944,7 +944,7 @@ Use the Agent tool with model `haiku` (the shorthand resolves to the current Hai
 **Wait for the subagent to complete before proceeding.** The refreshed documents must be
 committed on the feature branch before it is merged into the base branch. When it has committed,
 read its diff (`git show --stat HEAD` and the changed lines): correct any statement that contradicts
-a Phase 1 verdict (e.g. a Known Issue for a requirement that passed) and commit the correction
+a Phase 1 verdict or the code inspected in Steps 1.2–1.4 (e.g. a Known Issue for a requirement that passed) and commit the correction
 before Step 5.
 
 ---

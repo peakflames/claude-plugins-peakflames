@@ -899,7 +899,7 @@ greenfield files.
    write the old block back in place, same ID, no record (`check` accepts a requirement returned
    to its text as first merged, and its saved fingerprint matches again). When the description
    asks for exactly the old text (new text = old text), skip L3 and step 4's question: offer
-   only `Restore the verified text` and `"Meaning unchanged or unsure — re-verify instead"`.
+   only `Restore the verified text` and `"Meaning unchanged — re-verify instead"`.
 
    A requested change with no description: stop and ask for one
    (`/peak-workflow:capture-requirements <TOR-ID> <what should change>`). A requirement that is
@@ -923,7 +923,7 @@ greenfield files.
    `Pending` row) — and, for the first two cases, with these four
    options instead: `Restore the verified text` (recommended when the vision, ConOps, or
    description matches the old text), `Supersede` (or `Reword` when L3 found it reword-eligible),
-   `Record as pending`, and `"Meaning unchanged or unsure — re-verify instead"` (it ends this mode: print
+   `Record as pending`, and `"Meaning unchanged — re-verify instead"` (when L3 found a meaning change, say first: "L3 found a meaning change (<detail>); re-verifying accepts it as same meaning"; it ends this mode: print
    `/peak-workflow:wrapup-epic <owning epic> reverify <TOR-ID>`, leave every file as it was, and
    delete the branch if Step 0 created it and nothing else is on it). For **Disputed**, show the
    open record's title, reason, owner, and age, then ask
