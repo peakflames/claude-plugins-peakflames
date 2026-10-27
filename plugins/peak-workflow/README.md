@@ -115,7 +115,8 @@ The formal requirements baseline lives in Gherkin-style `.feature.md` files with
 
 > **On ceremony overhead:** the discover → requirements → planning sequence amortizes as the
 > project grows — every new request routes through `/triage`, which tells you whether it needs
-> new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL).
+> new TOR IDs (HEAVY), changes one existing requirement (AMEND), implements existing ones (EPIC),
+> or is a trivial bug (TRIVIAL).
 
 ### Vertical slices — one capability per epic
 

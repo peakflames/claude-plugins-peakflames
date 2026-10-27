@@ -946,7 +946,9 @@ committed on the feature branch before it is merged into the base branch.
 After Phase 3 orientation is complete and the Step 4 doc refresh subagent has
 committed on the feature branch, run `tor-lifecycle check --base <base>` once more: a finding
 marked `[this branch, blocking]` stops the ship (the doc refresh or a late fix introduced it) —
-fix it as in Step 1.1 item 3a and commit before continuing. Then ship the branch. Ask the user which mode to use
+fix it as in Step 1.1 item 3a and commit before continuing. An **E** finding marked
+`[this branch]` (a citation of a superseded or retired ID this branch added — often in the
+refreshed docs) is fixed the same way: cite the successor or the record instead. Then ship the branch. Ask the user which mode to use
 via `AskUserQuestion`. Present both options neutrally — do **not** auto-detect a
 default, do **not** recommend one mode over the other. There is no reliable signal
 to determine which mode is correct for the user's context (repo permissions, team

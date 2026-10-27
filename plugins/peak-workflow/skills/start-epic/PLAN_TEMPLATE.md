@@ -262,6 +262,9 @@ Rules:
      `tor-lifecycle check --base <base-branch>`: no finding may be marked `[this branch, blocking]`.
   6. Continue the middle steps against the successor's Given/When/Then; the self-assessment checks
      the successor. Reconcile spec records a Spec Deviations row citing the record.
+  7. Rewrite each vision or ConOps line that states the replaced detail, and each copied tracing
+     `paraphrase`, to the successor's meaning — no record (as capture-requirements 3C step 5).
+  A split (several successors) applies items 3–5 to each successor.
 - **Implement as written** — continue; never narrow the Then clause to fit what was built (that
   is a Deferral gate event).
 - **Stop** — run `/peak-workflow:pause`.

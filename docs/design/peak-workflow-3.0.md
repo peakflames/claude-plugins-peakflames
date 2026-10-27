@@ -477,7 +477,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | # | Gate | State |
 |---|---|---|
 | 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
-| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ◐ Criticals: pass 1: 4, pass 2: 2, pass 3: 1, pass 4: 1, pass 5: 3 (all fixed); **pass 6: 0 (clean)**; pass 7 running |
+| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ◐ Criticals: passes 1–5: 4, 2, 1, 1, 3; pass 6: 0 (clean); pass 7: 1 (wrapup's doc refresh cited a superseded ID — fixed). Needs passes 8 and 9 clean |
 | 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
 | 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
 
@@ -542,4 +542,10 @@ proposal + addendum). Every plan reads this file first and updates it last.
   PLAN_TEMPLATE TODO grep is case-sensitive; add's stop names the branch and its merge has `-m`;
   wrapup PASS question text; discover/3B.2 treat an open pending hit as a settle, not a
   re-proposal; upgrade Stop deletes its empty branch; Recovery Check reads the branch.
+- **Pass 7:** 1 Critical — wrapup's Haiku doc refresh wrote a superseded ID into
+  `design-notes.md`, leaving an E finding on `develop`; refresh-docs now cites the record and
+  successor, and wrapup's pre-ship `check` fixes an own-branch E. UX applied: Amendment gate
+  rewrites vision/ConOps lines and handles splits; `Fixes: <TOR>` trailer lets status point a
+  merged fix at reverify; Safety Keep unchanged and Disputed → Change it wording; triage's
+  current-text case; AMEND in the ceremony notes; Disclosed cell values in the templates.
 

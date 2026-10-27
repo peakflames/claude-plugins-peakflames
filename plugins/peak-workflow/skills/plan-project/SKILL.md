@@ -930,8 +930,8 @@ instructions are printed), not a silent action taken on the skill's own initiati
 
 > **On ceremony overhead:** The discover → requirements → planning sequence amortizes across
 > the project's lifetime. Once the TOR baseline is established, every new request routes
-> through `/triage` to determine whether it needs new TOR IDs (HEAVY), implements existing
-> ones (EPIC), or is a trivial bug (TRIVIAL) — preventing both over-engineering and
+> through `/triage` to determine whether it needs new TOR IDs (HEAVY), changes one (AMEND),
+> implements existing ones (EPIC), or is a trivial bug (TRIVIAL) — preventing both over-engineering and
 > under-speccing.
 ```
 

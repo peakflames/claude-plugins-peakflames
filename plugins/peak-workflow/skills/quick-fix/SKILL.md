@@ -41,7 +41,7 @@ Follow these steps exactly:
 5. **Requirements in play.** The helper is always called as
    `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <command>` (written `tor-lifecycle` below);
    exit 2 or 3 from it is a data or install problem — print its output and stop. Run
-   `tor-lifecycle states --json` once. The fix's **requirements** are the TOR IDs the request
+   `tor-lifecycle states --json` and `tor-lifecycle check --json` once each. The fix's **requirements** are the TOR IDs the request
    names, plus those cited by the test functions and source lines the fix will change (not every
    ID in those files). Print each as `TOR-… — <title>` from one `tor-lifecycle titles <IDs>` run,
    with its `states` state; `titles` exits 1 when an ID is unknown — print its line and continue.
@@ -201,6 +201,7 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
    - Commit message subject: `fix: <one-line summary>` (on the regression-test-only path from item
      1a: `test: <one-line summary>`, with no `Closes` trailer)
    - If a GitHub issue number was provided, append a trailer line: `Closes #<N>`. If no issue number, omit the trailer.
+   - For each requirement in play that is Verification failed, add the body line `Fixes: <TOR>` — `/peak-workflow:status` reads it to switch its nudge to the reverify.
    - On a supersede, add the body lines `Amends: <old TOR> → <successor> (<CR-ID>)` and
      `Reverified: <successor> PASS` (or `Unverified: <successor> — <reason>`) — the record solo mode
      keeps. A reword adds its `Amends:` line to its own commit (item 5a).

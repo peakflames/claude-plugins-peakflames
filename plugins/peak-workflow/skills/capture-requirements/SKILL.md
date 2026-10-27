@@ -372,7 +372,8 @@ recommended choice first. Which choices appear depends on what the input says an
 Question: `"<TOR-ID> — <title>: <what the input changes, one line>. How should it change?"`.
 Drop `Record as pending` for a Safety requirement; for an undecided change to one (the `Pending`
 row), offer `Keep unchanged` in its place and say *"<TOR> is a Safety requirement and cannot be
-recorded as pending — decide it on this branch, or keep it unchanged."* `Keep unchanged` (Removed rows only) is for a
+recorded as pending — decide it on this branch, or keep it unchanged."* `Keep unchanged` (Removed rows, and the Safety `Pending` row) writes nothing; in TOR-ID mode print
+`Outcome: Kept unchanged — no record` and delete the branch Step 0 created. On a Removed row it is for a
 requirement the removal does not actually touch; name it in the summary with the reason.
 
 ---
@@ -929,7 +930,8 @@ greenfield files.
    with `["Uphold — it stands as written", "Change it", "Retire it", "Renew the pending record"]`
    (recommend from the description: none or "it is right" → Uphold). Drop **Renew** for a
    requirement under `# Safety`. **Change it** asks what it should say when there is no
-   description, runs L3, and applies Reword or Supersede per L5. **Renew** writes a new `pending`
+   description, runs L3, and applies it without the L5 question — Supersede on a meaning change,
+   Reword when reword-eligible. **Renew** writes a new `pending`
    record that refs the open one, copies its title, keywords, owner, and `tracker`, with a fresh
    reason. After **Change it** applies a Supersede or
    Reword, ask the settle question from step 3 too; on No, follow its renewal rule.

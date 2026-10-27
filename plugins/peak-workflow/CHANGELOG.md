@@ -186,6 +186,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Step 0002 keeps a banner's section name** — a one-line banner holding a marker word
   ("revised …") is reported `kept`, so the strip no longer refuses to rename the section below it.
+- **Wrapup ships no stale citations** — refresh-docs never cites a superseded or retired TOR ID,
+  and wrapup's pre-ship `check` fixes any E finding the branch added.
 - **A kept banner passes capture-requirements' checks** — a section banner step 0002 kept is not
   counted as a dated banner.
 - **Step 0001 reads the skills' own merge subjects** — `docs(plan): merge docs/<task> — …` now
