@@ -478,7 +478,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 |---|---|---|
 | 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
 | 2 | Two clean full dry-run passes incl. lifecycle scenarios | ☐ pass 1: 4 Critical; pass 2: 2; pass 3: 1 (all fixed). Needs passes 4 and 5 clean |
-| 3 | Live UAT upgrade of the maintainer's 2.x project | ☐ Summit (built on 1.5.0, format 0, 6 Complete epics) with two planted merges on develop: TOR-03-s6tFG4V edited in place (WKhBuVK), CHANGE-CONTROL note on TOR-02-K6frDEV (Yz4JE9Z). Baseline: exactly s6tFG4V Changed since verified. Maintainer running `docs/uat/live-uat-2.1-upgrade.md` against a frozen worktree at `0f94476` |
+| 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
 | 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
 
 - **Docs:** plugin README gains Prerequisites (Python 3.11+), a Requirements lifecycle section
@@ -525,4 +525,15 @@ proposal + addendum). Every plan reads this file first and updates it last.
 - **Left alone** (adds to the list above): wrapup has no NOT RUN path for a gate tool that cannot
   be installed; add writes planning files on the current branch; discover/plan-project offer Team
   PR with no remote; setup's logging default vs the toolchain row; no test-only clock switch.
+- **Live UAT (gate 3).** Run by a separate Claude Code session on a `/tmp` clone of Summit with
+  the plugin pinned to a frozen worktree. Run 1 found two helper bugs: `migrate scan` marked a
+  one-line banner holding a marker word strippable though it names the section below it (strip
+  then refused), and step 0001's `provenance` did not read the skills' own solo-merge subjects
+  (`docs(plan): merge docs/<task> — …`), leaving Plan branch `—`. Fixed with tests. Run 2: every
+  step ✅. Observations: the kept banner tripped capture-requirements' "no dated banner" check
+  (now exempt); the Session Guard does not count a capture-requirements run on the same epic
+  (left alone — reverify does not read implementer context).
+- **Passes 4–5:** pass 4, 1 Critical (pause wrote on `develop`); pass 5, 3 Critical (add wrote
+  on the current branch; status read only In Progress epics from their branches; quick-fix
+  amendments left vision/ConOps stale and could close a dispute unrecorded). All fixed.
 

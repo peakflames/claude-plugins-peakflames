@@ -186,6 +186,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Step 0002 keeps a banner's section name** — a one-line banner holding a marker word
   ("revised …") is reported `kept`, so the strip no longer refuses to rename the section below it.
+- **A kept banner passes capture-requirements' checks** — a section banner step 0002 kept is not
+  counted as a dated banner.
 - **Step 0001 reads the skills' own merge subjects** — `docs(plan): merge docs/<task> — …` now
   fills `**Plan branch:**` instead of `—`.
 - **`add` branches off the base** — run on `develop`, it writes on `docs/add-<name>` and ends
