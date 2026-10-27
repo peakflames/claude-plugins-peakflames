@@ -7,7 +7,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
   and posted once on #20 after approval.
   Posted so far: rows through Plan 4 (Plan 4 comment), Plans 5–7b (issuecomment-6428372050),
   and Plan 8 (issuecomment-6429562613). Post rows added from Plan 9 on in one follow-up at the
-  merge gate. **Plan 9 rows not yet posted:** `Non-ID requirements: entry`.
+  merge gate. **Plan 9 rows not yet posted:** `Non-ID requirements: entry`, `Kept banner`, `Implemented owner`, `Fixes: trailer`.
 - **Integration branch:** `feature/peak-workflow-3.0` (off `develop`). Each plan works on
   `feature/peak-workflow-3.0-pN-<name>` and merges back `--no-ff`. The integration branch merges to
   `develop` only after the merge gate (Q10).
@@ -87,6 +87,9 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | Duplicate sidecar keys | (none) | The sidecar parser rejects a key that appears twice (`owner:` twice → data error naming both lines), so `check`, `states`, and step 0002's prerequisites stop on it | A clean git merge of an in-flight branch after step 0001 can add a second `owner:` line silently; step 0001 is frozen, so the parser catches it |
 | Requirements README | Migration rewrites `docs/requirements/README.md` | Step 0002 replaces the `## Conventions` section only when the file is still the 2.1 setup stub, writes one when there is none, and leaves a user-written README alone (named in the report) | An upgrade step never overwrites prose a user wrote |
 | Non-ID `requirements:` entry | A Complete epic's `requirements:` line is append-only | A non-ID entry `check` reports as finding C (e.g. `TOR-24 set`) is corrected or deleted by hand on a `docs/` branch; quick-fix's amendment path and reverify stop before branching while one exists | `mark` refuses a sidecar it cannot parse strictly, so the epic could never record a verdict again; step 0002's report already prescribed the hand fix |
+| Kept banner | (as `Kept prose`) | A section banner's first text line is kept (reported `kept`) even when it holds a marker word; only later marker lines in a banner are stripped | The first line names the section; removing it moves the requirements below into another section (Summit live UAT) |
+| Implemented owner | Retire and supersede act on the live set; open epics are swapped, Complete ones keep the old ID | capture-requirements refuses a retire or supersede that would leave an **Implemented** epic with no live anchor ("wrap it up first") | wrapup cannot complete an epic with nothing left to verify |
+| `Fixes:` trailer | (none) | A quick-fix for a Verification failed requirement adds `Fixes: <TOR>` to its commit body; status then points that requirement at reverify | Nothing else records that the code was fixed before the reverify |
 
 ## Plan checklist
 
@@ -477,7 +480,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | # | Gate | State |
 |---|---|---|
 | 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
-| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ◐ Criticals: passes 1–8: 4, 2, 1, 1, 3, 0, 1, 2 (all fixed); **pass 9: 0 (clean)**; pass 10 running |
+| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ✅ passes 9 and 10 clean (0 Critical, 8 agents). Criticals per pass 1–8: 4, 2, 1, 1, 3, 0, 1, 2 — all fixed |
 | 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
 | 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
 
@@ -562,4 +565,13 @@ proposal + addendum). Every plan reads this file first and updates it last.
   upgrade catch-up; capture-requirements Restore prints the reverify too, names the merge command
   and the expected E follow-ups; wrapup reviews the doc-refresh sub-agent's diff; discover's
   backlog promotion is an `Added` row.
+- **Pass 10: clean** (0 Critical). Gate 2 met with passes 9 and 10. UX applied: standalone
+  refresh-docs runs `check --base` before committing; "Meaning unchanged — re-verify instead"
+  (no "or unsure", which L3 treats as a meaning change) with a warning when L3 found one;
+  reverify skips its pre-3.0 question for that route.
+- **Left alone after the passes** (UX/Minor, not lifecycle-critical): no setup toolchain row for
+  standard-library Python; plan-project's skeleton fault switch on CLIs; triage routing of a
+  request an open epic already covers (add stops cleanly); `approved_by` typed by hand is not
+  caught by `validate`; renewed pending records reuse a reason that may name a replaced detail;
+  wrapup 1.4b Amend has no vision/ConOps rewrite item (quick-fix and start-epic do).
 
