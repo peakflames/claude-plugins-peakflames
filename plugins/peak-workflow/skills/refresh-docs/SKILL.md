@@ -124,7 +124,9 @@ If both tables are empty, report that the documentation is current and stop — 
 
 ## Step 6: Rewrite Target Documents
 
-Rewrite only the documents where gaps were found.
+Rewrite only the documents where gaps were found. Never cite a superseded or retired TOR ID in
+either document (`tor-lifecycle titles <ID>` says which): name its Change Record (`CR-…`) and the
+live successor(s) instead — `check` reports any such citation as finding E.
 
 ### Rewriting `docs/architecture.md`
 

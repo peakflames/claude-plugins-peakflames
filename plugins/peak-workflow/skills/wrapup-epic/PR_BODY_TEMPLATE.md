@@ -34,7 +34,7 @@ Count: N (undisclosed: M, waived: W, fixed at wrapup: F, amended: A, pending: P)
 
 | TOR ID | Unmet | Disclosed | Implementer decision | Verifier finding | Waived by / Date / Reason |
 |--------|-------|-----------|----------------------|------------------|---------------------------|
-| TOR-NN-XXXXXXX | <what is unmet> | yes / **no** | <decision — why → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, FIXED DURING WRAPUP — <what changed>, AMENDED AT WRAPUP — <CR-ID>: <old> → <successor>, or RECORDED AS PENDING — <CR-ID> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
+| TOR-NN-XXXXXXX | <what is unmet> | yes / yes (misfiled) / **no** / n/a (no handoff) / n/a (observation) | <decision — why → epic <succ> (by, date)> | FAIL / CANNOT VERIFY — <detail>, FIXED DURING WRAPUP — <what changed>, AMENDED AT WRAPUP — <CR-ID>: <old> → <successor>, or RECORDED AS PENDING — <CR-ID> | <user> / <YYYY-MM-DD> / <reason> → epic <succ> — or `—` |
 
 <If Count is 0: replace the table with the literal line `None`.>
 

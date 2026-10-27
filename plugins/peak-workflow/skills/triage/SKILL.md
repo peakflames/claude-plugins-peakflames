@@ -123,6 +123,9 @@ Apply this rubric — pick exactly one verdict:
     **AMEND** (`/peak-workflow:capture-requirements <TOR-ID> <description>` offers to restore the
     verified text). If the code also follows the edit, say so: a quick-fix follows once the
     restore merges.
+  - It asks for what the **current** text says (the edit was intended) → **AMEND**
+    (`/peak-workflow:capture-requirements <TOR-ID> <description>` records it as a supersede, or a
+    reword with evidence).
   - It disagrees with both → a bug against the current text, but the text itself is unproven:
     recommend the reverify first (`/peak-workflow:wrapup-epic <epic-id> reverify <TOR-ID>`, fresh
     session), then quick-fix if the requirement holds and the code fails it.
