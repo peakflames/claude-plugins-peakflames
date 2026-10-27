@@ -160,7 +160,8 @@ If the user confirms the list, use it. If the user specifies additions or remova
 is valid — continue with `requirements: —`), inform the user:
 > No existing TOR requirements match this description. To add new requirements, run
 > `/peak-workflow:capture-requirements` (brownfield mode) on a `docs/{task-short-name}` branch
-> to derive and approve new TOR IDs, then re-run `/peak-workflow:add`.
+> to derive and approve new TOR IDs, then re-run `/peak-workflow:add` on that same branch
+> (create it with `git checkout -b docs/<short-name>` from the base).
 
 Wait for the user's answer. The confirmed TOR ID set is the Requirements Anchors list for this epic.
 
@@ -477,5 +478,5 @@ Requirements Anchors table — ensure those feature files are on develop (merged
 
 Do NOT commit — leave that for the user to decide. When Step 6 created `docs/add-<kebab-name>`,
 end the summary with how it reaches the base: commit on it (`docs(plan): add epic <id> (<slug>)`),
-then `git checkout <base> && git merge --no-ff docs/add-<kebab-name> && git branch -d
+then `git checkout <base> && git merge --no-ff docs/add-<kebab-name> -m "docs(plan): merge docs/add-<kebab-name> — add epic <id> (<slug>)" && git branch -d
 docs/add-<kebab-name>` (solo) or push it and open a PR (team).

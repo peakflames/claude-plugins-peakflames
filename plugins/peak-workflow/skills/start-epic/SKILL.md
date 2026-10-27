@@ -203,7 +203,7 @@ Follow these steps exactly:
 
 If `owner:` in the sidecar names someone other than you (as defined in Step 2.5), defer this check until Step 2.5 confirms **Start it**, then run it.
 
-If `docs/implementation-plan/status/epic-<id>.md` has `status: In Progress` but there is no pause handoff file (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/peak-workflow:pause`. Inform the user:
+If `docs/implementation-plan/status/epic-<id>.md` (read from `feature/epic-<id>-<short-name>` when that branch exists — `git show <branch>:<path>`) has `status: In Progress` but there is no pause handoff file on that branch (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/peak-workflow:pause`. Inform the user:
 
 > Epic <id> is marked "In Progress" but has no pause handoff — a previous session may have been interrupted. I'll scan the codebase for any partial implementation and pick up from the current state.
 

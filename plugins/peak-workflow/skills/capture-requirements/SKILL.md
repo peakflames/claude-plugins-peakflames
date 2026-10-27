@@ -292,7 +292,7 @@ On Reintroduce, the new requirement gets a **new ID** (never the old one) and it
 list it under the summary's Coverage Gaps as `dropped — <CR-ID> stands`. A hit on a `pending`
 record printed `pending (closed by CR-…)` is settled — the closing record is the decision; ask
 about that one. An open `pending` hit means the requirement is still live and known wrong: resolve it with Step 3C instead of
-adding a second one — except when the pending record names the requirement being amended (Step 3C, or a
+adding a second one — except when the pending record names the requirement being amended (Step 3B.2, Step 3C, or a
 quick-fix, start-epic, or wrapup amendment of it): its settle question decides it; skip it. A hit on an `uphold` record means the requirement was disputed and kept as
 written: a new requirement that contradicts it changes that decision — name the record in the
 question.
@@ -797,7 +797,9 @@ Read all existing `.feature.md` files. For each input from 3B.1:
 - **Already covered by an existing TOR?** → Skip. Note: "already covered by `TOR-NN-XXXXXXX`".
 - **Changes, withdraws, or extends a merged requirement?** (L1) → Draft the change, run the
   decision test (L3), and ask the L5 question for that requirement. Record the answer; apply it
-  per L5 after the 3B.3b gate approves (the citing-test run for a reword happens then too).
+  per L5 after the 3B.3b gate approves (the citing-test run for a reword happens then too). When
+  the requirement is **Disputed** (an open `pending` record), also ask Step 3C step 3's settle
+  question and follow its renewal rule.
   There is no silent defer: a change the user does not want to make now is **Record as
   pending**.
 - **Changes a requirement created on this branch?** → Edit it freely (L1).
