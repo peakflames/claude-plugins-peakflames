@@ -477,7 +477,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | # | Gate | State |
 |---|---|---|
 | 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
-| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ◐ Criticals: passes 1–5: 4, 2, 1, 1, 3; pass 6: 0 (clean); pass 7: 1; pass 8: 2 (`historical_records` listed proven rewords; quick-fix could amend an undecided pre-3.0 edit) — fixed. Needs passes 9 and 10 clean |
+| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ◐ Criticals: passes 1–8: 4, 2, 1, 1, 3, 0, 1, 2 (all fixed); **pass 9: 0 (clean)**; pass 10 running |
 | 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
 | 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
 
@@ -556,4 +556,10 @@ proposal + addendum). Every plan reads this file first and updates it last.
   keywords); Restore commit subject; triage asks which text when a request could mean either,
   and routes new behavior on a stale requirement through HEAVY/AMEND; C message names the
   branch; `1 day old`.
+- **Pass 9: clean** (0 Critical; regression of passes 7–8 plus upgrade Skip/resume/catch-up on
+  F1 and Summit). UX applied: status's panel agrees with the nudge once a fix merged, strips the
+  `RECORDED AS PENDING` prefix from the quick-fix argument, suggests housekeeping and a pending
+  upgrade catch-up; capture-requirements Restore prints the reverify too, names the merge command
+  and the expected E follow-ups; wrapup reviews the doc-refresh sub-agent's diff; discover's
+  backlog promotion is an `Added` row.
 

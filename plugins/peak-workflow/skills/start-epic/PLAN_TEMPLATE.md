@@ -243,7 +243,7 @@ Rules:
      not an amendment the code needs: say so, implement as written, and suggest
      `/peak-workflow:capture-requirements <TOR> <wording>` after the epic. **Meaning change** →
      continue.
-  2. Run L4 (`tor-lifecycle search <key nouns>`) for the successor. Generate its ID in the same
+  2. Run L4 (`tor-lifecycle search -- <key nouns>`) for the successor. Generate its ID in the same
      feature number — generate the 7-character suffix with `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7` and regenerate it while it is all digits or `git grep --untracked -q <suffix>` finds it anywhere (feature files and `docs/requirements/changes/` included) — and write its block in place of the old one. Generate the record's
      `CR-` suffix the same way. Read the old tracing entry's sources first (they become the
      record's `traced_to`). Write the `supersede` record with `approved_via = "epic-branch"`, `approved_by` =

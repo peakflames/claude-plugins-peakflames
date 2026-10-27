@@ -172,7 +172,8 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    verified` or `Verification failed` (and Disputed rows whose `underlying_state` is one of them)
    by `epic`. One group per Complete epic: its `<id> (<slug>) — <Name>`, each requirement as
    `TOR-… — <title>`, and the command `/peak-workflow:wrapup-epic <id> reverify`. A Verification
-   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`" — unless it is
+   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`" — or, when its fix
+   has merged (item 5's `Fixes:` test), "fixed in <sha> — reverify now" — unless it is
    Disputed, which adds "known to be wrong (<CR-ID>): decide with
    `/peak-workflow:capture-requirements <TOR>` first — uphold it if it stands" instead. A requirement in
    this group (either state) that also has an A finding (edited without a record) adds "decide first
@@ -195,7 +196,7 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
    group's first requirement carries an A finding or `historical_records`, its
    `/peak-workflow:capture-requirements <TOR>` decision first; when it is Verification failed,
-   `/peak-workflow:quick-fix <TOR>: <the row's unverified text without its leading date>` for the code first; when it is
+   `/peak-workflow:quick-fix <TOR>: <the row's unverified text without its leading date or a leading `RECORDED AS PENDING — CR-…: `>` for the code first; when it is
    Disputed, its `/peak-workflow:capture-requirements <TOR>` first; when a quick-fix for it has
    already merged (`git log --grep='^Fixes: <TOR>$' <base>` finds a commit dated on or after the
    row's `unverified` date), its `/peak-workflow:wrapup-epic <id> reverify <TOR>` (groups follow the order of
@@ -395,6 +396,8 @@ means the spec records no planner.]
  - If there are "Specified" requirements (no epic): "Run `/peak-workflow:add` to assign [N] unplanned TOR requirements to epics"
  - If exactly one epic is ready to start: "Start Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>` — <one-clause reason, e.g. the only unblocked epic>"
  - If several epics are ready to start: do **not** pick one. Write "[N] epics are ready — choose from the Ready to Start table above", and add one line when the ready epics span more than one phase or more than one planner ("They come from phases 3 and 4; ⚑ rows were planned by someone else — check with them before starting"). Choosing among ready epics is the team's decision, not the dashboard's.
+ - If `check` reported C or E findings: "Fix <N> housekeeping finding(s) under Requirements Health — each message names its fix" (E findings a planned epic will clear: name that epic instead).
+ - If `tor-lifecycle provenance --base <base>` exits 1 and no in-flight branch names those epics: "Run `/peak-workflow:upgrade` — catch-up for <epic IDs> is pending."
  - If all epics are complete and every live requirement counts as verified with no findings: "All requirements verified! Consider `/peak-workflow:refresh-docs` before release."
  - If all epics are complete but some requirements are still Implemented: "Run `/peak-workflow:wrapup-epic <id>` to complete independent verification of remaining epics."]
 ```
