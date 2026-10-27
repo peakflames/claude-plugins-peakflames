@@ -955,6 +955,8 @@ be made by the user every invocation.
 
 - Question: `"Ship mode — solo (merge locally to the base branch) or team (push the branch and open a pull request)?"`
 - Options: `["Team — push and open PR", "Solo — local merge only"]`
+- If `git remote` does not list `origin`, skip the question: say `No remote — shipping solo (local
+  merge).` and use Solo.
 
 ### Step 5a: Solo mode
 

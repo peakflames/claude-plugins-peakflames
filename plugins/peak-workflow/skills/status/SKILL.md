@@ -195,8 +195,9 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
    group's first requirement carries an A finding or `historical_records`, its
    `/peak-workflow:capture-requirements <TOR>` decision first; when it is Verification failed,
-   `/peak-workflow:quick-fix <TOR>: <the row's unverified reason>` for the code first (groups
-   follow the order of `states` rows) — else the oldest Disputed one's
+   `/peak-workflow:quick-fix <TOR>: <the row's unverified reason>` for the code first; when it is
+   Disputed, its `/peak-workflow:capture-requirements <TOR>` first (groups follow the order of
+   `states` rows) — else the oldest Disputed one's
    `/peak-workflow:capture-requirements <TOR>`), even in degraded mode — there, add "after the fix".
 
 ## Step 5: Flag Stale Paused Epics

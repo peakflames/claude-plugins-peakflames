@@ -188,7 +188,7 @@ Merge is approval, as for every `docs/` branch. Ask via `AskUserQuestion`:
 - Options: `["Team — push and open a PR", "Solo — merge into <base> locally", "Leave the branch for now"]`
 
 - **Team:** `git push -u origin <branch>`, then
-  `gh pr create --base <base> --title "chore(upgrade): format N → <target>"` (catch-up only:
+  `gh pr create --base <base> --title "chore(upgrade): format B → <target>"` (catch-up only:
   `"chore(upgrade): catch-up on format N"`) with the summary table as the body.
 - **Solo:** `git checkout <base> && git merge --no-ff <branch> && git branch -d <branch>`.
 - **Leave:** print the two commands above for later, and say: *"Until it merges, <base> is still on
