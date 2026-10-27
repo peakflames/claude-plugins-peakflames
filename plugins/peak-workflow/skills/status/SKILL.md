@@ -196,7 +196,8 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    group's first requirement carries an A finding or `historical_records`, its
    `/peak-workflow:capture-requirements <TOR>` decision first; when it is Verification failed,
    `/peak-workflow:quick-fix <TOR>: <the row's unverified text without its leading date>` for the code first; when it is
-   Disputed, its `/peak-workflow:capture-requirements <TOR>` first (groups follow the order of
+   Disputed, its `/peak-workflow:capture-requirements <TOR>` first; when a quick-fix for it has
+   already merged, its `/peak-workflow:wrapup-epic <id> reverify <TOR>` (groups follow the order of
    `states` rows) — else the oldest Disputed one's
    `/peak-workflow:capture-requirements <TOR>`), even in degraded mode — there, add "after the fix".
 
@@ -355,8 +356,9 @@ with removal pending.
 
 ## Active Work
 
-[List any epics currently "In Progress" as `<id> (<slug>) — <Name>`, with phase and owner]
+[List any epics currently "In Progress" or "Paused" as `<id> (<slug>) — <Name>`, with phase, status, and owner]
 [If none: "No epics currently in progress."]
+[For a Paused epic that is not stale, add to Suggested Next Actions: "Resume Epic <id> (<slug>) — <Name> with /peak-workflow:start-epic <id>"]
 
 ## Stale Paused Epics (>7 days)
 

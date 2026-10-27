@@ -211,8 +211,10 @@ For each existing section that needs changes, show the current content alongside
 **Re-litigation check.** Before drafting a proposed capability into the vision or ConOps, run
 `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" search -- <2–4 key nouns or quoted phrases>`.
 Exit 0 = no earlier decision. Exit 1 prints the Change Records that retired, superseded, or
-recorded the idea as pending. For each hit that is really the same idea, ask with
-`AskUserQuestion`:
+recorded the idea as pending. A hit on an open `pending` record (not
+`closed by`) is not a re-proposal — do not ask: write the section's `Modified` (decided) or
+`Pending` (undecided) row naming `(settles <CR-ID>)`, never a New Capabilities line. For each other
+hit that is really the same idea, ask with `AskUserQuestion`:
 - Question: `"<capability> was <retired / superseded / recorded as pending> in <CR-ID> (<date>): <reason, one line>. Bring it back anyway?"`
 - Options: `["Bring it back — note why in the changelog", "Drop it — the earlier decision stands"]`
 

@@ -126,7 +126,8 @@ skipped epics' files:
     **Skip** line says it supports skipping. Tell the user to re-run `/peak-workflow:upgrade` after
     those epics merge — the detect check picks up exactly what was skipped.
   - `"Rewrite everything anyway"`
-  - `"Stop — I'll merge or finish those branches first"`
+  - `"Stop — I'll merge or finish those branches first"` — then `git checkout <base> && git branch
+    -D <branch>` (nothing was committed on it).
 
 A skipped epic does not hold the stamp back: the step's change is optional history for in-flight
 epics, and its detect check stays honest on the next run.

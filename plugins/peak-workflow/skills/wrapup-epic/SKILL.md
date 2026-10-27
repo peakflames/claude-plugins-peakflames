@@ -172,7 +172,7 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 
 ### Step 1.1: Load Context
 
-1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
+1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it yet — item 1a re-reads it from the working tree after checkout.
 1a. **Check out the feature branch before reading any sidecar or spec content.** The sidecar and spec on `develop`/`main` may still say `Not Started` or `In Progress` — only the feature branch carries the implementer's updates. Locate the spec by filename only (no content read): `ls docs/implementation-plan/phase-*/epic-<id>-*.md`. Extract the **branch short name** from that filename: strip the directory path, the `epic-<id>-` prefix (`<id>` is an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it. Then detect the branch with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
    ```bash
    git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
@@ -703,7 +703,7 @@ its row.)
 
 ## Counts
 - TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup, A amended, P pending)
-- Quality Gates: X/Y PASS
+- Quality Gates: X/Y PASS (N/A gates are excluded from Y and listed after the count)
 - Tests: X passed, Y skipped, Z failed
 
 (Y is the final anchors — a SUPERSEDED row is not counted; Z includes pending TORs. P counts Step 1.4b pending records only; renewals from Step 1.1 item 3a appear under Requirement
@@ -794,7 +794,7 @@ column sets exactly as shown.
 **If the verdict is FAIL:** Stop here, on the feature branch (a stop that wrote nothing, like the
 Step 1.1 item 3a stops, says where it leaves the session). List the specific items that need to be fixed — TORs already fixed during this wrapup are re-verified and not on that list. Do NOT proceed to Phase 2. Tell the user: make the fixes (re-run `/peak-workflow:start-epic <id>` on the same branch, or fix by hand), then run `/peak-workflow:wrapup-epic <id>` again in a fresh session. Any fix or Change Record written during this wrapup is uncommitted on the feature branch — say so, so it is not lost.
 
-**If the verdict is PASS:** Ask the user to confirm before proceeding to Phase 2.
+**If the verdict is PASS:** ask via `AskUserQuestion` `"Verdict PASS. Proceed to Phase 2 (complete and ship)?"` — `["Proceed", "Stop"]`.
 
 ---
 

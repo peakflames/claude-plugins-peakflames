@@ -386,7 +386,7 @@ Middle step example:
   - **Verification Results (self-assessment)** — quality gate results
 
   After writing the handoff, run
-  `grep -inE 'stub|partial|for now|follow-up|todo|placeholder|not implemented' <handoff-path>`.
+  `grep -inE 'stub|partial|for now|follow-up|placeholder|not implemented' <handoff-path>` plus the case-sensitive `grep -nE '\bTODO\b|\bFIXME\b' <handoff-path>` (a product named "todo" is not a hit).
   Any hit outside the Deferrals table that has no matching Deferrals row fires the deferral
   gate for that TOR before continuing. If Defer is chosen here, update that TOR's TOR Coverage
   verdict to FAIL, apply the xfail marking, and re-run this grep.
@@ -409,7 +409,8 @@ Middle step example:
   created or modified during this epic by specific path (not `git add -A`), including the
   handoff file, updated status sidecar, updated spec file, — if a Defer edited them — the
   successor epic's spec and sidecar, and — if the Amendment gate fired — the Change Record, the
-  feature file, and its tracing sidecar. Commit without asking for permission.
+  feature file, and its tracing sidecar. A paused handoff removed with `git rm` is already staged —
+  do not pass it to `git add`. Commit without asking for permission.
   Message format:
   ```
   feat(epic-<id>): <short summary>

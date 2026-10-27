@@ -220,7 +220,7 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
 
    ### If ship mode is SOLO
    - `git checkout <base-branch>`
-   - `git merge <hotfix-branch> --no-ff -m "fix: merge <hotfix-branch> — <one-line summary>"`
+   - `git merge <hotfix-branch> --no-ff -m "<fix|test>: merge <hotfix-branch> — <one-line summary>"`
    - `git branch -d <hotfix-branch>`
    - Do **not** push.
    - Report: `Branch <hotfix-branch> merged into <base-branch> and deleted. Changes not pushed — run 'git push' when ready.`

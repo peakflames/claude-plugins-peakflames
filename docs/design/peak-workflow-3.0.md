@@ -477,7 +477,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | # | Gate | State |
 |---|---|---|
 | 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
-| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ☐ pass 1: 4 Critical; pass 2: 2; pass 3: 1 (all fixed). Needs passes 4 and 5 clean |
+| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ◐ Criticals: pass 1: 4, pass 2: 2, pass 3: 1, pass 4: 1, pass 5: 3 (all fixed); **pass 6: 0 (clean)**; pass 7 running |
 | 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
 | 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
 
@@ -536,4 +536,10 @@ proposal + addendum). Every plan reads this file first and updates it last.
 - **Passes 4–5:** pass 4, 1 Critical (pause wrote on `develop`); pass 5, 3 Critical (add wrote
   on the current branch; status read only In Progress epics from their branches; quick-fix
   amendments left vision/ConOps stale and could close a dispute unrecorded). All fixed.
+- **Pass 6: clean** (0 Critical, four agents incl. greenfield through a paused-and-resumed
+  skeleton, Disputed supersede via quick-fix with renewal, removal epic, Change-some-rows Drop).
+  UX applied: status suggests resuming a Paused epic and points a merged fix at reverify;
+  PLAN_TEMPLATE TODO grep is case-sensitive; add's stop names the branch and its merge has `-m`;
+  wrapup PASS question text; discover/3B.2 treat an open pending hit as a settle, not a
+  re-proposal; upgrade Stop deletes its empty branch; Recovery Check reads the branch.
 
