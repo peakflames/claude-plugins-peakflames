@@ -1089,7 +1089,9 @@ tracing-sidecar, and `validate` / `check` items apply — nothing new was derive
 
 - [ ] No feature file holds a `# Note:` block (other than the `# Note: reference screen(s)`
   line), a change marker, a version tag, or a dated banner (`FEATURE_TEMPLATE.md` "Lifecycle
-  Rules").
+  Rules") — written by this run. A section banner that upgrade step 0002 kept (its first text
+  line, which names the section) is pre-existing: leave it, and do not count it against this
+  check. Rewording it is a section rename this run need not make.
 - [ ] No tracing sidecar entry has a `title`, no sidecar has a top-level `generated`, and every
   sidecar has exactly one entry per Scenario in its feature file.
 - [ ] Every Change Record this run wrote passes `tor-lifecycle validate`, and Step 4.2's
