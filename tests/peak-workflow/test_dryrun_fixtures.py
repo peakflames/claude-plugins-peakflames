@@ -1,0 +1,162 @@
+"""The Plan 5 dry-run fixture holds every derived requirement state and every finding letter."""
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from fixtures import SCRIPT
+
+BUILDER = Path(__file__).resolve().parent / "dryrun" / "plan5_states.py"
+STATES = {"Verified", "Verified (reworded)", "Changed since verified", "Disputed", "Verification failed",
+          "Verified (legacy, unfingerprinted)", "Specified", "Planned", "In Progress", "Paused",
+          "Implemented", "Waived", "Superseded", "Retired", "Retired, removal pending"}
+
+
+def run(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(SCRIPT), *args], cwd=root, capture_output=True, text=True)
+
+
+class Plan5FixtureTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan5-"))
+        cls.root = cls.tmp / "fx"
+        subprocess.run([sys.executable, str(BUILDER), str(cls.root)], check=True, capture_output=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def git(self, *args):
+        subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
+
+    def test_develop_holds_every_state_and_letter(self):
+        self.git("checkout", "-q", "develop")
+        states = json.loads(run(self.root, "states", "--json").stdout)
+        self.assertEqual(set(states["summary"]["by_state"]), STATES)
+        disputes = {r["tor"]: r["dispute"] for r in states["requirements"] if r["state"] == "Disputed"}
+        self.assertEqual(sorted((d["overdue"], d["safety"]) for d in disputes.values()),
+                         [(False, False), (True, False), (True, True)])
+        check = json.loads(run(self.root, "check", "--json").stdout)
+        self.assertTrue(all(check["counts"][letter] for letter in "ABCDEF"), check["counts"])
+        self.assertNotIn("removal-missing", {f.get("kind") for f in check["findings"]})
+
+    def test_docs_branch_leaves_a_successor_and_a_missing_removal_epic(self):
+        self.git("checkout", "-q", "docs/q4-requirements")
+        rows = {r["tor"]: r for r in json.loads(run(self.root, "states", "--json").stdout)["requirements"]}
+        self.assertEqual(rows["TOR-02-Tax0002"]["state"], "Specified")
+        self.assertEqual(rows["TOR-02-Tax0001"]["state"], "Superseded")
+        self.assertEqual(rows["TOR-02-Slip001"]["state"], "Retired, removal pending")
+        check = json.loads(run(self.root, "check", "--json").stdout)
+        missing = [f["detail"]["record"] for f in check["findings"] if f.get("kind") == "removal-missing"]
+        self.assertEqual(missing, ["CR-Rt0Slip"])
+
+    def test_behind_variant(self):
+        dest = self.tmp / "behind"
+        subprocess.run([sys.executable, str(BUILDER), str(dest), "--behind"], check=True, capture_output=True)
+        result = run(dest, "format")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("verdict: behind", result.stdout)
+        self.assertEqual(run(dest, "states", "--json").returncode, 0)
+
+
+class Plan6FixtureTests(unittest.TestCase):
+    """The Plan 6 fixture: a superseded anchor on an open epic, a Specified anchor to amend, an
+    epic with no anchors, and the Plan 5 removal epic."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan6-"))
+        cls.root = cls.tmp / "fx"
+        subprocess.run([sys.executable, str(BUILDER.with_name("plan6_execution.py")), str(cls.root)],
+                       check=True, capture_output=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_execution_cases(self):
+        rows = {r["tor"]: r for r in json.loads(run(self.root, "states", "--json").stdout)["requirements"]}
+        self.assertEqual(rows["TOR-02-Rfnd001"]["state"], "Superseded")
+        self.assertEqual(rows["TOR-02-Rfnd002"]["state"], "Specified")
+        self.assertEqual((rows["TOR-02-Due0001"]["state"], rows["TOR-02-Due0001"]["epic"]), ("Planned", "lDue11"))
+        self.assertEqual((rows["TOR-01-Ver0001"]["state"], rows["TOR-01-Ver0001"]["epic"]), ("Verified", "aSkel01"))
+        check = json.loads(run(self.root, "check", "--json").stdout)
+        self.assertIn("open-epic-retired", {f.get("kind") for f in check["findings"]})
+        sweep = json.loads(run(self.root, "sweep", "--json").stdout)
+        self.assertIn(("TOR-02-Rfnd001", "tests/test_refund.py"), {(r["tor"], r["path"]) for r in sweep})
+        sidecar = (self.root / "docs/implementation-plan/status/epic-mNoA12.md").read_text()
+        self.assertIn("requirements: —", sidecar)
+        self.assertEqual(run(self.root, "validate").returncode, 0)
+
+
+class Plan7FixtureTests(unittest.TestCase):
+    """The Plan 7 fixture: Implemented epics on feature branches and stale Complete-epic requirements."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan7-"))
+        cls.root = cls.tmp / "fx"
+        subprocess.run([sys.executable, str(BUILDER.with_name("plan7_wrapup.py")), str(cls.root)],
+                       check=True, capture_output=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def git(self, *args):
+        subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
+
+    def test_wrapup_and_reverify_cases(self):
+        self.git("checkout", "-q", "develop")
+        rows = {r["tor"]: r for r in json.loads(run(self.root, "states", "--json").stdout)["requirements"]}
+        self.assertEqual((rows["TOR-02-Page010"]["state"], rows["TOR-02-Page010"]["epic"]), ("Changed since verified", "aSkel01"))
+        self.assertEqual((rows["TOR-02-Mail001"]["state"], rows["TOR-02-Mail001"]["epic"]), ("Verification failed", "bShip02"))
+        self.assertEqual((rows["TOR-03-Csv0002"]["state"], rows["TOR-03-Csv0002"]["epic"]), ("Changed since verified", "bShip02"))
+        findings = json.loads(run(self.root, "check", "--json").stdout)["findings"]
+        self.assertNotIn(("A", "TOR-03-Csv0002"), {(f["letter"], f.get("tor")) for f in findings})
+        self.assertIn(("A", "TOR-02-Page010"), {(f["letter"], f.get("tor")) for f in findings})
+        for branch in ("nGft13-gift-messages", "qDsc15-discount-rounding", "rPrv16-email-footer",
+                       "hRmXls7-remove-excel-export"):
+            self.git("checkout", "-q", f"feature/epic-{branch}")
+            check = json.loads(run(self.root, "check", "--base", "develop", "--json").stdout)
+            self.assertEqual(check["blocking"], 0, branch)
+        self.assertEqual(run(self.root, "sweep", "TOR-03-Xls0001").returncode, 1)
+        self.git("checkout", "-q", "develop")
+
+
+class Plan8FixtureTests(unittest.TestCase):
+    """The Plan 8 "Project A-like" fixture: a format-0 2.1 project holding everything step 0002 migrates."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan8-"))
+        cls.root = cls.tmp / "fx"
+        subprocess.run([sys.executable, str(BUILDER.with_name("plan8_project_a.py")), str(cls.root)],
+                       check=True, capture_output=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_format_0_with_every_migration_input(self):
+        result = run(self.root, "format")
+        self.assertIn("project: 0 (no stamp)", result.stdout)
+        scan = json.loads(run(self.root, "migrate", "scan", "--json", "--base", "develop").stdout)
+        self.assertEqual(scan["counts"], {"prose": 9, "kept": 0, "tracing": 3, "specs": 4, "sidecar_keys": 1,
+                                          "edits": 2, "removed": 1, "seed": 11, "migration_source": 0})
+        kinds = sorted(p["kind"] for p in scan["prose"])
+        self.assertEqual(kinds, ["banner", "comment", "marker", "marker", "marker", "marker", "marker", "note", "note"])
+        self.assertEqual({e["tor"] for e in scan["edits"]}, {"TOR-01-Pre0001", "TOR-02-Wrd0001"})
+        self.assertEqual([r["tor"] for r in scan["removed"]], ["TOR-03-Csv0001"])
+        self.assertEqual([k["key"] for k in scan["sidecar_keys"]], ["superseded_by"])
+        check = json.loads(run(self.root, "check", "--json").stdout)
+        self.assertIn("Epic cExp03 lists 'TOR-24 set'", "\n".join(f["message"] for f in check["findings"]))
+        self.assertEqual(run(self.root, "provenance").returncode, 1)  # step 0001 has work too
+
+
+if __name__ == "__main__":
+    unittest.main()

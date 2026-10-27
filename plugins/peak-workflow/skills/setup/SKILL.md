@@ -8,7 +8,7 @@ description: |
   "configure CLAUDE.md", "get the project ready".
 ---
 
-You are auditing the project's `CLAUDE.md` file to ensure it contains the sections that the epic workflow depends on, and ensuring the documentation stubs exist for the architecture and design documents that the workflow reads and maintains.
+You are auditing the project's `CLAUDE.md` file to ensure it contains the sections that peak-workflow depends on, and ensuring the documentation stubs exist for the architecture and design documents that the workflow reads and maintains.
 
 The user's description of the product (may be empty — `/peak-workflow:new-project` passes it
 through): $ARGUMENTS
@@ -27,6 +27,17 @@ down (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `*.csproj`, `*.s
 `code_present = true / false`. Step 3 reads defaults from the code when it is present, and from
 a reference sheet or the toolchain table when it is not.
 
+Then probe for Python and read the format stamp (`tor-lifecycle` means
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"`):
+
+1. `tor-lifecycle version`. Exit 0 prints the interpreter it found — record
+   `[PASS] Python — <version>`. Exit 3 prints an install hint — record
+   `[MISS] Python 3.11+ — <the hint's line for this OS>` and skip item 2 and the Step 6 stamp;
+   peak-workflow's requirement checks need it, and running setup again after installing is safe.
+2. `tor-lifecycle format`, then act on its `verdict:` line: `ahead` or `not-peak-workflow` —
+   print its message and stop; exit 2 (unreadable stamp) — print its output and stop; `behind` —
+   record it for Step 6 and continue the audit; `new` or `current` — continue.
+
 ## Step 2: Check Required Sections
 
 Check for the presence and completeness of each section below. Report a status for each:
@@ -39,11 +50,11 @@ Check for the presence and completeness of each section below. Report a status f
 | **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Embedded / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
 | **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library / Embedded projects report `[N/A] UX Baseline — no user interface`. If Tool Hygiene & Operability is also missing, the Project type is not yet known — report `[MISS] UX Baseline — resolved after Project type is captured in Step 3` and let Step 3 turn it into `[N/A]` or a populated section. |
 | **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:wrapup-epic`, not derived as TORs. |
-| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
+| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`, `/peak-workflow:upgrade`, `/peak-workflow:new-project`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
-| **Git Workflow** | Documents branch strategy (including epic branch naming convention `feature/epic-<id>-<short-name>` where `<id>` is a legacy integer or 7-character alphanumeric, and quick-fix convention `hotfix/issue-<N>-<slug>` or `hotfix/<slug>`), merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, credential files, `appsettings.*.local.json` — not a template `appsettings.json` with no secrets, which is normally committed). Names `develop` as the base branch and `main` as the release branch; once published, a `**Remote:**` line records the repository, its default branch, and its branch protection |
+| **Git Workflow** | Documents branch strategy (including epic branch naming convention `feature/epic-<id>-<short-name>` where `<id>` is the epic's ID, and quick-fix convention `hotfix/issue-<N>-<slug>` or `hotfix/<slug>`), merge preferences (`--no-ff`), push approval rules, and files that must never be committed (e.g., `.env`, credential files, `appsettings.*.local.json` — not a template `appsettings.json` with no secrets, which is normally committed). Names `develop` as the base branch and `main` as the release branch; once published, a `**Remote:**` line records the repository, its default branch, and its branch protection |
 | **Verification Before Commit Rule** | Prescribes the implement → lint → build → verify → commit sequence; explains why compiled code ≠ correct behavior |
 | **Release Protocol** | Documents the full release flow: changelog finalization, merge to main, tagging convention, post-release version bump, and where the version lives in the codebase |
 
@@ -783,9 +794,12 @@ touches user data.
 ```
 
 **Peak Workflow** (if missing) — **default, no questions**:
+- Product vision: `docs/product-vision-planning/product-vision.md` and concept of operations:
+  `docs/product-vision-planning/concept-of-operations.md` — written by `/peak-workflow:discover`
+  (link them even before they exist; `plan-project` Step 7 reads this section)
 - Requirements baseline: `docs/requirements/`
 - Implementation plan: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard
-- List the peak commands: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- List the peak commands: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`, `/peak-workflow:upgrade`, `/peak-workflow:new-project`
 - Leave room for a `**Recommended skills:**` line — Step 8 writes it for Web app / Desktop app / Hybrid-with-UI projects only; for CLI / Service / Library / Embedded projects write nothing.
 
 **Verification & Quality Gates** (if missing) — **default, no questions.** Fill every row from
@@ -879,7 +893,7 @@ confirmation**:
   lets a solo owner's local `--no-ff` merge (`/peak-workflow:wrapup-epic` solo mode) and the
   Release Protocol push go straight to a protected branch. Someone without admin rights uses team
   mode (a pull request) instead. Once CI exists, add its check as a required status check.
-- Epic feature branches use the naming convention `feature/epic-<id>-<short-name>` where `<id>` is either a legacy integer (pre-v2.0.0 epics, e.g., `7` or `6.5`) or a 7-character alphanumeric ID (v2.0.0+ epics, e.g., `a3f2K7p`), and `<short-name>` is derived from the epic spec filename (e.g., `epic-a3f2K7p-user-auth.md` → `feature/epic-a3f2K7p-user-auth`). Include this convention in the Git Workflow section.
+- Epic feature branches use the naming convention `feature/epic-<id>-<short-name>` where `<id>` is the epic's ID (e.g., `a3f2K7p`), and `<short-name>` is derived from the epic spec filename (e.g., `epic-a3f2K7p-user-auth.md` → `feature/epic-a3f2K7p-user-auth`). Include this convention in the Git Workflow section.
 - Quick-fix branches use the naming convention `hotfix/issue-<N>-<slug>` when tied to a GitHub issue, or `hotfix/<slug>` otherwise. Include this convention too.
 - Merges use `--no-ff` to preserve history.
 - Claude asks before every push to a remote.
@@ -951,7 +965,7 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 
 **Steps:**
 
-1. **Finalize CHANGELOG** — Change `[X.Y.Z] - UNDER DEVELOPMENT` → `[X.Y.Z] - DD-MMM-YYYY` in `CHANGELOG.md`
+1. **Finalize CHANGELOG** — Change `## [X.Y.Z] — UNDER DEVELOPMENT` → `## [X.Y.Z] — YYYY-MM-DD` in `CHANGELOG.md`
    - Commit: `chore: release vX.Y.Z`
 
 2. **Merge to [main branch]**
@@ -963,7 +977,6 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 3. **Tag the release** (on [main branch])
    ```​bash
    git tag -a vX.Y.Z -m "Release vX.Y.Z - Brief description"
-   git push origin vX.Y.Z
    ```​
 
 4. **Merge back to [dev branch]**
@@ -972,13 +985,13 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
    ```​
 
 5. **Post-release version bump** (on [dev branch])
-   - Bump `[version file path]`: `<Version>X.Y.Z</Version>` → next version
-   - Add `## [X.Y+1.0] - UNDER DEVELOPMENT` to `CHANGELOG.md`
+   - Bump the version in `[version file path]` → next version
+   - Add `## [X.Y+1.0] — UNDER DEVELOPMENT` to `CHANGELOG.md`
    - Commit: `chore: bump version for next development cycle`
 
 6. **Push** (ASK USER FIRST)
    ```​bash
-   git push origin [main branch] && git push origin [dev branch]
+   git push origin [main branch] && git push origin [dev branch] && git push origin vX.Y.Z
    ```​
 
 **Note:** [Describe CI/CD behavior for branch pushes vs tags]
@@ -1006,13 +1019,19 @@ Git (peak-workflow convention): day-to-day work happens on branches off `develop
   holds releases. I'll create `develop` and switch to it. I ask before pushing.
 Releases: tagged vX.Y.Z with a CHANGELOG.
 Decided later by the first epic: none.
+Files (peak-workflow convention): CLAUDE.md, README.md, CHANGELOG.md, docs/architecture.md,
+  docs/design-notes.md, docs/requirements/README.md, and the format stamp docs/.peak-workflow.toml.
+  When I'm done I'll save these files as the project's first commit.
+  [existing repository: "When I'm done I'll commit these setup files."]
 
 Does this look right? Say "ok", or tell me anything to change — and mention any existing
 documents or designs I should point to.
 ```
 
 The summary also carries the housekeeping that used to be separate questions: repo files that
-will be created (README, CHANGELOG), `.gitignore` entries that will be appended (existing
+will be created (README, CHANGELOG, the docs stubs, and on a new project the format stamp
+`docs/.peak-workflow.toml` — listed as *"skipped until Python 3.11+ is installed"* when Step 1
+found none, with the install hint), `.gitignore` entries that will be appended (existing
 repositories), recommended add-on skills not yet installed (Step 8), the shadcn helper on shadcn
 stacks when it is not already present (Step 9.0 — *"I'll add the shadcn/ui helper for Claude — a
 skill and a component-lookup server — so it builds screens with the right components"*), the
@@ -1059,6 +1078,17 @@ Show the final checklist with all sections now passing.
 
 ## Step 6: Check Requirements Directory and Documentation Stubs
 
+**Format stamp:** unless Step 1 recorded `[MISS] Python`, run `tor-lifecycle format --init`. It
+writes `docs/.peak-workflow.toml` only for a project with no peak-workflow files yet — never over
+an existing project, which `/peak-workflow:upgrade` brings forward and stamps. Report by its first
+field:
+
+- `stamped` — `[PASS] Format stamp — docs/.peak-workflow.toml written (format <N>, Disputed threshold 30 days)`
+- `already-stamped`, exit 0 — `[PASS] Format stamp — format <N>`
+- `already-stamped` with exit 1, or `not-stamped` — `[MISS] Format stamp — run /peak-workflow:upgrade`
+
+Commit the stamp with the setup files (Step 9). Never edit `format` by hand.
+
 **Requirements directory check:** Check whether `docs/requirements/` exists and contains any `.feature.md` files.
 
 - If **`docs/requirements/` exists with at least one `.feature.md` file**: Report `[PASS] Requirements baseline — {N} feature files found` and proceed to the architecture/design-notes check below.
@@ -1067,17 +1097,24 @@ Show the final checklist with all sections now passing.
 ```markdown
 # Requirements Baseline
 
-This directory holds the formal Gherkin-style requirements (`.feature.md` files) and their
-traceability sidecars (`.feature.tracing.json`), written by `/peak-workflow:capture-requirements`.
+This directory holds the formal Gherkin-style requirements (`.feature.md` files), their
+traceability sidecars (`.feature.tracing.json`), and the Change Records (`changes/*.toml`) that
+explain each change to a merged requirement. `/peak-workflow:capture-requirements` writes all three.
 
 ## Conventions
 
-- Feature files are **append-only** — feature numbers are stable once assigned.
+- Feature numbers (`NN`) are stable once assigned and never reused.
 - TOR IDs (`TOR-NN-XXXXXXX`) are **immutable** once merged to develop — they are foreign keys
-  referenced by epic specs, tests, and handoffs.
-- Requirements changes go through a `docs/{task-short-name}` branch via
-  `/peak-workflow:capture-requirements` (brownfield mode), reviewed and merged like any
-  change to the requirements baseline.
+  referenced by epic specs, tests, and handoffs — and are never reused.
+- A change in meaning gets a **new ID**: a `supersede` Change Record names the successor. A
+  requirement nobody needs any more is retired with a `retire` record. Only a same-meaning
+  rewording with passing test evidence keeps its ID (a `reword` record).
+- Change Records are history: written once, never edited.
+- Every change travels through a `docs/{task-short-name}` branch via
+  `/peak-workflow:capture-requirements`; merging the branch is the approval.
+- `docs/.peak-workflow.toml` holds the project's format (kept by `/peak-workflow:setup` and
+  `/peak-workflow:upgrade` — do not edit it) and `[lifecycle] disputed_threshold_days`, how long
+  a requirement may stay disputed before it blocks work (default 30; `# Safety` requirements: 0).
 
 ## Lifecycle
 
@@ -1755,6 +1792,7 @@ Remind the user:
   before publishing the project externally or merging significant work
 - After implementing epics, run `/peak-workflow:refresh-docs` to bring the docs in sync with the as-built codebase
 
-**Legacy layout check:** After completing the above, check whether `docs/implementation-plan/index.md` exists and contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column. If found, add a one-line reminder at the end of your summary:
+**Format check:** when Step 1 recorded `verdict: behind`, end the summary with:
 
-> Your implementation plan uses the pre-v2.5.0 layout. Run `/peak-workflow:migrate-2.5` to upgrade to per-phase indexes + status sidecars and eliminate implementation-plan merge conflicts.
+> This project's peak-workflow files are older than this plugin reads. Run `/peak-workflow:upgrade`
+> next — commands that change files wait for it; status and triage still run, with a warning.

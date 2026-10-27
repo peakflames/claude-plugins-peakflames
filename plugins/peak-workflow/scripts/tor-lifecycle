@@ -1,0 +1,37 @@
+#!/bin/sh
+# tor-lifecycle — finds a Python 3.11+ interpreter and runs tor_lifecycle.py with the given
+# arguments. Skills call: sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <command> [args]
+# Probe order: python3, py -3 (Windows launcher), python. Uses shell builtins only.
+# Exit 3 with an install hint when no suitable interpreter is found.
+
+case $0 in
+  */*) here=${0%/*} ;;
+  *) here=. ;;
+esac
+script="$here/tor_lifecycle.py"
+
+found=""
+# Prints the interpreter's version; succeeds only when it is 3.11 or newer.
+probe() {
+  "$@" -c 'import sys; print("%d.%d.%d" % sys.version_info[:3]); sys.exit(sys.version_info < (3, 11))' 2>/dev/null
+}
+
+if v=$(probe python3); then exec python3 "$script" "$@"; fi
+[ -n "$v" ] && found="$found python3 ($v)"
+if v=$(probe py -3); then exec py -3 "$script" "$@"; fi
+[ -n "$v" ] && found="$found py -3 ($v)"
+if v=$(probe python); then exec python "$script" "$@"; fi
+[ -n "$v" ] && found="$found python ($v)"
+
+{
+  echo "peak-workflow needs Python 3.11 or newer to check requirements, and none was found."
+  if [ -n "$found" ]; then
+    echo "Found, but too old:$found"
+  fi
+  echo ""
+  echo "Install a current Python, then run the command again:"
+  echo "  macOS:   brew install python   (or download it from https://www.python.org/downloads/)"
+  echo "  Windows: winget install Python.Python.3.13   (or https://www.python.org/downloads/)"
+  echo "  Linux:   use your package manager, e.g. sudo apt install python3"
+} >&2
+exit 3

@@ -23,9 +23,17 @@ The user's request (scenario title, or blank for all scenarios): $ARGUMENTS
 
 ---
 
+## Format Guard
+
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
+
 ## Project Type Guard
 
-**Before any other action (read-only):** read `CLAUDE.md` at the repo root (do not re-read if
+**Right after the Format Guard (read-only):** read `CLAUDE.md` at the repo root (do not re-read if
 already in context) and take the **Project type** from its `Tool Hygiene & Operability`
 section. If it is `CLI tool`, `Library`, `Service or API`, or a `Hybrid` whose description names
 no UI, print and stop — before the branch guard, so a non-UI project never sees a branch question:
@@ -67,14 +75,6 @@ On "No UI — stop", end here. Otherwise carry the project type into Step 1.
    If the user chooses Stop, end here.
 
 4. If `<current-branch>` starts with `docs/` — continue. No action needed.
-
-## Layout Guard
-
-**Before any other action after the branch guard:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
 
 ---
 
@@ -142,10 +142,11 @@ neither. Print the same message `/peak-workflow:capture-requirements` 3B.1 uses:
 are processed from scratch (or only the scenario named in `$ARGUMENTS`).
 
 **Brownfield** = `ux/screens.md` exists with at least one screen row. Existing screens are the
-baseline; this run only **adds or changes** screens for the scenarios named in `$ARGUMENTS` or
+baseline; this run only **adds, changes, or removes** screens for the scenarios named in `$ARGUMENTS` or
 in the unprocessed discovery changelog listed above. Read the changelog **read-only** — do not
 archive or rename it; `/peak-workflow:capture-requirements` does that. Its "What Changed" rows
-for `concept-of-operations.md` Section 5 identify the scenarios in scope. A changelog whose
+for `concept-of-operations.md` Section 5 identify the scenarios in scope. A `Pending` row does not put
+its scenario in scope — the documents still describe today's behavior. A changelog whose
 `**Mode:**` line reads `Brownfield (UX concretization)` is this skill's own output from an earlier
 run on this branch — it names no changed scenarios, so for scoping it counts as no discovery
 changelog: fall through to `$ARGUMENTS` or the git-diff fallback below. It still counts toward
@@ -188,7 +189,7 @@ rewritten.
 ### 3.1: Draft the inventory
 
 One row per screen, with these columns (the table format is in
-`plugins/peak-workflow/skills/mockup/SCREENS_TEMPLATE.md`):
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/SCREENS_TEMPLATE.md`):
 
 | Column | Rule |
 |---|---|
@@ -289,10 +290,18 @@ Do not print the flows to the terminal — mermaid does not render there. They g
 ### 4.2: Write screens.md
 
 Write `docs/product-vision-planning/ux/screens.md` following
-`plugins/peak-workflow/skills/mockup/SCREENS_TEMPLATE.md` (`mkdir -p docs/product-vision-planning/ux/wireframes`
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/SCREENS_TEMPLATE.md` (`mkdir -p docs/product-vision-planning/ux/wireframes`
 first). Greenfield: create it at version 1.0. Brownfield: append new rows, `## States`
 subsections, and `## Flows` blocks per the template's append note; replace a changed screen's
-row and states in place; bump the document version (minor) and date.
+row and states in place, keeping the existing state copy verbatim unless this change alters
+what the state shows; bump the document version (minor) and date.
+
+**Removed screens (brownfield).** A screen is **removed** when no ConOps step in scope uses it
+any more — its steps were withdrawn by `/peak-workflow:discover` (a `Removed` changelog row) or
+now land on another screen. Keep its row, so the ID is never reused: set **Purpose** to
+`retired {date} — {reason}` (add `— superseded by {S-NN}` when another screen took over its
+steps), **Wireframe** and **Serves** to `—`. Delete its `## States` block, its flow nodes, and
+its wireframe file. A screen only some steps left is **modified**, not removed.
 
 ---
 
@@ -300,10 +309,11 @@ row and states in place; bump the document version (minor) and date.
 
 ### 5.1: One HTML file per screen
 
-For every screen in scope (not the Application menu and Window rows), write the file its
+For every screen in scope — greenfield: every screen; brownfield: every screen Added or Modified
+this run (not the Application menu and Window rows) — write the file its
 `Wireframe` column in `ux/screens.md` names —
 `docs/product-vision-planning/ux/wireframes/S-NN-<kebab-name>.html` — following
-`plugins/peak-workflow/skills/mockup/WIREFRAME_TEMPLATE.md`. Each file is self-contained:
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/WIREFRAME_TEMPLATE.md`. Each file is self-contained:
 
 **Write these files in parallel.** Every screen's wireframe is independent of every other
 screen's — none reads or depends on another's output — so issue one `Write` tool call per screen
@@ -357,8 +367,9 @@ their `S-NN` IDs. Create it only if it does not exist.
 ### 5.3: Write the wireframe index
 
 Write `docs/product-vision-planning/ux/wireframes/index.html` following the **Index Template** in
-`plugins/peak-workflow/skills/mockup/WIREFRAME_TEMPLATE.md` — one linked row per screen in
-`ux/screens.md`, in `S-NN` order. This is the file Step 6 opens in the browser, so it is written
+`${CLAUDE_PLUGIN_ROOT}/skills/mockup/WIREFRAME_TEMPLATE.md` — one linked row per screen in
+`ux/screens.md`, in `S-NN` order. A removed screen's row has no link: its Screen cell is plain
+text followed by its `retired …` purpose. This is the file Step 6 opens in the browser, so it is written
 on every run, greenfield or brownfield, and regenerated in full whenever the screen set changes
 (including after a Step 6 adjustment round that adds, merges, or drops a screen).
 
@@ -452,6 +463,9 @@ concrete.
    4. User fills the Customer and Quantity fields and clicks the "Save" button; the Order Detail (S-03) shows the new order.
    ```
    State-dependent steps name the state: `…the Orders List (S-01) shows its empty state with the "Create first order" button`.
+   **Brownfield:** never split or renumber a step a tracing sidecar cites (`grep -l '"S<N>"' docs/requirements/*.tracing.json`
+   finds the scenario; check its `step` values) — name both screens in the one step instead.
+   A step withdrawn by `/peak-workflow:discover` stays withdrawn; do not reintroduce it.
 2. **Add a Screens cross-reference line** directly under each rewritten scenario's `**Outcome:**`
    line:
    ```
@@ -472,9 +486,9 @@ concrete.
      ```markdown
      ## UX Changes
 
-     | Screen | Change Type | Summary |
-     |--------|-------------|---------|
-     | S-NN {Name} | [Added / Modified] | [1-line summary — which steps it now serves] |
+     | Screen | Change Type | Summary | Citing TORs |
+     |--------|-------------|---------|-------------|
+     | S-NN {Name} | [Added / Modified / Removed] | [1-line summary — which steps it now serves, or why it is gone] | [Modified / Removed only: the TOR IDs citing S-NN, or `none`] |
      ```
    - If none exists, create `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md`
      with `{TIMESTAMP}` from:
@@ -491,14 +505,23 @@ concrete.
 
      ## UX Changes
 
-     | Screen | Change Type | Summary |
-     |--------|-------------|---------|
-     | S-NN {Name} | [Added / Modified] | [1-line summary] |
+     | Screen | Change Type | Summary | Citing TORs |
+     |--------|-------------|---------|-------------|
+     | S-NN {Name} | [Added / Modified / Removed] | [1-line summary] | [Modified / Removed only: TOR IDs, or `none`] |
 
      ## New Capabilities Identified
 
      None — UX concretization only.
      ```
+   - **Citing TORs** for a `Modified` or `Removed` row: for `Removed`, every TOR whose Scenario
+     block in `docs/requirements/*.feature.md` names that `S-NN` (`grep -n 'S-NN'
+     docs/requirements/*.feature.md`, then read each hit's `Scenario:` line for its ID). For
+     `Modified`, only those whose Given/When/Then names a control, option, text, or state this
+     change adds, removes, or renames; add the others as `(unaffected: TOR-…, …)` so the reader
+     sees they were checked. Do not edit the feature files —
+     `/peak-workflow:capture-requirements` runs its decision test on the `Modified` rows' TORs and
+     treats the `Removed` rows' TORs as retire candidates. Leaving a citing TOR out of the row
+     leaves that requirement silently stale.
 
 ---
 
@@ -507,7 +530,8 @@ concrete.
 Before the self-check, verify:
 
 - [ ] Every ConOps Section 5 step in scope maps to exactly one screen (or is `n/a — no screen`).
-- [ ] Every screen in `ux/screens.md` appears in at least one flow.
+- [ ] Every screen in `ux/screens.md` appears in at least one flow (rows marked `retired …` are
+  exempt).
 - [ ] Every data-bearing screen lists all four states in `ux/screens.md` **and** its wireframe
   has all four `section.state` blocks with matching copy.
 - [ ] Every primary action names a control with its visible text; the same text appears in the
@@ -515,7 +539,7 @@ Before the self-check, verify:
 - [ ] Every path in the `Wireframe` column of `ux/screens.md` exists under
   `docs/product-vision-planning/ux/` (`wireframes/S-NN-<kebab-name>.html`), and every file in
   `wireframes/` **except `index.html`** appears in that column. Only the Application menu and
-  Window rows carry `—`.
+  Window rows, and rows marked `retired …`, carry `—`.
 - [ ] `wireframes/index.html` exists and links to every `S-NN` wireframe file, with no dead links
   and no link to a screen that was dropped during a Step 6 adjustment round.
 - [ ] Every `div.region` carries a `data-component` value from the table in
@@ -530,7 +554,7 @@ Before the self-check, verify:
 - [ ] Every wireframe carrying app chrome has an `@media` block at the declared layout floor, and
   the app header and footer strip are byte-identical across the signed-in screens:
   ```bash
-  for f in docs/product-vision-planning/ux/wireframes/S-*.html; do
+  for f in docs/product-vision-planning/ux/wireframes/S-*.html; do  # brownfield: only files written this run
     grep -q '@media' "$f" || echo "$f: no layout-floor media query"
   done
   ```
@@ -557,7 +581,11 @@ Before the self-check, verify:
 - [ ] `ux/screens.md` mermaid blocks parse (node handles have no hyphens; every edge has a label).
 - [ ] ConOps Document Version and Date were bumped, `ux/screens.md`'s `**Companion:**` line cites
   the bumped version, and every rewritten step names a screen ID.
-- [ ] Brownfield: no existing `S-NN` ID was renumbered or reassigned.
+- [ ] Brownfield: the per-file wireframe checks above ran on the wireframes written this run;
+  untouched wireframes are out of scope.
+- [ ] Brownfield: no existing `S-NN` ID was renumbered or reassigned; a removed screen keeps its
+  row (`retired …` Purpose) and lost its wireframe, States block, and flow nodes.
+- [ ] Every `Modified` and `Removed` UX Changes row lists its citing TORs (or `none`).
 
 Fix every failure in place before continuing.
 
@@ -590,6 +618,8 @@ internal scratch.
 - `Explicit? N` → gap. `Ambiguous? Y` → gap (the step names no control, or the control text
   differs between screens.md, the wireframe, and the ConOps).
 - Steps with no UI: `n/a — no screen` with `Explicit? Y`, `Ambiguous? N`.
+- Steps withdrawn on this branch (their screen removed): `withdrawn — S-NN retired` with
+  `Explicit? Y`, `Ambiguous? N`.
 - Out-of-scope steps (brownfield, scenario not in scope): `N/A — not in scope` in the Ambiguous
   column.
 - For every gap: add or tighten the screen row, state, wireframe, or ConOps step in place, then
@@ -644,7 +674,7 @@ and print it verbatim.
 [Only when `feature_files_exist = true`:] - `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` — [UX Changes appended / replaced / created]
 
 ### By the Numbers
-- Screens: {N} ({M} new, {K} modified) [desktop: + Application menu and Window rows]
+- Screens: {N} ({M} new, {K} modified, {R} removed) [desktop: + Application menu and Window rows]
 - Flows: {N} (one per scenario in scope)
 - Wireframes: {N} files, {N} data-bearing screens × 4 states
 - ConOps steps concretized: {X} of {Y} in scope ({Z} split)

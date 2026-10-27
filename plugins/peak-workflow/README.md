@@ -2,6 +2,14 @@
 
 > All slash commands belong to the `peak-workflow` plugin. This README uses the short form (`/discover`, `/start-epic`, etc.) for readability; invoke them with the full form (`/peak-workflow:discover`, `/peak-workflow:start-epic`, etc.) or use the short form if no other plugin uses the same skill name.
 
+## Prerequisites
+
+- **Claude Code** with this marketplace added.
+- **Python 3.11 or newer** (standard library only; 3.11 brings `tomllib`). Every skill calls the
+  plugin's helper, `scripts/tor-lifecycle`, which looks for `python3`, then `py -3`, then `python`,
+  and prints an install hint when none is new enough. `/setup` checks for it. On Windows, run
+  Claude Code from Git Bash.
+
 ## Where do I start?
 
 ```
@@ -10,24 +18,24 @@
               ┌─────────────┴─────────────┐
               │                           │
               ▼                           ▼
-       No (greenfield)             Yes (brownfield)
+       No (greenfield)          Yes — on peak-workflow
               │                           │
               ▼                           ▼
-    /peak-workflow:setup       Was it built with epic-workflow?
+    /peak-workflow:setup        older format? → /peak-workflow:upgrade
               │                           │
-              ▼                  ┌────────┴────────┐
-          /discover              ▼                 ▼
-              │                 Yes          No (already
-              ▼                  │           peak-workflow
-      /mockup (UI apps)          ▼           or different)
-              │            /peak-workflow:         │
-              ▼            migrate-from-           │
-    /capture-requirements  epic-workflow           │
-              │                  │                 │
-              ▼                  │                 ▼
-        /plan-project            │         /triage  or  /status
-              │                  │                 │
-              ▼                  ▼                 ▼
+              ▼                           ▼
+          /discover               /triage  or  /status
+              │                           │
+              ▼                           │
+      /mockup (UI apps)                   │
+              │                           │
+              ▼                           │
+    /capture-requirements                 │
+              │                           │
+              ▼                           │
+        /plan-project                     │
+              │                           │
+              ▼                           ▼
          iterate via /start-epic / /wrapup-epic / /quick-fix
 ```
 
@@ -54,8 +62,7 @@
 
 ## Brownfield — existing project, no peak-workflow yet
 
-If your project pre-dates peak-workflow but was **not** built with epic-workflow, run the
-greenfield path in **brownfield mode**: `/discover` and `/capture-requirements` both detect
+If your project pre-dates peak-workflow, run the greenfield path in **brownfield mode**: `/discover` and `/capture-requirements` both detect
 that vision/ConOps and TOR files already exist (or don't) and adapt accordingly.
 
 ```
@@ -67,27 +74,34 @@ that vision/ConOps and TOR files already exist (or don't) and adapt accordingly.
 /peak-workflow:start-epic <id>       → implement new epics
 ```
 
-## Migration from epic-workflow
+## Upgrading an existing project
 
-If your project was built with `epic-workflow` (epic specs use `## Acceptance Criteria`,
-no `docs/requirements/*.feature.md` files), run the one-shot migration:
+Each project records the format of its peak-workflow files in `docs/.peak-workflow.toml`
+(`setup` writes it; a project without one is on format 0). When a plugin update needs a newer
+format, every command stops and points to:
 
 ```
-/peak-workflow:migrate-from-epic-workflow
+/peak-workflow:upgrade
 ```
 
-The skill is non-destructive, atomic (single revertable commit), and idempotent:
+It applies numbered, forward-only steps on a `docs/upgrade-format-N` branch, one commit per step
+(or per phase), shows each step before applying it, and warns about feature branches in flight that
+touch the files a step rewrites. `status` and `triage` still run, with a banner, while a project is
+behind. Merge the upgrade branch like any planning change (merge = approval).
 
-1. **Derives a TOR requirements baseline** from existing vision/ConOps and epic acceptance
-   criteria (hybrid strategy — ConOps-first, refined by epic content).
-2. **Transforms Not-Started epic specs** from Acceptance Criteria format to Requirements
-   Anchors format.
-3. **Updates all status sidecars** with the `requirements:` field.
-4. **Updates CLAUDE.md** to reference peak-workflow commands.
-5. **Lands everything in one commit** — `git revert HEAD` rolls the migration back.
+**From 2.1 to 3.0** (format 0 → 2), two steps run:
 
-In-Progress, Paused, Implemented, and Complete epics are left untouched and their sidecars
-get `requirements: —`.
+1. **0001 epic provenance** — backfills `**Planned by:**` / `**Planned:**` / `**Plan branch:**`
+   from git (`—` where git cannot tell) and adds `owner: —` to sidecars.
+2. **0002 requirements lifecycle** — turns lifecycle notes in feature files and ad hoc sidecar keys
+   into Change Records (you approve one classification table), strips notes and titles (every
+   surviving requirement's fingerprint must stay identical), seeds `verified:` fingerprints from
+   each Complete epic's completion commit, and ends with a health report grouped by epic.
+
+Requirements edited after they were verified now show as **Changed since verified**; `/status`
+lists them by epic. Settle each one with the decision test: a meaning change →
+`/peak-workflow:capture-requirements <TOR-ID>`; otherwise `/peak-workflow:wrapup-epic <id> reverify`.
+Epics still in flight can be skipped; a later `/upgrade` run catches them up once they merge.
 
 ## Philosophy
 
@@ -96,12 +110,13 @@ Peak Workflow is a requirements-driven development lifecycle in the spirit of DO
 The formal requirements baseline lives in Gherkin-style `.feature.md` files with TOR requirement IDs (`TOR-NN-XXXXXXX`). Each TOR ID is:
 - The **acceptance criterion** for an epic (an epic's spec lists the TOR IDs it implements)
 - The **verification procedure** for wrapup (the Given/When/Then defines exactly what a passing test must demonstrate)
-- An **immutable foreign key** once merged to develop (referenced by epic specs, tests, and handoffs)
+- A **stable foreign key** once merged to develop (referenced by epic specs, tests, and handoffs): a
+  change in meaning gets a new ID, never a new meaning under the old one
 
 > **On ceremony overhead:** the discover → requirements → planning sequence amortizes as the
 > project grows — every new request routes through `/triage`, which tells you whether it needs
-> new TOR IDs (HEAVY), implements existing ones (EPIC), or is a trivial bug (TRIVIAL). For a
-> one-off script, `epic-workflow` may be a better fit.
+> new TOR IDs (HEAVY), changes one existing requirement (AMEND), implements existing ones (EPIC),
+> or is a trivial bug (TRIVIAL).
 
 ### Vertical slices — one capability per epic
 
@@ -209,8 +224,8 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 
 | Command | Purpose |
 |---|---|
-| `/new-project` | **Front door for newcomers.** Detects project state (greenfield, brownfield epic-workflow, or existing peak-workflow) and dispatches to the right entry point. Writes no state files. |
-| `/setup` | Audits `CLAUDE.md` (Project Overview, Product shape, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, installs the shadcn skills and MCP server on shadcn stacks, recommends companion skills, creates `develop`, and offers to publish to GitHub. **Run once per project, before `/discover`** (re-run to pick up new sections). |
+| `/new-project` | **Front door for newcomers.** Reads the format stamp (fresh project, existing peak-workflow project, or one that needs `/upgrade`) and dispatches to the right entry point. Writes no state files. |
+| `/setup` | Audits `CLAUDE.md` (Project Overview, Product shape, Tool Hygiene & Operability, UX Baseline for UI projects, Security Baseline, quality gates), asks only what the user alone knows and defaults the rest behind one confirmation, stubs `architecture.md`, `design-notes.md`, and `docs/requirements/README.md`, writes the format stamp `docs/.peak-workflow.toml` and checks for Python 3.11+, installs the shadcn skills and MCP server on shadcn stacks, recommends companion skills, creates `develop`, and offers to publish to GitHub. **Run once per project, before `/discover`** (re-run to pick up new sections). |
 
 ### Plan
 
@@ -218,10 +233,10 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 |---|---|---|
 | `/discover` | Adaptive interview that produces `product-vision.md` + `concept-of-operations.md` | Creates `docs/{task-short-name}` branch |
 | `/mockup [scenario]` | Low-fidelity UX prototyping for Web / Desktop / UI-Hybrid projects — derives an `S-NN` screen inventory, per-scenario flows, and grayscale HTML wireframes (shadcn app-shell layouts, reviewed in the browser) from the ConOps, then rewrites ConOps steps to name screens and controls so TORs cite them | Continues on `docs/` branch |
-| `/capture-requirements` | Derives TOR requirements (`.feature.md` files + `.feature.tracing.json` sidecars) from vision + ConOps | Continues on `docs/` branch |
+| `/capture-requirements [TOR-ID]` | Derives TOR requirements (`.feature.md` files + `.feature.tracing.json` sidecars) from vision + ConOps; amends, retires, or records pending changes with Change Records. With a TOR ID, settles one requirement (changed since verified, edited without a record, disputed, or a requested change) | Continues on `docs/` branch (TOR-ID mode: its own `docs/amend-<tor-id>`) |
 | `/plan-project` | Derives implementation plan (phases, epics, Requirements Anchors specs) from TOR requirements | Continues on `docs/` branch |
 | `/add <description>` | Adds new epic(s) referencing existing TOR IDs | — (writes planning docs) |
-| `/triage <issue\|description>` | Advisory routing — HEAVY (needs new TOR IDs) / EPIC (implements existing TOR IDs) / TRIVIAL (bug in already-implemented TOR) | — (writes no files) |
+| `/triage <issue\|description>` | Advisory routing — HEAVY (needs new TOR IDs) / AMEND (changes one existing requirement, no vision or ConOps impact → `/capture-requirements <TOR-ID>`) / EPIC (implements existing TOR IDs) / TRIVIAL (bug in an already-implemented TOR) | — (writes no files) |
 
 ### Implement
 
@@ -229,14 +244,15 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 |---|---|---|
 | `/start-epic <id>` | Implement the epic — shows an epic card (who planned it, phase, owner) and confirms before branching, loads TOR Given/When/Then, creates user-story tasks, implements, verifies | Not Started → In Progress → **Implemented** |
 | `/wrapup-epic <id>` | Independent review — verifies each TOR's Given/When/Then is satisfied, asks fix-now-or-defer on every gap, closes out, ships; runs on Opus in a fresh session | Implemented → **Complete** |
+| `/wrapup-epic <id> reverify [TOR-…]` | Re-checks a Complete epic's stale requirements (Changed since verified or Verification failed) and updates their `verified:` / `unverified:` lines; the epic stays Complete | `hotfix/verify-epic-<id>-<short-name>` |
 | `/pause` | Stop mid-epic, save progress | In Progress → **Paused** |
-| `/quick-fix <issue\|description>` | Lightweight path for trivial bugs in already-implemented TORs — creates `hotfix/` branch, implements, ships | Not tracked in implementation plan |
+| `/quick-fix <issue\|description>` | Lightweight path for trivial bugs in already-implemented TORs — creates `hotfix/` branch, implements, ships. May carry one owner-approved, non-Safety requirement change (reword, or supersede + same-branch reverify) | Not tracked in implementation plan |
 
 ### Inspect
 
 | Command | Purpose |
 |---|---|
-| `/status` | Read-only dashboard — behind-origin warning, what teammates changed since your last commit, epic progress, Requirements Coverage, active work with owners, a Ready to Start table (never a blind single pick), next actions |
+| `/status` | Read-only dashboard — behind-origin warning, what teammates changed since your last commit, epic progress, Requirements Coverage over live requirements, Changed Since Verified by epic, Requirements Health (findings A–F, Disputed), active work with owners, a Ready to Start table (never a blind single pick), next actions |
 
 ### Maintain
 
@@ -244,12 +260,11 @@ Grouped by lifecycle phase. The same commands are listed in `CLAUDE.md`'s skill 
 |---|---|
 | `/refresh-docs` | Refresh `architecture.md` + `design-notes.md` to match the as-built codebase |
 
-### Migrate
+### Upgrade
 
 | Command | Purpose |
 |---|---|
-| `/migrate-2.5` | One-shot migration from the legacy single-`index.md` layout to per-phase indexes + status sidecars |
-| `/migrate-from-epic-workflow` | One-shot migration from an epic-workflow project — derives TOR baseline, transforms Not-Started specs, updates sidecars and CLAUDE.md |
+| `/upgrade` | Brings an older project's files to this plugin's format — numbered steps, each previewed, one commit per step on a `docs/upgrade-format-N` branch |
 
 ## Choosing a Path
 
@@ -261,10 +276,10 @@ flowchart TD
     Start[New project /<br/>first time here] --> NP["/new-project<br/>(detects state)"]
     NP --> NPV{Verdict}
     NPV -->|Greenfield| Setup["/setup → /discover →<br/>/mockup (UI) →<br/>/capture-requirements →<br/>/plan-project"]
-    NPV -->|Brownfield<br/>epic-workflow| Mig["/migrate-from-epic-workflow"]
+    NPV -->|Older format| Up["/upgrade"]
     NPV -->|Existing<br/>peak-workflow| Iter
     Setup --> Merge[merge docs/ branch<br/>= requirements approved]
-    Mig --> Iter
+    Up --> Iter
     Merge --> Iter[Iteration loop]
 
     Iter --> Req[GitHub issue<br/>or ad-hoc request]
@@ -307,7 +322,7 @@ Format: `TOR-{NN}-{XXXXXXX}`
 
 Example: `TOR-01-Afs657G` lives in `docs/requirements/01-cli.feature.md`.
 
-TOR IDs are **immutable once merged to develop.** They are foreign keys — epic specs, tests, and handoffs all reference them by ID. If a requirement changes substantively, it goes through `/peak-workflow:capture-requirements` (brownfield mode) on a `docs/` branch as a change-control event.
+TOR IDs are **stable once merged to develop** and **never reused.** They are foreign keys — epic specs, tests, and handoffs all reference them by ID. A changed meaning gets a new ID through a supersede; see [Requirements lifecycle](#requirements-lifecycle).
 
 ## Epic Spec Structure
 
@@ -337,10 +352,12 @@ tool installation and access usage documentation from the command line.
 > `/peak-workflow:start-epic` reads each TOR's Given/When/Then to drive implementation and tests.
 > `/peak-workflow:wrapup-epic` independently verifies each TOR's Given/When/Then is satisfied.
 
-| TOR ID | Feature File | Scenario Title |
-|--------|--------------|----------------|
-| TOR-01-Afs657G | `docs/requirements/01-cli.feature.md` | The tool shall report its part number and version to standard output |
-| TOR-01-Bcd2345 | `docs/requirements/01-cli.feature.md` | The tool shall display usage help when invoked with --help |
+| TOR ID | Feature File |
+|--------|--------------|
+| TOR-01-Afs657G | `docs/requirements/01-cli.feature.md` |
+| TOR-01-Bcd2345 | `docs/requirements/01-cli.feature.md` |
+
+Titles live only in the feature file; skills print the current title when they show a requirement.
 
 ## Key Components
 
@@ -362,7 +379,13 @@ completed: —
 handoff: —
 requirements: TOR-01-Afs657G, TOR-01-Bcd2345
 waived: TOR-01-Bcd2345 → B9xQr2z
+verified:
+  TOR-01-Afs657G: 3f9a0c21d7be
 ```
+
+`verified:` (written at wrapup), `unverified:` (a reverify FAIL or a requirement recorded as
+pending), and `reverified:` are written only by the helper's `mark` command, never by hand. Each
+`verified:` value is the requirement's fingerprint when it passed.
 
 The `owner:` line is set by `start-epic` to the person who starts the epic (`git config user.name`).
 It travels with the feature branch, so it reaches `develop` when the epic merges; until then,
@@ -390,6 +413,7 @@ docs/product-vision-planning/
 docs/requirements/
   NN-{name}.feature.md        ← TOR requirements (written by /capture-requirements)
   NN-{name}.feature.tracing.json  ← TOR → vision/ConOps linkage (written by Haiku sub-agent)
+  changes/YYYY-MM-DD-XXXXXXX.toml  ← Change Records, one per lifecycle decision, write-once
   README.md                   ← conventions (written by /setup)
 
 docs/implementation-plan/
@@ -401,6 +425,7 @@ docs/implementation-plan/
 
 docs/architecture.md          ← system architecture (stubbed by /setup, refreshed by /refresh-docs)
 docs/design-notes.md          ← design decisions (same)
+docs/.peak-workflow.toml      ← format stamp + [lifecycle] settings (written by /setup, moved by /upgrade)
 ```
 
 ## Requirements & Verification
@@ -415,7 +440,39 @@ The key distinction between peak-workflow and a typical Agile workflow:
 | Requirements source | Implicitly distributed across docs | Formally captured in `docs/requirements/*.feature.md` |
 | Requirements approval | N/A | Merge of `docs/` branch (solo or team PR) |
 
-**Quick-fixes never change requirements.** If a fix requires modifying a TOR's Given/When/Then, re-triage as HEAVY. If a quick-fix lands and later someone thinks the requirement itself was wrong, that's a new HEAVY event — not a retroactive quick-fix.
+## Requirements lifecycle
+
+Feature files show only present truth. Every change to a merged requirement is one small,
+write-once **Change Record** in `docs/requirements/changes/`; git holds the old text.
+
+| Kind | When | Effect |
+|---|---|---|
+| `reword` | Same meaning, better words, citing tests still pass | Same ID; shows **Verified (reworded)** with test evidence |
+| `supersede` | The meaning changes (even if never verified) | New ID in place; the successor starts unassigned, so `/plan-project` or `/add` plans it |
+| `retire` | The requirement goes away | ID removed for good; `removal = "code"` asks for a removal epic |
+| `pending` | Known wrong, not yet decided | Requirement is **Disputed** (not counted Verified); overdue after 30 days, at once for `# Safety` |
+| `uphold` | The owner decides a disputed requirement was right | Closes the dispute with no text change |
+
+**Where amendments happen.** On a `docs/` branch with `/capture-requirements` (all kinds, or one
+requirement with `/capture-requirements <TOR-ID>`); inside an epic at `/start-epic` (supersede only);
+at `/wrapup-epic` Step 1.4b (amend or record as pending); and in `/quick-fix` (reword, or supersede
+plus a same-branch reverify). Never for a Safety requirement outside a `docs/` branch.
+
+**Fingerprints and re-verification.** Wrapup saves each passing requirement's fingerprint (a
+12-character checksum of its normalized text) in the epic's sidecar. When the text later changes
+without a reword, `/status` shows it **Changed since verified** under its epic. Resolve it with
+`/capture-requirements <TOR-ID>` (meaning changed, or restore the verified text) or
+`/wrapup-epic <id> reverify` (still the same requirement). A reverify FAIL marks it
+**Verification failed**; fix the code with `/quick-fix`, then reverify again.
+
+**Health check.** `/status`, `/start-epic`, `/wrapup-epic`, `/quick-fix`, `/triage`, and
+`/capture-requirements` run the helper's `check`. Findings: **A** edited without a record, **B**
+removed without a record, **C** citation of an unknown ID, **D** changed since verified, **E**
+retired or superseded ID still cited, **F** housekeeping and disputes. `/wrapup-epic` and
+`/quick-fix` block only on A, B, or C their own branch created, and offer the fix.
+
+**Settings.** `docs/.peak-workflow.toml` `[lifecycle] disputed_threshold_days` (default 30) sets when
+a dispute is overdue. Safety requirements are always 0.
 
 ## Key Files
 
@@ -427,6 +484,8 @@ The key distinction between peak-workflow and a typical Agile workflow:
 | `docs/product-vision-planning/ux/` | Screen inventory and wireframes (written by `/mockup`, UI projects) |
 | `docs/requirements/*.feature.md` | TOR requirements — Gherkin feature files (written by `/capture-requirements`) |
 | `docs/requirements/*.feature.tracing.json` | TOR → vision/ConOps linkage (written by Haiku sub-agent) |
+| `docs/requirements/changes/*.toml` | Change Records — reword, supersede, retire, pending, uphold |
+| `docs/.peak-workflow.toml` | Format stamp and `[lifecycle]` settings |
 | `docs/implementation-plan/phase-N-*/index.md` | Per-phase epic registry — append-only |
 | `docs/implementation-plan/status/epic-<id>.md` | Per-epic sidecar — status + requirements: field |
 | `docs/implementation-plan/phase-N-*/epic-<id>-*.md` | Epic specs (Requirements Anchors format) |

@@ -6,13 +6,17 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 
 > **Recommended:** `peak-workflow` is the preferred plugin for new projects. It introduces a
 > formal requirements baseline (Gherkin-style TOR requirements) that makes acceptance criteria
-> explicit, immutable, and independently verifiable — eliminating the ambiguity of prose
-> checklists. Existing `epic-workflow` projects can migrate using
-> `/peak-workflow:migrate-from-epic-workflow`.
+> explicit, traceable, and independently verifiable — eliminating the ambiguity of prose
+> checklists. From peak-workflow 3.0.0 there is no migration path from `epic-workflow` projects.
+
+> **Upgrading peak-workflow 2.x to 3.0.0:** 3.0.0 adds a requirements lifecycle (amend, retire,
+> record a dispute, re-verify) and needs **Python 3.11+**. After updating the plugin, run
+> `/peak-workflow:upgrade` once in each project; every other command stops until you do. See
+> [Upgrading an existing project](plugins/peak-workflow/README.md#upgrading-an-existing-project).
 
 | Plugin | Description |
 |--------|-------------|
-| [peak-workflow](plugins/peak-workflow/) ⭐ | Requirements-driven development lifecycle — formal Gherkin TOR requirements serve as the single source of truth for acceptance criteria, test derivation, and verification |
+| [peak-workflow](plugins/peak-workflow/) ⭐ | Requirements-driven development lifecycle — formal Gherkin TOR requirements serve as the single source of truth for acceptance criteria, test derivation, and verification; Change Records amend, retire, and re-verify them, and versioned upgrades bring older projects forward |
 | [epic-workflow](plugins/epic-workflow/) | Structured epic-based project lifecycle — discovery, planning, implementation, and verification using prose acceptance criteria |
 
 ## Installation

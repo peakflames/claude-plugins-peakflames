@@ -11,13 +11,13 @@ description: |
 
 You are pausing the current epic implementation session. This preserves context so the next session can resume exactly where you left off.
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 
@@ -25,7 +25,11 @@ Follow these steps exactly:
 
 ## Step 1: Identify Current Epic
 
-Glob `docs/implementation-plan/status/epic-*.md` and read each sidecar to find the one with `status: In Progress`. This is the epic you are pausing. The epic ID is the filename stem after stripping `epic-` and `.md` (e.g., `status/epic-a3f2K7p.md` → ID `a3f2K7p`).
+Run `git branch --show-current`. The epic you are pausing is the one this branch implements:
+the branch must be `feature/epic-<id>-<short-name>` and that epic's sidecar
+(`docs/implementation-plan/status/epic-<id>.md`, read on this branch) must say
+`status: In Progress`. Otherwise stop and write nothing: *"Nothing to pause — no epic is in
+progress on this branch (<branch>). /peak-workflow:pause runs on the epic's feature branch."* The epic ID is the filename stem after stripping `epic-` and `.md` (e.g., `status/epic-a3f2K7p.md` → ID `a3f2K7p`).
 
 Open the epic spec file (`docs/implementation-plan/phase-*/epic-<id>-*.md`) and parse its header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 5 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
 
@@ -44,6 +48,12 @@ table show PASS or CANNOT VERIFY in the TOR Coverage section, the epic may be re
 If no implemented handoff exists yet, use test-file presence for the TOR IDs as a heuristic.
 When in doubt, defer to the user.
 
+A **removal epic** (its sidecar has a `retires:` line, its spec a `## Removal` section) may have
+no anchors at all. Its removal part is done only when
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <the Removal section's retired IDs>`
+reports nothing (exit 0) — check that as well, and never read an empty anchors table as "all
+done".
+
 If the user confirms they want to pause anyway, proceed with Step 2.
 
 ## Step 2: Capture Task State
@@ -52,7 +62,7 @@ List all tasks from this session with their current status (completed, in_progre
 
 ## Step 3: Write Handoff File
 
-Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (where `<id>` is the epic's ID — either a legacy integer like `7` or `6.5`, or a 7-char alphanumeric ID like `a3f2K7p`) with this structure:
+Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` with this structure:
 
 ```markdown
 # Epic <id>: [Name] — Session Handoff (Paused)
@@ -70,6 +80,10 @@ Create a handoff file at `docs/implementation-plan/session-handoffs/epic-<id>-pa
 
 ### TOR IDs Not Started
 - [List TOR IDs not yet touched]
+
+[Removal epic only:]
+### Removal
+- [N] citations of the retired IDs remain (`tor-lifecycle sweep <retired IDs>`); code paths still to delete: [list]
 
 ## Files Created/Modified So Far
 
@@ -94,7 +108,7 @@ When resuming this epic, start by:
 
 ## Step 4: Update Status Sidecar
 
-Update `docs/implementation-plan/status/epic-<id>.md` (use the epic's actual ID — legacy integer or 7-char alphanumeric):
+Update `docs/implementation-plan/status/epic-<id>.md`:
 1. Change `status: In Progress` to `status: Paused`
 2. Change `handoff: —` to `handoff: session-handoffs/epic-<id>-paused.md`
 
@@ -104,10 +118,10 @@ so the spec stays in sync with the sidecar.
 
 ## Step 5: Commit
 
-**Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + index update). If the user confirms:
+**Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + sidecar and spec Status line). If the user confirms:
 
 1. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
-2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>` (use the epic's actual ID — legacy integer or 7-char alphanumeric)
+2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`
 3. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
    ```
    wip(epic-<id>): pause — <brief summary of progress so far>
