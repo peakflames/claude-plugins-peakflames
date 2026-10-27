@@ -118,7 +118,9 @@ An epic's `status:` and `owner:` move on its feature branch until it merges. For
 In Progress whose `feature/epic-<id>-*` branch exists locally (`git branch --list
 'feature/epic-<id>-*'`), read `status:`, `owner:`, and `handoff:` from that branch instead
 (`git show <branch>:docs/implementation-plan/status/epic-<id>.md`), as start-epic Step 2.5 does —
-so a pause made there shows as Paused, and Step 5 can flag it.
+so a pause made there shows as Paused, and Step 5 can flag it. Requirement states (Step 1.5) still
+reflect the base, so that epic's requirements read In Progress in Requirements Coverage until it
+merges.
 
 Requirement ownership, `verified:`, `unverified:`, and `waived:` are read by the helper (Step
 1.5), not here.
@@ -193,13 +195,14 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
    group's first requirement carries an A finding or `historical_records`, its
    `/peak-workflow:capture-requirements <TOR>` decision first; when it is Verification failed,
-   `/peak-workflow:quick-fix` for the code first — else the oldest Disputed one's
+   `/peak-workflow:quick-fix <TOR>: <the row's unverified reason>` for the code first (groups
+   follow the order of `states` rows) — else the oldest Disputed one's
    `/peak-workflow:capture-requirements <TOR>`), even in degraded mode — there, add "after the fix".
 
 ## Step 5: Flag Stale Paused Epics
 
 For each epic whose sidecar (Step 2) has `status: Paused`:
-1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` 
+1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (when Step 2 read the sidecar from a feature branch, read the handoff from that branch: `git show <branch>:<path>`) 
 2. Check the **Paused** date
 3. If the pause date is more than 7 days ago, flag it as stale
 

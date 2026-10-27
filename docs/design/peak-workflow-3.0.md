@@ -477,8 +477,8 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | # | Gate | State |
 |---|---|---|
 | 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
-| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ☐ pass 1: 4 Critical (fixed); pass 2 running |
-| 3 | Live UAT upgrade of the maintainer's 2.x project | ☐ source is Summit (built on 1.5.0, format 0) with two planted edits; script `docs/uat/live-uat-2.1-upgrade.md` |
+| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ☐ pass 1: 4 Critical; pass 2: 2; pass 3: 1 (all fixed). Needs passes 4 and 5 clean |
+| 3 | Live UAT upgrade of the maintainer's 2.x project | ☐ Summit (built on 1.5.0, format 0, 6 Complete epics) with two planted merges on develop: TOR-03-s6tFG4V edited in place (WKhBuVK), CHANGE-CONTROL note on TOR-02-K6frDEV (Yz4JE9Z). Baseline: exactly s6tFG4V Changed since verified. Maintainer running `docs/uat/live-uat-2.1-upgrade.md` against a frozen worktree at `0f94476` |
 | 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
 
 - **Docs:** plugin README gains Prerequisites (Python 3.11+), a Requirements lifecycle section
@@ -509,4 +509,20 @@ proposal + addendum). Every plan reads this file first and updates it last.
   bug-does-not-reproduce path; triage routes a single new requirement through discover; the
   test-only fault switch on CLIs without persistence; migrated supersede records carry no
   `traced_to` and keep 2.1 note lines in `text` (Plan 8 left alone; step 0002 frozen).
+- **Pass 2** (same four scopes, new scenarios: wrapup of an Implemented epic with no branch,
+  reverify with a malformed sidecar, Change some rows at the upgrade gate). 2 Critical: wrapup
+  committed on `develop` when the work sat there (it now branches first); capture-requirements let
+  a baseline TOR use a domain command the skeleton cannot satisfy. UX applied: nudge sends a
+  failed requirement to quick-fix first; status reads open epics' sidecar from their branch;
+  quick-fix pulls and reproduces; refresh-docs branches; `docs/amend-*` reuse; "Meaning unchanged
+  or unsure — re-verify instead"; `Disclosed: n/a (no handoff)`; removal empties a test file.
+- **Pass 3** (greenfield through the skeleton's wrapup; in-flight branch through upgrade +
+  catch-up; regression → reverify FAIL → quick-fix → PASS). 1 Critical: retiring the only anchor
+  of an Implemented epic stranded it — capture-requirements now refuses ("wrap it up first") and
+  wrapup explains a pre-existing case. UX applied: nudge names the quick-fix argument; add stops
+  when an open epic already covers the request; upgrade catch-up stop matches by epic; L4 skips
+  the requirement's own lineage; baseline exit-code example proves code 2 only.
+- **Left alone** (adds to the list above): wrapup has no NOT RUN path for a gate tool that cannot
+  be installed; add writes planning files on the current branch; discover/plan-project offer Team
+  PR with no remote; setup's logging default vs the toolchain row; no test-only clock switch.
 

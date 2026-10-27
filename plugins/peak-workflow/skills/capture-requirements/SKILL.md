@@ -282,7 +282,8 @@ change: a wrong "meaning change" costs one ID swap, a wrong "reword" is a false 
 Before writing a new requirement — greenfield, brownfield, add-alongside, or a supersede
 successor — run `tor-lifecycle search <2–4 key nouns or quoted phrases of the capability>`.
 Exit 0 = no earlier decision; continue. Exit 1 prints the matching records. For each hit that is
-really the same idea, ask with `AskUserQuestion`:
+really the same idea, ask with `AskUserQuestion` (a hit on the record that created the
+requirement being superseded or reworded — its own lineage — is not a re-proposal; skip it):
 - Question: `"<capability> was <retired / superseded / recorded as pending / upheld> in <CR-ID> (<date>): <reason, one line>. Reintroduce it anyway?"`
 - Options: `["Reintroduce — new requirement, new ID", "Drop it — the earlier decision stands"]`
 
@@ -332,6 +333,14 @@ that resolves or renews a `pending` record lists that record's ID in `refs`.
    listing them all; delete the feature file and its tracing sidecar — the feature number stays
    reserved. A `removal = "code"` record needs a removal epic: Step 7 offers `/add` for it. Tests
    and source citing the retired ID are that epic's to delete; list them in the summary.
+
+   **An Implemented owner** (choices 3 and 4): the epic is waiting for wrapup, which replaces a
+   superseded anchor or drops a retired one. Say so. When the change would leave that epic with
+   **no live anchor** (every ID it lists retired, or superseded by successors another epic owns),
+   do not apply it: stop that requirement with `Epic <id> (<slug>) — <Name> is Implemented and
+   <TOR> is all it delivers — wrap it up first with /peak-workflow:wrapup-epic <id>; once it is
+   Complete, retire <TOR> again and plan its removal epic.` Wrapup could not complete an epic left
+   with nothing to verify.
 5. **Record as pending** — known to be wrong, but the right wording is not settled. The feature
    file is **not** touched. Write a `pending` record: `fingerprint` = the current one, `owner` =
    `git config user.name`. If `gh` is available and the repository is on GitHub, ask once whether
@@ -531,17 +540,20 @@ Scenario: [TOR-01-{XXXXXXX}] The tool shall report its name and semantic version
     And the exit code should be 0
 
 Scenario: [TOR-NN-{XXXXXXX}] The tool shall emit a log line at startup containing its name and semantic version at INFO level
-    Given the tool is invoked with any valid argument
+    Given the user passes the commandline args '--verbose --version'
     When the Tool is Run
     Then the standard error log should contain an INFO record matching /^\[INFO\] myapp v\d+\.\d+\.\d+ /
     And the log record should be the first record emitted
 
-Scenario: [TOR-NN-{XXXXXXX}] The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation
+Scenario: [TOR-NN-{XXXXXXX}] The tool shall exit with code 2 on invalid invocation
     Given the user passes the commandline args '--bogus-flag'
     When the Tool is Run
     Then the exit code should be 2
     And the standard error should contain the string "Try 'myapp --help' for usage."
 ```
+
+The exit-code baseline TOR proves code 2 only; code 0 is proven by the `--version` TOR, and code 1
+by the first domain TOR whose Then expects an operational failure.
 
 **Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
 `CLAUDE.md` will mark `Exit code convention: N/A — not a CLI tool` and
@@ -1016,8 +1028,9 @@ Run `tor-lifecycle validate` (every record in `changes/`), then
   - **E** — a test or source line on this branch cites a retired or superseded ID: retarget it
     to the successor or delete it.
 - **F findings this branch caused** — those naming an ID or record this run touched:
-  `open-epic-retired` (an open epic still lists an ID this run retired or superseded: apply the
-  L5 swap), `multiple-records`, `id-reused`, `feature-number-reused`, `multi-owner`. Two F kinds
+  `open-epic-retired` (a Not Started, In Progress, or Paused epic still lists an ID this run
+  retired or superseded: apply the L5 swap; on an Implemented epic it is expected — its wrapup
+  replaces or drops the anchor), `multiple-records`, `id-reused`, `feature-number-reused`, `multi-owner`. Two F kinds
   are expected and not fixed here: `disputed` for a `pending` record this run wrote, and
   `removal-missing` for a `removal = "code"` record (Step 7 offers its removal epic).
 
@@ -1132,7 +1145,7 @@ or have an explicit N/A deferral]
 Run `/peak-workflow:plan-project` to derive the implementation plan from these requirements.
 Epic specs will reference TOR IDs as their Requirements Anchors — the TOR Given/When/Then
 becomes the acceptance criterion and verification procedure.
-[Brownfield, when this run added no new or successor requirement — only Change Records, plus any
+[Brownfield, when this run added no new requirement and no unassigned successor — only Change Records, plus any
 `/add` epics from 7.1:]
 plan-project has nothing new to plan. Review the diff, commit it on this branch, and merge it into
 <base> (solo or team PR) — the merge approves the Change Records.

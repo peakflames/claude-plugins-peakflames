@@ -193,7 +193,10 @@ stays where it is being (or was) delivered. **Never edit an epic that is not Not
 spec, sidecar, or phase-index change; a Complete epic keeps the IDs it verified.
 
 If every confirmed TOR was dropped via Keep, the set is empty — stop with the "No existing TOR
-requirements match" message above (a removal epic continues with no anchors).
+requirements match" message above (a removal epic continues with no anchors). When every dropped
+TOR is owned by a Not Started, In Progress, or Paused epic, stop instead with
+`<TOR> — <title> already covers this in Epic <id> (<slug>) — <Name> (<status>). Build it there:
+/peak-workflow:start-epic <id>.`
 
 **Screens (UI epics, when `ux/screens.md` exists).** A UI epic lists the `S-NN` screens its
 confirmed TORs name in their Given/When — those are its `## Screens` rows in Step 6. A screen
