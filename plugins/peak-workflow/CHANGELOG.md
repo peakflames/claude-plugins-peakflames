@@ -184,6 +184,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Step 0002 keeps a banner's section name** — a one-line banner holding a marker word
+  ("revised …") is reported `kept`, so the strip no longer refuses to rename the section below it.
+- **Step 0001 reads the skills' own merge subjects** — `docs(plan): merge docs/<task> — …` now
+  fills `**Plan branch:**` instead of `—`.
+- **`pause` refuses off the epic branch** — run on `develop` or with nothing in progress, it stops
+  and writes nothing.
 - **Section of the last Scenario before a banner** — the helper read the next banner's name, so a
   requirement just above `# Safety` was treated as Safety (no Defer or Amend; disputes overdue at
   once).

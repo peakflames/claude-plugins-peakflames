@@ -49,7 +49,8 @@ cd <UAT> && claude --plugin-dir <REPO>/plugins/peak-workflow
 - **2.2** No in-flight warning (or, if you have unmerged branches, the warning lists them with a
   Skip option only for epic paths).
 - **2.3** Step 0001 preview shows counts of specs gaining provenance and sidecars gaining
-  `owner: —`. Apply → one commit `chore(upgrade): step 0001 epic-provenance`.
+  `owner: —`. Each spec's `**Plan branch:**` names its `docs/…` branch (e.g.
+  `docs/habit-tracker-mvp`), not `—`. Apply → one commit `chore(upgrade): step 0001 epic-provenance`.
 - **2.4** Step 0002 preview table shows counts. `prose` includes your pending note; `edit` includes
   `<STALE>`; `seed` covers every Complete epic's requirements.
 - **2.5** Classification table: your "pending change-control" note is proposed **Pending**; any
@@ -60,7 +61,9 @@ cd <UAT> && claude --plugin-dir <REPO>/plugins/peak-workflow
   `chore(upgrade): step 0002 requirements-lifecycle` with the stamp. `git status --short` empty.
 - **2.7** Report: `check --by-epic` shows **D** for `<STALE>` under `<EPIC>` (naming both routes:
   capture-requirements if the meaning changed, else reverify) and **F** "known to be wrong" for
-  the pending TOR. **No A or B.** The records count lists `reword` (historical) and `pending`.
+  the pending TOR. **No A or B.** The records count lists `reword` (historical — one record per
+  trunk commit, so the three edited TORs may share fewer records) and `pending`. The Streak
+  Continuation Hint banner line is reported `kept` (it names a section) and stays in the file.
 - **2.8** `git diff develop -- CLAUDE.md` is empty (no upgrade step edits it).
 - **2.9** Choose **Solo — merge into develop locally**. `docs/.peak-workflow.toml` on develop
   reads `format = 2` with `[lifecycle] disputed_threshold_days = 30`.

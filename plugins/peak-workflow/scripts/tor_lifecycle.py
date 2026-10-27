@@ -1302,7 +1302,9 @@ HEADER_LINE = re.compile(r"^\*\*([^*:]+):\*\*\s*(.*?)\s*$")
 HEADER_ANCHORS = ("Plan branch", "Planned", "Planned by", "Dependencies", "Status", "Phase")
 MERGE_SUBJECTS = (re.compile(r"^Merge branch '([^']+)'"),
                   re.compile(r"^Merge remote-tracking branch '(?:[^/']+/)?([^']+)'"),
-                  re.compile(r"^Merge pull request #\d+ from [^/\s]+/(\S+)"))
+                  re.compile(r"^Merge pull request #\d+ from [^/\s]+/(\S+)"),
+                  # the skills' own solo merges: `docs(plan): merge docs/<task> — …`, `epic(<id>): merge …`
+                  re.compile(r"^[a-z]+(?:\([^)]*\))?: merge (?:branch )?'?((?:docs|feature|hotfix)/[^'\s]+)"))
 EMPTY_VALUES = ("", "—", "-")
 
 
@@ -1569,9 +1571,11 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
                 in_banner, banner_text = True, False
             continue
         if in_banner:
-            banner_text = True
             if LIFECYCLE_MARKERS.search(content):
-                items.append(ProseItem(rel, i + 1, i + 1, "banner", None, content))
+                # A banner's first text line is its section name (parse_requirements): removing it
+                # would rename the section, so it is reported `kept`; a later marker line is not.
+                items.append(ProseItem(rel, i + 1, i + 1, "banner", None, content, strip=banner_text))
+            banner_text = True
             continue
         if not content:
             (group if group else held_empty).append(i)

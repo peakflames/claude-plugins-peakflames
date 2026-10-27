@@ -218,7 +218,7 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
 
    ### If ship mode is TEAM
    - `git push -u origin <hotfix-branch>`
-   - `gh pr create --base <base-branch> --title "fix: <one-line summary>" --body "<body>"`
+   - `gh pr create --base <base-branch> --title "<fix|test>: <one-line summary>" --body "<body>"`
    - Body template (populate from the issue body, quality gate results, and the manual-verification value captured in Step 4):
 
      ```
