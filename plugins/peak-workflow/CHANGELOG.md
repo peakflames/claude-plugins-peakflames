@@ -91,6 +91,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING: 2.1 projects must run `/peak-workflow:upgrade`** — every writing skill stops until the
+  project reaches format 2; `status` and `triage` run degraded with a banner. The upgrade backfills
+  provenance, converts notes to Change Records, and seeds `verified:` fingerprints.
+- **BREAKING: Python 3.11+ required** — every skill calls the helper; `setup` and the wrapper print
+  an install hint when no suitable Python is found.
+- **BREAKING: titles are gone from tracing sidecars and epic specs** — only feature files carry
+  titles; skills print them via `tor-lifecycle titles`. Step 0002 strips them from older projects.
 - **One Format Guard in every skill** — replaces the eleven layout guards. Writing skills stop when
   the project is behind or ahead of the plugin; `status` and `triage` run degraded with a banner.
   The pre-2.5 single-index layout is reported as not a peak-workflow layout.
@@ -155,12 +162,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`discover` writes current-state documents** — vision and ConOps are rewritten to the present;
   `Modified` and `Removed` changelog rows are mandatory when a capability changes; `Pending`
   rows carry undecided changes.
-
 - **Pre-3.0 edits flagged for a decision** — a requirement changed since verified whose edit only a
   migration reword explains lists `historical_records`; `check` and `status` ask whether its
   meaning changed before suggesting reverify.
 - **Duplicate sidecar keys rejected** — a key written twice (e.g. two `owner:` lines after a clean
   merge) is a data error naming both lines.
+- **`capture-requirements <TOR-ID>` routing** — a request that withdraws a capability goes to the
+  Removed row (Retire first), an undecided one to the Pending row; Disputed → Change it asks the
+  settle question; a records-only brownfield run merges without plan-project.
 - **`capture-requirements <TOR-ID>` on a disputed, edited requirement** — four options (no Uphold
   over an unrecorded edit); a supersede or reword asks whether it settles the dispute and carries it
   to the successor when not. Greenfield context checks are skipped in this mode.
@@ -173,8 +182,66 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **BREAKING: `migrate-2.5` and `migrate-from-epic-workflow`** are deleted, along with
   `new-project`'s epic-workflow detection and the "epic-workflow may be a better fit" advice.
 
+### Fixed
+
+- **Step 0002 keeps a banner's section name** — a one-line banner holding a marker word
+  ("revised …") is reported `kept`, so the strip no longer refuses to rename the section below it.
+- **Pre-3.0 edits stay undecided until decided** — `historical_records` lists only unproven
+  rewords; quick-fix refuses to amend such a requirement, and reverify confirms before a PASS
+  accepts the edit.
+- **Wrapup ships no stale citations** — refresh-docs never cites a superseded or retired TOR ID,
+  and wrapup's pre-ship `check` fixes any E finding the branch added.
+- **A kept banner passes capture-requirements' checks** — a section banner step 0002 kept is not
+  counted as a dated banner.
+- **Step 0001 reads the skills' own merge subjects** — `docs(plan): merge docs/<task> — …` now
+  fills `**Plan branch:**` instead of `—`.
+- **`add` branches off the base** — run on `develop`, it writes on `docs/add-<name>` and ends
+  with the merge commands; planning reaches the base only by a merge.
+- **`status` reads every open epic from its branch** — an epic started or paused on
+  `feature/epic-…` no longer shows as Ready to Start.
+- **`quick-fix` amendments keep docs and disputes honest** — a reword or supersede rewrites the
+  vision/ConOps line it replaced; amending a Disputed requirement asks whether it settles the
+  dispute and refs or renews the pending record.
+- **`pause` refuses off the epic branch** — run on `develop` or with nothing in progress, it stops
+  and writes nothing.
+- **Section of the last Scenario before a banner** — the helper read the next banner's name, so a
+  requirement just above `# Safety` was treated as Safety (no Defer or Amend; disputes overdue at
+  once).
+- **Malformed `requirements:` entries stop early** — quick-fix's amendment path and reverify stop
+  before branching when the owning epic's sidecar has a finding C, which `mark` would refuse; the
+  C message says how to correct it.
+- **`start-epic` nudge matches `status`** — same top requirement action, including
+  capture-requirements first for a pre-3.0 or unrecorded edit.
+- **`wrapup-epic` never commits on the base** — when the work sits on `develop`, it branches
+  `feature/epic-<id>-<short-name>` first; an epic with no implementer handoff reads
+  `Disclosed: n/a (no handoff)`.
+- **No retire strands an Implemented epic** — `capture-requirements` refuses a retire or
+  supersede that would leave an Implemented epic with no live anchor ("wrap it up first");
+  wrapup explains an epic left that way instead of a bare Stop.
+- **Baseline TORs stay in the skeleton** — tool-hygiene Givens use only `--version`, `--help`,
+  invalid flags, or the equivalent, never domain commands.
+- **Nudge for a failed requirement** — `status` and `start-epic` name `/quick-fix` first, not a
+  reverify that would fail again.
+- **`status` reads open epics from their branch** — a pause made on `feature/epic-…` shows as
+  Paused and is flagged when stale.
+- **Release Protocol template** — the tag is pushed with the branches in the ask-first step;
+  changelog headings use `—` and ISO dates; the version bump is language-neutral.
+- **Small skill fixes** — plan-project's solo merge no longer pushes unasked; pause checks the
+  branch before committing; start-epic's `<id>` is the first argument word; zsh-safe changelog
+  lookup; `docs/amend-*` reuse and naming; removal steps delete an emptied test file.
+- **`quick-fix` starts from a fresh base** — pulls the base and reproduces the bug before fixing;
+  a bug that does not reproduce offers a regression test only.
+- **`refresh-docs` branches off the base** when run standalone, instead of committing there.
+
 ### Documentation
 
+- **README requirements lifecycle** — prerequisites (Python 3.11+), a Requirements lifecycle
+  section (the five record kinds, where amendments happen, fingerprints, reverify, findings A–F),
+  the 2.1 → 3.0 upgrade walkthrough, and the triage AMEND, TOR-ID, and reverify rows.
+- **Root README upgrade pointer** — 2.x users are told to run `/peak-workflow:upgrade` and that
+  Python 3.11+ is required.
+- **Plugin CLAUDE.md invariants** — sidecar lifecycle lines written only by `mark`, Change Record
+  kinds, and derived requirement states.
 - **Plugin rules for scripts and upgrade steps** — `scripts/` holds deterministic mechanics;
   upgrade steps are forward-only and append-only; TOR IDs are never reused and a meaning change
   takes a new ID; major releases ship an upgrade step and bump the project format.

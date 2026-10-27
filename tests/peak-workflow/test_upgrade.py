@@ -247,6 +247,11 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(tl.merge_branch("Merge pull request #12 from acme/docs/plan-v2"), "docs/plan-v2")
         self.assertEqual(tl.merge_branch("Merge remote-tracking branch 'origin/docs/x'"), "docs/x")
         self.assertIsNone(tl.merge_branch("plan the thing"))
+        # plan-project / discover / start-epic solo merges (Plan 9 live UAT on Summit)
+        self.assertEqual(tl.merge_branch("docs(plan): merge docs/habit-tracker-mvp — requirements and plan baseline"),
+                         "docs/habit-tracker-mvp")
+        self.assertEqual(tl.merge_branch("docs(vision): merge docs/design-system — vision, TORs"), "docs/design-system")
+        self.assertIsNone(tl.merge_branch("docs: merge notes into one file"))
 
 
 class UpgradeRunTests(unittest.TestCase):

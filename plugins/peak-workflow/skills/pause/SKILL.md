@@ -25,7 +25,11 @@ Follow these steps exactly:
 
 ## Step 1: Identify Current Epic
 
-Glob `docs/implementation-plan/status/epic-*.md` and read each sidecar to find the one with `status: In Progress`. This is the epic you are pausing. The epic ID is the filename stem after stripping `epic-` and `.md` (e.g., `status/epic-a3f2K7p.md` → ID `a3f2K7p`).
+Run `git branch --show-current`. The epic you are pausing is the one this branch implements:
+the branch must be `feature/epic-<id>-<short-name>` and that epic's sidecar
+(`docs/implementation-plan/status/epic-<id>.md`, read on this branch) must say
+`status: In Progress`. Otherwise stop and write nothing: *"Nothing to pause — no epic is in
+progress on this branch (<branch>). /peak-workflow:pause runs on the epic's feature branch."* The epic ID is the filename stem after stripping `epic-` and `.md` (e.g., `status/epic-a3f2K7p.md` → ID `a3f2K7p`).
 
 Open the epic spec file (`docs/implementation-plan/phase-*/epic-<id>-*.md`) and parse its header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 5 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
 

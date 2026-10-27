@@ -8,7 +8,7 @@ description: |
   "configure CLAUDE.md", "get the project ready".
 ---
 
-You are auditing the project's `CLAUDE.md` file to ensure it contains the sections that the epic workflow depends on, and ensuring the documentation stubs exist for the architecture and design documents that the workflow reads and maintains.
+You are auditing the project's `CLAUDE.md` file to ensure it contains the sections that peak-workflow depends on, and ensuring the documentation stubs exist for the architecture and design documents that the workflow reads and maintains.
 
 The user's description of the product (may be empty — `/peak-workflow:new-project` passes it
 through): $ARGUMENTS
@@ -50,7 +50,7 @@ Check for the presence and completeness of each section below. Report a status f
 | **Tool Hygiene & Operability** | Declares project type (CLI / Web app / Desktop app / Service / Library / Embedded / Hybrid) and the project's chosen mechanisms for: version exposure to the user, version stamped at log startup, version single source of truth, logging convention (levels and format), exit code convention, stdout/stderr discipline, and error-message standard. These mechanisms become baseline TOR requirements via `/peak-workflow:capture-requirements`. |
 | **UX Baseline** | Project type Web app, Desktop app, or Hybrid with a UI only. Declares the design system (default shadcn/ui on Tailwind, themed only through CSS-variable tokens) and the interaction conventions every screen must meet: screen states, keyboard & focus, forms, destructive actions, progress feedback, layout floor, contrast, reduced motion, navigation, and (desktop) application-menu conventions. Each TOR line becomes a baseline UX TOR via `/peak-workflow:capture-requirements` (Step 3A.2.2); the walking skeleton in `/peak-workflow:plan-project` installs the design system; `/peak-workflow:wrapup-epic` runs the UX Baseline check on every UI epic. For CLI / Service / Library / Embedded projects report `[N/A] UX Baseline — no user interface`. If Tool Hygiene & Operability is also missing, the Project type is not yet known — report `[MISS] UX Baseline — resolved after Project type is captured in Step 3` and let Step 3 turn it into `[N/A]` or a populated section. |
 | **Security Baseline** | Lists the load-bearing coding-standard reminders that are NOT testable as positive observable shall-statements: no `shell=True` / `eval` on user input, no logging of secrets or PII, no secrets committed to the repo. Reviewed by `/peak-workflow:wrapup-epic`, not derived as TORs. |
-| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
+| **Peak Workflow** | References the peak commands (`/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage`, `/peak-workflow:start-epic`, `/peak-workflow:wrapup-epic`, `/peak-workflow:pause`, `/peak-workflow:quick-fix`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`, `/peak-workflow:upgrade`, `/peak-workflow:new-project`) and points to the requirements directory (`docs/requirements/`) and implementation plan |
 | **Verification & Quality Gates** | Lists concrete checks to run before marking an epic complete (e.g., build, tests, linting, visual checks, brand audits) |
 | **Important Reminders** | Project-specific constraints that prevent common mistakes |
 | **Reference Materials** | Pointers to docs, patterns, or external resources that inform implementation |
@@ -799,7 +799,7 @@ touches user data.
   (link them even before they exist; `plan-project` Step 7 reads this section)
 - Requirements baseline: `docs/requirements/`
 - Implementation plan: `docs/implementation-plan/` — run `/peak-workflow:status` for the dashboard
-- List the peak commands: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`
+- List the peak commands: `/peak-workflow:discover`, `/peak-workflow:mockup`, `/peak-workflow:capture-requirements`, `/peak-workflow:plan-project`, `/peak-workflow:add`, `/peak-workflow:triage <issue|description>`, `/peak-workflow:start-epic <id>`, `/peak-workflow:wrapup-epic <id>`, `/peak-workflow:pause`, `/peak-workflow:quick-fix <issue|description>`, `/peak-workflow:refresh-docs`, `/peak-workflow:status`, `/peak-workflow:setup`, `/peak-workflow:upgrade`, `/peak-workflow:new-project`
 - Leave room for a `**Recommended skills:**` line — Step 8 writes it for Web app / Desktop app / Hybrid-with-UI projects only; for CLI / Service / Library / Embedded projects write nothing.
 
 **Verification & Quality Gates** (if missing) — **default, no questions.** Fill every row from
@@ -965,7 +965,7 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 
 **Steps:**
 
-1. **Finalize CHANGELOG** — Change `[X.Y.Z] - UNDER DEVELOPMENT` → `[X.Y.Z] - DD-MMM-YYYY` in `CHANGELOG.md`
+1. **Finalize CHANGELOG** — Change `## [X.Y.Z] — UNDER DEVELOPMENT` → `## [X.Y.Z] — YYYY-MM-DD` in `CHANGELOG.md`
    - Commit: `chore: release vX.Y.Z`
 
 2. **Merge to [main branch]**
@@ -977,7 +977,6 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
 3. **Tag the release** (on [main branch])
    ```​bash
    git tag -a vX.Y.Z -m "Release vX.Y.Z - Brief description"
-   git push origin vX.Y.Z
    ```​
 
 4. **Merge back to [dev branch]**
@@ -986,13 +985,13 @@ git add <files> && git commit -m "feat: ..."      # Commit after verification
    ```​
 
 5. **Post-release version bump** (on [dev branch])
-   - Bump `[version file path]`: `<Version>X.Y.Z</Version>` → next version
-   - Add `## [X.Y+1.0] - UNDER DEVELOPMENT` to `CHANGELOG.md`
+   - Bump the version in `[version file path]` → next version
+   - Add `## [X.Y+1.0] — UNDER DEVELOPMENT` to `CHANGELOG.md`
    - Commit: `chore: bump version for next development cycle`
 
 6. **Push** (ASK USER FIRST)
    ```​bash
-   git push origin [main branch] && git push origin [dev branch]
+   git push origin [main branch] && git push origin [dev branch] && git push origin vX.Y.Z
    ```​
 
 **Note:** [Describe CI/CD behavior for branch pushes vs tags]

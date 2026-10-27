@@ -165,3 +165,24 @@ class DerivedStateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HistoricalRecordsTests(unittest.TestCase):
+    """`historical_records` names only the unproven links of the chain (Plan 9 dry-run pass 8)."""
+
+    def test_a_passing_reword_after_a_historical_one_is_not_listed(self):
+        with FixtureRepo() as repo:
+            v1, v2, v3 = (scenario("TOR-01-Hist001", f"The tool shall sync within {n} seconds")
+                          for n in (60, 30, 20))
+            repo.feature("01", "core", [v3])
+            repo.sidecar("E1aaaaa", "Complete", ["TOR-01-Hist001"], verified={"TOR-01-Hist001": v1.fp()})
+            repo.record("reword", "Hist000", "2026-10-01", changes=[
+                {"tor": "TOR-01-Hist001", "from": v1.fp(), "to": v2.fp()}],
+                evidence={"commit": "abc1234", "result": "historical"})
+            repo.record("reword", "Pass000", "2026-10-02", changes=[
+                {"tor": "TOR-01-Hist001", "from": v2.fp(), "to": v3.fp()}])
+            repo.commit("fixture")
+            _code, report = repo.json_cli("states", "--today", "2026-10-26")
+            row = next(r for r in report["requirements"] if r["tor"] == "TOR-01-Hist001")
+            self.assertEqual(row["state"], "Changed since verified")
+            self.assertEqual(row["historical_records"], ["CR-Hist000"])

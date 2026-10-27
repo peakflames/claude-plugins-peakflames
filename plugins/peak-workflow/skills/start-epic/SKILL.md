@@ -10,7 +10,7 @@ description: |
 argument-hint: "<epic-id>"
 ---
 
-You are starting an implementation session for Epic $ARGUMENTS. Use `$ARGUMENTS` verbatim wherever `<id>` appears below.
+You are starting an implementation session for an epic. `<id>` is the first word of `$ARGUMENTS`, used verbatim (an opaque string) wherever `<id>` appears below; any further words (e.g. `resume`) are not part of it.
 
 ## Format Guard
 
@@ -60,10 +60,11 @@ means findings — this skill warns and never blocks on them.
 failed, open the session with one plain sentence naming the counts and the next command, e.g.
 `3 requirements are known to be wrong, 1 changed after it was verified, and 1 failed
 verification — start with /peak-workflow:capture-requirements TOR-04-Priv001 (it does not touch
-this epic's anchors).` The command is, first match: an overdue Disputed requirement's
-(`/peak-workflow:capture-requirements <TOR>`, a Safety one — `dispute.safety` true — first), the
-first Changed since verified one's (`/peak-workflow:wrapup-epic <owning epic> reverify`), the
-first Verification failed one's (`/peak-workflow:quick-fix`, then the reverify). Say whether it
+this epic's anchors).` The command is the top requirement action exactly as
+`/peak-workflow:status` Step 4.5 item 5 picks it (an overdue Disputed one, Safety first; else the
+first Changed since verified or Verification failed one — `capture-requirements <TOR>` first when
+it carries an A finding or `historical_records`, `quick-fix <TOR>: <its unverified reason>` first when it failed verification,
+otherwise its reverify; else the oldest Disputed one). Say whether it
 touches this epic's anchors (Step 1 item 6 handles those). When Step 1 stops the skill before
 the Step 2.5 card, print the nudge after the stop message as one `Also:` line instead.
 
@@ -74,10 +75,10 @@ Follow these steps exactly:
 ## Step 1: Load Context
 
 1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
-2. Locate the epic's phase index: run `grep -rl "epic-$ARGUMENTS" docs/implementation-plan/phase-*/index.md` to find which phase index contains this epic. Read that phase index to get the epic's row (name, dependencies). For each dependency ID listed, read `docs/implementation-plan/status/epic-<dep-id>.md` to capture the dependency's status.
-3. Identify which phase and file corresponds to Epic $ARGUMENTS
-4. Read the epic spec file (e.g., `docs/implementation-plan/phase-N-*/epic-$ARGUMENTS-*.md`).
-4a. **Load TOR Requirements.** Read the epic's sidecar (`docs/implementation-plan/status/epic-$ARGUMENTS.md`,
+2. Locate the epic's phase index: run `grep -rl "epic-<id>" docs/implementation-plan/phase-*/index.md` to find which phase index contains this epic. Read that phase index to get the epic's row (name, dependencies). For each dependency ID listed, read `docs/implementation-plan/status/epic-<dep-id>.md` to capture the dependency's status.
+3. Identify which phase and file corresponds to Epic <id>
+4. Read the epic spec file (e.g., `docs/implementation-plan/phase-N-*/epic-<id>-*.md`).
+4a. **Load TOR Requirements.** Read the epic's sidecar (`docs/implementation-plan/status/epic-<id>.md`,
     from the feature branch when it exists — Step 2.5 says how). It is a **removal epic** when it
     has a `retires:` line.
     - **No Requirements Anchors** — the epic is not a removal epic, and its spec has no
@@ -89,7 +90,7 @@ Follow these steps exactly:
 
       Fill `<description>` from the spec's `## Description`, plus each `## Acceptance Criteria`
       bullet when that section exists. If no live requirement covers it (check the live titles
-      and `tor-lifecycle search <2–3 key nouns>`), put the `/peak-workflow:capture-requirements`
+      and `tor-lifecycle search -- <2–3 key nouns>`), put the `/peak-workflow:capture-requirements`
       option first.
     - **Removal epic** — read its `## Removal` section (the record it retires, the retired IDs,
       the code to remove, and the done-when line) and carry it into Step 4. Its Requirements
@@ -136,7 +137,7 @@ Follow these steps exactly:
         this epic until it is resolved.` and recommend resolving it first
         (`/peak-workflow:capture-requirements <TOR>` on a `docs/` branch). The in-epic Amendment
         gate (`PLAN_TEMPLATE.md`) can also resolve a non-Safety one on this branch.
-      - **Owned by another epic** (`epic` is set and is not `$ARGUMENTS`) — warn that two epics
+      - **Owned by another epic** (`epic` is set and is not `<id>`) — warn that two epics
         list it; `check` reports it as F `multi-owner`. Continue.
    2. **Not live** — run `tor-lifecycle titles <TOR>` and act on what it prints:
       - **Superseded** (`superseded in CR-… by TOR-…`) — follow the chain: run `titles` on each
@@ -179,9 +180,9 @@ Follow these steps exactly:
    4. **Removal epic.** Run `tor-lifecycle sweep <retired IDs from the Removal section>` and carry
       its hits, with the Removal section's **Code to remove**, into Step 4 (the code may have
       moved since the epic was planned — the sweep is current, the section is the plan-time list).
-7. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (`<id>` is `$ARGUMENTS` verbatim — treat it as an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
+7. From the spec filename, extract the **branch short name**: strip the directory path, the `epic-<id>-` prefix (`<id>` as defined at the top — an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. This becomes the branch short name for Step 3. If there is no suffix after `epic-<id>` (e.g., `epic-3.md`), omit it.
 8. Parse the epic spec header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 4 commit trailer and GitHub announce. If no `Source:` line exists, the source issue number is unknown — skip the trailer and announce later.
-9. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously).
+9. Check for any existing handoff files in `docs/implementation-plan/session-handoffs/` — read the most recent one, plus any handoff specifically for this epic (it may have been paused previously). A pause handoff lives on the epic's branch until it merges: when `feature/epic-<id>-<short-name>` exists, read it with `git show feature/epic-<id>-<short-name>:docs/implementation-plan/session-handoffs/epic-<id>-paused.md`.
 10. **Conditional read of `docs/architecture.md`.** If the epic touches IPC, the database schema, or other cross-cutting concerns named in `architecture.md`'s table of contents, read the relevant section. If the epic is a localized UI or copy change, skip — recent handoffs and the spec's Key Components section give the needed context.
 11. **Conditional read of `docs/design-notes.md`.** Same conditional applies — read only when the epic raises a decision the design notes might already have addressed.
 11a. **UX Baseline (UI epics only).** Applies only when `CLAUDE.md` has a **UX Baseline** section (Project type Web app, Desktop app, or Hybrid with a UI) **and** the spec's Key Components name screens, pages, UI components, or a renderer. For CLI / Service / Library / Embedded projects, or when the section is absent, skip this item without comment. Otherwise the **UX Baseline** section of `CLAUDE.md` (already in context) governs every screen this epic touches: compose from the walking skeleton's app shell and design system, render the loading / empty / error / populated states, and keep the keyboard, focus, form, and destructive-action conventions. Screens compose the `data-component` primitives their wireframes name (item 4c) — `Button`, `Dialog`, `Table`, `Form`, and so on from the design system. `/peak-workflow:wrapup-epic` runs the UX Baseline check as a quality gate. Design skills and component-lookup tools are found in item 11b and invoked in the plan's **Design pass** step; the UX Baseline and the design-system tokens in the global stylesheet take precedence over their choices — theme changes go in the token file, never in generated component files. Carry this into the Step 4 middle steps.
@@ -202,9 +203,9 @@ Follow these steps exactly:
 
 If `owner:` in the sidecar names someone other than you (as defined in Step 2.5), defer this check until Step 2.5 confirms **Start it**, then run it.
 
-If `docs/implementation-plan/status/epic-$ARGUMENTS.md` has `status: In Progress` but there is no pause handoff file (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/peak-workflow:pause`. Inform the user:
+If `docs/implementation-plan/status/epic-<id>.md` (read from `feature/epic-<id>-<short-name>` when that branch exists — `git show <branch>:<path>`) has `status: In Progress` but there is no pause handoff file on that branch (`session-handoffs/epic-<id>-paused.md`), a previous session was likely interrupted without running `/peak-workflow:pause`. Inform the user:
 
-> Epic $ARGUMENTS is marked "In Progress" but has no pause handoff — a previous session may have been interrupted. I'll scan the codebase for any partial implementation and pick up from the current state.
+> Epic <id> is marked "In Progress" but has no pause handoff — a previous session may have been interrupted. I'll scan the codebase for any partial implementation and pick up from the current state.
 
 Proceed with the implementation, using git history and the current codebase to determine what has already been done.
 
@@ -261,10 +262,10 @@ Purpose:       <first sentence of the spec's ## Description>
 ```
 
 - **Planned by / date** — the spec's `**Planned by:**` and `**Planned:**` lines.
-- **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-$ARGUMENTS.md`. `owner:` and an In Progress / Paused / Implemented status live on the feature branch
+- **Owner** — the `owner:` line in `docs/implementation-plan/status/epic-<id>.md`. `owner:` and an In Progress / Paused / Implemented status live on the feature branch
   until the epic merges, so when the local branch `feature/epic-<id>-<short-name>` exists, read
   this sidecar (for the card and for the resume rule below) from it:
-  `git show feature/epic-<id>-<short-name>:docs/implementation-plan/status/epic-$ARGUMENTS.md`
+  `git show feature/epic-<id>-<short-name>:docs/implementation-plan/status/epic-<id>.md`
   (if the path is absent there, use the working-tree sidecar).
 
 Below the card, add one `⚑` line for each that applies. **Who "you" are:** compare
@@ -312,7 +313,7 @@ branch, touch nothing, and say why in one line.
 
 ## Step 3: Create Feature Branch
 
-Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-<id>-<short-name>` where `<id>` is `$ARGUMENTS` verbatim and `<short-name>` was extracted in Step 1 (e.g., `feature/epic-a3f2K7p-user-auth`). If no short name was available, use `feature/epic-<id>`.
+Before entering plan mode, ensure work is isolated on a feature branch. The branch name uses the format `feature/epic-<id>-<short-name>` where `<id>` is the epic ID defined at the top and `<short-name>` was extracted in Step 1 (e.g., `feature/epic-a3f2K7p-user-auth`). If no short name was available, use `feature/epic-<id>`.
 
 1. Run `git branch --show-current` to check the current branch.
 2. Check whether the feature branch already exists with a reliable test:

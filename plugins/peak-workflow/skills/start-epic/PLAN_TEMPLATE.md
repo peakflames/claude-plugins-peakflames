@@ -7,7 +7,7 @@ steps are authored.
 
 Placeholder reference:
 
-- `<id>` — the epic ID, `$ARGUMENTS` verbatim (7-char alphanumeric)
+- `<id>` — the epic ID: the first word of `$ARGUMENTS`, verbatim (7-char alphanumeric)
 - `<short-name>` — extracted from the spec filename in Step 1
 - `<N>` — source issue number from Step 1 (omit announce/trailer if unknown)
 - `<base-branch>` — `develop` if it exists, else `main`, else `master`
@@ -56,7 +56,9 @@ paragraph verbatim…"); keep every rule.
    `completed:`, and `requirements:` unchanged except for the anchor decisions below. Capture whether this is a
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
    (prior status was already In Progress, or was Implemented — rework after a wrapup FAIL).
-   Item 3 uses this.
+   Item 3 uses this. On a Paused → In Progress transition, also `git rm` the
+   `session-handoffs/epic-<id>-paused.md` handoff (git keeps it) and set `handoff: —`; both land in
+   the closing Commit step, so a later interrupted session still trips the Recovery Check.
 
    Also update the epic spec file's `**Status:**` header line (the spec path was already
    identified in Step 1, at `docs/implementation-plan/phase-*/epic-<id>-*.md`) to
@@ -154,7 +156,8 @@ N. <record title> [<CR-ID>; retires <retired-IDs>]
    - Delete the code the Removal section's **Code to remove** names (the symbols in parentheses;
      a whole file only when it names the file with no symbol), and each test that
      `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" sweep <retired-IDs>` lists — the whole test
-     function containing the hit: <path:line, …>
+     function containing the hit: <path:line, …> (when it was the last test in its file, delete
+     the file)
    - Remove every remaining reference to the deleted symbols (imports, call sites):
      `git grep -n -w <symbol> -- . ':!docs/'` must return nothing
    - A test that only proved the old behavior is deleted, not retargeted; a guard requirement
@@ -218,7 +221,8 @@ Rules:
 **Amendment gate.** Copy this paragraph verbatim into the plan as a standing rule, next to the
 Deferral gate. It applies when implementation shows that one of this epic's anchor requirements is
 itself wrong — building it as written would ship the wrong behavior — not merely hard or slow to
-build. The helper is `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"` (written `tor-lifecycle`).
+build. When the requirement is already known to be wrong as the plan is written, the gate fires
+right after plan approval, before any middle step. The helper is `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"` (written `tor-lifecycle`).
 Stop implementation and use `AskUserQuestion`:
 - Question: `"TOR-<NN-XXXXXXX> — <title> looks wrong: <what implementation showed, one line>. Proposed: <new title> / <changed step(s)>. How to proceed?"`
   — before asking, check the proposed literals against the Given (dates, totals, counts) so the
@@ -239,7 +243,7 @@ Rules:
      not an amendment the code needs: say so, implement as written, and suggest
      `/peak-workflow:capture-requirements <TOR> <wording>` after the epic. **Meaning change** →
      continue.
-  2. Run L4 (`tor-lifecycle search <key nouns>`) for the successor. Generate its ID in the same
+  2. Run L4 (`tor-lifecycle search -- <key nouns>`) for the successor. Generate its ID in the same
      feature number — generate the 7-character suffix with `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7` and regenerate it while it is all digits or `git grep --untracked -q <suffix>` finds it anywhere (feature files and `docs/requirements/changes/` included) — and write its block in place of the old one. Generate the record's
      `CR-` suffix the same way. Read the old tracing entry's sources first (they become the
      record's `traced_to`). Write the `supersede` record with `approved_via = "epic-branch"`, `approved_by` =
@@ -258,6 +262,9 @@ Rules:
      `tor-lifecycle check --base <base-branch>`: no finding may be marked `[this branch, blocking]`.
   6. Continue the middle steps against the successor's Given/When/Then; the self-assessment checks
      the successor. Reconcile spec records a Spec Deviations row citing the record.
+  7. Rewrite each vision or ConOps line that states the replaced detail, and each copied tracing
+     `paraphrase`, to the successor's meaning — no record (as capture-requirements 3C step 5).
+  A split (several successors) applies items 3–5 to each successor.
 - **Implement as written** — continue; never narrow the Then clause to fit what was built (that
   is a Deferral gate event).
 - **Stop** — run `/peak-workflow:pause`.
@@ -304,7 +311,7 @@ Middle step example:
   - ```bash
     grep -inE --exclude-dir={.venv,node_modules,__pycache__,.pytest_cache,dist,build,out} \
       'todo|stub|placeholder|for now|not implemented|NotImplementedError' \
-      $(git diff --name-only <base-branch>; git ls-files --others --exclude-standard)
+      $(git diff --name-only --diff-filter=d <base-branch>; git ls-files --others --exclude-standard)
     ```
      Judge each hit: a marker describing incomplete TOR behavior is a deferral-gate trigger for
      that TOR, unless the TOR already has a Deferrals row (a hit inside a `Deferred:` xfail
@@ -382,7 +389,7 @@ Middle step example:
   - **Verification Results (self-assessment)** — quality gate results
 
   After writing the handoff, run
-  `grep -inE 'stub|partial|for now|follow-up|todo|placeholder|not implemented' <handoff-path>`.
+  `grep -inE 'stub|partial|for now|follow-up|placeholder|not implemented' <handoff-path>` plus the case-sensitive `grep -nE '\bTODO\b|\bFIXME\b' <handoff-path>` (a product named "todo" is not a hit).
   Any hit outside the Deferrals table that has no matching Deferrals row fires the deferral
   gate for that TOR before continuing. If Defer is chosen here, update that TOR's TOR Coverage
   verdict to FAIL, apply the xfail marking, and re-run this grep.
@@ -405,7 +412,8 @@ Middle step example:
   created or modified during this epic by specific path (not `git add -A`), including the
   handoff file, updated status sidecar, updated spec file, — if a Defer edited them — the
   successor epic's spec and sidecar, and — if the Amendment gate fired — the Change Record, the
-  feature file, and its tracing sidecar. Commit without asking for permission.
+  feature file, and its tracing sidecar. A paused handoff removed with `git rm` is already staged —
+  do not pass it to `git add`. Commit without asking for permission.
   Message format:
   ```
   feat(epic-<id>): <short summary>
