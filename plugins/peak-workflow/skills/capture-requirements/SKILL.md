@@ -373,7 +373,8 @@ Question: `"<TOR-ID> — <title>: <what the input changes, one line>. How should
 Drop `Record as pending` for a Safety requirement; for an undecided change to one (the `Pending`
 row), offer `Keep unchanged` in its place and say *"<TOR> is a Safety requirement and cannot be
 recorded as pending — decide it on this branch, or keep it unchanged."* `Keep unchanged` (Removed rows, and the Safety `Pending` row) writes nothing; in TOR-ID mode print
-`Outcome: Kept unchanged — no record` and delete the branch Step 0 created. On a Removed row it is for a
+`Outcome: Kept unchanged — no record`, run `git checkout <base>` and `git branch -D` the branch Step 0
+created, and end (skip Step 7). On a Removed row it is for a
 requirement the removal does not actually touch; name it in the summary with the reason.
 
 ---
@@ -932,7 +933,8 @@ greenfield files.
    requirement under `# Safety`. **Change it** asks what it should say when there is no
    description, runs L3, and applies it without the L5 question — Supersede on a meaning change,
    Reword when reword-eligible. **Renew** writes a new `pending`
-   record that refs the open one, copies its title, keywords, owner, and `tracker`, with a fresh
+   record that refs the open one, copies its title with ` (renewed)` appended, its keywords (topped up to 3–6 from the new reason),
+   owner, and `tracker`, with a fresh
    reason. After **Change it** applies a Supersede or
    Reword, ask the settle question from step 3 too; on No, follow its renewal rule.
 5. **Apply** the answer per L5, with these specifics:
@@ -1160,7 +1162,7 @@ becomes the acceptance criterion and verification procedure.
 plan-project has nothing new to plan. Review the diff, commit it on this branch, and merge it into
 <base> (solo or team PR) — the merge approves the Change Records.
 [TOR-ID mode:]
-Review the diff, commit it on this branch (`docs(requirements): <outcome> <TOR-ID> (<CR-ID>)`), and merge it into <base> (solo or team PR) — the
+Review the diff, commit it on this branch (`docs(requirements): <outcome> <TOR-ID> (<CR-ID>)`; a Restore, which writes no record: `docs(requirements): restore <TOR-ID>`; plan files `/add` wrote go in a separate `docs(plan): add epic <id> (<slug>)` commit), and merge it into <base> (solo or team PR) — the
 merge approves the Change Record.
 ```
 

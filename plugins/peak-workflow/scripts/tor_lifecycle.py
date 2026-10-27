@@ -824,7 +824,10 @@ def requirement_state(project: Project, tor: str) -> dict:
                 else:
                     state = "Changed since verified"
                     if (hist := p.reword_chain(tor, saved[1], req.fingerprint, proven_only=False)) is not None:
-                        row["historical_records"] = [r.id for r in hist]  # recorded, but unproven
+                        # only the unproven links: a reword with passing evidence is not "without test evidence"
+                        unproven = [r.id for r in hist if r.data["evidence"].get("result") != "pass"]
+                        if unproven:
+                            row["historical_records"] = unproven
         else:
             state = STATUS_STATE.get(best.status, f"Unknown epic status ({best.status})")
     if row["dispute"]:
@@ -965,8 +968,8 @@ def run_check(project: Project, base: str | None = None) -> dict:
     for sc in p.sidecars.values():
         for bad in sc.malformed:
             findings.append(Finding("C", f"Epic {sc.epic} lists '{bad}', which is not a requirement ID. "
-                                    "Correct it by hand on a docs/ branch (replace it with the TOR IDs it "
-                                    "meant, or delete it) and merge it.",
+                                    f"Correct it by hand on a docs/ branch (docs/fix-{sc.epic}-requirements): replace "
+                                    "it with the TOR IDs it meant, or delete it, and merge it.",
                                     epic=sc.epic, path=f"{STATUS_DIR}/epic-{sc.epic}.md",
                                     own_branch=bool(start) and bad not in start.sidecar_texts.get(sc.epic, "")))
 
@@ -1028,7 +1031,7 @@ def housekeeping(p: Project) -> list[Finding]:
             how = (" and failed verification" if any(tor in s.unverified for s in done)
                    else " and still marked done" if done else "")
             out.append(Finding("F", f"{tor} is known to be wrong{how} "
-                               f"({info['record']}, {info['age_days']} days old, {due}{safety}). Next "
+                               f"({info['record']}, {info['age_days']} day{'' if info['age_days'] == 1 else 's'} old, {due}{safety}). Next "
                                f"step: /peak-workflow:capture-requirements {tor}", tor=tor,
                                kind="disputed", detail=info))
         if tor in p.gone:

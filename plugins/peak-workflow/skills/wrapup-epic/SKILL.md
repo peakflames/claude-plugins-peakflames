@@ -74,6 +74,11 @@ has findings). Run these steps instead of Phases
    - Default scope empty → stop: `Every requirement Epic <id> owns is verified — nothing to
      re-check.` (Run the sidecar C check below first; when it fires, print its message instead.)
    - A named ID that is Verified is allowed: re-checking it records a past false PASS as data.
+   - A scoped ID whose `states` row has `historical_records` → say `<TOR> was edited before 3.0
+     (<CR-IDs>) without test evidence; a PASS accepts that edit as same meaning` and ask via
+     `AskUserQuestion` `["Meaning unchanged — re-verify", "Stop — decide it with
+     /peak-workflow:capture-requirements <TOR>"]` (skip the question when the user came from
+     capture-requirements' "Meaning unchanged or unsure — re-verify instead").
    - A Disputed requirement in scope → say it is known to be wrong (`<CR-ID>`, `<N>` days) and
      that a PASS does not resolve the dispute.
    - Run `tor-lifecycle check --json`. A scoped ID with an **A** finding (edited without a Change
