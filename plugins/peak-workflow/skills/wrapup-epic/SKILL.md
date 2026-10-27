@@ -72,14 +72,23 @@ has findings). Run these steps instead of Phases
    - A named ID that is not live → stop with its `tor-lifecycle titles` line: superseded or
      retired requirements are history — the successor is re-checked through its own epic.
    - Default scope empty → stop: `Every requirement Epic <id> owns is verified — nothing to
-     re-check.`
+     re-check.` (Run the sidecar C check below first; when it fires, print its message instead.)
    - A named ID that is Verified is allowed: re-checking it records a past false PASS as data.
+   - A scoped ID whose `states` row has `historical_records` → say `<TOR> was edited before 3.0
+     (<CR-IDs>) without test evidence; a PASS accepts that edit as same meaning` and ask via
+     `AskUserQuestion` `["Meaning unchanged — re-verify", "Stop — decide it with
+     /peak-workflow:capture-requirements <TOR>"]` (skip the question when capture-requirements' "Meaning unchanged — re-verify
+     instead" was chosen for that TOR — in this session, or as the command the user is running).
    - A Disputed requirement in scope → say it is known to be wrong (`<CR-ID>`, `<N>` days) and
      that a PASS does not resolve the dispute.
    - Run `tor-lifecycle check --json`. A scoped ID with an **A** finding (edited without a Change
      Record) → stop: `<TOR> was edited without a Change Record — decide whether its meaning changed
      with /peak-workflow:capture-requirements <TOR> first; a reverify PASS would ratify the edit.`
      (Name the other scoped IDs so the user can re-run with just those.)
+   - A **C** finding whose `path` is this epic's sidecar (a non-ID entry in `requirements:`) →
+     stop and print its message: `tor-lifecycle mark` refuses that sidecar, so R4 could not record
+     the verdicts. Re-run reverify after that `docs/` branch merges (when the named IDs or the
+     default scope still hold a requirement that is not Verified).
 3. Print the scope as `TOR-… — <title> (<state>)` from one `tor-lifecycle titles` run, with the
    epic as `<id> (<slug>) — <Name>`.
 
@@ -122,7 +131,7 @@ sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" mark <id> --pass TOR-A --pass T
 Before running it, note each scoped requirement's previous sidecar line (its `unverified:` date and
 reason, if any) for the handoff's **Was** column — `mark` replaces it. Then write
 `docs/implementation-plan/session-handoffs/epic-<id>-reverified-<today>.md`; if that file already
-exists (a second reverify today), append a `---` line and a new section — never overwrite it:
+exists (a second reverify today), append a `---` line, then the full block below again (heading included) — never overwrite it:
 
 ```markdown
 # Epic <id>: <Name> — Reverified <today>
@@ -142,7 +151,7 @@ Tests gate: PASS / FAIL (<summary>). UX Baseline: <PASS / N/A — no UI requirem
 
 Commit the sidecar and the reverified handoff:
 `chore(epic-<id>): reverify <TOR-list> — <N> PASS, <M> FAIL`. Then ship exactly as
-`/peak-workflow:quick-fix` Step 4 item 6 does — ask solo or team (neutrally, every time); solo
+`/peak-workflow:quick-fix` Step 4 item 6 does — ask solo or team (neutrally, every time — with no `origin` remote, skip the question: `No remote — shipping solo (local merge).`); solo
 merges `--no-ff` into the base (message `chore(epic-<id>): merge <branch> — reverify <TOR-list>`)
 and deletes the branch, team pushes and opens a PR (title
 `verify(epic-<id>): <TOR-list>`, body = the handoff's table plus `🤖 Generated via
@@ -168,7 +177,7 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
 
 ### Step 1.1: Load Context
 
-1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it via the `Read` tool — it is injected into every conversation turn.
+1. Use the project's `CLAUDE.md` content already loaded in your system context. Do not re-read it yet — item 1a re-reads it from the working tree after checkout.
 1a. **Check out the feature branch before reading any sidecar or spec content.** The sidecar and spec on `develop`/`main` may still say `Not Started` or `In Progress` — only the feature branch carries the implementer's updates. Locate the spec by filename only (no content read): `ls docs/implementation-plan/phase-*/epic-<id>-*.md`. Extract the **branch short name** from that filename: strip the directory path, the `epic-<id>-` prefix (`<id>` is an opaque string), and the `.md` suffix. For example, `epic-a3f2K7p-user-auth.md` → `user-auth`. If there is no suffix after `epic-<id>`, omit it. Then detect the branch with a reliable test — do **not** rely on `git branch --list … && echo "exists"` (always exits 0) or on `git checkout` failing silently:
    ```bash
    git show-ref --verify --quiet refs/heads/feature/epic-<id>-<short-name>
@@ -178,7 +187,10 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
    - If it does not exist, ask via `AskUserQuestion` which branch holds the work — question
      `"There is no feature/epic-<id>-<short-name> branch. Which branch holds this epic's work?"`,
      options: the current branch, `"Let me type a branch name"`, `"Stop"`. Check out the branch
-     the user names (stop if it does not exist), and call it the feature branch from here on.
+     the user names (stop if it does not exist), and call it the feature branch from here on. If
+     the named branch is the base (`develop`, `main`, or `master`), run
+     `git checkout -b feature/epic-<id>-<short-name>` from it instead and call that the feature
+     branch — wrapup never commits on the base.
    - After checkout, check freshness (base: `develop` > `main` > `master`). If `git remote` does
      not list `origin`, skip silently. Otherwise run `git fetch --quiet origin`; if the fetch
      fails, say `Freshness check skipped — origin not reachable`. If `origin/<base>` exists, count
@@ -295,7 +307,11 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
         <old> → <successor> (<CR-ID>)`.
       - **Retired** (`retired in CR-…`) — `Fix now` = drop it from the anchors and `requirements:`
         (`FIXED DURING WRAPUP — retired anchor dropped (<CR-ID>)`). If no anchor would remain and
-        this is not a removal epic, Fix now is unavailable — Stop.
+        this is not a removal epic, Fix now is unavailable — Stop with `Every requirement Epic <id>
+        delivers was retired after it was built (<CR-IDs>). Nothing is left to verify, so this
+        epic cannot be completed. Its code is removal work for /peak-workflow:add removal epic for
+        <CR-ID>.` (capture-requirements refuses such a retire while the epic is Implemented, so this
+        arises only from a retire written before that rule.)
       - **Unknown** (exit 1, finding C) — `Fix now` = correct the ID to the requirement the epic
         built (then verify that one) or drop it.
 
@@ -416,7 +432,7 @@ Only now, with every per-TOR verdict recorded, read
 `docs/implementation-plan/session-handoffs/epic-<id>-implemented.md` and locate its
 `## Deferrals` section.
 
-1. **If the handoff has no `## Deferrals` section** (or no handoff exists): add a warning line
+1. **If the handoff exists but has no `## Deferrals` section**: add a warning line
    to the Step 1.5 Deferrals section — `⚠️ implementer handoff has no Deferrals section —
    disclosure could not be checked` — and proceed to item 2 with an empty Deferrals table (the
    misfiled branch still applies). The warning itself does not affect the epic verdict (legacy
@@ -433,6 +449,9 @@ Only now, with every per-TOR verdict recorded, read
    - Else if the handoff reported it `PASS (operator-observed pending)` and the observation did not
      match → `Disclosed: n/a (observation)` — the implementer could not have known; no
      UNDISCLOSED marker.
+   - Else, when the epic has no implementer handoff at all (`handoff: —` and no
+     `session-handoffs/epic-<id>-implemented.md`) → `Disclosed: n/a (no handoff)`; no UNDISCLOSED
+     marker, but say in Highlights that the epic reached Implemented without a handoff.
    - Else → `Disclosed: **no**`. The Deferrals table row for this TOR reads
      `FAIL — ❌ UNDISCLOSED DEFERRAL` (or `CANNOT VERIFY — ❌ UNDISCLOSED DEFERRAL`) in the
      Verifier finding column. A mention in Key Decisions or prose ("stub for now") does not
@@ -543,7 +562,7 @@ configured `frontend-design` or brand skill does not replace this check.
 
 **Gate discrepancies are findings.** After running the gates, compare each result against the
 implementer handoff's *Verification Results (self-assessment)* section (the handoff is already
-open from Step 1.2b). Any gate the handoff reports as PASS that does not pass now is a named
+open from Step 1.2b; skip this comparison when the epic has no implementer handoff). Any gate the handoff reports as PASS that does not pass now is a named
 Code Review finding in Step 1.5: `⚠️ GATE DISCREPANCY: <gate> — handoff reports PASS, reproduces
 FAIL (<one-line detail>)`. Report it even when the failure predates this epic — the discrepancy
 is the finding, not the failure's age.
@@ -689,7 +708,7 @@ its row.)
 
 ## Counts
 - TOR Requirements: X/Y PASS, Z FAIL, C CANNOT VERIFY (V waived, F fixed at wrapup, A amended, P pending)
-- Quality Gates: X/Y PASS
+- Quality Gates: X/Y PASS (N/A gates are excluded from Y and listed after the count)
 - Tests: X passed, Y skipped, Z failed
 
 (Y is the final anchors — a SUPERSEDED row is not counted; Z includes pending TORs. P counts Step 1.4b pending records only; renewals from Step 1.1 item 3a appear under Requirement
@@ -780,7 +799,7 @@ column sets exactly as shown.
 **If the verdict is FAIL:** Stop here, on the feature branch (a stop that wrote nothing, like the
 Step 1.1 item 3a stops, says where it leaves the session). List the specific items that need to be fixed — TORs already fixed during this wrapup are re-verified and not on that list. Do NOT proceed to Phase 2. Tell the user: make the fixes (re-run `/peak-workflow:start-epic <id>` on the same branch, or fix by hand), then run `/peak-workflow:wrapup-epic <id>` again in a fresh session. Any fix or Change Record written during this wrapup is uncommitted on the feature branch — say so, so it is not lost.
 
-**If the verdict is PASS:** Ask the user to confirm before proceeding to Phase 2.
+**If the verdict is PASS:** ask via `AskUserQuestion` `"Verdict PASS. Proceed to Phase 2 (complete and ship)?"` — `["Proceed", "Stop"]`.
 
 ---
 
@@ -923,7 +942,10 @@ Use the Agent tool with model `haiku` (the shorthand resolves to the current Hai
 > Do NOT push to the remote.
 
 **Wait for the subagent to complete before proceeding.** The refreshed documents must be
-committed on the feature branch before it is merged into main.
+committed on the feature branch before it is merged into the base branch. When it has committed,
+read its diff (`git show --stat HEAD` and the changed lines): correct any statement that contradicts
+a Phase 1 verdict or the code inspected in Steps 1.2–1.4 (e.g. a Known Issue for a requirement that passed) and commit the correction
+before Step 5.
 
 ---
 
@@ -932,7 +954,9 @@ committed on the feature branch before it is merged into main.
 After Phase 3 orientation is complete and the Step 4 doc refresh subagent has
 committed on the feature branch, run `tor-lifecycle check --base <base>` once more: a finding
 marked `[this branch, blocking]` stops the ship (the doc refresh or a late fix introduced it) —
-fix it as in Step 1.1 item 3a and commit before continuing. Then ship the branch. Ask the user which mode to use
+fix it as in Step 1.1 item 3a and commit before continuing. An **E** finding marked
+`[this branch]` (a citation of a superseded or retired ID this branch added — often in the
+refreshed docs) is fixed the same way: cite the successor or the record instead. Then ship the branch. Ask the user which mode to use
 via `AskUserQuestion`. Present both options neutrally — do **not** auto-detect a
 default, do **not** recommend one mode over the other. There is no reliable signal
 to determine which mode is correct for the user's context (repo permissions, team
@@ -941,6 +965,8 @@ be made by the user every invocation.
 
 - Question: `"Ship mode — solo (merge locally to the base branch) or team (push the branch and open a pull request)?"`
 - Options: `["Team — push and open PR", "Solo — local merge only"]`
+- If `git remote` does not list `origin`, skip the question: say `No remote — shipping solo (local
+  merge).` and use Solo.
 
 ### Step 5a: Solo mode
 
@@ -956,6 +982,8 @@ be made by the user every invocation.
 7. Report to the user:
    > Branch `<branch>` has been merged into `<base-branch>` and deleted.
    > Changes have not been pushed — run `git push` when ready.
+
+   (With no `origin` remote, say instead: `No remote is configured — the merge is local only.`)
 
    If `CLAUDE.md`'s `**Remote:**` line records branch protection, add: *"`<base-branch>` is
    protected — the push goes through only for a repository administrator. Without admin rights,

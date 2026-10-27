@@ -105,11 +105,12 @@ def parse_requirements(text: str) -> list[ParsedScenario]:
     title = ""
     body: list[str] = []
     section: str | None = None
+    scen_section: str | None = None  # the banner in force at the Scenario line, not at its flush
     after_rule = False
 
     def flush() -> None:
         if tor:
-            out.append(ParsedScenario(tor, title, _digest(body), section))
+            out.append(ParsedScenario(tor, title, _digest(body), scen_section))
 
     # Split on newlines only (as universal-newline file reading does), not str.splitlines(),
     # which also breaks on form feeds and U+2028 and would change the hash.
@@ -128,6 +129,7 @@ def parse_requirements(text: str) -> list[ParsedScenario]:
         if m := SCEN.match(line):
             flush()
             tor, title, body = m.group(1), m.group(2).strip(), [m.group(2)]
+            scen_section = section
         elif FEAT.match(line):
             flush()
             tor, title, body = None, "", []
@@ -822,7 +824,10 @@ def requirement_state(project: Project, tor: str) -> dict:
                 else:
                     state = "Changed since verified"
                     if (hist := p.reword_chain(tor, saved[1], req.fingerprint, proven_only=False)) is not None:
-                        row["historical_records"] = [r.id for r in hist]  # recorded, but unproven
+                        # only the unproven links: a reword with passing evidence is not "without test evidence"
+                        unproven = [r.id for r in hist if r.data["evidence"].get("result") != "pass"]
+                        if unproven:
+                            row["historical_records"] = unproven
         else:
             state = STATUS_STATE.get(best.status, f"Unknown epic status ({best.status})")
     if row["dispute"]:
@@ -962,7 +967,9 @@ def run_check(project: Project, base: str | None = None) -> dict:
                                     own_branch=bool(start) and (c.path, c.tor) not in start.citations))
     for sc in p.sidecars.values():
         for bad in sc.malformed:
-            findings.append(Finding("C", f"Epic {sc.epic} lists '{bad}', which is not a requirement ID.",
+            findings.append(Finding("C", f"Epic {sc.epic} lists '{bad}', which is not a requirement ID. "
+                                    f"Correct it by hand on a docs/ branch (docs/fix-{sc.epic}-requirements): replace "
+                                    "it with the TOR IDs it meant, or delete it, and merge it.",
                                     epic=sc.epic, path=f"{STATUS_DIR}/epic-{sc.epic}.md",
                                     own_branch=bool(start) and bad not in start.sidecar_texts.get(sc.epic, "")))
 
@@ -1024,7 +1031,7 @@ def housekeeping(p: Project) -> list[Finding]:
             how = (" and failed verification" if any(tor in s.unverified for s in done)
                    else " and still marked done" if done else "")
             out.append(Finding("F", f"{tor} is known to be wrong{how} "
-                               f"({info['record']}, {info['age_days']} days old, {due}{safety}). Next "
+                               f"({info['record']}, {info['age_days']} day{'' if info['age_days'] == 1 else 's'} old, {due}{safety}). Next "
                                f"step: /peak-workflow:capture-requirements {tor}", tor=tor,
                                kind="disputed", detail=info))
         if tor in p.gone:
@@ -1040,7 +1047,7 @@ def housekeeping(p: Project) -> list[Finding]:
         if r.kind == "retire" and r.data.get("removal") == "code" and not any(
                 r.id in s.retires for s in p.sidecars.values()):
             out.append(Finding("F", f"{r.id} retired {', '.join(r.tors)} but the code is still there "
-                               "and no epic removes it. Plan a removal epic with /peak-workflow:add.",
+                               f"and no epic removes it. Plan a removal epic with /peak-workflow:add removal epic for {r.id}.",
                                kind="removal-missing", detail={"record": r.id}))
     for sc in p.sidecars.values():
         if sc.status == "Complete":
@@ -1298,7 +1305,9 @@ HEADER_LINE = re.compile(r"^\*\*([^*:]+):\*\*\s*(.*?)\s*$")
 HEADER_ANCHORS = ("Plan branch", "Planned", "Planned by", "Dependencies", "Status", "Phase")
 MERGE_SUBJECTS = (re.compile(r"^Merge branch '([^']+)'"),
                   re.compile(r"^Merge remote-tracking branch '(?:[^/']+/)?([^']+)'"),
-                  re.compile(r"^Merge pull request #\d+ from [^/\s]+/(\S+)"))
+                  re.compile(r"^Merge pull request #\d+ from [^/\s]+/(\S+)"),
+                  # the skills' own solo merges: `docs(plan): merge docs/<task> — …`, `epic(<id>): merge …`
+                  re.compile(r"^[a-z]+(?:\([^)]*\))?: merge (?:branch )?'?((?:docs|feature|hotfix)/[^'\s]+)"))
 EMPTY_VALUES = ("", "—", "-")
 
 
@@ -1565,9 +1574,11 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
                 in_banner, banner_text = True, False
             continue
         if in_banner:
-            banner_text = True
             if LIFECYCLE_MARKERS.search(content):
-                items.append(ProseItem(rel, i + 1, i + 1, "banner", None, content))
+                # A banner's first text line is its section name (parse_requirements): removing it
+                # would rename the section, so it is reported `kept`; a later marker line is not.
+                items.append(ProseItem(rel, i + 1, i + 1, "banner", None, content, strip=banner_text))
+            banner_text = True
             continue
         if not content:
             (group if group else held_empty).append(i)

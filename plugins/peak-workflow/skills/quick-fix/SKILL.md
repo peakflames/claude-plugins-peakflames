@@ -41,7 +41,7 @@ Follow these steps exactly:
 5. **Requirements in play.** The helper is always called as
    `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <command>` (written `tor-lifecycle` below);
    exit 2 or 3 from it is a data or install problem — print its output and stop. Run
-   `tor-lifecycle states --json` once. The fix's **requirements** are the TOR IDs the request
+   `tor-lifecycle states --json` and `tor-lifecycle check --json` once each. The fix's **requirements** are the TOR IDs the request
    names, plus those cited by the test functions and source lines the fix will change (not every
    ID in those files). Print each as `TOR-… — <title>` from one `tor-lifecycle titles <IDs>` run,
    with its `states` state; `titles` exits 1 when an ID is unknown — print its line and continue.
@@ -69,6 +69,13 @@ Follow these steps exactly:
      /peak-workflow:capture-requirements <TOR> <description>.` **Implemented** → stop: `Epic <id>
      is waiting for wrapup — run /peak-workflow:wrapup-epic <id>; its Step 1.4b can amend the
      requirement there.`
+   - **Edited before it was settled** — its `states` row has `historical_records`, or `check` has an
+     **A** finding for it → stop: `<TOR> changed after it was verified (<CR-IDs>) — decide whether
+     its meaning changed first with /peak-workflow:capture-requirements <TOR>.`
+   - **Owning epic's sidecar is malformed** — a `check --json` finding C whose `path` is that
+     epic's sidecar (`docs/implementation-plan/status/epic-<epic>.md`) → stop and print its
+     message: `tor-lifecycle mark` refuses that sidecar, so the fix could not record its
+     requirement change. The user corrects the line on a `docs/` branch, merges it, and re-runs.
    - **Size** — the requirement change plus the code fix must be about two hours or less; if
      not, stop and recommend `/peak-workflow:triage <request>`.
 
@@ -91,13 +98,15 @@ Use `AskUserQuestion` to pick the ship mode. Present both options neutrally — 
 
 - Question: `"Ship mode — solo (local merge, no push) or team (push + PR)?"`
 - Options: `["Team — push and open PR", "Solo — local merge only"]`
+- If `git remote` does not list `origin`, skip the question: say `No remote — shipping solo (local
+  merge).` and use Solo.
 
 Remember the user's choice — Step 4 and Step 5 branch on it.
 
 ## Step 3: Create the Hotfix Branch
 
 1. Detect the base branch: run `git branch --list develop main master` and prefer `develop` if it exists, then `main`, then `master`.
-2. `git checkout <base-branch>`
+2. `git checkout <base-branch>`, then — if `origin/<base-branch>` exists — `git pull --ff-only origin <base-branch>`
 3. Create the hotfix branch:
    - If you have a GitHub issue number: `git checkout -b hotfix/issue-<N>-<slug>`
    - Otherwise: `git checkout -b hotfix/<slug>`
@@ -109,7 +118,10 @@ Remember the user's choice — Step 4 and Step 5 branch on it.
 Enter plan mode. The plan is the complete execution script for this fix — every step after plan approval must appear as an explicit numbered item. The plan must include these items in order:
 
 1. **Read affected source files** — enumerate the specific files the fix touches.
-2. **Implement the fix** — name the specific files being modified and what changes. A test or
+1a. **Reproduce** (omit on an amendment-path fix that changes no behavior — item 5a's citing tests are its evidence) — write or run a test that fails on the reported behavior. If it passes on the
+   base branch, ask via `AskUserQuestion` `"The bug does not reproduce: <evidence>. How to
+   proceed?"` — `["Add a regression test only", "Stop"]`.
+2. **Implement the fix** — name the specific files being modified and what changes (on item 1a's regression-test-only path, this item is the test alone — no source change). A test or
    comment that cites a retired or superseded ID (`tor-lifecycle sweep <ID>`) may be retargeted to
    its successor or deleted as part of the fix — a test-and-comment-only change.
 2a. **Amend the requirement** (amendment path only — omit otherwise). Written as
@@ -127,7 +139,14 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
      entry (its sources go into `traced_to`) and add the successor's with the same `traces_to` and
      `"rationale": "Supersedes <old TOR> (<CR-ID>): <reason>"`. The fix's tests cite the
      successor; retarget any test still citing the old ID. With no owning epic, the successor stays
-     unassigned: Step 4 item 7 prints `/peak-workflow:add` for it.
+     unassigned: Step 4 item 7 prints `/peak-workflow:add` for it. The successor's `rationale`
+     keeps the old entry's rationale first when it still holds.
+   - **Disputed** (the requirement has an open `pending` record): ask capture-requirements 3C step
+     3's settle question. Yes → `refs` also lists the pending record's ID. No → also write the
+     renewed `pending` record on the requirement that now carries the dispute, as 3C step 3 says.
+   - **Vision and ConOps** (reword or supersede): if a vision or ConOps line states the detail
+     this change replaced, rewrite it to the current state on this branch — no record — and list
+     it in the commit body.
 2b. **Reverify the successor** (supersede with an owning epic only). Verification stays
    independent: launch a fresh `general-purpose` sub-agent with the `Agent` tool (never a fork —
    it must not see this session). Give it only the successor's Scenario block
@@ -182,13 +201,15 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
      and list this branch's own D and E (if any) in the PR body.
    - Stage by specific file path (not `git add -A`) — on the amendment path, also the Change Record,
      the feature file, its tracing sidecar, and the epic's status sidecar.
-   - Commit message subject: `fix: <one-line summary>`
+   - Commit message subject: `fix: <one-line summary>` (on the regression-test-only path from item
+     1a: `test: <one-line summary>`, with no `Closes` trailer)
    - If a GitHub issue number was provided, append a trailer line: `Closes #<N>`. If no issue number, omit the trailer.
+   - For each requirement in play that is Verification failed, add the body line `Fixes: <TOR>` — `/peak-workflow:status` reads it to switch its nudge to the reverify.
    - On a supersede, add the body lines `Amends: <old TOR> → <successor> (<CR-ID>)` and
      `Reverified: <successor> PASS` (or `Unverified: <successor> — <reason>`) — the record solo mode
      keeps. A reword adds its `Amends:` line to its own commit (item 5a).
 5a. **Reword <TOR>** (reword amendments only — omit otherwise). With no uncommitted change outside
-   `docs/`, run the citing tests (`git grep -l -w <TOR> -- . ':!docs/'`). All pass → edit the block
+   `docs/`, run the citing tests (the test-directory files among `git grep -l -w <TOR> -- . ':!docs/'`). All pass → edit the block
    in place, write the `reword` record per item 2a (`from` = the old fingerprint, `to` =
    `tor-lifecycle fingerprint` of the new block, `[evidence]` `commit` = `git rev-parse --short
    HEAD`, `result = "pass"`, `tests` = the citing files, and an `equivalence` sentence — why no
@@ -203,14 +224,14 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
 
    ### If ship mode is SOLO
    - `git checkout <base-branch>`
-   - `git merge <hotfix-branch> --no-ff -m "fix: merge <hotfix-branch> — <one-line summary>"`
+   - `git merge <hotfix-branch> --no-ff -m "<fix|test|docs>: merge <hotfix-branch> — <one-line summary>"`
    - `git branch -d <hotfix-branch>`
    - Do **not** push.
    - Report: `Branch <hotfix-branch> merged into <base-branch> and deleted. Changes not pushed — run 'git push' when ready.`
 
    ### If ship mode is TEAM
    - `git push -u origin <hotfix-branch>`
-   - `gh pr create --base <base-branch> --title "fix: <one-line summary>" --body "<body>"`
+   - `gh pr create --base <base-branch> --title "<fix|test>: <one-line summary>" --body "<body>"`
    - Body template (populate from the issue body, quality gate results, and the manual-verification value captured in Step 4):
 
      ```
@@ -282,5 +303,6 @@ Exit plan mode and execute every item in the plan in order. Do not add, skip, or
   one requirement, never a Safety one, with the owner's approval and a Change Record. A larger
   requirements change is not a quick fix — re-triage it with `/peak-workflow:triage`.
 - Do **NOT** change a Complete epic's `status:` line, or remove anything from its `requirements:`
-  line. Only `tor-lifecycle mark` writes its `requirements:` (append), `verified:`, and
+  line (the one exception: a non-ID entry `check` reports as finding C is corrected by hand on a
+  `docs/` branch, never on the hotfix branch). Only `tor-lifecycle mark` writes its `requirements:` (append), `verified:`, and
   `unverified:` lines.

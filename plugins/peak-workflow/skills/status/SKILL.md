@@ -114,6 +114,14 @@ Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For eac
 - `owner:` line: the person working on it (set by `start-epic`). `—` means unclaimed.
 - `retires:` line (optional): the Change Record(s) a removal epic carries out.
 
+An epic's `status:` and `owner:` move on its feature branch until it merges. For every sidecar
+that is not Complete and whose `feature/epic-<id>-*` branch exists locally (`git branch --list
+'feature/epic-<id>-*'`, unmerged), read `status:`, `owner:`, and `handoff:` from that branch instead
+(`git show <branch>:docs/implementation-plan/status/epic-<id>.md`), as start-epic Step 2.5 does —
+so an epic started or paused there shows as In Progress or Paused (never Ready to Start), and
+Step 5 can flag a stale pause. Requirement states (Step 1.5) still reflect the base, so that
+epic's requirements keep their base state (e.g. Planned) in Requirements Coverage until it merges.
+
 Requirement ownership, `verified:`, `unverified:`, and `waived:` are read by the helper (Step
 1.5), not here.
 
@@ -164,7 +172,8 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    verified` or `Verification failed` (and Disputed rows whose `underlying_state` is one of them)
    by `epic`. One group per Complete epic: its `<id> (<slug>) — <Name>`, each requirement as
    `TOR-… — <title>`, and the command `/peak-workflow:wrapup-epic <id> reverify`. A Verification
-   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`" — unless it is
+   failed requirement adds "fix the code first with `/peak-workflow:quick-fix`" — or, when its fix
+   has merged (item 5's `Fixes:` test), "fixed in <sha> — reverify now" — unless it is
    Disputed, which adds "known to be wrong (<CR-ID>): decide with
    `/peak-workflow:capture-requirements <TOR>` first — uphold it if it stands" instead. A requirement in
    this group (either state) that also has an A finding (edited without a record) adds "decide first
@@ -186,13 +195,18 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    `/peak-workflow:capture-requirements TOR-02-Mail001`." The command is the top requirement
    action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
    group's first requirement carries an A finding or `historical_records`, its
-   `/peak-workflow:capture-requirements <TOR>` decision first — else the oldest Disputed one's
+   `/peak-workflow:capture-requirements <TOR>` decision first; when it is Verification failed,
+   `/peak-workflow:quick-fix <TOR>: <the row's unverified text without its leading date or a leading `RECORDED AS PENDING — CR-…: `>` for the code first; when it is
+   Disputed, its `/peak-workflow:capture-requirements <TOR>` first; when a quick-fix for it has
+   already merged (`git log --grep='^Fixes: <TOR>$' <base>` finds a commit dated on or after the
+   row's `unverified` date), its `/peak-workflow:wrapup-epic <id> reverify <TOR>` (groups follow the order of
+   `states` rows) — else the oldest Disputed one's
    `/peak-workflow:capture-requirements <TOR>`), even in degraded mode — there, add "after the fix".
 
 ## Step 5: Flag Stale Paused Epics
 
 For each epic whose sidecar (Step 2) has `status: Paused`:
-1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` 
+1. Read its handoff file from `docs/implementation-plan/session-handoffs/epic-<id>-paused.md` (when Step 2 read the sidecar from a feature branch, read the handoff from that branch: `git show <branch>:<path>`) 
 2. Check the **Paused** date
 3. If the pause date is more than 7 days ago, flag it as stale
 
@@ -344,8 +358,9 @@ with removal pending.
 
 ## Active Work
 
-[List any epics currently "In Progress" as `<id> (<slug>) — <Name>`, with phase and owner]
+[List any epics currently "In Progress" or "Paused" as `<id> (<slug>) — <Name>`, with phase, status, and owner]
 [If none: "No epics currently in progress."]
+[For a Paused epic that is not stale, add to Suggested Next Actions: "Resume Epic <id> (<slug>) — <Name> with /peak-workflow:start-epic <id>"]
 
 ## Stale Paused Epics (>7 days)
 
@@ -381,6 +396,8 @@ means the spec records no planner.]
  - If there are "Specified" requirements (no epic): "Run `/peak-workflow:add` to assign [N] unplanned TOR requirements to epics"
  - If exactly one epic is ready to start: "Start Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>` — <one-clause reason, e.g. the only unblocked epic>"
  - If several epics are ready to start: do **not** pick one. Write "[N] epics are ready — choose from the Ready to Start table above", and add one line when the ready epics span more than one phase or more than one planner ("They come from phases 3 and 4; ⚑ rows were planned by someone else — check with them before starting"). Choosing among ready epics is the team's decision, not the dashboard's.
+ - If `check` reported C or E findings: "Fix <N> housekeeping finding(s) under Requirements Health — each message names its fix" (E findings a planned epic will clear: name that epic instead).
+ - If `tor-lifecycle provenance --base <base>` exits 1 and no in-flight branch names those epics: "Run `/peak-workflow:upgrade` — catch-up for <epic IDs> is pending."
  - If all epics are complete and every live requirement counts as verified with no findings: "All requirements verified! Consider `/peak-workflow:refresh-docs` before release."
  - If all epics are complete but some requirements are still Implemented: "Run `/peak-workflow:wrapup-epic <id>` to complete independent verification of remaining epics."]
 ```

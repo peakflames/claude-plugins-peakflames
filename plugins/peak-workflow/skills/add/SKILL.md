@@ -39,7 +39,7 @@ Follow these steps exactly:
    /peak-workflow:add.` Continue only if the user says to. Skip silently with no remote.
 1. Read `CLAUDE.md` at the repo root for project context.
 2. Read the phase indexes: glob `docs/implementation-plan/phase-*/index.md` and read each file to understand the existing epic structure, phase names, and existing epic IDs.
-3. Read `docs/architecture.md` for system context.
+3. Read `docs/architecture.md` for system context (skip silently if it does not exist).
 4. **Load TOR requirements baseline.** Glob `docs/requirements/*.feature.md`. For each file, parse every `Scenario: [TOR-NN-XXXXXXX]` block: capture the TOR ID, feature file path, and Given/When/Then. Then run, once each:
    - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" states --json` → **`states`**: one row
      per requirement with its `title`, `state`, and owning `epic`. Only `live: true` rows can be
@@ -160,7 +160,8 @@ If the user confirms the list, use it. If the user specifies additions or remova
 is valid — continue with `requirements: —`), inform the user:
 > No existing TOR requirements match this description. To add new requirements, run
 > `/peak-workflow:capture-requirements` (brownfield mode) on a `docs/{task-short-name}` branch
-> to derive and approve new TOR IDs, then re-run `/peak-workflow:add`.
+> to derive and approve new TOR IDs, then re-run `/peak-workflow:add` on that same branch
+> (create it with `git checkout -b docs/<short-name>` from the base).
 
 Wait for the user's answer. The confirmed TOR ID set is the Requirements Anchors list for this epic.
 
@@ -193,7 +194,10 @@ stays where it is being (or was) delivered. **Never edit an epic that is not Not
 spec, sidecar, or phase-index change; a Complete epic keeps the IDs it verified.
 
 If every confirmed TOR was dropped via Keep, the set is empty — stop with the "No existing TOR
-requirements match" message above (a removal epic continues with no anchors).
+requirements match" message above (a removal epic continues with no anchors). When every dropped
+TOR is owned by a Not Started, In Progress, or Paused epic, stop instead with
+`<TOR> — <title> already covers this in Epic <id> (<slug>) — <Name> (<status>). Build it there:
+/peak-workflow:start-epic <id>.`
 
 **Screens (UI epics, when `ux/screens.md` exists).** A UI epic lists the `S-NN` screens its
 confirmed TORs name in their Given/When — those are its `## Screens` rows in Step 6. A screen
@@ -247,6 +251,11 @@ Use this understanding to write acceptance criteria that reference real files, r
 Skip this step only if the epic is entirely greenfield with no connection to existing code.
 
 ## Step 6: Write the Epic Spec(s)
+
+**Branch first.** If the current branch is `develop`, `main`, or `master`, run
+`git checkout -b docs/add-<kebab-name>` (the first epic's kebab name) before writing anything —
+planning changes reach the base only by a merge. On any other branch (a `docs/` branch from
+capture-requirements or triage, an epic branch), write there.
 
 Create the epic spec file(s) following the **required structure** below. `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` depend on this exact format — particularly the Requirements Anchors table.
 
@@ -467,4 +476,7 @@ Note: `/peak-workflow:start-epic` loads TOR requirements from the feature files 
 Requirements Anchors table — ensure those feature files are on develop (merged) before starting.
 ```
 
-Do NOT commit — leave that for the user to decide.
+Do NOT commit — leave that for the user to decide. When Step 6 created `docs/add-<kebab-name>`,
+end the summary with how it reaches the base: commit on it (`docs(plan): add epic <id> (<slug>)`),
+then `git checkout <base> && git merge --no-ff docs/add-<kebab-name> -m "docs(plan): merge docs/add-<kebab-name> — add epic <id> (<slug>)" && git branch -d
+docs/add-<kebab-name>` (solo) or push it and open a PR (team).

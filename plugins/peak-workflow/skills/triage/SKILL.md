@@ -72,7 +72,7 @@ Skip this sub-step in degraded mode (Format Guard). Otherwise run, with
    a requirement the request touches: **A** (edited without a change record, with the commit),
    **D** (changed since verified, with its owning epic), **F `disputed`** (known to be wrong,
    with its record and age), and **E** (a retired or superseded ID still cited).
-2. `tor-lifecycle search <2–4 key nouns or quoted phrases of the request>` — the re-litigation
+2. `tor-lifecycle search -- <2–4 key nouns or quoted phrases of the request>` — the re-litigation
    check. Exit 1 lists Change Records that retired, superseded, or recorded the idea as pending.
 
 Both feed the verdict (3.3) and the `**Requirement health:**` line (Step 4).
@@ -123,6 +123,12 @@ Apply this rubric — pick exactly one verdict:
     **AMEND** (`/peak-workflow:capture-requirements <TOR-ID> <description>` offers to restore the
     verified text). If the code also follows the edit, say so: a quick-fix follows once the
     restore merges.
+  - It asks for what the **current** text says (the edit was intended) → **AMEND**
+    (`/peak-workflow:capture-requirements <TOR-ID> <description>` records it as a supersede, or a
+    reword with evidence).
+  - When the request could mean either text, show both blocks and ask which one the owner means.
+  - It asks for new behavior neither text states → apply the HEAVY / AMEND rules as usual, and
+    name the unrecorded edit in the Rationale so capture-requirements settles it in the same run.
   - It disagrees with both → a bug against the current text, but the text itself is unproven:
     recommend the reverify first (`/peak-workflow:wrapup-epic <epic-id> reverify <TOR-ID>`, fresh
     session), then quick-fix if the requirement holds and the code fails it.
@@ -153,7 +159,7 @@ Output this block:
 
 **Requirement health:** <omit when 3.1 found nothing relevant; otherwise one line each: `TOR-… edited without a change record (commit <sha of the edit: git log -1 --format=%h -- <feature file>>)`, `TOR-… changed since epic <id> verified it`, `TOR-… is disputed (<CR-ID>, <N> days)`, `<idea> was <retired / superseded / recorded as pending> in <CR-ID> (<date>): <reason>`>
 
-**Recommended next command:** <the exact slash command to run>
+**Recommended next command:** <the exact slash command to run — for the reverify-first case, the reverify command, then "then" and the quick-fix command>
 ```
 
 Do **not** recommend or hint at a ship mode (solo vs team). That choice belongs to the user at ship time and will be asked explicitly by `/peak-workflow:quick-fix` or `/peak-workflow:wrapup-epic`.

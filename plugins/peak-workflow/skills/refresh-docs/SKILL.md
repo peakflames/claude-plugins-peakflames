@@ -41,7 +41,7 @@ current format.
 
 ---
 
-## Step 1: Load Epic Workflow Context
+## Step 1: Load Project Context
 
 1. Read `CLAUDE.md` — extract the Tech Stack table, Key Architecture Decisions, Important Reminders, and note any custom paths to architecture or design docs (if different from `docs/architecture.md` / `docs/design-notes.md`)
 2. Glob `docs/implementation-plan/status/epic-*.md` and grep for `status: Complete` or `status: Implemented` to identify which epics have finished. These are the epics whose handoffs are relevant to the documentation refresh.
@@ -124,7 +124,9 @@ If both tables are empty, report that the documentation is current and stop — 
 
 ## Step 6: Rewrite Target Documents
 
-Rewrite only the documents where gaps were found.
+Rewrite only the documents where gaps were found. Never cite a superseded or retired TOR ID in
+either document (`tor-lifecycle titles <ID>` says which): name its Change Record (`CR-…`) and the
+live successor(s) instead — `check` reports any such citation as finding E.
 
 ### Rewriting `docs/architecture.md`
 
@@ -160,8 +162,14 @@ Report any remaining discrepancies. Fix them before proceeding to Step 8.
 
 **Ask the user if they'd like to commit** the refreshed documents. If the user confirms:
 
-1. Stage only the target document files (`docs/architecture.md` and/or `docs/design-notes.md`)
-2. Commit message: `docs: refresh architecture and design notes to as-built state`
-3. Commit body (1-2 lines): summarize the most significant changes — e.g., *"Corrects .NET version, adds 4 missing endpoints, adds 6 new design decisions from epics 7–10 handoffs."*
+1. Before committing, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --base <base>`: an E finding marked `[this branch]` is a superseded or retired ID this rewrite cited — name its `CR-…` and successor instead.
+2. Branch: inside wrapup-epic Step 4, commit on the feature branch. Run standalone on the base
+   branch (`develop`, `main`, or `master`), first `git checkout -b docs/refresh-<YYYY-MM-DD>`, and
+   after the commit ask via `AskUserQuestion` `["Merge into <base> locally", "Leave the branch for a
+   PR"]` — Merge: `git checkout <base> && git merge --no-ff -m "docs: merge docs/refresh-<YYYY-MM-DD> — refresh architecture and design notes" docs/refresh-<YYYY-MM-DD> && git branch
+   -d docs/refresh-<YYYY-MM-DD>`. On any other branch, commit there.
+2. Stage only the target document files (`docs/architecture.md` and/or `docs/design-notes.md`)
+3. Commit message: `docs: refresh architecture and design notes to as-built state`
+4. Commit body (1-2 lines): summarize the most significant changes — e.g., *"Corrects .NET version, adds 4 missing endpoints, adds 6 new design decisions from epics 7–10 handoffs."*
 
 Do NOT push — leave that for the user.

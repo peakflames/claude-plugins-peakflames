@@ -7,7 +7,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
   and posted once on #20 after approval.
   Posted so far: rows through Plan 4 (Plan 4 comment), Plans 5–7b (issuecomment-6428372050),
   and Plan 8 (issuecomment-6429562613). Post rows added from Plan 9 on in one follow-up at the
-  merge gate.
+  merge gate. **Plan 9 rows not yet posted:** `Non-ID requirements: entry`, `Kept banner`, `Implemented owner`, `Fixes: trailer`.
 - **Integration branch:** `feature/peak-workflow-3.0` (off `develop`). Each plan works on
   `feature/peak-workflow-3.0-pN-<name>` and merges back `--no-ff`. The integration branch merges to
   `develop` only after the merge gate (Q10).
@@ -86,6 +86,10 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | Historical D message | (none) | `states` adds `historical_records` to a Changed-since-verified row whose edit only a historical reword explains; `check`'s D message then names both routes (meaning changed → `capture-requirements <TOR>`; else reverify), and status's panel and nudge put the decision first | A reverify would otherwise ratify a pre-3.0 meaning change the migration could record only as a reword |
 | Duplicate sidecar keys | (none) | The sidecar parser rejects a key that appears twice (`owner:` twice → data error naming both lines), so `check`, `states`, and step 0002's prerequisites stop on it | A clean git merge of an in-flight branch after step 0001 can add a second `owner:` line silently; step 0001 is frozen, so the parser catches it |
 | Requirements README | Migration rewrites `docs/requirements/README.md` | Step 0002 replaces the `## Conventions` section only when the file is still the 2.1 setup stub, writes one when there is none, and leaves a user-written README alone (named in the report) | An upgrade step never overwrites prose a user wrote |
+| Non-ID `requirements:` entry | A Complete epic's `requirements:` line is append-only | A non-ID entry `check` reports as finding C (e.g. `TOR-24 set`) is corrected or deleted by hand on a `docs/` branch; quick-fix's amendment path and reverify stop before branching while one exists | `mark` refuses a sidecar it cannot parse strictly, so the epic could never record a verdict again; step 0002's report already prescribed the hand fix |
+| Kept banner | (as `Kept prose`) | A section banner's first text line is kept (reported `kept`) even when it holds a marker word; only later marker lines in a banner are stripped | The first line names the section; removing it moves the requirements below into another section (Summit live UAT) |
+| Implemented owner | Retire and supersede act on the live set; open epics are swapped, Complete ones keep the old ID | capture-requirements refuses a retire or supersede that would leave an **Implemented** epic with no live anchor ("wrap it up first") | wrapup cannot complete an epic with nothing left to verify |
+| `Fixes:` trailer | (none) | A quick-fix for a Verification failed requirement adds `Fixes: <TOR>` to its commit body; status then points that requirement at reverify | Nothing else records that the code was fixed before the reverify |
 
 ## Plan checklist
 
@@ -100,7 +104,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 7 | **wrapup-epic** — 1.1 `check --base` + own-branch blocking; Disputed block; 5.2/5.3; 1.4b Amend / Record as pending; removal-epic gate; 2.2 `verified:`; `reverify` mode; HANDOFF/PR_BODY templates | Dry-run: wrapup amend, pending, removal epic, reverify PASS/FAIL | ✅ Done |
 | 7b | **uphold** — fifth record kind closing a dispute when the requirement stands; capture-requirements 3C, wrapup overdue question, status/triage/quick-fix wording | Dry-run: capture-requirements uphold, wrapup uphold, status | ✅ Done |
 | 8 | **Step 0002 lifecycle migration** (#20 Migration 1–8, one commit each; strips `migration_source`) + contributor kit (Q9) | A "Project A-like" fixture upgrades with identical fingerprints before/after the strip; seed surfaces exactly the planted stale set | ✅ Done |
-| 9 | **Release gate** — README / plugin CLAUDE.md / CHANGELOG (BREAKING, /upgrade), 2-pass full dry-run, live UAT, draft PR → develop, contributor request, release | All four Q10 gates pass | ☐ |
+| 9 | **Release gate** — README / plugin CLAUDE.md / CHANGELOG (BREAKING, /upgrade), 2-pass full dry-run, live UAT, draft PR → develop, contributor request, release | All four Q10 gates pass | ◐ In progress (gate 1 ✅) |
 
 ## Plan notes
 
@@ -468,4 +472,106 @@ proposal + addendum). Every plan reads this file first and updates it last.
   successor shows only as Specified; step 0001 inserts `owner: —` after `status:` (a frozen step,
   so the duplicate-key parse error covers the merge case); the runner's in-flight warning about a
   duplicated `owner:` stays generic.
+
+### Plan 9 — Release gate
+
+**Q10 gates**
+
+| # | Gate | State |
+|---|---|---|
+| 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
+| 2 | Two clean full dry-run passes incl. lifecycle scenarios | ✅ passes 9 and 10 clean (0 Critical, 8 agents). Criticals per pass 1–8: 4, 2, 1, 1, 3, 0, 1, 2 — all fixed |
+| 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
+| 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
+
+- **Docs:** plugin README gains Prerequisites (Python 3.11+), a Requirements lifecycle section
+  (five record kinds, where amendments happen, fingerprints, reverify, findings A–F), the 2.1 →
+  3.0 upgrade walkthrough, the triage AMEND / TOR-ID / reverify rows, and drops "immutable" and
+  "quick-fixes never change requirements"; spec example has no title column; sidecar example
+  shows `verified:`. Root README: upgrade pointer. Plugin CLAUDE.md: sidecar lifecycle lines,
+  Change Records, derived states. Every skill, helper command, and path the docs name was checked
+  by script.
+- **CHANGELOG:** BREAKING bullets (must run `/upgrade`, Python 3.11+, titles gone, deleted
+  migrate skills); a Fixed section; every bullet ≤ 50 words.
+- **Dry-run fixtures:** `dryrun/plan9_release.py` `greenfield | brownfield | upgraded` (the last is
+  the Plan 8 fixture taken through steps 0001 + 0002 and merged, with a gated CLAUDE.md,
+  `unittest`-discoverable tests, `.gitignore`, and architecture stubs).
+- **Pass 1** (4 agents: greenfield planning; start/wrapup/pause/status/refresh-docs/triage/
+  quick-fix/add; brownfield upgrade + supersede/retire/pending/uphold; reverify PASS/FAIL, removal
+  epic, quick-fix reword + supersede). 4 Critical: the helper gave the last Scenario before a
+  banner the next banner's section (a requirement above `# Safety` read as Safety); start-epic's
+  nudge disagreed with status on a pre-3.0 edit; `mark` refused a sidecar with `TOR-24 set`, so
+  quick-fix and reverify died mid-run; the rules contradicted each other on fixing that line
+  (deviation row). All fixed with a test for the parser. UX/Minor applied: capture-requirements
+  3C Removed/Pending routing, settle question after Change it, records-only merge path, Haiku
+  skipped with no new IDs; Release Protocol template push order and headings; plan-project solo
+  push, `.gitkeep`, nested fence, stub label; pause branch check; quick-fix pull; start-epic
+  `<id>` = first word; refresh-docs heading; `removal-missing` names the full `/add` command.
+- **Left alone** (pre-existing, not lifecycle): status reads In Progress sidecars from the working
+  tree only; refresh-docs has no missing-target or branch rule; quick-fix has no
+  bug-does-not-reproduce path; triage routes a single new requirement through discover; the
+  test-only fault switch on CLIs without persistence; migrated supersede records carry no
+  `traced_to` and keep 2.1 note lines in `text` (Plan 8 left alone; step 0002 frozen).
+- **Pass 2** (same four scopes, new scenarios: wrapup of an Implemented epic with no branch,
+  reverify with a malformed sidecar, Change some rows at the upgrade gate). 2 Critical: wrapup
+  committed on `develop` when the work sat there (it now branches first); capture-requirements let
+  a baseline TOR use a domain command the skeleton cannot satisfy. UX applied: nudge sends a
+  failed requirement to quick-fix first; status reads open epics' sidecar from their branch;
+  quick-fix pulls and reproduces; refresh-docs branches; `docs/amend-*` reuse; "Meaning unchanged
+  or unsure — re-verify instead"; `Disclosed: n/a (no handoff)`; removal empties a test file.
+- **Pass 3** (greenfield through the skeleton's wrapup; in-flight branch through upgrade +
+  catch-up; regression → reverify FAIL → quick-fix → PASS). 1 Critical: retiring the only anchor
+  of an Implemented epic stranded it — capture-requirements now refuses ("wrap it up first") and
+  wrapup explains a pre-existing case. UX applied: nudge names the quick-fix argument; add stops
+  when an open epic already covers the request; upgrade catch-up stop matches by epic; L4 skips
+  the requirement's own lineage; baseline exit-code example proves code 2 only.
+- **Left alone** (adds to the list above): wrapup has no NOT RUN path for a gate tool that cannot
+  be installed; add writes planning files on the current branch; discover/plan-project offer Team
+  PR with no remote; setup's logging default vs the toolchain row; no test-only clock switch.
+- **Live UAT (gate 3).** Run by a separate Claude Code session on a `/tmp` clone of Summit with
+  the plugin pinned to a frozen worktree. Run 1 found two helper bugs: `migrate scan` marked a
+  one-line banner holding a marker word strippable though it names the section below it (strip
+  then refused), and step 0001's `provenance` did not read the skills' own solo-merge subjects
+  (`docs(plan): merge docs/<task> — …`), leaving Plan branch `—`. Fixed with tests. Run 2: every
+  step ✅. Observations: the kept banner tripped capture-requirements' "no dated banner" check
+  (now exempt); the Session Guard does not count a capture-requirements run on the same epic
+  (left alone — reverify does not read implementer context).
+- **Passes 4–5:** pass 4, 1 Critical (pause wrote on `develop`); pass 5, 3 Critical (add wrote
+  on the current branch; status read only In Progress epics from their branches; quick-fix
+  amendments left vision/ConOps stale and could close a dispute unrecorded). All fixed.
+- **Pass 6: clean** (0 Critical, four agents incl. greenfield through a paused-and-resumed
+  skeleton, Disputed supersede via quick-fix with renewal, removal epic, Change-some-rows Drop).
+  UX applied: status suggests resuming a Paused epic and points a merged fix at reverify;
+  PLAN_TEMPLATE TODO grep is case-sensitive; add's stop names the branch and its merge has `-m`;
+  wrapup PASS question text; discover/3B.2 treat an open pending hit as a settle, not a
+  re-proposal; upgrade Stop deletes its empty branch; Recovery Check reads the branch.
+- **Pass 7:** 1 Critical — wrapup's Haiku doc refresh wrote a superseded ID into
+  `design-notes.md`, leaving an E finding on `develop`; refresh-docs now cites the record and
+  successor, and wrapup's pre-ship `check` fixes an own-branch E. UX applied: Amendment gate
+  rewrites vision/ConOps lines and handles splits; `Fixes: <TOR>` trailer lets status point a
+  merged fix at reverify; Safety Keep unchanged and Disputed → Change it wording; triage's
+  current-text case; AMEND in the ceremony notes; Disclosed cell values in the templates.
+- **Pass 8:** 2 Critical, both on a pre-3.0 edit: `states` listed a reword with passing evidence
+  in `historical_records` (the D message then said "recorded without test evidence"), and
+  quick-fix let a reword ratify an undecided pre-3.0 edit. Fixed with a test; reverify now
+  confirms before a PASS on such a requirement. UX applied: Keep unchanged checks out the base
+  before deleting its branch; capture-requirements Renew matches wrapup's (`(renewed)`, 3–6
+  keywords); Restore commit subject; triage asks which text when a request could mean either,
+  and routes new behavior on a stale requirement through HEAVY/AMEND; C message names the
+  branch; `1 day old`.
+- **Pass 9: clean** (0 Critical; regression of passes 7–8 plus upgrade Skip/resume/catch-up on
+  F1 and Summit). UX applied: status's panel agrees with the nudge once a fix merged, strips the
+  `RECORDED AS PENDING` prefix from the quick-fix argument, suggests housekeeping and a pending
+  upgrade catch-up; capture-requirements Restore prints the reverify too, names the merge command
+  and the expected E follow-ups; wrapup reviews the doc-refresh sub-agent's diff; discover's
+  backlog promotion is an `Added` row.
+- **Pass 10: clean** (0 Critical). Gate 2 met with passes 9 and 10. UX applied: standalone
+  refresh-docs runs `check --base` before committing; "Meaning unchanged — re-verify instead"
+  (no "or unsure", which L3 treats as a meaning change) with a warning when L3 found one;
+  reverify skips its pre-3.0 question for that route.
+- **Left alone after the passes** (UX/Minor, not lifecycle-critical): no setup toolchain row for
+  standard-library Python; plan-project's skeleton fault switch on CLIs; triage routing of a
+  request an open epic already covers (add stops cleanly); `approved_by` typed by hand is not
+  caught by `validate`; renewed pending records reuse a reason that may name a replaced detail;
+  wrapup 1.4b Amend has no vision/ConOps rewrite item (quick-fix and start-epic do).
 

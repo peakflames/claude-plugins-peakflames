@@ -142,7 +142,7 @@ On `"I'll pick a command myself"`, print the inventory and exit:
 
 ```
 Common commands on an existing peak-workflow project:
-- /peak-workflow:triage <issue|description>   — size an incoming request (HEAVY/EPIC/TRIVIAL)
+- /peak-workflow:triage <issue|description>   — size an incoming request (HEAVY/AMEND/EPIC/TRIVIAL)
 - /peak-workflow:status                       — read-only progress dashboard
 - /peak-workflow:add                          — add an epic referencing existing TOR IDs
 - /peak-workflow:start-epic <id>              — implement a planned epic
@@ -156,7 +156,7 @@ Print the `format` command's message, then:
 
 ```
 This project's peak-workflow files are older than this plugin reads. The upgrade shows each step
-before applying it, works on its own docs/upgrade-format-… branch, and makes one commit per step.
+before applying it, works on its own docs/upgrade-format-… branch, and makes one commit per step (or per phase, when a step says so).
 Commands that change files wait until it is merged; status and triage still run, with a warning.
 ```
 

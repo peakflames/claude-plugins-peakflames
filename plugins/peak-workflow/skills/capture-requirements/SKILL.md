@@ -44,9 +44,11 @@ current format.
 2. **TOR-ID mode** (the first word of `$ARGUMENTS` is a `TOR-NN-XXXXXXX` ID — Step 2) on
    `develop`, `main`, or `master`: this is a one-requirement change, so create its branch
    instead of stopping. If `git status --porcelain` is not empty, stop and ask the user to commit
-   or stash first. Otherwise, if `git rev-parse --abbrev-ref @{u}` succeeds (the branch tracks a
+   or stash first. Otherwise, if `git rev-parse --abbrev-ref @{u} 2>/dev/null` succeeds (the branch tracks a
    remote), run `git pull --ff-only`; then run `git checkout -b docs/amend-<tor-id-lowercased>`
-   and continue at Step 1.
+   and continue at Step 1. If that branch already exists: merged into the base (`git merge-base
+   --is-ancestor`) → `git branch -D` it and create it again; unmerged → ask via `AskUserQuestion`
+   `["Continue on the existing branch", "Stop"]`.
 3. Otherwise, if `<current-branch>` is `develop`, `main`, or `master` — stop immediately:
 
    > `capture-requirements` modifies the requirements baseline (feature files, tracing sidecars).
@@ -126,7 +128,7 @@ requirement and derives nothing new: skip item 1's two missing-section questions
 are derived), and read the vision and ConOps in items 2–3 only as context for L3 and the
 vision/ConOps rewrite in 3C — a missing or thin one is not a stop. If any stop ends this mode
 before a file changed and Step 0 created the branch, run `git checkout <base>` and
-`git branch -D docs/amend-<tor-id>`.
+`git branch -D docs/amend-<tor-id-lowercased>`.
 
 1. Read `CLAUDE.md` at the repo root. Capture: project name, tech stack, any custom
    `docs/requirements/` path override (default is `docs/requirements/`). Do not re-read if
@@ -223,7 +225,7 @@ changelog lookup below.
 
 Look for an unprocessed discovery changelog:
 ```bash
-ls docs/product-vision-planning/changelogs/discovery-changelog-*.md 2>/dev/null | grep -v '\.processed$'
+find docs/product-vision-planning/changelogs -name 'discovery-changelog-*.md' 2>/dev/null
 ```
 
 Report detection:
@@ -278,9 +280,10 @@ change: a wrong "meaning change" costs one ID swap, a wrong "reword" is a false 
 ### L4: Re-litigation check (before adding any requirement)
 
 Before writing a new requirement — greenfield, brownfield, add-alongside, or a supersede
-successor — run `tor-lifecycle search <2–4 key nouns or quoted phrases of the capability>`.
+successor — run `tor-lifecycle search -- <2–4 key nouns or quoted phrases of the capability>`.
 Exit 0 = no earlier decision; continue. Exit 1 prints the matching records. For each hit that is
-really the same idea, ask with `AskUserQuestion`:
+really the same idea, ask with `AskUserQuestion` (a hit on the record that created the
+requirement being superseded or reworded — its own lineage — is not a re-proposal; skip it):
 - Question: `"<capability> was <retired / superseded / recorded as pending / upheld> in <CR-ID> (<date>): <reason, one line>. Reintroduce it anyway?"`
 - Options: `["Reintroduce — new requirement, new ID", "Drop it — the earlier decision stands"]`
 
@@ -289,8 +292,8 @@ On Reintroduce, the new requirement gets a **new ID** (never the old one) and it
 list it under the summary's Coverage Gaps as `dropped — <CR-ID> stands`. A hit on a `pending`
 record printed `pending (closed by CR-…)` is settled — the closing record is the decision; ask
 about that one. An open `pending` hit means the requirement is still live and known wrong: resolve it with Step 3C instead of
-adding a second one — except in Step 3C itself, where a hit on the pending record of the
-requirement being amended is already decided by 3C's settle question; skip it. A hit on an `uphold` record means the requirement was disputed and kept as
+adding a second one — except when the pending record names the requirement being amended (Step 3B.2, Step 3C, or a
+quick-fix, start-epic, or wrapup amendment of it): its settle question decides it; skip it. A hit on an `uphold` record means the requirement was disputed and kept as
 written: a new requirement that contradicts it changes that decision — name the record in the
 question.
 
@@ -298,7 +301,7 @@ question.
 
 Each choice below that writes a record follows `CHANGE_RECORD_TEMPLATE.md` (file name, ID,
 `approved_via = "docs-branch"`, `approved_by` from `git config user.name`) and is checked with
-`tor-lifecycle validate <record file>` until it prints `ok`. One record per decision; a record
+`tor-lifecycle validate <record file>` until it prints `ok` (with no record files at all, `validate` prints nothing and exits 0 — a pass). One record per decision; a record
 that resolves or renews a `pending` record lists that record's ID in `refs`.
 
 1. **Add alongside** — the existing requirement stays true as written; write the new behavior as a
@@ -330,6 +333,15 @@ that resolves or renews a `pending` record lists that record's ID in `refs`.
    listing them all; delete the feature file and its tracing sidecar — the feature number stays
    reserved. A `removal = "code"` record needs a removal epic: Step 7 offers `/add` for it. Tests
    and source citing the retired ID are that epic's to delete; list them in the summary.
+
+   **An Implemented owner** (choices 3 and 4): the epic is waiting for wrapup, which replaces a
+   superseded anchor or drops a retired one. Say so. When the change would leave that epic with
+   **no live anchor** (every ID it lists retired, or superseded by successors another epic owns),
+   do not apply it: stop that requirement with `Epic <id> (<slug>) — <Name> is Implemented and
+   <TOR> is all it delivers — wrap it up first with /peak-workflow:wrapup-epic <id>; once it is
+   Complete, retire <TOR> again and plan its removal epic.` Wrapup could not complete an epic left
+   with nothing to verify. Check this before asking: when the input withdraws the capability (a
+   `Removed` row, or a TOR-ID request that does), print the stop instead of the L5 question.
 5. **Record as pending** — known to be wrong, but the right wording is not settled. The feature
    file is **not** touched. Write a `pending` record: `fingerprint` = the current one, `owner` =
    `git config user.name`. If `gh` is available and the repository is on GitHub, ask once whether
@@ -358,7 +370,11 @@ recommended choice first. Which choices appear depends on what the input says an
 | A change is raised but not decided (`Pending` row) | — | Record as pending, Supersede, Add alongside |
 
 Question: `"<TOR-ID> — <title>: <what the input changes, one line>. How should it change?"`.
-Drop `Record as pending` for a Safety requirement. `Keep unchanged` (Removed rows only) is for a
+Drop `Record as pending` for a Safety requirement; for an undecided change to one (the `Pending`
+row), offer `Keep unchanged` in its place and say *"<TOR> is a Safety requirement and cannot be
+recorded as pending — decide it on this branch, or keep it unchanged."* `Keep unchanged` (Removed rows, and the Safety `Pending` row) writes nothing; in TOR-ID mode print
+`Outcome: Kept unchanged — no record`, run `git checkout <base>` and `git branch -D` the branch Step 0
+created, and end (skip Step 7). On a Removed row it is for a
 requirement the removal does not actually touch; name it in the summary with the reason.
 
 ---
@@ -516,7 +532,10 @@ Change Record once it is merged. The skeleton's tests name the concrete channel.
 | **stdout / stderr discipline** (CLI / Hybrid only) | The tool shall write primary data and parseable output to standard output and shall write diagnostics, progress, and log output to standard error | N/A | N/A |
 | **Error message standard** | The tool shall emit user-facing error messages to standard error that name the problem AND name the next user action | The web application shall display user-facing error messages that name the problem AND name the next user action | The application shall display user-facing error messages on screen that name the problem AND name the next user action |
 
-For each baseline TOR, write a concrete, observable Given/When/Then. Examples:
+For each baseline TOR, write a concrete, observable Given/When/Then. Baseline TORs belong to the
+walking-skeleton epic (plan-project 3A.1), which has no domain logic, so their Givens and Whens use
+only `--version`, `--help`, `--verbose`, an invalid flag, or the equivalent endpoint or console
+command — never a domain subcommand or domain data. Examples:
 
 ```gherkin
 Scenario: [TOR-01-{XXXXXXX}] The tool shall report its name and semantic version to standard output when invoked with --version, exiting with code 0
@@ -526,17 +545,20 @@ Scenario: [TOR-01-{XXXXXXX}] The tool shall report its name and semantic version
     And the exit code should be 0
 
 Scenario: [TOR-NN-{XXXXXXX}] The tool shall emit a log line at startup containing its name and semantic version at INFO level
-    Given the tool is invoked with any valid argument
+    Given the user passes the commandline args '--verbose --version'
     When the Tool is Run
     Then the standard error log should contain an INFO record matching /^\[INFO\] myapp v\d+\.\d+\.\d+ /
     And the log record should be the first record emitted
 
-Scenario: [TOR-NN-{XXXXXXX}] The tool shall exit with code 0 on success, code 1 on operational failure, and code 2 on invalid invocation
+Scenario: [TOR-NN-{XXXXXXX}] The tool shall exit with code 2 on invalid invocation
     Given the user passes the commandline args '--bogus-flag'
     When the Tool is Run
     Then the exit code should be 2
     And the standard error should contain the string "Try 'myapp --help' for usage."
 ```
+
+The exit-code baseline TOR proves code 2 only; code 0 is proven by the `--version` TOR, and code 1
+by the first domain TOR whose Then expects an operational failure.
 
 **Lines marked `N/A` in CLAUDE.md are skipped.** For example, a Web app project's
 `CLAUDE.md` will mark `Exit code convention: N/A — not a CLI tool` and
@@ -777,7 +799,9 @@ Read all existing `.feature.md` files. For each input from 3B.1:
 - **Already covered by an existing TOR?** → Skip. Note: "already covered by `TOR-NN-XXXXXXX`".
 - **Changes, withdraws, or extends a merged requirement?** (L1) → Draft the change, run the
   decision test (L3), and ask the L5 question for that requirement. Record the answer; apply it
-  per L5 after the 3B.3b gate approves (the citing-test run for a reword happens then too).
+  per L5 after the 3B.3b gate approves (the citing-test run for a reword happens then too). When
+  the requirement is **Disputed** (an open `pending` record), also ask Step 3C step 3's settle
+  question and follow its renewal rule.
   There is no silent defer: a change the user does not want to make now is **Record as
   pending**.
 - **Changes a requirement created on this branch?** → Edit it freely (L1).
@@ -839,7 +863,8 @@ in 3A.5, but instruct it to **update only the affected `.feature.tracing.json` f
 summary, not written), and: add
 entries for new and successor TOR IDs at the bottom of the `requirements` array, keep every
 other existing entry unchanged, and drop `coverage_gaps` entries naming an ID that is no longer
-in the feature file. A whole-file retirement has no sidecar left to update.
+in the feature file. A whole-file retirement has no sidecar left to update. Skip the sub-agent
+when this run added no new or successor ID (only rewords, retires, or pending records).
 
 ---
 
@@ -856,7 +881,7 @@ greenfield files.
      instead.
 
    In either stop, if Step 0 created the branch, run `git checkout <base>` and
-   `git branch -D docs/amend-<tor-id>`.
+   `git branch -D docs/amend-<tor-id-lowercased>`.
 2. **Read its state.** Run `tor-lifecycle states --json` and take this ID's row, and
    `tor-lifecycle check --base <base> --json` and take the findings naming it. Print the title,
    state, owning epic, and those findings in plain words.
@@ -874,7 +899,7 @@ greenfield files.
    write the old block back in place, same ID, no record (`check` accepts a requirement returned
    to its text as first merged, and its saved fingerprint matches again). When the description
    asks for exactly the old text (new text = old text), skip L3 and step 4's question: offer
-   only `Restore the verified text` and `"Unsure — re-verify instead"`.
+   only `Restore the verified text` and `"Meaning unchanged — re-verify instead"`.
 
    A requested change with no description: stop and ask for one
    (`/peak-workflow:capture-requirements <TOR-ID> <what should change>`). A requirement that is
@@ -892,10 +917,13 @@ greenfield files.
    keeps its reason with `Carried to <successor> by <new CR-ID>.` appended.
 4. **Decide.** For **Disputed**, ask the owner question below first and run L3 only after
    `Change it`. Otherwise run the decision test (L3) on old vs new, then ask the L5 question with the
-   "The requirement's text should change" row — and, for the first two cases, with these four
+   "The requirement's text should change" row — except for a **Requested change** whose
+   description withdraws the capability (skip L3; use the `Removed` row, Retire recommended) or
+   raises a change without deciding it ("not sure", "maybe", "ops wants"; skip L3; use the
+   `Pending` row) — and, for the first two cases, with these four
    options instead: `Restore the verified text` (recommended when the vision, ConOps, or
    description matches the old text), `Supersede` (or `Reword` when L3 found it reword-eligible),
-   `Record as pending`, and `"Unsure — re-verify instead"` (it ends this mode: print
+   `Record as pending`, and `"Meaning unchanged — re-verify instead"` (when L3 found a meaning change, say first: "L3 found a meaning change (<detail>); re-verifying accepts it as same meaning"; it ends this mode: print
    `/peak-workflow:wrapup-epic <owning epic> reverify <TOR-ID>`, leave every file as it was, and
    delete the branch if Step 0 created it and nothing else is on it). For **Disputed**, show the
    open record's title, reason, owner, and age, then ask
@@ -903,8 +931,12 @@ greenfield files.
    with `["Uphold — it stands as written", "Change it", "Retire it", "Renew the pending record"]`
    (recommend from the description: none or "it is right" → Uphold). Drop **Renew** for a
    requirement under `# Safety`. **Change it** asks what it should say when there is no
-   description, runs L3, and applies Reword or Supersede per L5. **Renew** writes a new `pending`
-   record that refs the open one, with a fresh reason.
+   description, runs L3, and applies it without the L5 question — Supersede on a meaning change,
+   Reword when reword-eligible. **Renew** writes a new `pending`
+   record that refs the open one, copies its title with ` (renewed)` appended, its keywords (topped up to 3–6 from the new reason),
+   owner, and `tracker`, with a fresh
+   reason. After **Change it** applies a Supersede or
+   Reword, ask the settle question from step 3 too; on No, follow its renewal rule.
 5. **Apply** the answer per L5, with these specifics:
    - **Changed since verified / Edited without a record:** the *old* text is the verified (or
      merged) version, not today's text. When the state row has `historical_records` (an edit
@@ -931,8 +963,8 @@ greenfield files.
      (e.g. "10 per page"), rewrite that line to the current state on this branch — no record, no
      changelog — and list it in the summary.
 6. **Trace.** Delete the retired or superseded entry from the tracing sidecar yourself, then run
-   the sub-agent as in 3B.4 for that one feature file (skip it for a reword, renewal, restore,
-   uphold, or pending record).
+   the sub-agent as in 3B.4 for that one feature file (skip it for a reword, retire, renewal,
+   restore, uphold, or pending record).
 7. Continue at Step 4 with a one-row trace table (the TOR-ID and the description — or, with none,
    the owner's decision and record, e.g. `Owner decision: uphold (CR-…)`), then Steps 5
    and 7. Step 6 does not apply.
@@ -981,7 +1013,7 @@ internal scratch.
 - An input may map to multiple TOR IDs — list all.
 - `Explicit? N` → gap. `Ambiguous? Y` → gap.
 - Out-of-scope items: mark `N/A — deferred: {rationale}` in the Ambiguous column.
-- For every gap: add or tighten the requirement, then re-run the affected row. Tightening a
+- For every gap: add or tighten the requirement, then re-run the affected row. A TOR added here after 3A.5 is traced by re-running the sub-agent on that one feature file, as in 3B.4. Tightening a
   merged requirement is a change like any other (L1 → L3 → L5). Do not present the summary with
   unresolved gaps (only explicit deferrals are acceptable).
 - `Removed`, `Modified`, and `Pending` changelog rows are inputs too: one row each, captured as
@@ -1006,8 +1038,9 @@ Run `tor-lifecycle validate` (every record in `changes/`), then
   - **E** — a test or source line on this branch cites a retired or superseded ID: retarget it
     to the successor or delete it.
 - **F findings this branch caused** — those naming an ID or record this run touched:
-  `open-epic-retired` (an open epic still lists an ID this run retired or superseded: apply the
-  L5 swap), `multiple-records`, `id-reused`, `feature-number-reused`, `multi-owner`. Two F kinds
+  `open-epic-retired` (a Not Started, In Progress, or Paused epic still lists an ID this run
+  retired or superseded: apply the L5 swap; on an Implemented epic it is expected — its wrapup
+  replaces or drops the anchor), `multiple-records`, `id-reused`, `feature-number-reused`, `multi-owner`. Two F kinds
   are expected and not fixed here: `disputed` for a `pending` record this run wrote, and
   `removal-missing` for a `removal = "code"` record (Step 7 offers its removal epic).
 
@@ -1062,7 +1095,9 @@ tracing-sidecar, and `validate` / `check` items apply — nothing new was derive
 
 - [ ] No feature file holds a `# Note:` block (other than the `# Note: reference screen(s)`
   line), a change marker, a version tag, or a dated banner (`FEATURE_TEMPLATE.md` "Lifecycle
-  Rules").
+  Rules") — written by this run. A section banner that upgrade step 0002 kept (its first text
+  line, which names the section) is pre-existing: leave it, and do not count it against this
+  check. Rewording it is a section rename this run need not make.
 - [ ] No tracing sidecar entry has a `title`, no sidecar has a top-level `generated`, and every
   sidecar has exactly one entry per Scenario in its feature file.
 - [ ] Every Change Record this run wrote passes `tor-lifecycle validate`, and Step 4.2's
@@ -1122,9 +1157,17 @@ or have an explicit N/A deferral]
 Run `/peak-workflow:plan-project` to derive the implementation plan from these requirements.
 Epic specs will reference TOR IDs as their Requirements Anchors — the TOR Given/When/Then
 becomes the acceptance criterion and verification procedure.
+[Brownfield, when this run added no new requirement and no unassigned successor — only Change Records, plus any
+`/add` epics from 7.1:]
+plan-project has nothing new to plan. Review the diff, commit it on this branch, and merge it into
+<base> (solo or team PR) — the merge approves the Change Records.
 [TOR-ID mode:]
-Review the diff, commit it on this branch, and merge it into <base> (solo or team PR) — the
-merge approves the Change Record.
+Review the diff, commit it on this branch (`docs(requirements): <outcome> <TOR-ID> (<CR-ID>)`, `<outcome>`
+one of `supersede`, `reword`, `retire`, `record pending`, `renew`, `uphold`; a Restore, which writes no record: `docs(requirements): restore <TOR-ID>`; plan files `/add` wrote go in a separate `docs(plan): add epic <id> (<slug>)` commit), and merge it into <base> (solo or team PR) — the
+merge approves the Change Record. Solo: `git checkout <base> && git merge --no-ff <branch> -m
+"docs(requirements): merge <branch> — <outcome> <TOR-ID>" && git branch -d <branch>`. Tests or
+source still citing a replaced ID (Follow-ups) show as `check` finding E on <base> until the
+successor's epic retargets them — expected.
 ```
 
 In TOR-ID mode, replace "Documents Written" and "By the Numbers" with:
@@ -1157,8 +1200,10 @@ summary):
 
 - **After a Restore whose code or tests still follow the unrecorded edit**:
   - Question: `"<TOR-ID> is back to its verified text, but <files> still do <edited behavior>. Fix the code with /peak-workflow:quick-fix after this branch merges?"`
-  - Options: `["Print the quick-fix command", "I'll handle it"]` — print
-    `/peak-workflow:quick-fix <TOR-ID>: make the code match the restored requirement (<detail>)`;
+  - Options: `["Print the quick-fix and reverify commands", "I'll handle it"]` — print
+    `/peak-workflow:quick-fix <TOR-ID>: make the code match the restored requirement (<detail>)`,
+    then `/peak-workflow:wrapup-epic <epic> reverify <TOR-ID>` to run after it merges (a Restore
+    writes no record, so nothing else will remind anyone);
     it runs on `develop` after this branch merges, so never dispatch it from here.
 
 On "Run /peak-workflow:add now", invoke `Skill({ skill: "peak-workflow:add", args: "<args>" })`

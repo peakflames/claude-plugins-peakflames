@@ -61,8 +61,9 @@ List `${CLAUDE_PLUGIN_ROOT}/skills/upgrade/steps/*.md`. Two kinds of work:
   earlier run may have skipped epics that were in flight; once those merge, the step's Detect
   finds them. Run each such Detect now, without skips; pending output is catch-up work. (Step 6
   runs it again with any Step 5 skips.) When there are no pending steps and every catch-up path
-  belongs to an epic whose branch is still unmerged (`tor-lifecycle inflight --base <base>
-  <those paths>` lists each one), print *"Catch-up for <epic IDs> waits until <branches> merge."*
+  names an epic (`status/epic-<id>.md`, `phase-*/epic-<id>-*.md`) that some row of
+  `tor-lifecycle inflight --base <base> '<the step's Rewrites patterns>'` also names (that epic's
+  branch is still unmerged), print *"Catch-up for <epic IDs> waits until <branches> merge."*
   and stop — there is nothing to apply yet.
 
 Then:
@@ -125,7 +126,8 @@ skipped epics' files:
     **Skip** line says it supports skipping. Tell the user to re-run `/peak-workflow:upgrade` after
     those epics merge — the detect check picks up exactly what was skipped.
   - `"Rewrite everything anyway"`
-  - `"Stop — I'll merge or finish those branches first"`
+  - `"Stop — I'll merge or finish those branches first"` — then `git checkout <base> && git branch
+    -D <branch>` (nothing was committed on it).
 
 A skipped epic does not hold the stamp back: the step's change is optional history for in-flight
 epics, and its detect check stays honest on the next run.
@@ -187,7 +189,7 @@ Merge is approval, as for every `docs/` branch. Ask via `AskUserQuestion`:
 - Options: `["Team — push and open a PR", "Solo — merge into <base> locally", "Leave the branch for now"]`
 
 - **Team:** `git push -u origin <branch>`, then
-  `gh pr create --base <base> --title "chore(upgrade): format N → <target>"` (catch-up only:
+  `gh pr create --base <base> --title "chore(upgrade): format B → <target>"` (catch-up only:
   `"chore(upgrade): catch-up on format N"`) with the summary table as the body.
 - **Solo:** `git checkout <base> && git merge --no-ff <branch> && git branch -d <branch>`.
 - **Leave:** print the two commands above for later, and say: *"Until it merges, <base> is still on

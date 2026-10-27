@@ -565,7 +565,7 @@ Iterate until the user approves. Maximum 3 rounds — if the user is still adjus
 
 For each phase, create the directory: `docs/implementation-plan/phase-{N}-{kebab-case-name}/`
 
-Create `docs/implementation-plan/session-handoffs/` if it doesn't exist.
+Create `docs/implementation-plan/session-handoffs/` if it doesn't exist, with an empty `.gitkeep` so git keeps the folder.
 
 ### 5.2: Write Epic Specs
 
@@ -697,7 +697,7 @@ epic.
 
 c. **README.md** — create `docs/implementation-plan/README.md` with the project lifecycle prose:
 
-```markdown
+````markdown
 # [Project Name] — Implementation Plan
 
 ## Quick Start for New Session
@@ -719,14 +719,14 @@ Not Started → In Progress → Implemented → Complete
 
 Each epic's status sidecar includes a `requirements:` field listing the TOR IDs the epic covers.
 `/peak-workflow:status` uses these fields to compute the Requirements Coverage dashboard.
-```
+````
 
 d. **Stub index** — create `docs/implementation-plan/index.md` as a thin pointer:
 
 ```markdown
 # Implementation Plan
 
-This project uses the v2.5.0 layout. See:
+This project uses the per-phase index layout. See:
 
 - `README.md` — project overview and lifecycle
 - `phase-*/index.md` — per-phase epic registries (epic ID, name, dependencies)
@@ -912,7 +912,7 @@ instructions are printed), not a silent action taken on the skill's own initiati
    git checkout <base-branch>  # develop if it exists, else main, else master
    git merge docs/<task-name> --no-ff -m "docs(plan): merge docs/<task-name> — requirements and plan baseline"
    git branch -d docs/<task-name>
-   git push
+   git push   # only when a remote exists, and ask the user first
    ```
    **Team** (PR review required):
    ```bash
@@ -930,8 +930,8 @@ instructions are printed), not a silent action taken on the skill's own initiati
 
 > **On ceremony overhead:** The discover → requirements → planning sequence amortizes across
 > the project's lifetime. Once the TOR baseline is established, every new request routes
-> through `/triage` to determine whether it needs new TOR IDs (HEAVY), implements existing
-> ones (EPIC), or is a trivial bug (TRIVIAL) — preventing both over-engineering and
+> through `/triage` to determine whether it needs new TOR IDs (HEAVY), changes one (AMEND),
+> implements existing ones (EPIC), or is a trivial bug (TRIVIAL) — preventing both over-engineering and
 > under-speccing.
 ```
 
