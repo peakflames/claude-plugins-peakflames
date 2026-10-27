@@ -280,7 +280,7 @@ change: a wrong "meaning change" costs one ID swap, a wrong "reword" is a false 
 ### L4: Re-litigation check (before adding any requirement)
 
 Before writing a new requirement — greenfield, brownfield, add-alongside, or a supersede
-successor — run `tor-lifecycle search <2–4 key nouns or quoted phrases of the capability>`.
+successor — run `tor-lifecycle search -- <2–4 key nouns or quoted phrases of the capability>`.
 Exit 0 = no earlier decision; continue. Exit 1 prints the matching records. For each hit that is
 really the same idea, ask with `AskUserQuestion` (a hit on the record that created the
 requirement being superseded or reworded — its own lineage — is not a re-proposal; skip it):
@@ -292,8 +292,8 @@ On Reintroduce, the new requirement gets a **new ID** (never the old one) and it
 list it under the summary's Coverage Gaps as `dropped — <CR-ID> stands`. A hit on a `pending`
 record printed `pending (closed by CR-…)` is settled — the closing record is the decision; ask
 about that one. An open `pending` hit means the requirement is still live and known wrong: resolve it with Step 3C instead of
-adding a second one — except in Step 3C itself, where a hit on the pending record of the
-requirement being amended is already decided by 3C's settle question; skip it. A hit on an `uphold` record means the requirement was disputed and kept as
+adding a second one — except when the pending record names the requirement being amended (Step 3C, or a
+quick-fix, start-epic, or wrapup amendment of it): its settle question decides it; skip it. A hit on an `uphold` record means the requirement was disputed and kept as
 written: a new requirement that contradicts it changes that decision — name the record in the
 question.
 

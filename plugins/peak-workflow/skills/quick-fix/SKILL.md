@@ -136,7 +136,14 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
      entry (its sources go into `traced_to`) and add the successor's with the same `traces_to` and
      `"rationale": "Supersedes <old TOR> (<CR-ID>): <reason>"`. The fix's tests cite the
      successor; retarget any test still citing the old ID. With no owning epic, the successor stays
-     unassigned: Step 4 item 7 prints `/peak-workflow:add` for it.
+     unassigned: Step 4 item 7 prints `/peak-workflow:add` for it. The successor's `rationale`
+     keeps the old entry's rationale first when it still holds.
+   - **Disputed** (the requirement has an open `pending` record): ask capture-requirements 3C step
+     3's settle question. Yes → `refs` also lists the pending record's ID. No → also write the
+     renewed `pending` record on the requirement that now carries the dispute, as 3C step 3 says.
+   - **Vision and ConOps** (reword or supersede): if a vision or ConOps line states the detail
+     this change replaced, rewrite it to the current state on this branch — no record — and list
+     it in the commit body.
 2b. **Reverify the successor** (supersede with an owning epic only). Verification stays
    independent: launch a fresh `general-purpose` sub-agent with the `Agent` tool (never a fork —
    it must not see this session). Give it only the successor's Scenario block

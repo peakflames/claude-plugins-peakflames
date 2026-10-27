@@ -72,7 +72,7 @@ Skip this sub-step in degraded mode (Format Guard). Otherwise run, with
    a requirement the request touches: **A** (edited without a change record, with the commit),
    **D** (changed since verified, with its owning epic), **F `disputed`** (known to be wrong,
    with its record and age), and **E** (a retired or superseded ID still cited).
-2. `tor-lifecycle search <2–4 key nouns or quoted phrases of the request>` — the re-litigation
+2. `tor-lifecycle search -- <2–4 key nouns or quoted phrases of the request>` — the re-litigation
    check. Exit 1 lists Change Records that retired, superseded, or recorded the idea as pending.
 
 Both feed the verdict (3.3) and the `**Requirement health:**` line (Step 4).

@@ -114,13 +114,13 @@ Glob `docs/implementation-plan/status/epic-*.md` and read every sidecar. For eac
 - `owner:` line: the person working on it (set by `start-epic`). `—` means unclaimed.
 - `retires:` line (optional): the Change Record(s) a removal epic carries out.
 
-An epic's `status:` and `owner:` move on its feature branch until it merges. For a sidecar reading
-In Progress whose `feature/epic-<id>-*` branch exists locally (`git branch --list
-'feature/epic-<id>-*'`), read `status:`, `owner:`, and `handoff:` from that branch instead
+An epic's `status:` and `owner:` move on its feature branch until it merges. For every sidecar
+that is not Complete and whose `feature/epic-<id>-*` branch exists locally (`git branch --list
+'feature/epic-<id>-*'`, unmerged), read `status:`, `owner:`, and `handoff:` from that branch instead
 (`git show <branch>:docs/implementation-plan/status/epic-<id>.md`), as start-epic Step 2.5 does —
-so a pause made there shows as Paused, and Step 5 can flag it. Requirement states (Step 1.5) still
-reflect the base, so that epic's requirements read In Progress in Requirements Coverage until it
-merges.
+so an epic started or paused there shows as In Progress or Paused (never Ready to Start), and
+Step 5 can flag a stale pause. Requirement states (Step 1.5) still reflect the base, so that
+epic's requirements keep their base state (e.g. Planned) in Requirements Coverage until it merges.
 
 Requirement ownership, `verified:`, `unverified:`, and `waived:` are read by the helper (Step
 1.5), not here.
@@ -195,7 +195,7 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    action (an overdue Disputed one, else the first Changed Since Verified group's — or, when that
    group's first requirement carries an A finding or `historical_records`, its
    `/peak-workflow:capture-requirements <TOR>` decision first; when it is Verification failed,
-   `/peak-workflow:quick-fix <TOR>: <the row's unverified reason>` for the code first; when it is
+   `/peak-workflow:quick-fix <TOR>: <the row's unverified text without its leading date>` for the code first; when it is
    Disputed, its `/peak-workflow:capture-requirements <TOR>` first (groups follow the order of
    `states` rows) — else the oldest Disputed one's
    `/peak-workflow:capture-requirements <TOR>`), even in degraded mode — there, add "after the fix".
