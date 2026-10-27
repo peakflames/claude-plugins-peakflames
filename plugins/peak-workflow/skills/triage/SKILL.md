@@ -153,7 +153,7 @@ Output this block:
 
 **Requirement health:** <omit when 3.1 found nothing relevant; otherwise one line each: `TOR-… edited without a change record (commit <sha of the edit: git log -1 --format=%h -- <feature file>>)`, `TOR-… changed since epic <id> verified it`, `TOR-… is disputed (<CR-ID>, <N> days)`, `<idea> was <retired / superseded / recorded as pending> in <CR-ID> (<date>): <reason>`>
 
-**Recommended next command:** <the exact slash command to run>
+**Recommended next command:** <the exact slash command to run — for the reverify-first case, the reverify command, then "then" and the quick-fix command>
 ```
 
 Do **not** recommend or hint at a ship mode (solo vs team). That choice belongs to the user at ship time and will be asked explicitly by `/peak-workflow:quick-fix` or `/peak-workflow:wrapup-epic`.

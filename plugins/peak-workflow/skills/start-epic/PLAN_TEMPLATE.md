@@ -56,7 +56,9 @@ paragraph verbatim…"); keep every rule.
    `completed:`, and `requirements:` unchanged except for the anchor decisions below. Capture whether this is a
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
    (prior status was already In Progress, or was Implemented — rework after a wrapup FAIL).
-   Item 3 uses this.
+   Item 3 uses this. On a Paused → In Progress transition, also `git rm` the
+   `session-handoffs/epic-<id>-paused.md` handoff in the same commit (git keeps it), so a later
+   interrupted session still trips the Recovery Check.
 
    Also update the epic spec file's `**Status:**` header line (the spec path was already
    identified in Step 1, at `docs/implementation-plan/phase-*/epic-<id>-*.md`) to
@@ -219,7 +221,8 @@ Rules:
 **Amendment gate.** Copy this paragraph verbatim into the plan as a standing rule, next to the
 Deferral gate. It applies when implementation shows that one of this epic's anchor requirements is
 itself wrong — building it as written would ship the wrong behavior — not merely hard or slow to
-build. The helper is `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"` (written `tor-lifecycle`).
+build. When the requirement is already known to be wrong as the plan is written, the gate fires
+right after plan approval, before any middle step. The helper is `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"` (written `tor-lifecycle`).
 Stop implementation and use `AskUserQuestion`:
 - Question: `"TOR-<NN-XXXXXXX> — <title> looks wrong: <what implementation showed, one line>. Proposed: <new title> / <changed step(s)>. How to proceed?"`
   — before asking, check the proposed literals against the Given (dates, totals, counts) so the

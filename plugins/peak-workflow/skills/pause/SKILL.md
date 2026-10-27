@@ -25,7 +25,11 @@ Follow these steps exactly:
 
 ## Step 1: Identify Current Epic
 
-Glob `docs/implementation-plan/status/epic-*.md` and read each sidecar to find the one with `status: In Progress`. This is the epic you are pausing. The epic ID is the filename stem after stripping `epic-` and `.md` (e.g., `status/epic-a3f2K7p.md` → ID `a3f2K7p`).
+Run `git branch --show-current`. The epic you are pausing is the one this branch implements:
+the branch must be `feature/epic-<id>-<short-name>` and that epic's sidecar
+(`docs/implementation-plan/status/epic-<id>.md`, read on this branch) must say
+`status: In Progress`. Otherwise stop and write nothing: *"Nothing to pause — no epic is in
+progress on this branch (<branch>). /peak-workflow:pause runs on the epic's feature branch."* The epic ID is the filename stem after stripping `epic-` and `.md` (e.g., `status/epic-a3f2K7p.md` → ID `a3f2K7p`).
 
 Open the epic spec file (`docs/implementation-plan/phase-*/epic-<id>-*.md`) and parse its header for a `**Source:** Issue #<N>` line. If present, capture the integer `<N>` as the **source issue number** for the Step 5 commit trailer. If no `Source:` line exists, the source issue number is unknown — skip the trailer later.
 
@@ -116,10 +120,9 @@ so the spec stays in sync with the sidecar.
 
 **Ask the user if they'd like to commit** all changes made during this session (implementation work + handoff file + sidecar and spec Status line). If the user confirms:
 
-1. Run `git branch --show-current`; it must be the epic's `feature/epic-<id>-<short-name>` branch. If it is not, stop and say which branch is checked out — a pause commit belongs on the epic branch.
-2. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
-3. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`
-4. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
+1. Stage all files created or modified during this epic session, including the updated status sidecar and the updated epic spec file (use specific file paths, not `git add -A`)
+2. Use the commit message format: `wip(epic-<id>): pause — <brief summary of progress so far>`
+3. When a **source issue number** was captured in Step 1, append a blank line then `Refs #<N>` as a trailer to the commit body. `Refs` links the commit to the issue **without closing it** — appropriate for work-in-progress:
    ```
    wip(epic-<id>): pause — <brief summary of progress so far>
 
