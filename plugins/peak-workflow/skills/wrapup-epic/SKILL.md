@@ -82,7 +82,8 @@ has findings). Run these steps instead of Phases
      (Name the other scoped IDs so the user can re-run with just those.)
    - A **C** finding whose `path` is this epic's sidecar (a non-ID entry in `requirements:`) →
      stop and print its message: `tor-lifecycle mark` refuses that sidecar, so R4 could not record
-     the verdicts. Re-run reverify after that `docs/` branch merges.
+     the verdicts. Re-run reverify after that `docs/` branch merges (when the named IDs or the
+     default scope still hold a requirement that is not Verified).
 3. Print the scope as `TOR-… — <title> (<state>)` from one `tor-lifecycle titles` run, with the
    epic as `<id> (<slug>) — <Name>`.
 
@@ -125,7 +126,7 @@ sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" mark <id> --pass TOR-A --pass T
 Before running it, note each scoped requirement's previous sidecar line (its `unverified:` date and
 reason, if any) for the handoff's **Was** column — `mark` replaces it. Then write
 `docs/implementation-plan/session-handoffs/epic-<id>-reverified-<today>.md`; if that file already
-exists (a second reverify today), append a `---` line and a new section — never overwrite it:
+exists (a second reverify today), append a `---` line, then the full block below again (heading included) — never overwrite it:
 
 ```markdown
 # Epic <id>: <Name> — Reverified <today>
@@ -301,7 +302,11 @@ Your goal is to independently confirm the implementation meets the spec. Do not 
         <old> → <successor> (<CR-ID>)`.
       - **Retired** (`retired in CR-…`) — `Fix now` = drop it from the anchors and `requirements:`
         (`FIXED DURING WRAPUP — retired anchor dropped (<CR-ID>)`). If no anchor would remain and
-        this is not a removal epic, Fix now is unavailable — Stop.
+        this is not a removal epic, Fix now is unavailable — Stop with `Every requirement Epic <id>
+        delivers was retired after it was built (<CR-IDs>). Nothing is left to verify, so this
+        epic cannot be completed. Its code is removal work for /peak-workflow:add removal epic for
+        <CR-ID>.` (capture-requirements refuses such a retire while the epic is Implemented, so this
+        arises only from a retire written before that rule.)
       - **Unknown** (exit 1, finding C) — `Fix now` = correct the ID to the requirement the epic
         built (then verify that one) or drop it.
 
@@ -552,7 +557,7 @@ configured `frontend-design` or brand skill does not replace this check.
 
 **Gate discrepancies are findings.** After running the gates, compare each result against the
 implementer handoff's *Verification Results (self-assessment)* section (the handoff is already
-open from Step 1.2b). Any gate the handoff reports as PASS that does not pass now is a named
+open from Step 1.2b; skip this comparison when the epic has no implementer handoff). Any gate the handoff reports as PASS that does not pass now is a named
 Code Review finding in Step 1.5: `⚠️ GATE DISCREPANCY: <gate> — handoff reports PASS, reproduces
 FAIL (<one-line detail>)`. Report it even when the failure predates this epic — the discrepancy
 is the finding, not the failure's age.

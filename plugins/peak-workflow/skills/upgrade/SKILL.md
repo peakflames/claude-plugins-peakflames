@@ -61,8 +61,9 @@ List `${CLAUDE_PLUGIN_ROOT}/skills/upgrade/steps/*.md`. Two kinds of work:
   earlier run may have skipped epics that were in flight; once those merge, the step's Detect
   finds them. Run each such Detect now, without skips; pending output is catch-up work. (Step 6
   runs it again with any Step 5 skips.) When there are no pending steps and every catch-up path
-  belongs to an epic whose branch is still unmerged (`tor-lifecycle inflight --base <base>
-  <those paths>` lists each one), print *"Catch-up for <epic IDs> waits until <branches> merge."*
+  names an epic (`status/epic-<id>.md`, `phase-*/epic-<id>-*.md`) that some row of
+  `tor-lifecycle inflight --base <base> '<the step's Rewrites patterns>'` also names (that epic's
+  branch is still unmerged), print *"Catch-up for <epic IDs> waits until <branches> merge."*
   and stop — there is nothing to apply yet.
 
 Then:

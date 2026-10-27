@@ -63,7 +63,7 @@ verification — start with /peak-workflow:capture-requirements TOR-04-Priv001 (
 this epic's anchors).` The command is the top requirement action exactly as
 `/peak-workflow:status` Step 4.5 item 5 picks it (an overdue Disputed one, Safety first; else the
 first Changed since verified or Verification failed one — `capture-requirements <TOR>` first when
-it carries an A finding or `historical_records`, `quick-fix` first when it failed verification,
+it carries an A finding or `historical_records`, `quick-fix <TOR>: <its unverified reason>` first when it failed verification,
 otherwise its reverify; else the oldest Disputed one). Say whether it
 touches this epic's anchors (Step 1 item 6 handles those). When Step 1 stops the skill before
 the Step 2.5 card, print the nudge after the stop message as one `Also:` line instead.

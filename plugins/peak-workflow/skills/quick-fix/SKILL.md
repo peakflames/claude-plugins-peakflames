@@ -189,7 +189,8 @@ Enter plan mode. The plan is the complete execution script for this fix — ever
      and list this branch's own D and E (if any) in the PR body.
    - Stage by specific file path (not `git add -A`) — on the amendment path, also the Change Record,
      the feature file, its tracing sidecar, and the epic's status sidecar.
-   - Commit message subject: `fix: <one-line summary>`
+   - Commit message subject: `fix: <one-line summary>` (on the regression-test-only path from item
+     1a: `test: <one-line summary>`, with no `Closes` trailer)
    - If a GitHub issue number was provided, append a trailer line: `Closes #<N>`. If no issue number, omit the trailer.
    - On a supersede, add the body lines `Amends: <old TOR> → <successor> (<CR-ID>)` and
      `Reverified: <successor> PASS` (or `Unverified: <successor> — <reason>`) — the record solo mode

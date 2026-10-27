@@ -195,6 +195,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`wrapup-epic` never commits on the base** — when the work sits on `develop`, it branches
   `feature/epic-<id>-<short-name>` first; an epic with no implementer handoff reads
   `Disclosed: n/a (no handoff)`.
+- **No retire strands an Implemented epic** — `capture-requirements` refuses a retire or
+  supersede that would leave an Implemented epic with no live anchor ("wrap it up first");
+  wrapup explains an epic left that way instead of a bare Stop.
 - **Baseline TORs stay in the skeleton** — tool-hygiene Givens use only `--version`, `--help`,
   invalid flags, or the equivalent, never domain commands.
 - **Nudge for a failed requirement** — `status` and `start-epic` name `/quick-fix` first, not a
