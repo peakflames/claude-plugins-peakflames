@@ -340,7 +340,8 @@ that resolves or renews a `pending` record lists that record's ID in `refs`.
    do not apply it: stop that requirement with `Epic <id> (<slug>) — <Name> is Implemented and
    <TOR> is all it delivers — wrap it up first with /peak-workflow:wrapup-epic <id>; once it is
    Complete, retire <TOR> again and plan its removal epic.` Wrapup could not complete an epic left
-   with nothing to verify.
+   with nothing to verify. Check this before asking: when the input withdraws the capability (a
+   `Removed` row, or a TOR-ID request that does), print the stop instead of the L5 question.
 5. **Record as pending** — known to be wrong, but the right wording is not settled. The feature
    file is **not** touched. Write a `pending` record: `fingerprint` = the current one, `owner` =
    `git config user.name`. If `gh` is available and the repository is on GitHub, ask once whether
@@ -369,7 +370,9 @@ recommended choice first. Which choices appear depends on what the input says an
 | A change is raised but not decided (`Pending` row) | — | Record as pending, Supersede, Add alongside |
 
 Question: `"<TOR-ID> — <title>: <what the input changes, one line>. How should it change?"`.
-Drop `Record as pending` for a Safety requirement. `Keep unchanged` (Removed rows only) is for a
+Drop `Record as pending` for a Safety requirement; for an undecided change to one (the `Pending`
+row), offer `Keep unchanged` in its place and say *"<TOR> is a Safety requirement and cannot be
+recorded as pending — decide it on this branch, or keep it unchanged."* `Keep unchanged` (Removed rows only) is for a
 requirement the removal does not actually touch; name it in the summary with the reason.
 
 ---
@@ -925,7 +928,8 @@ greenfield files.
    (recommend from the description: none or "it is right" → Uphold). Drop **Renew** for a
    requirement under `# Safety`. **Change it** asks what it should say when there is no
    description, runs L3, and applies Reword or Supersede per L5. **Renew** writes a new `pending`
-   record that refs the open one, with a fresh reason. After **Change it** applies a Supersede or
+   record that refs the open one, copies its title, keywords, owner, and `tracker`, with a fresh
+   reason. After **Change it** applies a Supersede or
    Reword, ask the settle question from step 3 too; on No, follow its renewal rule.
 5. **Apply** the answer per L5, with these specifics:
    - **Changed since verified / Edited without a record:** the *old* text is the verified (or
@@ -1150,7 +1154,7 @@ becomes the acceptance criterion and verification procedure.
 plan-project has nothing new to plan. Review the diff, commit it on this branch, and merge it into
 <base> (solo or team PR) — the merge approves the Change Records.
 [TOR-ID mode:]
-Review the diff, commit it on this branch, and merge it into <base> (solo or team PR) — the
+Review the diff, commit it on this branch (`docs(requirements): <outcome> <TOR-ID> (<CR-ID>)`), and merge it into <base> (solo or team PR) — the
 merge approves the Change Record.
 ```
 

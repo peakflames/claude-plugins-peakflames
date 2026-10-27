@@ -95,6 +95,8 @@ Use `AskUserQuestion` to pick the ship mode. Present both options neutrally — 
 
 - Question: `"Ship mode — solo (local merge, no push) or team (push + PR)?"`
 - Options: `["Team — push and open PR", "Solo — local merge only"]`
+- If `git remote` does not list `origin`, skip the question: say `No remote — shipping solo (local
+  merge).` and use Solo.
 
 Remember the user's choice — Step 4 and Step 5 branch on it.
 
@@ -113,7 +115,7 @@ Remember the user's choice — Step 4 and Step 5 branch on it.
 Enter plan mode. The plan is the complete execution script for this fix — every step after plan approval must appear as an explicit numbered item. The plan must include these items in order:
 
 1. **Read affected source files** — enumerate the specific files the fix touches.
-1a. **Reproduce** — write or run a test that fails on the reported behavior. If it passes on the
+1a. **Reproduce** (omit on an amendment-path fix that changes no behavior — item 5a's citing tests are its evidence) — write or run a test that fails on the reported behavior. If it passes on the
    base branch, ask via `AskUserQuestion` `"The bug does not reproduce: <evidence>. How to
    proceed?"` — `["Add a regression test only", "Stop"]`.
 2. **Implement the fix** — name the specific files being modified and what changes. A test or
