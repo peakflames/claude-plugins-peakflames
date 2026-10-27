@@ -7,7 +7,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
   and posted once on #20 after approval.
   Posted so far: rows through Plan 4 (Plan 4 comment), Plans 5–7b (issuecomment-6428372050),
   and Plan 8 (issuecomment-6429562613). Post rows added from Plan 9 on in one follow-up at the
-  merge gate. **Plan 9 rows not yet posted:** `Non-ID requirements: entry`, `Kept banner`, `Implemented owner`, `Fixes: trailer`.
+  merge gate. Plan 9 rows posted in issuecomment-6444877595.
 - **Integration branch:** `feature/peak-workflow-3.0` (off `develop`). Each plan works on
   `feature/peak-workflow-3.0-pN-<name>` and merges back `--no-ff`. The integration branch merges to
   `develop` only after the merge gate (Q10).
@@ -482,7 +482,7 @@ proposal + addendum). Every plan reads this file first and updates it last.
 | 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 223 tests OK on both (after pass 1 fixes) |
 | 2 | Two clean full dry-run passes incl. lifecycle scenarios | ✅ passes 9 and 10 clean (0 Critical, 8 agents). Criticals per pass 1–8: 4, 2, 1, 1, 3, 0, 1, 2 — all fixed |
 | 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
-| 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ waits on the contributor |
+| 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ☐ draft PR #24 open; contributor request drafted (`tmp/contributor-comment.md`), not yet posted |
 
 - **Docs:** plugin README gains Prerequisites (Python 3.11+), a Requirements lifecycle section
   (five record kinds, where amendments happen, fingerprints, reverify, findings A–F), the 2.1 →
