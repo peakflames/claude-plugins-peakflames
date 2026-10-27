@@ -251,6 +251,11 @@ Skip this step only if the epic is entirely greenfield with no connection to exi
 
 ## Step 6: Write the Epic Spec(s)
 
+**Branch first.** If the current branch is `develop`, `main`, or `master`, run
+`git checkout -b docs/add-<kebab-name>` (the first epic's kebab name) before writing anything —
+planning changes reach the base only by a merge. On any other branch (a `docs/` branch from
+capture-requirements or triage, an epic branch), write there.
+
 Create the epic spec file(s) following the **required structure** below. `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` depend on this exact format — particularly the Requirements Anchors table.
 
 ### File Location
@@ -470,4 +475,7 @@ Note: `/peak-workflow:start-epic` loads TOR requirements from the feature files 
 Requirements Anchors table — ensure those feature files are on develop (merged) before starting.
 ```
 
-Do NOT commit — leave that for the user to decide.
+Do NOT commit — leave that for the user to decide. When Step 6 created `docs/add-<kebab-name>`,
+end the summary with how it reaches the base: commit on it (`docs(plan): add epic <id> (<slug>)`),
+then `git checkout <base> && git merge --no-ff docs/add-<kebab-name> && git branch -d
+docs/add-<kebab-name>` (solo) or push it and open a PR (team).

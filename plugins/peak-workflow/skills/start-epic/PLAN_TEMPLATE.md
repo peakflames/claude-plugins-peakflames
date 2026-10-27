@@ -57,8 +57,8 @@ paragraph verbatim…"); keep every rule.
    **fresh transition** (prior status was Not Started or Paused) or a **resumption**
    (prior status was already In Progress, or was Implemented — rework after a wrapup FAIL).
    Item 3 uses this. On a Paused → In Progress transition, also `git rm` the
-   `session-handoffs/epic-<id>-paused.md` handoff in the same commit (git keeps it), so a later
-   interrupted session still trips the Recovery Check.
+   `session-handoffs/epic-<id>-paused.md` handoff (git keeps it) and set `handoff: —`; both land in
+   the closing Commit step, so a later interrupted session still trips the Recovery Check.
 
    Also update the epic spec file's `**Status:**` header line (the spec path was already
    identified in Step 1, at `docs/implementation-plan/phase-*/epic-<id>-*.md`) to

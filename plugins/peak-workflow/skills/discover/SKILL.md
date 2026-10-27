@@ -209,7 +209,7 @@ Then conduct a focused interview covering ONLY what is new or changed. Use the s
 For each existing section that needs changes, show the current content alongside the proposed update so the user can see exactly what's changing.
 
 **Re-litigation check.** Before drafting a proposed capability into the vision or ConOps, run
-`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" search <2–4 key nouns or quoted phrases>`.
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" search -- <2–4 key nouns or quoted phrases>`.
 Exit 0 = no earlier decision. Exit 1 prints the Change Records that retired, superseded, or
 recorded the idea as pending. For each hit that is really the same idea, ask with
 `AskUserQuestion`:

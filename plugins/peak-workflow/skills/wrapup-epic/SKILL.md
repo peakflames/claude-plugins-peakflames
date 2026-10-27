@@ -146,7 +146,7 @@ Tests gate: PASS / FAIL (<summary>). UX Baseline: <PASS / N/A — no UI requirem
 
 Commit the sidecar and the reverified handoff:
 `chore(epic-<id>): reverify <TOR-list> — <N> PASS, <M> FAIL`. Then ship exactly as
-`/peak-workflow:quick-fix` Step 4 item 6 does — ask solo or team (neutrally, every time); solo
+`/peak-workflow:quick-fix` Step 4 item 6 does — ask solo or team (neutrally, every time — with no `origin` remote, skip the question: `No remote — shipping solo (local merge).`); solo
 merges `--no-ff` into the base (message `chore(epic-<id>): merge <branch> — reverify <TOR-list>`)
 and deletes the branch, team pushes and opens a PR (title
 `verify(epic-<id>): <TOR-list>`, body = the handoff's table plus `🤖 Generated via
@@ -972,6 +972,8 @@ be made by the user every invocation.
 7. Report to the user:
    > Branch `<branch>` has been merged into `<base-branch>` and deleted.
    > Changes have not been pushed — run `git push` when ready.
+
+   (With no `origin` remote, say instead: `No remote is configured — the merge is local only.`)
 
    If `CLAUDE.md`'s `**Remote:**` line records branch protection, add: *"`<base-branch>` is
    protected — the push goes through only for a repository administrator. Without admin rights,

@@ -188,6 +188,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   ("revised …") is reported `kept`, so the strip no longer refuses to rename the section below it.
 - **Step 0001 reads the skills' own merge subjects** — `docs(plan): merge docs/<task> — …` now
   fills `**Plan branch:**` instead of `—`.
+- **`add` branches off the base** — run on `develop`, it writes on `docs/add-<name>` and ends
+  with the merge commands; planning reaches the base only by a merge.
+- **`status` reads every open epic from its branch** — an epic started or paused on
+  `feature/epic-…` no longer shows as Ready to Start.
+- **`quick-fix` amendments keep docs and disputes honest** — a reword or supersede rewrites the
+  vision/ConOps line it replaced; amending a Disputed requirement asks whether it settles the
+  dispute and refs or renews the pending record.
 - **`pause` refuses off the epic branch** — run on `develop` or with nothing in progress, it stops
   and writes nothing.
 - **Section of the last Scenario before a banner** — the helper read the next banner's name, so a

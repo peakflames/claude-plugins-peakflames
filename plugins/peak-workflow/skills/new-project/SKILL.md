@@ -142,7 +142,7 @@ On `"I'll pick a command myself"`, print the inventory and exit:
 
 ```
 Common commands on an existing peak-workflow project:
-- /peak-workflow:triage <issue|description>   — size an incoming request (HEAVY/EPIC/TRIVIAL)
+- /peak-workflow:triage <issue|description>   — size an incoming request (HEAVY/AMEND/EPIC/TRIVIAL)
 - /peak-workflow:status                       — read-only progress dashboard
 - /peak-workflow:add                          — add an epic referencing existing TOR IDs
 - /peak-workflow:start-epic <id>              — implement a planned epic
