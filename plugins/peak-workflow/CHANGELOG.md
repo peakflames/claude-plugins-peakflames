@@ -186,6 +186,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Step 0002 keeps a banner's section name** — a one-line banner holding a marker word
   ("revised …") is reported `kept`, so the strip no longer refuses to rename the section below it.
+- **Pre-3.0 edits stay undecided until decided** — `historical_records` lists only unproven
+  rewords; quick-fix refuses to amend such a requirement, and reverify confirms before a PASS
+  accepts the edit.
 - **Wrapup ships no stale citations** — refresh-docs never cites a superseded or retired TOR ID,
   and wrapup's pre-ship `check` fixes any E finding the branch added.
 - **A kept banner passes capture-requirements' checks** — a section banner step 0002 kept is not

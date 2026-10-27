@@ -126,6 +126,9 @@ Apply this rubric — pick exactly one verdict:
   - It asks for what the **current** text says (the edit was intended) → **AMEND**
     (`/peak-workflow:capture-requirements <TOR-ID> <description>` records it as a supersede, or a
     reword with evidence).
+  - When the request could mean either text, show both blocks and ask which one the owner means.
+  - It asks for new behavior neither text states → apply the HEAVY / AMEND rules as usual, and
+    name the unrecorded edit in the Rationale so capture-requirements settles it in the same run.
   - It disagrees with both → a bug against the current text, but the text itself is unproven:
     recommend the reverify first (`/peak-workflow:wrapup-epic <epic-id> reverify <TOR-ID>`, fresh
     session), then quick-fix if the requirement holds and the code fails it.

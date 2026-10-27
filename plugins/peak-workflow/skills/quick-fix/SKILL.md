@@ -69,6 +69,9 @@ Follow these steps exactly:
      /peak-workflow:capture-requirements <TOR> <description>.` **Implemented** → stop: `Epic <id>
      is waiting for wrapup — run /peak-workflow:wrapup-epic <id>; its Step 1.4b can amend the
      requirement there.`
+   - **Edited before it was settled** — its `states` row has `historical_records`, or `check` has an
+     **A** finding for it → stop: `<TOR> changed after it was verified (<CR-IDs>) — decide whether
+     its meaning changed first with /peak-workflow:capture-requirements <TOR>.`
    - **Owning epic's sidecar is malformed** — a `check --json` finding C whose `path` is that
      epic's sidecar (`docs/implementation-plan/status/epic-<epic>.md`) → stop and print its
      message: `tor-lifecycle mark` refuses that sidecar, so the fix could not record its
