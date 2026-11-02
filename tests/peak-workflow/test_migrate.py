@@ -93,6 +93,23 @@ class ProseScanTests(unittest.TestCase):
             self.assertNotIn("Covers every output", new)
             self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
 
+    def test_a_note_inside_a_banner_is_one_section_level_item(self):
+        # Project C (Gate 4): a `# Note:` paragraph between a banner's rules was read as banner text,
+        # so strip deleted only its "revised" lines and left broken sentences behind.
+        text = "\n".join([
+            "Feature: 1.0 Core", "", "Scenario: [TOR-01-Aaa0001] The tool shall do A", "    Then a", "",
+            "# ----", "# Persistent header", "#", "# Note:",
+            "#   Derived from the ConOps. The avatar is TOR-01-Aaa0001 (revised 2026-09-24); the",
+            "#   footer is TOR-01-Bbb0002.", "# ----", "",
+            "Scenario: [TOR-01-Bbb0002] The tool shall do B", "    Then b", ""])
+        items = [(it.line, it.end, it.kind, it.tor) for it in tl.scan_prose(FILE, text)]
+        self.assertEqual(items, [(8, 11, "marker", None)])
+        new, _n = tl.strip_feature_text(FILE, text)
+        self.assertNotIn("Derived", new)
+        self.assertNotIn("footer is", new)
+        self.assertIn("# ----\n# Persistent header\n# ----\n", new)
+        self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
     def test_a_later_marker_line_in_a_banner_is_stripped(self):
         text = feature_text("01", "Core", [Scenario("TOR-01-Aaa0001", "The tool shall do A")], fenced=False)
         text = text.replace("Scenario:", "# ----\n# Core\n# MODIFIED v1.2: reorganised\n# ----\n\nScenario:")

@@ -1549,6 +1549,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
     held_empty: list[int] = []
     in_banner = banner_text = in_doc = seen_feature = False
     preamble = False  # after a banner, before its section's first Scenario: prose is section-level
+    in_note = False   # inside a `# Note:` paragraph that sits within a banner (between its rules)
 
     def close() -> None:
         nonlocal group
@@ -1556,7 +1557,8 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             body = [lines[i].strip().lstrip("#").strip() for i in group]
             kind = ("marker" if any(LIFECYCLE_MARKERS.search(b) for b in body) else
                     "note" if any(b.lower().startswith("note:") for b in body) else "comment")
-            items.append(ProseItem(rel, group[0] + 1, group[-1] + 1, kind, None if preamble else tor,
+            items.append(ProseItem(rel, group[0] + 1, group[-1] + 1, kind,
+                                   None if preamble or in_banner else tor,
                                    "\n".join(b for b in body if b)))
         group = []
 
@@ -1581,7 +1583,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             tor, seen_feature, preamble = None, True, False
         if not stripped.startswith("#"):
             close()
-            held_empty = []
+            held_empty, in_note = [], False
             if stripped:
                 in_banner = False
             elif banner_text:
@@ -1591,14 +1593,26 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
         content = stripped.lstrip("#").strip()
         if RULE_LINE.match(content):
             close()
-            held_empty = []
+            held_empty, in_note = [], False
             if in_banner and banner_text:
                 in_banner = banner_text = False
                 preamble = True
             else:
                 in_banner, banner_text = True, False
             continue
+        if in_banner and banner_text and (in_note or (content.lower().startswith("note:")
+                                                      and not REFERENCE_SCREEN.match(content))):
+            # A note inside the banner is section-level prose, classified and stripped as a whole.
+            if not in_note:
+                in_note, group = True, held_empty
+            held_empty = []
+            group.append(i)
+            continue
+        if in_banner and banner_text and not content:
+            held_empty = [i]  # a lone `#` line; joins a note that starts right below it
+            continue
         if in_banner:
+            held_empty = []
             if LIFECYCLE_MARKERS.search(content):
                 # A banner's first text line is its section name (parse_requirements): removing it
                 # would rename the section, so it is reported `kept`; a later marker line is not.

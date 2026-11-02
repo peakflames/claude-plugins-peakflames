@@ -184,6 +184,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A note inside a banner is stripped whole** — a `# Note:` paragraph between a banner's
+  rules is one section-level item to classify; strip no longer deletes only its "revised" lines.
 - **Pre-3.0 feature-number reuse is not a finding** — `check` skips `feature-number-reused`
   when a migration record names the old file and the live file predates it; reuse after the
   upgrade is still reported.
