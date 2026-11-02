@@ -396,6 +396,100 @@ class ProjectAUpgradeTests(unittest.TestCase):
             self.assertIn("TOR-02-Nope999 is not a live requirement", result.stderr)
             self.assertFalse((fresh.root / "docs/requirements/changes").exists())
 
+    def test_10b_two_history_entries_for_one_requirement_are_refused(self):
+        # Dry-run pass 2: reasons are keyed by requirement, so a second entry silently replaced the first.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            first = plan["history"][0]
+            plan["history"].append({"tors": first["tors"][:1], "title": "A second title", "reason": "Another.",
+                                    "sources": []})
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(f"{first['tors'][0]} already has history entry #1", result.stderr)
+
+    def test_10c_two_rationale_entries_for_one_requirement_are_refused(self):
+        # Dry-run pass 4: a tracing entry holds one rationale, so the second text was silently lost.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            first = plan["rationale"][0]
+            plan["rationale"].append({"tor": first["tor"], "text": "A second reason.", "sources": []})
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(f"{first['tor']} already has rationale entry #1", result.stderr)
+
+    def test_10d_plans_that_would_lose_or_contradict_approved_content_are_refused(self):
+        # Dry-run pass 5 audit: each of these used to exit 0 and silently drop or contradict an entry.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            base = pa.classification(scan)
+            src = next(s for e in base["rationale"] for s in e["sources"])
+            sup = base["supersede"][0]
+            cases = {
+                "history without an edit": (lambda p: p["history"].append(
+                    {"tors": ["TOR-01-Fmt0001"], "title": "Phantom", "reason": "Never written.", "sources": []}),
+                    "TOR-01-Fmt0001 has no `edits` row"),
+                "two supersedes": (lambda p: p["supersede"].append({**sup, "sources": []}),
+                                   "one removal entry per requirement"),
+                "supersede and retire": (lambda p: p["retire"].append(
+                    {"tors": sup["tors"], "removal": "none", "title": "x", "reason": "x", "keywords": ["x"],
+                     "sources": []}), "one removal entry per requirement"),
+                "two pendings": (lambda p: p["pending"].append({**p["pending"][0], "sources": []}),
+                                 "one pending entry per requirement"),
+                "unknown field": (lambda p: p["supersede"][0].update({"tracker": "ENG-1"}),
+                                  "unknown field(s) tracker"),
+                "cited and dropped": (lambda p: p["drop"].append(src), "drop it or cite it, not both"),
+                "unknown source": (lambda p: p["rationale"][0]["sources"].append("docs/requirements/x.md:9"),
+                                   "is not a source the scan reports"),
+                "duplicate source": (lambda p: p["rationale"][0]["sources"].append(src), "is listed twice"),
+            }
+            for name, (mutate, message) in cases.items():
+                with self.subTest(name):
+                    plan = json.loads(json.dumps(base))
+                    mutate(plan)
+                    path = fresh.write(".plan.json", json.dumps(plan))
+                    result = fresh.cli("migrate", "records", "--plan", str(path))
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn(message, result.stderr)
+            self.assertFalse((fresh.root / "docs/requirements/changes").exists())
+
+    def test_10e_history_with_no_edits_at_all_and_an_existing_rationale_are_refused(self):
+        # Dry-run pass 6: with zero `edits` the History check was skipped and the entries were lost.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            root_commit = fresh.git("rev-list", "--max-parents=0", "HEAD").split()[0]
+            fresh.git("reset", "-q", "--soft", root_commit)
+            fresh.git("commit", "-q", "--amend", "-m", "squashed history: no edits")
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("has no `edits` row", result.stderr)
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            tor = plan["rationale"][0]["tor"]
+            tracing = next(p for p in (fresh.root / "docs/requirements").glob("*.tracing.json")
+                           if tor in p.read_text())
+            data = json.loads(tracing.read_text())
+            for entry in data["requirements"]:
+                if entry.get("id") == tor:
+                    entry["rationale"] = "Written by the owner before the upgrade."
+            tracing.write_text(json.dumps(data, indent=2))
+            fresh.commit("owner rationale")
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("already has a different rationale", result.stderr)
+
     def test_11_an_unexplained_edit_gets_a_generic_historical_reword(self):
         with FixtureRepo() as other:
             fresh = pa.build(other.root)

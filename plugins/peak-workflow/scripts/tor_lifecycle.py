@@ -1968,6 +1968,85 @@ def delete_scenario(text: str, tor: str, prose: list[ProseItem]) -> str:
     return "\n".join(lines[:start] + lines[end:])
 
 
+PLAN_FIELDS = {
+    "rationale": {"tor", "text", "sources"},
+    "history": {"tors", "title", "reason", "sources", "refs"},
+    "supersede": {"tors", "successors", "title", "reason", "keywords", "sources", "refs"},
+    "retire": {"tors", "removal", "title", "reason", "keywords", "sources", "refs"},
+    "pending": {"tors", "title", "reason", "keywords", "sources", "owner", "tracker", "refs"},
+}
+
+
+def plan_integrity(root: Path, plan: dict, scan: "MigrationScan") -> list[str]:
+    """Plan problems that would otherwise drop approved content or write contradictory records."""
+    problems: list[str] = []
+    known = {it.id for it in scan.prose if it.strip} | {k["source"] for k in scan.sidecar_keys}
+    check_sources = bool(known)  # a re-run after the strip has no sources left to check against
+    cited_by: dict[str, str] = {}
+    for key in PLAN_LISTS:
+        for n, e in enumerate(plan[key], 1):
+            where = f"plan {key} #{n}"
+            extra = sorted(set(e) - PLAN_FIELDS[key])
+            if extra:
+                problems.append(f"{where}: unknown field(s) {', '.join(extra)} (allowed: "
+                                f"{', '.join(sorted(PLAN_FIELDS[key]))})")
+            for fld in ("owner", "tracker"):
+                if fld in e and not isinstance(e[fld], str):
+                    problems.append(f"{where}: `{fld}` must be a string")
+            if "refs" in e and (not isinstance(e["refs"], list) or not all(isinstance(r, str) for r in e["refs"])):
+                problems.append(f"{where}: `refs` must be a list of strings (issues, tickets, design notes)")
+            src = e.get("sources", [])
+            if not isinstance(src, list) or not all(isinstance(s, str) for s in src):
+                problems.append(f"{where}: `sources` must be a list of source IDs")
+                continue
+            for s in sorted({s for s in src if src.count(s) > 1}):
+                problems.append(f"{where}: source {s} is listed twice")
+            for s in src:
+                if check_sources and s not in known:
+                    problems.append(f"{where}: {s} is not a source the scan reports")
+                cited_by.setdefault(s, where)
+    for s in plan["drop"]:
+        if check_sources and s not in known:
+            problems.append(f"plan drop: {s} is not a source the scan reports")
+        elif s in cited_by:
+            problems.append(f"plan drop: {s} is also cited by {cited_by[s]}; drop it or cite it, not both")
+    # An edit leaves the scan once its historical reword is written, so a re-run accepts those too.
+    edited = {ev["tor"] for ev in scan.edits} | {
+        t for r in load_records(root) if r.kind == "reword"
+        and (r.data.get("evidence") or {}).get("result") == "historical" for t in r.tors}
+    for n, e in enumerate(plan["history"], 1):
+        for t in e.get("tors", []) if isinstance(e.get("tors"), list) else []:
+            if t not in edited:
+                problems.append(f"plan history #{n}: {t} has no `edits` row, so no record would carry this "
+                                "entry; classify its note Rationale or Drop")
+    traced: dict[str, str | None] = {}  # TOR -> the rationale its tracing entry already holds
+    for path in tracing_files(root):
+        for entry in load_tracing(path).get("requirements", []):
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                traced[entry["id"]] = entry.get("rationale")
+    for n, e in enumerate(plan["rationale"], 1):
+        t = e.get("tor")
+        if not isinstance(t, str):
+            continue
+        if t not in traced:
+            problems.append(f"plan rationale #{n}: {t} has no tracing entry to hold its rationale; fix the "
+                            "tracing sidecar on the base first, or drop the note")
+        elif traced[t] and isinstance(e.get("text"), str) and traced[t].strip() != e["text"].strip():
+            problems.append(f"plan rationale #{n}: {t}'s tracing entry already has a different rationale; "
+                            "fold it into this entry's text (it is replaced)")
+    for label, keys in (("removal", ("supersede", "retire")), ("pending", ("pending",))):
+        first: dict[str, str] = {}
+        for key in keys:
+            for n, e in enumerate(plan[key], 1):
+                for t in set(e.get("tors", [])) if isinstance(e.get("tors"), list) else ():
+                    if t in first:
+                        problems.append(f"plan {key} #{n}: {t} is already in {first[t]}; one {label} entry "
+                                        "per requirement")
+                    else:
+                        first[t] = f"plan {key} #{n}"
+    return problems
+
+
 def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.date, write: bool) -> list[dict]:
     """#20 Migration 4: write the owner-approved classification as Change Records (approved_via =
     "migration", each carrying `migration_source`), move rationale into tracing entries, delete
@@ -2038,6 +2117,25 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
             for t in ([e.get("tor")] if key == "rationale" else e.get("tors", [])):
                 if t in deleting:
                     problems.append(f"plan {key}: {t} is being superseded or retired")
+    seen_rationale: dict[str, int] = {}
+    for n, e in enumerate(plan["rationale"], 1):
+        t = e.get("tor")
+        if isinstance(t, str) and t in seen_rationale:  # a tracing entry holds one rationale
+            problems.append(f"plan rationale #{n}: {t} already has rationale entry #{seen_rationale[t]}; "
+                            "write one entry per requirement whose text covers every note")
+        elif isinstance(t, str):
+            seen_rationale[t] = n
+    seen_history: dict[str, int] = {}
+    for n, e in enumerate(plan["history"], 1):
+        for t in e.get("tors", []) if isinstance(e.get("tors"), list) else []:
+            if t in seen_history:  # the reword records take one title and reason per requirement
+                where = ("is listed twice in this entry" if seen_history[t] == n
+                         else f"already has history entry #{seen_history[t]}")
+                problems.append(f"plan history #{n}: {t} {where}; "
+                                "write one entry per requirement whose title and reason cover all its edits")
+            else:
+                seen_history[t] = n
+    problems += plan_integrity(root, plan, scan)
     for e in plan["supersede"]:
         problems += [f"plan supersede: successor {s} is itself being removed" for s in e.get("successors", [])
                      if s in deleting]
@@ -2161,8 +2259,14 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
         problems += [f"{rec['id']}: {x}" for x in validate_record(name, rec)]
     if problems:
         raise DataError(problems)
+    def fields(r: dict) -> dict:  # everything the owner approves, so the gate can show what is written
+        out = {k: r[k] for k in ("reason", "keywords", "removal", "owner", "tracker", "refs") if k in r}
+        succ = [s for c in r["changes"] for s in c.get("successors", [])]
+        return {**out, "successors": succ} if succ else out
+
     rows = [{"record": r["id"], "kind": r["kind"], "tors": [c["tor"] for c in r["changes"]], "title": r["title"],
-             "path": f"{CHANGES_DIR}/{r['date'].isoformat()}-{r['id'][3:]}.toml"} for r in records]
+             "fields": fields(r), "path": f"{CHANGES_DIR}/{r['date'].isoformat()}-{r['id'][3:]}.toml"}
+            for r in records]
     rationale = {e["tor"]: e["text"].strip() for e in plan["rationale"]}
     rows += [{"record": None, "kind": "rationale", "tors": [t], "title": text, "path": None}
              for t, text in rationale.items()]
