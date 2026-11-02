@@ -184,6 +184,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Pre-3.0 feature-number reuse is not a finding** — `check` skips `feature-number-reused`
+  when a migration record names the old file and the live file predates it; reuse after the
+  upgrade is still reported.
 - **A note under a banner is not a section** — a `# Note:` after a banner's closing rule no
   longer becomes the section name, so Safety requirements keep Safety; step 0002 reports it
   section-level and strips it without refusing.
