@@ -61,8 +61,9 @@ Still in the upgraded copy, on the upgrade branch:
 python3.11 /path/to/claude-plugins-peakflames/tests/peak-workflow/acceptance/run.py after . > after.txt
 ```
 
-Then run `/peak-workflow:upgrade` once more and confirm it says the project is on format 2 with
-nothing to upgrade (the re-run is a no-op).
+Then run `/peak-workflow:upgrade` once more and confirm the re-run applies nothing: it says every
+step is applied on the upgrade branch and asks again how the branch should reach `develop` (choose
+**Leave the branch for now**).
 
 ## 4. Send back
 

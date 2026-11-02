@@ -177,6 +177,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   project is always upgradable; the interim "later build" messages and `format`'s `upgradable:`
   line are gone. A step may commit per phase and add a Report to the final message.
 
+- **Step 0002 strip preflight** — the upgrade trial-runs `migrate strip` before classification
+  and stops on a refusal, before any owner effort or commit.
+- **Neutral, chunked owner gate** — Phase 4 shows every judgment row inline, walks tables over
+  40 rows one feature file at a time, and marks no option recommended.
+- **Reword titles name the change** — History titles say what changed (≤ 60 characters); edits
+  without a note get a title read from their diff.
+- **Short upgrade report** — step 0002 prints the finding counts and the findings needing action,
+  and saves the full `check --by-epic` output to a file.
+
 ### Removed
 
 - **BREAKING: `migrate-2.5` and `migrate-from-epic-workflow`** are deleted, along with
@@ -184,6 +193,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Step 0002 refuses two Rationale or History entries for one requirement** — the second used
+  to replace the first silently, losing approved text; `migrate records` now names both entries.
+- **Step 0002 refuses plans that would lose or contradict approved content** — a History entry with
+  no edit, a requirement in two removal or two pending entries, unknown fields, and unknown,
+  duplicated, or both cited and dropped sources, and a rationale that would replace another, now
+  stop `migrate records` with a message.
+- **The records preview shows every approved field** — `migrate records --json` adds each record's
+  reason, keywords, successors, removal, owner, and tracker; the gate's table is built from it.
+- **Step 0002 resumes from its records, not a commit subject** — a re-run skips classification
+  whenever migration records exist, so a hand-made commit no longer re-opens Phase 4.
+- **A finished upgrade branch returns to the merge question** — re-running `/upgrade` on an
+  unmerged upgrade branch offers Team, Solo, or Leave again instead of "nothing to upgrade".
 - **A note inside a banner is stripped whole** — a `# Note:` paragraph between a banner's
   rules is one section-level item to classify; strip no longer deletes only its "revised" lines.
 - **Pre-3.0 feature-number reuse is not a finding** — `check` skips `feature-number-reused`

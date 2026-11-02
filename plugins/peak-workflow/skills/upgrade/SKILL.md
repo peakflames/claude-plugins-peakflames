@@ -68,8 +68,11 @@ List `${CLAUDE_PLUGIN_ROOT}/skills/upgrade/steps/*.md`. Two kinds of work:
 
 Then:
 
-- **Nothing pending and no catch-up:** print *"This project is on format N — nothing to upgrade."*
-  and stop.
+- **Nothing pending and no catch-up:** when you are on an upgrade branch that has not merged
+  into `<base>` (B is below N), print *"Every step is applied on <branch>, but <base> is still on
+  format B."* and go to Step 7: its summary lists that branch's commits as "(earlier run)", and its
+  merge question comes back. The heading's `<target>` is N. Otherwise print *"This project is on format N — nothing to
+  upgrade."* and stop.
 
 Read each step file involved. Show the plan:
 
@@ -174,13 +177,14 @@ Upgraded format B → <target> on <branch>
 | <sha7> | 0002 requirements-lifecycle — change records | <count> |
 ```
 
-`<count>` is the number of files in the commit, the stamp included (`git show --name-only --format= <sha>`).
+A commit whose subject names no step (made by hand) is labelled with its own subject. `<count>`
+is the number of files in the commit, the stamp included (`git show --name-only --format= <sha>`).
 
 Then, for each step applied in this run that has a **Report** section, do what it says — in this
-message, never in a file.
+message (a step may also save a full listing to a file it names).
 
-List any skipped epics with *"re-run /peak-workflow:upgrade after these merge"*. If the run made
-no commit at all, delete the empty branch (`git checkout <base> && git branch -d <branch>`), say
+List any skipped epics with *"re-run /peak-workflow:upgrade after these merge"*. If the branch has no
+commit at all (`git log <base>..HEAD` is empty), delete the empty branch (`git checkout <base> && git branch -d <branch>`), say
 there was nothing to apply, and stop.
 
 Merge is approval, as for every `docs/` branch. Ask via `AskUserQuestion`:

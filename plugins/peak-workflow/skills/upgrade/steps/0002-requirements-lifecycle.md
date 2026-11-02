@@ -33,13 +33,13 @@ this step — when a helper command refuses, stop and show its output.
 
 ## Preview
 
-When resuming (the branch already has `step 0002` commits — see **Resuming** under Apply), show
-only *"Resuming step 0002 after <last phase committed>"* and the phases left. Otherwise show the counts from the Detect's last line as a table, in plain words:
+When resuming (see **Resuming** under Apply for how to tell), show only *"Resuming step 0002
+after <last phase done>"* and the phases left. Otherwise show the counts from the Detect's last line as a table, in plain words:
 
 | What | Count | What happens |
 |---|---|---|
 | Lifecycle notes and markers in feature files | `prose` | Each is classified once (you approve the list), then removed |
-| Requirements edited in place before 3.0 | distinct TORs in `edit` | A `reword` record with `result = "historical"` per edit — no test evidence, so an edit made **after** the owning epic was verified leaves the requirement Changed since verified |
+| Requirements edited in place before 3.0 | distinct TORs across the `edit` lines | A `reword` record with `result = "historical"` per edit — no test evidence, so an edit made **after** the owning epic was verified leaves the requirement Changed since verified |
 | Requirements deleted without a record | `removed` | A `supersede` or `retire` record with the text as it last read |
 | Tracing sidecars with titles | `tracing` | `title` and `generated` removed (the Scenario line is the only title) |
 | Open epic specs with a title column | `specs` | The Requirements Anchors table becomes `TOR ID \| Feature File` |
@@ -53,8 +53,8 @@ Then say:
 - A Complete epic's spec is history and is not touched. A Complete epic's sidecar keeps its
   `status:` and every other line; it only gains `verified:` lines and loses ad hoc keys and `#` note lines.
 - Requirements edited after their epic was verified will show as **Changed since verified**, and
-  known-wrong ones recorded in prose as **Disputed**. That is the point: the report at the end
-  lists them per epic for you to triage.
+  known-wrong ones recorded in prose as **Disputed**. That is the point: the findings file saved
+  at the end lists them per epic for you to triage.
 - A dispute's age counts from today, the day its `pending` record is written — not from when the
   note was added — so the threshold (`[lifecycle] disputed_threshold_days`, default 30) gives you
   that long to settle it before it blocks work. A `# Safety` requirement blocks at once.
@@ -66,12 +66,14 @@ Run the phases in order. A phase whose command changes nothing makes no commit. 
 upgrade branch only, staging by path (never `git add -A`), with the message
 `chore(upgrade): step 0002 requirements-lifecycle — <phase>`.
 
-**Resuming.** When the branch already has commits from this step
-(`git log --format=%s <base>..HEAD` lists `step 0002`), the Preview says *"Resuming step 0002
-after <last phase committed>"* and lists only the phases left, instead of the table above —
-the classification is not shown or approved again. Keep `<scratch>/before.tsv`; if the `change
-records` commit exists, skip Phases 3–4. Every other phase is safe to re-run: its command reports
-nothing to do.
+**Resuming.** This step is being resumed when either is true: `git log --format=%s <base>..HEAD`
+lists `step 0002`, or a record added since `<base>` holds a `migration_source` line (`git diff
+--name-only --diff-filter=A <base> -- docs/requirements/changes | xargs grep -l '^migration_source'`
+— this catches records committed by hand under another message). The Preview then says
+*"Resuming step 0002 after <last phase done>"* and lists only the phases left, instead of the
+table above. When such a record exists, Phase 4 is done whatever the commit messages say: skip
+Phases 3–4, and the classification is not shown or approved again. Every other phase is safe to
+re-run: its command reports nothing to do.
 
 ### Phase 1 — Prerequisites
 
@@ -79,11 +81,13 @@ Satisfied: Detect exited 1, not 2 (and the wrapper found Python 3.11+).
 
 ### Phase 2 — Fingerprint before
 
-Unless resuming with the file in place: `tor-lifecycle fingerprint > "<scratch>/before.tsv"`.
+When `<scratch>/before.tsv` already exists, keep it and skip this phase (it is the snapshot from
+before any change). Otherwise: `tor-lifecycle fingerprint > "<scratch>/before.tsv"`.
 
 ### Phase 3 — Inventory
 
-`tor-lifecycle migrate scan --base <base> --json > "<scratch>/scan.json"` and read it:
+`tor-lifecycle migrate scan --base <base> --json > "<scratch>/scan.json"` (exit 1 is normal: items
+are pending) and read it:
 
 - `prose` items with `strip: true` — `id` (`<file>:<line>`), `kind` (`marker` for AMENDED /
   REVISED / SUPERSEDED / MODIFIED / CHANGE-CONTROL, `note`, `comment`, `banner`, `outside`), the
@@ -99,14 +103,23 @@ Unless resuming with the file in place: `tor-lifecycle fingerprint > "<scratch>/
 - `edits` — every trunk commit that changed a requirement's text with no record (`check`
   finding A): `tor`, `sha`, `date`, `subject`.
 
-### Phase 4 — Classify (one owner gate)
+**Strip preflight.** Before any classification, run `tor-lifecycle migrate strip` (no `--write`)
+on its own, unpiped, and read its exit code: strip removes every `strip: true` item whatever its
+classification, so a refusal now would stop Phase 5 after the owner's work. Its line counts can
+differ from Phase 5's (records are not written yet); only the refusal matters. Exit 0 or 1: say
+*"Strip preflight passed"* and continue. Exit 2: show its output and stop before Phase 4 —
+*"The helper cannot strip these files without changing a requirement's fingerprint or section.
+Nothing was classified or written; report this to the peak-workflow maintainers."* The branch
+keeps the commits made so far.
+
+### Phase 4 — Classify (the owner gate)
 
 Propose one classification per prose item and sidecar key:
 
 | Choice | When | Plan entry |
 |---|---|---|
-| **Rationale** | Explains why a live requirement reads as it does, and is still true | `rationale`: `tor`, `text` — one or two plain sentences, no marker words |
-| **History** | Describes an earlier edit of a requirement that stays live under the same ID (AMENDED, REVISED, MODIFIED, "was X, now Y") and that TOR has `edits` rows | `history`: `tors`, `title`, `reason` — the reason for that edit |
+| **Rationale** | Explains why a live requirement reads as it does, and is still true | `rationale`: `tor`, `text` — a few plain sentences, no marker words |
+| **History** | Describes an earlier edit of a requirement that stays live under the same ID (AMENDED, REVISED, MODIFIED, "was X, now Y") and that TOR has `edits` rows | `history`: `tors`, `title`, `reason` — the title names what changed in ≤ 60 characters ("Export limit raised from 100 to 500 rows"), never just a date or epic; the reason says why, with the date and source |
 | **Supersede** | The requirement was replaced by another live requirement: prose marks it superseded or replaced, or a `removed` ID's successor is named by a note or a `superseded_by` key | `supersede`: `tors`, `successors` (live IDs), `title`, `reason`, `keywords` |
 | **Retire** | The requirement no longer applies and nothing replaces it | `retire`: `tors`, `removal`, `title`, `reason`, `keywords` |
 | **Pending** | An open change-control note: a change proposed but not decided ("pending", "under review", "do not change until…") | `pending`: `tors`, `title`, `reason`, `keywords`, optional `owner` (default: you) and `tracker` |
@@ -130,20 +143,69 @@ Rules:
   `sources`); `supersession_note:` is the reason for its supersede.
 - Every `edits` row becomes a historical `reword` whether or not you write a History entry; the
   entry only supplies the title and reason (without one the helper names the commit subject).
+  When no note explains an edit and its `edits` row's `subject` does not say what changed, read the change with `git diff --word-diff -U3 <sha>^1 <sha> -- <feature file>`
+  (most `edits` shas are merges, which `git show` prints empty), looking only at the hunk under
+  that requirement's Scenario line, and write a History entry for it with `sources: []`.
+- A Rationale for a requirement with no tracing entry cannot be kept: the helper refuses it. Tell
+  the owner, propose Drop, and note that adding the tracing entry first (on `<base>`, through
+  `/peak-workflow:capture-requirements`) would keep it.
+- **One Rationale entry per requirement.** A tracing entry holds one rationale, and the helper
+  refuses a plan with two for one requirement. When several notes explain one requirement, write
+  one `text` covering them all and list every note in its `sources`.
+- **One removal or pending entry per requirement.** A requirement may appear in only one Supersede
+  or Retire entry, and in only one Pending entry; the helper refuses a second.
+- `refs` (optional on History, Supersede, Retire, and Pending): issues, tickets, or design notes
+  the note cites; the helper adds the source commits itself.
+- **One History entry per requirement.** The helper gives every edit of a requirement the same
+  title and reason, and refuses a plan with two entries for one requirement. When a requirement
+  has several `edits` rows, or a note plus an unexplained edit, write one entry whose title and
+  reason cover them all.
 
-Show the gate as one table — `# | Where | Requirement | What it says | Proposed | Detail` —
-`What it says` being the prose summarized in ≤ 80 characters, `Detail` the successor, removal,
-rationale text, or pending owner. Below it list the `removed` IDs with their proposed entries and
-the edited requirements with the History reason each will get. Then ask via `AskUserQuestion`:
+The classification is the owner's decision, not yours: you draft it, they decide. If helper agents
+draft rows, read every row they wrote before you show it. Run the preview below before the gate,
+so the owner never approves a plan the helper rejects.
 
-- Question: `"Apply this classification? Each row becomes the record or tracing change shown."`
-- Options: `["Apply (Recommended)", "Change some rows", "Stop here"]`
+Write the full table — `# | Where | Requirement | What it says | Proposed | Detail`, one row per
+prose item, sidecar key, `removed` ID, History entry with `sources: []`, and `edits` row with no
+History entry (its title is the one the preview shows), written in part order when the gate is
+split (below); `What it says` being
+the prose summarized in ≤ 80 characters (each note, when one item holds several), `Detail` the
+full entry the row informs — Supersede: successors, title, reason, keywords; Retire: removal,
+title, reason, keywords; Pending: owner, tracker, title, reason, keywords; History: title and
+reason; any `refs`; Rationale: text; a row whose
+entry another row already shows may say "as row N", and a Supersede or Retire row also says the
+Scenario is deleted — to `<scratch>/table.md`, and give its absolute path (`git rev-parse --path-format=absolute
+--git-path peak-workflow-0002/table.md`) on its own line with the row count. Then show inline, in this order, the rows that carry a judgment:
 
-On **Change some rows**, take the row numbers and the new choices in the user's words, re-show
-the table, and ask again. On **Stop here**, end the session: the branch keeps the commits made so
-far, and a later run resumes from the stamp.
+1. Every Supersede, Retire, and Pending entry, and every `removed` ID with its proposed entry.
+2. Every section-level item (`tor` null) with the requirement you chose for it, or Drop.
+3. Every sidecar key and `#` note line.
+4. Every History entry: requirements, title, and reason.
+5. Anything you were unsure of, with the alternative.
 
-Write the approved classification as JSON to `<scratch>/plan.json`:
+Drop rows, and Rationale rows whose `text` only restates the note, stay in the file; show any
+Rationale you reworded or wrote from scratch. When the table has more than 40 rows, skip
+the inline list and walk the table in parts instead. Group whole feature files in feature-number
+order until the next file would take the part past 40 rows; a file over 40 rows is a part of its
+own; rows outside the feature files (sidecar keys, `removed` IDs, History entries with
+`sources: []`, `edits` rows with no History entry) form the last part, named "outside the
+feature files" in its question and split again past 40. Say how many parts there are, then for each part show its judgment rows in the order above
+followed by its other rows, and ask `"Rows <first>–<last> (<files>): are these right?"` with
+options `["These are right", "Change some rows", "Stop here"]`. These choices work as they do at
+the final question below; after a change, rewrite `plan.json` and `table.md` and re-run the preview
+before the next part.
+
+Then ask via `AskUserQuestion`, with no option marked recommended:
+
+- Question: `"Apply this classification? Each row, shown above or in table.md, becomes the record or tracing change listed."`
+- Options: `["Apply", "Change some rows", "Stop here"]`
+
+On **Change some rows**, ask in chat which rows and what to change, take the new choices in the
+user's words, rewrite `plan.json` and `table.md`, re-run the preview, re-show the changed rows,
+and ask again. On **Stop here**, end the session: the branch keeps the commits
+made so far, and a later run resumes from the stamp.
+
+The plan file, `<scratch>/plan.json`:
 
 ```json
 {
@@ -152,14 +214,20 @@ Write the approved classification as JSON to `<scratch>/plan.json`:
   "supersede": [{"tors": ["TOR-02-…"], "successors": ["TOR-02-…"], "title": "…", "reason": "…",
                  "keywords": ["…"], "sources": ["…", "docs/implementation-plan/status/epic-<id>.md:superseded_by"]}],
   "retire":    [{"tors": ["TOR-03-…"], "removal": "none", "title": "…", "reason": "…", "keywords": ["…"], "sources": ["…"]}],
-  "pending":   [{"tors": ["TOR-02-…"], "title": "…", "reason": "…", "keywords": ["…"], "sources": ["…"]}],
+  "pending":   [{"tors": ["TOR-02-…"], "title": "…", "reason": "…", "keywords": ["…"], "sources": ["…"],
+                 "owner": "…", "tracker": "ENG-123", "refs": ["issue #40"]}],
   "drop":      ["docs/requirements/01-x.feature.md:40"]
 }
 ```
 
-Run `tor-lifecycle migrate records --plan "<scratch>/plan.json" --base <base>` (a preview: one
-line per record, rationale move, and deletion). Exit 2 names what is unclassified or inconsistent:
-fix the plan — asking the user only when the fix is a new decision — and run it again. Then:
+Before the gate, write your draft to `<scratch>/plan.json` and run `tor-lifecycle migrate records
+--plan "<scratch>/plan.json" --base <base> --json` (a preview: one row per record, rationale move,
+and deletion, each record with its `fields` — reason, keywords, successors, removal, owner,
+tracker, refs). Fill each row's `Detail` in `table.md` from this output, not from your draft, so the
+owner reads exactly what will be written. Exit 2 names what is unclassified, inconsistent, or would be lost (a second entry for one
+requirement, a History entry with no edit, a source cited twice or both cited and dropped): fix the plan — asking the user only
+when the fix is a new decision — and run it again. After the owner's changes, rewrite
+`plan.json` and re-run the preview. Once they choose **Apply**:
 
 1. `tor-lifecycle migrate records --plan "<scratch>/plan.json" --base <base> --write`
 2. `tor-lifecycle validate` — must exit 0.
@@ -228,14 +296,20 @@ Rewrites globs) plus the stamp.
 
 ## Report
 
-In the runner's final message — never a file — print the output of
-`tor-lifecycle check --by-epic` verbatim, then the last line of `tor-lifecycle states`, and the
-records this step wrote as a count per kind:
+Save the full findings, which can run to hundreds of lines, outside the scratch folder:
+`tor-lifecycle check --by-epic --base <base> > "$(git rev-parse --path-format=absolute --git-path peak-workflow-0002-findings.txt)"`.
+In the runner's final message print its last line (the counts); every `C` and `E` finding and
+every `F` finding reading "known to be wrong", verbatim; every blocking finding (the lines of
+the findings file containing `[this branch, blocking]`); one line per
+other finding letter with its count labelled from what its messages say (e.g. *"12 F: owned by more than one epic"*, *"5 D:
+changed since verified"*); then the file's
+absolute path on its own line. Then print the last line of `tor-lifecycle states`, and the records this step
+wrote as a count per kind:
 `git diff --name-only --diff-filter=A <base> -- docs/requirements/changes | xargs grep -h '^kind = ' | sort | uniq -c`.
 Then say, in plain words:
 
-- **Changed since verified** (`D`): the requirement's text changed after its epic verified it,
-  and the upgrade recorded that edit without test evidence. Triage each with the decision test:
+- **Changed since verified** (`D`): the requirement's text changed after its epic verified it;
+  when the message names a record, the upgrade recorded that edit without test evidence. Triage each with the decision test:
   when the meaning changed, `/peak-workflow:capture-requirements <TOR>`; when it did not,
   `/peak-workflow:wrapup-epic <epic> reverify` re-checks it. That triage is the owner's; nothing
   here decides it.
@@ -243,7 +317,10 @@ Then say, in plain words:
   a `pending` record; settle it with `/peak-workflow:capture-requirements <TOR>`.
 - **Dangling ID** (`C`) in a sidecar's `requirements:` line: the upgrade never rewrites a Complete
   epic's `requirements:`. Correct the line by hand on a `docs/` branch — replace the stray text
-  with the TOR IDs it meant, or delete it — and merge it like any planning change.
+  with the TOR IDs it meant, or delete it — and merge it like any planning change. A dangling ID
+  cited anywhere else (a design note, a spec): fix that citation on a `docs/` branch the same way.
 - Any other finding: follow its message.
+- When Phase 5 left a user-written `docs/requirements/README.md` alone, say so, and that its
+  Conventions may still describe 2.1 rules (the section Phase 5 would have written is above).
 
 Finally remove the scratch folder: `rm -rf "$(git rev-parse --git-path peak-workflow-0002)"`.
