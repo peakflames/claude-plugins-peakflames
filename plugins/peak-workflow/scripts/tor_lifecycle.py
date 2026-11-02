@@ -497,6 +497,7 @@ class Sidecar:
     reverified: str = "—"
     extra: dict[str, str] = field(default_factory=dict)             # unknown keys, verbatim
     malformed: list[str] = field(default_factory=list)              # bad `requirements:` entries (lenient)
+    comments: list[tuple[int, str]] = field(default_factory=list)   # (first line, text) per run of `#` lines
 
 
 SIDECAR_SCALARS = ("status", "owner", "implemented", "completed", "handoff", "reverified")
@@ -522,6 +523,7 @@ def parse_sidecar(epic: str, text: str, where: str = "", lenient: bool = False) 
     problems: list[str] = []
     block: str | None = None
     seen_keys: dict[str, tuple[int, str]] = {}
+    comment_end = 0
     prefix = f"{where}: " if where else ""
     for n, line in enumerate(text.splitlines(), 1):
         if not line.strip():
@@ -538,6 +540,13 @@ def parse_sidecar(epic: str, text: str, where: str = "", lenient: bool = False) 
             getattr(sc, block)[tor] = value
             continue
         block = None
+        if line.startswith("#"):  # a 2.x note; step 0002 classifies it, then `migrate sidecars` removes it
+            if sc.comments and comment_end == n - 1:
+                sc.comments[-1] = (sc.comments[-1][0], sc.comments[-1][1] + "\n" + line)
+            else:
+                sc.comments.append((n, line))
+            comment_end = n
+            continue
         m = KEY_LINE.match(line)
         if not m:
             problems.append(f"{prefix}line {n}: expected `key: value`, got {line!r}")
@@ -1817,6 +1826,9 @@ def scan_migration(root: Path, base: str | None = None, today: dt.date | None = 
             if key in sc.extra:
                 rel = f"{STATUS_DIR}/epic-{epic}.md"
                 keys.append({"path": rel, "epic": epic, "key": key, "value": sc.extra[key], "source": f"{rel}:{key}"})
+        for line, note in sc.comments:
+            rel = f"{STATUS_DIR}/epic-{epic}.md"
+            keys.append({"path": rel, "epic": epic, "key": "#", "value": note, "source": f"{rel}:#{line}"})
     removed = []
     for tor in sorted(set(tv.removed) - set(p.live) - set(p.gone)):
         removed.append({"tor": tor, **tv.removed[tor], "feature_file": Path(tv.last[tor][1]).name})
@@ -2247,8 +2259,14 @@ def run_strip(root: Path) -> list[dict]:
 
 
 def strip_sidecar_keys(text: str) -> str:
-    return "\n".join(ln for ln in text.split("\n")
-                     if not ((m := KEY_LINE.match(ln)) and not ln[:1].isspace() and m.group(1) in AD_HOC_KEYS))
+    """Drop the ad hoc keys and `#` note lines step 0002 folded into records."""
+    kept = [ln for ln in text.split("\n")
+            if not ((m := KEY_LINE.match(ln)) and not ln[:1].isspace() and m.group(1) in AD_HOC_KEYS)
+            and not ln.startswith("#")]
+    new = "\n".join(kept)
+    if any(ln.startswith("#") for ln in text.split("\n")):  # no blank runs or trailing gap left behind
+        new = re.sub(r"\n{3,}", "\n\n", new).rstrip("\n") + ("\n" if text.endswith("\n") else "")
+    return new
 
 
 def cmd_migrate(args: argparse.Namespace, root: Path) -> int:
@@ -2301,7 +2319,8 @@ def cmd_migrate(args: argparse.Namespace, root: Path) -> int:
             old = path.read_text(encoding="utf-8")
             new = strip_sidecar_keys(old)
             if new != old:
-                gone = [ln.split(":", 1)[0] for ln in old.split("\n") if ln not in new.split("\n") and ln.strip()]
+                gone = ["#" if ln.startswith("#") else ln.split(":", 1)[0]
+                        for ln in old.split("\n") if ln not in new.split("\n") and ln.strip()]
                 rows.append({"kind": "sidecar", "path": path.relative_to(root).as_posix(),
                              "lines": len(gone), "keys": gone, "text": new})
     else:  # finish

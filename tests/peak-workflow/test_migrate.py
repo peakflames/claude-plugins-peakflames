@@ -160,6 +160,26 @@ class HelperFlagTests(unittest.TestCase):
         self.assertEqual(self.repo.cli("migrate", "finish").returncode, 0)
 
 
+    def test_sidecar_comment_notes_are_sources_then_stripped(self):
+        # 2.x skills wrote `#` notes into sidecars (Project A); they must not block the upgrade.
+        path = self.repo.sidecar("aEpic01", status="Complete", requirements=["TOR-01-Aaa0001"],
+                                 reverified="2026-01-01")
+        path.write_text(path.read_text() + "\n# TOR-01-Bbb0002 rewritten by v1.27 and moved to epic bEpic02;\n"
+                        "# this epic's completion covers the old contract only.\n")
+        for args in (("check",), ("states",), ("validate",)):
+            self.assertNotEqual(self.repo.cli(*args).returncode, 2, args)
+        scan = json.loads(self.repo.cli("migrate", "scan", "--json").stdout)
+        notes = [k for k in scan["sidecar_keys"] if k["key"] == "#"]
+        self.assertEqual([k["source"] for k in notes], ["docs/implementation-plan/status/epic-aEpic01.md:#9"])
+        self.assertEqual(notes[0]["value"].count("\n"), 1)  # one run of two lines, one source
+        self.assertEqual(self.repo.cli("migrate", "sidecars").returncode, 1)
+        self.repo.cli("migrate", "sidecars", "--write")
+        side = path.read_text()
+        self.assertNotIn("#", side)
+        self.assertTrue(side.endswith("reverified: 2026-01-01\n"), repr(side))
+        self.assertEqual(self.repo.cli("migrate", "sidecars").returncode, 0)
+
+
 def run_step_0002(repo: FixtureRepo, plan: dict | None = None) -> list[str]:
     """What step 0002 does, phase by phase, as the runner applies it. Returns the commit subjects."""
     scratch = Path(repo.git("rev-parse", "--absolute-git-dir")) / "peak-workflow-0002"

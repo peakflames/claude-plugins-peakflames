@@ -43,7 +43,7 @@ only *"Resuming step 0002 after <last phase committed>"* and the phases left. Ot
 | Requirements deleted without a record | `removed` | A `supersede` or `retire` record with the text as it last read |
 | Tracing sidecars with titles | `tracing` | `title` and `generated` removed (the Scenario line is the only title) |
 | Open epic specs with a title column | `specs` | The Requirements Anchors table becomes `TOR ID \| Feature File` |
-| Ad hoc sidecar keys | `sidecar_keys` | Folded into the records, then removed |
+| Ad hoc sidecar keys and `#` note lines | `sidecar_keys` | Folded into the records, then removed |
 | Complete epics' requirements to fingerprint | `seed` | `verified:` lines from the commit that completed each epic |
 
 Then say:
@@ -51,7 +51,7 @@ Then say:
 - Fingerprints (the meaning-bearing text of each requirement) are checked before and after: they
   must come out identical for every requirement that stays.
 - A Complete epic's spec is history and is not touched. A Complete epic's sidecar keeps its
-  `status:` and every other line; it only gains `verified:` lines and loses ad hoc keys.
+  `status:` and every other line; it only gains `verified:` lines and loses ad hoc keys and `#` note lines.
 - Requirements edited after their epic was verified will show as **Changed since verified**, and
   known-wrong ones recorded in prose as **Disputed**. That is the point: the report at the end
   lists them per epic for you to triage.
@@ -90,7 +90,8 @@ Unless resuming with the file in place: `tor-lifecycle fingerprint > "<scratch>/
   requirement it sits in (`tor`), and `text`. Read each requirement's block with
   `tor-lifecycle text <TOR>` where the note alone is unclear.
 - `sidecar_keys` — `superseded_by`, `supersession_note`, `revised`, `revision-reason` lines;
-  `source` is `<sidecar path>:<key>`.
+  `source` is `<sidecar path>:<key>`. Each run of `#` note lines (key `#`, e.g. "TOR-… rewritten
+  by v1.27 and moved to epic …") is one entry; `source` is `<sidecar path>:#<line>`.
 - `removed` — IDs that left the feature files with no record (`check` finding B), with the merge
   that removed them.
 - `edits` — every trunk commit that changed a requirement's text with no record (`check`
@@ -210,7 +211,8 @@ reverified. `git add -- docs/implementation-plan/status` and commit `— seed ve
 ### Phase 7 — Normalize sidecar keys
 
 `tor-lifecycle migrate sidecars --write` removes the `superseded_by`, `supersession_note`,
-`revised`, and `revision-reason` lines Phase 4 folded into records (`reverified:` stays). `git add
+`revised`, and `revision-reason` lines and the `#` note lines Phase 4 folded into records
+(`reverified:` stays). `git add
 -- docs/implementation-plan/status` and commit `— normalize sidecar keys`.
 
 ### Phase 8 — Drop `migration_source`

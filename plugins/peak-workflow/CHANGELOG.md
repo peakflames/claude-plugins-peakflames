@@ -184,6 +184,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Status files with `#` notes upgrade** — the sidecar parser accepts the `#` note lines 2.x
+  wrote; step 0002 lists each run as a source to classify and `migrate sidecars` removes it.
 - **Step 0002 keeps a banner's section name** — a one-line banner holding a marker word
   ("revised …") is reported `kept`, so the strip no longer refuses to rename the section below it.
 - **Pre-3.0 edits stay undecided until decided** — `historical_records` lists only unproven
