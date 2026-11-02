@@ -479,10 +479,10 @@ proposal + addendum). Every plan reads this file first and updates it last.
 
 | # | Gate | State |
 |---|---|---|
-| 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 225 tests OK on both (rerun after the Gate 4 sidecar-notes fix) |
+| 1 | Unit + fixture tests green on 3.11 and 3.14 | ✅ 226 tests OK on both (rerun after the Gate 4 sidecar-notes and banner-note fixes) |
 | 2 | Two clean full dry-run passes incl. lifecycle scenarios | ✅ passes 9 and 10 clean (0 Critical, 8 agents). Criticals per pass 1–8: 4, 2, 1, 1, 3, 0, 1, 2 — all fixed |
 | 3 | Live UAT upgrade of the maintainer's 2.x project | ✅ Summit (1.5.0-era, format 0, 6 Complete epics, 33 TORs) with two planted merges. First run stopped at 2.6 (strip refused a one-line marker banner; Plan branch `—` for the skills' own merge subjects) — both fixed (`e83a681`). Re-run on `01827af`: 0.3–6.2 all ✅; 33/33 fingerprints identical; exactly TOR-03-s6tFG4V Changed since verified, TOR-02-K6frDEV Disputed, A = B = C = 0; supersede, reverify PASS, uphold all clean |
-| 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ◐ Maintainer ran the kit on 2026-11-02. A's baseline stopped: 7 sidecars hold 2.x `#` note lines the parser rejected (fixed: notes become step 0002 sources, Phase 7 strips them). Re-baseline: prerequisites ok, 423 Verified / 22 Changed since verified (the 16 reference IDs plus 6 edited after #20's study). B blocked by its invalid `01-…tracing.json` (expected). C prerequisites ok. Upgrade runs pending |
+| 4 | Contributor report: Project A reproduced (429 Verified / 16 Changed since verified / 1 C), B and C upgrade cleanly | ◐ Maintainer ran the kit on 2026-11-02. A's baseline stopped: 7 sidecars hold 2.x `#` note lines the parser rejected (fixed: notes become step 0002 sources, Phase 7 strips them). Re-baseline: prerequisites ok, 423 Verified / 22 Changed since verified (the 16 reference IDs plus 6 edited after #20's study). B blocked by its invalid `01-…tracing.json` (expected). C prerequisites ok. A's first upgrade run stopped at Phase 5: a `# Note:` under a banner was read as the section name (Safety lost on such requirements; note credited to the previous TOR). Fixed. That run's Phase 4 gate was approved unreviewed, so A reruns from scratch. Upgrade runs pending |
 
 - **Docs:** plugin README gains Prerequisites (Python 3.11+), a Requirements lifecycle section
   (five record kinds, where amendments happen, fingerprints, reverify, findings A–F), the 2.1 →
