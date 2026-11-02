@@ -184,6 +184,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A note under a banner is not a section** — a `# Note:` after a banner's closing rule no
+  longer becomes the section name, so Safety requirements keep Safety; step 0002 reports it
+  section-level and strips it without refusing.
 - **Status files with `#` notes upgrade** — the sidecar parser accepts the `#` note lines 2.x
   wrote; step 0002 lists each run as a source to classify and `migrate sidecars` removes it.
 - **Step 0002 keeps a banner's section name** — a one-line banner holding a marker word

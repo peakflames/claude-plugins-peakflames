@@ -98,7 +98,8 @@ def parse_requirements(text: str) -> list[ParsedScenario]:
 
     Fingerprint body = the title after the `[TOR-…]` prefix, then every line up to the next
     `Scenario:` or `Feature:` line, minus blank lines and comment lines (the `# Verification:` tag
-    is kept). A section banner is a comment line right after a `# ----` rule, or a bare `# Safety`.
+    is kept). A section banner is a comment line right after a `# ----` rule, or a bare `# Safety`;
+    the rule that closes a banner opens nothing, so a `# Note:` under it is not a section name.
     """
     out: list[ParsedScenario] = []
     tor: str | None = None
@@ -107,6 +108,7 @@ def parse_requirements(text: str) -> list[ParsedScenario]:
     section: str | None = None
     scen_section: str | None = None  # the banner in force at the Scenario line, not at its flush
     after_rule = False
+    in_banner = False  # a banner's title was read; its next rule (or a blank line) closes it
 
     def flush() -> None:
         if tor:
@@ -119,13 +121,15 @@ def parse_requirements(text: str) -> list[ParsedScenario]:
         if stripped.startswith("#"):
             content = stripped.lstrip("#").strip()
             if DASHES.match(content):
-                after_rule = True
+                after_rule, in_banner = not in_banner, False
             else:
                 if content and (after_rule or content.lower() == "safety") and not line[:1].isspace():
-                    section = content
+                    section, in_banner = content, after_rule or in_banner
                 after_rule = False
-        elif stripped:
-            after_rule = False
+        else:
+            in_banner = False
+            if stripped:
+                after_rule = False
         if m := SCEN.match(line):
             flush()
             tor, title, body = m.group(1), m.group(2).strip(), [m.group(2)]
@@ -1535,6 +1539,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
     group: list[int] = []
     held_empty: list[int] = []
     in_banner = banner_text = in_doc = seen_feature = False
+    preamble = False  # after a banner, before its section's first Scenario: prose is section-level
 
     def close() -> None:
         nonlocal group
@@ -1542,7 +1547,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             body = [lines[i].strip().lstrip("#").strip() for i in group]
             kind = ("marker" if any(LIFECYCLE_MARKERS.search(b) for b in body) else
                     "note" if any(b.lower().startswith("note:") for b in body) else "comment")
-            items.append(ProseItem(rel, group[0] + 1, group[-1] + 1, kind, tor,
+            items.append(ProseItem(rel, group[0] + 1, group[-1] + 1, kind, None if preamble else tor,
                                    "\n".join(b for b in body if b)))
         group = []
 
@@ -1561,10 +1566,10 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             continue
         if m := SCEN.match(line):
             close()
-            tor = m.group(1)
+            tor, preamble = m.group(1), False
         elif FEAT.match(line):
             close()
-            tor, seen_feature = None, True
+            tor, seen_feature, preamble = None, True, False
         if not stripped.startswith("#"):
             close()
             held_empty = []
@@ -1572,6 +1577,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
                 in_banner = False
             elif banner_text:
                 in_banner = banner_text = False
+                preamble = True
             continue
         content = stripped.lstrip("#").strip()
         if RULE_LINE.match(content):
@@ -1579,6 +1585,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             held_empty = []
             if in_banner and banner_text:
                 in_banner = banner_text = False
+                preamble = True
             else:
                 in_banner, banner_text = True, False
             continue

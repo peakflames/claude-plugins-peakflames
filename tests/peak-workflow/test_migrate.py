@@ -72,6 +72,27 @@ class ProseScanTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((repo.root / FILE).read_text(encoding="utf-8"), text)
 
+    def test_a_note_under_a_banner_is_not_a_section_and_is_section_level(self):
+        # Project A (Gate 4): a `# Note:` between a banner's closing rule and the first Scenario was
+        # read as the section name ("Note:"), so a Safety requirement lost Safety, the note was
+        # credited to the previous requirement, and strip refused (section would change).
+        text = "\n".join([
+            "Feature: 1.0 Core", "", "Scenario: [TOR-01-Aaa0001] The tool shall do A", "    Then a", "",
+            "# ----", "# Safety", "# MODIFIED v1.2: reorganised", "# ----", "# Note:",
+            "#   1. Covers every output the tool can switch.", "#", "",
+            "Scenario: [TOR-01-Bbb0002] The tool shall never do B", "    Then no B", ""])
+        reqs = {r.tor: r.section for r in tl.parse_requirements(text)}
+        self.assertEqual(reqs, {"TOR-01-Aaa0001": None, "TOR-01-Bbb0002": "Safety"})
+        items = [(it.line, it.kind, it.tor) for it in tl.scan_prose(FILE, text)]
+        self.assertEqual(items, [(8, "banner", None), (10, "note", None)])
+        with FixtureRepo() as repo:
+            repo.write(FILE, text)
+            result = repo.cli("migrate", "strip", "--write")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            new = (repo.root / FILE).read_text(encoding="utf-8")
+            self.assertNotIn("Covers every output", new)
+            self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
     def test_a_later_marker_line_in_a_banner_is_stripped(self):
         text = feature_text("01", "Core", [Scenario("TOR-01-Aaa0001", "The tool shall do A")], fenced=False)
         text = text.replace("Scenario:", "# ----\n# Core\n# MODIFIED v1.2: reorganised\n# ----\n\nScenario:")

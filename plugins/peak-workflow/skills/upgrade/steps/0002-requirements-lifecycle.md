@@ -88,7 +88,9 @@ Unless resuming with the file in place: `tor-lifecycle fingerprint > "<scratch>/
 - `prose` items with `strip: true` — `id` (`<file>:<line>`), `kind` (`marker` for AMENDED /
   REVISED / SUPERSEDED / MODIFIED / CHANGE-CONTROL, `note`, `comment`, `banner`, `outside`), the
   requirement it sits in (`tor`), and `text`. Read each requirement's block with
-  `tor-lifecycle text <TOR>` where the note alone is unclear.
+  `tor-lifecycle text <TOR>` where the note alone is unclear. `tor` is null for prose between a
+  section banner and that section's first Scenario: it speaks for the section, so pick the
+  requirement it explains (Rationale) or drop it.
 - `sidecar_keys` — `superseded_by`, `supersession_note`, `revised`, `revision-reason` lines;
   `source` is `<sidecar path>:<key>`. Each run of `#` note lines (key `#`, e.g. "TOR-… rewritten
   by v1.27 and moved to epic …") is one entry; `source` is `<sidecar path>:#<line>`.
