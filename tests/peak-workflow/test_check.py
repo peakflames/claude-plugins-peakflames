@@ -308,6 +308,20 @@ class FindingF(CheckCase):
                                    "fingerprint": "b" * 12, "text": "Scenario: old"}])
         self.assertEqual(self.kinds(self.repo.check()), ["feature-number-reused"])
 
+    def test_feature_number_reused_before_3_0_is_exempt(self):
+        # Project A (Gate 4): a 2.x feature was reverted and its number reused; step 0002's retire
+        # record names the old file. Renumbering would change every live TOR ID, so it is not a finding.
+        self.repo.record("retire", "Rt00005", "2099-01-01", tors=["TOR-01-Oldfile"], approved_via="migration",
+                         changes=[{"tor": "TOR-01-Oldfile", "feature_file": "01-legacy.feature.md",
+                                   "fingerprint": "b" * 12, "text": "Scenario: old"}])
+        self.assertEqual(self.kinds(self.repo.check()), [])
+
+    def test_feature_number_reused_after_the_upgrade_is_caught(self):
+        self.repo.record("retire", "Rt00006", "2000-01-01", tors=["TOR-01-Oldfile"], approved_via="migration",
+                         changes=[{"tor": "TOR-01-Oldfile", "feature_file": "01-legacy.feature.md",
+                                   "fingerprint": "b" * 12, "text": "Scenario: old"}])
+        self.assertEqual(self.kinds(self.repo.check()), ["feature-number-reused"])
+
     def test_retired_id_reused(self):
         self.repo.record("retire", "Rt00004", tors=[A3])
         self.assertIn("id-reused", self.kinds(self.repo.check()))

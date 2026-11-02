@@ -190,6 +190,13 @@ def git(root: Path, *args: str, check: bool = True) -> str:
     return proc.stdout
 
 
+def _added_by(root: Path, feature_file: str, day: dt.date) -> bool:
+    """True when `feature_file` was first committed on or before `day` (a pre-3.0 file)."""
+    out = git(root, "log", "--diff-filter=A", "--format=%as", "--", f"{REQ_DIR}/{feature_file}", check=False)
+    dates = [ln for ln in out.split() if ln]
+    return bool(dates) and dt.date.fromisoformat(min(dates)) <= day
+
+
 def show_at(root: Path, rev: str, relpath: str) -> str | None:
     """File text at `rev`, or None when the file does not exist there."""
     proc = _run_git(root, ["show", f"{rev}:{relpath}"])
@@ -1093,6 +1100,8 @@ def housekeeping(p: Project) -> list[Finding]:
                 continue
             nn = ff.split("-", 1)[0]
             if nn in live_files and live_files[nn] != ff and (nn, ff) not in reported:
+                if r.data.get("approved_via") == "migration" and _added_by(p.root, live_files[nn], r.date):
+                    continue  # reused before 3.0 banned it; renumbering would change every TOR ID
                 reported.add((nn, ff))
                 out.append(Finding("F", f"Feature number {nn} is reused: {live_files[nn]} is live, but "
                                    f"{r.id} names {ff}. Feature numbers are never reused.",
