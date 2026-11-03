@@ -489,6 +489,11 @@ class ProjectAUpgradeTests(unittest.TestCase):
             result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
             self.assertEqual(result.returncode, 2)
             self.assertIn("already has a different rationale", result.stderr)
+            plan["rationale"][0]["text"] = ("Written by the owner before the upgrade. "
+                                            + plan["rationale"][0]["text"])
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertNotEqual(result.returncode, 2, result.stderr)
 
     def test_11_an_unexplained_edit_gets_a_generic_historical_reword(self):
         with FixtureRepo() as other:

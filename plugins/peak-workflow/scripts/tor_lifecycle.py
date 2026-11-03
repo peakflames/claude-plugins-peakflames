@@ -2031,9 +2031,9 @@ def plan_integrity(root: Path, plan: dict, scan: "MigrationScan") -> list[str]:
         if t not in traced:
             problems.append(f"plan rationale #{n}: {t} has no tracing entry to hold its rationale; fix the "
                             "tracing sidecar on the base first, or drop the note")
-        elif traced[t] and isinstance(e.get("text"), str) and traced[t].strip() != e["text"].strip():
+        elif traced[t] and isinstance(e.get("text"), str) and traced[t].strip() not in e["text"]:
             problems.append(f"plan rationale #{n}: {t}'s tracing entry already has a different rationale; "
-                            "fold it into this entry's text (it is replaced)")
+                            "keep it word for word in this entry's text and add the note to it")
     for label, keys in (("removal", ("supersede", "retire")), ("pending", ("pending",))):
         first: dict[str, str] = {}
         for key in keys:
