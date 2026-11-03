@@ -52,6 +52,16 @@ class ProseScanTests(unittest.TestCase):
         for gone in ("AMENDED", "TODO", "caches", "MODIFIED", "SUPERSEDED banner"):
             self.assertNotIn(gone, new)
 
+    def test_record_block_drops_notes_and_keeps_the_fingerprint(self):
+        block = tl.scenario_block(self.TEXT, "TOR-01-Aaa0001")
+        self.assertIn("AMENDED", block)
+        stored = tl.record_block(block)
+        self.assertNotIn("AMENDED", stored)
+        for kept in ("# Verification: automated", "# not a comment"):
+            self.assertIn(kept, stored)
+        self.assertEqual(tl.fingerprint_text(stored), tl.fingerprint_text(block))
+        self.assertEqual(tl.record_block(""), "")
+
     def test_unfenced_title_before_feature_is_kept(self):
         text = "# Core requirements\n# SUPERSEDED file banner\n\nFeature: 1.0 Core\n\n" \
                "Scenario: [TOR-01-Aaa0001] The tool shall do A\n    # stray\n    Then a\n"
@@ -117,6 +127,51 @@ class ProseScanTests(unittest.TestCase):
         self.assertNotIn("MODIFIED", new)
         self.assertIn("# Core", new)
         self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
+
+class GateBoxTests(unittest.TestCase):
+    """F5/F7: `tor-lifecycle box` renders the Phase 4 NOW | BECOMES boxes the same way every run."""
+    ITEM = {"n": 37, "tor": "TOR-02-Abc1234", "title": "The app shall sync every 30 seconds",
+            "from": ["docs/requirements/02-sync.feature.md, lines 40–42 (the note is removed from here)"],
+            "to": ["docs/requirements/02-sync.feature.tracing.json → entry \"TOR-02-Abc1234\" → field \"rationale\""],
+            "rows": [["AMENDED v1.8: the interval was tightened from 60 to 30 seconds after the ops review "
+                      "asked for faster sync.", "The interval is 30 seconds because the ops review asked."],
+                     ["See ENG-123.", "(unchanged)"]],
+            "changed": "marker word removed", "lost": "the old 60-second value"}
+
+    def test_side_by_side_columns_line_up(self):
+        out = tl.render_box(self.ITEM).split("\n")
+        self.assertEqual(out[0], "37. TOR-02-Abc1234 — The app shall sync every 30 seconds")
+        self.assertTrue(out[1].startswith("FROM: ") and out[2].startswith("TO:   "))
+        box = [ln for ln in out if ln[:1] in "+|"]
+        self.assertEqual({len(ln) for ln in box}, {tl.BOX_WIDE})
+        self.assertEqual({ln.index("|", 1) for ln in box if ln.startswith("|")}, {tl.BOX_COL + 3})
+        self.assertEqual(out[-1], "Changed: marker word removed. LOST: the old 60-second value.")
+        text = " ".join(ln[2:tl.BOX_COL + 2].strip() for ln in box if ln.startswith("|"))
+        self.assertIn("after the ops review asked for faster sync.", " ".join(text.split()))
+
+    def test_narrow_terminal_stacks_now_above_becomes(self):
+        out = tl.render_box(self.ITEM, width=70).split("\n")
+        self.assertFalse([ln for ln in out if ln.startswith("|")])
+        self.assertTrue(all(len(ln) <= 70 for ln in out if not ln.startswith(("FROM", "TO", "37."))))
+        labels = [ln.split(":")[0] for ln in out if ln.startswith(("NOW:", "BECOMES:"))]
+        self.assertEqual(labels, ["NOW", "BECOMES", "NOW", "BECOMES"])
+
+    def test_cli_and_bad_items(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            good, bad = Path(d) / "good.json", Path(d) / "bad.json"
+            good.write_text(json.dumps([self.ITEM, {**self.ITEM, "n": 38}]))
+            bad.write_text(json.dumps([{**self.ITEM, "rows": [["only one cell"]]}]))
+            with FixtureRepo() as repo:
+                result = repo.cli("box", str(good))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("\n\n38. TOR-02-Abc1234", result.stdout)
+                stacked = repo.cli("box", "--stacked", str(good))
+                self.assertIn("BECOMES:  (unchanged)", stacked.stdout)
+                result = repo.cli("box", str(bad))
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("[now, becomes] string pairs", result.stderr)
 
 
 class AnchorTableTests(unittest.TestCase):
@@ -338,6 +393,13 @@ class ProjectAUpgradeTests(unittest.TestCase):
         self.assertEqual(reword.data["evidence"]["result"], "historical")
         csv = next(r for r in records if r.tors == ["TOR-03-Csv0001"])
         self.assertIn("text and date", csv.changes[0]["text"])  # verbatim, from git history
+        # Supersede and retire records store the requirement without its old notes (F2).
+        for tor, note in (("TOR-02-Old0001", "SUPERSEDED by"), ("TOR-03-Imp0001", "REVISED v1.6")):
+            ch = next(c for r in records for c in r.changes if c["tor"] == tor)
+            self.assertNotIn(note, ch["text"])
+            self.assertNotIn("# Note", ch["text"])
+            self.assertTrue(ch["text"].startswith(f"Scenario: [{tor}]"), ch["text"])
+            self.assertEqual(tl.fingerprint_text(ch["text"]), [(tor, ch["fingerprint"])])
 
     def test_07_feature_tracing_and_specs_are_clean(self):
         root = self.repo.root
@@ -494,6 +556,46 @@ class ProjectAUpgradeTests(unittest.TestCase):
             path = fresh.write(".plan.json", json.dumps(plan))
             result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
             self.assertNotEqual(result.returncode, 2, result.stderr)
+
+    def test_10f_whole_file_deletions_and_wide_supersedes_are_flagged(self):
+        # F3: a whole-file retirement deletes its tracing file, coverage gaps included.
+        # F9: one supersede entry links every old ID to every successor.
+        olds = [Scenario(f"TOR-01-Old000{n}", f"The tool shall do old thing {n}",
+                         note=[f"SUPERSEDED by the v2 requirements in 02 (item {n})."]) for n in range(1, 5)]
+        news = [Scenario(f"TOR-02-New000{n}", f"The tool shall do new thing {n}") for n in range(1, 5)]
+        gap = {"gap_type": "uncovered_source", "source_ref": "ConOps 5.2", "note": "Offline mode not covered."}
+        with FixtureRepo() as repo:
+            repo.feature("01", "old", olds)
+            repo.feature("02", "new", news)
+            for nn, name, scens, extra in (("01", "old", olds, {"coverage_gaps": [gap]}), ("02", "new", news, {})):
+                repo.write(f"docs/requirements/{nn}-{name}.feature.tracing.json", json.dumps(
+                    {"feature_id": nn, "requirements": [{"id": s.tor} for s in scens], **extra}, indent=2))
+            repo.commit("baseline")
+            _code, scan = repo.json_cli("migrate", "scan", "--base", "develop")
+            sources = [it["id"] for it in scan["prose"] if it["strip"]]
+            plan = {"rationale": [], "history": [], "retire": [], "pending": [], "drop": [],
+                    "supersede": [{"tors": [s.tor for s in olds], "successors": [s.tor for s in news],
+                                   "title": "Old things replaced by v2", "reason": "v2.", "keywords": ["v2"],
+                                   "sources": sources}]}
+            path = repo.write(".plan.json", json.dumps(plan))
+            code, rows = repo.json_cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(code, 0, rows)
+            [whole] = [r for r in rows if r["kind"] == "file-delete"]
+            self.assertEqual(whole["path"], "docs/requirements/01-old.feature.md")
+            self.assertEqual(whole["coverage_gaps"], [gap])
+            self.assertIn("losing 1 coverage gap", whole["title"])
+            [warn] = [r for r in rows if r["kind"] == "warning"]
+            self.assertIn("4 requirements to 4 successors (16 links)", warn["title"])
+            plan["supersede"][0]["tors"] = plan["supersede"][0]["tors"][:3]
+            plan["supersede"][0]["sources"] = [s for s in sources if any(
+                it["id"] == s and it["tor"] in plan["supersede"][0]["tors"] for it in scan["prose"])]
+            plan["drop"] = [s for s in sources if s not in plan["supersede"][0]["sources"]]
+            plan["retire"] = [{"tors": ["TOR-01-Old0004"], "removal": "none", "title": "x", "reason": "x",
+                               "keywords": ["x"], "sources": []}]
+            repo.write(".plan.json", json.dumps(plan))
+            code, rows = repo.json_cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(code, 0, rows)
+            self.assertFalse([r for r in rows if r["kind"] == "warning"])  # 3 x 4 is not wide
 
     def test_11_an_unexplained_edit_gets_a_generic_historical_reword(self):
         with FixtureRepo() as other:

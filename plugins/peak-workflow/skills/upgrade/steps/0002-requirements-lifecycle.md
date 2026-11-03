@@ -293,6 +293,10 @@ by one feature) are one question.
   work will remove the code that implements this, in <files>."* For Open question, add who owns
   it, and that the requirement is flagged until decided and blocks work after <threshold> days
   (a safety requirement at once).
+- **A whole file goes:** when the preview has a `file-delete` row for a removal's requirements,
+  say in its block *"Every requirement in <file> is removed, so the file and its .tracing.json file
+  are deleted."* When that row lists `coverage_gaps`, add each gap's `note` (with its `source_ref`)
+  word for word, then *"LOST: these known coverage gaps."*
 - **Delete the note:** the note word for word, then *"LOST: all of this."* Drops of notes on
   requirements being replaced or retired go inside that removal's block as LOST lines, not as
   their own questions.
@@ -318,7 +322,12 @@ Changed: <what changed, all in one line>. LOST: <each dropped detail>, or LOST: 
 ```
 
 Both columns are 52 characters wide, each original sentence its own row, wrapped so the columns
-line up. Build the box with a short script and paste its output. A merged item has one `FROM:`
+line up. Render the boxes with the helper, never by hand: write the round's items to
+`<scratch>/box-<r>.json` (`[{"n", "tor", "title", "from": [...], "to": [...], "above", "rows":
+[[now, becomes], ...], "changed", "lost"}]`, `above` only when set) and paste the output of
+`tor-lifecycle box "<scratch>/box-<r>.json"` into the round's code block. The legend ends *"If the
+boxes look jumbled, say so and I'll stack them."*; when the owner says so, re-render this and every
+later round with `--stacked` (NOW above BECOMES). A merged item has one `FROM:`
 line per source note, with its NOW rows grouped by source in that order. For History, `TO:` is *"a
 new history file in docs/requirements/changes/"* (*"<n> history files, one per commit that edited it"* when
 more than one commit did), and the BECOMES column holds the title, then the
@@ -345,7 +354,7 @@ given at this gate are not kept, and a later run starts the gate again. After a 
 ask Apply again.
 
 **3. Apply.** One message: counts per plain label, the past edits logged under their commit
-message, the live requirements to be deleted by ID and title (and, separately, already-removed ones whose removal is recorded), and the items changed through a Change
+message, the live requirements to be deleted by ID and title, any whole files deleted (with how many coverage gaps they lose) (and, separately, already-removed ones whose removal is recorded), and the items changed through a Change
 option. Then ask via `AskUserQuestion`, with no option marked recommended:
 
 - Question: `"Apply these choices? Each note is saved or dropped as shown; <D> requirements are deleted as listed, and every other requirement keeps its wording."`
@@ -371,7 +380,12 @@ Before the gate, write your draft to `<scratch>/plan.json` and run `tor-lifecycl
 --plan "<scratch>/plan.json" --base <base> --json` (a preview: one row per record, rationale move,
 and deletion, each record with its `fields` — reason, keywords, successors, removal, owner,
 tracker, refs). Fill each row's `Saved as` in `table.md`, and every BECOMES column, from this output, not from your draft, so the
-owner reads exactly what will be written. Exit 2 names what is unclassified, inconsistent, or would be lost (a second entry for one
+owner reads exactly what will be written. Two row kinds write nothing: `file-delete` (every
+requirement in a feature file is removed; shown at the gate as above) and `warning` (a Supersede
+entry wide enough to link many old IDs to many successors). For a `warning`, check the entry
+against "Successors are the requirements that take over": split it into one entry per successor
+group, or, when every old requirement really is replaced by every successor, say so in that
+removal's block (*"Each of these <a> requirements is replaced by all <b> successors."*). Exit 2 names what is unclassified, inconsistent, or would be lost (a second entry for one
 requirement, a History entry with no edit, a source listed twice in one entry, or both cited and dropped): fix the plan — asking the user only
 when the fix is a new decision — and run it again. After the owner's changes, rewrite
 `plan.json` and re-run the preview. Once they choose **Apply**:

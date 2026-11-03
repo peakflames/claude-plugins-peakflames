@@ -98,6 +98,10 @@ behind. Merge the upgrade branch like any planning change (merge = approval).
    surviving requirement's fingerprint must stay identical), seeds `verified:` fingerprints from
    each Complete epic's completion commit, and ends with a health report grouped by epic.
 
+   Records it writes carry `approved_via = "migration"`: the owner classified them at the upgrade
+   gate. Notes copied over word for word may have been accepted in bulk (the "Only the decisions"
+   path), so `approved_by` names who approved the classification, not a line-by-line review.
+
 Requirements edited after they were verified now show as **Changed since verified**; `/status`
 lists them by epic. Settle each one with the decision test: a meaning change →
 `/peak-workflow:capture-requirements <TOR-ID>`; otherwise `/peak-workflow:wrapup-epic <id> reverify`.
