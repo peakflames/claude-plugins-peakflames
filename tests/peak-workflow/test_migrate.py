@@ -140,7 +140,7 @@ class GateBoxTests(unittest.TestCase):
             "changed": "marker word removed", "lost": "the old 60-second value"}
 
     def test_side_by_side_columns_line_up(self):
-        out = tl.render_box(self.ITEM).split("\n")
+        out = tl.render_box(self.ITEM, all_rows=True).split("\n")
         self.assertEqual(out[0], "37. TOR-02-Abc1234 — The app shall sync every 30 seconds")
         self.assertTrue(out[1].startswith("FROM: ") and out[2].startswith("TO:   "))
         box = [ln for ln in out if ln[:1] in "+|"]
@@ -150,8 +150,17 @@ class GateBoxTests(unittest.TestCase):
         text = " ".join(ln[2:tl.BOX_COL + 2].strip() for ln in box if ln.startswith("|"))
         self.assertIn("after the ops review asked for faster sync.", " ".join(text.split()))
 
+    def test_unchanged_rows_are_counted_not_drawn(self):
+        out = tl.render_box(self.ITEM)
+        self.assertNotIn("(unchanged)", out)
+        self.assertIn("+ 1 sentence kept word for word", out)
+        only_unchanged = {**self.ITEM, "rows": [["See ENG-123.", "(unchanged)"]]}
+        out = tl.render_box(only_unchanged)
+        self.assertNotIn("+---", out)
+        self.assertIn("+ 1 sentence kept word for word", out)
+
     def test_narrow_terminal_stacks_now_above_becomes(self):
-        out = tl.render_box(self.ITEM, width=70).split("\n")
+        out = tl.render_box(self.ITEM, width=70, all_rows=True).split("\n")
         self.assertFalse([ln for ln in out if ln.startswith("|")])
         self.assertTrue(all(len(ln) <= 70 for ln in out if not ln.startswith(("FROM", "TO", "37."))))
         labels = [ln.split(":")[0] for ln in out if ln.startswith(("NOW:", "BECOMES:"))]
@@ -167,11 +176,59 @@ class GateBoxTests(unittest.TestCase):
                 result = repo.cli("box", str(good))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("\n\n38. TOR-02-Abc1234", result.stdout)
-                stacked = repo.cli("box", "--stacked", str(good))
+                stacked = repo.cli("box", "--stacked", "--all-rows", str(good))
                 self.assertIn("BECOMES:  (unchanged)", stacked.stdout)
                 result = repo.cli("box", str(bad))
                 self.assertEqual(result.returncode, 2)
                 self.assertIn("[now, becomes] string pairs", result.stderr)
+
+
+class GateCardTests(unittest.TestCase):
+    """Gate 5: every owner question is one card — ASKING / CHANGES / MY READ, then a section body."""
+    CARD = {"q": 1, "of": 24, "section": "Notes to delete",
+            "asking": "OK to delete 2 background notes? Each one only lists where requirements came from.",
+            "changes": ["Requirements: no wording changes.", "Lost: these 2 notes (git history keeps them)."],
+            "read": "Safe: the sources they name still exist.",
+            "list": [{"where": "01-app", "text": "UX rules come from the UX Baseline", "n": 3},
+                     {"where": "11-navigation", "text": "Route map comes from vision section 6", "n": 106}],
+            "example": {"where": "01-app.feature.md", "rows": [["# Derived from the UX Baseline ...", "(note removed)"],
+                                                              ["Scenario: [TOR-01-Aaa0001] A", "Scenario: [TOR-01-Aaa0001] A"]]},
+            "footer": "#10 holds a past decision, so it is asked next, on its own."}
+
+    def test_card_leads_with_the_question_in_plain_words(self):
+        out = tl.render_card(self.CARD).split("\n")
+        self.assertEqual(out[0], "Question 1 of 24: Notes to delete")
+        self.assertTrue(out[2].startswith("ASKING   OK to delete 2 background notes?"))
+        self.assertIn("CHANGES  Requirements: no wording changes.", out)
+        self.assertTrue(any(ln.startswith("MY READ  Safe") for ln in out))
+        self.assertIn("  01-app         UX rules come from the UX Baseline  (#3)", out)
+        prose = out[: out.index("THE NOTES")]
+        self.assertTrue(all(len(ln) <= tl.CARD_TEXT for ln in prose))
+        row = next(ln for ln in out if ln.startswith("  # Derived"))
+        self.assertTrue(row.rstrip().endswith("(note removed)"))  # NOW and AFTER on one line
+        self.assertEqual(out[-1], "#10 holds a past decision, so it is asked next, on its own.")
+
+    def test_titles_requirements_items_and_lost(self):
+        card = {**self.CARD, "section": "Past changes to log", "list": [], "example": None, "footer": "",
+                "titles": [{"where": "01-app", "requirement": "JSON log record on startup",
+                            "title": "Startup stamp moved from plain text to JSON", "n": 4}],
+                "requirements": [{"tor": "TOR-02-Old0001", "title": "Ask which version to keep", "n": 9,
+                                  "then": ["replaced by TOR-02-New0001: Keep the most recent edit"]}],
+                "items": [GateBoxTests.ITEM], "lost": ["the old 60-second value"]}
+        out = tl.render_card(card)
+        self.assertIn("  01-app: JSON log record on startup\n    -> Startup stamp moved from plain text to JSON  (#4)", out)
+        self.assertIn("  TOR-02-Old0001: Ask which version to keep  (#9)\n    -> replaced by TOR-02-New0001", out)
+        self.assertIn("37. TOR-02-Abc1234", out)
+        self.assertTrue(out.endswith("LOST: the old 60-second value"))
+
+    def test_narrow_card_stacks_and_bad_cards_are_refused(self):
+        out = tl.render_card(self.CARD, width=60)
+        self.assertIn("  NOW\n    # Derived from the UX Baseline ...", out)
+        self.assertIn("  AFTER\n    (note removed)", out)
+        with self.assertRaises(tl.DataError):
+            tl.render_card({"q": 1})
+        with self.assertRaises(tl.DataError):
+            tl.render_card({**self.CARD, "example": {"rows": [["only one"]]}})
 
 
 class AnchorTableTests(unittest.TestCase):
