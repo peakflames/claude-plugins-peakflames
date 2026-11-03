@@ -184,6 +184,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   side-by-side NOW/BECOMES box with FROM/TO lines and every lost detail. No option is recommended.
 - **Rewordings keep details** — rationale rewrites strip only marker wording; supersede entries
   list only the real successors.
+- **Gate boxes from the helper** — `tor-lifecycle box` renders the NOW/BECOMES boxes from a JSON
+  item list, identical every run; `--stacked` (or `--width` under 111) prints NOW above BECOMES
+  for narrow terminals.
+- **Gate flags whole-file deletions and wide supersedes** — the `migrate records` preview reports
+  a feature file deleted whole (with the coverage gaps it loses) and a supersede entry linking
+  more than 3 old IDs to more than 3 successors.
 - **Reword titles name the change** — History titles say what changed (≤ 60 characters); edits
   without a note get a title read from their diff.
 - **Short upgrade report** — step 0002 prints the finding counts and the findings needing action,
@@ -259,6 +265,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   reverify that would fail again.
 - **`status` reads open epics from their branch** — a pause made on `feature/epic-…` shows as
   Paused and is flagged when stale.
+- **Removal records store clean text** — supersede and retire records written by step 0002 drop
+  the old `# Note:` lines and markers from the stored Scenario text; the fingerprint is unchanged.
+- **Upgrade format check is quiet** — reading the base branch's missing stamp no longer prints
+  git's harmless "exists on disk, but not in" error.
 - **Release Protocol template** — the tag is pushed with the branches in the ask-first step;
   changelog headings use `—` and ISO dates; the version bump is language-neutral.
 - **Small skill fixes** — plan-project's solo merge no longer pushes unasked; pause checks the
@@ -273,6 +283,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **README requirements lifecycle** — prerequisites (Python 3.11+), a Requirements lifecycle
   section (the five record kinds, where amendments happen, fingerprints, reverify, findings A–F),
   the 2.1 → 3.0 upgrade walkthrough, and the triage AMEND, TOR-ID, and reverify rows.
+- **What `approved_via = "migration"` means** — the README says the owner approved the
+  classification at the upgrade gate, with copied notes possibly accepted in bulk, not a
+  line-by-line review.
 - **Root README upgrade pointer** — 2.x users are told to run `/peak-workflow:upgrade` and that
   Python 3.11+ is required.
 - **Plugin CLAUDE.md invariants** — sidecar lifecycle lines written only by `mark`, Change Record

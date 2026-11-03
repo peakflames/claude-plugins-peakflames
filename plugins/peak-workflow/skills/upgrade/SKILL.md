@@ -39,8 +39,9 @@ each upgrade step is its own commit, and yours must not ride along."*
 
 Then pick the base branch: `git branch --list develop main master` — prefer `develop`, then
 `main`, then `master`. Every `<base>` below is this branch. `B` is the base's own format — `N` as
-read in Step 1 when you are on `<base>`, else `git show <base>:docs/.peak-workflow.toml` (`format
-= …`; no file = 0). The plan heading, the summary, and the Leave message name `B`, not a
+read in Step 1 when you are on `<base>`, else `git show <base>:docs/.peak-workflow.toml 2>/dev/null`
+(`format = …`; no file = 0 — git's "exists on disk, but not in" message is expected then, so it is
+silenced). The plan heading, the summary, and the Leave message name `B`, not a
 half-upgraded branch's number.
 
 **Resume check.** Unless you are already on one, look for an earlier run's branch:

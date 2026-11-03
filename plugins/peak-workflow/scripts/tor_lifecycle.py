@@ -1977,6 +1977,23 @@ PLAN_FIELDS = {
 }
 
 
+SUPERSEDE_WIDE = 3  # a supersede entry with more old IDs and more successors than this is flagged
+
+
+def record_block(block: str) -> str:
+    """A Scenario block as a supersede or retire record stores it: the lifecycle prose the strip
+    phase would remove (`# Note:` lines, change markers, stray comments) is dropped first, so the
+    record holds the requirement, not its old notes. Comments do not count toward the fingerprint."""
+    if not block:
+        return block
+    head = "Feature: record"
+    text, _n = strip_feature_text("record", f"{head}\n{block}")
+    lines = text.split("\n")[1:] if text.startswith(head) else text.split("\n")
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return "\n".join(lines)
+
+
 def plan_integrity(root: Path, plan: dict, scan: "MigrationScan") -> list[str]:
     """Plan problems that would otherwise drop approved content or write contradictory records."""
     problems: list[str] = []
@@ -2209,7 +2226,7 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
                     ch["successors"] = list(e["successors"])
                 else:
                     ch["traced_to"] = _traced_to(tracing_entries.get(t))
-                ch["text"] = block
+                ch["text"] = record_block(block)
                 changes.append(ch)
                 if t in removed_ids:
                     extra.append(removed_ids[t]["sha"])
@@ -2272,6 +2289,26 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
              for t, text in rationale.items()]
     rows += [{"record": None, "kind": "delete", "tors": [t], "title": "", "path": f"{REQ_DIR}/{p.live[t].feature_file}"}
              for t in sorted(deleting)]
+    # Whole-file deletions take the tracing file, and its `coverage_gaps`, with them: say so.
+    for name in sorted({p.live[t].feature_file for t in deleting}):
+        in_file = sorted(t for t, req in p.live.items() if req.feature_file == name)
+        if not set(in_file) <= deleting:
+            continue
+        tracing = (root / REQ_DIR / name).with_name(name.removesuffix(".md") + ".tracing.json")
+        gaps = load_tracing(tracing).get("coverage_gaps", []) if tracing.exists() else []
+        gaps = gaps if isinstance(gaps, list) else []
+        rows.append({"record": None, "kind": "file-delete", "tors": in_file, "path": f"{REQ_DIR}/{name}",
+                     "title": f"every requirement in {name} is removed: the file and its tracing file are deleted"
+                              + (f", losing {len(gaps)} coverage gap(s)" if gaps else ""),
+                     "coverage_gaps": gaps})
+    # A supersede links every old ID to every successor: a wide entry is usually several groups.
+    for n, e in enumerate(plan["supersede"], 1):
+        old_ids, succ = e.get("tors", []), e.get("successors", [])
+        if len(old_ids) > SUPERSEDE_WIDE and len(succ) > SUPERSEDE_WIDE:
+            rows.append({"record": None, "kind": "warning", "tors": list(old_ids), "path": None,
+                         "title": f"plan supersede #{n} links {len(old_ids)} requirements to {len(succ)} successors "
+                                  f"({len(old_ids) * len(succ)} links); if each is replaced by only some of them, "
+                                  "write one entry per successor group"})
     if not write:
         return [{**r, "record": "new" if r["record"] else None, "path": None if r["record"] else r["path"]}
                 for r in rows]
@@ -2967,6 +3004,71 @@ def cmd_text(args: argparse.Namespace, root: Path) -> int:
     return EXIT_OK
 
 
+BOX_COL = 52                   # each column of the side-by-side box
+BOX_WIDE = 2 * BOX_COL + 7     # its full width: below this, the box is stacked (NOW above BECOMES)
+
+
+def _sentence(text: str) -> str:
+    text = text.strip()
+    return text if not text or text[-1] in ".!?" else text + "."
+
+
+def render_box(item: dict, width: int = BOX_WIDE) -> str:
+    """One gate item (step 0002 Phase 4 "Altered text"): heading, FROM/TO lines, the NOW | BECOMES
+    rows (one row per original sentence, both columns wrapped to line up), then the Changed line.
+    Narrower than BOX_WIDE, each row is printed NOW above BECOMES instead."""
+    import textwrap
+    problems = [f"`{k}` is required" for k in ("n", "tor", "title", "rows", "changed", "lost") if k not in item]
+    rows = item.get("rows", [])
+    if not isinstance(rows, list) or not all(isinstance(r, list) and len(r) == 2 and all(isinstance(c, str) for c in r)
+                                             for r in rows):
+        problems.append("`rows` must be a list of [now, becomes] string pairs")
+    if problems:
+        raise DataError([f"item {item.get('n', '?')}: {x}" for x in problems])
+    out = [f"{item['n']}. {item['tor']} — {item['title']}"]
+    for label, key in (("FROM:", "from"), ("TO:  ", "to")):
+        lines = item.get(key) or []
+        out += [f"{label} {ln}" for ln in ([lines] if isinstance(lines, str) else lines)]
+    if item.get("above"):
+        out.append(item["above"])
+    if width >= BOX_WIDE:
+        rule = "+" + "-" * (BOX_COL + 2) + "+" + "-" * (BOX_COL + 2) + "+"
+        out += [rule, f"| {'NOW':<{BOX_COL}} | {'BECOMES':<{BOX_COL}} |", rule]
+        for now, becomes in rows:
+            left = textwrap.wrap(now, BOX_COL) or [""]
+            right = textwrap.wrap(becomes, BOX_COL) or [""]
+            for i in range(max(len(left), len(right))):
+                a = left[i] if i < len(left) else ""
+                b = right[i] if i < len(right) else ""
+                out.append(f"| {a:<{BOX_COL}} | {b:<{BOX_COL}} |")
+            out.append(rule)
+    else:
+        inner = max(width - 11, 20)
+        rule = "-" * min(width, inner + 11)
+        out.append(rule)
+        for now, becomes in rows:
+            for label, text in (("NOW:      ", now), ("BECOMES:  ", becomes)):
+                wrapped = textwrap.wrap(text, inner) or [""]
+                out += [label + wrapped[0]] + [" " * len(label) + ln for ln in wrapped[1:]]
+            out.append(rule)
+    out.append(f"Changed: {_sentence(item['changed'])} LOST: {_sentence(item['lost'])}")
+    return "\n".join(out)
+
+
+def cmd_box(args: argparse.Namespace, root: Path) -> int:
+    try:
+        items = json.loads(Path(args.items).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DataError(f"{args.items}: cannot read the items ({exc})") from None
+    if isinstance(items, dict):
+        items = [items]
+    if not isinstance(items, list) or not all(isinstance(i, dict) for i in items):
+        raise DataError(f"{args.items}: expected a list of item objects")
+    width = 0 if args.stacked else args.width
+    print("\n\n".join(render_box(i, width) for i in items))
+    return EXIT_OK
+
+
 def cmd_version(args: argparse.Namespace, root: Path) -> int:
     print(f"python\t{'.'.join(map(str, sys.version_info[:3]))}\t{sys.executable}")
     print(f"format\t{PLUGIN_FORMAT}")
@@ -3074,6 +3176,14 @@ def build_parser() -> argparse.ArgumentParser:
     mg.add_argument("--json", action="store_true")
     mg.add_argument("--today", help=argparse.SUPPRESS)
     mg.set_defaults(func=cmd_migrate)
+
+    bx = sub.add_parser("box", help="step 0002 gate: render NOW | BECOMES boxes from a JSON list of items")
+    bx.add_argument("items", help='JSON file: [{"n", "tor", "title", "from": [...], "to": [...], "above"?, '
+                                  '"rows": [[now, becomes], ...], "changed", "lost"}]')
+    bx.add_argument("--width", type=int, default=BOX_WIDE,
+                    help=f"terminal width; below {BOX_WIDE} the box is stacked")
+    bx.add_argument("--stacked", action="store_true", help="NOW above BECOMES, for a narrow terminal")
+    bx.set_defaults(func=cmd_box)
 
     ve = sub.add_parser("version", help="print the interpreter and the project format this plugin writes")
     ve.set_defaults(func=cmd_version)
