@@ -3084,7 +3084,9 @@ def render_card(card: dict, width: int = BOX_WIDE, all_rows: bool = False) -> st
         value = card[key]
         lines = [ln for v in ([value] if isinstance(value, str) else value) for ln in _wrap(v, text_w)]
         out += [f"{label:<{CARD_LABEL}}{lines[0]}"] + [" " * CARD_LABEL + ln for ln in lines[1:]]
-    tag = lambda e: f"  (#{e['n']})" if e.get("n") not in (None, "") else ""
+    def tag(e: dict) -> str:  # `n` may arrive as 4, "4", or "#4": one "#" either way
+        n = str(e.get("n", "") or "").strip().lstrip("#")
+        return f"  (#{n})" if n else ""
     if card.get("list"):
         out += ["", card.get("list_heading", "THE NOTES")]
         col = min(max(len(e.get("where", "")) for e in card["list"]), 22)

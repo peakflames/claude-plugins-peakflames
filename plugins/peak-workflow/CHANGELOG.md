@@ -186,7 +186,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   list only the real successors.
 - **Gate questions as cards** — `tor-lifecycle card` renders every owner question as ASKING /
   CHANGES / MY READ plus a per-section body: one-line note lists, title lists, before/after
-  examples, or NOW/BECOMES boxes. Item numbers become trailing `(#n)` tags.
+  examples, or NOW/BECOMES boxes. Item numbers become trailing `(#n)` tags. Each card is pasted in
+  chat and shown again in the question's option previews.
 - **Gate boxes from the helper** — `tor-lifecycle box` draws NOW/BECOMES boxes showing only changed
   sentences (plus a kept-word-for-word count); `--stacked` or a narrow `--width` stacks them.
 - **Gate sections sized for reading** — source-only notes to delete share one card, notes holding a
