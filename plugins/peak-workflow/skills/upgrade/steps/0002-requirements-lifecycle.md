@@ -93,9 +93,15 @@ are pending) and read it:
   REVISED / SUPERSEDED / MODIFIED / CHANGE-CONTROL, `note`, `comment`, `banner`, `outside`), the
   requirement it sits in (`tor`), and `text`. Read each requirement's block with
   `tor-lifecycle text <TOR>` where the note alone is unclear. `tor` is null for prose between a
-  section banner and that section's first Scenario: it speaks for the section, so pick the
-  requirement it explains (Rationale) or drop it.
-- `sidecar_keys` — `superseded_by`, `supersession_note`, `revised`, `revision-reason` lines;
+  section banner and that section's first Scenario, and for a whole-file banner or header marker:
+  it speaks for the section or file. Pick the requirement it explains (Rationale), or drop it.
+  When it marks the section or file superseded or retired, cite it instead in the Supersede or
+  Retire entry for the requirements of that section or file (only when `strip: true`; a kept
+  banner line goes with the file).
+  A preamble note directly above a Scenario line gets that Scenario's `tor`: judge every note by
+  its words, not only by its `tor`.
+- `sidecar_keys` — `superseded_by`, `supersession_note`, `revised`, `revision-reason` /
+  `revision_reason` lines;
   `source` is `<sidecar path>:<key>`. Each run of `#` note lines (key `#`, e.g. "TOR-… rewritten
   by v1.27 and moved to epic …") is one entry; `source` is `<sidecar path>:#<line>`.
 - `removed` — IDs that left the feature files with no record (`check` finding B), with the merge
@@ -135,20 +141,38 @@ Rules:
   or Drop.
 - A live requirement marked superseded or retired in prose is deleted from its feature file by
   the helper after its record is written; its tracing entry goes too. A requirement with a
-  Rationale, History, or Pending entry must not also be superseded or retired.
+  Rationale, History, or Pending entry must not also be superseded or retired: a note on a
+  requirement being removed is cited in that Supersede or Retire entry's `sources` with its
+  content folded into the reason, or dropped.
 - Retire `removal`: run `git grep -n -w <TOR> -- . ':!docs'`. Hits in tests or source → propose
   `"code"` (a removal epic is needed; `/peak-workflow:add` plans it later); none → `"none"`.
 - `keywords` are the words someone would use to re-propose the idea (two to five).
-- `revised:` / `revision-reason:` keys are the reason for that epic's edited requirement (History
-  `sources`); `supersession_note:` is the reason for its supersede.
+- `revised:` / `revision-reason:` (or `revision_reason:`) keys are the reason for an edited requirement of the epic whose
+  sidecar holds the key (History `sources`) — the requirement the value names, among that
+  sidecar's `requirements:`; when it
+  names none, propose Drop and say why. When that requirement has no `edits` row, classify them
+  Rationale or Drop.
+  `superseded_by:` names the replaced requirements' successors. The requirements it replaces are
+  among the `requirements:` of the epic whose sidecar holds the key. Its successors are the live
+  IDs its value names; when it names an epic or a file, propose only the requirements in it that
+  take over (see "Successors are the requirements that take over"), never all of them. A key alone never deletes a live requirement: without a prose
+  marker or the owner's say-so, propose Drop. `supersession_note:` is the reason for its
+  supersede.
 - Every `edits` row becomes a historical `reword` whether or not you write a History entry; the
   entry only supplies the title and reason (without one the helper names the commit subject).
-  When no note explains an edit and its `edits` row's `subject` does not say what changed, read the change with `git diff --word-diff -U3 <sha>^1 <sha> -- <feature file>`
+  When no note explains an edit and the title the `migrate records` preview shows for it (*"Edited in place before 3.0: <subject>"*, the inner commit's subject) does not say what changed, read the change with `git diff --word-diff -U3 <sha>^1 <sha> -- <feature file>`
   (most `edits` shas are merges, which `git show` prints empty), looking only at the hunk under
   that requirement's Scenario line, and write a History entry for it with `sources: []`.
-- A Rationale for a requirement with no tracing entry cannot be kept: the helper refuses it. Tell
-  the owner, propose Drop, and note that adding the tracing entry first (on `<base>`, through
-  `/peak-workflow:capture-requirements`) would keep it.
+- A Rationale for a requirement with no tracing entry cannot be kept: the helper refuses it.
+  Propose Drop, and tell the owner in plain words: *"This requirement has no companion entry to
+  hold the note. To keep it, choose Stop here (answers so far are not kept), add an entry for
+  <TOR> to <file>.feature.tracing.json on a docs/ branch, merge it into <base>, then run the
+  upgrade again."* (The other skills stop on an un-upgraded project, so the entry is added by
+  hand, shaped like that file's other entries.)
+- **An existing rationale is kept.** When the requirement's tracing entry already holds a
+  rationale, the new `text` keeps it and adds the note (the helper refuses a text that would
+  replace a different one). The item is a decision, shown with its own `FROM:` line (*"existing
+  reason in the .tracing.json file"*) and NOW rows.
 - **One Rationale entry per requirement.** A tracing entry holds one rationale, and the helper
   refuses a plan with two for one requirement. When several notes explain one requirement, write
   one `text` covering them all and list every note in its `sources`.
@@ -161,49 +185,172 @@ Rules:
   has several `edits` rows, or a note plus an unexplained edit, write one entry whose title and
   reason cover them all.
 
+- **Reword only the marker words.** A Rationale `text` drops marker and history wording
+  ("AMENDED", "Note (updated 2026-05-14):", "has been removed", version tags) and keeps every
+  example, ID, number, and named detail word for word. Anything you leave out is a loss the owner
+  must see (below).
+- **Successors are the requirements that take over.** The helper links every requirement in a
+  Supersede entry to every one of its `successors`, so list only the live requirements that
+  replace those in `tors`. When different requirements have different replacements (A and B by
+  X, C and D by Y), write one entry per successor group; it is still one question, and its block
+  shows each arrow. When a whole feature file replaces another, name the specific successors;
+  never list a whole file "to be safe".
+
 The classification is the owner's decision, not yours: you draft it, they decide. If helper agents
 draft rows, read every row they wrote before you show it. Run the preview below before the gate,
 so the owner never approves a plan the helper rejects.
 
-Write the full table — `# | Where | Requirement | What it says | Proposed | Detail`, one row per
-prose item, sidecar key, `removed` ID, History entry with `sources: []`, and `edits` row with no
-History entry (its title is the one the preview shows), written in part order when the gate is
-split (below); `What it says` being
-the prose summarized in ≤ 80 characters (each note, when one item holds several), `Detail` the
-full entry the row informs — Supersede: successors, title, reason, keywords; Retire: removal,
-title, reason, keywords; Pending: owner, tracker, title, reason, keywords; History: title and
-reason; any `refs`; Rationale: text; a row whose
-entry another row already shows may say "as row N", and a Supersede or Retire row also says the
-Scenario is deleted — to `<scratch>/table.md`, and give its absolute path (`git rev-parse --path-format=absolute
---git-path peak-workflow-0002/table.md`) on its own line with the row count. Then show inline, in this order, the rows that carry a judgment:
+Write the full table to `<scratch>/table.md` — `# | Note in | Requirement | What it says | Choice
+| Saved as`, one row per prose item, sidecar key, `removed` ID, History entry with `sources: []`,
+and `edits` row with no History entry (its title is the one the preview shows). `Note in` is the
+file and line range (`docs/requirements/02-x.feature.md, lines 40–42`, or `epic-<id> status file:
+revised`); `What it says` is the prose summarized in ≤ 80 characters; `Choice` is the plain label
+below (two, joined by "+", for a note feeding two entries); `Saved as` is the full entry the row informs — Supersede: successors, title, reason,
+keywords; Retire: removal, title, reason, keywords; Pending: owner, tracker, title, reason,
+keywords; History: title and reason; any `refs`; Rationale: text. A row whose entry another row
+already shows may say "as row N"; a Supersede or Retire row also says the Scenario is deleted (or, for a `removed` ID: already gone, removal recorded). Row
+numbers are fixed once written: a later change never renumbers. Give the file's absolute path
+(`git rev-parse --path-format=absolute --git-path peak-workflow-0002/table.md`) on its own line with
+the row count.
 
-1. Every Supersede, Retire, and Pending entry, and every `removed` ID with its proposed entry.
-2. Every section-level item (`tor` null) with the requirement you chose for it, or Drop.
-3. Every sidecar key and `#` note line.
-4. Every History entry: requirements, title, and reason.
-5. Anything you were unsure of, with the alternative.
+#### Presenting the gate
 
-Drop rows, and Rationale rows whose `text` only restates the note, stay in the file; show any
-Rationale you reworded or wrote from scratch. When the table has more than 40 rows, skip
-the inline list and walk the table in parts instead. Group whole feature files in feature-number
-order until the next file would take the part past 40 rows; a file over 40 rows is a part of its
-own; rows outside the feature files (sidecar keys, `removed` IDs, History entries with
-`sources: []`, `edits` rows with no History entry) form the last part, named "outside the
-feature files" in its question and split again past 40. Say how many parts there are, then for each part show its judgment rows in the order above
-followed by its other rows, and ask `"Rows <first>–<last> (<files>): are these right?"` with
-options `["These are right", "Change some rows", "Stop here"]`. These choices work as they do at
-the final question below; after a change, rewrite `plan.json` and `table.md` and re-run the preview
-before the next part.
+**The owner may not be technical, and reads only your chat text.** The terminal collapses tool
+output to "Ran 1 shell command", so anything a command prints is invisible: paste it into your
+own message. Never use the plan keys, `NN:line` shorthand, or a long markdown table in what the
+owner reads (long table cells collapse into key/value lists in a terminal). Number every item by
+its `table.md` row, so "item 37" means one thing everywhere.
+
+Name each choice by its plain label; the briefing gives each one as a single bullet, worded as here:
+
+| Plain label | Plan key | Briefing bullet |
+|---|---|---|
+| **Keep as the reason** | Rationale | saved next to the requirement as the reason it reads as it does |
+| **Log as a past change** | History | saved in a history file saying what changed and why |
+| **Replaced by another requirement** | Supersede | the requirement is deleted (or, if already gone, its removal is recorded); a history file names what replaced it |
+| **No longer needed** | Retire | the requirement is deleted (or, if already gone, its removal is recorded); a history file says why |
+| **Open question** | Pending | the change is recorded as undecided, and that requirement is flagged until someone decides |
+| **Delete the note** | Drop | the note is thrown away (git history still has it) |
+
+Sort the items into three groups:
+
+- **Copied notes:** a Rationale whose `text` is its note minus the marker words, nothing else
+  changed, attached to the requirement whose Scenario the note sits inside. A note just above a
+  Scenario line (it may belong to the Scenario before) is a decision.
+- **Housekeeping drops:** a Drop of a note that says nothing lasting (a TODO, a section reshuffle,
+  a marker with no text), except on a requirement being replaced or retired: those notes are
+  LOST lines in that removal's block.
+- **Decisions:** everything else — Supersede, Retire, and Pending entries and `removed` IDs; other
+  Drops; History entries; Rationale you reworded beyond marker words, merged, wrote, or attached
+  from a section-level note (`tor` null); anything you narrowed or were unsure of.
+
+**Ask about each item once.** A sidecar key or `#` note line is shown inside the question for the
+entry it feeds; a section-level note is shown as that entry's item, with the Changed line *"This
+note was about the whole section; I attached it to <ID>."* (in a removal block: *"This note marks
+the whole section"*). A note that feeds several entries (a Rationale and a History) is one box
+with one `TO:` line per entry and its BECOMES rows labelled by destination; when one of those
+entries is a removal, the box goes inside that removal's question and not in a round. `edits` rows with no History entry are
+not asked about; they are counted. **Counts are in questions and box items** — the units the owner
+answers — and an item spanning several `table.md` rows is headed by all of them ("Items 31 + 32").
+
+**1. Briefing** (one message, no items yet), in plain words:
+
+- What is happening: the requirement files hold notes, markers, and comments written inside
+  their Scenarios over time. This format does not allow them there, so each one moves to a
+  permanent place. The wording of every requirement that stays does not change, and a check
+  proves it afterward.
+- One real example from this project, as a code block: a short Scenario excerpt with its note
+  lines as they are today, then the same excerpt without them, then the `FROM:` and `TO:` lines
+  (format below) saying where that note goes.
+- The six choices, one bullet each, as in the table above.
+- The stakes: *"<N> notes: <K> copied word for word (low risk), <H> housekeeping notes to drop,
+  and <M> decisions (<F> from notes, <S> from git history) in about <Q> questions"*. <N> is
+  <K> + <H> + <F>; say *"<X> of these combine several notes"* when the inventory count differs.
+  `removed` IDs always count in <S>; <Q> counts the housekeeping question.
+- Which live requirements would be deleted, by ID and title.
+- *"<E> other past edits are logged under their commit message."*
+- Nothing is written until the final Apply.
 
 Then ask via `AskUserQuestion`, with no option marked recommended:
 
-- Question: `"Apply this classification? Each row, shown above or in table.md, becomes the record or tracing change listed."`
-- Options: `["Apply", "Change some rows", "Stop here"]`
+- Question: `"How do you want to review the notes?"`
+- Options: `["Only the <M> decisions", "Every note", "Stop here"]` — the first's description:
+  *"one at a time or in small rounds; the <K> copied notes are kept word for word, marker words
+  removed, and you approve dropping the <H> housekeeping notes in one question"*; the second's: *"the decisions, then the
+  housekeeping drops, then the copied notes in small rounds"*.
 
-On **Change some rows**, ask in chat which rows and what to change, take the new choices in the
-user's words, rewrite `plan.json` and `table.md`, re-run the preview, re-show the changed rows,
-and ask again. On **Stop here**, end the session: the branch keeps the commits
-made so far, and a later run resumes from the stamp.
+**2. Decisions**, in this order: Drops the helper forces (a reason for a requirement with no
+companion entry), then removals, pending, and other Drops, one per question; then all altered
+text (History and Rationale) in rounds; then the housekeeping drops. Items that share one decision (26 requirements replaced
+by one feature) are one question.
+
+- **Replaced, No longer needed, Open question:** one code block showing each affected
+  requirement's title (`<ID> — <title>`; for a `removed` ID, read it with `tor-lifecycle text
+  <TOR> --rev <sha>^1`, `<sha>` being the commit that removed it), for Replaced an arrow to each successor's `<ID> —
+  <title>` (when you narrowed successors from an epic or file, list the others below as `<ID> —
+  <title> (not a successor)`), then each record's title and reason as they will be saved, under its arrows, then the notes or sidecar
+  keys it came from, word for word, and a `Keywords:` line (plus `Tracker:` and `Refs:` when set). For a Retire with `removal = "code"`, add: *"A later piece of
+  work will remove the code that implements this, in <files>."* For Open question, add who owns
+  it, and that the requirement is flagged until decided and blocks work after <threshold> days
+  (a safety requirement at once).
+- **Delete the note:** the note word for word, then *"LOST: all of this."* Drops of notes on
+  requirements being replaced or retired go inside that removal's block as LOST lines, not as
+  their own questions.
+- Under the block: why you propose it, and the alternative. Ask `"Item <n>: <short decision>?"` (`"Items <a> + <b>: …"` for one spanning several rows)
+  with options `["Yes, as shown", "Change it", "Stop here"]`, no option marked recommended. A
+  forced drop (no companion entry) offers only `["Yes, drop it", "Stop here"]`.
+
+**Altered text** (reworded, merged, or written Rationale; History titles and reasons) goes in rounds
+of about 5 items, one code block per round. Before the first box, the legend: *"Each row is one
+sentence. Left is what's there now; right is what it becomes."* Then, per item:
+
+```
+<n>. <TOR-ID> — <requirement title>
+FROM: docs/requirements/<NN-name>.feature.md, lines <a>–<b> (the note is removed from here)
+      (or: epic-<id> status file, key "revised")
+TO:   docs/requirements/<NN-name>.feature.tracing.json → entry "<TOR-ID>" → field "rationale"
++------------------------------------------------------+------------------------------------------------------+
+| NOW                                                  | BECOMES                                              |
++------------------------------------------------------+------------------------------------------------------+
+| <one sentence or clause of the note>                 | <its rewrite, or "(unchanged)">                      |
++------------------------------------------------------+------------------------------------------------------+
+Changed: <what changed, all in one line>. LOST: <each dropped detail>, or LOST: nothing.
+```
+
+Both columns are 52 characters wide, each original sentence its own row, wrapped so the columns
+line up. Build the box with a short script and paste its output. A merged item has one `FROM:`
+line per source note, with its NOW rows grouped by source in that order. For History, `TO:` is *"a
+new history file in docs/requirements/changes/"* (*"<n> history files, one per commit that edited it"* when
+more than one commit did), and the BECOMES column holds the title, then the
+reason; for an entry written from a diff, `FROM:` names the commit (no "removed from here"), the
+line *"Requirement wording untouched; this logs a past edit."* goes above the box, its Changed
+line reads *"Changed: past edit logged. LOST: nothing."*, the NOW column
+holds the requirement's sentences from the diff labelled *"Before <date>:"* and *"After:"*, word
+for word, and the BECOMES cells start *"Title:"* and *"Reason:"*. A cell whose text moves
+elsewhere says where in plain words (*"(moved to the history file in docs/requirements/changes/)"*).
+Then ask `"Round <r> of <T> (items <a>, <b>, … above): save the BECOMES text as shown?"` with
+options `["Save as shown", "Change some", "Stop here"]`, no option marked recommended.
+
+**Housekeeping drops** are one question on either path: each note word for word in one code
+block, then *"LOST: all of these."* — `"Drop these <H> housekeeping notes?"` with options
+`["Yes, drop them", "Change some", "Stop here"]`. **Every note** then shows the copied notes in the
+same boxes, about 5 per round.
+
+**Changes.** On **Change it**, **Change some**, or **Change something**, ask in chat *"Which item
+numbers, and what should change?"*, take the owner's words, rewrite `plan.json` and `table.md`, and
+re-run the preview. The other items in that question or round are accepted as shown. Re-show only the changed items, in the format they were shown in, and ask about
+just those. An item whose choice changed (Keep as the reason → Delete the note) is re-asked in its
+new form. On **Stop here**, end the session: the branch keeps the commits made so far, the answers
+given at this gate are not kept, and a later run starts the gate again. After a change at Apply,
+ask Apply again.
+
+**3. Apply.** One message: counts per plain label, the past edits logged under their commit
+message, the live requirements to be deleted by ID and title (and, separately, already-removed ones whose removal is recorded), and the items changed through a Change
+option. Then ask via `AskUserQuestion`, with no option marked recommended:
+
+- Question: `"Apply these choices? Each note is saved or dropped as shown; <D> requirements are deleted as listed, and every other requirement keeps its wording."`
+  (with no deletions: `"…saved or dropped as shown; no requirement's wording changes."`)
+- Options: `["Apply", "Change something", "Stop here"]`
 
 The plan file, `<scratch>/plan.json`:
 
@@ -223,9 +370,9 @@ The plan file, `<scratch>/plan.json`:
 Before the gate, write your draft to `<scratch>/plan.json` and run `tor-lifecycle migrate records
 --plan "<scratch>/plan.json" --base <base> --json` (a preview: one row per record, rationale move,
 and deletion, each record with its `fields` — reason, keywords, successors, removal, owner,
-tracker, refs). Fill each row's `Detail` in `table.md` from this output, not from your draft, so the
+tracker, refs). Fill each row's `Saved as` in `table.md`, and every BECOMES column, from this output, not from your draft, so the
 owner reads exactly what will be written. Exit 2 names what is unclassified, inconsistent, or would be lost (a second entry for one
-requirement, a History entry with no edit, a source cited twice or both cited and dropped): fix the plan — asking the user only
+requirement, a History entry with no edit, a source listed twice in one entry, or both cited and dropped): fix the plan — asking the user only
 when the fix is a new decision — and run it again. After the owner's changes, rewrite
 `plan.json` and re-run the preview. Once they choose **Apply**:
 

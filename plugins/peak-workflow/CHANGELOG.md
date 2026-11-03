@@ -179,8 +179,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Step 0002 strip preflight** — the upgrade trial-runs `migrate strip` before classification
   and stops on a refusal, before any owner effort or commit.
-- **Neutral, chunked owner gate** — Phase 4 shows every judgment row inline, walks tables over
-  40 rows one feature file at a time, and marks no option recommended.
+- **Owner gate for non-technical owners** — Phase 4 opens with a plain briefing and a real
+  before/after example, then walks only the decisions one at a time; altered text shows in a
+  side-by-side NOW/BECOMES box with FROM/TO lines and every lost detail. No option is recommended.
+- **Rewordings keep details** — rationale rewrites strip only marker wording; supersede entries
+  list only the real successors.
 - **Reword titles name the change** — History titles say what changed (≤ 60 characters); edits
   without a note get a title read from their diff.
 - **Short upgrade report** — step 0002 prints the finding counts and the findings needing action,
@@ -197,8 +200,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   to replace the first silently, losing approved text; `migrate records` now names both entries.
 - **Step 0002 refuses plans that would lose or contradict approved content** — a History entry with
   no edit, a requirement in two removal or two pending entries, unknown fields, and unknown,
-  duplicated, or both cited and dropped sources, and a rationale that would replace another, now
-  stop `migrate records` with a message.
+  duplicated, or both cited and dropped sources, and a rationale that drops an existing one, now
+  stop `migrate records` with a message. A rationale that keeps the existing text and adds to it
+  passes.
 - **The records preview shows every approved field** — `migrate records --json` adds each record's
   reason, keywords, successors, removal, owner, and tracker; the gate's table is built from it.
 - **Step 0002 resumes from its records, not a commit subject** — a re-run skips classification
