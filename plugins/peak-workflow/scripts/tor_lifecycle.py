@@ -3013,11 +3013,19 @@ def _sentence(text: str) -> str:
     return text if not text or text[-1] in ".!?" else text + "."
 
 
-def render_box(item: dict, width: int = BOX_WIDE) -> str:
+UNCHANGED = re.compile(r"^\(unchanged\b", re.I)
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    import textwrap
+    return textwrap.wrap(text, max(width, 10)) or [""]
+
+
+def render_box(item: dict, width: int = BOX_WIDE, all_rows: bool = False) -> str:
     """One gate item (step 0002 Phase 4 "Altered text"): heading, FROM/TO lines, the NOW | BECOMES
     rows (one row per original sentence, both columns wrapped to line up), then the Changed line.
-    Narrower than BOX_WIDE, each row is printed NOW above BECOMES instead."""
-    import textwrap
+    Rows whose BECOMES is "(unchanged)" are counted, not drawn, unless `all_rows`. Narrower than
+    BOX_WIDE, each row is printed NOW above BECOMES instead."""
     problems = [f"`{k}` is required" for k in ("n", "tor", "title", "rows", "changed", "lost") if k not in item]
     rows = item.get("rows", [])
     if not isinstance(rows, list) or not all(isinstance(r, list) and len(r) == 2 and all(isinstance(c, str) for c in r)
@@ -3025,47 +3033,126 @@ def render_box(item: dict, width: int = BOX_WIDE) -> str:
         problems.append("`rows` must be a list of [now, becomes] string pairs")
     if problems:
         raise DataError([f"item {item.get('n', '?')}: {x}" for x in problems])
+    kept = 0 if all_rows else sum(bool(UNCHANGED.match(b.strip())) for _a, b in rows)
+    shown = rows if all_rows else [r for r in rows if not UNCHANGED.match(r[1].strip())]
     out = [f"{item['n']}. {item['tor']} — {item['title']}"]
     for label, key in (("FROM:", "from"), ("TO:  ", "to")):
         lines = item.get(key) or []
         out += [f"{label} {ln}" for ln in ([lines] if isinstance(lines, str) else lines)]
     if item.get("above"):
         out.append(item["above"])
-    if width >= BOX_WIDE:
+    if shown and width >= BOX_WIDE:
         rule = "+" + "-" * (BOX_COL + 2) + "+" + "-" * (BOX_COL + 2) + "+"
         out += [rule, f"| {'NOW':<{BOX_COL}} | {'BECOMES':<{BOX_COL}} |", rule]
-        for now, becomes in rows:
-            left = textwrap.wrap(now, BOX_COL) or [""]
-            right = textwrap.wrap(becomes, BOX_COL) or [""]
+        for now, becomes in shown:
+            left, right = _wrap(now, BOX_COL), _wrap(becomes, BOX_COL)
             for i in range(max(len(left), len(right))):
                 a = left[i] if i < len(left) else ""
                 b = right[i] if i < len(right) else ""
                 out.append(f"| {a:<{BOX_COL}} | {b:<{BOX_COL}} |")
             out.append(rule)
-    else:
-        inner = max(width - 11, 20)
-        rule = "-" * min(width, inner + 11)
+    elif shown:
+        inner = max(width - 10, 20)
+        rule = "-" * (inner + 10)
         out.append(rule)
-        for now, becomes in rows:
+        for now, becomes in shown:
             for label, text in (("NOW:      ", now), ("BECOMES:  ", becomes)):
-                wrapped = textwrap.wrap(text, inner) or [""]
+                wrapped = _wrap(text, inner)
                 out += [label + wrapped[0]] + [" " * len(label) + ln for ln in wrapped[1:]]
             out.append(rule)
+    if kept:
+        out.append(f"+ {kept} sentence{'s' if kept != 1 else ''} kept word for word")
     out.append(f"Changed: {_sentence(item['changed'])} LOST: {_sentence(item['lost'])}")
     return "\n".join(out)
 
 
-def cmd_box(args: argparse.Namespace, root: Path) -> int:
+CARD_LABEL = 9   # "MY READ  "
+CARD_TEXT = 80   # card prose wraps here, so it reads in one glance
+
+
+def render_card(card: dict, width: int = BOX_WIDE, all_rows: bool = False) -> str:
+    """One owner-gate question (step 0002 Phase 4): `Question q of T: <section>`, then ASKING,
+    CHANGES, and MY READ in plain words, then the section's body — `list` (one line per note),
+    `titles` (requirement -> title saved), `requirements` (what a removal or open question touches),
+    `example` (one before/after), `items` (NOW | BECOMES boxes), and `lost` lines."""
+    problems = [f"`{k}` is required" for k in ("q", "of", "section", "asking", "changes", "read") if k not in card]
+    if problems:
+        raise DataError([f"card {card.get('q', '?')}: {x}" for x in problems])
+    text_w = min(max(width, 40), CARD_TEXT) - CARD_LABEL
+    out = [f"Question {card['q']} of {card['of']}: {card['section']}", ""]
+    for label, key in (("ASKING", "asking"), ("CHANGES", "changes"), ("MY READ", "read")):
+        value = card[key]
+        lines = [ln for v in ([value] if isinstance(value, str) else value) for ln in _wrap(v, text_w)]
+        out += [f"{label:<{CARD_LABEL}}{lines[0]}"] + [" " * CARD_LABEL + ln for ln in lines[1:]]
+    tag = lambda e: f"  (#{e['n']})" if e.get("n") not in (None, "") else ""
+    if card.get("list"):
+        out += ["", card.get("list_heading", "THE NOTES")]
+        col = min(max(len(e.get("where", "")) for e in card["list"]), 22)
+        for e in card["list"]:
+            body = _wrap(e.get("text", "") + tag(e), text_w + CARD_LABEL - col - 4)
+            out.append(f"  {e.get('where', ''):<{col}}  {body[0]}")
+            out += [" " * (col + 4) + ln for ln in body[1:]]
+    if card.get("titles"):
+        out.append("")
+        for e in card["titles"]:
+            out.append(f"  {e.get('where', '')}: {e.get('requirement', '')}".rstrip(": "))
+            out.append(f"    -> {e.get('title', '')}{tag(e)}")
+    if card.get("requirements"):
+        out.append("")
+        for e in card["requirements"]:
+            out.append(f"  {e.get('tor', '')}: {e.get('title', '')}{tag(e)}")
+            out += [f"    -> {s}" for s in e.get("then", [])]
+    if card.get("example"):
+        ex = card["example"]
+        pairs = ex.get("rows", [])
+        if not isinstance(pairs, list) or not all(isinstance(r, list) and len(r) == 2 for r in pairs):
+            raise DataError(f"card {card['q']}: `example.rows` must be a list of [now, after] line pairs")
+        out += ["", f"EXAMPLE: {ex.get('where', '')}, before / after"]
+        if width >= BOX_WIDE:
+            half = (BOX_WIDE - 6) // 2
+            out.append(f"  {'NOW':<{half}}  AFTER")
+            for now, after in pairs:
+                left, right = _wrap(now, half), _wrap(after, half)
+                for i in range(max(len(left), len(right))):
+                    a = left[i] if i < len(left) else ""
+                    b = right[i] if i < len(right) else ""
+                    out.append(f"  {a:<{half}}  {b}".rstrip())
+        else:
+            for label, col in (("NOW", 0), ("AFTER", 1)):
+                out.append(f"  {label}")
+                out += [f"    {w}" for r in pairs for w in _wrap(r[col], max(width, 30) - 6)]
+    if card.get("items"):
+        out += [""] + ["\n\n".join(render_box(i, width, all_rows) for i in card["items"])]
+    if card.get("lost"):
+        out += [""] + [f"LOST: {x}" for x in card["lost"]]
+    if card.get("footer"):
+        out += ["", card["footer"]]
+    return "\n".join(out).rstrip()
+
+
+def _load_json_arg(path: str):
     try:
-        items = json.loads(Path(args.items).read_text(encoding="utf-8"))
+        return json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise DataError(f"{args.items}: cannot read the items ({exc})") from None
+        raise DataError(f"{path}: cannot read ({exc})") from None
+
+
+def cmd_box(args: argparse.Namespace, root: Path) -> int:
+    items = _load_json_arg(args.items)
     if isinstance(items, dict):
         items = [items]
     if not isinstance(items, list) or not all(isinstance(i, dict) for i in items):
         raise DataError(f"{args.items}: expected a list of item objects")
     width = 0 if args.stacked else args.width
-    print("\n\n".join(render_box(i, width) for i in items))
+    print("\n\n".join(render_box(i, width, args.all_rows) for i in items))
+    return EXIT_OK
+
+
+def cmd_card(args: argparse.Namespace, root: Path) -> int:
+    card = _load_json_arg(args.card)
+    if not isinstance(card, dict):
+        raise DataError(f"{args.card}: expected one card object")
+    print(render_card(card, 0 if args.stacked else args.width, args.all_rows))
     return EXIT_OK
 
 
@@ -3183,7 +3270,16 @@ def build_parser() -> argparse.ArgumentParser:
     bx.add_argument("--width", type=int, default=BOX_WIDE,
                     help=f"terminal width; below {BOX_WIDE} the box is stacked")
     bx.add_argument("--stacked", action="store_true", help="NOW above BECOMES, for a narrow terminal")
+    bx.add_argument("--all-rows", action="store_true", help='also draw rows whose BECOMES is "(unchanged)"')
     bx.set_defaults(func=cmd_box)
+
+    cd = sub.add_parser("card", help="step 0002 gate: render one owner question (ASKING / CHANGES / MY READ + body)")
+    cd.add_argument("card", help='JSON file: {"q", "of", "section", "asking", "changes", "read", "list"?, '
+                                 '"titles"?, "requirements"?, "example"?, "items"?, "lost"?, "footer"?}')
+    cd.add_argument("--width", type=int, default=BOX_WIDE, help=f"terminal width; below {BOX_WIDE} boxes stack")
+    cd.add_argument("--stacked", action="store_true", help="NOW above BECOMES, for a narrow terminal")
+    cd.add_argument("--all-rows", action="store_true", help='also draw rows whose BECOMES is "(unchanged)"')
+    cd.set_defaults(func=cmd_card)
 
     ve = sub.add_parser("version", help="print the interpreter and the project format this plugin writes")
     ve.set_defaults(func=cmd_version)

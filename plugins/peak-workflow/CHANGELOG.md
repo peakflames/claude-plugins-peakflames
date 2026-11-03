@@ -184,9 +184,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   side-by-side NOW/BECOMES box with FROM/TO lines and every lost detail. No option is recommended.
 - **Rewordings keep details** — rationale rewrites strip only marker wording; supersede entries
   list only the real successors.
-- **Gate boxes from the helper** — `tor-lifecycle box` renders the NOW/BECOMES boxes from a JSON
-  item list, identical every run; `--stacked` (or `--width` under 111) prints NOW above BECOMES
-  for narrow terminals.
+- **Gate questions as cards** — `tor-lifecycle card` renders every owner question as ASKING /
+  CHANGES / MY READ plus a per-section body: one-line note lists, title lists, before/after
+  examples, or NOW/BECOMES boxes. Item numbers become trailing `(#n)` tags.
+- **Gate boxes from the helper** — `tor-lifecycle box` draws NOW/BECOMES boxes showing only changed
+  sentences (plus a kept-word-for-word count); `--stacked` or a narrow `--width` stacks them.
+- **Gate sections sized for reading** — source-only notes to delete share one card, notes holding a
+  decision are asked alone, and word-for-word past changes are reviewed as title lists of about 10.
 - **Gate flags whole-file deletions and wide supersedes** — the `migrate records` preview reports
   a feature file deleted whole (with the coverage gaps it loses) and a supersede entry linking
   more than 3 old IDs to more than 3 successors.

@@ -249,9 +249,9 @@ entry it feeds; a section-level note is shown as that entry's item, with the Cha
 note was about the whole section; I attached it to <ID>."* (in a removal block: *"This note marks
 the whole section"*). A note that feeds several entries (a Rationale and a History) is one box
 with one `TO:` line per entry and its BECOMES rows labelled by destination; when one of those
-entries is a removal, the box goes inside that removal's question and not in a round. `edits` rows with no History entry are
+entries is a removal, the box goes inside that removal's card (`items`), not in a reworded-reasons card. `edits` rows with no History entry are
 not asked about; they are counted. **Counts are in questions and box items** — the units the owner
-answers — and an item spanning several `table.md` rows is headed by all of them ("Items 31 + 32").
+answers — and an item spanning several `table.md` rows is tagged with all of them (`(#31 + #32)`).
 
 **1. Briefing** (one message, no items yet), in plain words:
 
@@ -269,85 +269,120 @@ answers — and an item spanning several `table.md` rows is headed by all of the
   `removed` IDs always count in <S>; <Q> counts the housekeeping question.
 - Which live requirements would be deleted, by ID and title.
 - *"<E> other past edits are logged under their commit message."*
+- How each question will look: a short card saying what I'm asking, what changes for you, and
+  my read, then the notes themselves.
 - Nothing is written until the final Apply.
 
 Then ask via `AskUserQuestion`, with no option marked recommended:
 
 - Question: `"How do you want to review the notes?"`
 - Options: `["Only the <M> decisions", "Every note", "Stop here"]` — the first's description:
-  *"one at a time or in small rounds; the <K> copied notes are kept word for word, marker words
+  *"one question at a time, a few items each; the <K> copied notes are kept word for word, marker words
   removed, and you approve dropping the <H> housekeeping notes in one question"*; the second's: *"the decisions, then the
-  housekeeping drops, then the copied notes in small rounds"*.
+  housekeeping drops, then the copied notes a few at a time"*.
 
-**2. Decisions**, in this order: Drops the helper forces (a reason for a requirement with no
-companion entry), then removals, pending, and other Drops, one per question; then all altered
-text (History and Rationale) in rounds; then the housekeeping drops. Items that share one decision (26 requirements replaced
-by one feature) are one question.
+**Every question is one card.** The owner must see, before anything else, what is being asked
+and what it costs them. Write each question's card to `<scratch>/card-<q>.json` and paste the output
+of `tor-lifecycle card "<scratch>/card-<q>.json"` into one code block — never hand-built:
 
-- **Replaced, No longer needed, Open question:** one code block showing each affected
-  requirement's title (`<ID> — <title>`; for a `removed` ID, read it with `tor-lifecycle text
-  <TOR> --rev <sha>^1`, `<sha>` being the commit that removed it), for Replaced an arrow to each successor's `<ID> —
-  <title>` (when you narrowed successors from an epic or file, list the others below as `<ID> —
-  <title> (not a successor)`), then each record's title and reason as they will be saved, under its arrows, then the notes or sidecar
-  keys it came from, word for word, and a `Keywords:` line (plus `Tracker:` and `Refs:` when set). For a Retire with `removal = "code"`, add: *"A later piece of
-  work will remove the code that implements this, in <files>."* For Open question, add who owns
-  it, and that the requirement is flagged until decided and blocks work after <threshold> days
-  (a safety requirement at once).
-- **A whole file goes:** when the preview has a `file-delete` row for a removal's requirements,
-  say in its block *"Every requirement in <file> is removed, so the file and its .tracing.json file
-  are deleted."* When that row lists `coverage_gaps`, add each gap's `note` (with its `source_ref`)
-  word for word, then *"LOST: these known coverage gaps."*
-- **Delete the note:** the note word for word, then *"LOST: all of this."* Drops of notes on
-  requirements being replaced or retired go inside that removal's block as LOST lines, not as
-  their own questions.
-- Under the block: why you propose it, and the alternative. Ask `"Item <n>: <short decision>?"` (`"Items <a> + <b>: …"` for one spanning several rows)
-  with options `["Yes, as shown", "Change it", "Stop here"]`, no option marked recommended. A
-  forced drop (no companion entry) offers only `["Yes, drop it", "Stop here"]`.
+```
+Question <q> of <T>: <section>
 
-**Altered text** (reworded, merged, or written Rationale; History titles and reasons) goes in rounds
-of about 5 items, one code block per round. Before the first box, the legend: *"Each row is one
-sentence. Left is what's there now; right is what it becomes."* Then, per item:
+ASKING   <one sentence: the yes/no question, in plain words>
+CHANGES  Requirements: <"no wording changes", or which are deleted>.
+         Lost: <what is thrown away, or "nothing">.
+MY READ  <why you propose it, and the alternative, in one or two lines>
+
+<body: the section's format, below>
+```
+
+`<T>` is the number of cards. The header names the section, never "Decision", a plan key, or a list
+of item numbers; an item's `table.md` row appears only as a trailing `(#<n>)` tag, so the owner can
+say "change #3". Card JSON: `q`, `of`, `section`, `asking`, `changes` (a list of lines), `read`, and
+the body keys `list` (`[{"where", "text", "n"}]`, one line each), `titles` (`[{"where",
+"requirement", "title", "n"}]`), `requirements` (`[{"tor", "title", "n", "then": [lines]}]`),
+`example` (`{"where", "rows": [[now line, after line], ...]}`), `items` (box items, below), `lost`
+(lines), `footer`. The `AskUserQuestion` question repeats the ASKING sentence (`"Question <q>:
+<ASKING>"`), never item numbers; options are given per section, none marked recommended.
+
+**2. Decisions**, in this order, one section after another: forced drops (a reason for a requirement
+with no companion entry), removals and open questions, notes to delete, past changes to log, then
+reworded reasons; then the housekeeping drops. Items that share one decision (26 requirements
+replaced by one feature) are one card.
+
+- **Replaced, No longer needed, Open question** — one card each. Body `requirements`: each affected
+  requirement (`tor`, `title`; for a `removed` ID, read the title with `tor-lifecycle text <TOR>
+  --rev <sha>^1`, `<sha>` being the commit that removed it), its `then` lines saying what happens:
+  for Replaced, *"replaced by <ID>: <title>"* per successor (when you narrowed successors from an
+  epic or file, list the others as *"<ID>: <title> (not a successor)"*); then *"History file title:
+  …"*, *"Reason: …"*, *"Keywords: …"* (plus `Tracker:` and `Refs:` when set), as they will be saved.
+  The notes or sidecar keys it came from go in `list`, word for word. For a Retire with `removal =
+  "code"`, the footer says *"A later piece of work will remove the code that implements this, in
+  <files>."* For Open question, `changes` says who owns it and that the requirement is flagged until
+  decided and blocks work after <threshold> days (a safety requirement at once). Options `["Yes, as
+  shown", "Change it", "Stop here"]`.
+- **A whole file goes:** when the preview has a `file-delete` row for a removal's requirements, its
+  card's `changes` says *"Every requirement in <file> is removed, so the file and its .tracing.json
+  file are deleted."*; each of that row's `coverage_gaps` (its `note`, with its `source_ref`) is a
+  `lost` line, word for word.
+- **Notes to delete** — split them in two. Notes that only say where requirements came from or what
+  covers them elsewhere ("Derived from ConOps §3 …", "Screens are TOR-…") are one card: `asking`
+  *"OK to delete <k> background notes? Each one only lists where a group of requirements came
+  from."*, every note in `list` as one plain line of ≤ 60 characters (what it says, not its
+  jargon), and one `example`: a real excerpt of one note above its Scenario line, the note rows
+  paired with *"(note removed)"* and the Scenario row unchanged. A note that also holds a rule, a
+  decision ("user decision 2026-09-24"), a number, or a fact found nowhere else gets its own card,
+  the note word for word in `list` and *"LOST: all of this."* in `lost`. Drops of notes on
+  requirements being replaced or retired go in that removal's card as `lost` lines, not their own
+  card. Options `["Yes, as shown", "Change it", "Stop here"]`; a forced drop offers only `["Yes,
+  drop it", "Stop here"]`.
+- **Past changes to log** whose reason is the note word for word, marker words removed: about 10
+  per card, body `titles` (`where` = the feature file's short name, `requirement` = its title,
+  `title` = the history file title). `asking` *"OK to save these <k> past edits under these
+  titles?"*; `changes` *"Requirements: no wording changes."*, *"Each note moves word for word into a
+  history file. Lost: nothing."* Options `["Save as shown", "Change some", "Stop here"]`.
+- **Reworded reasons** (reworded, merged, or written Rationale; History whose reason you rewrote or
+  wrote from a diff): about 5 per card, body `items`, the NOW | BECOMES boxes below. Options
+  `["Save as shown", "Change some", "Stop here"]`.
+
+**The box** (an `items` entry: `{"n", "tor", "title", "from": [...], "to": [...], "above", "rows":
+[[now, becomes], ...], "changed", "lost"}`, `above` only when set):
 
 ```
 <n>. <TOR-ID> — <requirement title>
 FROM: docs/requirements/<NN-name>.feature.md, lines <a>–<b> (the note is removed from here)
-      (or: epic-<id> status file, key "revised")
 TO:   docs/requirements/<NN-name>.feature.tracing.json → entry "<TOR-ID>" → field "rationale"
 +------------------------------------------------------+------------------------------------------------------+
 | NOW                                                  | BECOMES                                              |
 +------------------------------------------------------+------------------------------------------------------+
-| <one sentence or clause of the note>                 | <its rewrite, or "(unchanged)">                      |
+| <a sentence you changed or dropped>                  | <its rewrite>                                        |
 +------------------------------------------------------+------------------------------------------------------+
++ <k> sentences kept word for word
 Changed: <what changed, all in one line>. LOST: <each dropped detail>, or LOST: nothing.
 ```
 
-Both columns are 52 characters wide, each original sentence its own row, wrapped so the columns
-line up. Render the boxes with the helper, never by hand: write the round's items to
-`<scratch>/box-<r>.json` (`[{"n", "tor", "title", "from": [...], "to": [...], "above", "rows":
-[[now, becomes], ...], "changed", "lost"}]`, `above` only when set) and paste the output of
-`tor-lifecycle box "<scratch>/box-<r>.json"` into the round's code block. The legend ends *"If the
-boxes look jumbled, say so and I'll stack them."*; when the owner says so, re-render this and every
-later round with `--stacked` (NOW above BECOMES). A merged item has one `FROM:`
-line per source note, with its NOW rows grouped by source in that order. For History, `TO:` is *"a
-new history file in docs/requirements/changes/"* (*"<n> history files, one per commit that edited it"* when
-more than one commit did), and the BECOMES column holds the title, then the
-reason; for an entry written from a diff, `FROM:` names the commit (no "removed from here"), the
-line *"Requirement wording untouched; this logs a past edit."* goes above the box, its Changed
-line reads *"Changed: past edit logged. LOST: nothing."*, the NOW column
-holds the requirement's sentences from the diff labelled *"Before <date>:"* and *"After:"*, word
-for word, and the BECOMES cells start *"Title:"* and *"Reason:"*. A cell whose text moves
-elsewhere says where in plain words (*"(moved to the history file in docs/requirements/changes/)"*).
-Then ask `"Round <r> of <T> (items <a>, <b>, … above): save the BECOMES text as shown?"` with
-options `["Save as shown", "Change some", "Stop here"]`, no option marked recommended.
+Give every original sentence its own row; a sentence kept word for word has BECOMES
+*"(unchanged)"*, and the helper counts it instead of drawing it. Before the first box, the legend:
+*"Each row is one sentence you'd see changed. Left is what's there now; right is what it becomes.
+If the boxes look jumbled, say so and I'll stack them."* — when the owner says so, render this and
+every later card with `--stacked` (NOW above BECOMES). A merged item has one `FROM:` line per source
+note (`epic-<id> status file, key "revised"` for a sidecar key), its rows grouped by source in that
+order. For History, `TO:` is *"a new history file in docs/requirements/changes/"* (*"<n> history
+files, one per commit that edited it"* when more than one commit did), and BECOMES holds the title,
+then the reason; for an entry written from a diff, `FROM:` names the commit (no "removed from
+here"), `above` is *"Requirement wording untouched; this logs a past edit."*, `changed` *"past edit
+logged"*, `lost` *"nothing"*, the NOW cells hold the requirement's sentences from the diff labelled
+*"Before <date>:"* and *"After:"*, word for word, and the BECOMES cells start *"Title:"* and
+*"Reason:"*. A cell whose text moves elsewhere says where in plain words (*"(moved to the history
+file in docs/requirements/changes/)"*).
 
-**Housekeeping drops** are one question on either path: each note word for word in one code
-block, then *"LOST: all of these."* — `"Drop these <H> housekeeping notes?"` with options
-`["Yes, drop them", "Change some", "Stop here"]`. **Every note** then shows the copied notes in the
-same boxes, about 5 per round.
+**Housekeeping drops** are one card on either path, every note word for word in `list`, `lost`
+*"all of these"* — options `["Yes, drop them", "Change some", "Stop here"]`. **Every note** then
+shows the copied notes as reworded-reason cards, about 5 per card, rendered with `--all-rows`.
 
 **Changes.** On **Change it**, **Change some**, or **Change something**, ask in chat *"Which item
 numbers, and what should change?"*, take the owner's words, rewrite `plan.json` and `table.md`, and
-re-run the preview. The other items in that question or round are accepted as shown. Re-show only the changed items, in the format they were shown in, and ask about
+re-run the preview. The other items in that card are accepted as shown. Re-show only the changed items, in the format they were shown in, and ask about
 just those. An item whose choice changed (Keep as the reason → Delete the note) is re-asked in its
 new form. On **Stop here**, end the session: the branch keeps the commits made so far, the answers
 given at this gate are not kept, and a later run starts the gate again. After a change at Apply,
