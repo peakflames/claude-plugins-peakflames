@@ -283,7 +283,11 @@ Then ask via `AskUserQuestion`, with no option marked recommended:
 
 **Every question is one card.** The owner must see, before anything else, what is being asked
 and what it costs them. Write each question's card to `<scratch>/card-<q>.json` and paste the output
-of `tor-lifecycle card "<scratch>/card-<q>.json"` into one code block — never hand-built:
+of `tor-lifecycle card "<scratch>/card-<q>.json"` into one code block — never hand-built, never
+reflowed. **Paste it in your own message, then ask**: a card that is only in a tool result is
+invisible, so each `AskUserQuestion` call comes after a message that holds its whole card. The
+question dialog then covers that message, so also give **every option** a `preview` holding the same
+card rendered with `--stacked` (it fits the preview pane): the owner reads the card while choosing.
 
 ```
 Question <q> of <T>: <section>
@@ -362,7 +366,9 @@ Changed: <what changed, all in one line>. LOST: <each dropped detail>, or LOST: 
 ```
 
 Give every original sentence its own row; a sentence kept word for word has BECOMES
-*"(unchanged)"*, and the helper counts it instead of drawing it. Before the first box, the legend:
+*"(unchanged)"*, and the helper counts it instead of drawing it — except for a note split across
+destinations (a Rationale and a History, or several entries), whose card is rendered with
+`--all-rows` so the owner sees where every sentence lands. Before the first box, the legend:
 *"Each row is one sentence you'd see changed. Left is what's there now; right is what it becomes.
 If the boxes look jumbled, say so and I'll stack them."* — when the owner says so, render this and
 every later card with `--stacked` (NOW above BECOMES). A merged item has one `FROM:` line per source

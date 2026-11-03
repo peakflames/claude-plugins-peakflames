@@ -217,6 +217,7 @@ class GateCardTests(unittest.TestCase):
                 "items": [GateBoxTests.ITEM], "lost": ["the old 60-second value"]}
         out = tl.render_card(card)
         self.assertIn("  01-app: JSON log record on startup\n    -> Startup stamp moved from plain text to JSON  (#4)", out)
+        self.assertNotIn("##", tl.render_card({**card, "titles": [{**card["titles"][0], "n": "#4"}]}))
         self.assertIn("  TOR-02-Old0001: Ask which version to keep  (#9)\n    -> replaced by TOR-02-New0001", out)
         self.assertIn("37. TOR-02-Abc1234", out)
         self.assertTrue(out.endswith("LOST: the old 60-second value"))
