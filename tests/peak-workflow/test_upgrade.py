@@ -321,6 +321,12 @@ class InflightTests(unittest.TestCase):
         self.assertEqual(parse_tsv(result.stdout), [
             ("feature/epic-Bbbb002-search", "docs/implementation-plan/status/epic-Bbbb002.md")])
 
+    def test_current_branch_and_its_origin_copy_are_not_in_flight(self):
+        self.repo.checkout("feature/epic-Bbbb002-search")
+        self.repo.git("update-ref", "refs/remotes/origin/feature/epic-Bbbb002-search", "HEAD")
+        result = self.repo.cli("inflight", "docs/implementation-plan")
+        self.assertEqual((result.returncode, result.stdout), (0, ""))
+
     def test_upgrade_branches_are_never_in_flight(self):
         self.repo.checkout("docs/upgrade-format-1", create=True)
         self.repo.write("docs/implementation-plan/status/epic-Aaaa001.md", "status: Complete\nowner: —\n")

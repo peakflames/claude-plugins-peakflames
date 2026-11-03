@@ -184,6 +184,12 @@ class FindingC(CheckCase):
         self.assertIn("'TOR-24 set', which is not a requirement ID", c["message"])
         self.assertIn("by hand on a docs/ branch", c["message"])
 
+    def test_own_branch_malformed_entry_matching_base_text(self):
+        self.repo.checkout("hotfix/x", create=True)
+        self.repo.sidecar("Epic002", "Not Started", [A3, "TOR-01"])  # "TOR-01" is in A3 at the base
+        [c] = letters(self.repo.check("--base", "develop"), "C")
+        self.assertTrue((c["own_branch"], c["blocking"]) == (True, True), c)
+
     def test_history_files_are_not_scanned(self):
         self.repo.write("docs/implementation-plan/session-handoffs/epic-x-complete.md", "TOR-09-Nowhere\n")
         self.repo.write("CHANGELOG.md", "TOR-09-Nowhere\n")

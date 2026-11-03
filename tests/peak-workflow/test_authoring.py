@@ -110,6 +110,13 @@ class TextTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.rstrip("\n"), self.v2.render())
 
+    def test_duplicate_id_is_a_data_error(self):
+        self.repo.feature("01", "cli", [self.v2, self.v2, self.other], banner="Paging")
+        result = self.repo.cli("text", LIVE)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("appears 2 times", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_block_stops_before_trailing_banner_and_fence(self):
         text = "Feature: x\n\n" + self.v1.render() + "\n\n# ----\n# Next\n# ----\n```\nprose\n"
         self.assertEqual(tl.scenario_block(text, LIVE), self.v1.render())

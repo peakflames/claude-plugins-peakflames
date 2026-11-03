@@ -184,10 +184,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   side-by-side NOW/BECOMES box with FROM/TO lines and every lost detail. No option is recommended.
 - **Rewordings keep details** — rationale rewrites strip only marker wording; supersede entries
   list only the real successors.
-- **Gate questions as cards** — `tor-lifecycle card` renders every owner question as ASKING /
-  CHANGES / MY READ plus a per-section body: one-line note lists, title lists, before/after
-  examples, or NOW/BECOMES boxes. Item numbers become trailing `(#n)` tags. Each card is pasted in
-  chat and shown again in the question's option previews.
+- **Gate questions as cards** — `tor-lifecycle card` renders each owner question as ASKING /
+  CHANGES / MY READ plus a section body (note lists, title lists, before/after examples, or
+  NOW/BECOMES boxes) with trailing `(#n)` item tags. Each card appears in chat and again in the
+  option previews.
 - **Gate boxes from the helper** — `tor-lifecycle box` draws NOW/BECOMES boxes showing only changed
   sentences (plus a kept-word-for-word count); `--stacked` or a narrow `--width` stacks them.
 - **Gate sections sized for reading** — source-only notes to delete share one card, notes holding a
@@ -209,11 +209,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Step 0002 refuses two Rationale or History entries for one requirement** — the second used
   to replace the first silently, losing approved text; `migrate records` now names both entries.
-- **Step 0002 refuses plans that would lose or contradict approved content** — a History entry with
-  no edit, a requirement in two removal or two pending entries, unknown fields, and unknown,
-  duplicated, or both cited and dropped sources, and a rationale that drops an existing one, now
-  stop `migrate records` with a message. A rationale that keeps the existing text and adds to it
-  passes.
+- **Step 0002 refuses plans that would lose or contradict approved content** — `migrate records`
+  stops on a History entry with no edit, a requirement in two removal or pending entries, unknown
+  fields, unknown, duplicated, or cited-and-dropped sources, or a rationale that drops existing
+  text. Adding to existing text passes.
+- **Step 0002 asks about decision notes alone**: `migrate records` refuses a `drop` note that
+  records a decision ("user-approved", "user decision"); it goes in the new `drop_decision` list
+  after the owner approves it on its own card.
+- **Step 0002 caps History titles at 60 characters**: `migrate records` refuses a longer title.
+- **Step 0002 shows each card while the owner answers**: one card per question, with the full
+  stacked card in every option's preview; only title-list cards may share a question dialog.
 - **The records preview shows every approved field** — `migrate records --json` adds each record's
   reason, keywords, successors, removal, owner, and tracker; the gate's table is built from it.
 - **Step 0002 resumes from its records, not a commit subject** — a re-run skips classification

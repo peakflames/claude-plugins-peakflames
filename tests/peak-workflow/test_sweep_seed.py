@@ -3,6 +3,7 @@ import unittest
 from fixtures import FixtureRepo, parse_tsv, scenario, tor_lifecycle as tl
 
 A1, A2, A3, NEW = "TOR-01-Alpha01", "TOR-01-Bravo01", "TOR-01-Charl01", "TOR-01-Newid01"
+SIDECAR1 = "docs/implementation-plan/status/epic-Epic001.md"
 
 
 class SweepTests(unittest.TestCase):
@@ -93,13 +94,22 @@ class SeedTests(unittest.TestCase):
         rows = [r for r in self.repo.json_cli("seed")[1] if r["epic"] == "Epic002"]
         self.assertEqual(rows[0]["reason"], "no completion commit")
 
-    def test_write_verified_extends_existing_block(self):
-        text = "status: Complete\nverified:\n  TOR-01-Alpha01: aaaaaaaaaaaa\nreverified: 2026-10-01\n"
-        out = tl.write_verified(text, {A2: "b" * 12})
-        self.assertEqual(out, "status: Complete\nverified:\n  TOR-01-Alpha01: aaaaaaaaaaaa\n"
-                              f"  {A2}: bbbbbbbbbbbb\nreverified: 2026-10-01\n")
-        self.assertEqual(tl.write_verified("status: Complete\n", {A2: "b" * 12}),
-                         f"status: Complete\nverified:\n  {A2}: bbbbbbbbbbbb\n")
+    def test_seed_write_keeps_existing_lines(self):
+        self.repo.sidecar("Epic001", "Complete", [A1, A2, A3], waived=f"{A3} → Epic002",
+                          verified={A1: "a" * 12})
+        self.assertEqual(self.repo.cli("seed", "--write").returncode, 0)
+        sc = tl.parse_sidecar("Epic001", (self.repo.root / SIDECAR1).read_text(encoding="utf-8"))
+        self.assertEqual(sc.verified, {A1: "a" * 12, A2: self.v1[1].fp()})
+        self.assertEqual((sc.status, sc.requirements, sc.waived), ("Complete", [A1, A2, A3], {A3: "Epic002"}))
+
+    def test_seed_never_fingerprints_a_failed_requirement(self):
+        self.repo.sidecar("Epic001", "Complete", [A1, A2, A3], waived=f"{A3} → Epic002",
+                          unverified={A1: "2026-10-01 fails on empty input"})
+        code, rows = self.repo.json_cli("seed", "--write")
+        self.assertEqual((code, [r["tor"] for r in rows]), (0, [A2]))
+        sc = tl.parse_sidecar("Epic001", (self.repo.root / SIDECAR1).read_text(encoding="utf-8"))
+        self.assertEqual(sc.unverified, {A1: "2026-10-01 fails on empty input"})
+        self.assertEqual(sc.verified, {A2: self.v1[1].fp()})
 
 
 if __name__ == "__main__":
