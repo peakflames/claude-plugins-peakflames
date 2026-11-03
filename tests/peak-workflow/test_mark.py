@@ -50,6 +50,13 @@ class MarkTests(unittest.TestCase):
         self.assertEqual(self.mark("--append", NEW).returncode, 0)  # idempotent
         self.assertEqual(tl.parse_sidecar("cMpl001", self.read()).requirements, [A1, A2, A3, NEW])
 
+    def test_append_adds_a_missing_requirements_line(self):
+        self.repo.write("docs/implementation-plan/status/epic-nReq001.md", "status: In Progress\nowner: —\n")
+        result = self.repo.cli("mark", "nReq001", "--today", "2026-10-26", "--append", NEW)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = (self.repo.root / "docs/implementation-plan/status/epic-nReq001.md").read_text(encoding="utf-8")
+        self.assertEqual(text, f"status: In Progress\nrequirements: {NEW}\nowner: —\n")
+
     def test_flags_take_several_ids(self):
         self.assertEqual(self.mark("--append", NEW, "--pass", A1, A2, NEW).returncode, 0)
         sc = tl.parse_sidecar("cMpl001", self.read())

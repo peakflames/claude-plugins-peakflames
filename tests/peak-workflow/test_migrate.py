@@ -516,6 +516,47 @@ class ProjectAUpgradeTests(unittest.TestCase):
             self.assertIn("TOR-02-Nope999 is not a live requirement", result.stderr)
             self.assertFalse((fresh.root / "docs/requirements/changes").exists())
 
+    def test_10a_dropping_a_decision_note_needs_its_own_card(self):
+        # Gate rerun on Project C: notes recording a user decision were deleted together on one card.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            path = next(p for p in (fresh.root / "docs/requirements").glob("*.feature.md")
+                        if "TODO: tighten" in p.read_text(encoding="utf-8"))
+            path.write_text(path.read_text(encoding="utf-8").replace(
+                "TODO: tighten", "TODO: tighten (user decision 2026-09-24)", 1), encoding="utf-8")
+            fresh.commit("a decision in a note")
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            note = next(s for s in plan["drop"] if "user decision" in next(
+                p["text"] for p in scan["prose"] if p["file"] + ":" + str(p["line"]) == s))
+            plan_path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(plan_path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(f'plan drop: {note} records a decision ("user decision")', result.stderr)
+            plan["drop"].remove(note)
+            plan["drop_decision"] = [note]
+            fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(plan_path))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            plan["drop"].append(note)
+            fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(plan_path))
+            self.assertIn("is also in `drop`; list it once", result.stderr)
+
+    def test_10a2_history_titles_over_60_characters_are_refused(self):
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            plan["history"][0]["title"] = "x" * 60
+            path = fresh.write(".plan.json", json.dumps(plan))
+            self.assertEqual(fresh.cli("migrate", "records", "--plan", str(path)).returncode, 0)
+            plan["history"][0]["title"] = "x" * 61
+            fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("plan history #1: `title` is 61 characters", result.stderr)
+
     def test_10b_two_history_entries_for_one_requirement_are_refused(self):
         # Dry-run pass 2: reasons are keyed by requirement, so a second entry silently replaced the first.
         with FixtureRepo() as other:

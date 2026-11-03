@@ -1,6 +1,26 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from fixtures import FixtureRepo, tor_lifecycle as tl
+
+
+class ReadBlobsTests(unittest.TestCase):
+    def setUp(self):
+        self.repo = FixtureRepo()
+        self.addCleanup(self.repo.cleanup)
+        self.repo.write("docs/a b.md", "spaced\n")
+        self.repo.commit("one")
+
+    def test_missing_path_with_spaces_and_tree(self):
+        out = tl.read_blobs(self.repo.root, ["HEAD:docs/user login.feature.md", "HEAD:docs/a b.md",
+                                             "HEAD:docs", "HEAD:docs/two words here.md"])
+        self.assertEqual(out, [None, "spaced\n", None, None])
+
+    def test_git_failure_is_a_data_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(tl.DataError):
+                tl.read_blobs(Path(tmp), ["HEAD:x"])
 
 
 class StampTests(unittest.TestCase):

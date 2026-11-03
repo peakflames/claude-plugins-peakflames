@@ -129,7 +129,7 @@ Propose one classification per prose item and sidecar key:
 | **Supersede** | The requirement was replaced by another live requirement: prose marks it superseded or replaced, or a `removed` ID's successor is named by a note or a `superseded_by` key | `supersede`: `tors`, `successors` (live IDs), `title`, `reason`, `keywords` |
 | **Retire** | The requirement no longer applies and nothing replaces it | `retire`: `tors`, `removal`, `title`, `reason`, `keywords` |
 | **Pending** | An open change-control note: a change proposed but not decided ("pending", "under review", "do not change until…") | `pending`: `tors`, `title`, `reason`, `keywords`, optional `owner` (default: you) and `tracker` |
-| **Drop** | Nothing to keep: housekeeping, TODOs, section reshuffles, "pre-amendment contract only" comments, or a note that only repeats what a record now says | its source ID in `drop` |
+| **Drop** | Nothing to keep: housekeeping, TODOs, section reshuffles, "pre-amendment contract only" comments, or a note that only repeats what a record now says | its source ID in `drop`; a note that records a decision ("user-approved", "user decision", "decided") goes in `drop_decision` instead, only after the owner approves it on its own card; `migrate records` refuses it in `drop` |
 
 Rules:
 
@@ -288,6 +288,11 @@ reflowed. **Paste it in your own message, then ask**: a card that is only in a t
 invisible, so each `AskUserQuestion` call comes after a message that holds its whole card. The
 question dialog then covers that message, so also give **every option** a `preview` holding the same
 card rendered with `--stacked` (it fits the preview pane): the owner reads the card while choosing.
+The preview is that render, whole and unedited, and the same on every option — never shortened,
+summarized, or rewritten per option. **One card per `AskUserQuestion` call**, so each call follows
+the message that holds its card. The one exception: up to 4 **Past changes to log** cards (title
+lists only) may share a call, every card pasted in the message before it and every question with
+its own previews. Every other card, and every decision, is asked alone.
 
 ```
 Question <q> of <T>: <section>
@@ -336,7 +341,8 @@ replaced by one feature) are one card.
   jargon), and one `example`: a real excerpt of one note above its Scenario line, the note rows
   paired with *"(note removed)"* and the Scenario row unchanged. A note that also holds a rule, a
   decision ("user decision 2026-09-24"), a number, or a fact found nowhere else gets its own card,
-  the note word for word in `list` and *"LOST: all of this."* in `lost`. Drops of notes on
+  the note word for word in `list` and *"LOST: all of this."* in `lost`. On approval, a note that
+  records a decision goes in the plan's `drop_decision`, never `drop`. Drops of notes on
   requirements being replaced or retired go in that removal's card as `lost` lines, not their own
   card. Options `["Yes, as shown", "Change it", "Stop here"]`; a forced drop offers only `["Yes,
   drop it", "Stop here"]`.
@@ -413,7 +419,8 @@ The plan file, `<scratch>/plan.json`:
   "retire":    [{"tors": ["TOR-03-…"], "removal": "none", "title": "…", "reason": "…", "keywords": ["…"], "sources": ["…"]}],
   "pending":   [{"tors": ["TOR-02-…"], "title": "…", "reason": "…", "keywords": ["…"], "sources": ["…"],
                  "owner": "…", "tracker": "ENG-123", "refs": ["issue #40"]}],
-  "drop":      ["docs/requirements/01-x.feature.md:40"]
+  "drop":      ["docs/requirements/01-x.feature.md:40"],
+  "drop_decision": ["docs/requirements/01-x.feature.md:52"]
 }
 ```
 
@@ -427,7 +434,9 @@ entry wide enough to link many old IDs to many successors). For a `warning`, che
 against "Successors are the requirements that take over": split it into one entry per successor
 group, or, when every old requirement really is replaced by every successor, say so in that
 removal's block (*"Each of these <a> requirements is replaced by all <b> successors."*). Exit 2 names what is unclassified, inconsistent, or would be lost (a second entry for one
-requirement, a History entry with no edit, a source listed twice in one entry, or both cited and dropped): fix the plan — asking the user only
+requirement, a History entry with no edit, a History title over 60 characters, a source listed
+twice in one entry, both cited and dropped, or a note recording a decision in `drop` instead of
+`drop_decision`): fix the plan — asking the user only
 when the fix is a new decision — and run it again. After the owner's changes, rewrite
 `plan.json` and re-run the preview. Once they choose **Apply**:
 

@@ -272,14 +272,23 @@ def read_blobs(root: Path, specs: list[str]) -> list[str | None]:
     except FileNotFoundError:
         raise DataError("git is not installed or not on PATH") from None
     data, pos, out = proc.stdout, 0, []
-    for _spec in specs:
-        nl = data.index(b"\n", pos)
-        header = data[pos:nl].decode("utf-8", "replace").split()
+    for spec in specs:
+        nl = data.find(b"\n", pos)
+        if nl < 0:
+            err = proc.stderr.decode("utf-8", "replace").strip()
+            raise DataError(f"git cat-file --batch stopped before {spec}" + (f": {err}" if err else ""))
+        line = data[pos:nl].decode("utf-8", "replace")
         pos = nl + 1
-        if len(header) != 3 or header[1] != "blob":
+        # `<spec> missing` / `<spec> ambiguous`: the spec is echoed back and may hold spaces.
+        if line.endswith((" missing", " ambiguous")):
             out.append(None)
-            if len(header) == 3:  # a tree or commit: skip its content
-                pos += int(header[2]) + 1
+            continue
+        header = line.split()  # `<oid> <type> <size>`: none of the three holds a space
+        if len(header) != 3 or not header[2].isdigit():
+            raise DataError(f"git cat-file --batch: unexpected header {line!r} for {spec}")
+        if header[1] != "blob":  # a tree or commit: skip its content
+            out.append(None)
+            pos += int(header[2]) + 1
             continue
         size = int(header[2])
         out.append(data[pos:pos + size].decode("utf-8", "replace"))
@@ -927,6 +936,14 @@ def branch_start(root: Path, base: str) -> BranchStart:
             {Path(n).name[len("epic-"):-len(".md")]: t or "" for n, t in zip(status_paths, texts)})
 
 
+REQUIREMENTS_LINE = re.compile(r"^requirements:\s*(.*?)\s*$", re.M)
+
+
+def _requirement_entries(text: str) -> list[str]:
+    """Every entry of a sidecar's `requirements:` line(s), well-formed or not."""
+    return [e for m in REQUIREMENTS_LINE.finditer(text) for e in _id_list(m.group(1))]
+
+
 def run_check(project: Project, base: str | None = None) -> dict:
     root, p = project.root, project
     trunk = resolve_trunk(root, base)
@@ -991,7 +1008,8 @@ def run_check(project: Project, base: str | None = None) -> dict:
                                     f"Correct it by hand on a docs/ branch (docs/fix-{sc.epic}-requirements): replace "
                                     "it with the TOR IDs it meant, or delete it, and merge it.",
                                     epic=sc.epic, path=f"{STATUS_DIR}/epic-{sc.epic}.md",
-                                    own_branch=bool(start) and bad not in start.sidecar_texts.get(sc.epic, "")))
+                                    own_branch=bool(start) and bad not in _requirement_entries(
+                                        start.sidecar_texts.get(sc.epic, ""))))
 
     # D — changed since verified. With an A finding too, reverify would ratify the unrecorded edit.
     edited = {f.tor for f in findings if f.letter == "A"}
@@ -1138,12 +1156,17 @@ def completion_commit(root: Path, epic: str) -> str | None:
 def run_seed(project: Project) -> list[dict]:
     """For each Complete epic, fingerprint its requirements at the commit that completed it.
 
-    Only requirements without a `verified:` line are seeded; waived ones are skipped. A requirement
-    absent at that commit (or an epic with no recoverable completion) stays legacy, unfingerprinted.
+    Only requirements without a `verified:` or `unverified:` line are seeded (a recorded failure is
+    never overwritten); waived ones are skipped. A requirement absent at that commit (or an epic with
+    no recoverable completion) stays legacy, unfingerprinted.
     """
     p, root = project, project.root
+
+    def seedable(sc: Sidecar, tor: str) -> bool:
+        return tor not in sc.verified and tor not in sc.unverified and tor not in sc.waived
+
     epics = [s for s in p.sidecars.values() if s.status == "Complete"
-             and any(t not in s.verified and t not in s.waived for t in s.requirements)]
+             and any(seedable(s, t) for t in s.requirements)]
     with ThreadPoolExecutor(max_workers=min(max(len(epics), 1), 16)) as pool:
         commits = dict(zip([s.epic for s in epics], pool.map(lambda s: completion_commit(root, s.epic), epics)))
         distinct = sorted({c for c in commits.values() if c})
@@ -1152,7 +1175,7 @@ def run_seed(project: Project) -> list[dict]:
     for sc in epics:
         sha = commits[sc.epic]
         for tor in sc.requirements:
-            if tor in sc.verified or tor in sc.waived:
+            if not seedable(sc, tor):
                 continue
             then = trees.get(sha, {}).get(tor) if sha else None
             rows.append({"epic": sc.epic, "tor": tor, "commit": sha,
@@ -1160,20 +1183,6 @@ def run_seed(project: Project) -> list[dict]:
                          "reason": None if then else ("no completion commit" if not sha
                                                       else "not in the feature files at completion")})
     return rows
-
-
-def write_verified(text: str, lines: dict[str, str]) -> str:
-    """Add `  TOR: fp` lines to a sidecar's `verified:` block (created at the end if absent)."""
-    rows = text.rstrip("\n").split("\n")
-    new = [f"  {tor}: {fp}" for tor, fp in lines.items()]
-    try:
-        at = next(i for i, ln in enumerate(rows) if ln.rstrip() == "verified:")
-    except StopIteration:
-        return "\n".join(rows + ["verified:"] + new) + "\n"
-    end = at + 1
-    while end < len(rows) and rows[end][:1].isspace() and rows[end].strip():
-        end += 1
-    return "\n".join(rows[:end] + new + rows[end:]) + "\n"
 
 
 def mark_sidecar(text: str, *, append: list[str], verified: dict[str, str], unverified: dict[str, str],
@@ -1200,13 +1209,16 @@ def mark_sidecar(text: str, *, append: list[str], verified: dict[str, str], unve
         if key == "requirements" and append:
             ids = _id_list(m.group(2))
             ids += [t for t in append if t not in ids]
-            line = f"requirements: {', '.join(ids)}"
+            line, append = f"requirements: {', '.join(ids)}", []
         if key == "reverified" and reverified:
             line, reverified = f"reverified: {reverified}", None
         out.append(line)
         i += 1
     while out and not out[-1].strip():
         out.pop()
+    if append:  # no `requirements:` line to extend: add one after `status:` (or at the end)
+        at = next((n + 1 for n, ln in enumerate(out) if ln.startswith("status:")), len(out))
+        out.insert(at, f"requirements: {', '.join(dict.fromkeys(append))}")
     if reverified:
         at = next((n + 1 for n, ln in enumerate(out) if ln.startswith("requirements:")), len(out))
         out.insert(at, f"reverified: {reverified}")
@@ -1244,6 +1256,7 @@ def shipped_format(steps_dir: Path = STEPS_DIR) -> int:
     build ships one step per format up to PLUGIN_FORMAT (the tests hold it to that)."""
     nums = [int(m.group(1)) for p in steps_dir.glob("*.md") if (m := STEP_NAME.match(p.name))]
     return max(nums, default=0)
+
 
 
 @dataclass
@@ -1468,14 +1481,15 @@ def inflight_branches(root: Path, base: str | None, paths: list[str]) -> list[tu
     trunk = resolve_trunk(root, base)
     if trunk is None:
         return []
-    current = git(root, "branch", "--show-current", check=False)
-    tip = git(root, "rev-parse", trunk)
+    current = git(root, "branch", "--show-current", check=False).strip()
+    tip = git(root, "rev-parse", trunk).strip()
+    own = {trunk, f"origin/{trunk}", "origin"} | ({current, f"origin/{current}"} if current else set())
     refs = git(root, "for-each-ref", "--format=%(refname:short)%09%(objectname)",
                "refs/heads", "refs/remotes").splitlines()
     out = []
     for row in refs:
         ref, sha = row.split("\t")
-        if ref in (trunk, current, f"origin/{trunk}", "origin") or ref.endswith("/HEAD") or sha == tip:
+        if ref in own or ref.endswith("/HEAD") or sha == tip:
             continue
         if ref.split("/", 1)[-1].startswith("docs/upgrade-") or ref.startswith("docs/upgrade-"):
             continue  # an upgrade's own branch, merged or not, is not someone's work in flight
@@ -1781,6 +1795,8 @@ class MigrationScan:
     removed: list[dict]       # {tor, sha, date, feature_file}
     seed: list[dict]          # seedable rows
     sources: list[str]        # records still carrying migration_source
+    project: Project = field(repr=False, compare=False)       # what the scan read, reused by
+    versions: TrunkVersions = field(repr=False, compare=False)  # apply_migration_records
 
     @property
     def pending(self) -> bool:
@@ -1812,7 +1828,7 @@ def migration_prerequisites(root: Path) -> list[str]:
 
 def unexplained_edits(p: Project, tv: TrunkVersions) -> list[dict]:
     """Trunk edits of live requirements whose first-merged text no record chain explains (finding A)."""
-    rows = []
+    rows, head = [], None
     for tor, req in sorted(p.live.items()):
         first = tv.first.get(tor)
         if first is None or first == req.fingerprint or p.reword_chain(tor, first, req.fingerprint, False) is not None:
@@ -1820,7 +1836,7 @@ def unexplained_edits(p: Project, tv: TrunkVersions) -> list[dict]:
         events = list(tv.events.get(tor, []))
         last = events[-1]["to"] if events else first
         if last != req.fingerprint:  # edited on this branch after the trunk tip
-            head = git(p.root, "rev-parse", "HEAD").strip()
+            head = head or git(p.root, "rev-parse", "HEAD").strip()
             events.append({"sha": head, "date": p.today.isoformat(), "subject": "working tree",
                            "from": last, "to": req.fingerprint})
         rows += [{"tor": tor, **e} for e in events]
@@ -1864,7 +1880,8 @@ def scan_migration(root: Path, base: str | None = None, today: dt.date | None = 
         removed.append({"tor": tor, **tv.removed[tor], "feature_file": Path(tv.last[tor][1]).name})
     seed = [r for r in run_seed(p) if r["fingerprint"]]
     sources = [r.path for r in p.records if "migration_source" in r.data]
-    return MigrationScan(trunk, prose, tracing, specs, keys, unexplained_edits(p, tv), removed, seed, sources)
+    return MigrationScan(trunk, prose, tracing, specs, keys, unexplained_edits(p, tv), removed, seed, sources,
+                         p, tv)
 
 
 def _toml_str(value: str, multiline: bool = False) -> str:
@@ -1922,6 +1939,11 @@ def _note_commit(root: Path, item: ProseItem) -> str | None:
 
 
 PLAN_LISTS = ("rationale", "history", "supersede", "retire", "pending")
+DROP_KEYS = ("drop", "drop_decision")  # drop_decision: notes recording a decision, each approved on its own card
+# A note that records someone's decision. Dropping one needs its own card, so `drop` refuses it.
+DECISION_NOTE = re.compile(r"\b(?:user|owner|customer|stakeholder|product owner|team)[- ](?:approved|decided|"
+                           r"decision|accepted|agreed|confirmed|chose|requested)\b|\b(?:decision|decided)\b", re.I)
+HISTORY_TITLE_MAX = 60
 
 
 def load_plan(path: str) -> dict:
@@ -1933,16 +1955,17 @@ def load_plan(path: str) -> dict:
         raise DataError(f"{path}: expected a JSON object")
     problems = []
     for key in plan:
-        if key not in (*PLAN_LISTS, "drop"):
-            problems.append(f"plan: unknown key `{key}` (expected {', '.join(PLAN_LISTS)}, drop)")
+        if key not in (*PLAN_LISTS, *DROP_KEYS):
+            problems.append(f"plan: unknown key `{key}` (expected {', '.join((*PLAN_LISTS, *DROP_KEYS))})")
     for key in PLAN_LISTS:
         if not isinstance(plan.get(key, []), list) or not all(isinstance(e, dict) for e in plan.get(key, [])):
             problems.append(f"plan: `{key}` must be a list of objects")
-    if not isinstance(plan.get("drop", []), list):
-        problems.append("plan: `drop` must be a list of source IDs")
+    for key in DROP_KEYS:
+        if not isinstance(plan.get(key, []), list) or not all(isinstance(s, str) for s in plan.get(key, [])):
+            problems.append(f"plan: `{key}` must be a list of source IDs")
     if problems:
         raise DataError(problems)
-    return {k: plan.get(k, []) for k in (*PLAN_LISTS, "drop")}
+    return {k: plan.get(k, []) for k in (*PLAN_LISTS, *DROP_KEYS)}
 
 
 def _new_suffix(taken: set[str]) -> str:
@@ -2022,11 +2045,29 @@ def plan_integrity(root: Path, plan: dict, scan: "MigrationScan") -> list[str]:
                 if check_sources and s not in known:
                     problems.append(f"{where}: {s} is not a source the scan reports")
                 cited_by.setdefault(s, where)
-    for s in plan["drop"]:
-        if check_sources and s not in known:
-            problems.append(f"plan drop: {s} is not a source the scan reports")
-        elif s in cited_by:
-            problems.append(f"plan drop: {s} is also cited by {cited_by[s]}; drop it or cite it, not both")
+    texts = {it.id: it.text for it in scan.prose}
+    dropped: dict[str, str] = {}
+    for key in DROP_KEYS:
+        for s in plan[key]:
+            if dropped.get(s) == key:  # listed twice in one drop list: harmless
+                continue
+            if s in dropped:
+                problems.append(f"plan {key}: {s} is also in `{dropped[s]}`; list it once")
+                continue
+            dropped[s] = key
+            if check_sources and s not in known:
+                problems.append(f"plan {key}: {s} is not a source the scan reports")
+            elif s in cited_by:
+                problems.append(f"plan {key}: {s} is also cited by {cited_by[s]}; drop it or cite it, not both")
+            elif key == "drop" and (m := DECISION_NOTE.search(texts.get(s, ""))):
+                problems.append(f"plan drop: {s} records a decision (\"{m.group(0)}\"). Ask about deleting it on "
+                                "its own card, word for word; list it under `drop_decision` only once the owner "
+                                "approves, or keep it as a reason")
+    for n, e in enumerate(plan["history"], 1):
+        title = e.get("title")
+        if isinstance(title, str) and len(title.strip()) > HISTORY_TITLE_MAX:
+            problems.append(f"plan history #{n}: `title` is {len(title.strip())} characters; name what changed "
+                            f"in {HISTORY_TITLE_MAX} or fewer")
     # An edit leaves the scan once its historical reword is written, so a re-run accepts those too.
     edited = {ev["tor"] for ev in scan.edits} | {
         t for r in load_records(root) if r.kind == "reword"
@@ -2070,19 +2111,19 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
     already-retired requirements, and record every unexplained trunk edit as a historical reword.
     Idempotent: requirements already recorded are skipped."""
     scan = scan_migration(root, base, today)
-    p = load_project(root, today)
-    tv = trunk_versions(root, scan.trunk)
+    p, tv = scan.project, scan.versions
     approver = git(root, "config", "user.name", check=False).strip()
     if not approver:
         raise DataError("git config user.name is not set; records name their approver (approved_by)")
     problems: list[str] = []
 
     # Every source must be classified: strippable prose, ad hoc sidecar keys, unrecorded removals.
-    cited = set(plan["drop"]) | {s for key in PLAN_LISTS for e in plan[key] for s in e.get("sources", [])}
+    cited = {s for key in DROP_KEYS for s in plan[key]} | {
+        s for key in PLAN_LISTS for e in plan[key] for s in e.get("sources", [])}
     by_id = {it.id: it for it in scan.prose}
     for it in scan.prose:
         if it.strip and it.id not in cited:
-            problems.append(f"{it.id}: {it.kind} not classified (cite it in an entry's `sources` or in `drop`)")
+            problems.append(f"{it.id}: {it.kind} not classified (cite it in an entry's `sources`, `drop`, or `drop_decision`)")
     for k in scan.sidecar_keys:
         if k["source"] not in cited:
             problems.append(f"{k['source']}: ad hoc sidecar key not classified")
@@ -2838,7 +2879,9 @@ def cmd_seed(args: argparse.Namespace, root: Path) -> int:
                 by_epic.setdefault(r["epic"], {})[r["tor"]] = r["fingerprint"]
         for epic, lines in by_epic.items():
             path = root / STATUS_DIR / f"epic-{epic}.md"
-            path.write_text(write_verified(path.read_text(encoding="utf-8"), lines), encoding="utf-8")
+            text = path.read_text(encoding="utf-8")
+            path.write_text(mark_sidecar(text, append=[], verified=lines, unverified={}, reverified=None),
+                            encoding="utf-8")
     if args.json:
         _print_json(rows)
     else:
@@ -2994,7 +3037,10 @@ def cmd_text(args: argparse.Namespace, root: Path) -> int:
         if rel is None:
             print(f"{args.tor}: not in any feature file{' at ' + args.rev if args.rev else ''}.", file=sys.stderr)
             return EXIT_FINDINGS
-        [(_tor, fp)] = [x for x in fingerprint_text(texts[rel]) if x[0] == args.tor]
+        fps = [fp for tor, fp in fingerprint_text(texts[rel]) if tor == args.tor]
+        if len(fps) != 1:
+            raise DataError(f"{rel}: {args.tor} appears {len(fps)} times; each ID must appear once")
+        fp = fps[0]
         row = {"tor": args.tor, "fingerprint": fp, "commit": args.rev, "feature_file": Path(rel).name,
                "text": block}
     if args.json:
