@@ -6,29 +6,27 @@ Requirements-driven development lifecycle in the spirit of DO-330 TQL-5. Formal
 Gherkin-style TOR requirements (`TOR-NN-XXXXXXX`) are the single source of truth —
 epics implement them, tests derive from Given/When/Then, wrapup verifies against them.
 
-Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
-`/peak-workflow:migrate-from-epic-workflow` to migrate an existing epic-workflow project.
+Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflow projects.
 
 ## Skill Inventory
 
 | Skill | Purpose |
 |-------|---------|
-| `new-project` | Front-door router — detects project state and dispatches to the right entry point |
+| `new-project` | Front-door router — routes on the format stamp and dispatches to the right entry point |
 | `setup` | Audit CLAUDE.md — ask only what the user alone knows, default the rest behind one confirmation; stub architecture/design-notes docs (run once before discover) |
 | `discover` | Adaptive interview → product-vision.md + concept-of-operations.md |
 | `mockup` | UI projects only — screen inventory (`S-NN`), per-scenario flows, grayscale wireframes; concretizes ConOps steps |
-| `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json |
+| `capture-requirements` | Derive TOR requirements → .feature.md + .feature.tracing.json; amend, retire, or record pending changes with Change Records; `<TOR-ID>` mode amends one requirement |
 | `plan-project` | Derive epics from TOR IDs → phase indexes + epic specs + sidecars |
 | `add` | Add new epic(s) referencing existing TOR IDs |
-| `triage` | Route incoming request → HEAVY / EPIC / TRIVIAL |
-| `start-epic` | Implement an epic — TOR-driven plan + tasks + verification |
-| `wrapup-epic` | Independent TOR verification, complete, ship |
+| `triage` | Route incoming request → HEAVY / AMEND / EPIC / TRIVIAL |
+| `start-epic` | Implement an epic — TOR-driven plan + tasks + verification; settles superseded or retired anchors; owner-approved in-epic amendment (supersede) |
+| `wrapup-epic` | Independent TOR verification, complete, ship; owner-approved amend or record-as-pending at Step 1.4b; `reverify` mode re-checks a Complete epic's stale requirements |
 | `pause` | Save progress mid-epic |
-| `status` | Read-only dashboard — phase progress + Requirements Coverage |
-| `quick-fix` | Trivial bug fix on a hotfix/ branch, no TOR changes |
+| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Requirements Health (findings A–F, Disputed) |
+| `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
-| `migrate-2.5` | One-shot migration from legacy index.md layout |
-| `migrate-from-epic-workflow` | One-shot migration from an epic-workflow project to peak-workflow |
+| `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
 
 ## Key Design Invariants
 
@@ -36,18 +34,43 @@ Forked from `epic-workflow` v2.5.1. The two plugins coexist. Use
 - `{NN}` = 2-digit zero-padded feature file number (stable, never renumbered)
 - `{XXXXXXX}` = 7-char random alphanumeric (`LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7`)
 - Immutable once merged to develop — they are foreign keys
+- Never reused. A retired or superseded ID stays out of every feature file for good, and a
+  feature number named in any Change Record is reserved forever
+- A change in meaning gets a **new ID** (a `supersede` record names the successor); only a
+  same-meaning `reword` with passing test evidence keeps the ID
 
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
-**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an optional `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup
+**Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup.
+Removal epics add `retires: CR-…`. `verified:` (TOR → fingerprint), `unverified:` (TOR → date and
+reason), and `reverified:` are written only by `tor-lifecycle mark`. A Complete sidecar's `status:`
+never changes and its `requirements:` is append-only — except deleting or correcting a non-ID
+entry that `check` reports as finding C, by hand on a `docs/` branch (`mark` refuses a sidecar
+holding one)
+
+**Change Records:** `docs/requirements/changes/<YYYY-MM-DD>-<suffix>.toml`, one write-once record per
+lifecycle decision — `reword` (same meaning, test evidence), `supersede` (new ID), `retire`,
+`pending` (Disputed), `uphold` (closes a dispute). Feature files hold no notes or history; titles
+live only in the feature file (tracing sidecars and specs carry IDs). Requirement states (Verified,
+Verified (reworded), Changed since verified, Verification failed, Disputed, …) are derived by
+`tor-lifecycle states`, never stored
 
 **Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
 ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by
-`plan-project` and `add`); older specs show `—` — no git-history fallback. `status` fetches and warns when the base is behind origin, shows what teammates
+`plan-project` and `add`; upgrade step 0001 backfills older specs from git, `—` where git cannot tell). `status` fetches and warns when the base is behind origin, shows what teammates
 changed since the user's own last commit, lists ready epics as a table, and **never picks among
 several ready epics**. `start-epic` pulls the base, then shows an epic card (with `⚑` lines for a
 teammate's epic, phase, owner, or existing origin branch) and confirms before creating the branch,
 and removes an empty branch left by a rejected plan.
+
+**Format stamp and guard:** `docs/.peak-workflow.toml` holds `format = N` (written by `setup` on a
+new project, moved forward only by `upgrade`; missing = format 0) and `[lifecycle]
+disputed_threshold_days`. Every skill starts with one Format Guard, `tor-lifecycle format`:
+writing skills stop unless the project is current (or new); `status` and `triage` run degraded
+with a banner when it is behind; `new-project` routes to `upgrade`. After the guard, skills read
+only the current format — no reader fallbacks for older ones. No upgrade step edits the user's
+`CLAUDE.md`; `setup` writes it, and `plan-project` Step 7 (document links) and `start-epic` (the
+Test directories line, on Yes) are the only other skills that add to it.
 
 **Branch families:**
 - `docs/{task-short-name}` — full planning sequence (discover → mockup [UI] → capture-requirements → plan-project)
@@ -157,7 +180,21 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
 
 ## Skill File Rules
 
-- `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere
+- `SKILL.md` is the sole source of truth for skill behavior — no logic elsewhere, with two
+  exceptions below (`scripts/` and upgrade steps)
+- `scripts/` holds deterministic mechanics only — hashing, parsing, and history reads a prompt
+  would get wrong at scale. `tor_lifecycle.py` (Python 3.11+, standard library only) is the
+  **only** implementation of the fingerprint normalization; no skill restates or re-derives it.
+  Skills call it through the POSIX wrapper, `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <cmd>`,
+  which finds a suitable Python or prints an install hint (exit 3). Exit codes: 0 ok, 1 findings,
+  2 usage/data error, 3 interpreter. Decisions (what to ask, what to block) stay in `SKILL.md`.
+  `tor-lifecycle mark` is the only writer of a sidecar's `verified:`, `unverified:`, and
+  `reverified:` lines and of an append to a Complete epic's `requirements:`
+- `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
+  templates. They are **forward-only and append-only**: a shipped step is never edited; a
+  correction is a new step. Each step starts with a detect check (so re-running is harmless) and
+  is applied as one commit, `chore(upgrade): step NNNN <name>` — or, when its **Commits** line says
+  so, one commit per phase (`… — <phase>`) with the last phase committed together with the stamp
 - Template files (`PLAN_TEMPLATE.md`, `HANDOFF_TEMPLATE.md`, etc.) live alongside SKILL.md in the skill directory
 - Sibling template files are referenced by path in SKILL.md; Claude Code makes them available at skill load time
 - `references/` holds the three stack sheets (Bun static SPA, Bun web, Bun + Electron desktop).
@@ -192,7 +229,10 @@ Both `plugin.json` and `CHANGELOG.md` must be updated in the same commit.
 
 - **Patch** — wording, UX clarity, step renumbering, no behavioral change
 - **Minor** — new steps, new skills, changed skill contracts
-- **Major** — breaking changes to artifact formats or skill API
+- **Major** — breaking changes to artifact formats or skill API. A major release that changes
+  project artifacts ships a new upgrade step and bumps `PLUGIN_FORMAT` in `tor_lifecycle.py`
+  (the `format` that `setup` writes to a project's `docs/.peak-workflow.toml`). It may then delete
+  compatibility clauses for formats the `upgrade` runner can bring forward
 - **Changelog entries:** one bullet per change, each ≤ 50 words, no rationale essays —
   see "Changelog entry style" in the repo-level CLAUDE.md.
 
