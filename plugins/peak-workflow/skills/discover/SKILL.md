@@ -15,10 +15,21 @@ You are conducting an adaptive discovery interview to produce (or refine) the pr
 
 The user's request: $ARGUMENTS
 
+## Format Guard
+
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
+
 ## Step 0: Branch Guard
 
-**Before the Layout Guard or any other action:**
+**Right after the Format Guard:**
 
+0. If `git rev-parse -q --verify HEAD` fails (no commits yet), stop: *"This repository has no commits
+   yet — run /peak-workflow:setup first. It makes the first commit and the `develop` branch this
+   docs/ branch merges into."*
 1. Run `git branch --show-current`. Capture the result as `<current-branch>`.
 2. If `<current-branch>` is `develop`, `main`, or `master`:
    - **Uncommitted changes:** note whether `git status --porcelain` lists files. They carry over
@@ -52,14 +63,6 @@ The user's request: $ARGUMENTS
      - Options: `["Continue on this branch", "Stop — I'll create a docs/ branch first"]`
    - If Stop, end here.
 
-## Layout Guard
-
-**Before any other action after the branch guard:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
-
 ---
 
 ## Setup Advisory Check
@@ -70,13 +73,21 @@ Before the discovery interview, verify that `/peak-workflow:setup` has been run:
    ```bash
    grep -qiE "Verification.*Quality|Quality.*Gates" CLAUDE.md && echo "found" || echo "missing"
    ```
-2. If **missing**, print a non-blocking advisory and continue — discovery can proceed now, but
+2. If `CLAUDE.md` does not exist, print *"There is no CLAUDE.md yet — run /peak-workflow:setup
+   before or right after this session."* and continue. Otherwise, if the section is **missing**,
+   print a non-blocking advisory and continue — discovery can proceed now, but
    setup must be run before the first `/peak-workflow:start-epic`:
    > **Setup Advisory:** `CLAUDE.md` does not have a "Verification & Quality Gates" section.
    > `/peak-workflow:start-epic` and `/peak-workflow:wrapup-epic` both require this section. Consider
    > running `/peak-workflow:setup` before or immediately after this discovery session — it
    > audits `CLAUDE.md` and stubs `docs/architecture.md` and `docs/design-notes.md` as well.
 3. If **found**, continue without comment.
+4. If the Format Guard's verdict was `new`, nothing has stamped the project yet, and once
+   this session writes the vision it would count as an older project. Stamp it now, on the
+   `docs/` branch: run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format --init` and include
+   `docs/.peak-workflow.toml` in this session's Commit Gate. If it exits 3 (no Python 3.11+), print
+   its install hint and stop — later commands need Python, and running discover again after
+   installing is safe.
 
 ---
 
@@ -179,7 +190,7 @@ Produce draft content for Product Vision sections 9–11 and ConOps sections 7�
 
 1. Read the existing `docs/product-vision-planning/product-vision.md` and `docs/product-vision-planning/concept-of-operations.md` in full.
 2. Read the phase indexes (`docs/implementation-plan/phase-*/index.md`) and spot-check sidecars in `docs/implementation-plan/status/` to understand what phases and epics have been planned and built.
-3. Read `docs/architecture.md` and `docs/design-notes.md` for current system context.
+3. Read `docs/architecture.md` and `docs/design-notes.md` for current system context (skip either silently if absent).
 
 Present a summary to the user:
 ```
@@ -196,6 +207,25 @@ Based on your description, here's what I think has changed or needs to be added:
 Then conduct a focused interview covering ONLY what is new or changed. Use the same adaptive protocol (draft → react → iterate → gate) but skip sections that don't need updates.
 
 For each existing section that needs changes, show the current content alongside the proposed update so the user can see exactly what's changing.
+
+**Re-litigation check.** Before drafting a proposed capability into the vision or ConOps, run
+`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" search -- <2–4 key nouns or quoted phrases>`.
+Exit 0 = no earlier decision. Exit 1 prints the Change Records that retired, superseded, or
+recorded the idea as pending. A hit on an open `pending` record (not
+`closed by`) is not a re-proposal — do not ask: write the section's `Modified` (decided) or
+`Pending` (undecided) row naming `(settles <CR-ID>)`, never a New Capabilities line. For each other
+hit that is really the same idea, ask with `AskUserQuestion`:
+- Question: `"<capability> was <retired / superseded / recorded as pending> in <CR-ID> (<date>): <reason, one line>. Bring it back anyway?"`
+- Options: `["Bring it back — note why in the changelog", "Drop it — the earlier decision stands"]`
+
+On "Bring it back", carry on and name the record in the capability's line under "New
+Capabilities Identified" (`reintroduces the idea in <CR-ID>: <why now>`) so
+`/peak-workflow:capture-requirements` gives it a new ID. On "Drop it", leave it out and list it
+under "Deferred Items" with the record ID.
+
+**A capability that changes or goes away** is captured, not just discussed: every section edit
+that changes what an existing capability does is a `Modified` row in the changelog, and every
+capability withdrawn is a `Removed` row (Step 3).
 
 ## Step 3: Write Documents
 
@@ -252,8 +282,8 @@ After all phases are complete, write the documents.
 
 ### Brownfield Output
 
-1. Update `docs/product-vision-planning/product-vision.md` in place — increment the document version, update the date, and modify only the sections that changed.
-2. Update `docs/product-vision-planning/concept-of-operations.md` in place — same approach.
+1. Update `docs/product-vision-planning/product-vision.md` in place — increment the document version, update the date, and rewrite only the sections that changed **to the current state**: the document reads as if it had always said this. No "previously", "was", "removed in vN", strike-through, or change notes — the history lives in the changelog and git. A withdrawn capability is deleted from scope, scenarios, and the functional summary (move it to §7 Out of Scope or §11 Backlog only if it is genuinely still out of scope or future work).
+2. Update `docs/product-vision-planning/concept-of-operations.md` in place — same approach. Renumber nothing that requirements cite: keep scenario numbers and step numbers stable, and leave a withdrawn scenario's number unused rather than shifting later ones. Product Vision §8 uses the same scenario numbers — leave a withdrawn one unused there too.
 3. Write `docs/product-vision-planning/changelogs/discovery-changelog-{TIMESTAMP}.md` with content. `{TIMESTAMP}` is a second-granularity UTC timestamp — second granularity is required because parallel discovery sessions on different machines may produce changelogs within the same minute, and day-granularity would collide. Generate it with:
 
    ```bash
@@ -273,8 +303,8 @@ After all phases are complete, write the documents.
 
 | Document | Section | Change Type | Summary |
 |----------|---------|-------------|---------|
-| product-vision.md | [section] | [Added / Modified / Removed] | [1-line summary] |
-| concept-of-operations.md | [section] | [Added / Modified / Removed] | [1-line summary] |
+| product-vision.md | [section] | [Added / Modified / Removed / Pending] | [1-line summary] |
+| concept-of-operations.md | [section] | [Added / Modified / Removed / Pending] | [1-line summary] |
 
 ## New Capabilities Identified
 
@@ -289,6 +319,22 @@ After all phases are complete, write the documents.
 [Items discussed but explicitly pushed to a future cycle.]
 ```
 
+`Modified` and `Removed` rows are **mandatory** whenever an existing capability's behavior
+changes or the capability is withdrawn — one row per affected section, with the Summary naming
+the capability and what changed (`Modified`) or that it is withdrawn and why (`Removed`). A
+wording change to a term the requirements use (no behavior change) is a `Modified` row whose
+Summary starts `Wording only:`. A capability that **may** change but the user has not decided is
+a `Pending` row (the documents keep describing today's behavior), naming the capability and
+the open question. A change to an **existing** capability is written only as a `Modified` row —
+never also under "New Capabilities Identified", which is for capabilities with no requirements
+yet. Promoting an out-of-scope or backlog item into scope is an `Added` row (`promoted from
+backlog`) on the section that now describes it — never a `Removed` row for the backlog line.
+`/peak-workflow:capture-requirements` reads them: `Modified` rows send the requirements tracing
+to that section through its decision test (reword, supersede, or record as pending),
+`Removed` rows make those requirements retire candidates, and `Pending` rows make them
+record-as-pending candidates. A change left out of this table
+leaves its requirements silently stale.
+
 ## Step 4: Quality Check
 
 Before presenting the final documents to the user, verify:
@@ -298,9 +344,10 @@ Before presenting the final documents to the user, verify:
 - [ ] ConOps scenarios name specific UI elements, data fields, and user actions (or the CLI / API / device equivalents)
 - [ ] Embedded or equipment-controlling products: ConOps §8 has a `What Must Never Happen` table with a safe state per hazard
 - [ ] The "As-Is" section describes real current-state pain points (not generic ones)
-- [ ] The Glossary defines all domain-specific terms used in both documents
+- [ ] The Glossary defines all domain-specific terms used in both documents (brownfield: the checks in this list apply to the sections this run changed)
 - [ ] Cross-references between documents are correct (ConOps references Product Vision as companion)
-- [ ] Brownfield only: the discovery changelog accurately captures all changes
+- [ ] Brownfield only: the discovery changelog accurately captures all changes — every changed capability has a `Modified` row and every withdrawn one a `Removed` row
+- [ ] Brownfield only: the vision and ConOps read as the current state — no change notes, "previously" wording, or struck-through text, and no scenario or step renumbered
 
 ## Step 4.5: Product-Shape Re-check
 

@@ -31,17 +31,17 @@ TOR requirements into `architecture.md` or `design-notes.md`.
 
 ---
 
-## Layout Guard
+## Format Guard
 
-**Before any other action:** check whether `docs/implementation-plan/index.md` contains a legacy status table header — a line matching `| Phase | Epic |` with a `| Status |` column present in the file. If the legacy header is found, stop immediately and print:
-
-> This project uses the pre-v2.5.0 implementation-plan layout. Run `/peak-workflow:migrate-2.5` once to upgrade to the new layout (per-phase indexes + status sidecars), then retry your command.
-
-Do not attempt the skill's normal flow on a legacy layout.
+**Before any other action:** run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`.
+On exit 0 (`verdict: current`, or `new` for a project with no peak-workflow files yet), continue.
+On any other exit, print its output and stop — it names the fix (`/peak-workflow:upgrade`, a
+plugin update, or a Python install). After this guard, read the project's files only in the
+current format.
 
 ---
 
-## Step 1: Load Epic Workflow Context
+## Step 1: Load Project Context
 
 1. Read `CLAUDE.md` — extract the Tech Stack table, Key Architecture Decisions, Important Reminders, and note any custom paths to architecture or design docs (if different from `docs/architecture.md` / `docs/design-notes.md`)
 2. Glob `docs/implementation-plan/status/epic-*.md` and grep for `status: Complete` or `status: Implemented` to identify which epics have finished. These are the epics whose handoffs are relevant to the documentation refresh.
@@ -64,8 +64,6 @@ These become the **claims to verify** in Step 4.
 ## Step 3: Aggregate Session Handoffs
 
 Read all files in `docs/implementation-plan/session-handoffs/` that correspond to Complete or Implemented epics. Skip Paused handoffs — their decisions may not be final.
-
-> **Epic ID formats:** handoff filenames are `epic-<id>-complete.md` or `epic-<id>-implemented.md`, where `<id>` may be a legacy integer (e.g., `7`, `6.5`) or a 7-character alphanumeric ID (e.g., `a3f2K7p`). The `epic-*-complete.md` and `epic-*-implemented.md` glob patterns match both formats — no special handling needed.
 
 For each handoff, collect:
 - **Key Files** — every file path listed in the Key Files table
@@ -126,7 +124,9 @@ If both tables are empty, report that the documentation is current and stop — 
 
 ## Step 6: Rewrite Target Documents
 
-Rewrite only the documents where gaps were found.
+Rewrite only the documents where gaps were found. Never cite a superseded or retired TOR ID in
+either document (`tor-lifecycle titles <ID>` says which): name its Change Record (`CR-…`) and the
+live successor(s) instead — `check` reports any such citation as finding E.
 
 ### Rewriting `docs/architecture.md`
 
@@ -162,8 +162,14 @@ Report any remaining discrepancies. Fix them before proceeding to Step 8.
 
 **Ask the user if they'd like to commit** the refreshed documents. If the user confirms:
 
-1. Stage only the target document files (`docs/architecture.md` and/or `docs/design-notes.md`)
-2. Commit message: `docs: refresh architecture and design notes to as-built state`
-3. Commit body (1-2 lines): summarize the most significant changes — e.g., *"Corrects .NET version, adds 4 missing endpoints, adds 6 new design decisions from epics 7–10 handoffs."*
+1. Before committing, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --base <base>`: an E finding marked `[this branch]` is a superseded or retired ID this rewrite cited — name its `CR-…` and successor instead.
+2. Branch: inside wrapup-epic Step 4, commit on the feature branch. Run standalone on the base
+   branch (`develop`, `main`, or `master`), first `git checkout -b docs/refresh-<YYYY-MM-DD>`, and
+   after the commit ask via `AskUserQuestion` `["Merge into <base> locally", "Leave the branch for a
+   PR"]` — Merge: `git checkout <base> && git merge --no-ff -m "docs: merge docs/refresh-<YYYY-MM-DD> — refresh architecture and design notes" docs/refresh-<YYYY-MM-DD> && git branch
+   -d docs/refresh-<YYYY-MM-DD>`. On any other branch, commit there.
+2. Stage only the target document files (`docs/architecture.md` and/or `docs/design-notes.md`)
+3. Commit message: `docs: refresh architecture and design notes to as-built state`
+4. Commit body (1-2 lines): summarize the most significant changes — e.g., *"Corrects .NET version, adds 4 missing endpoints, adds 6 new design decisions from epics 7–10 handoffs."*
 
 Do NOT push — leave that for the user.

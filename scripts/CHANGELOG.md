@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.1] — 2026-11-04
+
+### Fixed
+
+- **`setup.sh` detects a node that won't start.** Exits with a clear error instead of a
+  raw `dyld` crash; on macOS Homebrew installs it suggests `brew upgrade node`.
+- **`setup.ps1` detects a node that won't start.** Exits with the first lines of node's
+  error and a reinstall hint (`winget install OpenJS.NodeJS.LTS` or nodejs.org).
+
 ## [0.1.0] — 2026-09-02
 
 ### Added

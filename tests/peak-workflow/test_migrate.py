@@ -1,0 +1,716 @@
+"""Plan 8: step 0002 mechanics (`migrate scan|records|strip|sidecars|finish`, `fingerprint --against`,
+`check --by-epic`) and a "Project A-like" fixture upgraded from format 0 to 2, twice."""
+import json
+import sys
+import unittest
+from pathlib import Path
+
+from fixtures import FixtureRepo, Scenario, feature_text, parse_tsv, tor_lifecycle as tl
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "dryrun"))
+import plan8_project_a as pa  # noqa: E402
+
+TODAY = "2026-10-26"
+FILE = "docs/requirements/01-core.feature.md"
+
+
+class ProseScanTests(unittest.TestCase):
+    TEXT = "\n".join([
+        "# Core", "", "> SUPERSEDED banner in the Markdown preamble", "", "```gherkin",
+        "Feature: 1.0 Core", "    As a user", "    I want things", "    So that value", "",
+        "# ----", "# UX Baseline", "# ----", "# Note: reference screen — Orders List (S-01)", "",
+        "Scenario: [TOR-01-Aaa0001] The tool shall do A",
+        "    #", "    # Note:", "    #   AMENDED v1.8: wording.", "    #",
+        "    # Verification: automated",
+        "    Given a", '    """', "    # not a comment: doc string content", '    """', "    Then b",
+        "", "# TODO stray comment", "Scenario: [TOR-01-Bbb0002] The tool shall do B",
+        "    # Note: B is fast because it caches.", "    Given a", "    Then b", "",
+        "# ----", "# Later", "# MODIFIED v1.8: section moved", "# ----", "",
+        "Scenario: [TOR-01-Ccc0003] The tool shall do C", "    Given a", "    Then c", "```",
+        "REVISED after the fence: part of C's fingerprint", ""])
+
+    def test_items_kinds_and_owners(self):
+        items = tl.scan_prose(FILE, self.TEXT)
+        got = [(it.line, it.kind, it.tor, it.strip) for it in items]
+        self.assertEqual(got, [
+            (3, "outside", None, True),             # preamble: safe to strip
+            (17, "marker", "TOR-01-Aaa0001", True),  # the `#` / Note / `#` run
+            (28, "comment", "TOR-01-Bbb0002", True),  # directly above B's Scenario line
+            (30, "note", "TOR-01-Bbb0002", True),
+            (36, "banner", None, True),
+            (43, "outside", None, False),           # after the last Scenario: in C's fingerprint
+        ])
+        self.assertEqual(items[1].end, 20)
+        self.assertEqual(items[1].summary, "AMENDED v1.8: wording.")
+
+    def test_strip_keeps_fingerprints_and_kept_lines(self):
+        new, _n = tl.strip_feature_text(FILE, self.TEXT)
+        self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(self.TEXT))
+        for kept in ("# Note: reference screen", "# Verification: automated", "# not a comment",
+                     "# Later", "REVISED after the fence", "# UX Baseline"):
+            self.assertIn(kept, new)
+        for gone in ("AMENDED", "TODO", "caches", "MODIFIED", "SUPERSEDED banner"):
+            self.assertNotIn(gone, new)
+
+    def test_record_block_drops_notes_and_keeps_the_fingerprint(self):
+        block = tl.scenario_block(self.TEXT, "TOR-01-Aaa0001")
+        self.assertIn("AMENDED", block)
+        stored = tl.record_block(block)
+        self.assertNotIn("AMENDED", stored)
+        for kept in ("# Verification: automated", "# not a comment"):
+            self.assertIn(kept, stored)
+        self.assertEqual(tl.fingerprint_text(stored), tl.fingerprint_text(block))
+        self.assertEqual(tl.record_block(""), "")
+
+    def test_unfenced_title_before_feature_is_kept(self):
+        text = "# Core requirements\n# SUPERSEDED file banner\n\nFeature: 1.0 Core\n\n" \
+               "Scenario: [TOR-01-Aaa0001] The tool shall do A\n    # stray\n    Then a\n"
+        self.assertEqual([(it.line, it.kind) for it in tl.scan_prose(FILE, text)], [(2, "marker"), (7, "comment")])
+
+    def test_a_banners_section_name_is_kept_even_with_a_marker(self):
+        # Summit (Plan 9 live UAT): a one-line banner "(added …, revised …)" names the section of the
+        # Scenarios below it; stripping it moved them into the previous section and strip refused.
+        text = "\n".join([
+            "Feature: 1.0 Core", "", "# ----", "# Safety", "# ----", "",
+            "Scenario: [TOR-01-Aaa0001] The tool shall never do A", "    Then no A", "",
+            "# ----", "# Hint (added 2026-08-30, revised 2026-08-30 to one place)", "# ----", "",
+            "Scenario: [TOR-01-Bbb0002] The tool shall do B", "    Then b", ""])
+        self.assertEqual([(it.line, it.kind, it.strip) for it in tl.scan_prose(FILE, text)], [(11, "banner", False)])
+        with FixtureRepo() as repo:
+            repo.write(FILE, text)
+            result = repo.cli("migrate", "strip", "--write")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((repo.root / FILE).read_text(encoding="utf-8"), text)
+
+    def test_a_note_under_a_banner_is_not_a_section_and_is_section_level(self):
+        # Project A (Gate 4): a `# Note:` between a banner's closing rule and the first Scenario was
+        # read as the section name ("Note:"), so a Safety requirement lost Safety, the note was
+        # credited to the previous requirement, and strip refused (section would change).
+        text = "\n".join([
+            "Feature: 1.0 Core", "", "Scenario: [TOR-01-Aaa0001] The tool shall do A", "    Then a", "",
+            "# ----", "# Safety", "# MODIFIED v1.2: reorganised", "# ----", "# Note:",
+            "#   1. Covers every output the tool can switch.", "#", "",
+            "Scenario: [TOR-01-Bbb0002] The tool shall never do B", "    Then no B", ""])
+        reqs = {r.tor: r.section for r in tl.parse_requirements(text)}
+        self.assertEqual(reqs, {"TOR-01-Aaa0001": None, "TOR-01-Bbb0002": "Safety"})
+        items = [(it.line, it.kind, it.tor) for it in tl.scan_prose(FILE, text)]
+        self.assertEqual(items, [(8, "banner", None), (10, "note", None)])
+        with FixtureRepo() as repo:
+            repo.write(FILE, text)
+            result = repo.cli("migrate", "strip", "--write")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            new = (repo.root / FILE).read_text(encoding="utf-8")
+            self.assertNotIn("Covers every output", new)
+            self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
+    def test_a_note_inside_a_banner_is_one_section_level_item(self):
+        # Project C (Gate 4): a `# Note:` paragraph between a banner's rules was read as banner text,
+        # so strip deleted only its "revised" lines and left broken sentences behind.
+        text = "\n".join([
+            "Feature: 1.0 Core", "", "Scenario: [TOR-01-Aaa0001] The tool shall do A", "    Then a", "",
+            "# ----", "# Persistent header", "#", "# Note:",
+            "#   Derived from the ConOps. The avatar is TOR-01-Aaa0001 (revised 2026-09-24); the",
+            "#   footer is TOR-01-Bbb0002.", "# ----", "",
+            "Scenario: [TOR-01-Bbb0002] The tool shall do B", "    Then b", ""])
+        items = [(it.line, it.end, it.kind, it.tor) for it in tl.scan_prose(FILE, text)]
+        self.assertEqual(items, [(8, 11, "marker", None)])
+        new, _n = tl.strip_feature_text(FILE, text)
+        self.assertNotIn("Derived", new)
+        self.assertNotIn("footer is", new)
+        self.assertIn("# ----\n# Persistent header\n# ----\n", new)
+        self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
+    def test_a_later_marker_line_in_a_banner_is_stripped(self):
+        text = feature_text("01", "Core", [Scenario("TOR-01-Aaa0001", "The tool shall do A")], fenced=False)
+        text = text.replace("Scenario:", "# ----\n# Core\n# MODIFIED v1.2: reorganised\n# ----\n\nScenario:")
+        new, _n = tl.strip_feature_text(FILE, text)
+        self.assertNotIn("MODIFIED", new)
+        self.assertIn("# Core", new)
+        self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
+
+class GateBoxTests(unittest.TestCase):
+    """F5/F7: `tor-lifecycle box` renders the Phase 4 NOW | BECOMES boxes the same way every run."""
+    ITEM = {"n": 37, "tor": "TOR-02-Abc1234", "title": "The app shall sync every 30 seconds",
+            "from": ["docs/requirements/02-sync.feature.md, lines 40–42 (the note is removed from here)"],
+            "to": ["docs/requirements/02-sync.feature.tracing.json → entry \"TOR-02-Abc1234\" → field \"rationale\""],
+            "rows": [["AMENDED v1.8: the interval was tightened from 60 to 30 seconds after the ops review "
+                      "asked for faster sync.", "The interval is 30 seconds because the ops review asked."],
+                     ["See ENG-123.", "(unchanged)"]],
+            "changed": "marker word removed", "lost": "the old 60-second value"}
+
+    def test_side_by_side_columns_line_up(self):
+        out = tl.render_box(self.ITEM, all_rows=True).split("\n")
+        self.assertEqual(out[0], "37. TOR-02-Abc1234 — The app shall sync every 30 seconds")
+        self.assertTrue(out[1].startswith("FROM: ") and out[2].startswith("TO:   "))
+        box = [ln for ln in out if ln[:1] in "+|"]
+        self.assertEqual({len(ln) for ln in box}, {tl.BOX_WIDE})
+        self.assertEqual({ln.index("|", 1) for ln in box if ln.startswith("|")}, {tl.BOX_COL + 3})
+        self.assertEqual(out[-1], "Changed: marker word removed. LOST: the old 60-second value.")
+        text = " ".join(ln[2:tl.BOX_COL + 2].strip() for ln in box if ln.startswith("|"))
+        self.assertIn("after the ops review asked for faster sync.", " ".join(text.split()))
+
+    def test_unchanged_rows_are_counted_not_drawn(self):
+        out = tl.render_box(self.ITEM)
+        self.assertNotIn("(unchanged)", out)
+        self.assertIn("+ 1 sentence kept word for word", out)
+        only_unchanged = {**self.ITEM, "rows": [["See ENG-123.", "(unchanged)"]]}
+        out = tl.render_box(only_unchanged)
+        self.assertNotIn("+---", out)
+        self.assertIn("+ 1 sentence kept word for word", out)
+
+    def test_narrow_terminal_stacks_now_above_becomes(self):
+        out = tl.render_box(self.ITEM, width=70, all_rows=True).split("\n")
+        self.assertFalse([ln for ln in out if ln.startswith("|")])
+        self.assertTrue(all(len(ln) <= 70 for ln in out if not ln.startswith(("FROM", "TO", "37."))))
+        labels = [ln.split(":")[0] for ln in out if ln.startswith(("NOW:", "BECOMES:"))]
+        self.assertEqual(labels, ["NOW", "BECOMES", "NOW", "BECOMES"])
+
+    def test_cli_and_bad_items(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            good, bad = Path(d) / "good.json", Path(d) / "bad.json"
+            good.write_text(json.dumps([self.ITEM, {**self.ITEM, "n": 38}]))
+            bad.write_text(json.dumps([{**self.ITEM, "rows": [["only one cell"]]}]))
+            with FixtureRepo() as repo:
+                result = repo.cli("box", str(good))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("\n\n38. TOR-02-Abc1234", result.stdout)
+                stacked = repo.cli("box", "--stacked", "--all-rows", str(good))
+                self.assertIn("BECOMES:  (unchanged)", stacked.stdout)
+                result = repo.cli("box", str(bad))
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("[now, becomes] string pairs", result.stderr)
+
+
+class GateCardTests(unittest.TestCase):
+    """Gate 5: every owner question is one card — ASKING / CHANGES / MY READ, then a section body."""
+    CARD = {"q": 1, "of": 24, "section": "Notes to delete",
+            "asking": "OK to delete 2 background notes? Each one only lists where requirements came from.",
+            "changes": ["Requirements: no wording changes.", "Lost: these 2 notes (git history keeps them)."],
+            "read": "Safe: the sources they name still exist.",
+            "list": [{"where": "01-app", "text": "UX rules come from the UX Baseline", "n": 3},
+                     {"where": "11-navigation", "text": "Route map comes from vision section 6", "n": 106}],
+            "example": {"where": "01-app.feature.md", "rows": [["# Derived from the UX Baseline ...", "(note removed)"],
+                                                              ["Scenario: [TOR-01-Aaa0001] A", "Scenario: [TOR-01-Aaa0001] A"]]},
+            "footer": "#10 holds a past decision, so it is asked next, on its own."}
+
+    def test_card_leads_with_the_question_in_plain_words(self):
+        out = tl.render_card(self.CARD).split("\n")
+        self.assertEqual(out[0], "Question 1 of 24: Notes to delete")
+        self.assertTrue(out[2].startswith("ASKING   OK to delete 2 background notes?"))
+        self.assertIn("CHANGES  Requirements: no wording changes.", out)
+        self.assertTrue(any(ln.startswith("MY READ  Safe") for ln in out))
+        self.assertIn("  01-app         UX rules come from the UX Baseline  (#3)", out)
+        prose = out[: out.index("THE NOTES")]
+        self.assertTrue(all(len(ln) <= tl.CARD_TEXT for ln in prose))
+        row = next(ln for ln in out if ln.startswith("  # Derived"))
+        self.assertTrue(row.rstrip().endswith("(note removed)"))  # NOW and AFTER on one line
+        self.assertEqual(out[-1], "#10 holds a past decision, so it is asked next, on its own.")
+
+    def test_titles_requirements_items_and_lost(self):
+        card = {**self.CARD, "section": "Past changes to log", "list": [], "example": None, "footer": "",
+                "titles": [{"where": "01-app", "requirement": "JSON log record on startup",
+                            "title": "Startup stamp moved from plain text to JSON", "n": 4}],
+                "requirements": [{"tor": "TOR-02-Old0001", "title": "Ask which version to keep", "n": 9,
+                                  "then": ["replaced by TOR-02-New0001: Keep the most recent edit"]}],
+                "items": [GateBoxTests.ITEM], "lost": ["the old 60-second value"]}
+        out = tl.render_card(card)
+        self.assertIn("  01-app: JSON log record on startup\n    -> Startup stamp moved from plain text to JSON  (#4)", out)
+        self.assertNotIn("##", tl.render_card({**card, "titles": [{**card["titles"][0], "n": "#4"}]}))
+        self.assertIn("  TOR-02-Old0001: Ask which version to keep  (#9)\n    -> replaced by TOR-02-New0001", out)
+        self.assertIn("37. TOR-02-Abc1234", out)
+        self.assertTrue(out.endswith("LOST: the old 60-second value"))
+
+    def test_narrow_card_stacks_and_bad_cards_are_refused(self):
+        out = tl.render_card(self.CARD, width=60)
+        self.assertIn("  NOW\n    # Derived from the UX Baseline ...", out)
+        self.assertIn("  AFTER\n    (note removed)", out)
+        with self.assertRaises(tl.DataError):
+            tl.render_card({"q": 1})
+        with self.assertRaises(tl.DataError):
+            tl.render_card({**self.CARD, "example": {"rows": [["only one"]]}})
+
+
+class AnchorTableTests(unittest.TestCase):
+    LIVE = {"TOR-01-Aaa0001": tl.LiveRequirement("TOR-01-Aaa0001", "A", "0" * 12, "01-core.feature.md")}
+
+    def test_three_columns_become_two(self):
+        text = ("## Requirements Anchors\n\n| TOR ID | Feature File | Scenario Title |\n|---|---|---|\n"
+                "| TOR-01-Aaa0001 | `docs/requirements/01-core.feature.md` | The tool shall \\| do A |\n\n## Next\n")
+        self.assertEqual(tl.strip_anchor_titles(text, self.LIVE),
+                         "## Requirements Anchors\n\n| TOR ID | Feature File |\n|--------|--------------|\n"
+                         "| TOR-01-Aaa0001 | `docs/requirements/01-core.feature.md` |\n\n## Next\n")
+
+    def test_title_only_table_gains_the_feature_file(self):
+        text = "## Requirements Anchors\n\n| TOR ID | Scenario |\n|---|---|\n| TOR-01-Aaa0001 | A |\n| TOR-01-Gone001 | G |\n"
+        out = tl.strip_anchor_titles(text, self.LIVE)
+        self.assertIn("| TOR-01-Aaa0001 | `docs/requirements/01-core.feature.md` |", out)
+        self.assertIn("| TOR-01-Gone001 | — |", out)
+
+    def test_two_column_table_is_left_alone(self):
+        text = "## Requirements Anchors\n\n| TOR ID | Feature File |\n|---|---|\n| TOR-01-Aaa0001 | x |\n"
+        self.assertEqual(tl.strip_anchor_titles(text, self.LIVE), text)
+
+
+class HelperFlagTests(unittest.TestCase):
+    def setUp(self):
+        self.repo = FixtureRepo()
+        self.addCleanup(self.repo.cleanup)
+
+    def test_fingerprint_against(self):
+        a, b = Scenario("TOR-01-Aaa0001", "The tool shall do A"), Scenario("TOR-01-Bbb0002", "The tool shall do B")
+        self.repo.feature("01", "core", [a, b])
+        before = self.repo.write("before.tsv", self.repo.cli("fingerprint").stdout)
+        self.repo.feature("01", "core", [a])
+        result = self.repo.cli("fingerprint", "--against", str(before))
+        self.assertEqual((result.returncode, parse_tsv(result.stdout)),
+                         (1, [("TOR-01-Bbb0002", "removed", "no change record"), ("identical", "1")]))
+        self.repo.record("retire", "Rt00001", tors=["TOR-01-Bbb0002"])
+        self.assertEqual(self.repo.cli("fingerprint", "--against", str(before)).returncode, 0)
+        self.repo.feature("01", "core", [Scenario(a.tor, "The tool shall do A twice")])
+        result = self.repo.cli("fingerprint", "--against", str(before))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("TOR-01-Aaa0001\tchanged", result.stdout)
+
+    def test_check_by_epic(self):
+        a = Scenario("TOR-01-Aaa0001", "The tool shall do A")
+        self.repo.feature("01", "core", [a])
+        self.repo.sidecar("aEpic01", status="Complete", requirements=[a.tor], verified={a.tor: "0" * 12})
+        self.repo.write("docs/implementation-plan/phase-1-core/epic-aEpic01-alpha.md", "# Epic aEpic01: Alpha\n")
+        self.repo.write("tests/test_x.py", "# TOR-01-Nope001\n")
+        self.repo.commit("x")
+        out = self.repo.cli("check", "--by-epic", "--today", TODAY).stdout
+        self.assertIn("Epic aEpic01 (alpha) — Alpha (1)\n  - D. TOR-01-Aaa0001 changed", out)
+        self.assertIn("No epic (1)\n  - C. tests/test_x.py:1 cites TOR-01-Nope001", out)
+        self.assertTrue(out.rstrip().endswith("2 finding(s) (1 C, 1 D); 0 blocking."))
+
+    def test_duplicate_sidecar_key_is_a_data_error(self):
+        # A clean git merge of an in-flight branch can leave a second `owner:` line.
+        self.repo.write("docs/implementation-plan/status/epic-aEpic01.md",
+                        "status: In Progress\nowner: —\nrequirements: —\nowner: Dev Two\n")
+        for args in (("migrate", "scan"), ("check",), ("states",)):
+            result = self.repo.cli(*args)
+            self.assertEqual(result.returncode, 2, args)
+            self.assertIn("line 4: `owner:` appears twice (also line 2); delete line 2 (`owner: —`) and keep `owner: Dev Two`", result.stderr)
+
+    def test_sidecar_keys_and_finish(self):
+        self.repo.sidecar("aEpic01", status="Complete", requirements=["TOR-01-Aaa0001"],
+                          superseded_by="TOR-01-Bbb0002", reverified="2026-01-01")
+        self.repo.write("docs/requirements/changes/2026-10-21-Pnd0001.toml",
+                        "migration_source = \"x\"\n" + (self.repo.root / self.repo.record(
+                            "pending", "Pnd0001", tors=["TOR-01-Aaa0001"])).read_text())
+        self.assertEqual(self.repo.cli("migrate", "sidecars").returncode, 1)
+        self.repo.cli("migrate", "sidecars", "--write")
+        side = (self.repo.root / "docs/implementation-plan/status/epic-aEpic01.md").read_text()
+        self.assertNotIn("superseded_by", side)
+        self.assertIn("reverified: 2026-01-01", side)
+        self.assertEqual(self.repo.cli("migrate", "finish", "--write").returncode, 0)
+        self.assertNotIn("migration_source",
+                         (self.repo.root / "docs/requirements/changes/2026-10-21-Pnd0001.toml").read_text())
+        self.assertEqual(self.repo.cli("migrate", "finish").returncode, 0)
+
+
+    def test_sidecar_comment_notes_are_sources_then_stripped(self):
+        # 2.x skills wrote `#` notes into sidecars (Project A); they must not block the upgrade.
+        path = self.repo.sidecar("aEpic01", status="Complete", requirements=["TOR-01-Aaa0001"],
+                                 reverified="2026-01-01")
+        path.write_text(path.read_text() + "\n# TOR-01-Bbb0002 rewritten by v1.27 and moved to epic bEpic02;\n"
+                        "# this epic's completion covers the old contract only.\n")
+        for args in (("check",), ("states",), ("validate",)):
+            self.assertNotEqual(self.repo.cli(*args).returncode, 2, args)
+        scan = json.loads(self.repo.cli("migrate", "scan", "--json").stdout)
+        notes = [k for k in scan["sidecar_keys"] if k["key"] == "#"]
+        self.assertEqual([k["source"] for k in notes], ["docs/implementation-plan/status/epic-aEpic01.md:#9"])
+        self.assertEqual(notes[0]["value"].count("\n"), 1)  # one run of two lines, one source
+        self.assertEqual(self.repo.cli("migrate", "sidecars").returncode, 1)
+        self.repo.cli("migrate", "sidecars", "--write")
+        side = path.read_text()
+        self.assertNotIn("#", side)
+        self.assertTrue(side.endswith("reverified: 2026-01-01\n"), repr(side))
+        self.assertEqual(self.repo.cli("migrate", "sidecars").returncode, 0)
+
+
+def run_step_0002(repo: FixtureRepo, plan: dict | None = None) -> list[str]:
+    """What step 0002 does, phase by phase, as the runner applies it. Returns the commit subjects."""
+    scratch = Path(repo.git("rev-parse", "--absolute-git-dir")) / "peak-workflow-0002"
+    scratch.mkdir(exist_ok=True)
+    subjects = []
+
+    def commit(phase: str) -> None:
+        if repo.git("status", "--porcelain"):
+            subjects.append(f"chore(upgrade): step 0002 requirements-lifecycle — {phase}")
+            repo.commit(subjects[-1])
+
+    if repo.cli("migrate", "scan", "--base", "develop", "--today", TODAY).returncode == 0:
+        return subjects
+    if not (scratch / "before.tsv").exists():
+        (scratch / "before.tsv").write_text(repo.cli("fingerprint").stdout)
+    _code, scan = repo.json_cli("migrate", "scan", "--base", "develop", "--today", TODAY)
+    (scratch / "plan.json").write_text(json.dumps(plan or pa.classification(scan)))
+    result = repo.cli("migrate", "records", "--plan", str(scratch / "plan.json"), "--base", "develop",
+                      "--today", TODAY, "--write")
+    assert result.returncode == 0, result.stderr
+    assert repo.cli("validate").returncode == 0
+    commit("change records")
+    assert repo.cli("migrate", "strip", "--write").returncode == 0
+    against = repo.cli("fingerprint", "--against", str(scratch / "before.tsv"))
+    assert against.returncode == 0, against.stdout
+    commit("strip notes and titles")
+    repo.cli("seed", "--write")
+    commit("seed verified fingerprints")
+    repo.cli("migrate", "sidecars", "--write")
+    commit("normalize sidecar keys")
+    repo.cli("migrate", "finish", "--write")
+    repo.cli("format", "--set", "2")
+    subjects.append("chore(upgrade): step 0002 requirements-lifecycle")
+    repo.commit(subjects[-1])
+    return subjects
+
+
+class ProjectAUpgradeTests(unittest.TestCase):
+    """The Plan 8 "Project A-like" fixture, upgraded from format 0 to 2 the way the runner does it."""
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        cls.tmp = Path(tempfile.mkdtemp(prefix="pw-plan8-"))
+        cls.repo = repo = pa.build(cls.tmp / "fx")
+        cls.base_sha = repo.git("rev-parse", "develop")
+        repo.checkout("docs/upgrade-format-2", create=True)
+        cls.before_fp = dict(parse_tsv(repo.cli("fingerprint").stdout))
+        cls.before_check = repo.check("--base", "develop")
+        assert repo.cli("provenance", "--write").returncode == 0
+        repo.cli("format", "--set", "1")
+        repo.commit("chore(upgrade): step 0001 epic-provenance")
+        cls.step1_sha = repo.git("rev-parse", "HEAD")
+        cls.subjects = run_step_0002(repo)
+        cls.head = repo.git("rev-parse", "HEAD")
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_01_before_the_upgrade(self):
+        letters = sorted({(f["letter"], f.get("tor")) for f in self.before_check if f["letter"] in "AB"})
+        self.assertEqual(letters, [("A", "TOR-01-Pre0001"), ("A", "TOR-02-Wrd0001"), ("B", "TOR-03-Csv0001")])
+
+    def test_02_one_commit_per_phase(self):
+        self.assertEqual([s.split("— ")[-1] for s in self.subjects], [
+            "change records", "strip notes and titles", "seed verified fingerprints", "normalize sidecar keys",
+            "chore(upgrade): step 0002 requirements-lifecycle"])
+        self.assertEqual(self.repo.cli("format").stdout.splitlines()[0], "verdict: current")
+
+    def test_03_fingerprints_identical_for_survivors(self):
+        after = dict(parse_tsv(self.repo.cli("fingerprint").stdout))
+        self.assertEqual(set(self.before_fp) - set(after), {"TOR-02-Old0001", "TOR-03-Imp0001"})
+        self.assertEqual({t: self.before_fp[t] for t in after}, after)
+
+    def test_04_seed_surfaces_exactly_the_planted_stale_set(self):
+        states = self.repo.states()
+        stale = {t for t, r in states.items() if r["state"] == "Changed since verified"}
+        self.assertEqual(stale, pa.STALE)
+        self.assertEqual(states["TOR-02-Tmo0001"]["state"], "Disputed")
+        self.assertEqual(states["TOR-02-Tmo0001"]["underlying_state"], "Verified")
+        self.assertEqual(len(states["TOR-02-Wrd0001"]["historical_records"]), 1)
+        self.assertEqual(states["TOR-01-Pre0001"]["state"], "Verified")  # edited before verification
+        self.assertEqual({t for t, r in states.items() if r["state"] == "Superseded"},
+                         {"TOR-02-Old0001", "TOR-03-Csv0001"})
+        self.assertEqual(states["TOR-03-Imp0001"]["state"], "Retired")
+        self.assertEqual({r["state"] for t, r in states.items() if t in ("TOR-03-Prn0001", "TOR-01-Tag0001",
+                                                                          "TOR-03-Shr0001", "TOR-02-New0001")},
+                         {"In Progress", "Implemented", "Paused", "Planned"})
+
+    def test_05_check_shows_the_planted_findings_only(self):
+        findings = self.repo.check()
+        self.assertEqual([(f["letter"], f.get("tor") or f.get("epic")) for f in findings],
+                         [("C", "cExp03"), ("D", "TOR-02-Wrd0001"), ("F", "TOR-02-Tmo0001")])
+        self.assertIn(pa.DANGLING, findings[0]["message"])
+        by_epic = self.repo.cli("check", "--by-epic", "--today", TODAY).stdout
+        self.assertIn("Epic bSync02 (sync) — Sync (2)", by_epic)
+        self.assertIn("Epic cExp03 (export) — Export (1)", by_epic)
+        # The pre-3.0 edit is recorded but unproven: the owner decides meaning before any reverify.
+        self.assertIn("recorded without test evidence). If its meaning changed: /peak-workflow:capture-requirements "
+                      "TOR-02-Wrd0001; if not, re-check it: /peak-workflow:wrapup-epic bSync02 reverify",
+                      findings[1]["message"])
+
+    def test_06_records_validate_and_carry_no_migration_source(self):
+        result = self.repo.cli("validate")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        records = tl.load_records(self.repo.root)
+        self.assertEqual(sorted((r.kind, tuple(r.tors)) for r in records), [
+            ("pending", ("TOR-02-Tmo0001",)), ("retire", ("TOR-03-Imp0001",)),
+            ("reword", ("TOR-01-Pre0001",)), ("reword", ("TOR-02-Wrd0001",)),
+            ("supersede", ("TOR-02-Old0001",)), ("supersede", ("TOR-03-Csv0001",))])
+        for r in records:
+            self.assertEqual(r.data["approved_via"], "migration")
+            self.assertNotIn("migration_source", r.data)
+            self.assertTrue(any(ref.startswith("commit ") for ref in r.data["refs"]), r.id)
+        reword = next(r for r in records if r.kind == "reword" and r.tors == ["TOR-02-Wrd0001"])
+        self.assertEqual(reword.data["evidence"]["result"], "historical")
+        csv = next(r for r in records if r.tors == ["TOR-03-Csv0001"])
+        self.assertIn("text and date", csv.changes[0]["text"])  # verbatim, from git history
+        # Supersede and retire records store the requirement without its old notes (F2).
+        for tor, note in (("TOR-02-Old0001", "SUPERSEDED by"), ("TOR-03-Imp0001", "REVISED v1.6")):
+            ch = next(c for r in records for c in r.changes if c["tor"] == tor)
+            self.assertNotIn(note, ch["text"])
+            self.assertNotIn("# Note", ch["text"])
+            self.assertTrue(ch["text"].startswith(f"Scenario: [{tor}]"), ch["text"])
+            self.assertEqual(tl.fingerprint_text(ch["text"]), [(tor, ch["fingerprint"])])
+
+    def test_07_feature_tracing_and_specs_are_clean(self):
+        root = self.repo.root
+        scan = self.repo.json_cli("migrate", "scan", "--base", "develop")[1]
+        self.assertFalse(scan["pending"], scan["counts"])
+        self.assertNotIn("TOR-02-Old0001", (root / "docs/requirements/02-sync.feature.md").read_text())
+        raw = (root / "docs/requirements/01-notes.feature.tracing.json").read_text()
+        self.assertTrue(raw.isascii() and "\\u00a7" in raw)  # the file's own escaping is kept
+        tracing = json.loads(raw)
+        self.assertNotIn("generated", tracing)
+        crt = tracing["requirements"][0]
+        self.assertEqual(list(crt)[:2], ["id", "rationale"])
+        self.assertTrue(all("title" not in r for r in tracing["requirements"]))
+        sync = json.loads((root / "docs/requirements/02-sync.feature.tracing.json").read_text())
+        self.assertNotIn("TOR-02-Old0001", {r["id"] for r in sync["requirements"]})
+        for epic in ("dNext04-merge-and-csv", "eWip05-print", "fImp06-tags", "hPau08-share"):
+            spec = (root / f"docs/implementation-plan/phase-2-more/epic-{epic}.md").read_text()
+            self.assertIn("| TOR ID | Feature File |\n", spec, epic)
+            self.assertNotIn("Scenario Title", spec, epic)
+
+    def test_08_complete_epics_only_gain_verified_lines(self):
+        for epic in ("aCore01", "bSync02", "cExp03"):
+            rel = f"docs/implementation-plan/status/epic-{epic}.md"
+            spec = next(self.repo.root.glob(f"docs/implementation-plan/phase-*/epic-{epic}-*.md")).relative_to(self.repo.root)
+            self.assertEqual(self.repo.git("diff", self.step1_sha, "HEAD", "--", str(spec)), "", epic)
+            old = self.repo.git("show", f"{self.step1_sha}:{rel}").splitlines()
+            new = (self.repo.root / rel).read_text().splitlines()
+            self.assertEqual([ln for ln in old if not ln.startswith("superseded_by:")],
+                             new[:len(old) - (epic == "cExp03")], epic)
+            self.assertTrue(all(ln == "verified:" or ln.startswith("  TOR-") for ln in new[len(old) - (epic == "cExp03"):]))
+
+    def test_09_rerun_is_a_no_op(self):
+        self.assertEqual(run_step_0002(self.repo), [])
+        plan = json.loads((Path(self.repo.git("rev-parse", "--absolute-git-dir")) / "peak-workflow-0002/plan.json").read_text())
+        for action in ("records", "strip", "sidecars", "finish"):
+            args = ["--plan", str(Path(self.repo.git("rev-parse", "--absolute-git-dir")) / "peak-workflow-0002/plan.json"),
+                    "--base", "develop"] if action == "records" else []
+            result = self.repo.cli("migrate", action, *args, "--write")
+            self.assertEqual(result.returncode, 0, (action, result.stderr))
+        self.assertTrue(plan["supersede"])
+        self.assertEqual(self.repo.cli("seed", "--write").stdout.strip(), "")
+        self.assertEqual(self.repo.git("status", "--porcelain"), "")
+        self.assertEqual(self.repo.git("rev-parse", "HEAD"), self.head)
+
+    def test_10_unclassified_prose_is_refused(self):
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            plan["drop"] = plan["drop"][1:]
+            plan["supersede"][0]["successors"] = ["TOR-02-Nope999"]
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("not classified", result.stderr)
+            self.assertIn("TOR-02-Nope999 is not a live requirement", result.stderr)
+            self.assertFalse((fresh.root / "docs/requirements/changes").exists())
+
+    def test_10a_dropping_a_decision_note_needs_its_own_card(self):
+        # Gate rerun on Project C: notes recording a user decision were deleted together on one card.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            path = next(p for p in (fresh.root / "docs/requirements").glob("*.feature.md")
+                        if "TODO: tighten" in p.read_text(encoding="utf-8"))
+            path.write_text(path.read_text(encoding="utf-8").replace(
+                "TODO: tighten", "TODO: tighten (user decision 2026-09-24)", 1), encoding="utf-8")
+            fresh.commit("a decision in a note")
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            note = next(s for s in plan["drop"] if "user decision" in next(
+                p["text"] for p in scan["prose"] if p["file"] + ":" + str(p["line"]) == s))
+            plan_path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(plan_path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(f'plan drop: {note} records a decision ("user decision")', result.stderr)
+            plan["drop"].remove(note)
+            plan["drop_decision"] = [note]
+            fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(plan_path))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            plan["drop"].append(note)
+            fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(plan_path))
+            self.assertIn("is also in `drop`; list it once", result.stderr)
+
+    def test_10a2_history_titles_over_60_characters_are_refused(self):
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            plan["history"][0]["title"] = "x" * 60
+            path = fresh.write(".plan.json", json.dumps(plan))
+            self.assertEqual(fresh.cli("migrate", "records", "--plan", str(path)).returncode, 0)
+            plan["history"][0]["title"] = "x" * 61
+            fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("plan history #1: `title` is 61 characters", result.stderr)
+
+    def test_10b_two_history_entries_for_one_requirement_are_refused(self):
+        # Dry-run pass 2: reasons are keyed by requirement, so a second entry silently replaced the first.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            first = plan["history"][0]
+            plan["history"].append({"tors": first["tors"][:1], "title": "A second title", "reason": "Another.",
+                                    "sources": []})
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(f"{first['tors'][0]} already has history entry #1", result.stderr)
+
+    def test_10c_two_rationale_entries_for_one_requirement_are_refused(self):
+        # Dry-run pass 4: a tracing entry holds one rationale, so the second text was silently lost.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            first = plan["rationale"][0]
+            plan["rationale"].append({"tor": first["tor"], "text": "A second reason.", "sources": []})
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(f"{first['tor']} already has rationale entry #1", result.stderr)
+
+    def test_10d_plans_that_would_lose_or_contradict_approved_content_are_refused(self):
+        # Dry-run pass 5 audit: each of these used to exit 0 and silently drop or contradict an entry.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            base = pa.classification(scan)
+            src = next(s for e in base["rationale"] for s in e["sources"])
+            sup = base["supersede"][0]
+            cases = {
+                "history without an edit": (lambda p: p["history"].append(
+                    {"tors": ["TOR-01-Fmt0001"], "title": "Phantom", "reason": "Never written.", "sources": []}),
+                    "TOR-01-Fmt0001 has no `edits` row"),
+                "two supersedes": (lambda p: p["supersede"].append({**sup, "sources": []}),
+                                   "one removal entry per requirement"),
+                "supersede and retire": (lambda p: p["retire"].append(
+                    {"tors": sup["tors"], "removal": "none", "title": "x", "reason": "x", "keywords": ["x"],
+                     "sources": []}), "one removal entry per requirement"),
+                "two pendings": (lambda p: p["pending"].append({**p["pending"][0], "sources": []}),
+                                 "one pending entry per requirement"),
+                "unknown field": (lambda p: p["supersede"][0].update({"tracker": "ENG-1"}),
+                                  "unknown field(s) tracker"),
+                "cited and dropped": (lambda p: p["drop"].append(src), "drop it or cite it, not both"),
+                "unknown source": (lambda p: p["rationale"][0]["sources"].append("docs/requirements/x.md:9"),
+                                   "is not a source the scan reports"),
+                "duplicate source": (lambda p: p["rationale"][0]["sources"].append(src), "is listed twice"),
+            }
+            for name, (mutate, message) in cases.items():
+                with self.subTest(name):
+                    plan = json.loads(json.dumps(base))
+                    mutate(plan)
+                    path = fresh.write(".plan.json", json.dumps(plan))
+                    result = fresh.cli("migrate", "records", "--plan", str(path))
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn(message, result.stderr)
+            self.assertFalse((fresh.root / "docs/requirements/changes").exists())
+
+    def test_10e_history_with_no_edits_at_all_and_an_existing_rationale_are_refused(self):
+        # Dry-run pass 6: with zero `edits` the History check was skipped and the entries were lost.
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            root_commit = fresh.git("rev-list", "--max-parents=0", "HEAD").split()[0]
+            fresh.git("reset", "-q", "--soft", root_commit)
+            fresh.git("commit", "-q", "--amend", "-m", "squashed history: no edits")
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("has no `edits` row", result.stderr)
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            tor = plan["rationale"][0]["tor"]
+            tracing = next(p for p in (fresh.root / "docs/requirements").glob("*.tracing.json")
+                           if tor in p.read_text())
+            data = json.loads(tracing.read_text())
+            for entry in data["requirements"]:
+                if entry.get("id") == tor:
+                    entry["rationale"] = "Written by the owner before the upgrade."
+            tracing.write_text(json.dumps(data, indent=2))
+            fresh.commit("owner rationale")
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("already has a different rationale", result.stderr)
+            plan["rationale"][0]["text"] = ("Written by the owner before the upgrade. "
+                                            + plan["rationale"][0]["text"])
+            path = fresh.write(".plan.json", json.dumps(plan))
+            result = fresh.cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertNotEqual(result.returncode, 2, result.stderr)
+
+    def test_10f_whole_file_deletions_and_wide_supersedes_are_flagged(self):
+        # F3: a whole-file retirement deletes its tracing file, coverage gaps included.
+        # F9: one supersede entry links every old ID to every successor.
+        olds = [Scenario(f"TOR-01-Old000{n}", f"The tool shall do old thing {n}",
+                         note=[f"SUPERSEDED by the v2 requirements in 02 (item {n})."]) for n in range(1, 5)]
+        news = [Scenario(f"TOR-02-New000{n}", f"The tool shall do new thing {n}") for n in range(1, 5)]
+        gap = {"gap_type": "uncovered_source", "source_ref": "ConOps 5.2", "note": "Offline mode not covered."}
+        with FixtureRepo() as repo:
+            repo.feature("01", "old", olds)
+            repo.feature("02", "new", news)
+            for nn, name, scens, extra in (("01", "old", olds, {"coverage_gaps": [gap]}), ("02", "new", news, {})):
+                repo.write(f"docs/requirements/{nn}-{name}.feature.tracing.json", json.dumps(
+                    {"feature_id": nn, "requirements": [{"id": s.tor} for s in scens], **extra}, indent=2))
+            repo.commit("baseline")
+            _code, scan = repo.json_cli("migrate", "scan", "--base", "develop")
+            sources = [it["id"] for it in scan["prose"] if it["strip"]]
+            plan = {"rationale": [], "history": [], "retire": [], "pending": [], "drop": [],
+                    "supersede": [{"tors": [s.tor for s in olds], "successors": [s.tor for s in news],
+                                   "title": "Old things replaced by v2", "reason": "v2.", "keywords": ["v2"],
+                                   "sources": sources}]}
+            path = repo.write(".plan.json", json.dumps(plan))
+            code, rows = repo.json_cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(code, 0, rows)
+            [whole] = [r for r in rows if r["kind"] == "file-delete"]
+            self.assertEqual(whole["path"], "docs/requirements/01-old.feature.md")
+            self.assertEqual(whole["coverage_gaps"], [gap])
+            self.assertIn("losing 1 coverage gap", whole["title"])
+            [warn] = [r for r in rows if r["kind"] == "warning"]
+            self.assertIn("4 requirements to 4 successors (16 links)", warn["title"])
+            plan["supersede"][0]["tors"] = plan["supersede"][0]["tors"][:3]
+            plan["supersede"][0]["sources"] = [s for s in sources if any(
+                it["id"] == s and it["tor"] in plan["supersede"][0]["tors"] for it in scan["prose"])]
+            plan["drop"] = [s for s in sources if s not in plan["supersede"][0]["sources"]]
+            plan["retire"] = [{"tors": ["TOR-01-Old0004"], "removal": "none", "title": "x", "reason": "x",
+                               "keywords": ["x"], "sources": []}]
+            repo.write(".plan.json", json.dumps(plan))
+            code, rows = repo.json_cli("migrate", "records", "--plan", str(path), "--base", "develop")
+            self.assertEqual(code, 0, rows)
+            self.assertFalse([r for r in rows if r["kind"] == "warning"])  # 3 x 4 is not wide
+
+    def test_11_an_unexplained_edit_gets_a_generic_historical_reword(self):
+        with FixtureRepo() as other:
+            fresh = pa.build(other.root)
+            _code, scan = fresh.json_cli("migrate", "scan", "--base", "develop")
+            plan = pa.classification(scan)
+            wrd = plan["history"].pop()  # no History entry for Wrd0001: its note is dropped instead
+            plan["drop"] += wrd["sources"]
+            path = fresh.write(".plan.json", json.dumps(plan))
+            code, rows = fresh.json_cli("migrate", "records", "--plan", str(path), "--write", "--today", TODAY)
+            rec = next(r for r in tl.load_records(fresh.root) if r.tors == ["TOR-02-Wrd0001"])
+            self.assertEqual(rec.data["title"], "Edited in place before 3.0: docs: v1.8 wording cascade")
+            self.assertEqual(rec.data["evidence"]["result"], "historical")
+            self.assertTrue(rec.data["migration_source"].startswith("git "))
+            self.assertEqual([f for f in fresh.check() if f["letter"] == "A"], [])
+
+
+if __name__ == "__main__":
+    unittest.main()
