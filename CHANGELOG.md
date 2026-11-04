@@ -15,6 +15,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] — 2026-11-04
+
+### Changed
+
+- **Bundles `peak-workflow` v3.0.0** — a major release: a requirements lifecycle (amend,
+  supersede, retire, pending, uphold), the `tor-lifecycle` helper, and `/peak-workflow:upgrade`.
+  2.1 projects must run `/upgrade`; Python 3.11+ required.
+- **Bundles the `claude-code-setup` scripts v0.1.1** — setup scripts detect a node that won't
+  start. `epic-workflow` v2.5.1 is unchanged.
+
 ## [1.2.0] — 2026-10-26
 
 ### Changed
