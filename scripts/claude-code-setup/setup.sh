@@ -10,6 +10,23 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+# Node can be on PATH yet fail to launch (e.g. a Homebrew dependency was
+# upgraded out from under it, leaving a missing .dylib). Catch that up front.
+if ! NODE_ERR="$(node -e '' 2>&1)"; then
+  echo "error: node was found at $(command -v node) but failed to start:" >&2
+  echo "$NODE_ERR" | head -n 3 >&2
+  if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1 \
+     && [[ "$(command -v node)" == "$(brew --prefix)"/* ]]; then
+    echo "" >&2
+    echo "This usually means a Homebrew library node depends on was upgraded" >&2
+    echo "without node being upgraded too. Fix it with:" >&2
+    echo "    brew upgrade node   # or: brew reinstall node" >&2
+  else
+    echo "Reinstall Node.js (https://nodejs.org) and re-run this script." >&2
+  fi
+  exit 1
+fi
+
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 DEST="$TMP_DIR/setupHelper.js"

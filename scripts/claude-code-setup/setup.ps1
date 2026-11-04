@@ -8,6 +8,27 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+# Node can be on PATH yet fail to launch (e.g. a corrupted install or a missing
+# runtime library). Catch that up front with a clear message.
+$NodePath = (Get-Command node).Source
+$NodeErr = $null
+try {
+    $NodeErr = & node -e '' 2>&1 | Out-String
+    $NodeOk = ($LASTEXITCODE -eq 0)
+}
+catch {
+    $NodeErr = $_.Exception.Message
+    $NodeOk = $false
+}
+if (-not $NodeOk) {
+    $detail = (($NodeErr -split "`r?`n") | Where-Object { $_ } | Select-Object -First 3) -join "`n"
+    $msg = "node was found at $NodePath but failed to start:`n$detail`n`n" +
+           "Reinstall Node.js and re-run this script, e.g.:`n" +
+           "    winget install OpenJS.NodeJS.LTS   # or download from https://nodejs.org"
+    Write-Error $msg
+    exit 1
+}
+
 $TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
 New-Item -Force -ItemType Directory -Path $TmpDir | Out-Null
 $Dest = Join-Path $TmpDir 'setupHelper.js'
