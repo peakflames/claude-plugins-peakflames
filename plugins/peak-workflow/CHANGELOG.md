@@ -6,6 +6,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.0.1] — 2026-11-05
+
+### Fixed
+
+- **Windows output encoding** — the helper prints UTF-8 whatever the console code page, so
+  `migrate scan --json`, `migrate records --json`, `card`, and `box` no longer crash with
+  `UnicodeEncodeError` on "→" or "§" without `PYTHONUTF8=1`.
+- **Wrapped reference-screen note** — step 0002's strip keeps every `#` line a
+  `# Note: reference screen` wraps onto, instead of deleting the second line mid-sentence.
+- **Line endings kept on rewrite** — files the helper rewrites keep their own CRLF or LF endings;
+  on Windows an LF file is no longer rewritten as CRLF.
+
 ## [3.0.0] — 2026-11-04
 
 ### Added
