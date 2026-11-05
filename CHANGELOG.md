@@ -15,6 +15,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.1] — 2026-11-05
+
+### Fixed
+
+- **Bundles `peak-workflow` v3.0.1** — Windows fixes for the `tor-lifecycle` helper (UTF-8 output,
+  kept line endings) and step 0002 keeping a wrapped reference-screen note whole.
+
 ## [1.3.0] — 2026-11-04
 
 ### Changed

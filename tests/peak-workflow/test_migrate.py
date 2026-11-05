@@ -1,11 +1,14 @@
 """Plan 8: step 0002 mechanics (`migrate scan|records|strip|sidecars|finish`, `fingerprint --against`,
 `check --by-epic`) and a "Project A-like" fixture upgraded from format 0 to 2, twice."""
 import json
+import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
-from fixtures import FixtureRepo, Scenario, feature_text, parse_tsv, tor_lifecycle as tl
+from fixtures import SCRIPT, FixtureRepo, Scenario, feature_text, parse_tsv, tor_lifecycle as tl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "dryrun"))
 import plan8_project_a as pa  # noqa: E402
@@ -127,6 +130,44 @@ class ProseScanTests(unittest.TestCase):
         self.assertNotIn("MODIFIED", new)
         self.assertIn("# Core", new)
         self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
+    def test_a_wrapped_reference_screen_note_is_kept_whole(self):
+        text = "\n".join([
+            "```gherkin", "Feature: 1.0 Core", "", "# ----", "# UX Baseline", "# ----",
+            "# Note: reference screen — Orders List (S-01), the screen every",
+            "# baseline UX requirement below is checked against.", "",
+            "# TODO stray comment",
+            "Scenario: [TOR-01-Aaa0001] The tool shall do A", "    Given a", "    Then b", "```", ""])
+        self.assertEqual([(it.line, it.kind) for it in tl.scan_prose(FILE, text)], [(10, "comment")])
+        new, _n = tl.strip_feature_text(FILE, text)
+        self.assertIn("(S-01), the screen every\n# baseline UX requirement below is checked against.\n", new)
+        self.assertNotIn("TODO", new)
+        self.assertEqual(tl.parse_requirements(new), tl.parse_requirements(text))
+
+
+class WindowsPortabilityTests(unittest.TestCase):
+    """Windows: output is UTF-8 whatever the console code page, and rewrites keep line endings."""
+
+    def test_output_is_utf8_under_a_legacy_code_page(self):
+        item = {**GateBoxTests.ITEM}
+        with tempfile.TemporaryDirectory() as d, FixtureRepo() as repo:
+            path = Path(d) / "items.json"
+            path.write_text(json.dumps([item]), encoding="utf-8")
+            result = subprocess.run([sys.executable, str(SCRIPT), "box", str(path)], cwd=repo.root,
+                                    capture_output=True, env={**os.environ, "PYTHONIOENCODING": "cp1252"})
+            self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
+            self.assertIn("→ entry", result.stdout.decode("utf-8"))
+
+    def test_write_text_keeps_the_files_line_ending(self):
+        with tempfile.TemporaryDirectory() as d:
+            crlf, lf, new = Path(d) / "crlf.md", Path(d) / "lf.md", Path(d) / "new.md"
+            crlf.write_bytes(b"a\r\nb\r\n")
+            lf.write_bytes(b"a\nb\n")
+            for path in (crlf, lf, new):
+                tl.write_text(path, "a\nc\n")
+            self.assertEqual(crlf.read_bytes(), b"a\r\nc\r\n")
+            self.assertEqual(lf.read_bytes(), b"a\nc\n")
+            self.assertEqual(new.read_bytes(), b"a\nc\n")
 
 
 class GateBoxTests(unittest.TestCase):

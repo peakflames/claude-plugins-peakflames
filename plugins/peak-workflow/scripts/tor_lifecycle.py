@@ -175,6 +175,15 @@ def parse_files(paths: list[str], full: bool = False) -> list[list]:
         return list(pool.map(func, paths))
 
 
+def write_text(path: Path, text: str) -> None:
+    """Write `text` (LF line endings) as UTF-8, keeping the file's own line ending: CRLF when the
+    file already uses it, LF otherwise and for a new file. Never the platform default, which on
+    Windows would turn an LF file into a CRLF one and rewrite every line."""
+    newline = "\r\n" if path.is_file() and b"\r\n" in path.read_bytes() else "\n"
+    with open(path, "w", encoding="utf-8", newline=newline) as fh:
+        fh.write(text)
+
+
 def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
@@ -1328,7 +1337,7 @@ def write_stamp_format(root: Path, n: int, lifecycle: bool = False) -> None:
         if lifecycle:
             text += f"\n[lifecycle]\ndisputed_threshold_days = {DEFAULT_DISPUTED_DAYS}\n"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
     load_stamp(root)  # what was written must read back
 
 
@@ -1553,7 +1562,7 @@ def _gherkin_mask(lines: list[str]) -> list[bool]:
 
 def scan_prose(rel: str, text: str) -> list[ProseItem]:
     """Lifecycle prose in one feature file. Kept: section banners and their rules, `# Verification:`,
-    the `# Note: reference screen` line, a bare `# Safety`, and comment lines inside doc strings."""
+    the `# Note: reference screen` line (and the `#` lines it wraps onto), a bare `# Safety`, and comment lines inside doc strings."""
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     mask = _gherkin_mask(lines)
     items: list[ProseItem] = []
@@ -1564,6 +1573,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
     in_banner = banner_text = in_doc = seen_feature = False
     preamble = False  # after a banner, before its section's first Scenario: prose is section-level
     in_note = False   # inside a `# Note:` paragraph that sits within a banner (between its rules)
+    in_ref = False    # on the `# Note: reference screen` line or the `#` lines it wraps onto
 
     def close() -> None:
         nonlocal group
@@ -1597,7 +1607,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             tor, seen_feature, preamble = None, True, False
         if not stripped.startswith("#"):
             close()
-            held_empty, in_note = [], False
+            held_empty, in_note, in_ref = [], False, False
             if stripped:
                 in_banner = False
             elif banner_text:
@@ -1607,7 +1617,7 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
         content = stripped.lstrip("#").strip()
         if RULE_LINE.match(content):
             close()
-            held_empty, in_note = [], False
+            held_empty, in_note, in_ref = [], False, False
             if in_banner and banner_text:
                 in_banner = banner_text = False
                 preamble = True
@@ -1634,9 +1644,17 @@ def scan_prose(rel: str, text: str) -> list[ProseItem]:
             banner_text = True
             continue
         if not content:
+            in_ref = False
             (group if group else held_empty).append(i)
             continue
-        if VERIF.match(line) or REFERENCE_SCREEN.match(content) or content.lower() == "safety" or (
+        if REFERENCE_SCREEN.match(content) or (in_ref and not content.lower().startswith("note:")
+                                               and not VERIF.match(line)):
+            # The reference-screen note is kept whole, including the `#` lines it wraps onto.
+            close()
+            held_empty, in_ref = [], True
+            continue
+        in_ref = False
+        if VERIF.match(line) or content.lower() == "safety" or (
                 not seen_feature and not LIFECYCLE_MARKERS.search(content)):  # e.g. a Markdown title
             close()
             held_empty = []
@@ -2357,7 +2375,7 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
     for rec, row in zip(records, rows):
         path = root / row["path"]
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(record_toml(rec), encoding="utf-8")
+        write_text(path, record_toml(rec))
     for t in sorted(deleting):
         name = p.live[t].feature_file
         texts[name] = delete_scenario(current_text(name), t,
@@ -2373,7 +2391,7 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
             if tracing.exists():
                 tracing.unlink()
         else:
-            path.write_text(text, encoding="utf-8")
+            write_text(path, text)
     gone = {c["tor"] for r in records if r["kind"] in ("supersede", "retire") for c in r["changes"]}
     for path in tracing_files(root):
         data = load_tracing(path)
@@ -2392,7 +2410,7 @@ def apply_migration_records(root: Path, plan: dict, base: str | None, today: dt.
             new_reqs.append(entry)
         if new_reqs != reqs:
             data["requirements"] = new_reqs
-            path.write_text(dump_tracing(data, path.read_text(encoding="utf-8")), encoding="utf-8")
+            write_text(path, dump_tracing(data, path.read_text(encoding="utf-8")))
     bad = [f"{rel}: {x}" for rel, probs in validate_record_files(root, []) for x in probs]
     if bad:
         raise DataError(bad)
@@ -2544,7 +2562,7 @@ def cmd_migrate(args: argparse.Namespace, root: Path) -> int:
                 rows.append({"kind": "record", "path": f"{CHANGES_DIR}/{path.name}", "lines": 1, "text": new})
     if args.write:
         for r in rows:
-            (root / r["path"]).write_text(r["text"], encoding="utf-8")
+            write_text(root / r["path"], r["text"])
         if args.action == "finish":
             bad = [f"{rel}: {x}" for rel, probs in validate_record_files(root, []) for x in probs]
             if bad:
@@ -2568,7 +2586,8 @@ def find_root(explicit: str | None) -> Path:
     if explicit:
         return Path(explicit).resolve()
     try:
-        proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+        proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                              encoding="utf-8")
     except FileNotFoundError:  # no git: commands that need history report it when they run
         return Path.cwd().resolve()
     return Path(proc.stdout.strip()).resolve() if proc.returncode == 0 else Path.cwd().resolve()
@@ -2880,8 +2899,7 @@ def cmd_seed(args: argparse.Namespace, root: Path) -> int:
         for epic, lines in by_epic.items():
             path = root / STATUS_DIR / f"epic-{epic}.md"
             text = path.read_text(encoding="utf-8")
-            path.write_text(mark_sidecar(text, append=[], verified=lines, unverified={}, reverified=None),
-                            encoding="utf-8")
+            write_text(path, mark_sidecar(text, append=[], verified=lines, unverified={}, reverified=None))
     if args.json:
         _print_json(rows)
     else:
@@ -2921,7 +2939,7 @@ def cmd_mark(args: argparse.Namespace, root: Path) -> int:
                        unverified={t: f"{today} {why}" for t, why in fails.items()},
                        reverified=today if args.reverified else None)
     parse_sidecar(epic, new, f"{STATUS_DIR}/epic-{epic}.md")  # never write a sidecar we cannot read
-    path.write_text(new, encoding="utf-8")
+    write_text(path, new)
     for t in append:
         print(f"{epic}\trequirements\t+{t}" if t not in sc.requirements else f"{epic}\trequirements\t{t} (already listed)")
     for t in passes:
@@ -2972,7 +2990,7 @@ def cmd_provenance(args: argparse.Namespace, root: Path) -> int:
     rows = run_provenance(root, args.base, skip)
     if args.write:
         for r in rows:
-            (root / r["path"]).write_text(r["text"], encoding="utf-8")
+            write_text(root / r["path"], r["text"])
     if args.json:
         _print_json([{k: v for k, v in r.items() if k != "text"} for r in rows])
     else:
@@ -3335,6 +3353,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Output is UTF-8 everywhere: on Windows a captured stream defaults to the code page (cp1252),
+    # which cannot encode the "→" and "§" the commands print.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     args = build_parser().parse_args(argv)
     try:
         return args.func(args, find_root(args.root))
