@@ -8,7 +8,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 
 | WP | Status | Verify report |
 |---|---|---|
-| WP1 | not-started | — |
+| WP1 | verified | wp/WP1/verify-2.md |
 | WP2 | not-started | — |
 | WP3a | not-started | — |
 | WP3b | not-started | — |
@@ -25,9 +25,9 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 
 | ID | source | WP | given / when / then | method | status | evidence |
 |---|---|---|---|---|---|---|
-| AC-CON-01 | §7 | WP1 | G the three v1 schemas · W `validate` runs on the F0, F1 and neutral fixtures · T exit 0 for each | script | not-started | — |
-| AC-CON-02 | §7 | WP1 | G 6 bad fixtures (missing schemaVersion, schemaVersion 2, negative duration, unknown kind, plate without beat, brand missing tokens) · W validate · T each exits non-zero and names the field | script | not-started | — |
-| AC-CON-03 | D11 | WP1 | G the archived `narration.json` mapped into the manifest · W validate · T it passes and every legacy clip field is kept | script | not-started | — |
+| AC-CON-01 | §7 | WP1 | G the three v1 schemas · W `validate` runs on the F0, F1 and neutral fixtures · T exit 0 for each | script | PASS | evidence/WP1/AC-CON-01.log |
+| AC-CON-02 | §7 | WP1 | G 6 bad fixtures (missing schemaVersion, schemaVersion 2, negative duration, unknown kind, plate without beat, brand missing tokens) · W validate · T each exits non-zero and names the field | script | PASS | evidence/WP1/AC-CON-02.log |
+| AC-CON-03 | D11 | WP1 | G the archived `narration.json` mapped into the manifest · W validate · T it passes and every legacy clip field is kept | script | PASS | evidence/WP1/AC-CON-03.log |
 | AC-SKL-01 | kickoff §3 | WP2 | G F0 and no TTS key · W `skeleton` runs beatgrid → 1 motion plate → composite · T `out/final.mp4` exists and lasts 3.0 s ±1 frame | script | not-started | — |
 | AC-SKL-02 | D7 | WP2 | G AC-SKL-01's output · W `probe-spec` · T H.264 High, yuv420p, AAC 48 kHz, faststart, 1280×720 | script | not-started | — |
 | AC-SKL-03 | kickoff §5 | WP2 | G any MP4 · W `contact-sheet --every 0.5s` · T a JPEG grid with a timecode label on each frame; the Lead reads the F0 sheet and the kinetic text is legible | still | not-started | — |
@@ -65,11 +65,11 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-ASM-05 | kickoff | WP6 | G the brand pack outro · W assemble · T the final contact sheet's last frames show the outro | still | not-started | — |
 | AC-ASM-06 | design stage 8 | WP6 | G a user-supplied track and SFX · W the music pass, then the SFX pass · T the user listens and approves the levels (narration −16 LUFS, music ducked) | manual | not-started | — |
 | AC-REC-01 | D1 | WP7a | G `capture --help` · W parsed · T it lists `--storyboard --out --mp4 --viewport --no-captions --caption-css --url --debug-requests --audio-offset-ms --spine` and no narration flags; a test parses each flag | script | not-started | — |
-| AC-REC-02 | D2 | WP7a | G a missing Chromium or ffmpeg, or a bad `--spine` · W record · T exits non-zero in under 2 s with no browser launch | script | not-started | — |
+| AC-REC-02 | D2 | WP7a | G a missing Chromium or ffmpeg, or a bad `--spine` · W capture · T exits non-zero in under 2 s with no browser launch | script | not-started | — |
 | AC-REC-03 | D6 | WP7a | G `examples/deck/storyboard.mjs` (original loop) · W it runs in silent, captions and spine-timed modes · T it runs unmodified in all three | script | not-started | — |
-| AC-REC-04 | DEC-06 | WP7a | G F3 with a 3-clip spine · W record · T the plate duration equals the planned duration ±1 frame | script | not-started | — |
+| AC-REC-04 | DEC-06 | WP7a | G F3 with a 3-clip spine · W capture · T the plate duration equals the planned duration ±1 frame | script | not-started | — |
 | AC-REC-05 | D7 | WP7b | G the recorder `--mp4` output · W probe-spec · T it passes | script | not-started | — |
-| AC-REC-06 | D8 | WP7b | G a sync page that flips a full-frame colour on each `say()`, with fake tones · W record (run alone) · T median offset ≤ 120 ms and worst ≤ 200 ms | script | not-started | — |
+| AC-REC-06 | D8 | WP7b | G a sync page that flips a full-frame colour on each `say()`, with fake tones · W capture (run alone) · T median offset ≤ 120 ms and worst ≤ 200 ms | script | not-started | — |
 | AC-REC-07 | D9 | WP7b | G the narrated example deck · W `check-take` · T every scene change (threshold 0.02) is inside silence (−40 dB, ≥ 900 ms) | script | not-started | — |
 | AC-REC-08 | D10 | WP7b | G the ui-demo · W stills are sampled inside each `say()` window · T the caption text shows; with `--no-captions` it doesn't; `--caption-css` changes the style | still | not-started | — |
 | AC-REC-09 | D11 | WP7b | G a take · W the manifest is written · T it validates; `command[]` reproduces the take | script | not-started | — |
@@ -91,7 +91,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-REAL-02 | kickoff §7 | WP10 | G the run · W it ends · T `wp/WP10/manual-steps.md` lists every hand step as a next-version backlog item | manual | not-started | — |
 | AC-REAL-03 | DEC-16 | WP10 | G the Peakflames pack · W validate · T it passes; the outro reproduces `#s6`, checked on the contact sheet | script + still | not-started | — |
 | AC-BASE-01 | orch §5 baseline | WP2 | G the `setup.sh` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
-| AC-BASE-02 | orch §5 baseline | WP1 | G the `validate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
+| AC-BASE-02 | orch §5 baseline | WP1 | G the `validate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP1/AC-BASE-02.log |
 | AC-BASE-03 | orch §5 baseline | WP2 | G the `contact-sheet` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
 | AC-BASE-04 | orch §5 baseline | WP2 | G the `probe-spec` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
 | AC-BASE-05 | orch §5 baseline | WP2 | G the `check-cuts` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |

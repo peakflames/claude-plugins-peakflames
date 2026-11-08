@@ -1,30 +1,11 @@
-# AC-CON-03 — verifier run 2026-11-08T22:00:06Z
-# archived source: docs/reference/narration.json (byte-identical to evals/fixtures/legacy-narration.json: yes)
-$ validate --from-legacy docs/reference/narration.json --out /tmp/pm-verify-wp1-Y6Ql/manifest.json
+# AC-CON-03 — verifier-wp1-r2-c4e19a07 @ 42652e9, node v26.8.1, 2026-11-08T22:16:26Z; every validate run uses the evals/helpers/no-network.mjs preload
+$ validate --from-legacy docs/reference/narration.json --out /tmp/pm-v2-con03-ejrm/manifest.json
 ok    docs/reference/narration.json (spine v1)
 exit=0
-$ validate /tmp/pm-verify-wp1-Y6Ql/manifest.json   (re-validate written file)
-ok    /tmp/pm-verify-wp1-Y6Ql/manifest.json (spine v1)
+$ cmp docs/reference/narration.json evals/fixtures/legacy-narration.json
+identical
+$ validate /tmp/pm-v2-con03-ejrm/manifest.json
+ok    /tmp/pm-v2-con03-ejrm/manifest.json (spine v1)
 exit=0
-# field-by-field comparison (independent script, deep-equal per key):
-  top  model kept
-  top  voice kept
-  top  style kept
-  top  audioOffsetMs kept
-  top  command kept
-  top  videoMs kept
-  top  wallMs kept
-  clips count legacy=9 mapped=9
-  clip 1: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b1
-  clip 2: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b2
-  clip 3: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b3
-  clip 4: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b4
-  clip 5: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b5
-  clip 6: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b6
-  clip 7: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b7
-  clip 8: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b8
-  clip 9: n,text,style,startMs,durationMs,words,wpm,file kept; added beat=b9
-  beats: b1@3159+18800[1] b2@23368+15320[2] b3@40090+12160[3] b4@53654+20560[4] b5@75622+23160[5] b6@100199+17280[6] b7@118873+19760[7] b8@140040+28000[8] b9@169446+22680[9]
-  mapped top-level keys: schemaVersion,kind,targetMs,totalMs,model,voice,style,audioOffsetMs,command,narrate,videoMs,wallMs,beats,clips
-RESULT checked=79 mismatches=0
-exit=0
+# field-by-field deep-equal (verifier script)
+legacy top-level fields: 7 clips: 9 checks: 79 mismatches: 0

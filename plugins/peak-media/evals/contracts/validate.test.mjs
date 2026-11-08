@@ -95,6 +95,8 @@ test('validate: cross-reference checks (not AC-bound)', () => {
   check('stray.plates.json', stray, /plates\[1\]\.live: is only allowed on plates of kind "live"/);
   const emptyGrid = JSON.parse(readFileSync(path.join(B, 'F0', 'spine', 'beatgrid.json'), 'utf8')); delete emptyGrid.beats[0].onScreenText;
   check('empty.beatgrid.json', emptyGrid, /beats\[0\]\.onScreenText: is required/);
+  const blankGrid = structuredClone(emptyGrid); blankGrid.beats[0].onScreenText = '   ';
+  check('blank.beatgrid.json', blankGrid, /beats\[0\]\.onScreenText: must have visible text/);
   const pack = path.join(dir, 'pack'); cpSync(fx('brand-min'), pack, { recursive: true });
   writeFileSync(path.join(pack, 'tokens.css'), ':root{--color-bg:#000}\n');
   const r = run(V, [pack]);

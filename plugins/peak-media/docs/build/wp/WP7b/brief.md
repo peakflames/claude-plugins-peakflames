@@ -24,7 +24,7 @@ Captions via `showOverlay(html,{duration})` with injected-DOM fallback; neutral 
 ## Acceptance criteria
 
 - **AC-REC-05** (script) — G the recorder `--mp4` output · W probe-spec · T it passes
-- **AC-REC-06** (script) — G a sync page that flips a full-frame colour on each `say()`, with fake tones · W record (run alone) · T median offset ≤ 120 ms and worst ≤ 200 ms
+- **AC-REC-06** (script) — G a sync page that flips a full-frame colour on each `say()`, with fake tones · W capture (run alone) · T median offset ≤ 120 ms and worst ≤ 200 ms
 - **AC-REC-07** (script) — G the narrated example deck · W `check-take` · T every scene change (threshold 0.02) is inside silence (−40 dB, ≥ 900 ms)
 - **AC-REC-08** (still) — G the ui-demo · W stills are sampled inside each `say()` window · T the caption text shows; with `--no-captions` it doesn't; `--caption-css` changes the style
 - **AC-REC-09** (script) — G a take · W the manifest is written · T it validates; `command[]` reproduces the take

@@ -1,11 +1,4 @@
-# AC-CON-02 — verifier run 2026-11-08T21:59:50Z
-# each bad fixture diffs from its good twin by exactly one defect (verified with diff):
-#  missing-schemaVersion.manifest.json vs neutral manifest: schemaVersion line removed
-#  schemaVersion-2.plates.json vs neutral plates: schemaVersion 1->2
-#  negative-duration.manifest.json: beats[1].durationMs 8000 -> -100
-#  unknown-kind.plates.json: plates[0].kind motion -> video
-#  plate-without-beat.plates.json: plates[1].beat removed
-#  brand-missing-tokens/brand.json vs brand-min: tokens field removed
+# AC-CON-02 — verifier-wp1-r2-c4e19a07 @ 42652e9, node v26.8.1, 2026-11-08T22:16:25Z; every validate run uses the evals/helpers/no-network.mjs preload
 $ validate evals/fixtures/bad/missing-schemaVersion.manifest.json
 FAIL  evals/fixtures/bad/missing-schemaVersion.manifest.json (spine v1)
       schemaVersion: is required (this plugin reads schemaVersion 1)
@@ -20,7 +13,7 @@ FAIL  evals/fixtures/bad/negative-duration.manifest.json (spine v1)
 exit=1
 $ validate evals/fixtures/bad/unknown-kind.plates.json
 FAIL  evals/fixtures/bad/unknown-kind.plates.json (plates v1)
-      plates[0].kind: must be one of motion, slide, recorded
+      plates[0].kind: must be one of motion, slide, live
 exit=1
 $ validate evals/fixtures/bad/plate-without-beat.plates.json
 FAIL  evals/fixtures/bad/plate-without-beat.plates.json (plates v1)

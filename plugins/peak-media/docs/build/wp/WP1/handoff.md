@@ -42,3 +42,11 @@ builder-id: lead-main-session (claude-opus-5-5, interactive Lead session, 2026-1
 - F-10: baseline helper asserts exactly one error line (plus the `--help` hint); the network spy also blocks `dns.promises`.
 - F-11: unknown-flag error trimmed to `Unknown option '--x'`. The `setup.sh` pointer in the missing-dependency message stays; WP2 creates the script.
 - Left for the freeze decision: F-05 (beat-grid beats without `onScreenText`), F-07 (`record` on non-recorded plates; `record.url` optional). F-09 left as is (no `totalMs` cap; brand paths may point outside the pack).
+
+## Round 2 fixes (verify-2 nits)
+
+- N-01: AC-REC-02/04/06 When-clauses say `capture`.
+- N-02: no "only allowed on live" message when `kind` itself is missing.
+- N-03: whitespace-only `onScreenText` fails in a beat grid (lib check; schema unchanged).
+- N-05: invalid-JSON errors print on one line.
+- N-04 left: the tokens check is a pattern match, not a CSS parser.

@@ -55,7 +55,8 @@ function ajvToErrors(errs) {
     if (e.keyword === 'required') { field = fieldPath(e.instancePath, e.params.missingProperty); message = 'is required'; }
     else if (e.keyword === 'additionalProperties') { field = fieldPath(e.instancePath, e.params.additionalProperty); message = 'is not allowed (unknown field; use an x- prefix for extensions)'; }
     else if (e.keyword === 'enum') message = `must be one of ${e.params.allowedValues.join(', ')}`;
-    else if (e.keyword === 'not' && e.schemaPath.endsWith('/else/not') && e.instancePath.startsWith('/plates/')) { field = fieldPath(e.instancePath, 'live'); message = 'is only allowed on plates of kind "live"'; }
+    else if (e.keyword === 'not' && e.schemaPath.endsWith('/else/not') && e.instancePath.startsWith('/plates/')) {
+      if (errs.some((o) => o.keyword === 'required' && o.instancePath === e.instancePath && o.params.missingProperty === 'kind')) continue; field = fieldPath(e.instancePath, 'live'); message = 'is only allowed on plates of kind "live"'; }
     else if (e.keyword === 'const') message = `must be ${JSON.stringify(e.params.allowedValue)}`;
     out.push({ field, message });
   }
@@ -74,6 +75,9 @@ function semanticSpine(doc) {
       const prev = doc.beats[i - 1];
       if (b.startMs < prev.startMs + prev.durationMs) errs.push({ field: `beats[${i}].startMs`, message: `overlaps beats[${i - 1}] (must be >= ${prev.startMs + prev.durationMs})` });
     }
+  });
+  if (doc.kind === 'beatgrid') doc.beats.forEach((b, i) => {
+    if (!b.onScreenText?.trim()) errs.push({ field: `beats[${i}].onScreenText`, message: 'must have visible text in a beat grid (DEC-23)' });
   });
   const ns = new Set();
   doc.clips.forEach((c, i) => {
@@ -187,7 +191,7 @@ export async function validateFile(file, kind) {
   if (!k) throw new CliError(`can't tell which contract ${file} is — pass --schema spine|plates|brand`, 2);
   let doc;
   try { doc = JSON.parse(readFileSync(f, 'utf8')); } catch (e) {
-    return { ok: false, kind: k, file: f, errors: [{ field: '(file)', message: `is not valid JSON: ${e.message}` }] };
+    return { ok: false, kind: k, file: f, errors: [{ field: '(file)', message: `is not valid JSON: ${e.message.replace(/\s*\n\s*/g, ' ')}` }] };
   }
   return { ...(await validateDoc(k, doc, f)), file: f };
 }
