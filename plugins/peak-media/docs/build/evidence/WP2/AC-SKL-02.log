@@ -1,0 +1,18 @@
+$ probe-spec /tmp/vwp2/skel1/out/final.mp4 --size 1280x720
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+PASS  /tmp/vwp2/skel1/out/final.mp4
+exit=0
+$ ffprobe (independent cross-check)
+stream|codec_name=h264|profile=High|codec_type=video|width=1280|height=720|pix_fmt=yuv420p
+stream|codec_name=aac|profile=LC|codec_type=audio|sample_rate=48000|channels=2
+$ top-level boxes (independent, python)
+['ftyp', 'moov', 'free', 'mdat']
+## node --test (AC-SKL-02)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (105.849791ms)

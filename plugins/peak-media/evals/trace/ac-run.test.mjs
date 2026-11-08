@@ -37,6 +37,13 @@ test('AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without
   r = run(AC, ['--trace', '--root', noEv]);
   assert.equal(r.code, 1); assert.match(r.stdout, /AC-X-01: PASS with no evidence/); assert.match(r.stdout, /AC-X-02: PASS but evidence file missing/);
 
+  const pipe = fixture({ rows: ['| AC-X-01 | src | WP1 | G a | b · W y · T z | script | PASS | — |'], briefs: { WP1: ['AC-X-01'] } });
+  r = run(AC, ['--trace', '--root', pipe]);
+  assert.notEqual(r.code, 0); assert.match(r.stderr, /malformed row for AC-X-01/);
+  const dirEv = fixture({ rows: [row('AC-X-01', 'WP1', 'PASS', 'evidence/WP1'), row('AC-X-02', 'WP1', 'PASS', '../outside.log')], briefs: { WP1: ['AC-X-01', 'AC-X-02'] }, files: { 'evidence/WP1/x.log': 'x' } });
+  r = run(AC, ['--trace', '--root', dirEv]);
+  assert.equal(r.code, 1); assert.match(r.stdout, /AC-X-01: PASS but evidence file missing: evidence\/WP1/); assert.match(r.stdout, /AC-X-02: evidence must live under the build folder/);
+
   r = run(AC, ['--trace']);
   assert.equal(r.code, 0, r.stdout);
 });
@@ -47,6 +54,8 @@ test('AC-TRC-02: a verify report whose verifier-id equals the builder-id is reje
   assert.equal(r.code, 1); assert.match(r.stdout, /verify-1\.md: verifier-id equals the builder-id \(agent-123\) — report rejected/);
   r = run(AC, ['--wp', 'WP1', '--no-run', '--root', same]);
   assert.equal(r.code, 1); assert.match(r.stdout, /report rejected/);
+  const loose = fixture({ rows: [row('AC-X-01', 'WP1')], briefs: { WP1: ['AC-X-01'] }, files: { 'wp/WP1/handoff.md': 'builder-id: Lead-Main (opus, 2026)\n', 'wp/WP1/verify-1.md': 'verifier-id: lead-main\n' } });
+  assert.equal(run(AC, ['--trace', '--root', loose]).code, 1, 'case and a trailing (note) do not make ids differ');
   const diff = fixture({ rows: [row('AC-X-01', 'WP1')], briefs: { WP1: ['AC-X-01'] }, files: { 'wp/WP1/handoff.md': 'builder-id: agent-123\n', 'wp/WP1/verify-1.md': 'verifier-id: agent-456\n' } });
   assert.equal(run(AC, ['--trace', '--root', diff]).code, 0);
 });

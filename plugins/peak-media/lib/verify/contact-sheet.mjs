@@ -114,6 +114,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const at = values.at?.split(',').filter(Boolean).map((t) => parseMs(/m?s$/.test(t) ? t : `${t}ms`, '--at'));
     if (values.count !== undefined && !(values.count >= 1)) throw new CliError('--count must be at least 1', EXIT.USAGE);
     if (!(values.cols >= 1)) throw new CliError('--cols must be at least 1', EXIT.USAGE);
+    if (!(values.width >= 64)) throw new CliError('--width must be at least 64', EXIT.USAGE);
     requireFfmpeg();
     const out = values.out ?? video.replace(/\.[^./]+$/, '') + '.contact.jpg';
     const r = contactSheet(video, { out, everyMs, count: values.count, at, cols: values.cols, width: values.width });

@@ -4,7 +4,7 @@
 //                       and print a markdown table for the milestone commit
 //   ac-run --trace      deterministic checks: orphan ACs, unknown ACs in briefs,
 //                       PASS without evidence, verifier == builder (independence guard)
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +26,7 @@ export function parseRegister(root) {
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     if (/^\|\s*AC-[A-Z]+-\d+\s*\|/.test(line)) {
       const c = splitRow(line);
-      if (c.length < 7) throw new CliError(`acceptance.md: malformed row for ${c[0]} (expected 7 columns, got ${c.length})`);
+      if (c.length !== 7) throw new CliError(`acceptance.md: malformed row for ${c[0]} (expected 7 columns, got ${c.length} — escape '|' inside cells as '\\|')`);
       const [id, source, wp, gwt, method, status, evidence] = c;
       acs.push({ id, source, wp, gwt, method, status, evidence });
     } else if (/^\|\s*WP\w+\s*\|/.test(line)) {
@@ -53,6 +53,8 @@ const idLine = (file, key) => {
   const m = new RegExp(`^${key}:\\s*(\\S.*?)\\s*$`, 'm').exec(readFileSync(file, 'utf8'));
   return m ? m[1] : null;
 };
+// Compare agent ids loosely: case, whitespace and a trailing "(…)" note don't make two ids different.
+const normId = (s) => s.toLowerCase().replace(/\(.*\)\s*$/, '').replace(/\s+/g, ' ').trim();
 
 /** Independence guard: each verify-N.md must name a verifier-id different from the handoff's builder-id. */
 export function independence(root, wp) {
@@ -64,7 +66,7 @@ export function independence(root, wp) {
     const v = idLine(path.join(dir, f), 'verifier-id');
     if (!v) errs.push(`${wp}/${f}: no 'verifier-id:' line — report rejected`);
     else if (!builder) errs.push(`${wp}/${f}: handoff.md has no 'builder-id:' line — can't prove independence`);
-    else if (v === builder) errs.push(`${wp}/${f}: verifier-id equals the builder-id (${v}) — report rejected`);
+    else if (normId(v) === normId(builder)) errs.push(`${wp}/${f}: verifier-id equals the builder-id (${v}) — report rejected`);
   }
   return errs;
 }
@@ -82,7 +84,11 @@ export function trace(root) {
     if (/^PASS$/i.test(a.status)) {
       const ev = a.evidence.replace(/`/g, '').split(/[,;]\s*/).filter((e) => e && e !== '—');
       if (!ev.length) errs.push(`${a.id}: PASS with no evidence`);
-      for (const e of ev) if (!existsSync(path.resolve(root, e))) errs.push(`${a.id}: PASS but evidence file missing: ${e}`);
+      for (const e of ev) {
+        const p = path.resolve(root, e);
+        if (path.relative(root, p).startsWith('..')) errs.push(`${a.id}: evidence must live under the build folder: ${e}`);
+        else if (!existsSync(p) || !statSync(p).isFile()) errs.push(`${a.id}: PASS but evidence file missing: ${e}`);
+      }
     }
   }
   for (const [wp, list] of Object.entries(br)) for (const id of list) if (!ids.has(id)) errs.push(`wp/${wp}/brief.md lists unknown ${id}`);

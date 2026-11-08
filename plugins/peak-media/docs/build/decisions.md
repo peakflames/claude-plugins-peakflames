@@ -32,6 +32,7 @@ IDs are stable. A decision is changed by adding a new entry that supersedes it, 
 | DEC-26 | Every HyperFrames call sets `HYPERFRAMES_NO_UPDATE_CHECK=1 HYPERFRAMES_NO_AUTO_INSTALL=1 HYPERFRAMES_NO_TELEMETRY=1 HYPERFRAMES_SKIP_SKILLS=1 DO_NOT_TRACK=1` (in `lib/hf.mjs` and `setup.sh`) | Extends DEC-05: HF 0.9.25 has usage telemetry and installs its own skills on `init` |
 | DEC-27 | Contact-sheet timecodes are drawn as 7-segment digits with ffmpeg `drawbox`, not `drawtext` | Homebrew ffmpeg 9.0.2 is built without `drawtext` (no freetype); drawbox works on every build, needs no font, and stays deterministic |
 | DEC-28 | `setup.sh` runs `npm ci --ignore-scripts` | No runtime dep needs an install script (esbuild resolves its platform binary from optional deps); keeps installs deterministic and avoids npm's install-script prompts |
+| DEC-29 | `check-cuts` also requires a cut to sit at least `--edge-ms` (default 100 ms) inside its silence, file start/end excepted; `--expect-cuts n` fails when the cut count differs | WP2 verify-1 F-4/F-5: a cut on the first sound of a word passed. The spine's lead/tail padding (≥200 ms) clears 100 ms comfortably |
 
 ## Contract changes
 

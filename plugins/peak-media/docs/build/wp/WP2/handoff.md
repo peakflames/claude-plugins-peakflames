@@ -24,3 +24,14 @@ builder-id: lead-main-session (claude-opus-5-5, interactive Lead session, 2026-1
 
 - `lib/hf.mjs` `render()` uses `--quality standard`; WP4 may expose quality.
 - The skeleton composite is a stand-in for WP6's `assemble`.
+
+## Round 1 fixes (verify-1, all ACs PASS)
+
+- F-1: `ac-run` rejects register rows that don't have exactly 7 cells (unescaped `|`).
+- F-2: PASS evidence must be a file under the build folder.
+- F-3: verifier/builder ids compared case-insensitively, ignoring whitespace and a trailing `(…)` note.
+- F-4/F-5: `check-cuts --edge-ms` (DEC-29), `--expect-cuts`, "no cuts found" note, `--scene-threshold` must be in (0,1), cut times past the end are a usage error (F-14).
+- F-6: number options accept negative values (`--noise-db -50`); `--help` shows a placeholder for number options (F-12).
+- F-10: `contact-sheet --width` must be ≥ 64. F-11: `setup.sh` unwritable `--data-dir` is one line.
+- Also edited outside WP2 folders (Lead): `CHANGELOG.md` (3 bullets), `decisions.md` DEC-25..29, `scripts/validate.mjs` made executable.
+- Left: F-7 (7-segment "1" is right-aligned, as on any 7-segment display), F-8 (version grep is name-anchored), F-9 (re-run AC-SKL-06 with the default brand after WP5 — noted in the WP5 brief), F-13 (no-audio file counts as silent; probe-spec catches a missing track).

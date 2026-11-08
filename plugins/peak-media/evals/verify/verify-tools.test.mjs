@@ -73,3 +73,16 @@ test('AC-BASE-04: probe-spec baseline', (t) => {
 test('AC-BASE-05: check-cuts baseline', (t) => {
   baseline(t, assert, 'lib/verify/check-cuts.mjs', { flags: ['--min-silence-ms', '--cuts', '--scene-threshold', '--noise-db', '--json'], badArgs: [[], ['nope.mp4'], [cuts, '--cuts', 'a,b'], [cuts, '--min-silence-ms', 'x']] });
 });
+
+test('check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound)', () => {
+  // silence runs 0–2000 ms; a cut at 1950 ms sits 50 ms before the tone starts
+  assert.equal(run('lib/verify/check-cuts.mjs', [cuts, '--cuts', '1950']).code, 1, 'cut 50 ms before sound fails the 100 ms edge');
+  assert.equal(run('lib/verify/check-cuts.mjs', [cuts, '--cuts', '1950', '--edge-ms', '0']).code, 0);
+  assert.equal(run('lib/verify/check-cuts.mjs', [cuts, '--cuts', '1000', '--noise-db', '-50']).code, 0, 'negative number accepted');
+  const bad = run('lib/verify/check-cuts.mjs', [cuts, '--scene-threshold', '7']);
+  assert.equal(bad.code, 2); assert.match(bad.stderr, /between 0 and 1/);
+  const late = run('lib/verify/check-cuts.mjs', [cuts, '--cuts', '9000']);
+  assert.equal(late.code, 2); assert.match(late.stderr, /past the end/);
+  const none = run('lib/verify/check-cuts.mjs', [cuts, '--cuts', '', '--expect-cuts', '1']);
+  assert.equal(none.code, 1); assert.match(none.stdout, /no cuts found/);
+});

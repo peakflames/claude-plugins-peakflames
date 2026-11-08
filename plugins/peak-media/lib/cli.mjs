@@ -30,7 +30,7 @@ function renderHelp(spec) {
   lines.push('Options:');
   const all = { ...spec.options, help: { type: 'boolean', short: 'h', desc: 'Show this help and exit' }, version: { type: 'boolean', desc: 'Print the plugin version and exit' } };
   const rows = Object.entries(all).map(([k, o]) => {
-    const flag = `${o.short ? `-${o.short}, ` : '    '}--${k}${o.type === 'string' ? ` <${o.arg ?? 'value'}>` : ''}`;
+    const flag = `${o.short ? `-${o.short}, ` : '    '}--${k}${o.type !== 'boolean' ? ` <${o.arg ?? (o.type === 'number' ? 'n' : 'value')}>` : ''}`;
     const def = o.default !== undefined && o.type !== 'boolean' ? ` (default: ${o.default})` : '';
     return [flag, `${o.desc}${def}`];
   });
@@ -65,7 +65,13 @@ export async function runCli(spec, main, argv = process.argv.slice(2)) {
     options.version = { type: 'boolean' };
     let parsed;
     try {
-      parsed = parseArgs({ args: argv, options, allowPositionals: true, strict: true });
+      // let number options take negative values: `--noise-db -50` -> `--noise-db=-50`
+      const nums = new Set(Object.entries(spec.options ?? {}).filter(([, o]) => o.type === 'number').map(([k]) => `--${k}`));
+      const args = [];
+      for (let i = 0; i < argv.length; i++) {
+        if (nums.has(argv[i]) && /^-\d/.test(argv[i + 1] ?? '')) { args.push(`${argv[i]}=${argv[i + 1]}`); i++; } else args.push(argv[i]);
+      }
+      parsed = parseArgs({ args, options, allowPositionals: true, strict: true });
     } catch (e) {
       throw usageError(e.message.split('\n')[0].split('. To specify a positional')[0]);
     }

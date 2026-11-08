@@ -24,3 +24,4 @@ Neutral default pack per DEC-15: `brand.json` (v1 schema), `tokens.css` with all
 - **AC-BRD-01** (script) — G `brand-packs/default` · W validate · T it passes; every font has a licence file
 - **AC-BRD-02** (still) — G F1 plate 1 rendered with the default pack and with a second synthetic pack · W both contact sheets are compared · T colours and fonts differ, and nothing but `--brand` changed
 - **AC-BRD-03** (script) — G the plugin tree · W search for audio files · T no music ships
+- **Re-check (from WP2 F-9):** after the default pack lands, re-run AC-SKL-06 (offline render) with `--brand brand-packs/default` so web fonts are covered.

@@ -83,7 +83,7 @@ if deps_ok; then
   say "deps: up to date ($DEPS)"
 else
   say "deps: installing pinned versions into $DEPS"
-  mkdir -p "$DEPS" || die "cannot create $DEPS — pass --data-dir <writable folder>" 1
+  mkdir -p "$DEPS" 2>/dev/null || die "cannot create $DEPS — pass --data-dir <writable folder>" 1
   cp "$ROOT/package.json" "$ROOT/package-lock.json" "$DEPS/" || die "cannot copy the lockfile into $DEPS" 1
   LOG="$DEPS/npm-install.log"
   if ! (cd "$DEPS" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund >"$LOG" 2>&1); then
