@@ -168,7 +168,6 @@ Contract-change requests from a builder stop that WP. The request goes in `decis
 
 ## 10. Housekeeping found during survey
 
-- `plate-factory-workflow.md` and `plate_factory_faceless_hyperframes_workflow.md` are byte-identical; delete one.
 - `peak-media-docs.zip` at repo root is untracked; keep it out of commits.
 - `docs/` under `plugins/peak-media/` ships to users; move design/plan docs out (to `docs/peak-media-build/`) during WP9 if they shouldn't ship.
 
