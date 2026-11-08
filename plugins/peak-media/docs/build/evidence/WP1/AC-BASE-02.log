@@ -1,0 +1,100 @@
+# AC-BASE-02 — verifier run 2026-11-08T22:00:19Z; all runs under the no-network preload (any socket/dns/fetch prints NETWORK-ATTEMPT)
+$ validate --help
+validate — check peak-media contract files against their v1 schemas
+
+Usage: validate [options] <file|brand-pack-dir>...
+
+The contract is inferred from the file name (*manifest*.json / *beatgrid*.json -> spine,
+*plates*.json -> plates, brand*.json or a folder -> brand) unless --schema is given.
+Beyond the schema it checks cross-references: beat/clip links, plate beats against the
+spine, and that every brand-pack file exists and tokens.css defines the required properties.
+Exit 0 when every file is valid, 1 when any is invalid, 2 on usage errors.
+
+Options:
+      --schema <spine|plates|brand>  Contract to validate against (skips name inference)
+      --from-legacy                  Treat inputs as legacy narration.json and validate the mapped v1 spine manifest
+      --out <file>                   With --from-legacy and one input: write the mapped manifest here
+      --json                         Print results as JSON
+  -q, --quiet                        Print only failures
+  -h, --help                         Show this help and exit
+      --version                      Print the plugin version and exit
+
+Examples:
+  validate spine/manifest.json plates.json
+  validate --schema brand ./my-brand-pack
+  validate --from-legacy narration.json --out spine/manifest.json
+exit=0
+# flags declared in scripts/validate.mjs spec.options: schema from-legacy out json quiet (+ help, version from lib/cli.mjs)
+  help lists --schema
+  help lists --from-legacy
+  help lists --out
+  help lists --json
+  help lists --quiet
+  help lists -q
+  help lists --help
+  help lists -h
+  help lists --version
+$ validate --version
+0.1.0
+exit=0
+  plugin.json version: 0.1.0
+# bad inputs: expect non-zero, stderr one actionable line (+ optional '--help' hint), no stack
+$ validate 
+  stdout| 
+  stderr| validate: expected at least 1 argument(s), got 0
+  stderr| Run 'validate --help' for usage.
+  exit=2 stderr_lines=2 stack=0 network=0
+$ validate --nope
+  stdout| 
+  stderr| validate: Unknown option '--nope'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- "--nope"
+  stderr| Run 'validate --help' for usage.
+  exit=2 stderr_lines=2 stack=0 network=0
+$ validate does-not-exist.json
+  stdout| 
+  stderr| validate: cannot read does-not-exist.json: no such file
+  exit=1 stderr_lines=1 stack=0 network=0
+$ validate --schema bogus x.json
+  stdout| 
+  stderr| validate: --schema must be one of spine, plates, brand, got 'bogus'
+  stderr| Run 'validate --help' for usage.
+  exit=2 stderr_lines=2 stack=0 network=0
+$ validate --out x.json y.json
+  stdout| 
+  stderr| validate: --out needs --from-legacy and exactly one input
+  stderr| Run 'validate --help' for usage.
+  exit=2 stderr_lines=2 stack=0 network=0
+$ validate /tmp/pm-verify-wp1-Y6Ql/broken.manifest.json
+  stdout| FAIL  /tmp/pm-verify-wp1-Y6Ql/broken.manifest.json (spine v1)
+  stdout|       (file): is not valid JSON: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+  exit=1 stderr_lines=0 stack=0 network=0
+$ validate /tmp/pm-verify-wp1-Y6Ql/mystery.json
+  stdout| 
+  stderr| validate: can't tell which contract /tmp/pm-verify-wp1-Y6Ql/mystery.json is — pass --schema spine|plates|brand
+  stderr| Run 'validate --help' for usage.
+  exit=2 stderr_lines=2 stack=0 network=0
+$ validate --from-legacy evals/fixtures/neutral-brief/plates.json
+  stdout| 
+  stderr| validate: evals/fixtures/neutral-brief/plates.json has no clips[] — not a legacy narration.json
+  exit=1 stderr_lines=1 stack=0 network=0
+$ validate /tmp/pm-verify-wp1-Y6Ql/arr.manifest.json
+  stdout| FAIL  /tmp/pm-verify-wp1-Y6Ql/arr.manifest.json (spine v1)
+  stdout|       (root): must be a JSON object
+  exit=1 stderr_lines=0 stack=0 network=0
+# missing-prereq path (ajv not resolvable): copy plugin without node_modules
+  stderr| validate: missing dependency 'ajv' — run /private/tmp/pm-verify-wp1-Y6Ql/noddeps/scripts/setup.sh
+  exit=3 stack=0
+# static: network-capable imports in validate path
+  none
+$ node --test evals/contracts/validate.test.mjs
+✔ AC-CON-02: six bad fixtures each fail and name the field (804.771042ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (378.342041ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (441.444625ms)
+✔ validate: cross-reference checks (not AC-bound) (812.635291ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3894.196583

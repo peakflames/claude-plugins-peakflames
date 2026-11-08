@@ -45,7 +45,7 @@
         "record": {
           "type": "object",
           "required": ["storyboard", "viewport"],
-          "additionalProperties": false,
+          "additionalProperties": false, "patternProperties": { "^x-": true },
           "properties": {
             "url": { "type": "string", "minLength": 1 },
             "storyboard": { "type": "string", "minLength": 1 },

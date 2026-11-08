@@ -49,9 +49,10 @@ await runCli(spec, async ({ values, positionals }) => {
     }
   }
   if (values.json) {
-    process.stdout.write(JSON.stringify(results.map(({ file, kind, ok, errors }) => ({ file, kind, ok, errors })), null, 2) + '\n');
+    process.stdout.write(JSON.stringify(results.map(({ file, kind, ok, errors, warnings = [] }) => ({ file, kind, ok, errors, warnings })), null, 2) + '\n');
   } else {
     for (const r of results) {
+      for (const w of r.warnings ?? []) process.stdout.write(`warn  ${r.file}: ${w.field}: ${w.message}\n`);
       if (r.ok) { if (!values.quiet) process.stdout.write(`ok    ${r.file} (${r.kind} v1)\n`); continue; }
       process.stdout.write(`FAIL  ${r.file} (${r.kind} v1)\n`);
       for (const e of r.errors) process.stdout.write(`      ${e.field}: ${e.message}\n`);

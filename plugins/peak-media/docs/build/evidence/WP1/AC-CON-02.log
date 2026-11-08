@@ -1,0 +1,32 @@
+# AC-CON-02 — verifier run 2026-11-08T21:59:50Z
+# each bad fixture diffs from its good twin by exactly one defect (verified with diff):
+#  missing-schemaVersion.manifest.json vs neutral manifest: schemaVersion line removed
+#  schemaVersion-2.plates.json vs neutral plates: schemaVersion 1->2
+#  negative-duration.manifest.json: beats[1].durationMs 8000 -> -100
+#  unknown-kind.plates.json: plates[0].kind motion -> video
+#  plate-without-beat.plates.json: plates[1].beat removed
+#  brand-missing-tokens/brand.json vs brand-min: tokens field removed
+$ validate evals/fixtures/bad/missing-schemaVersion.manifest.json
+FAIL  evals/fixtures/bad/missing-schemaVersion.manifest.json (spine v1)
+      schemaVersion: is required (this plugin reads schemaVersion 1)
+exit=1
+$ validate evals/fixtures/bad/schemaVersion-2.plates.json
+FAIL  evals/fixtures/bad/schemaVersion-2.plates.json (plates v1)
+      schemaVersion: is 2; this plugin reads 1 — update peak-media or migrate the file
+exit=1
+$ validate evals/fixtures/bad/negative-duration.manifest.json
+FAIL  evals/fixtures/bad/negative-duration.manifest.json (spine v1)
+      beats[1].durationMs: must be >= 1
+exit=1
+$ validate evals/fixtures/bad/unknown-kind.plates.json
+FAIL  evals/fixtures/bad/unknown-kind.plates.json (plates v1)
+      plates[0].kind: must be one of motion, slide, recorded
+exit=1
+$ validate evals/fixtures/bad/plate-without-beat.plates.json
+FAIL  evals/fixtures/bad/plate-without-beat.plates.json (plates v1)
+      plates[1].beat: is required
+exit=1
+$ validate evals/fixtures/bad/brand-missing-tokens
+FAIL  evals/fixtures/bad/brand-missing-tokens/brand.json (brand v1)
+      tokens: is required
+exit=1

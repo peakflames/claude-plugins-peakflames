@@ -67,7 +67,7 @@ export async function runCli(spec, main, argv = process.argv.slice(2)) {
     try {
       parsed = parseArgs({ args: argv, options, allowPositionals: true, strict: true });
     } catch (e) {
-      throw usageError(e.message.split('\n')[0]);
+      throw usageError(e.message.split('\n')[0].split('. To specify a positional')[0]);
     }
     const { values, positionals } = parsed;
     if (values.help) { process.stdout.write(renderHelp(spec)); code = EXIT.OK; }

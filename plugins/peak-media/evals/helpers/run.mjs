@@ -27,8 +27,9 @@ export function baseline(t, assert, script, { flags, badArgs }) {
   for (const args of badArgs) {
     const r = run(script, args);
     assert.notEqual(r.code, 0, `non-zero exit for ${args.join(' ')}`);
-    const first = r.stderr.trim().split('\n')[0];
-    assert.match(first, /\S/, 'one-line error');
+    const lines = r.stderr.trim().split('\n').filter((l) => !/^Run '.+ --help' for usage\.$/.test(l));
+    assert.equal(lines.length, 1, `one-line error for ${args.join(' ')}: ${r.stderr}`);
+    assert.match(lines[0], /\S/, 'error text present');
     assert.doesNotMatch(r.stderr, /\n\s+at .+:\d+:\d+/, 'no stack trace');
     assert.doesNotMatch(r.stderr, /NETWORK-ATTEMPT/, 'no network');
   }

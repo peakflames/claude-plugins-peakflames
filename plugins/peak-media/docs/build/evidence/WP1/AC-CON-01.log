@@ -1,0 +1,30 @@
+# AC-CON-01 — verifier run 2026-11-08T21:59:49Z, node v26.8.1; network blocked via evals/helpers/no-network.mjs preload
+$ validate docs/build/fixtures/F0/spine/beatgrid.json
+ok    docs/build/fixtures/F0/spine/beatgrid.json (spine v1)
+exit=0
+$ validate docs/build/fixtures/F0/plates.json
+ok    docs/build/fixtures/F0/plates.json (plates v1)
+exit=0
+$ validate docs/build/fixtures/F1/spine/manifest.json
+ok    docs/build/fixtures/F1/spine/manifest.json (spine v1)
+exit=0
+$ validate docs/build/fixtures/F1/plates.json
+ok    docs/build/fixtures/F1/plates.json (plates v1)
+exit=0
+$ validate evals/fixtures/neutral-brief/spine/manifest.json
+ok    evals/fixtures/neutral-brief/spine/manifest.json (spine v1)
+exit=0
+$ validate evals/fixtures/neutral-brief/plates.json
+ok    evals/fixtures/neutral-brief/plates.json (plates v1)
+exit=0
+$ validate evals/fixtures/brand-min
+ok    evals/fixtures/brand-min/brand.json (brand v1)
+exit=0
+$ validate --json <all 7> | kinds
+spine true docs/build/fixtures/F0/spine/beatgrid.json
+plates true docs/build/fixtures/F0/plates.json
+spine true docs/build/fixtures/F1/spine/manifest.json
+plates true docs/build/fixtures/F1/plates.json
+spine true evals/fixtures/neutral-brief/spine/manifest.json
+plates true evals/fixtures/neutral-brief/plates.json
+brand true evals/fixtures/brand-min/brand.json

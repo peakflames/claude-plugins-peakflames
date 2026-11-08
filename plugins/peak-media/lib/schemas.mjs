@@ -78,7 +78,12 @@ function semanticSpine(doc) {
   doc.clips.forEach((c, i) => {
     if (ns.has(c.n)) errs.push({ field: `clips[${i}].n`, message: `duplicate clip number ${c.n}` });
     ns.add(c.n);
-    if (!ids.has(c.beat)) errs.push({ field: `clips[${i}].beat`, message: `references unknown beat '${c.beat}'` });
+    const b = doc.beats.find((x) => x.id === c.beat);
+    if (!b) { errs.push({ field: `clips[${i}].beat`, message: `references unknown beat '${c.beat}'` }); return; }
+    if (!b.clipNs.includes(c.n)) errs.push({ field: `clips[${i}].beat`, message: `beat '${b.id}' does not list clip ${c.n} in clipNs` });
+    if (c.startMs < b.startMs || c.startMs + c.durationMs > b.startMs + b.durationMs) {
+      errs.push({ field: `clips[${i}].startMs`, message: `clip ${c.n} (${c.startMs}–${c.startMs + c.durationMs} ms) is outside beat '${b.id}' (${b.startMs}–${b.startMs + b.durationMs} ms)` });
+    }
   });
   doc.beats.forEach((b, i) => b.clipNs.forEach((n, j) => {
     if (!ns.has(n)) errs.push({ field: `beats[${i}].clipNs[${j}]`, message: `references unknown clip ${n}` });
@@ -96,16 +101,28 @@ function semanticPlates(doc, file) {
     if (ids.has(p.id)) errs.push({ field: `plates[${i}].id`, message: `duplicate plate id '${p.id}'` });
     ids.add(p.id);
   });
+  const order = doc.plates.map((p, i) => [p, i]).sort((a, b) => a[0].startMs - b[0].startMs);
+  for (let k = 1; k < order.length; k++) {
+    const [prev, pi] = order[k - 1]; const [p, i] = order[k];
+    if (p.startMs < prev.startMs + prev.durationMs) errs.push({ field: `plates[${i}].startMs`, message: `overlaps plates[${pi}] '${prev.id}' (must be >= ${prev.startMs + prev.durationMs})` });
+  }
   if (file) {
-    const spinePath = path.resolve(path.dirname(file), doc.spine);
-    if (existsSync(spinePath)) {
+    const dir = path.dirname(file);
+    const spinePath = path.resolve(dir, doc.spine);
+    if (!existsSync(spinePath)) errs.push({ field: 'spine', message: `file not found: ${doc.spine}` });
+    else {
       let spine;
-      try { spine = JSON.parse(readFileSync(spinePath, 'utf8')); } catch { /* reported when validated itself */ }
-      const beats = new Set((spine?.beats ?? []).map((b) => b.id));
+      try { spine = JSON.parse(readFileSync(spinePath, 'utf8')); } catch { errs.push({ field: 'spine', message: `${doc.spine} is not valid JSON` }); }
       if (spine) doc.plates.forEach((p, i) => {
-        if (!beats.has(p.beat)) errs.push({ field: `plates[${i}].beat`, message: `beat '${p.beat}' is not in ${doc.spine}` });
+        const b = (spine.beats ?? []).find((x) => x.id === p.beat);
+        if (!b) { errs.push({ field: `plates[${i}].beat`, message: `beat '${p.beat}' is not in ${doc.spine}` }); return; }
+        if (p.startMs < b.startMs || p.startMs + p.durationMs > b.startMs + b.durationMs) {
+          errs.push({ field: `plates[${i}].startMs`, message: `plate '${p.id}' (${p.startMs}–${p.startMs + p.durationMs} ms) is outside beat '${b.id}' (${b.startMs}–${b.startMs + b.durationMs} ms)` });
+        }
       });
     }
+    const brandPath = path.resolve(dir, doc.brand);
+    if (!existsSync(brandPath)) errs.push({ field: 'brand', message: `not found: ${doc.brand} (render steps will fail until it exists)`, warn: true });
   }
   return errs;
 }
@@ -119,8 +136,8 @@ function semanticBrand(doc, file) {
     return true;
   };
   if (mustExist(doc.tokens, 'tokens')) {
-    const css = readFileSync(path.resolve(dir, doc.tokens), 'utf8');
-    const defined = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+    const css = readFileSync(path.resolve(dir, doc.tokens), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const defined = new Set([...css.matchAll(/(--[\w-]+)\s*:\s*([^;}]*)/g)].filter((m) => m[2].trim()).map((m) => m[1]));
     for (const t of REQUIRED_TOKENS) if (!defined.has(t)) errs.push({ field: 'tokens', message: `${doc.tokens} does not define ${t}` });
     if (![...defined].some((t) => t.startsWith('--ease-'))) errs.push({ field: 'tokens', message: `${doc.tokens} defines no --ease-* property` });
   }
@@ -155,7 +172,9 @@ export async function validateDoc(kind, doc, file) {
   const v = (await validators())[kind];
   if (!v(doc)) return { ok: false, kind, errors: ajvToErrors(v.errors) };
   const sem = kind === 'spine' ? semanticSpine(doc) : kind === 'plates' ? semanticPlates(doc, file) : semanticBrand(doc, file);
-  return { ok: sem.length === 0, kind, errors: sem };
+  const errors = sem.filter((e) => !e.warn);
+  const warnings = sem.filter((e) => e.warn).map(({ field, message }) => ({ field, message }));
+  return { ok: errors.length === 0, kind, errors, warnings };
 }
 
 /** Read + parse + validate a file. A brand pack folder resolves to its brand.json. */

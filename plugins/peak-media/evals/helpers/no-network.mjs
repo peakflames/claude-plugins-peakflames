@@ -12,4 +12,6 @@ net.Socket.prototype.connect = function (...args) {
   throw new Error(`network blocked (${target})`);
 };
 dns.lookup = (host, ...rest) => { note(`dns:${host}`); const cb = rest.at(-1); if (typeof cb === 'function') cb(new Error('network blocked')); };
+dns.promises.lookup = async (host) => { note(`dns:${host}`); throw new Error('network blocked'); };
+dns.promises.resolve = async (host) => { note(`dns:${host}`); throw new Error('network blocked'); };
 globalThis.fetch = async (url) => { note(String(url)); throw new Error(`network blocked (${url})`); };

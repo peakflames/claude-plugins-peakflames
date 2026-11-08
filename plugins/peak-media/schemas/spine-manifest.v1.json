@@ -83,7 +83,7 @@
     "caption": {
       "type": "object",
       "required": ["n", "text", "startMs", "durationMs"],
-      "additionalProperties": false,
+      "additionalProperties": false, "patternProperties": { "^x-": true },
       "properties": {
         "n": { "type": "integer", "minimum": 1 },
         "text": { "type": "string" },

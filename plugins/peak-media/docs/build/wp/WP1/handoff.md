@@ -26,3 +26,19 @@ builder-id: lead-main-session (claude-opus-5-5, interactive Lead session, 2026-1
 ## Open
 
 - `ac-run` doesn't exist until WP2, so the WP1 milestone table is assembled by hand from the verify report.
+
+## Edits outside owned folders (disclosed after verify-1)
+
+- `docs/build/wp/WP3a/brief.md` — the legacy-fixture copy moved into WP1 (`evals/fixtures/legacy-narration.json` already exists); WP3a no longer copies it.
+- `.gitignore` — dropped the `fixtures/**/spine/` ignore so the hand-authored F0–F3 contract files commit; run output goes under `fixtures/**/run/` instead.
+- `lib/deps.mjs`, `package.json`, `package-lock.json`, `evals/helpers/` — handed to WP2 (WP2 owns setup and pins; keep `evals/helpers` shared).
+
+## Round 1 fixes (verify-1 findings)
+
+- F-01/F-02: clips must sit inside their beat's window, and clip↔beat links are checked both ways.
+- F-03/F-04: plates must sit inside their beat's window and not overlap; a missing `spine` file is an error; a missing `brand` is a warning (the default pack lands in WP5).
+- F-06: CSS comments are ignored and empty token values don't count.
+- F-08: `x-*` extensions allowed in `captions[]` and `record`.
+- F-10: baseline helper asserts exactly one error line (plus the `--help` hint); the network spy also blocks `dns.promises`.
+- F-11: unknown-flag error trimmed to `Unknown option '--x'`. The `setup.sh` pointer in the missing-dependency message stays; WP2 creates the script.
+- Left for the freeze decision: F-05 (beat-grid beats without `onScreenText`), F-07 (`record` on non-recorded plates; `record.url` optional). F-09 left as is (no `totalMs` cap; brand paths may point outside the pack).
