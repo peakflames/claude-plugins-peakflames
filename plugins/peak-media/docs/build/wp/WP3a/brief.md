@@ -12,7 +12,7 @@
 
 ## Scope
 
-Port the web2video TTS layer (see `docs/web2video-plan.md` §1–2 and `docs/reference/`): OpenRouter `POST /api/v1/audio/speech`, raw PCM → WAV header (DEC-03), MAI voice suffix per model, `provider:{zdr:true}` on every request (DEC-04), `fake/tone` provider, cache + legacy cache dirs (DEC-12), wpm table and slow-clip warning. **Export the `lib/tts/index.mjs` API first** (stub ok) and note it in handoff so WP3b isn't blocked. AC-TTS-07 needs the user's `TTS_OPENROUTER_API_KEY`: prepare the command and mark it `blocked: needs user key` — the Lead runs it with the user. Copy `docs/reference/narration.json` into `evals/fixtures/legacy-narration.json` for AC-TTS-02.
+Port the web2video TTS layer (see `docs/web2video-plan.md` §1–2 and `docs/reference/`): OpenRouter `POST /api/v1/audio/speech`, raw PCM → WAV header (DEC-03), MAI voice suffix per model, `provider:{zdr:true}` on every request (DEC-04), `fake/tone` provider, cache + legacy cache dirs (DEC-12), wpm table and slow-clip warning. **Export the `lib/tts/index.mjs` API first** (stub ok) and note it in handoff so WP3b isn't blocked. AC-TTS-07 needs the user's `TTS_OPENROUTER_API_KEY`: prepare the command and mark it `blocked: needs user key` — the Lead runs it with the user. `evals/fixtures/legacy-narration.json` (copied in WP1) is the AC-TTS-02 fixture.
 
 ## Owns
 

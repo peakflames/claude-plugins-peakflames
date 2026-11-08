@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:peak-media:schema:brand-pack:v1",
+  "title": "peak-media brand pack v1",
+  "description": "brand.json at the root of a brand pack folder. Every path is relative to brand.json. The tokens CSS must define --color-bg --color-fg --color-accent --font-display --font-body --font-mono and at least one --ease-* custom property (checked by validate, not by this schema).",
+  "type": "object",
+  "required": ["schemaVersion", "name", "tokens", "fonts", "logo", "outro", "music"],
+  "additionalProperties": false,
+  "patternProperties": { "^x-": true },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "tokens": { "type": "string", "pattern": "\\.css$", "description": "Path of tokens.css." },
+    "fonts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["family", "files", "license"],
+        "additionalProperties": false,
+        "properties": {
+          "family": { "type": "string", "minLength": 1 },
+          "files": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "license": { "type": "string", "minLength": 1, "description": "Path of the font's licence file." }
+        }
+      }
+    },
+    "logo": { "type": "string", "minLength": 1 },
+    "outro": {
+      "type": "object",
+      "required": ["composition", "durationMs"],
+      "additionalProperties": false,
+      "properties": {
+        "composition": { "type": "string", "minLength": 1, "description": "Path of the outro HyperFrames composition (index.html)." },
+        "durationMs": { "type": "integer", "minimum": 1 },
+        "audio": { "type": "string", "minLength": 1, "description": "Optional outro sting; the pack owner is responsible for its licence." }
+      }
+    },
+    "captionCss": { "type": "string", "pattern": "\\.css$" },
+    "music": {
+      "type": "object",
+      "required": ["rules"],
+      "additionalProperties": false,
+      "properties": {
+        "rules": { "type": "string", "minLength": 1, "description": "Path of music-rules.md (what to pick, levels, ducking)." },
+        "credits": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

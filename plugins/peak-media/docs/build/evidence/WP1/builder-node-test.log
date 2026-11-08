@@ -1,0 +1,13 @@
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (688.744209ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (414.844042ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (160.1145ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (243.550167ms)
+✔ validate: cross-reference checks (not AC-bound) (485.561541ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2051.733708

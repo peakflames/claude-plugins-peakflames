@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:peak-media:schema:spine-manifest:v1",
+  "title": "peak-media spine manifest v1",
+  "description": "The clock every plate hangs on. Written by the spine as spine/manifest.json (narration) or spine/beatgrid.json (no narration). Narration clips are a superset of the legacy narration.json clip shape.",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "targetMs", "totalMs", "beats", "clips"],
+  "additionalProperties": false,
+  "patternProperties": { "^x-": true },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "enum": ["narration", "beatgrid"], "description": "narration: TTS clips set the timing. beatgrid: no voice; beats carry on-screen text." },
+    "targetMs": { "type": "integer", "minimum": 1, "description": "Runtime the brief asked for." },
+    "totalMs": { "type": "integer", "minimum": 1, "description": "Actual spine runtime." },
+    "model": { "type": "string", "minLength": 1, "description": "TTS model id, e.g. google/gemini-3.8-flash-lite-tts or fake/tone." },
+    "voice": { "type": "string", "minLength": 1 },
+    "style": { "type": "string", "description": "Style instructions sent with every clip (may be empty)." },
+    "audioOffsetMs": { "type": "integer", "description": "Shift applied when laying narration onto picture." },
+    "command": { "type": "array", "items": { "type": "string" }, "description": "argv that reproduces this manifest." },
+    "narrate": { "type": "boolean" },
+    "audio": { "type": "string", "minLength": 1, "description": "Path (relative to this file) of the mixed narration WAV. Always written by the spine; absent only in legacy imports." },
+    "bpm": { "type": "number", "exclusiveMinimum": 0, "description": "Beat grid tempo." },
+    "spine": { "type": "string", "minLength": 1, "description": "For a recorder take: path of the spine manifest it was timed to." },
+    "videoMs": { "type": "integer", "minimum": 0, "description": "Legacy/take: recorded video length." },
+    "wallMs": { "type": "integer", "minimum": 0, "description": "Legacy/take: wall-clock length of the take." },
+    "beats": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/beat" }
+    },
+    "clips": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/clip" }
+    },
+    "captions": {
+      "type": "array",
+      "description": "Recorder takes: caption timings (also written for non-narrated takes).",
+      "items": { "$ref": "#/$defs/caption" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "narration" } }, "required": ["kind"] },
+      "then": { "required": ["model", "voice", "style", "audioOffsetMs", "narrate"], "properties": { "clips": { "type": "array", "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "beatgrid" } }, "required": ["kind"] },
+      "then": { "required": ["bpm"], "properties": { "clips": { "type": "array", "maxItems": 0 } } }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "beat": {
+      "type": "object",
+      "required": ["id", "startMs", "durationMs", "clipNs"],
+      "additionalProperties": false,
+      "patternProperties": { "^x-": true },
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "startMs": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 1 },
+        "clipNs": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
+        "onScreenText": { "type": "string" }
+      }
+    },
+    "clip": {
+      "type": "object",
+      "required": ["n", "beat", "text", "style", "startMs", "durationMs", "words", "wpm", "file"],
+      "additionalProperties": false,
+      "patternProperties": { "^x-": true },
+      "properties": {
+        "n": { "type": "integer", "minimum": 1 },
+        "beat": { "$ref": "#/$defs/id" },
+        "text": { "type": "string", "minLength": 1 },
+        "style": { "type": "string" },
+        "startMs": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 1 },
+        "words": { "type": "integer", "minimum": 0 },
+        "wpm": { "type": "number", "minimum": 0 },
+        "file": { "type": "string", "pattern": "^[0-9a-f]{64}\\.wav$", "description": "Cache file name: sha256(model\\0voice\\0style\\0text).wav" }
+      }
+    },
+    "caption": {
+      "type": "object",
+      "required": ["n", "text", "startMs", "durationMs"],
+      "additionalProperties": false,
+      "properties": {
+        "n": { "type": "integer", "minimum": 1 },
+        "text": { "type": "string" },
+        "startMs": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

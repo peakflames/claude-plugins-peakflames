@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "spine": "spine/manifest.json",
+  "brand": "../../../../brand-packs/default",
+  "fps": 30,
+  "width": 1280,
+  "height": 720,
+  "plates": [
+    {
+      "id": "p1-hook",
+      "beat": "hook",
+      "kind": "motion",
+      "startMs": 0,
+      "durationMs": 6500,
+      "intent": "Same promise, different checker",
+      "assets": [],
+      "text": [
+        "Two tools.",
+        "Same promise.",
+        "Who checks the work?"
+      ]
+    },
+    {
+      "id": "p2-table",
+      "beat": "compare",
+      "kind": "slide",
+      "startMs": 6500,
+      "durationMs": 7500,
+      "intent": "Head-to-head on four dimensions",
+      "assets": [],
+      "text": [
+        "Unit of work | change | epic",
+        "Requirement IDs | none | TOR-NN-XXXXXXX",
+        "Verification | advisory, same model | fresh session, PASS/FAIL",
+        "Ceremony | low | medium–high"
+      ]
+    },
+    {
+      "id": "p3-close",
+      "beat": "close",
+      "kind": "motion",
+      "startMs": 14000,
+      "durationMs": 6000,
+      "intent": "Speed vs proof",
+      "assets": [],
+      "text": [
+        "OpenSpec wins on speed.",
+        "peak-workflow wins on proof."
+      ]
+    }
+  ]
+}
