@@ -43,3 +43,16 @@ export async function importDep(spec) {
   }
   return import(pathToFileURL(p).href);
 }
+
+/** Folder of an installed package (e.g. 'hyperframes'), or null. */
+export function depRoot(name) {
+  for (const root of roots()) {
+    const p = path.join(root, 'node_modules', name);
+    if (existsSync(path.join(p, 'package.json'))) return p;
+  }
+  return null;
+}
+
+export function pins() {
+  return JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'lib', 'pins.json'), 'utf8'));
+}

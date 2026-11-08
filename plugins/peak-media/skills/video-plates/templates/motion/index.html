@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- peak-media motion plate template (minimal, WP2). Kinetic type: each line rises in, staggered.
+     Placeholders (double-braced): WIDTH HEIGHT FPS DURATION_S LINES.
+     Brand comes only from brand/tokens.css; GSAP is the local copy in vendor/ (never a CDN). -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width={{WIDTH}}, height={{HEIGHT}}">
+<link rel="stylesheet" href="brand/tokens.css">
+<script src="vendor/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: {{WIDTH}}px; height: {{HEIGHT}}px; overflow: hidden; background: var(--color-bg); }
+  #root { width: 100%; height: 100%; font-family: var(--font-display); color: var(--color-fg); }
+  #stage { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc({{HEIGHT}}px * 0.02); }
+  .line { font-size: calc({{HEIGHT}}px * 0.11); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; opacity: 0; }
+  .line:nth-child(even) { color: var(--color-accent); }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="{{DURATION_S}}" data-width="{{WIDTH}}" data-height="{{HEIGHT}}" data-fps="{{FPS}}">
+  <div id="stage" class="clip" data-start="0" data-duration="{{DURATION_S}}" data-track-index="0">
+{{LINES}}
+  </div>
+</div>
+<script>
+  const tl = gsap.timeline({ paused: true });
+  const lines = gsap.utils.toArray(".line");
+  const step = Math.min(0.4, ({{DURATION_S}} * 0.5) / Math.max(1, lines.length));
+  lines.forEach((el, i) => {
+    tl.fromTo(el, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.1 + i * step);
+  });
+  window.__timelines["main"] = tl;
+  tl.seek(0);
+</script>
+</body>
+</html>

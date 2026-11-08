@@ -12,7 +12,8 @@ export const pluginVersion = () => JSON.parse(readFileSync(path.join(ROOT, '.cla
 export function run(script, args = [], opts = {}) {
   const pre = opts.network ? [] : ['--import', path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')];
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, [...pre, path.join(ROOT, script), ...args], { encoding: 'utf8', cwd: opts.cwd ?? ROOT, env: { ...process.env, ...opts.env } });
+  const [bin, argv] = script.endsWith('.sh') ? ['bash', [path.join(ROOT, script), ...args]] : [process.execPath, [...pre, path.join(ROOT, script), ...args]];
+  const r = spawnSync(bin, argv, { encoding: 'utf8', cwd: opts.cwd ?? ROOT, env: { ...process.env, ...opts.env } });
   return { code: r.status, stdout: r.stdout, stderr: r.stderr, ms: Date.now() - t0 };
 }
 

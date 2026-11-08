@@ -28,6 +28,10 @@ IDs are stable. A decision is changed by adding a new entry that supersedes it, 
 | DEC-22 | Only `kind: "live"` plates may carry a `live` block, and `live.url` stays optional (a storyboard can serve its own page) | Verify-1 F-07. Catches a stale block after a kind change; loosening later is non-breaking, tightening would need v2 |
 | DEC-23 | In a `beatgrid` spine, every beat must have a non-empty `onScreenText` | Verify-1 F-05, user choice. With no narration the text is the beat's only content |
 | DEC-24 | **v1 contracts frozen 2026-11-08** by the user: `spine-manifest.v1.json`, `plates.v1.json`, `brand-pack.v1.json` as of the WP1 milestone commit. Freeze choices: `audio` optional (legacy imports); brand `outro` + `music` required, `fonts` may be empty; `text` is a string or lines; recorder takes reuse the spine schema (`spine`, `videoMs`, `wallMs`, `captions[]`); clip `file` = `<sha256>.wav`; unknown fields rejected except `x-*` | WP1 gate. Any change from here is a Contract change entry below |
+| DEC-25 | `lib/pins.json` is the single source of the HyperFrames/Playwright/GSAP/ajv versions. `package.json` and `package-lock.json` mirror it so `npm ci` reproduces the exact tree; AC-SKL-07 asserts the mirrors equal the pins and that no other runtime file names a version | A lockfile is the only way to pin transitive deps; the eval keeps the three files from drifting |
+| DEC-26 | Every HyperFrames call sets `HYPERFRAMES_NO_UPDATE_CHECK=1 HYPERFRAMES_NO_AUTO_INSTALL=1 HYPERFRAMES_NO_TELEMETRY=1 HYPERFRAMES_SKIP_SKILLS=1 DO_NOT_TRACK=1` (in `lib/hf.mjs` and `setup.sh`) | Extends DEC-05: HF 0.9.25 has usage telemetry and installs its own skills on `init` |
+| DEC-27 | Contact-sheet timecodes are drawn as 7-segment digits with ffmpeg `drawbox`, not `drawtext` | Homebrew ffmpeg 9.0.2 is built without `drawtext` (no freetype); drawbox works on every build, needs no font, and stays deterministic |
+| DEC-28 | `setup.sh` runs `npm ci --ignore-scripts` | No runtime dep needs an install script (esbuild resolves its platform binary from optional deps); keeps installs deterministic and avoids npm's install-script prompts |
 
 ## Contract changes
 
@@ -44,3 +48,7 @@ Decision: accepted | rejected — schemaVersion bump? yes/no
 ## Run-time findings
 
 *Facts learned during the build that later WPs depend on (e.g. the PCM sample rate from AC-TTS-07).*
+
+- **2026-11-08 (WP2):** HyperFrames 0.9.25 renders correctly here, so the DEC-05 fallback to 0.9.23 is not needed. A 3 s 1280×720 plate takes about 7 s; two renders give identical `framemd5`, and a render with outbound network blocked (macOS `sandbox-exec`, loopback allowed) matches the online one.
+- **HF composition rules found in WP2:** elements with class `clip` are positioned absolutely by the runtime, so a flex layout needs one `clip` wrapper around its children. Timelines register via `window.__timelines["main"]`. GSAP is loaded from a local `vendor/gsap.min.js` (the HF scaffold defaults to a CDN URL, which we never use).
+- **Template placeholders** must not appear inside HTML comments (the WP2 F0 sheet caught `{{LINES}}` being substituted into a comment).
