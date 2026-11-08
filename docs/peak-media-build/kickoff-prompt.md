@@ -1,5 +1,0 @@
-Read `tmp/plate_factory_kickoff_prompt.md` (the task), `docs/peak-media-build/orchestration-plan.md` (how we'll run it), and `plugins/peak-media/docs/plate-factory-workflow.md` + `web2video-plan.md` in full. You are the Lead in the orchestration plan. Test-video topic: `docs/references/openspec-vs-peak-workflow.md`; use the fixtures in plan §6 for the kickoff's "first real video".
-
-This session is WP0. Spawn the four Researchers from plan §2 in parallel (HyperFrames current release + changelog; HyperFrames skills and their licenses; OpenRouter TTS request shape + ZDR field; Playwright screencast API), then ask me your clarifying questions one at a time. Then write the plan: skill names and folder layout, decisions with reasons, the full `acceptance.md` register with given/when/then and baseline ACs, and a brief for each WP. Don't write code until I approve the plan.
-
-After approval: save the plan into `docs/peak-media-build/`, do WP1 and WP2 yourself, then run waves 2–5 per plan §7–8. Commit at each milestone with the `ac-run` table in the commit body. Never merge to `develop`; ask before any push.

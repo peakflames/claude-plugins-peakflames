@@ -1,6 +1,6 @@
 # peak-media build: multi-agent orchestration scheme
 
-*Draft 2026-11-08. Inputs: `tmp/plate_factory_kickoff_prompt.md`, `plugins/peak-media/docs/plate-factory-workflow.md`, `plugins/peak-media/docs/web2video-plan.md`, `docs/references/openspec-vs-peak-workflow.md` (test-video topic).*
+*Draft 2026-11-08. Inputs: `tmp/plate_factory_kickoff_prompt.md`, `plugins/peak-media/docs/plate-factory-workflow.md`, `plugins/peak-media/docs/web2video-plan.md`, `plugins/peak-media/docs/build/references/openspec-vs-peak-workflow.md` (test-video topic).*
 
 ---
 
@@ -9,7 +9,7 @@
 1. **Contracts are the seams.** Nothing fans out until `spine/manifest.json`, `plates.json` and the brand-pack layout are frozen at `schemaVersion: 1`. After that, parallel builders only touch their own folder; a contract change is a request to the Lead, never a local edit.
 2. **Shared verification tools before features.** Contact-sheet sampler, ffprobe spec check, silent-gap (cut-in-silence) check and the AC runner are built in the walking skeleton. Every builder and verifier uses the same tools, so "pass" means one thing.
 3. **Builder never verifies its own work.** Each work package (WP) ends with a fresh Verifier that sees only the acceptance register, the code and the artifacts, never the builder's summary. Same idea as peak-workflow's `/wrapup-epic`.
-4. **Evidence is files, not claims.** Every AC result points to a log, JSON report or labelled contact sheet under `docs/peak-media-build/evidence/<WP>/`.
+4. **Evidence is files, not claims.** Every AC result points to a log, JSON report or labelled contact sheet under `plugins/peak-media/docs/build/evidence/<WP>/`.
 5. **Small WPs.** Each WP is sized so its builder can plan within ~25% of context. Spine and recorder are split in two for that reason.
 6. **Humans own the taste gates.** Plan Q&A, storyboard approval, "listen to it", brand pack. Everything mechanical runs unattended.
 
@@ -28,7 +28,7 @@ Optional: commit these as project agents in `.claude/agents/pm-builder.md`, `pm-
 ## 3. Shared state (survives sessions and compaction)
 
 ```
-docs/peak-media-build/              # repo-level, NOT shipped with the plugin
+plugins/peak-media/docs/build/      # ships with the plugin (DEC-18); evidence limited to JPEG/JSON/log
   orchestration-plan.md             # this file
   plan.md                           # approved plan from the kickoff Q&A
   decisions.md                      # D-log: skill names, TTS default, HF pin, vendoring
@@ -92,7 +92,7 @@ Sources folded in:
 | D1 flags | Partly | Recorder keeps `--storyboard --out --mp4 --viewport --no-captions --caption-css --url --debug-requests --audio-offset-ms`; narration flags move to spine; recorder adds `--spine <manifest>` |
 | D2 pre-flight | Yes | Voice/key checks → spine; ffmpeg/Chromium → recorder |
 | D3 no key | Yes | Spine beat grid + recorder captions-only; zero OpenRouter calls |
-| D4 cache key | Yes, verbatim | Spine; against `docs/reference/narration.json` |
+| D4 cache key | Yes, verbatim | Spine; against `plugins/peak-media/docs/reference/narration.json` |
 | D5 legacy cache | Yes | Spine reads `~/.cache/record-website-interaction/tts/` and `~/.cache/web2video/tts/` |
 | D6 storyboard API | Yes | `say()` now plays the spine's clip/timing instead of synthesizing |
 | D7 MP4 spec | Yes | Recorder output **and** assembly `out/final.mp4` |
@@ -113,7 +113,7 @@ A WP is **Done** only when every AC it owns is `PASS` in a verifier report. `ac-
 
 ## 6. Test videos (topic: OpenSpec vs. peak-workflow)
 
-Shipped fixtures must pass D17, so the plugin's own eval fixture stays topic-neutral. The OpenSpec content is used for the dev fixtures and the real video, kept in `docs/peak-media-build/fixtures/`.
+Shipped fixtures must pass D17, so the plugin's own eval fixture stays topic-neutral. The OpenSpec content is used for the dev fixtures and the real video, kept in `plugins/peak-media/docs/build/fixtures/`.
 
 | Fixture | Used by | Shape |
 |---|---|---|
@@ -151,7 +151,7 @@ Contract-change requests from a builder stop that WP. The request goes in `decis
 ## 8. Running it: two modes
 
 - **In-session (recommended for Waves 1–4):** the Lead session spawns Builders with `Agent(isolation: "worktree")` in the background and Verifiers as fresh agents. You stay in one conversation, see only summaries, and answer gates. Shared state files make compaction safe.
-- **Multi-session (fallback, or for WP7/WP10):** each WP gets `claude` in its own `git worktree` with the prompt "Read `docs/peak-media-build/wp/<WP>/brief.md` and execute it." Use this when a WP needs your hands (live TTS key, listening, D16 container, real brand pack) or when it's long enough to deserve its own context.
+- **Multi-session (fallback, or for WP7/WP10):** each WP gets `claude` in its own `git worktree` with the prompt "Read `plugins/peak-media/docs/build/wp/<WP>/brief.md` and execute it." Use this when a WP needs your hands (live TTS key, listening, D16 container, real brand pack) or when it's long enough to deserve its own context.
 
 ## 9. Gates that need you
 
@@ -169,7 +169,7 @@ Contract-change requests from a builder stop that WP. The request goes in `decis
 ## 10. Housekeeping found during survey
 
 - `peak-media-docs.zip` at repo root is untracked; keep it out of commits.
-- `docs/` under `plugins/peak-media/` ships to users; move design/plan docs out (to `docs/peak-media-build/`) during WP9 if they shouldn't ship.
+- `docs/` under `plugins/peak-media/` ships to users. Per DEC-18 build state stays there anyway; WP9 checks it holds no media heavier than JPEGs.
 
 ## 11. What this borrows from peak-workflow (and what it skips)
 
@@ -188,14 +188,14 @@ Skipped: `/discover` + ConOps (the design doc already is one), `/mockup`, phases
 
 ## 12. Kickoff
 
-**Plan mode is used in WP0 only.** WP0 is read-only survey + one-at-a-time questions + an approved plan, which is exactly what plan mode enforces. After approval, copy the plan into `docs/peak-media-build/plan.md` (plan mode stores its own copy outside the repo).
+**Plan mode is used in WP0 only.** WP0 is read-only survey + one-at-a-time questions + an approved plan, which is exactly what plan mode enforces. After approval, copy the plan into `plugins/peak-media/docs/build/plan.md` (plan mode stores its own copy outside the repo).
 
 Builders do not use plan mode. They run unattended in worktrees, plan mode would stall them waiting for an approval nobody is watching, and their plan was already approved as the WP brief. Exception: a WP you run yourself as an interactive session (WP10, or anything that needs your key or ears) can start in plan mode for a quick check of the approach.
 
 **Start the Lead session in plan mode** (`claude --permission-mode plan`, or Shift+Tab until "plan mode"), on `feature/new-peak-media-plugin`, and paste:
 
-> Read `tmp/plate_factory_kickoff_prompt.md` (the task), `docs/peak-media-build/orchestration-plan.md` (how we'll run it), and `plugins/peak-media/docs/plate-factory-workflow.md` + `web2video-plan.md` in full. You are the Lead in the orchestration plan. Test-video topic: `docs/references/openspec-vs-peak-workflow.md`; use the fixtures in plan §6 for the kickoff's "first real video".
+> Read `tmp/plate_factory_kickoff_prompt.md` (the task), `plugins/peak-media/docs/build/orchestration-plan.md` (how we'll run it), and `plugins/peak-media/docs/plate-factory-workflow.md` + `web2video-plan.md` in full. You are the Lead in the orchestration plan. Test-video topic: `plugins/peak-media/docs/build/references/openspec-vs-peak-workflow.md`; use the fixtures in plan §6 for the kickoff's "first real video".
 >
 > This session is WP0. Spawn the four Researchers from plan §2 in parallel (HyperFrames current release + changelog; HyperFrames skills and their licenses; OpenRouter TTS request shape + ZDR field; Playwright screencast API), then ask me your clarifying questions one at a time. Then write the plan: skill names and folder layout, decisions with reasons, the full `acceptance.md` register with given/when/then and baseline ACs, and a brief for each WP. Don't write code until I approve the plan.
 >
-> After approval: save the plan into `docs/peak-media-build/`, do WP1 and WP2 yourself, then run waves 2–5 per plan §7–8. Commit at each milestone with the `ac-run` table in the commit body. Never merge to `develop`; ask before any push.
+> After approval: save the plan into `plugins/peak-media/docs/build/`, do WP1 and WP2 yourself, then run waves 2–5 per plan §7–8. Commit at each milestone with the `ac-run` table in the commit body. Never merge to `develop`; ask before any push.

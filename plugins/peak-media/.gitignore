@@ -1,0 +1,9 @@
+node_modules/
+renders/
+out/
+docs/build/**/*.mp4
+docs/build/**/*.webm
+docs/build/**/*.wav
+docs/build/**/*.mov
+docs/build/fixtures/**/spine/
+docs/build/fixtures/**/review/
