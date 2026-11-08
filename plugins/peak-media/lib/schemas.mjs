@@ -55,6 +55,7 @@ function ajvToErrors(errs) {
     if (e.keyword === 'required') { field = fieldPath(e.instancePath, e.params.missingProperty); message = 'is required'; }
     else if (e.keyword === 'additionalProperties') { field = fieldPath(e.instancePath, e.params.additionalProperty); message = 'is not allowed (unknown field; use an x- prefix for extensions)'; }
     else if (e.keyword === 'enum') message = `must be one of ${e.params.allowedValues.join(', ')}`;
+    else if (e.keyword === 'not' && e.schemaPath.endsWith('/else/not') && e.instancePath.startsWith('/plates/')) { field = fieldPath(e.instancePath, 'live'); message = 'is only allowed on plates of kind "live"'; }
     else if (e.keyword === 'const') message = `must be ${JSON.stringify(e.params.allowedValue)}`;
     out.push({ field, message });
   }

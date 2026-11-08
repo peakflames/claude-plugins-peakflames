@@ -9,12 +9,12 @@
     {
       "id": "r1-feature",
       "beat": "feature",
-      "kind": "recorded",
+      "kind": "live",
       "startMs": 0,
       "durationMs": 7000,
       "intent": "A TOR-tagged scenario on GitHub",
       "assets": [],
-      "record": {
+      "live": {
         "url": "https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md",
         "storyboard": "storyboard-feature.mjs",
         "viewport": "1280x720"
@@ -23,12 +23,12 @@
     {
       "id": "r2-anchor",
       "beat": "anchor",
-      "kind": "recorded",
+      "kind": "live",
       "startMs": 7000,
       "durationMs": 6500,
       "intent": "The ID the epic and verifier use",
       "assets": [],
-      "record": {
+      "live": {
         "url": "https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md",
         "storyboard": "storyboard-anchor.mjs",
         "viewport": "1280x720"
@@ -37,12 +37,12 @@
     {
       "id": "r3-openspec",
       "beat": "openspec",
-      "kind": "recorded",
+      "kind": "live",
       "startMs": 13500,
       "durationMs": 6500,
       "intent": "OpenSpec workflow page",
       "assets": [],
-      "record": {
+      "live": {
         "url": "https://openspec.dev/docs/the-workflow",
         "storyboard": "storyboard-openspec.mjs",
         "viewport": "1280x720"

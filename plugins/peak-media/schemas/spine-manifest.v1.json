@@ -45,7 +45,7 @@
     },
     {
       "if": { "properties": { "kind": { "const": "beatgrid" } }, "required": ["kind"] },
-      "then": { "required": ["bpm"], "properties": { "clips": { "type": "array", "maxItems": 0 } } }
+      "then": { "required": ["bpm"], "properties": { "clips": { "type": "array", "maxItems": 0 }, "beats": { "type": "array", "items": { "type": "object", "required": ["onScreenText"], "properties": { "onScreenText": { "type": "string", "minLength": 1 } } } } } }
     }
   ],
   "$defs": {

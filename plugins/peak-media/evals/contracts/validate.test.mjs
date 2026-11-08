@@ -89,8 +89,12 @@ test('validate: cross-reference checks (not AC-bound)', () => {
   check('plates.json', plates, /plates\[2\]\.beat: beat 'missing' is not in/);
   const shifted = structuredClone(plates); shifted.plates[2].beat = 'tip'; shifted.plates[1].durationMs = 9000;
   check('shifted.plates.json', shifted, /plates\[1\]\.startMs: plate 'p2-why' .* is outside beat|plates\[2\]\.startMs: overlaps/);
-  const rec = structuredClone(plates); rec.plates[2].beat = 'tip'; rec.plates[0].kind = 'recorded';
-  check('rec.plates.json', rec, /plates\[0\]\.record: is required/);
+  const rec = structuredClone(plates); rec.plates[2].beat = 'tip'; rec.plates[0].kind = 'live';
+  check('rec.plates.json', rec, /plates\[0\].live: is required/);
+  const stray = structuredClone(plates); stray.plates[2].beat = 'tip'; stray.plates[1].live = { storyboard: 's.mjs', viewport: '1280x720' };
+  check('stray.plates.json', stray, /plates\[1\]\.live: is only allowed on plates of kind "live"/);
+  const emptyGrid = JSON.parse(readFileSync(path.join(B, 'F0', 'spine', 'beatgrid.json'), 'utf8')); delete emptyGrid.beats[0].onScreenText;
+  check('empty.beatgrid.json', emptyGrid, /beats\[0\]\.onScreenText: is required/);
   const pack = path.join(dir, 'pack'); cpSync(fx('brand-min'), pack, { recursive: true });
   writeFileSync(path.join(pack, 'tokens.css'), ':root{--color-bg:#000}\n');
   const r = run(V, [pack]);

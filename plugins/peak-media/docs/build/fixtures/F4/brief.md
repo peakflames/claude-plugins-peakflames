@@ -11,9 +11,9 @@
 
 1. Hook (motion) — "Two tools, same promise: no code until we agree on the spec. They disagree about *who checks the work*."
 2. Shared problem (motion) — vibe coding drifts; both make human and AI agree first
-3. OpenSpec loop (slide + recorded docs page) — propose → apply → archive, the four files
+3. OpenSpec loop (slide + live docs page) — propose → apply → archive, the four files
 4. Delta merge (motion diagram) — ADDED/MODIFIED/REMOVED folding into the living spec
-5. peak-workflow: TOR ID (recorded GitHub page) — a scenario with its TOR ID
+5. peak-workflow: TOR ID (live GitHub page) — a scenario with its TOR ID
 6. Requirements Anchors → `/wrapup-epic` refusing same-session (motion terminal replay)
 7. Head-to-head (slide) — §4 table, trimmed
 8. Honest close (motion) — speed vs. proof; pick by whether you must *show your work*

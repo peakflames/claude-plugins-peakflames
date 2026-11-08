@@ -16,10 +16,10 @@ Captions via `showOverlay(html,{duration})` with injected-DOM fallback; neutral 
 
 ## Owns
 
-- `skills/video-record/scripts/check-take.mjs`
-- `caption overlay code in skills/video-record/`
-- `skills/video-record/examples/ui-demo/`
-- `skills/video-record/SKILL.md`
+- `skills/video-capture/scripts/check-take.mjs`
+- `caption overlay code in skills/video-capture/`
+- `skills/video-capture/examples/ui-demo/`
+- `skills/video-capture/SKILL.md`
 
 ## Acceptance criteria
 
