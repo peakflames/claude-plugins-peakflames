@@ -1,0 +1,17 @@
+# AC-ASM-04 — verifier-wp6-r1-90efea8d, worktree a2ed450, 2026-11-09T00:23:32Z
+# inputs: /tmp/vwp6 (testsrc/colour plates 1280x720@30 at 0-6500/6500-14000/14000-20000; 330 Hz narration tones in F1 clip windows 200-6000/6700-13500/14200-19500; music 110/138/165/220 Hz; SFX 1.5 kHz blips at 6.4-6.6 s and 13.9-14.1 s)
+## assemble proj (no --music/--sfx)
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 600 frames)
+cuts      2 plate cut(s) in silence (≥300 ms)
+outro     rendered renders/outro-8e989dbcd4d03f5f.mp4
+final     out/final.mp4 1280x720@30, 23000 ms (spine 20000 + outro 3000) — spec PASS
+/tmp/vwp6/out-nomusic/out/final.mp4
+exit 0
+stream|codec_name=h264|codec_type=video
+stream|codec_name=aac|codec_type=audio
+format|tag:comment=peak-media assemble: final
+## review.mp4 loudness
+    I:         -16.0 LUFS
+assemble.json
+review.mp4
