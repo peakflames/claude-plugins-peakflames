@@ -40,8 +40,8 @@ export function rmsDb(file, startMs, endMs) {
 }
 
 /** Speech intervals [{startMs,endMs}]: the complement of silences ≥ 200 ms at ≤ -40 dB. */
-export function speechWindows(file, durMs) {
-  const { stderr } = ffmpeg(['-i', file, '-map', '0:a:0', '-af', 'silencedetect=noise=-40dB:d=0.2', '-f', 'null', '-'], { what: 'speech detection' });
+export function speechWindows(file, durMs, { minSilenceMs = 200 } = {}) {
+  const { stderr } = ffmpeg(['-i', file, '-map', '0:a:0', '-af', `silencedetect=noise=-40dB:d=${minSilenceMs / 1000}`, '-f', 'null', '-'], { what: 'speech detection' });
   const sil = [];
   let start = null;
   for (const line of stderr.split('\n')) {
@@ -92,39 +92,48 @@ export function silentStem(out, durationMs) {
   return out;
 }
 
-// Sidechain ducking: music drops by about 14 dB (measured on F1) while the narration key is above about
-// -32 dBFS, and recovers over 400 ms in the gaps.
-export const DUCK = { threshold: 0.025, ratio: 5, attack: 20, release: 400, knee: 2.5 };
+// Ducking: the music is lowered by exactly duckDb while the narration speaks. The narration is
+// known in advance, so the envelope starts to fall attackMs before each spoken window and
+// recovers over releaseMs after it; pauses shorter than mergeGapMs stay ducked.
+export const DUCK = { attackMs: 150, releaseMs: 350, mergeGapMs: 500 };
 
-/**
- * Mix levelled stems (all same length, 48 kHz stereo float WAVs): narration on top, music
- * ducked by the narration (sidechain), SFX as-is. A true-peak limiter guards the sum.
- */
-export function mixStems({ narration, music, sfx, out, duck = true }) {
+/** Speech windows with short pauses merged, so the bed doesn't bob between words. */
+export function duckWindows(windows, { mergeGapMs = DUCK.mergeGapMs } = {}) {
+  const out = [];
+  for (const w of windows) {
+    const last = out.at(-1);
+    if (last && w.startMs - last.endMs < mergeGapMs) last.endMs = w.endMs;
+    else out.push({ ...w });
+  }
+  return out;
+}
+
+/** ffmpeg `volume` expression: 0 dB outside the windows, -duckDb inside, linear-in-dB ramps. */
+export function duckExpr(windows, duckDb, { attackMs = DUCK.attackMs, releaseMs = DUCK.releaseMs } = {}) {
+  if (!windows.length || duckDb <= 0) return '1';
+  const A = attackMs / 1000, R = releaseMs / 1000;
+  const w = windows.map(({ startMs, endMs }) => {
+    const a = startMs / 1000, b = endMs / 1000;
+    return `min(clip((t-${(a - A).toFixed(4)})/${A}\\,0\\,1)\\,clip((${(b + R).toFixed(4)}-t)/${R}\\,0\\,1))`;
+  });
+  return `pow(10\\,-${duckDb}*clip(${w.join('+')}\\,0\\,1)/20)`;
+}
+
+/** Apply the duck envelope to a levelled music stem. */
+export function duckStem(src, out, windows, duckDb) {
+  ffmpeg(['-y', '-i', src, '-af', `volume=volume=${duckExpr(windows, duckDb)}:eval=frame`, ...WAV, out], { what: 'ducking' });
+  return out;
+}
+
+/** Mix levelled stems (all the same length, 48 kHz stereo float WAVs). A true-peak limiter guards the sum. */
+export function mixStems({ narration, music, sfx, out }) {
   const inputs = [narration, music, sfx].filter(Boolean);
   const args = ['-y'];
   inputs.forEach((f) => args.push('-i', f));
-  let i = 1;
-  const chain = [];
-  const parts = [];
-  if (music && duck) {
-    chain.push(`[0:a]asplit=2[nar][key]`, `[${i}:a][key]sidechaincompress=threshold=${DUCK.threshold}:ratio=${DUCK.ratio}:attack=${DUCK.attack}:release=${DUCK.release}:knee=${DUCK.knee}[mus]`);
-    parts.push('[nar]', '[mus]'); i++;
-  } else {
-    parts.push('[0:a]');
-    if (music) { parts.push(`[${i}:a]`); i++; }
-  }
-  if (sfx) { parts.push(`[${i}:a]`); i++; }
-  chain.push(`${parts.join('')}amix=inputs=${parts.length}:normalize=0:duration=first:dropout_transition=0,alimiter=limit=${dbToLin(TP_LIMIT_DB - 0.5).toFixed(4)}:level=false:latency=true:attack=5:release=80[mix]`);
-  args.push('-filter_complex', chain.join(';'), '-map', '[mix]', ...WAV, out);
+  const parts = inputs.map((_, i) => `[${i}:a]`).join('');
+  args.push('-filter_complex', `${parts}amix=inputs=${inputs.length}:normalize=0:duration=first:dropout_transition=0,alimiter=limit=${dbToLin(TP_LIMIT_DB - 0.5).toFixed(4)}:level=false:latency=true:attack=5:release=80[mix]`,
+    '-map', '[mix]', ...WAV, out);
   ffmpeg(args, { what: 'stem mix' });
   return out;
 }
 
-/** The ducked music alone (for level reports): same sidechain as mixStems. */
-export function duckedMusic({ narration, music, out }) {
-  ffmpeg(['-y', '-i', narration, '-i', music, '-filter_complex',
-    `[1:a][0:a]sidechaincompress=threshold=${DUCK.threshold}:ratio=${DUCK.ratio}:attack=${DUCK.attack}:release=${DUCK.release}:knee=${DUCK.knee}[mus]`,
-    '-map', '[mus]', ...WAV, out], { what: 'ducked music' });
-  return out;
-}

@@ -1,9 +1,0 @@
-:root {
-  --color-bg: #0b1d3a;
-  --color-fg: #ffffff;
-  --color-accent: #f59e0b;
-  --font-display: system-ui, sans-serif;
-  --font-body: system-ui, sans-serif;
-  --font-mono: ui-monospace, monospace;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-}

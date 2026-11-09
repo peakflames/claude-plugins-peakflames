@@ -3,12 +3,12 @@
 // and three synthetic plate renders), plus synthetic music and SFX stems. Everything is made
 // with ffmpeg lavfi sources in a temp dir — no media is committed or downloaded.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ROOT } from '../../helpers/run.mjs';
 
 export const F1 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F1');
-export const BRAND_OUTRO = path.join(ROOT, 'evals', 'video-assemble', 'fixtures', 'brand-outro');
+export const BRAND_DEFAULT = path.join(ROOT, 'brand-packs', 'default'); // the shipping pack F1 names
 
 export function ff(args) {
   const r = spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-v', 'error', '-y', ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -37,7 +37,7 @@ export function plateMp4(out, { durationMs, hue = 0, width = 1280, height = 720,
  * spine/narration.wav (tones in each clip window unless `windows` is given), renders/plates/*.mp4.
  * `spine: 'beatgrid'` writes a beat-grid spine instead (no narration).
  */
-export function makeF1Project(dir, { brand = BRAND_OUTRO, windows, spine = 'narration', renders = true } = {}) {
+export function makeF1Project(dir, { brand = BRAND_DEFAULT, windows, spine = 'narration', renders = true } = {}) {
   mkdirSync(path.join(dir, 'spine'), { recursive: true });
   const plates = JSON.parse(readFileSync(path.join(F1, 'plates.json'), 'utf8'));
   const manifest = JSON.parse(readFileSync(path.join(F1, 'spine', 'manifest.json'), 'utf8'));
@@ -73,4 +73,3 @@ export function sfxWav(out, hitsMs, seconds = 20) {
   return out;
 }
 
-export function copyBrand(to, from = BRAND_OUTRO) { cpSync(from, to, { recursive: true }); return to; }

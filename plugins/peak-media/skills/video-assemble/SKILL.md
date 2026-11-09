@@ -55,10 +55,21 @@ Run either with `--help` for every flag. Expected failures are one line naming t
    remux-audio review/review.mp4 --music audio/music.wav -o review/review-music.mp4
    remux-audio review/review.mp4 --music audio/music.wav --sfx audio/sfx.wav -o review/review-mix.mp4 --levels review/levels.json
    ```
-   Narration is held at −16 LUFS, the music bed at −28 LUFS before ducking, ducked under the
-   voice by a sidechain compressor; the SFX stem is added at `--sfx-db`. The levels report
-   gives narration/music/SFX/mix LUFS, true peak, and the measured duck in dB. The user
-   listens and approves the levels — that is the stage-8 gate; don't skip it.
+   Levels (the same flags on `assemble`):
+
+   | Flag | Default | Meaning |
+   |---|---|---|
+   | `--narration-lufs` | −16 | narration loudness (always levelled; never time-stretched) |
+   | `--music-lufs` | −22 | music loudness **under the voice**, i.e. about 6 dB below the narration, so it is clearly audible |
+   | `--duck-db` | 8 | how much louder the music is between lines than under the voice (it ducks 150 ms before each line and recovers over 350 ms; pauses under 500 ms stay ducked). `--no-duck` = 0 |
+   | `--sfx-lufs` | −20 | loudness of each SFX hit (silence between hits does not count) |
+   | `--sfx-db` | 0 | extra trim on the SFX stem after `--sfx-lufs` |
+
+   A true-peak limiter at −1.5 dBFS guards the mix. The levels report gives each stem's
+   LUFS, the mix LUFS and true peak, and the measured music level under the voice
+   (`belowVoiceDb`, expect about 6). If the music fights the voice, lower `--music-lufs`;
+   if it swells too much between lines, lower `--duck-db`. The user listens and approves the levels — that
+   is the stage-8 gate; don't skip it.
    `remux-audio` refuses an already-mixed MP4 as the narration source (pass `--narration`
    if you really mean it).
 5. **Export (stage 9).** `assemble <project> --music audio/music.wav --sfx audio/sfx.wav
@@ -67,6 +78,10 @@ Run either with `--help` for every flag. Expected failures are one line naming t
    forces it, `--outro <mp4>` supplies one) and writes `out/final.mp4`. It is checked with
    `probe-spec`: H.264 High, yuv420p, AAC 48 kHz, faststart, the export size and fps, and
    duration = spine `totalMs` + outro `durationMs` ±1 frame.
+   The outro is rendered at the export fps. `--export 1080p60` from plates rendered below
+   60 fps (F1 is 30) scales and **duplicates frames**: the file is 60 fps but plate motion
+   stays 30 fps, and assemble prints a `note` saying so. For true 60 fps motion set `"fps": 60`
+   in plates.json and re-render the plates (`render-plate` renders at plates.json fps).
 6. **Final contact sheet.** Sheet `out/final.mp4` and Read it: the last frames must show the
    brand outro.
 
@@ -76,5 +91,8 @@ Run either with `--help` for every flag. Expected failures are one line naming t
 - Stems are files the user supplies or makes; the plugin ships no music. Respect the brand
   pack's `music-rules.md` for what to pick and its levels.
 - Never edit a plate render to fix a cut. Every fix names a plate or a spine beat.
-- A brand outro that loads `vendor/gsap.min.js` gets the locally installed GSAP at render
-  time (DEC-09); the outro may use `../tokens.css` and `../logo.svg` from its pack.
+- The brand outro is rendered exactly like a plate: its `index.html` is copied to the top of
+  a temp dir, the whole brand pack to `<dir>/brand/`, and the locally installed GSAP to
+  `<dir>/vendor/gsap.min.js` (DEC-09). So an outro loads `brand/tokens.css`,
+  `brand/logo.svg`, `brand/fonts/…` and `vendor/gsap.min.js` — never `../` paths or a CDN.
+- Each run deletes the old `out/final.mp4` first, so a failed run never leaves a stale final.

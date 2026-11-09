@@ -16,7 +16,7 @@ import { render, gsapPath } from '../../../lib/hf.mjs';
 import { probeSpec } from '../../../lib/verify/probe-spec.mjs';
 import { checkCuts } from '../../../lib/verify/check-cuts.mjs';
 import { levelStem, silentStem } from './audio.mjs';
-import { remuxAudio, videoMs } from './remux-audio.mjs';
+import { remuxAudio, videoMs, checkLevels, spec as remuxSpec } from './remux-audio.mjs';
 
 export const EXPORTS = { source: null, '1080p60': { width: 1920, height: 1080, fps: 60 } };
 const NARRATION_LUFS = -16;
@@ -101,8 +101,10 @@ function filesUnder(dir) {
 
 /**
  * The brand outro as an MP4: a supplied file, a cached render keyed on the pack's bytes
- * and the fps, or a fresh HyperFrames render (GSAP is staged into the outro folder if the
- * composition loads vendor/gsap.min.js and the pack doesn't ship it, per DEC-09).
+ * and the fps, or a fresh HyperFrames render. The outro is staged exactly like a plate
+ * (skeleton.mjs scaffoldPlate): its index.html at the top of a temp dir, the brand pack in
+ * <dir>/brand/ and the local GSAP in <dir>/vendor/gsap.min.js (DEC-09), so it loads
+ * brand/tokens.css, brand/logo.svg, brand/fonts/… and vendor/gsap.min.js.
  */
 export function outroRender({ brandDir, brand, fps, cacheDir, outro, rerender = false, renderWrap }) {
   if (outro) {
@@ -110,26 +112,24 @@ export function outroRender({ brandDir, brand, fps, cacheDir, outro, rerender = 
     return { mp4: path.resolve(outro), source: 'given' };
   }
   const comp = path.resolve(brandDir, brand.outro.composition);
-  const compDir = statSync(comp).isDirectory() ? comp : path.dirname(comp);
-  const h = createHash('sha256').update(`fps=${fps}\0`);
+  const html = statSync(comp).isDirectory() ? path.join(comp, 'index.html') : comp;
+  if (!existsSync(html)) throw new CliError(`brand outro composition not found: ${html}`);
+  const h = createHash('sha256').update(`layout=plate\0fps=${fps}\0`);
   for (const f of filesUnder(brandDir)) h.update(path.relative(brandDir, f)).update('\0').update(readFileSync(f)).update('\0');
   const key = h.digest('hex').slice(0, 16);
   const mp4 = path.join(cacheDir, `outro-${key}.mp4`);
   if (existsSync(mp4) && !rerender) return { mp4, source: 'cache', key };
-  preflight({ ffmpeg: true, hyperframes: true });
+  preflight({ ffmpeg: true, deps: ['gsap'], hyperframes: true });
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'pm-outro-'));
   try {
-    const stage = path.join(tmp, 'brand');
-    cpSync(brandDir, stage, { recursive: true });
-    const stagedComp = path.join(stage, path.relative(brandDir, compDir));
-    const html = path.join(stagedComp, 'index.html');
-    if (existsSync(html) && /vendor\/gsap(\.min)?\.js/.test(readFileSync(html, 'utf8')) && !existsSync(path.join(stagedComp, 'vendor', 'gsap.min.js'))) {
-      mkdirSync(path.join(stagedComp, 'vendor'), { recursive: true });
-      cpSync(gsapPath(), path.join(stagedComp, 'vendor', 'gsap.min.js'));
-    }
+    const dir = path.join(tmp, 'outro');
+    mkdirSync(path.join(dir, 'vendor'), { recursive: true });
+    cpSync(html, path.join(dir, 'index.html'));
+    cpSync(brandDir, path.join(dir, 'brand'), { recursive: true });
+    cpSync(gsapPath(), path.join(dir, 'vendor', 'gsap.min.js'));
     mkdirSync(cacheDir, { recursive: true });
     const part = path.join(tmp, 'outro.mp4');
-    render(stagedComp, part, { fps, wrap: renderWrap });
+    render(dir, part, { fps, wrap: renderWrap });
     cpSync(part, mp4);
     return { mp4, source: 'render', key };
   } finally { rmSync(tmp, { recursive: true, force: true }); }
@@ -142,7 +142,7 @@ export function plateCuts(sorted, totalMs) {
   return [...set].sort((a, b) => a - b);
 }
 
-export async function assemble({ input, brand, renders, out, music, sfx, musicLufs = -28, sfxDb = 0, exportPreset = 'source', minSilenceMs = 300, outro, rerenderOutro = false, renderWrap, log = () => {} }) {
+export async function assemble({ input, brand, renders, out, music, sfx, musicLufs, duckDb, sfxLufs, sfxDb, exportPreset = 'source', minSilenceMs = 300, outro, rerenderOutro = false, renderWrap, log = () => {} }) {
   if (!(exportPreset in EXPORTS)) throw new CliError(`--export must be one of ${Object.keys(EXPORTS).join(', ')}`, EXIT.USAGE);
   for (const [flag, f] of [['--music', music], ['--sfx', sfx]]) if (f && !existsSync(f)) throw new CliError(`${flag} ${f}: no such file`);
   const P = await loadProject(input, { brand });
@@ -164,7 +164,10 @@ export async function assemble({ input, brand, renders, out, music, sfx, musicLu
   mkdirSync(finalDir, { recursive: true });
   const review = path.join(reviewDir, 'review.mp4');
   const final = path.join(finalDir, 'final.mp4');
-  const report = { project, plates: rs.map((r) => ({ id: r.plate.id, startMs: r.plate.startMs, durationMs: r.plate.durationMs, render: r.mp4, renderMs: r.ms })) };
+  // a failed run must not leave an older final behind
+  rmSync(final, { force: true });
+  rmSync(path.join(reviewDir, 'review-mix.mp4'), { force: true });
+  const report ={ project, plates: rs.map((r) => ({ id: r.plate.id, startMs: r.plate.startMs, durationMs: r.plate.durationMs, render: r.mp4, renderMs: r.ms })) };
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'pm-assemble-'));
   try {
     // 1. spine audio at -16 LUFS (beat grid: silence), exactly the spine length
@@ -205,34 +208,40 @@ export async function assemble({ input, brand, renders, out, music, sfx, musicLu
     let picture = review;
     if (music || sfx) {
       const mixed = path.join(reviewDir, 'review-mix.mp4');
-      report.mix = remuxAudio({ video: review, out: mixed, music, sfx, musicLufs, sfxDb });
+      report.mix = remuxAudio({ video: review, out: mixed, music, sfx, musicLufs, duckDb, sfxLufs, sfxDb });
       writeFileSync(path.join(reviewDir, 'levels.json'), JSON.stringify(report.mix, null, 2) + '\n');
       picture = mixed;
-      log(`mix       ${rel(outDir, mixed)} (${report.mix.mix.lufs} LUFS${report.mix.music?.duckDb != null ? `, music ducked ${report.mix.music.duckDb} dB` : ''})`);
+      log(`mix       ${rel(outDir, mixed)} (${report.mix.mix.lufs} LUFS${report.mix.music?.belowVoiceDb != null ? `, music ${report.mix.music.belowVoiceDb} dB under the voice` : ''})`);
     }
 
     // 5. brand outro (cached render) appended, then export
-    const o = outroRender({ brandDir, brand: P.brand, fps, cacheDir: path.join(outDir, 'renders'), outro, rerender: rerenderOutro, renderWrap });
+    // export preset; the outro is rendered at the export fps. Plates rendered below the export
+    // fps are frame-duplicated up to it (S-2): motion stays at the plates' fps.
+    const ex = EXPORTS[exportPreset] ?? { width, height, fps };
+    if (ex.fps > fps) {
+      report.note = `plates are ${fps} fps: --export ${exportPreset} duplicates frames to ${ex.fps} fps (motion stays ${fps} fps); for true ${ex.fps} fps motion set "fps": ${ex.fps} in plates.json and re-render the plates`;
+      log(`note      ${report.note}`);
+    }
+    const o = outroRender({ brandDir, brand: P.brand, fps: ex.fps, cacheDir: path.join(outDir, 'renders'), outro, rerender: rerenderOutro, renderWrap });
     const outroMs = P.brand.outro.durationMs;
     report.outro = { ...o, durationMs: outroMs, renderMs: videoMs(o.mp4) };
-    log(`outro     ${o.source === 'render' ? 'rendered' : o.source === 'cache' ? 'cached' : 'given'} ${rel(outDir, o.mp4)}`);
-    const ex = EXPORTS[exportPreset] ?? { width, height, fps };
-    const oFrames = frames(outroMs, fps);
+    log(`outro     ${o.source === 'render' ? 'rendered' : o.source === 'cache' ? 'cached' : 'given'} ${rel(outDir, o.mp4)} at ${ex.fps} fps`);
+    const picFrames = frames(totalMs, ex.fps);
+    const oFrames = frames(outroMs, ex.fps);
     const fit = (w, h) => `scale=${w}:${h}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
     const oAudio = P.brand.outro.audio ? path.resolve(brandDir, P.brand.outro.audio) : null;
     const fargs = ['-y', '-i', picture, '-i', o.mp4];
     if (oAudio) fargs.push('-i', oAudio); else fargs.push('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo');
-    const totalS = (totalFrames / fps).toFixed(6), outroS = (oFrames / fps).toFixed(6);
+    const totalS = (picFrames / ex.fps).toFixed(6), outroS = (oFrames / ex.fps).toFixed(6);
     const fg = [
-      `[0:v]setpts=PTS-STARTPTS,trim=end_frame=${totalFrames},setpts=PTS-STARTPTS[a]`,
-      `[1:v]setpts=PTS-STARTPTS,fps=${fps},${fit(width, height)},format=yuv420p,tpad=stop_mode=clone:stop=${oFrames},trim=end_frame=${oFrames},setpts=PTS-STARTPTS[b]`,
-      `[a][b]concat=n=2:v=1:a=0[cat]`,
-      exportPreset === 'source' ? '[cat]null[v]' : `[cat]${fit(ex.width, ex.height)},fps=${ex.fps}[v]`,
+      `[0:v]setpts=PTS-STARTPTS,fps=${ex.fps},${fit(ex.width, ex.height)},format=yuv420p,tpad=stop_mode=clone:stop=${picFrames},trim=end_frame=${picFrames},setpts=PTS-STARTPTS[a]`,
+      `[1:v]setpts=PTS-STARTPTS,fps=${ex.fps},${fit(ex.width, ex.height)},format=yuv420p,tpad=stop_mode=clone:stop=${oFrames},trim=end_frame=${oFrames},setpts=PTS-STARTPTS[b]`,
+      `[a][b]concat=n=2:v=1:a=0[v]`,
       `[0:a]aresample=48000,aformat=channel_layouts=stereo,apad=whole_dur=${totalS},atrim=end=${totalS},asetpts=PTS-STARTPTS[aa]`,
       `[2:a]aresample=48000,aformat=channel_layouts=stereo,apad=whole_dur=${outroS},atrim=end=${outroS},asetpts=PTS-STARTPTS[ab]`,
       `[aa][ab]concat=n=2:v=0:a=1[aout]`,
     ];
-    const finalFrames = Math.round(((totalFrames + oFrames) / fps) * ex.fps);
+    const finalFrames = picFrames + oFrames;
     fargs.push('-filter_complex', fg.join(';'), '-map', '[v]', '-map', '[aout]', ...X264(16), '-r', String(ex.fps), '-frames:v', String(finalFrames),
       ...AAC, '-metadata', 'comment=peak-media assemble: final', '-movflags', '+faststart', path.join(tmp, 'final.mp4'));
     ffmpeg(fargs, { what: 'export' });
@@ -269,9 +278,11 @@ writes out/final.mp4 = spine + outro, checked with probe-spec. Report: review/as
     out: { type: 'string', arg: 'dir', desc: 'Where review/, out/ and the outro cache go (default: the project folder)' },
     music: { type: 'string', arg: 'file', desc: 'Music bed stem, ducked under the narration' },
     sfx: { type: 'string', arg: 'file', desc: 'SFX stem, already placed on the timeline' },
-    'music-lufs': { type: 'number', arg: 'LUFS', desc: 'Music bed loudness before ducking', default: -28 },
-    'sfx-db': { type: 'number', arg: 'dB', desc: 'Gain applied to the SFX stem', default: 0 },
-    export: { type: 'string', arg: 'preset', desc: `Final export: ${Object.keys(EXPORTS).join(' | ')} (source = plates.json size and fps)`, default: 'source', choices: Object.keys(EXPORTS) },
+    'music-lufs': remuxSpec.options['music-lufs'],
+    'duck-db': remuxSpec.options['duck-db'],
+    'sfx-lufs': remuxSpec.options['sfx-lufs'],
+    'sfx-db': remuxSpec.options['sfx-db'],
+    export: { type: 'string', arg: 'preset', desc: `Final export: ${Object.keys(EXPORTS).join(' | ')} (source = plates.json size and fps; from plates below 60 fps, 1080p60 duplicates frames — set fps 60 in plates.json and re-render for true 60 fps motion)`, default: 'source', choices: Object.keys(EXPORTS) },
     'min-silence-ms': { type: 'number', arg: 'ms', desc: 'Silent gap every plate cut must sit in (DEC-13)', default: 300 },
     outro: { type: 'string', arg: 'file.mp4', desc: 'Use this pre-rendered outro instead of rendering the brand outro' },
     'rerender-outro': { type: 'boolean', desc: 'Render the brand outro even if a cached render exists' },
@@ -288,10 +299,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await runCli(spec, async ({ values, positionals: [input] }) => {
     if (!existsSync(input)) throw new CliError(`cannot read ${input}: no such file or folder`);
     if (!(values['min-silence-ms'] >= 0)) throw new CliError('--min-silence-ms must be >= 0', EXIT.USAGE);
-    if (values['music-lufs'] >= 0) throw new CliError('--music-lufs must be negative (e.g. -28)', EXIT.USAGE);
+    checkLevels(values);
     requireFfmpeg();
     const r = await assemble({ input, brand: values.brand, renders: values.renders, out: values.out, music: values.music, sfx: values.sfx,
-      musicLufs: values['music-lufs'], sfxDb: values['sfx-db'], exportPreset: values.export, minSilenceMs: values['min-silence-ms'],
+      musicLufs: values['music-lufs'], duckDb: values['duck-db'], sfxLufs: values['sfx-lufs'], sfxDb: values['sfx-db'], exportPreset: values.export, minSilenceMs: values['min-silence-ms'],
       outro: values.outro, rerenderOutro: values['rerender-outro'], log: values.json ? () => {} : (l) => process.stdout.write(`${l}\n`) });
     if (values.json) process.stdout.write(JSON.stringify(r, null, 2) + '\n');
     else process.stdout.write(`${r.final.file}\n`);

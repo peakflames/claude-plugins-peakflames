@@ -1,5 +1,5 @@
 // WP6 assembly: AC-ASM-01..05, AC-BASE-11/12. F1 plates and narration are generated per run
-// (helpers/fixtures.mjs); the brand outro is rendered once through HyperFrames and cached.
+// (helpers/fixtures.mjs); the brand outro (brand-packs/default) is rendered through HyperFrames and cached.
 // Set PEAK_MEDIA_EVIDENCE_DIR to also write the AC-ASM-05 contact sheet there.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,13 +49,15 @@ test('AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a
 
   // negative: narration that runs over the 6.5 s cut fails assembly with the timecode
   const bad = makeF1Project(path.join(tmp, 'bad'), { windows: [[200, 6700], [6800, 13500], [14200, 19500]] }).dir;
+  mkdirSync(path.join(bad, 'out'), { recursive: true });
+  writeFileSync(path.join(bad, 'out', 'final.mp4'), 'stale final from an earlier run');
   const r = run(ASSEMBLE, [bad, '--outro', first.outro.mp4]);
   assert.equal(r.code, 1, r.stdout + r.stderr);
   const lines = r.stderr.trim().split('\n');
   assert.equal(lines.length, 1, r.stderr);
   assert.match(lines[0], /0:06\.500/);
   assert.doesNotMatch(lines[0], /0:14\.000/, 'only the failing cut is named');
-  assert.ok(!existsSync(path.join(bad, 'out', 'final.mp4')), 'no final.mp4 after a failed sync check');
+  assert.ok(!existsSync(path.join(bad, 'out', 'final.mp4')), 'no final.mp4 (not even a stale one) after a failed sync check');
 });
 
 test('AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream md5 unchanged', () => {
@@ -68,7 +70,7 @@ test('AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream 
   assert.equal(md5v(out), before, 'video stream md5 (-map 0:v -c copy -f md5) unchanged');
   const lv = JSON.parse(r.stdout);
   assert.ok(Math.abs(lv.narration.lufs - -16) <= 0.5, `narration ${lv.narration.lufs} LUFS`);
-  assert.ok(lv.music.duckDb >= 6, `music ducked under voice by ${lv.music.duckDb} dB`);
+  assert.ok(lv.music.belowVoiceDb >= 6 && lv.music.belowVoiceDb <= 12, `music ${lv.music.belowVoiceDb} dB under the voice`);
   assert.ok(lv.mix.truePeakDb <= -1, `mix true peak ${lv.mix.truePeakDb} dBFS`);
   // music pass, then SFX pass: each pass re-runs from the narration-only review; the picture never changes
   const pass1 = path.join(tmp, 'remux', 'pass1-music.mp4');
@@ -81,17 +83,46 @@ test('AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream 
   const out2 = path.join(tmp, 'with-music');
   const rep = assembleJson([proj, '--music', music, '--sfx', sfx, '--out', out2, '--outro', first.outro.mp4]);
   assert.equal(md5v(path.join(out2, 'review', 'review-mix.mp4')), md5v(path.join(out2, 'review', 'review.mp4')));
-  assert.ok(rep.mix.music.duckDb >= 6);
+  assert.ok(rep.mix.music.belowVoiceDb >= 6 && rep.mix.music.belowVoiceDb <= 12);
   assert.ok(rep.final.ok);
+});
+
+// Supports the AC-ASM-06 listening gate: with the default levels the music and SFX are audible.
+test('default levels: music sits 6–12 dB under the voice (not more), rises between lines, SFX hits are audible', () => {
+  const review = path.join(proj, 'review', 'review.mp4');
+  const mixed = path.join(tmp, 'levels', 'music-only.mp4');
+  assert.equal(run(REMUX, [review, '--music', music, '-o', mixed]).code, 0);
+  // recover the music from the mix: mix minus the (unchanged, already −16 LUFS) narration
+  const est = path.join(tmp, 'levels', 'music-est.wav');
+  spawnSync('ffmpeg', ['-v', 'error', '-y', '-i', mixed, '-i', review, '-filter_complex', '[1:a]volume=-1[n];[0:a][n]amix=inputs=2:normalize=0[m]', '-map', '[m]', est]);
+  const win = (f, a, b) => {
+    const r = spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-i', f, '-map', '0:a:0', '-af', `atrim=start=${a}:end=${b},ebur128`, '-f', 'null', '-'], { encoding: 'utf8' });
+    return Number(/I:\s*(-?[\d.]+)\s*LUFS/.exec(r.stderr.slice(r.stderr.lastIndexOf('Summary:')))[1]);
+  };
+  for (const [a, b] of [[1, 5.5], [7.5, 13], [15, 19]]) { // inside the F1 clip windows
+    const below = win(review, a, b) - win(est, a, b);
+    assert.ok(below >= 6 && below <= 12, `music ${below.toFixed(1)} dB under the voice at ${a}–${b} s`);
+  }
+  const gap = win(est, 6.0, 6.7); // the 700 ms pause between clips 1 and 2 (release, then attack)
+  assert.ok(gap > win(est, 1, 5.5) + 2, `music rises between lines (${gap} LUFS)`);
+  // SFX: each hit is levelled to about −20 LUFS
+  const r = run(REMUX, [review, '--sfx', sfx, '-o', path.join(tmp, 'levels', 'sfx.mp4'), '--json']);
+  const lv = JSON.parse(r.stdout);
+  assert.ok(Math.abs(lv.sfx.lufs - -20) <= 1, `sfx hits ${lv.sfx.lufs} LUFS`);
 });
 
 test('AC-ASM-03: out/final.mp4 passes probe-spec and lasts spine + outro ±1 frame', () => {
   const final = path.join(proj, 'out', 'final.mp4');
   const r = run('lib/verify/probe-spec.mjs', [final, '--size', '1280x720', '--fps', '30', '--duration-ms', String(SPINE_MS + OUTRO_MS)]);
   assert.equal(r.code, 0, r.stdout + r.stderr);
-  // --export 1080p60: scaled and frame-rate converted, same duration
+  // --export 1080p60: scaled, outro rendered at 60 fps, 30 fps plates frame-duplicated (with a note)
   const hd = path.join(tmp, 'hd');
-  assembleJson([proj, '--export', '1080p60', '--out', hd, '--outro', first.outro.mp4]);
+  const h = assembleJson([proj, '--export', '1080p60', '--out', hd]);
+  assert.match(h.note, /duplicates frames to 60 fps/);
+  assert.equal(h.outro.source, 'render');
+  const ofps = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'csv=p=0', h.outro.mp4], { encoding: 'utf8' }).stdout.trim();
+  assert.equal(ofps, '60/1', 'outro rendered at the export fps');
+  assert.equal(first.note, undefined, 'no note for a source export');
   const r2 = run('lib/verify/probe-spec.mjs', [path.join(hd, 'out', 'final.mp4'), '--size', '1920x1080', '--fps', '60', '--duration-ms', String(SPINE_MS + OUTRO_MS)]);
   assert.equal(r2.code, 0, r2.stdout + r2.stderr);
   // second run in the same project reuses the cached outro render
@@ -122,13 +153,19 @@ test('AC-ASM-05: the final contact sheet ends on the brand outro', () => {
   assert.equal(r.code, 0, r.stderr);
   assert.ok(existsSync(sheet));
   const outro = first.outro.mp4;
+  const brandPack = JSON.parse(readFileSync(path.join(proj, 'plates.json'), 'utf8')).brand;
+  assert.ok(brandPack.endsWith(path.join('brand-packs', 'default')), `F1 uses the shipping default pack (${brandPack})`);
+  // logo and name are on screen at 21 s (the default outro holds 0.8–2.4 s, then fades out)
+  const t = thumb(final, 21000);
+  const busy = [...Array(t.length / 3).keys()].filter((i) => Math.abs(t[i * 3] - t[0]) + Math.abs(t[i * 3 + 1] - t[1]) + Math.abs(t[i * 3 + 2] - t[2]) > 60).length;
+  assert.ok(busy >= 3, `outro content visible at 21 s (${busy} non-background thumb pixels)`);
   for (const ms of [21000, 22000, 22900]) assert.ok(diff(thumb(final, ms), thumb(outro, ms - SPINE_MS)) < 6, `final at ${ms} ms shows the outro`);
   assert.ok(diff(thumb(final, 19000), thumb(outro, 2000)) > 30, 'the last plate is not the outro');
   const ev = process.env.PEAK_MEDIA_EVIDENCE_DIR;
   if (ev) {
     mkdirSync(ev, { recursive: true });
     copyFileSync(sheet, path.join(ev, 'AC-ASM-05-final-contact.jpg'));
-    writeFileSync(path.join(ev, 'AC-ASM-05-final-contact.json'), JSON.stringify({ final: 'out/final.mp4 (F1, brand-outro test pack)', spineMs: SPINE_MS, outroMs: OUTRO_MS, frames: JSON.parse(r.stdout).frames }, null, 2) + '\n');
+    writeFileSync(path.join(ev, 'AC-ASM-05-final-contact.json'), JSON.stringify({ final: 'out/final.mp4 (F1, brand-packs/default)', spineMs: SPINE_MS, outroMs: OUTRO_MS, frames: JSON.parse(r.stdout).frames }, null, 2) + '\n');
     writeFileSync(path.join(ev, 'AC-ASM-assemble-report.json'), JSON.stringify(JSON.parse(readFileSync(path.join(proj, 'review', 'assemble.json'), 'utf8')), (k, v) => (typeof v === 'string' ? v.replace(tmp, '<tmp>') : v), 2) + '\n');
   }
 });
