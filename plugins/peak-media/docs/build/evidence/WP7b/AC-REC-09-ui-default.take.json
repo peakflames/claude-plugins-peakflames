@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "kind": "beatgrid",
-  "targetMs": 14233,
-  "totalMs": 14233,
+  "targetMs": 14500,
+  "totalMs": 14500,
   "audioOffsetMs": -100,
   "command": [
     "node",
@@ -10,19 +10,19 @@
     "--storyboard",
     "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/ui-demo/storyboard.mjs",
     "--mp4",
-    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.FS3bJTjIQE/tmp/pm-capture-wp7b-zTMALh/ui-default.mp4",
+    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.Wg6zPSLG3k/tmp/pm-capture-wp7b-9oPnbF/ui-default.mp4",
     "--debug-requests",
     "--json"
   ],
   "narrate": false,
   "bpm": 60,
-  "videoMs": 14233,
-  "wallMs": 14230,
+  "videoMs": 14500,
+  "wallMs": 14498,
   "beats": [
     {
       "id": "take",
       "startMs": 0,
-      "durationMs": 14233,
+      "durationMs": 14500,
       "clipNs": [],
       "onScreenText": "A small to-do list. Type a task and press Enter. / New tasks land at the bottom of the list. / Tick a task when it is done. / Filters show what is left, or what is done. / Clear done tasks to tidy up."
     }
@@ -32,43 +32,43 @@
     {
       "n": 1,
       "text": "A small to-do list. Type a task and press Enter.",
-      "startMs": 43,
-      "durationMs": 3332
+      "startMs": 318,
+      "durationMs": 3333
     },
     {
       "n": 2,
       "text": "New tasks land at the bottom of the list.",
-      "startMs": 3380,
-      "durationMs": 2995
+      "startMs": 3650,
+      "durationMs": 3000
     },
     {
       "n": 3,
       "text": "Tick a task when it is done.",
-      "startMs": 6376,
+      "startMs": 6650,
       "durationMs": 2333
     },
     {
       "n": 4,
       "text": "Filters show what is left, or what is done.",
-      "startMs": 8713,
+      "startMs": 8983,
       "durationMs": 3000
     },
     {
       "n": 5,
       "text": "Clear done tasks to tidy up.",
-      "startMs": 11713,
+      "startMs": 11984,
       "durationMs": 2000
     }
   ],
   "x-take": {
     "mode": "captions",
     "storyboard": "../../../../../../../../Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/ui-demo/storyboard.mjs",
-    "url": "http://127.0.0.1:55137/index.html",
+    "url": "http://127.0.0.1:63923/index.html",
     "plate": null,
     "fps": 30,
     "width": 1280,
     "height": 720,
-    "frames": 427,
+    "frames": 435,
     "mp4": "ui-default.mp4",
     "captionEngine": "overlay",
     "audio": {
@@ -80,7 +80,7 @@
         "n": 1,
         "text": "A small to-do list. Type a task and press Enter.",
         "narrate": null,
-        "startMs": 42,
+        "startMs": 316,
         "durationMs": 3333,
         "caption": true
       },
@@ -88,7 +88,7 @@
         "n": 2,
         "text": "New tasks land at the bottom of the list.",
         "narrate": null,
-        "startMs": 3375,
+        "startMs": 3650,
         "durationMs": 3000,
         "caption": true
       },
@@ -96,7 +96,7 @@
         "n": 3,
         "text": "Tick a task when it is done.",
         "narrate": null,
-        "startMs": 6376,
+        "startMs": 6650,
         "durationMs": 2333,
         "caption": true
       },
@@ -104,7 +104,7 @@
         "n": 4,
         "text": "Filters show what is left, or what is done.",
         "narrate": null,
-        "startMs": 8712,
+        "startMs": 8983,
         "durationMs": 3000,
         "caption": true
       },
@@ -112,7 +112,7 @@
         "n": 5,
         "text": "Clear done tasks to tidy up.",
         "narrate": null,
-        "startMs": 11713,
+        "startMs": 11983,
         "durationMs": 2000,
         "caption": true
       }

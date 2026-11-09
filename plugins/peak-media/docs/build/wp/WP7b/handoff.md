@@ -107,3 +107,33 @@ Branch `feature/peak-media-wp7b`, based on `feature/new-peak-media-plugin` @ a9f
 - **Added — `check-take`**: checks that every scene change in a take lands in ≥ 900 ms of silence.
 - **Added — `video-capture` SKILL.md and a captioned ui-demo example**: a static to-do app with a 5-beat storyboard and an alternative caption style.
 - **Fixed — First `say()` no longer lags**: the capture warms up before t0. A watchdog aborts a take that hangs or overruns its spine window by more than 2 s (`--max-ms`).
+
+## Round 1 fixes (after verify-1; Lead decision DEC-36: showOverlay stays the default, DOM is a documented choice)
+
+- **S1 — check-take no longer passes a narrated take with zero scene changes.** It prints one line and exits 1: `FAIL  no scene changes found on a narrated take at threshold 0.02 — gradual fades score below it: lower --scene-threshold, or pass --expect-cuts 0 if the take really has none`.
+  - The new `--expect-cuts n` fails unless exactly n changes are found; `0` accepts a take that really has none.
+  - Silent and captions-only tracks still pass, with the note.
+  - AC-REC-07 now covers this with a synthetic narrated MP4 that has no change (fails as one line; passes with `--expect-cuts 0`) and with `--expect-cuts` on the deck (exact count passes, count + 1 fails).
+  - AC-BASE-10 adds `--expect-cuts -1` and `--expect-cuts 1.5` as bad input.
+- **S2 — AC-REC-06 runs alone and has no retry.**
+  - **Mechanism** (`evals/video-capture/helpers/alone.mjs`): `before()` in `captions-mux.test.mjs` waits until no other test process from the same `node --test` runner is alive (siblings by parent pid, via `ps`), so the whole WP7b file runs after every other eval file has finished.
+  - Its tests run one at a time (`concurrency: false`, which is also node:test's default within a file). `ac-run --wp WP7b` gets the same isolation.
+  - Only this file may use the gate, or two waiting files would deadlock; the header says so.
+  - The gate has a 30-minute timeout. If it ever expires, the tests run anyway and the evidence records `ranAlone.alone: false`.
+  - The test asserts **both** modes, two interleaved takes each: voice-only (`--no-captions`, so no overlay at all; this answers verifier nit N2) and captioned (default overlay engine).
+  - In the final full-suite run the gate waited 187 s for 6 sibling files, then ran alone.
+- **S3 — `--caption-engine overlay|dom`** (default `overlay`) is in `--help`, SKILL.md (flag table, plus when to choose `dom`) and storyboard-api.md. The `PEAK_MEDIA_CAPTION_ENGINE` env var is removed. `overlay` still falls back to the DOM if `showOverlay` is missing or fails, and logs it.
+- **Nits:**
+  - AC-REC-09's reproduction tolerance is now ±150 ms (was ±1 s).
+  - The `command[]` check is no longer circular. It asserts that `command[1]` is capture.mjs, and that every flag/value of the spawning invocation (`--storyboard --mp4 --caption-css --manifest --json --debug-requests`) is present with absolute paths and nothing added. It also checks that the re-run take still shows the amber `--caption-css` card.
+  - SKILL.md notes that the deck's first-`say()` warning (about +224 ms) is expected.
+
+### Results (final full-suite run, which also wrote the evidence)
+
+- `node --test plugins/peak-media/evals`: **81/81 pass** (`evidence/WP7b/evals-all.log`). A second full-suite run (no evidence): 81/81.
+- **AC-REC-06** (`evidence/WP7b/AC-REC-06-sync.json`):
+  - Voice-only: median **+17.5 ms**, worst **+18.3 ms**, first `say()` +16.6/+16.6 ms.
+  - Captioned (overlay): median **+17.6 ms**, worst **+50.0 ms**, first `say()` +16.6/+50.0 ms.
+- `ac-run --trace`: PASS — 77 ACs, 12 briefs, 0 problems.
+- `ac-run --wp WP7b`: AC-REC-05/06/07/09/10 and AC-BASE-10 `pass`; AC-REC-08 `—` (still).
+- The verifier's report (`wp/WP7b/verify-1.md`) and evidence (`*-verifier*`, `AC-*.log`) are committed with this round. The verifier's sync JSON and the stills were left untouched.

@@ -247,7 +247,8 @@ export async function planTake(values) {
 
   const captions = !values['no-captions'];
   const mode = spine ? 'spine' : captions ? 'captions' : 'silent';
-  return { values, plates, storyboard, sb, out, mp4, viewport, size, fps, captions, captionCss, spineFile, spine, window, audioOffsetMs, chrome, pwEntry, page, mode, manifest, sources, watchdogMs };
+  const captionEngineChoice = values['caption-engine'] ?? 'overlay';
+  return { values, plates, storyboard, sb, out, mp4, viewport, size, fps, captions, captionCss, captionEngine: captionEngineChoice, spineFile, spine, window, audioOffsetMs, chrome, pwEntry, page, mode, manifest, sources, watchdogMs };
 }
 
 /** Narration loudness of the --mp4 deliverable (D7). */
@@ -391,11 +392,12 @@ function encode(pattern, n, file, { fps, size, deliverable = false, audio = null
 }
 
 /**
- * Caption drawing (DEC-06): screencast.showOverlay renders into the captured frames only; if the
- * Playwright build lacks it (or PEAK_MEDIA_CAPTION_ENGINE=dom), the caption is injected into the
- * page DOM instead. show(text) resolves to an idempotent remove().
+ * Caption drawing (DEC-06, DEC-36): --caption-engine overlay (default) uses screencast.showOverlay,
+ * which renders into the captured frames only; if the Playwright build lacks it, or it fails, the
+ * caption falls back to the page DOM. --caption-engine dom injects it into the page DOM from the
+ * start. show(text) resolves to an idempotent remove().
  */
-function captionEngine(page, css) {
+function captionEngine(page, css, choice = 'overlay') {
   const html = (text) => `<style>${css}</style><div class="pm-caption-wrap"><div class="pm-caption">${esc(text)}</div></div>`;
   const dom = {
     name: 'dom',
@@ -423,8 +425,9 @@ function captionEngine(page, css) {
       return () => { if (done) return Promise.resolve(); done = true; return Promise.resolve(o?.[Symbol.asyncDispose]?.() ?? o?.dispose?.()).catch(() => {}); };
     },
   };
-  const forced = process.env.PEAK_MEDIA_CAPTION_ENGINE === 'dom';
-  const engine = { name: forced || typeof page.screencast?.showOverlay !== 'function' ? 'dom' : 'overlay' };
+  const noOverlay = typeof page.screencast?.showOverlay !== 'function';
+  if (choice === 'overlay' && noOverlay) log('this Playwright has no screencast.showOverlay; drawing captions in the page instead');
+  const engine = { name: choice === 'dom' || noOverlay ? 'dom' : 'overlay' };
   engine.show = async (text) => {
     if (engine.name === 'overlay') {
       try { return await overlay.show(text); } catch (e) {
@@ -485,7 +488,7 @@ export async function capture(plan) {
     // live sites keep laying out after 'load' (lazy diagrams, fonts); let them settle, briefly
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
 
-    const engine = captionEngine(page, captionCss);
+    const engine = captionEngine(page, captionCss, plan.captionEngine);
     await warmUp(page, engine, captions);
 
     // ---- the clock: t0 = timestamp of the first onFrame (DEC-06) ----
@@ -684,6 +687,7 @@ Storyboard API: references/storyboard-api.md.`,
     viewport: { type: 'string', arg: 'WxH', desc: 'Browser viewport (default: the plate\'s live.viewport, else 1280x720)' },
     'no-captions': { type: 'boolean', desc: 'Draw no captions (silent mode without --spine)' },
     'caption-css': { type: 'string', arg: 'file.css', desc: 'Caption style sheet (classes .pm-caption-wrap, .pm-caption) replacing the neutral default' },
+    'caption-engine': { type: 'string', arg: 'overlay|dom', choices: ['overlay', 'dom'], desc: 'How captions are drawn: overlay = screencast.showOverlay, in the captured frames only (default); dom = injected into the page (visible to page scripts; no overlay frame delays)' },
     url: { type: 'string', arg: 'url|file', desc: 'Page to load: http(s) URL or local .html file/folder (overrides the plate and storyboard)' },
     'debug-requests': { type: 'boolean', desc: 'Log every page request, failure and HTTP error to stderr' },
     'audio-offset-ms': { type: 'number', arg: 'ms', desc: 'Audio placement offset. Spine-timed: say() fires at clip start minus this (default: the spine\'s audioOffsetMs); otherwise only recorded in the take manifest (default: -100)' },

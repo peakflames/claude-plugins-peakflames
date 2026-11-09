@@ -13,16 +13,16 @@
     "--storyboard",
     "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs",
     "--mp4",
-    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.FS3bJTjIQE/tmp/pm-capture-wp7b-zTMALh/deck.mp4",
+    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.Wg6zPSLG3k/tmp/pm-capture-wp7b-9oPnbF/deck.mp4",
     "--debug-requests",
     "--spine",
-    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.FS3bJTjIQE/tmp/pm-capture-wp7b-zTMALh/deck-spine/manifest.json",
+    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.Wg6zPSLG3k/tmp/pm-capture-wp7b-9oPnbF/deck-spine/manifest.json",
     "--json"
   ],
   "narrate": true,
   "spine": "deck-spine/manifest.json",
   "videoMs": 21433,
-  "wallMs": 21470,
+  "wallMs": 21468,
   "beats": [
     {
       "id": "take",
@@ -49,7 +49,7 @@
       "x-spineBeat": "intro",
       "x-spineStartMs": 950,
       "x-sayN": 1,
-      "x-lateMs": 220
+      "x-lateMs": 222
     },
     {
       "n": 2,
@@ -79,14 +79,14 @@
       "x-spineBeat": "how",
       "x-spineStartMs": 16078,
       "x-sayN": 3,
-      "x-lateMs": 124
+      "x-lateMs": 41
     }
   ],
   "captions": [],
   "x-take": {
     "mode": "spine",
     "storyboard": "../../../../../../../../Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs",
-    "url": "http://127.0.0.1:55130/index.html",
+    "url": "http://127.0.0.1:63918/index.html",
     "plate": null,
     "fps": 30,
     "width": 1280,
@@ -103,12 +103,12 @@
         "n": 1,
         "text": "",
         "narrate": "Water your garden in the morning. It is one small habit with three good reasons.",
-        "startMs": 1170,
+        "startMs": 1172,
         "durationMs": 5455,
         "caption": false,
         "clip": 1,
         "plannedMs": 950,
-        "lateMs": 220
+        "lateMs": 222
       },
       {
         "n": 2,
@@ -125,12 +125,12 @@
         "n": 3,
         "text": "",
         "narrate": "Aim at the roots, not the leaves. Water deeply, then let the soil dry.",
-        "startMs": 16202,
+        "startMs": 16119,
         "durationMs": 5091,
         "caption": false,
         "clip": 3,
         "plannedMs": 16078,
-        "lateMs": 124
+        "lateMs": 41
       }
     ]
   }

@@ -1,0 +1,121 @@
+v26.8.1
+ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers
+✔ AC-BRD-01: brand-packs/default validates and every font has a licence file (441.689083ms)
+✔ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (18748.698042ms)
+✔ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (71960.077875ms)
+✔ AC-BRD-03: the plugin tree ships no music or other audio files (114.530125ms)
+✔ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (74756.532125ms)
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (1821.754958ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (1462.7615ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (749.117708ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (462.632125ms)
+✔ validate: cross-reference checks (not AC-bound) (2351.316583ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (163.610167ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (187.872917ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (35451.88575ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (47039.551541ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (14.051417ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (528.159083ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (239.570292ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (183.842958ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (789.673958ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (971.507333ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (140.976416ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (153.02125ms)
+✔ AC-BASE-03: contact-sheet baseline (921.30825ms)
+✔ AC-BASE-04: probe-spec baseline (982.916ms)
+✔ AC-BASE-05: check-cuts baseline (335.464917ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (1169.428334ms)
+✔ AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a ≥300 ms silent gap (11737.2885ms)
+✔ AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream md5 unchanged (21352.921666ms)
+✔ default levels: music sits 9–15 dB under the voice, rises between lines, SFX hits are audible (5002.272708ms)
+✔ AC-ASM-03: out/final.mp4 passes probe-spec and lasts spine + outro ±1 frame (77263.737375ms)
+✔ AC-ASM-04: no music supplied — assembly succeeds with narration only (and a beat grid gets a silent track) (13801.660667ms)
+✔ AC-ASM-05: the final contact sheet ends on the brand outro (3021.465916ms)
+✔ AC-BASE-11: assemble --help lists every flag, --version = plugin.json, bad input is one line with no stack (597.701292ms)
+✔ AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, bad input is one line with no stack (658.720125ms)
+✔ AC-BASE-10: check-take --help lists every flag, --version = plugin.json, bad input is one actionable line, no network (1569.464375ms)
+✔ AC-REC-05: the --mp4 deliverable passes probe-spec (H.264 High, yuv420p, AAC 48 kHz, faststart), narrated at -16 LUFS, otherwise silent AAC (45377.199334ms)
+✔ AC-REC-06: on a sync page that flips a full-frame colour on each say(), with fake tones, the median offset is <= 120 ms and the worst <= 200 ms (95362.918042ms)
+ℹ attempt 1 failed (worst 251.6 ms: 16.6, 16.6, 17.3, 17.3, 17.6, 17.6, 18, 18, 50.3, 50.3, 151.6, 251.6); measuring again
+✔ AC-REC-07: on the narrated example deck, every scene change (threshold 0.02) lands inside silence (-40 dB, >= 900 ms) (4676.859417ms)
+✔ AC-REC-08: ui-demo stills inside each say() window show the caption; --no-captions shows none; --caption-css changes the style (37196.582541ms)
+✔ AC-REC-09: the take manifest validates against the v1 spine schema and command[] reproduces the take (16425.779125ms)
+✔ AC-REC-10: with no key, the captions-only example passes with 0 OpenRouter calls (461.121459ms)
+✔ watchdog: a hanging storyboard is aborted at --max-ms with one line and the process exits (4151.756916ms)
+✔ watchdog: a spine-timed take that overruns its window by more than 2 s is aborted (17316.397291ms)
+✔ captions: the injected-DOM fallback draws the caption when showOverlay is not used (3300.478292ms)
+✔ AC-BASE-09: capture --help lists every flag, --version = plugin.json, bad input is one actionable line, no network (775.248583ms)
+✔ AC-REC-01: --help lists the recorder flags and no narration flags; each flag parses (2462.279333ms)
+✔ AC-REC-02: missing Chromium, missing ffmpeg or a bad --spine exit non-zero in < 2 s with no browser launch (7351.648ms)
+✔ AC-REC-03: the example deck storyboard (original loop) runs unmodified in silent, captions and spine-timed modes (79355.475875ms)
+✔ AC-REC-04: F3 live plates on a 3-clip spine capture to their planned durations ±1 frame (30459.095208ms)
+✔ AC-REC-04: the frame grid places frames by their own timestamps (t0 = first onFrame) and fills to an exact count (26.855375ms)
+✔ layout: motion close plate keeps display text >= 56 px and wraps its long line instead of shrinking (667.851875ms)
+✔ layout: settled motion text block is centred in the frame within 2% both ways (433.814375ms)
+✔ layout: the last table row (and last bullet) has settled by 60% of the slide plate (951.224458ms)
+✔ layout: slide body stays inside the content box and nothing reaches the footer (2110.672458ms)
+✔ AC-BASE-08: render-plate --help/--version/bad input follow the baseline (4101.607ms)
+✔ AC-BASE-08: a live plate named explicitly is refused with a pointer to video-capture (182.525125ms)
+✔ AC-BASE-08: --all skips live plates (they belong to video-capture) (422.612167ms)
+✔ AC-PLT-01: every F1 plate renders alone to durationMs ±1 frame (94763.200625ms)
+✔ AC-PLT-01: a hand-authored index.html is kept; brand/ and vendor/ are refreshed (1722.391541ms)
+✔ AC-PLT-01: an over-long motion line wraps inside the frame (no edge overflow) (15510.5595ms)
+✔ AC-PLT-01: text that cannot fit at the 27 px floor fails fast with one line naming the plate (155.440666ms)
+✔ AC-PLT-04: every F1 and F2 plate passes hyperframes lint and check --strict (43095.947458ms)
+✔ AC-VND-01: every path listed in vendored-map.md exists (4.242917ms)
+✔ AC-VND-01: every vendor folder is referenced by vendored-map.md (no orphans) (4.450667ms)
+✔ AC-VND-01: the map tells the agent to Read runtimes.md before the first plate (5.032791ms)
+✔ AC-VND-02: no `hyperframes events` telemetry line anywhere in the vendor tree; LICENSE is present (8.773125ms)
+✔ AC-VND-02: vendored skills are references, not registered skills (no SKILL.md under vendor/) (1.256958ms)
+✔ AC-SPN-01: F1 brief → script → spine with fake/tone; manifest.totalMs within 20 s ±10% and validates (595.620792ms)
+✔ AC-SPN-02: F1 with the key unset → beatgrid.json validates, 0 OpenRouter calls, runtime within ±10% (399.028542ms)
+✔ AC-SPN-03: F1 manifest gaps between beats are ≥ 400 ms and check-cuts passes at every beat boundary (119.473209ms)
+✔ AC-BASE-06: spine baseline (help lists every flag, version, one-line errors, no stack, no network) (1780.284125ms)
+✔ spine: script.md parsing, layout rules and a second (neutral) brief (not AC-bound) (179.568417ms)
+✔ openrouter: sample rate read from the response content-type, table as fallback (not AC-bound) (36.005042ms)
+✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (266.457625ms)
+ℹ --voice Nope: exit 2 in 100 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+ℹ key unset: exit 3 in 96 ms — sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)
+ℹ ffmpeg missing: exit 3 in 68 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (0.942916ms)
+ℹ 9/9 legacy clip keys match (model google/gemini-3.8-flash-lite-tts, voice Rasalgethi)
+✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (167.57525ms)
+ℹ lib: clip reused from pm-tts-legacy-4Xyk7C/…/tts, calls=0, 1234 ms
+ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.ytaDEY6zXd/pm-tts-legacy-out-PewYt6/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached
+✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (53.738666ms)
+ℹ run1 calls=3, run2 calls=0 (3/3 cached), from export calls=0 (3/3 cached)
+ℹ 
+clip  words   sec  wpm  cached
+----  -----  ----  ---  ------
+1        19  6.91  165     yes
+2        25  9.09  165     yes
+3        21  7.64  165     yes
+median 165 wpm · 3/3 cached
+✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (46.910166ms)
+ℹ 
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        19   6.91  165      no
+2        25  18.18   82      no
+3        21   7.64  165      no
+median 165 wpm · 0/3 cached
+WARN slow clip 2: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (690.413834ms)
+ℹ 
+Achird   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.ytaDEY6zXd/pm-tts-sv-XxbLKY/samples/Achird.wav
+Kore     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.ytaDEY6zXd/pm-tts-sv-XxbLKY/samples/Kore.wav
+Puck     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.ytaDEY6zXd/pm-tts-sv-XxbLKY/samples/Puck.wav
+google/gemini-3.8-flash-lite-tts · median 170 wpm · 0/3 cached
+[debug-requests] {"request":{"method":"POST","url":"https://openrouter.ai/api/v1/audio/speech","headers":{"Authorization":"Bearer ***REDACTED***","Content-Type":"application/json"},"body":{"model":"google/gemini-3.8-flash-lite-tts","input":"Here is a short paragraph for comparing narrators. It has a question, a list of three things, and a closing line. Which voice sounds most like the video you have in mind?","voice":"Achird","response_format":"pcm","provider":{"zdr":true},"instructions":"Clear, friendly, unhurried explainer tone."}}}
+✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (119.532083ms)
+ℹ ffprobe: pcm_s16le 24000 Hz 1 ch, 3529 ms, 169456 bytes
+✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (382.280917ms)
+ℹ tests 81
+ℹ suites 0
+ℹ pass 81
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 226193.920166

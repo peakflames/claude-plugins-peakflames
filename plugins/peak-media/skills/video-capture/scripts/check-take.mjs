@@ -27,7 +27,17 @@ export function checkTake(file, opts = {}) {
   // one silence spanning the whole file means no narration (a silent or captions-only take)
   const s = silences(file, { noiseDb: o.noiseDb }).intervals;
   const silentTrack = s.length === 1 && s[0].startMs <= 1 && s[0].endMs >= r.durMs - 1;
-  return { ...r, threshold: o.threshold, noiseDb: o.noiseDb, silentTrack };
+  const out = { ...r, threshold: o.threshold, noiseDb: o.noiseDb, silentTrack };
+  if (o.expectCuts !== undefined && r.cuts.length !== o.expectCuts) {
+    out.ok = false;
+    out.error = `expected ${o.expectCuts} scene change(s), found ${r.cuts.length} at threshold ${o.threshold}`;
+  } else if (o.expectCuts === undefined && !silentTrack && r.cuts.length === 0) {
+    // on a narrated take, no change at all is almost always a missed detection: a fade of
+    // ~300 ms or more spreads the change so no single frame scores above the threshold
+    out.ok = false;
+    out.error = `no scene changes found on a narrated take at threshold ${o.threshold} — gradual fades score below it: lower --scene-threshold, or pass --expect-cuts 0 if the take really has none`;
+  }
+  return out;
 }
 
 export const spec = {
@@ -40,12 +50,15 @@ lies inside a silence of the audio (at or below --noise-db, lasting at least --m
 --edge-ms clear on both sides). Defaults are the recorder's (web2video D9, DEC-13): 0.02, -40 dB,
 900 ms, 100 ms. Pass the --mp4 deliverable from capture: the picture-only --out has no audio.
 A silent or captions-only take has a silent track, so every change passes; the report says so.
+A narrated take with no scene change at all fails: gradual fades (about 300 ms or longer) score
+under the threshold, so lower --scene-threshold, or pass --expect-cuts 0 if it really has none.
 Exit 0 if every scene change passes, 1 if any fails (its timecode is listed).`,
   options: {
     'min-silence-ms': { type: 'number', arg: 'ms', desc: 'Shortest silence a scene change may sit in', default: TAKE_DEFAULTS.minSilenceMs },
     'scene-threshold': { type: 'number', arg: '0..1', desc: 'Scene-change threshold (ffmpeg scene score)', default: TAKE_DEFAULTS.threshold },
     'noise-db': { type: 'number', arg: 'dB', desc: 'Silence threshold (negative, e.g. --noise-db -40)', default: TAKE_DEFAULTS.noiseDb },
     'edge-ms': { type: 'number', arg: 'ms', desc: 'Distance a scene change must keep from either edge of its silence', default: TAKE_DEFAULTS.edgeMs },
+    'expect-cuts': { type: 'number', arg: 'n', desc: 'Fail unless exactly n scene changes are found (--expect-cuts 0 accepts a narrated take with none)' },
     json: { type: 'boolean', desc: 'Print the result as JSON' },
   },
   positionals: { min: 1, max: 1 },
@@ -63,11 +76,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (values['min-silence-ms'] < 0) throw usageError(`--min-silence-ms must be >= 0, got ${values['min-silence-ms']}`);
     if (values['edge-ms'] < 0) throw usageError(`--edge-ms must be >= 0, got ${values['edge-ms']}`);
     if (values['noise-db'] >= 0) throw usageError(`--noise-db must be negative (dBFS), got ${values['noise-db']}`);
+    const expect = values['expect-cuts'];
+    if (expect !== undefined && !(Number.isInteger(expect) && expect >= 0)) throw usageError(`--expect-cuts must be a whole number >= 0, got ${expect}`);
     requireFfmpeg();
-    const r = checkTake(path.resolve(file), { minSilenceMs: values['min-silence-ms'], threshold: th, noiseDb: values['noise-db'], edgeMs: values['edge-ms'] });
+    const r = checkTake(path.resolve(file), { minSilenceMs: values['min-silence-ms'], threshold: th, noiseDb: values['noise-db'], edgeMs: values['edge-ms'], expectCuts: expect });
     if (values.json) { process.stdout.write(JSON.stringify(r, null, 2) + '\n'); return r.ok ? EXIT.OK : EXIT.FAIL; }
+    if (r.error && !r.cuts.length) { process.stdout.write(`FAIL  ${r.error} — ${file}\n`); return EXIT.FAIL; }
     if (!r.cuts.length) process.stdout.write('note  no scene changes found\n');
     if (r.silentTrack) process.stdout.write('note  the audio is silent for the whole take (silent or captions-only): every scene change passes\n');
+    if (r.error) process.stdout.write(`FAIL  ${r.error}\n`);
     for (const c of r.cuts) {
       process.stdout.write(`${c.ok ? 'ok  ' : 'FAIL'}  scene change at ${c.timecode} — ${c.gap ? `silence ${c.silenceMs} ms` : 'over sound'}${c.ok ? '' : c.edge ? ` (within ${r.edgeMs} ms of the silence edge)` : c.gap ? ` (need ≥ ${r.minSilenceMs} ms)` : ' (move it into a pause between clips)'}\n`);
     }

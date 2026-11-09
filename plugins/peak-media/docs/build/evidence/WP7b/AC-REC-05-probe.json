@@ -120,8 +120,8 @@
       {
         "name": "duration (±1 frame)",
         "ok": true,
-        "expected": "14233 ms",
-        "actual": "14233 ms"
+        "expected": "14500 ms",
+        "actual": "14500 ms"
       }
     ]
   },

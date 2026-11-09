@@ -72,6 +72,7 @@ Not for designed motion graphics, kinetic text or slides you are building from s
 | `--viewport WxH` | Browser size (default 1280x720, or the plate's) |
 | `--no-captions` | No captions (silent mode) |
 | `--caption-css <file.css>` | Replace the caption style (`.pm-caption-wrap`, `.pm-caption`) |
+| `--caption-engine overlay\|dom` | Draw captions into the frames only (`overlay`, default) or into the page DOM (`dom`) |
 | `--spine <manifest.json>` | Spine-timed mode: `say()` plays to the spine's clips |
 | `--plates <plates.json> --plate <id>` | Capture one live plate to its planned window |
 | `--audio-offset-ms <ms>` | Shift between picture and voice (spine-timed: `say()` fires at clip start minus this) |
@@ -83,9 +84,14 @@ Not for designed motion graphics, kinetic text or slides you are building from s
 
 ## Captions
 
-- On by default: a neutral bottom-centre, semi-opaque dark bar in the system sans font, drawn into
-  the captured frames with Playwright's `screencast.showOverlay` (the page DOM is untouched; if
-  `showOverlay` is unavailable the caption is injected into the page instead).
+- On by default: a neutral bottom-centre, semi-opaque dark bar in the system sans font.
+- `--caption-engine overlay` (default) draws it into the captured frames with Playwright's
+  `screencast.showOverlay`; the page DOM is untouched. If `showOverlay` is unavailable, the caption
+  falls back to the page DOM. Rarely, a page change made at the same moment as a caption appears
+  reaches the frames up to ~200 ms late.
+- `--caption-engine dom` injects the caption into the page instead. Choose it for sync-critical
+  takes (a picture change on the same beat as a caption), when the page doesn't react to extra DOM
+  (no MutationObserver-driven layout, no full-page screenshots of its own).
 - `--caption-css` restyles it for a brand; `examples/ui-demo/captions-alt.css` shows the classes.
   A brand pack's `captionCss` is the file to pass.
 - Hold time: about 3 words/s, at least 1.5 s (captions/silent modes), or to the clip's end
@@ -98,7 +104,10 @@ Not for designed motion graphics, kinetic text or slides you are building from s
   deliverable; the picture-only `--out` has no audio and is refused. A captions-only take's track
   is silent, so it always passes and says so. A failing timecode means a slide or page changed
   over speech: move the change between beats, or give the spine longer lead-ins
-  (`spine --lead-ms …`; the deck loop needs about 950 ms).
+  (`spine --lead-ms …`; the deck loop needs about 950 ms). A narrated take with **no** detected
+  change fails too: fades of ~300 ms or longer score under 0.02 per frame. Shorten the transitions
+  or lower `--scene-threshold`; `--expect-cuts n` pins the expected count (`0` for a take that
+  really has none).
 - **probe-spec** (`lib/verify/probe-spec.mjs out/demo.mp4 --size 1280x720`) confirms the delivery
   spec.
 - **The take summary** reports any `say()` that started after its clip; a few hundred ms in a deck
@@ -121,5 +130,8 @@ Not for designed motion graphics, kinetic text or slides you are building from s
 - `examples/deck/` — a neutral 3-slide deck and the original deck loop; runs unchanged in all
   three modes. Narrated: `spine --brief examples/deck/brief.md --tts-model fake/tone --lead-ms 950 --out /tmp/deck-spine`,
   then `capture --storyboard examples/deck/storyboard.mjs --spine /tmp/deck-spine/manifest.json --mp4 /tmp/deck.mp4`.
+  Expect `1 say() call(s) started after their clip: #1 +224 ms` (about): the loop waits 1150 ms
+  before its first `say()` and the first clip starts at 950 ms. The voice stays at its spine time;
+  only the first slide's picture is that much later. The warning is harmless here.
 - `examples/ui-demo/` — a small static to-do app and a captioned storyboard (5 beats, about 14 s).
   No key: `capture --storyboard examples/ui-demo/storyboard.mjs --mp4 /tmp/ui-demo.mp4`.

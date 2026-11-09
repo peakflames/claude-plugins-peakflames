@@ -74,7 +74,8 @@ overlap the beat, such as a slide change.
 ## Captions
 
 Captions are drawn with Playwright's `page.screencast.showOverlay`, which renders into the
-captured frames only (the page's DOM is untouched). If the Playwright build has no `showOverlay`,
+captured frames only (the page's DOM is untouched); `--caption-engine dom` injects them into the
+page instead (see SKILL.md for when). If the Playwright build has no `showOverlay`,
 or it fails, the caption is injected into the page DOM instead, with the same classes and style.
 
 - **Default style:** neutral: a bottom-centre, semi-opaque dark bar with white system sans text.

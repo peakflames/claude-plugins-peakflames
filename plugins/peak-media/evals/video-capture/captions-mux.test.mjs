@@ -1,10 +1,15 @@
 // video-capture (WP7b): captions, the --mp4 mux, the take manifest, check-take, the ui-demo and
 // the A/V sync test. Pages are served on 127.0.0.1 — no internet. Spines come from spine.mjs with
 // fake/tone and a temp TTS cache, with both key variables unset.
-// Run alone: captures are real time and the sync test (AC-REC-06) is timing-sensitive.
+// Run alone (AC-REC-06): captures are real time and the sync test is timing-sensitive. Under
+// `node --test plugins/peak-media/evals` the files run in parallel child processes, so before()
+// waits (helpers/alone.mjs) until every other eval file has finished; the tests in this file then
+// run one after another (node:test runs a file's top-level tests serially; concurrency: false is
+// set explicitly below). ac-run --wp WP7b gets the same isolation. This must stay the only file
+// that uses the run-alone gate.
 //
 // Set PEAK_MEDIA_EVIDENCE_DIR to keep the stills, measurements and manifests (JPEG/JSON only).
-import { test, before, after } from 'node:test';
+import { test as nodeTest, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, statSync, mkdirSync, copyFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -13,6 +18,7 @@ import path from 'node:path';
 import { ROOT, run, baseline } from '../helpers/run.mjs';
 import { CAPTURE, SPINE, DECK, NO_KEY } from './helpers/projects.mjs';
 import { measureSync } from './helpers/sync.mjs';
+import { waitUntilAlone } from './helpers/alone.mjs';
 import { COLOURS } from './fixtures/sync/storyboard.mjs';
 import { CAPTIONS } from '../../skills/video-capture/examples/ui-demo/storyboard.mjs';
 import { spec as checkTakeSpec } from '../../skills/video-capture/scripts/check-take.mjs';
@@ -31,8 +37,12 @@ const EVIDENCE = process.env.PEAK_MEDIA_EVIDENCE_DIR;
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
 
-let tmp, cache;
-before(() => {
+const test = (name, fn) => nodeTest(name, { concurrency: false }, fn);
+
+let tmp, cache, alone;
+before(async () => {
+  alone = await waitUntilAlone();
+  if (!alone.alone) process.stderr.write(`warning: other eval files still running after ${alone.waitedMs} ms; timing tests run anyway\n`);
   tmp = mkdtempSync(path.join(os.tmpdir(), 'pm-capture-wp7b-'));
   cache = path.join(tmp, 'tts-cache');
   if (EVIDENCE) mkdirSync(EVIDENCE, { recursive: true });
@@ -98,9 +108,10 @@ const ui = {
 };
 
 const syncSpine = memo(() => buildSpine(path.join(SYNC, 'brief.md'), 'sync-spine'));
-function syncTake(captioned) {
-  const mp4 = path.join(tmp, `sync-${captioned ? 'captions' : 'voice'}.mp4`);
-  const { take } = capture(['--storyboard', path.join(SYNC, 'storyboard.mjs'), '--spine', syncSpine().file, '--mp4', mp4, '--audio-offset-ms', '0'],
+/** A sync take: voice-only (--no-captions: no overlay at all) or captioned (the default overlay engine). */
+function syncTake(captioned, i = 1) {
+  const mp4 = path.join(tmp, `sync-${captioned ? 'captions' : 'voice'}-${i}.mp4`);
+  const { take } = capture(['--storyboard', path.join(SYNC, 'storyboard.mjs'), '--spine', syncSpine().file, '--mp4', mp4, '--audio-offset-ms', '0', ...(captioned ? [] : ['--no-captions'])],
     { extraEnv: { PEAK_MEDIA_SYNC_CAPTIONS: captioned ? '1' : '0' } });
   return { mp4, take };
 }
@@ -158,6 +169,8 @@ test('AC-BASE-10: check-take --help lists every flag, --version = plugin.json, b
       ['--noise-db', '6', noAudio],                    // positive dB
       ['--min-silence-ms', 'long', noAudio],           // not a number
       [noAudio, noAudio],                              // two takes
+      ['--expect-cuts', '-1', noAudio],                // negative count
+      ['--expect-cuts', '1.5', noAudio],               // not a whole number
     ],
   });
   const missing = run(CHECK_TAKE, [path.join(tmp, 'missing.mp4')]);
@@ -185,18 +198,16 @@ test('AC-REC-05: the --mp4 deliverable passes probe-spec (H.264 High, yuv420p, A
   keep('AC-REC-05-probe.json', { results, narratedLufs: lufs, captionsOnlyLufs: null });
 });
 
-test('AC-REC-06: on a sync page that flips a full-frame colour on each say(), with fake tones, the median offset is <= 120 ms and the worst <= 200 ms', (t) => {
-  // Asserted: two voice-only takes (say("", {narrate}), as a narrated deck speaks). Also measured
-  // and kept as information: one take with showOverlay captions drawn on each say(), where a rare
-  // flip has been seen to lag ~150–220 ms (see the WP7b handoff).
-  // The AC is "run alone". Under `node --test` of the whole evals folder other files render in
-  // parallel and a frame can arrive late; a failing first attempt is kept in the evidence and the
-  // voice-only pair is measured once more. Both attempts are reported.
-  const measure = (captioned) => {
-    const { mp4, take } = syncTake(captioned);
+test('AC-REC-06: on a sync page that flips a full-frame colour on each say(), with fake tones, the median offset is <= 120 ms and the worst <= 200 ms', () => {
+  // Both modes are asserted, two takes each (12 flips per mode): voice-only (--no-captions, as a
+  // narrated deck speaks) and captioned (each line drawn with the default showOverlay engine).
+  // No retry: the file runs alone (see the header), so one measurement is the result.
+  const measure = (captioned, i) => {
+    const { mp4, take } = syncTake(captioned, i);
     if (!captioned) syncMp4 = mp4;
     assert.equal(take.says.length, COLOURS.length);
     assert.equal(take.audio.clips, COLOURS.length, 'every tone is laid');
+    assert.equal(take.captionEngine, captioned ? 'overlay' : null);
     const m = measureSync(mp4, COLOURS, FPS);
     assert.equal(m.onsets.length, COLOURS.length, `one tone onset per say(): ${m.onsets}`);
     for (const row of m.rows) assert.ok(row.offsetMs !== null, `colour ${row.name} appears`);
@@ -206,28 +217,20 @@ test('AC-REC-06: on a sync page that flips a full-frame colour on each say(), wi
     const all = rs.flatMap((r) => r.rows.map((x) => x.offsetMs)).sort((a, b) => a - b);
     const median = all.length % 2 ? all[(all.length - 1) / 2] : (all[all.length / 2 - 1] + all[all.length / 2]) / 2;
     const worst = all.reduce((w, x) => (Math.abs(x) > Math.abs(w) ? x : w), 0);
-    return { all, median, worst, firstSay: rs.map((r) => r.rows[0].offsetMs) };
+    return { median, worst, firstSay: rs.map((r) => r.rows[0].offsetMs), offsets: all };
   };
-  const pass = (s) => Math.abs(s.median) <= 120 && Math.abs(s.worst) <= 200;
-  const attempts = [[measure(false), measure(false)]];
-  if (!pass(stats(attempts[0]))) {
-    t.diagnostic(`attempt 1 failed (worst ${stats(attempts[0]).worst} ms: ${stats(attempts[0]).all.join(', ')}); measuring again`);
-    attempts.push([measure(false), measure(false)]);
-  }
-  const captionedRun = measure(true);
-  const asserted = stats(attempts.at(-1));
-  const captioned = stats([captionedRun]);
-  const { all, median, worst } = asserted;
+  const runs = [measure(false, 1), measure(true, 1), measure(false, 2), measure(true, 2)]; // interleaved
+  const modes = { voiceOnly: stats(runs.filter((r) => !r.captions)), captioned: stats(runs.filter((r) => r.captions)) };
   keep('AC-REC-06-sync.json', {
-    note: 'offsetMs = first frame of the colour - tone onset (picture lags sound when > 0); each frame time carries up to ±16.7 ms (½ frame) of grid rounding. Asserted: the two voice-only takes of the last attempt. Information only: the captioned take.',
-    asserted: { attempt: attempts.length, median, worst, firstSay: asserted.firstSay, offsets: all },
-    ...(attempts.length > 1 && { failedFirstAttempt: (({ median: m, worst: w, all: a }) => ({ median: m, worst: w, offsets: a }))(stats(attempts[0])) }),
-    captionedInfo: { median: captioned.median, worst: captioned.worst, firstSay: captioned.firstSay, offsets: captioned.all },
-    runs: [...attempts.flat(), captionedRun],
+    note: 'offsetMs = first frame of the colour - tone onset (picture lags sound when > 0); each frame time carries up to ±16.7 ms (½ frame) of grid rounding. Both modes asserted; no retry.',
+    ranAlone: alone, ...modes, runs,
   });
-  assert.ok(Math.abs(median) <= 120, `median offset ${median} ms <= 120 ms (${all.join(', ')})`);
-  assert.ok(Math.abs(worst) <= 200, `worst offset ${worst} ms <= 200 ms (${all.join(', ')})`);
+  for (const [mode, s] of Object.entries(modes)) {
+    assert.ok(Math.abs(s.median) <= 120, `${mode}: median offset ${s.median} ms <= 120 ms (${s.offsets.join(', ')})`);
+    assert.ok(Math.abs(s.worst) <= 200, `${mode}: worst offset ${s.worst} ms <= 200 ms (${s.offsets.join(', ')})`);
+  }
 });
+
 
 test('AC-REC-07: on the narrated example deck, every scene change (threshold 0.02) lands inside silence (-40 dB, >= 900 ms)', () => {
   const { mp4, spine } = deck();
@@ -250,7 +253,23 @@ test('AC-REC-07: on the narrated example deck, every scene change (threshold 0.0
   assert.equal(ctl.code, 1, 'a take that changes picture over speech fails');
   const bad = JSON.parse(ctl.stdout).cuts.filter((c) => !c.ok);
   assert.ok(bad.length >= COLOURS.length - 1, `the flips over sound are reported (${bad.map((c) => c.timecode)})`);
-  keep('AC-REC-07-check-take.json', { deck: res, control: { ok: false, failing: bad.map((c) => ({ timecode: c.timecode, gap: c.gap })) } });
+  // --expect-cuts: the deck has exactly as many detected changes as reported, not one more
+  assert.equal(run(CHECK_TAKE, [mp4, '--expect-cuts', String(res.cuts.length)]).code, 0);
+  const more = run(CHECK_TAKE, [mp4, '--expect-cuts', String(res.cuts.length + 1)]);
+  assert.equal(more.code, 1);
+  assert.match(more.stdout, /FAIL {2}expected \d+ scene change\(s\), found \d+/);
+  // guard: a narrated take with NO detected change (e.g. slow fades) must not pass silently
+  const flat = path.join(tmp, 'narrated-no-change.mp4');
+  const g = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x336699:s=320x240:r=30:d=4',
+    '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=4', '-af', 'volume=enable=between(t\\,1.5\\,2.6):volume=0',
+    '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', flat]);
+  assert.equal(g.status, 0, String(g.stderr));
+  const none = run(CHECK_TAKE, [flat]);
+  assert.equal(none.code, 1, `zero scene changes on a narrated take fails: ${none.stdout}`);
+  assert.equal(none.stdout.trim().split('\n').length, 1, 'one line');
+  assert.match(none.stdout, /^FAIL {2}no scene changes found on a narrated take .*lower --scene-threshold, or pass --expect-cuts 0/);
+  assert.equal(run(CHECK_TAKE, [flat, '--expect-cuts', '0']).code, 0, '--expect-cuts 0 accepts it');
+  keep('AC-REC-07-check-take.json', { deck: res, control: { ok: false, failing: bad.map((c) => ({ timecode: c.timecode, gap: c.gap })) }, noChangeGuard: none.stdout.trim() });
 });
 
 test('AC-REC-08: ui-demo stills inside each say() window show the caption; --no-captions shows none; --caption-css changes the style', () => {
@@ -321,7 +340,17 @@ test('AC-REC-09: the take manifest validates against the v1 spine schema and com
   const doc = docs['ui-caption-css'];
   const [bin, ...args] = doc.command;
   assert.equal(bin, 'node');
+  assert.equal(args[0], path.join(ROOT, CAPTURE), 'command[1] is the capture entry point');
   const mp4 = ui['caption-css']().mp4;
+  // not circular: command[] must carry every flag of the invocation that made the take (as spawned
+  // by capture() above), with paths absolute
+  const given = [['--storyboard', UI_STORYBOARD], ['--mp4', mp4], ['--caption-css', UI_ALT_CSS], ['--manifest', manifests['ui-caption-css']], ['--json'], ['--debug-requests']];
+  for (const [flag, value] of given) {
+    const i = args.indexOf(flag);
+    assert.ok(i > 0, `command[] has ${flag}`);
+    if (value !== undefined) assert.equal(args[i + 1], value, `command[] keeps ${flag} ${value}`);
+  }
+  assert.equal(args.filter((a) => a.startsWith('--')).length, given.length, `command[] adds no flag that wasn't given: ${args.join(' ')}`);
   const before = statSync(mp4).mtimeMs;
   const again = spawnSync(process.execPath, args, { encoding: 'utf8', cwd: os.tmpdir(), env: { ...process.env, ...env() } });
   assert.equal(again.status, 0, again.stderr);
@@ -331,9 +360,12 @@ test('AC-REC-09: the take manifest validates against the v1 spine schema and com
   assert.deepEqual(re.command, doc.command, 'same command');
   assert.equal(re['x-take'].mode, doc['x-take'].mode);
   assert.deepEqual(re.captions.map((c) => c.text), doc.captions.map((c) => c.text), 'same captions');
-  // a real-time take repeats to within page/CPU jitter (more when other evals run alongside)
-  assert.ok(Math.abs(re.videoMs - doc.videoMs) <= 1000, `same length within real-time jitter (${re.videoMs} vs ${doc.videoMs} ms)`);
-  re.captions.forEach((c, i) => assert.ok(Math.abs(c.startMs - doc.captions[i].startMs) <= 1000, `caption ${c.n} at the same time ±1 s (${c.startMs} vs ${doc.captions[i].startMs})`));
+  // a real-time take (run alone) repeats to within page jitter
+  assert.ok(Math.abs(re.videoMs - doc.videoMs) <= 150, `same length ±150 ms (${re.videoMs} vs ${doc.videoMs} ms)`);
+  re.captions.forEach((c, i) => assert.ok(Math.abs(c.startMs - doc.captions[i].startMs) <= 150, `caption ${c.n} at the same time ±150 ms (${c.startMs} vs ${doc.captions[i].startMs})`));
+  // and it looks the same: the re-run still draws the --caption-css amber card
+  const mid = re.captions[0].startMs + re.captions[0].durationMs / 2;
+  assert.ok(band(mp4, Math.round(mid)).amber >= 100, 'the re-run take carries the restyled caption');
   keep('AC-REC-09-deck.take.json', n);
   keep('AC-REC-09-ui-default.take.json', docs['ui-default']);
   keep('AC-REC-09-reproduce.json', { command: doc.command, first: { videoMs: doc.videoMs, captions: doc.captions }, second: { videoMs: re.videoMs, captions: re.captions } });
@@ -382,11 +414,11 @@ test('watchdog: a spine-timed take that overruns its window by more than 2 s is 
   assert.ok(ms < spine.doc.totalMs + 2000 + 15000, `aborted near window + 2 s (${ms} ms for a ${spine.doc.totalMs} ms spine)`);
 });
 
-test('captions: the injected-DOM fallback draws the caption when showOverlay is not used', () => {
+test('captions: --caption-engine dom draws the caption in the page instead of showOverlay', () => {
   const sb = path.join(tmp, 'dom-caption.mjs');
   writeFileSync(sb, "export default async ({ say, waitForVoice }) => { await say('Drawn in the page instead'); await waitForVoice(); };\n");
   const mp4 = path.join(tmp, 'dom-caption.mp4');
-  const { take } = capture(['--storyboard', sb, '--url', path.join(UI, 'index.html'), '--mp4', mp4], { extraEnv: { PEAK_MEDIA_CAPTION_ENGINE: 'dom' } });
+  const { take } = capture(['--storyboard', sb, '--url', path.join(UI, 'index.html'), '--mp4', mp4, '--caption-engine', 'dom']);
   assert.equal(take.captionEngine, 'dom');
   const c = take.captionTimings[0];
   const s = band(mp4, Math.round(c.startMs + c.durationMs / 2));
