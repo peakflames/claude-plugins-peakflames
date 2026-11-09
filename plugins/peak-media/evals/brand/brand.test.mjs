@@ -116,14 +116,16 @@ function plateOneFixture() {
 test('AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5)', () => {
   const { dir, plate } = plateOneFixture();
   const outs = {};
+  // evidence files are written only when asked (PEAK_MEDIA_EVIDENCE=1), so a normal test run leaves the tree clean
+  const sheetDir = process.env.PEAK_MEDIA_EVIDENCE ? EVIDENCE : mkdtempSync(path.join(os.tmpdir(), 'pm-brd02-sheets-'));
   for (const [name, pack] of [['default', DEFAULT], ['alt', ALT]]) {
     const out = mkdtempSync(path.join(os.tmpdir(), `pm-brd02-${name}-`));
     const r = run(SKEL, ['--fixture', dir, '--brand', pack, '--out', out], { env: NO_KEY });
     assert.equal(r.code, 0, r.stderr);
     outs[name] = { out, pack, mp4: path.join(out, 'renders', 'plates', `${plate.id}.mp4`) };
-    const sheet = run('lib/verify/contact-sheet.mjs', [outs[name].mp4, '--every', '0.5s', '-o', path.join(EVIDENCE, `AC-BRD-02-${name}.jpg`), '--json']);
+    const sheet = run('lib/verify/contact-sheet.mjs', [outs[name].mp4, '--every', '0.5s', '-o', path.join(sheetDir, `AC-BRD-02-${name}.jpg`), '--json']);
     assert.equal(sheet.code, 0, sheet.stderr);
-    writeFileSync(path.join(EVIDENCE, `AC-BRD-02-${name}.json`), sheet.stdout.replaceAll(ROOT + path.sep, '').replaceAll(os.tmpdir(), '$TMPDIR'));
+    writeFileSync(path.join(sheetDir, `AC-BRD-02-${name}.json`), sheet.stdout.replaceAll(ROOT + path.sep, '').replaceAll(os.tmpdir(), '$TMPDIR'));
   }
   const { default: a, alt: b } = outs;
   // nothing but --brand changed: the scaffolded composition is byte-identical

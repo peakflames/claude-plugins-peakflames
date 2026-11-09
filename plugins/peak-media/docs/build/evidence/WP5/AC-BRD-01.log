@@ -1,0 +1,40 @@
+# AC-BRD-01 verifier run 2026-11-09T00:06:42Z
+$ node scripts/validate.mjs brand-packs/default
+ok    brand-packs/default/brand.json (brand v1)
+exit=0
+$ node scripts/validate.mjs evals/fixtures/brand-alt
+ok    evals/fixtures/brand-alt/brand.json (brand v1)
+exit=0
+--- woff2 magic (expect 774f4632 = 'wOF2'):
+brand-packs/default/fonts/inter/inter-latin-400-normal.woff2 774f4632
+brand-packs/default/fonts/inter/inter-latin-700-normal.woff2 774f4632
+brand-packs/default/fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2 774f4632
+brand-packs/default/fonts/jetbrains-mono/jetbrains-mono-latin-700-normal.woff2 774f4632
+evals/fixtures/brand-alt/fonts/playfair-display/playfair-display-latin-400-normal.woff2 774f4632
+evals/fixtures/brand-alt/fonts/playfair-display/playfair-display-latin-700-normal.woff2 774f4632
+evals/fixtures/brand-alt/fonts/space-mono/space-mono-latin-400-normal.woff2 774f4632
+evals/fixtures/brand-alt/fonts/space-mono/space-mono-latin-700-normal.woff2 774f4632
+--- licence: each fonts/<family>/ dir has OFL.txt containing 'SIL OPEN FONT LICENSE Version 1.1':
+brand-packs/default/fonts/inter 1
+brand-packs/default/fonts/jetbrains-mono 1
+evals/fixtures/brand-alt/fonts/playfair-display 1
+evals/fixtures/brand-alt/fonts/space-mono 1
+--- byte compare vs npm @fontsource/<family>@5.3.0 (files/<name>.woff2, LICENSE):
+MATCH brand-packs/default/fonts/inter/OFL.txt == @fontsource/inter/LICENSE
+MATCH brand-packs/default/fonts/inter/inter-latin-400-normal.woff2 == @fontsource/inter/files/inter-latin-400-normal.woff2
+MATCH brand-packs/default/fonts/inter/inter-latin-700-normal.woff2 == @fontsource/inter/files/inter-latin-700-normal.woff2
+MATCH brand-packs/default/fonts/jetbrains-mono/OFL.txt == @fontsource/jetbrains-mono/LICENSE
+MATCH brand-packs/default/fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2 == @fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2
+MATCH brand-packs/default/fonts/jetbrains-mono/jetbrains-mono-latin-700-normal.woff2 == @fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2
+MATCH evals/fixtures/brand-alt/fonts/playfair-display/OFL.txt == @fontsource/playfair-display/LICENSE
+MATCH evals/fixtures/brand-alt/fonts/playfair-display/playfair-display-latin-400-normal.woff2 == @fontsource/playfair-display/files/playfair-display-latin-400-normal.woff2
+MATCH evals/fixtures/brand-alt/fonts/playfair-display/playfair-display-latin-700-normal.woff2 == @fontsource/playfair-display/files/playfair-display-latin-700-normal.woff2
+MATCH evals/fixtures/brand-alt/fonts/space-mono/OFL.txt == @fontsource/space-mono/LICENSE
+MATCH evals/fixtures/brand-alt/fonts/space-mono/space-mono-latin-400-normal.woff2 == @fontsource/space-mono/files/space-mono-latin-400-normal.woff2
+MATCH evals/fixtures/brand-alt/fonts/space-mono/space-mono-latin-700-normal.woff2 == @fontsource/space-mono/files/space-mono-latin-700-normal.woff2
+--- node --test (brand tests excerpt):
+✔ AC-BRD-01: brand-packs/default validates and every font has a licence file (471.033083ms)
+✔ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (24233.225917ms)
+✔ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (50673.504083ms)
+✔ AC-BRD-03: the plugin tree ships no music or other audio files (34.414542ms)
+✔ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (50763.20875ms)
