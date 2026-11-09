@@ -25,4 +25,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`check-take`** — fails a take whose scene changes don't sit inside ≥ 900 ms of silence, or a narrated take where no change is detected (`--expect-cuts`).
 - **Storyboard API reference and example deck** — `references/storyboard-api.md` and a neutral 3-slide deck whose storyboard runs unchanged in all three modes.
 - **Neutral default brand pack** — `brand-packs/default` with Inter and JetBrains Mono (OFL, bundled woff2), design tokens, a placeholder logo, a 3 s outro and music rules; no music ships, and a rebrand is a re-render with `--brand`.
+- **`plate-factory` orchestrator** — `/peak-media:plate-factory` runs brief → script → spine → plate list → storyboard → plates → composite → audio → export, with a gate line per stage; shows each artifact before asking for approval; storyboard stills approved before any animation; up to 3 self-review rounds per plate, then an independent reviewer.
+- **`retime-plates`** — sets every plate's start and duration from its spine beat (one plate per beat), so plate timing always matches the real narration.
 - **`validate` script** — checks any contract file against its schema plus cross-references, and imports a legacy `narration.json` as a spine manifest.

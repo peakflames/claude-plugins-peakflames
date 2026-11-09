@@ -17,7 +17,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP6 | verified | wp/WP6/verify-2.md |
 | WP7a | verified | wp/WP7a/verify-1.md |
 | WP7b | verified | wp/WP7b/verify-2.md |
-| WP8 | in-progress | — |
+| WP8 | verified | wp/WP8/verify-3.md |
 | WP9 | not-started | — |
 | WP10 | not-started | — |
 
@@ -74,11 +74,11 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-REC-08 | D10 | WP7b | G the ui-demo · W stills are sampled inside each `say()` window · T the caption text shows; with `--no-captions` it doesn't; `--caption-css` changes the style | still | PASS | evidence/WP7b/AC-REC-08-verifier-default.jpg, evidence/WP7b/AC-REC-08-verifier-no-captions.jpg, evidence/WP7b/AC-REC-08-verifier-caption-css.jpg |
 | AC-REC-09 | D11 | WP7b | G a take · W the manifest is written · T it validates; `command[]` reproduces the take | script | PASS | evidence/WP7b/AC-REC-09.r2.log |
 | AC-REC-10 | D3 | WP7b | G the key is unset · W the captions-only example runs · T it passes with 0 OpenRouter calls | script | PASS | evidence/WP7b/AC-REC-10.log |
-| AC-ORC-01 | kickoff milestone | WP8 | G the F1 brief and a fresh session · W `/peak-media:plate-factory` runs · T it reaches `out/final.mp4`, and the transcript shows each gate 0–9 in order | manual | not-started | — |
-| AC-ORC-02 | design stage 4 | WP8 | G the same run · W the transcript is checked · T the storyboard contact sheet is produced and approved **before** any `plates/<id>/index.html` is written | script (transcript grep) | not-started | — |
-| AC-ORC-03 | design stage 6 | WP8 | G the same run · W the transcript is checked · T at most 3 self-review rounds per plate, then a separate reviewer agent call | script | not-started | — |
-| AC-ORC-04 | DEC-07 | WP8 | G the same run · W the transcript is checked · T `runtimes.md` is Read before the first plate is written | script | not-started | — |
-| AC-ORC-05 | spine timing (WP6 verify-2 S-3) | WP8 | G the F1 fixture `plates.json` (stale 20 s-era times) and an F1 spine manifest · W `retime-plates` runs · T every plate's `startMs`/`durationMs` equals its beat's, the file validates, and a plate list that doesn't map one plate per beat (missing beat, unknown beat, two plates on one beat) exits non-zero naming the plate or beat | script | not-started | — |
+| AC-ORC-01 | kickoff milestone | WP8 | G the F1 brief and a fresh session · W `/peak-media:plate-factory` runs · T it reaches `out/final.mp4`, and the transcript shows each gate 0–9 in order | manual | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log, evidence/WP8/AC-ORC-01-output.verifier-r3.log, evidence/WP8/AC-ORC-01-final.verifier-r3.jpg |
+| AC-ORC-02 | design stage 4 | WP8 | G the same run · W the transcript is checked · T the storyboard contact sheet is produced and approved **before** any `plates/<id>/index.html` is written | script (transcript grep) | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
+| AC-ORC-03 | design stage 6 | WP8 | G the same run · W the transcript is checked · T at most 3 self-review rounds per plate, then a separate reviewer agent call | script | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
+| AC-ORC-04 | DEC-07 | WP8 | G the same run · W the transcript is checked · T `runtimes.md` is Read before the first plate is written | script | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
+| AC-ORC-05 | spine timing (WP6 verify-2 S-3) | WP8 | G the F1 fixture `plates.json` (stale 20 s-era times) and an F1 spine manifest · W `retime-plates` runs · T every plate's `startMs`/`durationMs` equals its beat's, the file validates, and a plate list that doesn't map one plate per beat (missing beat, unknown beat, two plates on one beat) exits non-zero naming the plate or beat | script | PASS | evidence/WP8/plate-factory-evals.verifier-r3.log |
 | AC-PKG-01 | D19 | WP9 | G the repo · W check · T `plugin.json` version = the top CHANGELOG entry; marketplace.json lists peak-media | script | not-started | — |
 | AC-PKG-02 | D19 | WP9 | G `/plugin marketplace add peakflames/claude-plugins-peakflames#feature/new-peak-media-plugin` · W install · T the 5 peak-media skills are listed, and `web2video` is not | manual | not-started | — |
 | AC-PKG-03 | D17 | WP9 | G the plugin tree · W `grep -ri peakflames` over the runtime tree (`skills/ lib/ schemas/ brand-packs/ vendor/ scripts/ evals/`, so `docs/` and the plugin.json author/repository fields are excluded) · T 0 hits; no brand assets in examples | script | not-started | — |
@@ -103,4 +103,4 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-BASE-10 | orch §5 baseline | WP7b | G the `check-take` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP7b/AC-BASE-10.log |
 | AC-BASE-11 | orch §5 baseline | WP6 | G the `assemble` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-11.r2.log |
 | AC-BASE-12 | orch §5 baseline | WP6 | G the `remux-audio` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-12.r2.log |
-| AC-BASE-13 | orch §5 baseline | WP8 | G the `retime-plates` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
+| AC-BASE-13 | orch §5 baseline | WP8 | G the `retime-plates` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP8/AC-BASE-13.verifier-r3.log |
