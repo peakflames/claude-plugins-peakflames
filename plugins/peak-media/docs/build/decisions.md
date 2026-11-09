@@ -51,6 +51,7 @@ Decision: accepted | rejected — schemaVersion bump? yes/no
 
 *Facts learned during the build that later WPs depend on (e.g. the PCM sample rate from AC-TTS-07).*
 
+- **2026-11-08 (WP3a, AC-TTS-07 live run by the Lead):** OpenRouter `/api/v1/audio/speech` returns **24 kHz mono PCM** for both `google/gemini-3.8-flash-lite-tts` (Achird, 177 wpm, −19.3 LUFS) and `microsoft/mai-voice-2.1-flash` (en-GB-Emily, 161 wpm, −16.8 LUFS). Each request carried `"provider":{"zdr":true}`; Gemini with ZDR was accepted on this account. The key was redacted in both debug logs (0 leaks).
 - **2026-11-08 (WP2):** HyperFrames 0.9.25 renders correctly here, so the DEC-05 fallback to 0.9.23 is not needed. A 3 s 1280×720 plate takes about 7 s; two renders give identical `framemd5`, and a render with outbound network blocked (macOS `sandbox-exec`, loopback allowed) matches the online one.
 - **HF composition rules found in WP2:** elements with class `clip` are positioned absolutely by the runtime, so a flex layout needs one `clip` wrapper around its children. Timelines register via `window.__timelines["main"]`. GSAP is loaded from a local `vendor/gsap.min.js` (the HF scaffold defaults to a CDN URL, which we never use).
 - **Template placeholders** must not appear inside HTML comments (the WP2 F0 sheet caught `{{LINES}}` being substituted into a comment).
