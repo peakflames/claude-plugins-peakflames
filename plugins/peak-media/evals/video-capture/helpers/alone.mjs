@@ -1,5 +1,5 @@
 // Run-alone gate for timing-sensitive evals (AC-REC-06 "run alone").
-// `node --test <folder>` runs each test file in its own child process, in parallel. A file that
+// `node --test "<evals>/**/*.test.mjs"` runs each test file in its own child process, in parallel. A file that
 // calls waitUntilAlone() waits until it is the only test process left under the same runner, so
 // its real-time captures don't share the CPU with HyperFrames renders or other captures. Run
 // directly (`node --test <this file>` or ac-run), there are no siblings and it returns at once.

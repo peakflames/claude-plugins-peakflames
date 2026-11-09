@@ -2,7 +2,7 @@
 // the A/V sync test. Pages are served on 127.0.0.1 — no internet. Spines come from spine.mjs with
 // fake/tone and a temp TTS cache, with both key variables unset.
 // Run alone (AC-REC-06): captures are real time and the sync test is timing-sensitive. Under
-// `node --test plugins/peak-media/evals` the files run in parallel child processes, so before()
+// `node --test "plugins/peak-media/evals/**/*.test.mjs"` the files run in parallel child processes, so before()
 // waits (helpers/alone.mjs) until every other eval file has finished; the tests in this file then
 // run one after another (node:test runs a file's top-level tests serially; concurrency: false is
 // set explicitly below). ac-run --wp WP7b gets the same isolation. This must stay the only file

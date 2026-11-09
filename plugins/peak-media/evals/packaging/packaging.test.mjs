@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync, copyFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { run, ROOT, pluginVersion, tmpDir } from '../helpers/run.mjs';
+import { depsDir as depsRoot } from '../../lib/deps.mjs';
 
 const REPO = path.resolve(ROOT, '..', '..');
 const SKILLS = ['plate-factory', 'video-spine', 'video-plates', 'video-capture', 'video-assemble']; // DEC-21
@@ -55,7 +56,7 @@ test('AC-PKG-03: the runtime tree carries no house-brand name (D17), and the exa
   assert.deepEqual(assets, [], 'examples carry no logos, fonts, images or audio');
 });
 
-test('AC-PKG-06: every skill has at least one eval (node --test plugins/peak-media/evals)', () => {
+test('AC-PKG-06: every skill has at least one eval (node --test "plugins/peak-media/evals/**/*.test.mjs")', () => {
   const skills = readdirSync(path.join(ROOT, 'skills')).filter((d) => existsSync(path.join(ROOT, 'skills', d, 'SKILL.md'))).sort();
   assert.deepEqual(skills, [...SKILLS].sort(), 'the five skills of DEC-21, and no others (no web2video)');
   for (const s of skills) {
@@ -155,6 +156,12 @@ test('AC-PKG-08: setup + F0 in a headless environment — passes, or prints one 
   const noFfmpeg = run('scripts/setup.sh', ['--check'], { env: { PEAK_MEDIA_FFMPEG: path.join(empty, 'no-ffmpeg') } });
   assert.equal(noFfmpeg.code, 3);
   assert.deepEqual(lines(noFfmpeg.stdout + noFfmpeg.stderr), ['setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)']);
+  const badBrowser = run('scripts/setup.sh', ['--check'], { env: { HYPERFRAMES_BROWSER_PATH: '/usr/bin/false' } });
+  if (existsSync(path.join(depsRoot(), '.installed'))) { // deps present: the browser is started once and its failure named
+    assert.equal(badBrowser.code, 3, badBrowser.stdout + badBrowser.stderr);
+    assert.equal(lines(badBrowser.stdout + badBrowser.stderr).length, 1, badBrowser.stderr);
+    assert.match(badBrowser.stderr, /^setup\.sh: render browser can't start/);
+  }
   if (!existsSync(path.join(ROOT, 'node_modules'))) { // a dev checkout with its own node_modules can't lack deps
     const skel = run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', tmpDir('pm-pkg08-miss-')], { env: { ...NO_KEY, CLAUDE_PLUGIN_DATA: empty } });
     assert.notEqual(skel.code, 0);

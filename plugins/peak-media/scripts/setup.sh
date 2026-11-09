@@ -71,9 +71,22 @@ browser_ok() {
   [ -f "$HF" ] && node "$HF" browser path >/dev/null 2>&1
 }
 
+# Start the browser once: a binary that is present but can't run (e.g. missing system libraries on
+# a slim Linux image) is reported in one line naming the libraries and the apt command.
+browser_starts() {
+  if [ "$SKIP_BROWSER" = 1 ] && [ -z "${HYPERFRAMES_BROWSER_PATH:-}" ]; then return 0; fi
+  local why
+  why=$(node --input-type=module -e "
+    const m = await import('$ROOT/lib/hf.mjs');
+    const c = m.browserCheck(process.env.HYPERFRAMES_BROWSER_PATH || m.browserPath());
+    if (!c.ok) { process.stdout.write(c.message); process.exit(1); }" 2>/dev/null) && return 0
+  die "${why:-render browser cannot start — run $ROOT/scripts/setup.sh (or set HYPERFRAMES_BROWSER_PATH)}" 3
+}
+
 if [ "$CHECK_ONLY" = 1 ]; then
   deps_ok || die "runtime deps not installed in $DEPS — run $ROOT/scripts/setup.sh" 3
   [ "$SKIP_BROWSER" = 1 ] || browser_ok || die "render browser missing — run $ROOT/scripts/setup.sh (or set HYPERFRAMES_BROWSER_PATH)" 3
+  browser_starts
   echo "peak-media ready: deps $DEPS"
   exit 0
 fi
@@ -103,9 +116,13 @@ else
   if [ -n "$SHELL_BIN" ]; then
     say "browser: using $SHELL_BIN (export HYPERFRAMES_BROWSER_PATH to make it permanent)"
   else
+    case "$(uname -s)/$(uname -m)" in
+      Linux/aarch64|Linux/arm64) die "no headless browser build exists for Linux arm64 — use macOS or an x86_64 Linux host, or set HYPERFRAMES_BROWSER_PATH" 3 ;;
+    esac
     say "browser: downloading the render browser"
     node "$HF" browser ensure >"$DEPS/browser.log" 2>&1 || die "browser download failed — see $DEPS/browser.log (or set HYPERFRAMES_BROWSER_PATH)" 1
   fi
 fi
 
+browser_starts
 echo "peak-media ready: deps $DEPS · $("$FFMPEG" -version | head -1 | cut -d' ' -f1-3)"

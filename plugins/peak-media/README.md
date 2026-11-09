@@ -36,7 +36,21 @@ it to change without a release.
 | **Network** for setup, and for narration | Setup downloads the pinned packages and a headless browser once; rendering is offline | |
 
 Install ffmpeg with `brew install ffmpeg` (macOS) or `sudo apt-get install ffmpeg` (Debian/Ubuntu).
-macOS and Linux are supported, including headless machines and containers.
+
+**Linux:** the headless browser also needs a few system libraries that slim images and servers
+often lack. On Debian/Ubuntu:
+
+```bash
+sudo apt-get install ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+  libatspi2.0-0 libxcomposite1 libxdamage1
+```
+
+If one is still missing, `setup.sh` says which, in one line, with the `apt-get` command.
+
+macOS (Apple silicon or Intel) and Linux x86_64 are supported, including headless machines and
+containers. **Linux on ARM (arm64) is not:** there is no headless browser build for it, so setup
+stops with a one-line message. On an ARM machine, use macOS or an x86_64 (amd64) Linux host or
+container.
 
 ## Setup
 

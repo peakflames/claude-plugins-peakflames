@@ -1,0 +1,11 @@
+# F1: spine 20773 ms (3 beats) + outro 3000 ms → out/final.mp4; PASS  /tmp/wp9scratch/tmpA/pm-pkg04-9oSVBK/out/final.mp4
+✔ AC-PKG-04: setup.sh, then the F1 brief end to end with no key (fake/tone spine, default pack) — passes with no manual steps (55801.210917ms)
+✔ AC-PKG-08: setup + F0 in a headless environment — passes, or prints one line naming what is missing (9941.661417ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 65817.335
