@@ -14,4 +14,5 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`setup.sh`** — installs the pinned HyperFrames, Playwright, GSAP and ajv into the plugin data dir and fetches the render browser; safe to re-run, `--check` reports what's missing.
 - **Verify tools** — `contact-sheet` (time-labelled frame grid), `probe-spec` (MP4 delivery spec) and `check-cuts` (every cut inside a silent gap).
 - **Minimal motion-plate template** — kinetic type with brand tokens and local GSAP; renders identically offline.
+- **Neutral default brand pack** — `brand-packs/default` with Inter and JetBrains Mono (OFL, bundled woff2), design tokens, a placeholder logo, a 3 s outro and music rules; no music ships, and a rebrand is a re-render with `--brand`.
 - **`validate` script** — checks any contract file against its schema plus cross-references, and imports a legacy `narration.json` as a spine manifest.

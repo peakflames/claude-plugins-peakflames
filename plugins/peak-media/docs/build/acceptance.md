@@ -13,7 +13,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP3a | not-started | — |
 | WP3b | not-started | — |
 | WP4 | not-started | — |
-| WP5 | not-started | — |
+| WP5 | verified | wp/WP5/verify-1.md |
 | WP6 | not-started | — |
 | WP7a | not-started | — |
 | WP7b | not-started | — |
@@ -55,9 +55,9 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-PLT-04 | DEC-07 | WP4 | G every plate · W `hyperframes lint` and `check --strict` · T 0 errors | script | not-started | — |
 | AC-VND-01 | DEC-07 | WP4 | G `vendored-map.md` · W the script checks every listed path, and checks that every vendor folder is referenced · T no missing files, no orphan folders | script | not-started | — |
 | AC-VND-02 | DEC-07 | WP4 | G the vendor tree · W grep `hyperframes events` · T 0 hits; LICENSE is present | script | not-started | — |
-| AC-BRD-01 | §7 | WP5 | G `brand-packs/default` · W validate · T it passes; every font has a licence file | script | not-started | — |
-| AC-BRD-02 | design §1.10 | WP5 | G F1 plate 1 rendered with the default pack and with a second synthetic pack · W both contact sheets are compared · T colours and fonts differ, and nothing but `--brand` changed | still | not-started | — |
-| AC-BRD-03 | §7 | WP5 | G the plugin tree · W search for audio files · T no music ships | script | not-started | — |
+| AC-BRD-01 | §7 | WP5 | G `brand-packs/default` · W validate · T it passes; every font has a licence file | script | PASS | evidence/WP5/AC-BRD-01.log |
+| AC-BRD-02 | design §1.10 | WP5 | G F1 plate 1 rendered with the default pack and with a second synthetic pack · W both contact sheets are compared · T colours and fonts differ, and nothing but `--brand` changed | still | PASS | evidence/WP5/AC-BRD-02-verifier-default.jpg, evidence/WP5/AC-BRD-02-verifier-alt.jpg |
+| AC-BRD-03 | §7 | WP5 | G the plugin tree · W search for audio files · T no music ships | script | PASS | evidence/WP5/AC-BRD-03.log |
 | AC-ASM-01 | kickoff milestone | WP6 | G the F1 manifest and plate MP4s · W assemble · T every plate cut lands in a silent gap (`check-cuts --min-silence-ms 300`) | script | not-started | — |
 | AC-ASM-02 | design rule | WP6 | G the review MP4 · W music and SFX stems are remuxed · T the md5 of the video stream (`-map 0:v -f md5`) is unchanged | script | not-started | — |
 | AC-ASM-03 | D7 | WP6 | G `out/final.mp4` · W probe-spec · T the spec passes and duration = spine + outro ±1 frame | script | not-started | — |
