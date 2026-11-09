@@ -11,8 +11,8 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP1 | verified | wp/WP1/verify-2.md |
 | WP2 | verified | wp/WP2/verify-1.md |
 | WP3a | verified | wp/WP3a/verify-1.md |
-| WP3b | not-started | — |
-| WP4 | not-started | — |
+| WP3b | verified | wp/WP3b/verify-1.md |
+| WP4 | verified | wp/WP4/verify-2.md |
 | WP5 | verified | wp/WP5/verify-1.md |
 | WP6 | not-started | — |
 | WP7a | not-started | — |
@@ -45,16 +45,16 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-TTS-06 | D15 | WP3a | G 3 Gemini voices (fake transport in eval; live in AC-TTS-07) · W `sample-voice` · T 3 WAVs and 3 wpm lines | script | PASS | evidence/WP3a/AC-TTS-06.log |
 | AC-TTS-07 | D14 | WP3a | G the user's key · W one Gemini and one MAI clip are synthesized with `--debug-requests` · T speech is audible at a plausible wpm; the log shows `"zdr":true` and the key is redacted; PCM sample rate is recorded in decisions.md | manual | PASS | evidence/WP3a/AC-TTS-07-user-listen.md, evidence/WP3a/AC-TTS-07-gemini-debug.log, evidence/WP3a/AC-TTS-07-mai-debug.log |
 | AC-TTS-08 | DEC-03 | WP3a | G a PCM response · W the clip is cached · T it is a valid WAV (ffprobe reads its rate and channels) | script | PASS | evidence/WP3a/AC-TTS-08.log |
-| AC-SPN-01 | kickoff milestone | WP3b | G F1 (target 20 s) and the fake provider · W brief → script → spine · T `manifest.totalMs` is within 20 s ±10% and validates | script | not-started | — |
-| AC-SPN-02 | D3 | WP3b | G F1 with the key unset · W spine runs · T `beatgrid.json` validates, there are 0 OpenRouter calls (network spy), and runtime is within ±10% | script | not-started | — |
-| AC-SPN-03 | DEC-13 | WP3b | G the F1 manifest · W the gaps between beats are inspected · T each is ≥ 400 ms, and `check-cuts` on `narration.wav` at the beat boundaries passes | script | not-started | — |
-| AC-SPN-04 | design stage 1 | WP3b | G the F1 `script.md` · W a cold-reader agent reads it with no context · T no beat is flagged unclear; the user approves | manual | not-started | — |
-| AC-PLT-01 | kickoff milestone | WP4 | G F1 `plates.json` · W `render-plate` runs for each plate · T each MP4's duration equals the planned `durationMs` ±1 frame | script | not-started | — |
-| AC-PLT-02 | kickoff milestone | WP4 | G every rendered plate · W contact-sheet · T one sheet per plate; the Verifier confirms the brand fonts and colours, with no overflow or clipping | still | not-started | — |
-| AC-PLT-03 | design §5 | WP4 | G F2 (5 slides) · W the deck is rendered · T 5 slide plates; the sheet shows deck layout and readable text | still | not-started | — |
-| AC-PLT-04 | DEC-07 | WP4 | G every plate · W `hyperframes lint` and `check --strict` · T 0 errors | script | not-started | — |
-| AC-VND-01 | DEC-07 | WP4 | G `vendored-map.md` · W the script checks every listed path, and checks that every vendor folder is referenced · T no missing files, no orphan folders | script | not-started | — |
-| AC-VND-02 | DEC-07 | WP4 | G the vendor tree · W grep `hyperframes events` · T 0 hits; LICENSE is present | script | not-started | — |
+| AC-SPN-01 | kickoff milestone | WP3b | G F1 (target 20 s) and the fake provider · W brief → script → spine · T `manifest.totalMs` is within 20 s ±10% and validates | script | PASS | evidence/WP3b/AC-SPN-01.log |
+| AC-SPN-02 | D3 | WP3b | G F1 with the key unset · W spine runs · T `beatgrid.json` validates, there are 0 OpenRouter calls (network spy), and runtime is within ±10% | script | PASS | evidence/WP3b/AC-SPN-02.log |
+| AC-SPN-03 | DEC-13 | WP3b | G the F1 manifest · W the gaps between beats are inspected · T each is ≥ 400 ms, and `check-cuts` on `narration.wav` at the beat boundaries passes | script | PASS | evidence/WP3b/AC-SPN-03.log |
+| AC-SPN-04 | design stage 1 | WP3b | G the F1 `script.md` · W a cold-reader agent reads it with no context · T no beat is flagged unclear; the user approves | manual | PASS | evidence/WP3b/AC-SPN-04-user-approval.md, evidence/WP3b/AC-SPN-04-cold-read-final.md |
+| AC-PLT-01 | kickoff milestone | WP4 | G F1 `plates.json` · W `render-plate` runs for each plate · T each MP4's duration equals the planned `durationMs` ±1 frame | script | PASS | evidence/WP4/AC-PLT-01.r2.log |
+| AC-PLT-02 | kickoff milestone | WP4 | G every rendered plate · W contact-sheet · T one sheet per plate; the Verifier confirms the brand fonts and colours, with no overflow or clipping | still | PASS | evidence/WP4/AC-PLT-02-verifier-r2-p1-hook.jpg, evidence/WP4/AC-PLT-02-verifier-r2-p2-table.jpg, evidence/WP4/AC-PLT-02-verifier-r2-p3-close.jpg |
+| AC-PLT-03 | design §5 | WP4 | G F2 (5 slides) · W the deck is rendered · T 5 slide plates; the sheet shows deck layout and readable text | still | PASS | evidence/WP4/AC-PLT-03-verifier-r2-s1-unit.jpg, evidence/WP4/AC-PLT-03-verifier-r2-s5-peak.jpg, evidence/WP4/AC-PLT-03.r2.log |
+| AC-PLT-04 | DEC-07 | WP4 | G every plate · W `hyperframes lint` and `check --strict` · T 0 errors | script | PASS | evidence/WP4/AC-PLT-04.r2.log |
+| AC-VND-01 | DEC-07 | WP4 | G `vendored-map.md` · W the script checks every listed path, and checks that every vendor folder is referenced · T no missing files, no orphan folders | script | PASS | evidence/WP4/AC-VND-01.r2.log |
+| AC-VND-02 | DEC-07 | WP4 | G the vendor tree · W grep `hyperframes events` · T 0 hits; LICENSE is present | script | PASS | evidence/WP4/AC-VND-02.r2.log |
 | AC-BRD-01 | §7 | WP5 | G `brand-packs/default` · W validate · T it passes; every font has a licence file | script | PASS | evidence/WP5/AC-BRD-01.log |
 | AC-BRD-02 | design §1.10 | WP5 | G F1 plate 1 rendered with the default pack and with a second synthetic pack · W both contact sheets are compared · T colours and fonts differ, and nothing but `--brand` changed | still | PASS | evidence/WP5/AC-BRD-02-verifier-default.jpg, evidence/WP5/AC-BRD-02-verifier-alt.jpg |
 | AC-BRD-03 | §7 | WP5 | G the plugin tree · W search for audio files · T no music ships | script | PASS | evidence/WP5/AC-BRD-03.log |
@@ -95,9 +95,9 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-BASE-03 | orch §5 baseline | WP2 | G the `contact-sheet` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP2/AC-BASE-03.log |
 | AC-BASE-04 | orch §5 baseline | WP2 | G the `probe-spec` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP2/AC-BASE-04.log |
 | AC-BASE-05 | orch §5 baseline | WP2 | G the `check-cuts` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP2/AC-BASE-05.log |
-| AC-BASE-06 | orch §5 baseline | WP3b | G the `spine` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
+| AC-BASE-06 | orch §5 baseline | WP3b | G the `spine` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP3b/AC-BASE-06.log |
 | AC-BASE-07 | orch §5 baseline | WP3a | G the `sample-voice` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP3a/AC-BASE-07.log |
-| AC-BASE-08 | orch §5 baseline | WP4 | G the `render-plate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
+| AC-BASE-08 | orch §5 baseline | WP4 | G the `render-plate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP4/AC-BASE-08.r2.log |
 | AC-BASE-09 | orch §5 baseline | WP7a | G the `capture` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
 | AC-BASE-10 | orch §5 baseline | WP7b | G the `check-take` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
 | AC-BASE-11 | orch §5 baseline | WP6 | G the `assemble` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |

@@ -1,0 +1,37 @@
+{
+  "project": "tmp/ev1",
+  "brand": "brand-packs/default",
+  "plates": [
+    {
+      "id": "p1-hook",
+      "kind": "motion",
+      "dir": "tmp/ev1/plates/p1-hook",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev1/renders/plates/p1-hook.mp4",
+      "durationMs": 6500,
+      "sheet": "tmp/ev1/review/contact-p1-hook.jpg"
+    },
+    {
+      "id": "p2-table",
+      "kind": "slide",
+      "dir": "tmp/ev1/plates/p2-table",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev1/renders/plates/p2-table.mp4",
+      "durationMs": 7500,
+      "sheet": "tmp/ev1/review/contact-p2-table.jpg"
+    },
+    {
+      "id": "p3-close",
+      "kind": "motion",
+      "dir": "tmp/ev1/plates/p3-close",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev1/renders/plates/p3-close.mp4",
+      "durationMs": 6000,
+      "sheet": "tmp/ev1/review/contact-p3-close.jpg"
+    }
+  ],
+  "skipped": []
+}

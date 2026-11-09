@@ -1,0 +1,7 @@
+# AC-VND-01 r2 — verifier-wp4-r2-a91e50a1 — HEAD 047a6f2 — own script /tmp/vwp4r2/scripts/vnd.mjs (every backticked vendor/hyperframes/ path in vendored-map.md exists; every vendor folder is a prefix of a listed path)
+listed paths: 44; missing: 0
+vendor folders: 13; orphan folders: 0
+vendor files: 44; files not covered by a listed path: 0
+
+## tree diff vs round 1 verify commit 8227677
+(empty = unchanged since round 1)

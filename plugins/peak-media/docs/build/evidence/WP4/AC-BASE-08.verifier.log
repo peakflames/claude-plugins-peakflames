@@ -1,0 +1,106 @@
+$ render-plate --help
+render-plate — render motion/slide plates from plates.json, each alone, to renders/plates/<id>.mp4
+
+Usage: render-plate [options] <plates.json> (<plate-id>... | --all)
+
+For each plate: plates/<id>/index.html is kept if it exists (hand-authored) or written from the
+template for its kind (templates/motion, templates/slide); brand/ (the brand pack) and
+vendor/gsap.min.js are refreshed; the composition is rendered on its own at the plates.json
+fps and size; the MP4 must last durationMs ±1 frame. Live plates are refused (use video-capture).
+Project folders (plates/, renders/plates/, review/) live next to plates.json unless --out is given.
+
+Options:
+      --all              Every motion and slide plate in plates.json (live plates are skipped)
+      --brand <pack>     Brand pack folder or brand.json (overrides plates.json "brand")
+      --out <dir>        Project folder for plates/, renders/plates/ and review/ (default: the plates.json folder)
+      --sheet            Also write review/contact-<id>.jpg (a frame every --every)
+      --every <time>     Contact-sheet interval with --sheet, e.g. 0.5s or 250ms (default: 0.5s)
+      --lint             Run hyperframes lint and check --strict on each plate before rendering; any failure stops
+      --storyboard       Do not render: snapshot one key frame per plate into review/storyboard.jpg (stage 4)
+      --scaffold-only    Only prepare plates/<id>/ (template, brand, GSAP); do not render
+      --rescaffold       Overwrite an existing plates/<id>/index.html from the template
+      --quality <value>  HyperFrames render quality (default: standard)
+      --json             Print the results as JSON
+  -h, --help             Show this help and exit
+      --version          Print the plugin version and exit
+
+Examples:
+  render-plate plates.json --all --sheet
+  render-plate plates.json p2-table --lint
+  render-plate plates.json --all --storyboard
+  render-plate docs/build/fixtures/F1/plates.json --all --brand brand-packs/default --out /tmp/f1
+[exit=0]
+
+$ render-plate --version
+0.1.0
+[exit=0]
+
+plugin.json version: 0.1.0
+$ render-plate 
+render-plate: expected at least 1 argument(s), got 0
+Run 'render-plate --help' for usage.
+[exit=2]
+
+$ render-plate /nonexistent/plates.json --all
+render-plate: cannot read /nonexistent/plates.json: no such file
+[exit=1]
+
+$ render-plate docs/build/fixtures/F1/plates.json
+render-plate: brand pack not found: /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/brand-packs/default — fix "brand" in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/docs/build/fixtures/F1/plates.json or pass --brand <pack>
+[exit=1]
+
+$ render-plate docs/build/fixtures/F1/plates.json p1-hook --all --brand evals/fixtures/brand-min
+render-plate: pass plate ids or --all, not both
+Run 'render-plate --help' for usage.
+[exit=2]
+
+$ render-plate docs/build/fixtures/F1/plates.json nope --brand evals/fixtures/brand-min
+render-plate: no plate 'nope' in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/docs/build/fixtures/F1/plates.json (plates: p1-hook, p2-table, p3-close)
+[exit=1]
+
+$ render-plate docs/build/fixtures/F1/plates.json --all --bogus
+render-plate: Unknown option '--bogus'
+Run 'render-plate --help' for usage.
+[exit=2]
+
+$ render-plate docs/build/fixtures/F1/plates.json --all --quality ultra
+render-plate: --quality must be one of draft, looks, standard, high, delivery, got 'ultra'
+Run 'render-plate --help' for usage.
+[exit=2]
+
+$ render-plate docs/build/fixtures/F1/plates.json --all --every abc --brand evals/fixtures/brand-min
+render-plate: --every expects a time like 0.5s or 500ms, got 'abc'
+Run 'render-plate --help' for usage.
+[exit=2]
+
+$ render-plate docs/build/fixtures/F1/plates.json --all --brand /nonexistent
+render-plate: brand pack not found: /nonexistent — fix "brand" in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/docs/build/fixtures/F1/plates.json or pass --brand <pack>
+[exit=1]
+
+$ render-plate docs/build/fixtures/F1/plates.json --all
+render-plate: brand pack not found: /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/brand-packs/default — fix "brand" in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/docs/build/fixtures/F1/plates.json or pass --brand <pack>
+[exit=1]
+
+$ render-plate /tmp/vwp4/bad.json --all
+render-plate: /tmp/vwp4/bad.json: spine: is required; brand: is required; fps: is required; width: is required; height: is required; plates: is required
+[exit=1]
+
+$ render-plate /tmp/vwp4/notjson.json --all
+render-plate: /tmp/vwp4/notjson.json: (file): is not valid JSON: Unexpected token 'o', "not json " is not valid JSON
+[exit=1]
+
+$ render-plate /tmp/vwp4/live/plates.json p3-live --brand evals/fixtures/brand-min --out /tmp/vwp4/live/out
+render-plate: plate p3-live is kind 'live' — it is played and screen-captured, not rendered: use video-capture (skills/video-capture/scripts/capture.mjs)
+[exit=1]
+
+$ render-plate /tmp/vwp4/live/plates.json --all --scaffold-only --brand evals/fixtures/brand-min --out /tmp/vwp4/live/out
+p1-hook: /tmp/vwp4/live/out/plates/p1-hook (scaffolded)
+p2-table: /tmp/vwp4/live/out/plates/p2-table (scaffolded)
+[exit=0]
+
+$ render-plate /tmp/vwp4/live/only.json --all --brand evals/fixtures/brand-min
+render-plate: no motion or slide plates in /tmp/vwp4/live/only.json (live plates use video-capture)
+[exit=1]
+
+--- stack-trace lines ('    at '): 0
+--- network: every run above executed under sandbox-exec '(deny network*)'; render-plate.mjs has no fetch/http import

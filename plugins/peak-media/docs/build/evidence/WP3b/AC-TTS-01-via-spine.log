@@ -1,0 +1,25 @@
+# WP3a deferred re-checks through spine.mjs — TTS-01 2026-11-09T00:25:03Z HEAD 0dce4ae; keys unset; network spy
+spine imports a browser? 0 matches in spine.mjs
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t1 --tts-model fake/tone --voice NotAVoice
+spine: unknown --voice 'NotAVoice' for fake/tone — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+Run 'spine --help' for usage.
+exit=2 elapsed_ms=89 lines=1 stack=0 net=0
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t1 --voice NotAVoice
+spine: unknown --voice 'NotAVoice' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+Run 'spine --help' for usage.
+exit=2 elapsed_ms=71 lines=1 stack=0 net=0
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t1 --narrate
+spine: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)
+exit=3 elapsed_ms=74 lines=1 stack=0 net=0
+$ nokey PEAK_MEDIA_FFMPEG=/nonexistent node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t1 --tts-model fake/tone --cache-dir $T/c-ff
+spine: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3 elapsed_ms=90 lines=1 stack=0 net=0
+$ nokey PEAK_MEDIA_FFMPEG=/nonexistent node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t1 --narrate --tts-model fake/tone --cache-dir $T/c-ff
+spine: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3 elapsed_ms=73 lines=1 stack=0 net=0
+files written by the failing runs: 0 in out, 0 in cache
+## legacy key name alone counts as a key (DEC-30): --narrate with only TTS_OPENROUTER_API_KEY=dummy, but bad voice so no request is sent
+$ nokey TTS_OPENROUTER_API_KEY=dummy-not-a-key node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t1 --narrate --voice NotAVoice
+spine: unknown --voice 'NotAVoice' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+Run 'spine --help' for usage.
+exit=2 elapsed_ms=72 lines=1 stack=0 net=0
