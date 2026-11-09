@@ -3,12 +3,11 @@
 // PEAK_MEDIA_TTS_LEGACY_DIRS (or the cacheDir / legacyDirs options).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, readdirSync, existsSync, copyFileSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, copyFileSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import os from 'node:os';
 import path from 'node:path';
-import { run, fx, ROOT, baseline } from '../helpers/run.mjs';
+import { run, fx, ROOT, baseline, tmpDir } from '../helpers/run.mjs';
 import { makeFakeFetch, FAKE_OR_RATE } from './helpers/fake-openrouter.mjs';
 import {
   DEFAULT_MODEL, DEFAULT_VOICE, cacheKey, checkTtsOptions, synthesizeClips, wpmReport, cacheSummary,
@@ -19,7 +18,7 @@ import { probe } from '../../lib/ffmpeg.mjs';
 
 const SV = 'skills/video-spine/scripts/sample-voice.mjs';
 const F1 = JSON.parse(readFileSync(path.join(ROOT, 'docs', 'build', 'fixtures', 'F1', 'spine', 'manifest.json'), 'utf8'));
-const tmp = (p) => mkdtempSync(path.join(os.tmpdir(), `pm-tts-${p}-`));
+const tmp = (p) => tmpDir(`pm-tts-${p}-`);
 const sha = (f) => createHash('sha256').update(readFileSync(f)).digest('hex');
 const KEY = 'sk-or-v1-TESTSECRET0123456789';
 const f1Clips = () => F1.clips.map(({ n, text, style }) => ({ n, text, style }));

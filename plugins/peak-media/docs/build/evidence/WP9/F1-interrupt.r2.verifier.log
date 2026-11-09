@@ -1,0 +1,42 @@
+# F1 r2 verifier probe: interrupting a watched step. F0 skeleton started in its own process group (as a terminal job); after 3.2 s, signal sent; processes tied to this run listed by out-dir name
+## SIGINT to node's process group (= Ctrl-C at a terminal)
+node alive: no
+run's processes 0.5 s later:
+69006     1 69006 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; shift 4; "$@" <"$in" >"$o" 2>"$e"; echo $? >"$st.tmp"; mv "$st.tmp" "$st" 
+69007 69006 69006 /opt/homebrew/Cellar/node/26.8.1/bin/node /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c/node_modules/hyperframes/bin/hyperfram
+10 s later:
+bfs: error: bfs -S dfs -regextype findutils-default /tmp/pm-v2probe/f0sigINT -newermt "-10 seconds" -type f
+bfs: error:                                                                  ~~~~~~~~~~~~~~~~~~~~~~
+bfs: error: Invalid timestamp.
+
+Supported timestamp formats are ISO 8601-like, e.g.
+
+  - 2026-11-09
+  - 2026-11-09T15:51:12
+  - 2026-11-09T15:51:12-05:00
+  - 2026-11-09T20:51:12Z
+files written after the signal: 
+pm-run-* dirs leaked in TMPDIR: 1
+## SIGTERM to the node pid only
+node alive: no
+run's processes 0.5 s later:
+69187     1 69187 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; shift 4; "$@" <"$in" >"$o" 2>"$e"; echo $? >"$st.tmp"; mv "$st.tmp" "$st" 
+69188 69187 69187 /opt/homebrew/Cellar/node/26.8.1/bin/node /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c/node_modules/hyperframes/bin/hyperfram
+10 s later:
+bfs: error: bfs -S dfs -regextype findutils-default /tmp/pm-v2probe/f0sigTERM -newermt "-10 seconds" -type f
+bfs: error:                                                                   ~~~~~~~~~~~~~~~~~~~~~~
+bfs: error: Invalid timestamp.
+
+Supported timestamp formats are ISO 8601-like, e.g.
+
+  - 2026-11-09
+  - 2026-11-09T15:51:26
+  - 2026-11-09T15:51:26-05:00
+  - 2026-11-09T20:51:26Z
+files written after the signal: 
+pm-run-* dirs leaked in TMPDIR: 1
+## outputs present after node was killed (orphaned render finished them):
+f0sigINT: 
+f0sigTERM: 
+## note: with the pre-r2 spawnSync, the render child shared node's process group, so a Ctrl-C (SIGINT to the group) reached it too
+## correction: no mp4 was produced in either run (renders/plates/ empty); the orphaned hyperframes+chrome ran on for several seconds unsupervised, then exited. A first, unlogged run left its pm-run-* dir with a status file, i.e. sh outlived node until the render ended.

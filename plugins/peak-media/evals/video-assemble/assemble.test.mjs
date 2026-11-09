@@ -4,10 +4,9 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, readFileSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
+import { existsSync, readFileSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { run } from '../helpers/run.mjs';
+import { run, tmpDir } from '../helpers/run.mjs';
 import { makeF1Project, musicWav, sfxWav } from './helpers/fixtures.mjs';
 
 const ASSEMBLE = 'skills/video-assemble/scripts/assemble.mjs';
@@ -27,7 +26,7 @@ const diff = (a, b) => { assert.equal(a.length, b.length); let s = 0; for (let i
 const assembleJson = (args, opts) => { const r = run(ASSEMBLE, [...args, '--json'], opts); assert.equal(r.code, 0, r.stderr); return JSON.parse(r.stdout); };
 
 before(() => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'pm-asm-'));
+  tmp = tmpDir('pm-asm-');
   proj = makeF1Project(path.join(tmp, 'f1')).dir;
   music = musicWav(path.join(tmp, 'music.wav'));
   sfx = sfxWav(path.join(tmp, 'sfx.wav'), [6500, 14000]);
@@ -177,8 +176,15 @@ test('AC-BASE-11: assemble --help lists every flag, --version = plugin.json, bad
   baseline(null, assert, ASSEMBLE, {
     flags,
     badArgs: [[], ['/no/such/project'], [proj, '--export', '4k'], [proj, '--bogus'], [proj, '--min-silence-ms', 'x'], [path.join(tmp, 'music.wav')],
-      [proj, '--music', '/no/such.wav'], [proj, '--renders', path.join(tmp, 'empty-renders')]],
+      [proj, '--music', '/no/such.wav'], [proj, '--renders', path.join(tmp, 'empty-renders')], [proj, '--outro', '/no/such/outro.mp4']],
   });
+  // --outro is checked up front with the stems: nothing runs and an existing final is left alone
+  const final = path.join(proj, 'out', 'final.mp4');
+  const had = existsSync(final);
+  const r = run(ASSEMBLE, [proj, '--outro', '/no/such/outro.mp4']);
+  assert.equal(r.code, 1, r.stderr);
+  assert.match(r.stderr, /^assemble: --outro \/no\/such\/outro\.mp4: no such file/);
+  assert.equal(existsSync(final), had, 'out/final.mp4 untouched by a run refused up front');
 });
 
 test('AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, bad input is one line with no stack', async () => {

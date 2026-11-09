@@ -1,0 +1,103 @@
+# verifier retry r2: Docker Desktop 29.7.2 (desktop-linux, aarch64 VM), --platform linux/amd64 via Rosetta (/run/rosetta/rosetta in /proc/1/maps), node:22-slim, worktree mounted ro; script = ~/tmp/v9-verifier/amd64.sh (copied below)
+```
+#!/usr/bin/env bash
+# Verifier WP9: fresh node:22-slim; /repo = worktree mounted read-only.
+set -uo pipefail
+export DEBIAN_FRONTEND=noninteractive
+cd /repo/plugins/peak-media
+echo "## container: $(uname -m) · $(. /etc/os-release && echo "$PRETTY_NAME") · node $(node -v)"
+echo "## V0 — nothing installed: setup.sh (install mode) and --check"
+bash scripts/setup.sh; echo "exit $?"
+bash scripts/setup.sh --check; echo "exit $?"
+echo "## V1 — apt-get install ffmpeg ca-certificates only (no browser libs), then setup.sh"
+apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends ffmpeg ca-certificates >/dev/null 2>&1; echo "apt exit $?"
+bash scripts/setup.sh -q; echo "exit $?"
+echo "## V1b — setup.sh --check with libs missing"
+bash scripts/setup.sh --check; echo "exit $?"
+echo "## V2 — README's Linux package line"
+PKGS="ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libxcomposite1 libxdamage1"
+echo "apt-get install -y --no-install-recommends $PKGS"
+apt-get install -y -qq --no-install-recommends $PKGS >/dev/null 2>&1; echo "apt exit $?"
+bash scripts/setup.sh; echo "exit $?"
+bash scripts/setup.sh --check; echo "exit $?"
+B=$(ls /root/.cache/hyperframes/chrome/chrome-headless-shell/*/*/chrome-headless-shell 2>/dev/null | head -1)
+echo "browser: $B"; [ -n "$B" ] && { ldd "$B" | grep "not found" || echo "ldd: nothing missing"; }
+echo "## V3 — AC-PKG-04 and AC-PKG-08 evals"
+export TMPDIR=$(mktemp -d)
+node --test --test-reporter=spec --test-name-pattern='^AC-PKG-0[48]:' 'evals/packaging/*.test.mjs'
+code=$?; echo "node --test exit $code"
+echo "## TMPDIR left: $(find "$TMPDIR" -mindepth 1 -maxdepth 1 | wc -l) entries"; ls -A "$TMPDIR"
+exit $code
+```
+## watcher
+15:13:02 stage: setup.sh 
+15:13:32 stage: spine.mjs 
+15:14:02 stage: render-plate.mjs 
+15:24:35 STALL: same processes for 10 min; stage: render-plate.mjs 
+PID                 ELAPSED             STAT                COMMAND
+820                 12:40               Ss                  /run/rosetta/rosetta /usr/bin/bash bash /v/amd64.sh
+6581                11:08               Sl                  /run/rosetta/rosetta /usr/local/bin/node node --no-opt -r /proc/.reset --test --test-reporter=spec --test-name-pattern=^AC-PKG-0[48]: evals/
+6587                11:08               Sl                  /run/rosetta/rosetta /usr/local/bin/node /usr/local/bin/node --no-opt -r /proc/.reset --test-name-pattern=^AC-PKG-0[48]: evals/packaging/pac
+6744                11:01               Sl                  /run/rosetta/rosetta /usr/local/bin/node /usr/local/bin/node --no-opt -r /proc/.reset --import /repo/plugins/peak-media/evals/helpers/no-net
+## docker top (full)
+PID                 PPID                ELAPSED             STAT                WCHAN               COMMAND
+820                 795                 12:51               Ss                  do_wait             /run/rosetta/rosetta /usr/bin/bash bash /v/amd64.sh
+6581                820                 11:19               Sl                  do_epoll_wait       /run/rosetta/rosetta /usr/local/bin/node node --no-opt -r /proc/.reset --test --test-reporter=spec --test-name-pattern=^AC-PKG-0[48]: evals/packaging/*.test.mjs
+6587                6581                11:18               Sl                  do_epoll_wait       /run/rosetta/rosetta /usr/local/bin/node /usr/local/bin/node --no-opt -r /proc/.reset --test-name-pattern=^AC-PKG-0[48]: evals/packaging/packaging.test.mjs
+6744                6587                11:11               Sl                  do_epoll_wait       /run/rosetta/rosetta /usr/local/bin/node /usr/local/bin/node --no-opt -r /proc/.reset --import /repo/plugins/peak-media/evals/helpers/no-network.mjs /repo/plugins/peak-media/skills/video-plates/scripts/render-plate.mjs /tmp/tmp.JuMC5d3g0k/pm-pkg04-KtuOwn/plates.json --all
+## pid 6744 detail
+sh: 1: pgrep: not found
+pid=
+init=/initd loglevel=1 root=/dev/vdb rootfstype=erofs ro vsyscall=emulate panic=0 eth0.dhcp eth1.dhcp linuxkit.unified_cgroup_hierarchy=1 console=hvc0   virtio_net.disable_csum=1 slub_min_order=2 page_reporting.page_reporting_order=2 vpnkit.connect=connect://2/1999 com.docker.VMID=36e4a851-e842-4b27-8554-97f5ffadac42
+
+cat: /proc//wchan: No such file or directory
+
+ls: cannot access '/proc//fd': No such file or directory
+children:
+cat: '/proc//task/*/children': No such file or directory
+
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode                                                     
+node-compile-cache
+tmp.JuMC5d3g0k
+/tmp/node-compile-cache:
+total 28
+drwxr-xr-x 3 root root  4096 Nov  9 20:12 .
+drwxrwxrwt 1 root root  4096 Nov  9 20:14 ..
+drwxr-xr-x 2 root root 20480 Nov  9 20:13 v22.23.4-x64-4977cf6d-0
+
+/tmp/tmp.JuMC5d3g0k:
+total 20
+drwx------ 5 root root 4096 Nov  9 20:14 .
+drwxrwxrwt 1 root root 4096 Nov  9 20:14 ..
+drwxr-xr-x 3 root root 4096 Nov  9 20:13 node-compile-cache
+drwx------ 6 root root 4096 Nov  9 20:13 pm-pkg04-KtuOwn
+drwx------ 2 root root 4096 Nov  9 20:13 pulse-PKdhtXMmr18n
+## container log
+## container: x86_64 · Debian GNU/Linux 12 (bookworm) · node v22.23.4
+## V0 — nothing installed: setup.sh (install mode) and --check
+setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)
+exit 3
+setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)
+exit 3
+## V1 — apt-get install ffmpeg ca-certificates only (no browser libs), then setup.sh
+apt exit 0
+setup.sh: render browser can't start — missing system libraries: libXcomposite.so.1 libXdamage.so.1 libatk-1.0.so.0 libatk-bridge-2.0.so.0 libatspi.so.0 libnspr4.so libnss3.so libnssutil3.so — install them (Debian/Ubuntu: sudo apt-get install libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libnspr4 libnss3 libxcomposite1 libxdamage1)
+exit 3
+## V1b — setup.sh --check with libs missing
+setup.sh: render browser can't start — missing system libraries: libXcomposite.so.1 libXdamage.so.1 libatk-1.0.so.0 libatk-bridge-2.0.so.0 libatspi.so.0 libnspr4.so libnss3.so libnssutil3.so — install them (Debian/Ubuntu: sudo apt-get install libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libnspr4 libnss3 libxcomposite1 libxdamage1)
+exit 3
+## V2 — README's Linux package line
+apt-get install -y --no-install-recommends ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libxcomposite1 libxdamage1
+apt exit 0
+deps: up to date (/root/.cache/peak-media/deps/88b6dff0a77c)
+browser: present
+peak-media ready: deps /root/.cache/peak-media/deps/88b6dff0a77c · ffmpeg version 5.1.9-0+deb12u1
+exit 0
+peak-media ready: deps /root/.cache/peak-media/deps/88b6dff0a77c
+exit 0
+browser: /root/.cache/hyperframes/chrome/chrome-headless-shell/linux-152.0.7977.30/chrome-headless-shell-linux64/chrome-headless-shell
+ldd: nothing missing
+## V3 — AC-PKG-04 and AC-PKG-08 evals
+6587                11:31               do_epoll_wait
+6744                11:24               do_epoll_wait
+## stopped by verifier at 15:24:58 after 10 min with no process change (docker rm -f)

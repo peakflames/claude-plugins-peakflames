@@ -4,11 +4,10 @@
 // template's fit, seeks the registered GSAP timeline, and dumps rects and computed styles as JSON.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import os from 'node:os';
 import path from 'node:path';
-import { run, ROOT } from '../helpers/run.mjs';
+import { run, ROOT, tmpDir } from '../helpers/run.mjs';
 import { browserPath } from '../../lib/hf.mjs';
 
 const SCRIPT = 'skills/video-plates/scripts/render-plate.mjs';
@@ -29,7 +28,7 @@ window.__timelines = {};
     content: document.getElementById('content') && rect(document.getElementById('content')),
     body: document.getElementById('body') && rect(document.getElementById('body')),
     footer: document.getElementById('footer') && rect(document.getElementById('footer')),
-    items: [...document.querySelectorAll('.cell,.bullet')].map((e) => ({ text: e.textContent, px: parseFloat(getComputedStyle(e).fontSize), ...rect(e) })),
+    items: [...document.querySelectorAll('.cell,.bullet')].map((e) => ({ text: e.textContent, px: parseFloat(getComputedStyle(e).fontSize), rows: rows(e), ...rect(e) })),
   });
   const wait = () => {
     const tl = window.__timelines.main;
@@ -52,8 +51,17 @@ const projects = {};
 before(() => {
   chrome = browserPath();
   assert.ok(chrome, 'HyperFrames browser installed (run scripts/setup.sh)');
-  for (const [name, file] of [['F1', F1], ['F2', F2]]) {
-    const out = mkdtempSync(path.join(os.tmpdir(), `pm-layout-${name}-`));
+  // ADV: F2's spine with two edge-case slides (WP4 verify-3 N-2/N-3): a table whose last column
+  // holds a 97-character URL next to a hyphenated word, and six bullets that fill the content box.
+  const adv = JSON.parse(readFileSync(F2, 'utf8'));
+  adv.spine = path.join(path.dirname(F2), adv.spine);
+  adv.brand = BRAND;
+  adv.plates[0].text = ['Where each tool lives', 'Tool | Name | Link', 'OpenSpec | peak-workflow | https://github.com/example-org/a-fairly-long-repository-name/blob/main/docs/specs/requirements.md', 'Spec kit | none | n/a'];
+  adv.plates[1].text = ['Six bullets', 'Label: one fairly long bullet that goes on and on to fill the line width and more', 'Two', 'Three', 'Four', 'Five', 'Six'];
+  const ADV = path.join(tmpDir('pm-layout-advsrc-'), 'plates.json');
+  writeFileSync(ADV, JSON.stringify(adv));
+  for (const [name, file] of [['F1', F1], ['F2', F2], ['ADV', ADV]]) {
+    const out = tmpDir(`pm-layout-${name}-`);
     const r = run(SCRIPT, [file, '--all', '--brand', BRAND, '--out', out, '--scaffold-only']);
     assert.equal(r.code, 0, r.stderr);
     projects[name] = out;
@@ -120,4 +128,14 @@ test('layout: slide body stays inside the content box and nothing reaches the fo
       assert.ok(it.px >= 27, `${id}: "${it.text.slice(0, 30)}" is ${it.px} px (< 27 px floor)`);
     }
   }
+});
+
+test('layout: a long URL in a table cell does not split a neighbour\'s word, and the body ends inside the content box', () => {
+  for (const id of ['s1-unit', 's2-ids']) {
+    const { end } = measure('ADV', id);
+    assert.ok(end.body.b <= end.content.b + 0.5, `${id}: body bottom ${end.body.b} past content bottom ${end.content.b}`);
+    for (const it of end.items) assert.ok(it.px >= 27, `${id}: "${it.text.slice(0, 30)}" is ${it.px} px (< 27 px floor)`);
+  }
+  const cell = measure('ADV', 's1-unit').end.items.find((x) => x.text === 'peak-workflow');
+  assert.equal(cell.rows, 1, `"peak-workflow" sits on one row (rows: ${cell.rows})`);
 });

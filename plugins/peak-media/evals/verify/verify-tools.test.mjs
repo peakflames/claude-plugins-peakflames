@@ -2,14 +2,13 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, statSync } from 'node:fs';
-import os from 'node:os';
+import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { run, baseline } from '../helpers/run.mjs';
+import { run, baseline, tmpDir } from '../helpers/run.mjs';
 
 let dir, cuts, plain;
 before(() => {
-  dir = mkdtempSync(path.join(os.tmpdir(), 'pm-verify-'));
+  dir = tmpDir('pm-verify-');
   // 4 s: red | blue at 1.0 s (audio silent 0–2 s) | green at 3.0 s (440 Hz tone 2–4 s)
   cuts = path.join(dir, 'cuts.mp4');
   const r = spawnSync('ffmpeg', ['-v', 'error', '-y',

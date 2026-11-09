@@ -144,7 +144,7 @@ export function plateCuts(sorted, totalMs) {
 
 export async function assemble({ input, brand, renders, out, music, sfx, musicLufs, duckDb, sfxLufs, sfxDb, exportPreset = 'source', minSilenceMs = 300, outro, rerenderOutro = false, renderWrap, log = () => {} }) {
   if (!(exportPreset in EXPORTS)) throw new CliError(`--export must be one of ${Object.keys(EXPORTS).join(', ')}`, EXIT.USAGE);
-  for (const [flag, f] of [['--music', music], ['--sfx', sfx]]) if (f && !existsSync(f)) throw new CliError(`${flag} ${f}: no such file`);
+  for (const [flag, f] of [['--music', music], ['--sfx', sfx], ['--outro', outro]]) if (f && !existsSync(f)) throw new CliError(`${flag} ${f}: no such file`);
   const P = await loadProject(input, { brand });
   const { project, plates, sorted, spine, spineFile, brandDir } = P;
   const { fps, width, height } = plates;

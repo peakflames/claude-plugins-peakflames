@@ -1,0 +1,15 @@
+# r3 verifier: suite TMPDIR /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.oUbn198ZBf right after the suite
+node-compile-cache
+puppeteer_dev_chrome_profile-Lk0ajh
+pm-* entries: 0
+processes then: 5 (HyperFrames warmCheck.js daemon, parent PID 1, + its chrome: README Known limits)
+# after waiting 5 s:
+stray processes (chrome-headless|hyperframes|pm-watchdog|warmCheck): [14995 /opt/homebrew/Cellar/node/26.8.1/bin/node /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c/node_modules/hyperfr
+15056 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-ar
+15057 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-ar
+15058 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-ar
+15059 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-ar]
+TMPDIR now: [node-compile-cache puppeteer_dev_chrome_profile-Lk0ajh ]
+deleted /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.oUbn198ZBf: yes
+# (the wait loop above exited early — a quoting slip in my probe; TMPDIR was deleted with the warm-check daemon still alive.) Waited on PID 14995 directly: it exited 75 s later
+stray processes now: []

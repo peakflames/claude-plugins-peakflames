@@ -89,17 +89,19 @@ above, and follow these rules:
   (folder target) and `curl -o plates/<id>/index.html`. Don't write plates that way.
 - Any `AskUserQuestion` after the storyboard opens unlocks gate 4; the check can't tell whether the
   answer was about the storyboard. Ask about the storyboard, then write the gate line.
+- The check only orders each gate's first passing line. It doesn't see a stage that **starts**
+  before the previous gate line (e.g. the spine run before `GATE 1`, or `assemble` before
+  `GATE 6`). The rule below still holds: write gate n−1's line before stage n's first command.
 
 ---
-
 
 Each stage below ends with **"End the stage with:"** and the literal gate line to emit. Fill in the
 `<…>` parts and write it on its own line in your reply before starting the next stage, every
 time, whatever output style or brevity setting is active. **A stage may not begin until the
 previous stage's gate line has been written**: before a stage's first command, confirm the
-previous gate line is in your replies, and if it isn't, write it now (or finish that stage first). "Show" means put it in the chat, as
-text, before the `AskUserQuestion`; give every file as an absolute path (`<abs>/…` below is the
-video project's absolute path) so the user can open it.
+previous gate line is in your replies, and if it isn't, write it now (or finish that stage first).
+"Show" means put it in the chat, as text, before the `AskUserQuestion`; give every file as an
+absolute path (`<abs>/…` below is the video project's absolute path) so the user can open it.
 
 ## Stage 0 — Brief (user gate)
 

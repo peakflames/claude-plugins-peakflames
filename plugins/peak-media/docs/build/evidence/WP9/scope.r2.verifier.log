@@ -1,0 +1,13 @@
+# r2 scope/media check (HEAD c50972c)
+tracked media files (mp4|webm|wav|mov|mp3|m4a|aac|flac|ogg) in repo: 0
+docs/build tracked extensions:
+  68 jpg
+  27 json
+ 221 log
+  67 md
+   6 mjs
+files changed a79e511..c50972c outside plugins/peak-media: 0
+schemas changed: 0
+plugin.json/CHANGELOG changed: 0
+plugins/peak-media/.gitignore:8:docs/build/**/*.mp3	plugins/peak-media/docs/build/x.mp3
+plugins/peak-media/.gitignore:9:docs/build/**/*.m4a	plugins/peak-media/docs/build/evidence/x.m4a

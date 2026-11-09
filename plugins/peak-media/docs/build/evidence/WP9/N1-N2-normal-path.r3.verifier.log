@@ -1,0 +1,49 @@
+# r3 verifier: runWatched() normal path after the N1 watcher + N2 change (scratch probe /tmp/pm-v3probe/normal.mjs; fresh TMPDIR /tmp/pm-v3probe/nt/tmp). Note: 20 x true timing taken while the full suite was running
+(eval):2: no matches found: nt/tmp/*
+exit 0 echo                        {"status":0,"out":"hi\n","err":"","timedOut":false}
+exit 3                             {"status":3,"out":"o\n","err":"e\n","timedOut":false}
+args w/ spaces quotes $            {"status":0,"out":"a b|it's|$HOME|\"q\"|","err":"","timedOut":false}
+stdin input                        {"status":0,"out":"from-stdin","err":"","timedOut":false}
+cwd honoured                       {"status":0,"out":"/private/tmp\n","err":"","timedOut":false}
+env honoured                       {"status":0,"out":"yes\n","err":"","timedOut":false}
+killed by signal (self SIGTERM)    {"status":143,"out":"","err":"","timedOut":false}
+real binary exits 127              {"status":127,"out":"","err":"No such file or directory: input.mp4\n","timedOut":false}
+missing abs path                   {"status":null,"out":"","err":"","error":"ENOENT","timedOut":false}
+missing on PATH                    {"status":null,"out":"","err":"","error":"ENOENT","timedOut":false}
+non-executable file                {"status":126,"out":"","err":"pm-watchdog: line 2: /tmp/pm-v3probe/nt/noexec: Permission denied\n","timedOut":false}
+timeout 1.5 s                      {"status":null,"out":"","err":"","timedOut":true}
+20 x true ms: 165
+50 MB stdout length 50000000
+buffer true [ 1, 2 ]
+pm-run-* left in TMPDIR: []
+watcher / 'sleep 1' processes left 1.2 s later: [ 5585 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 5586 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 6426 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 6427 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 7170 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 7171 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 7593 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 7594 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 8613 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 8614 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 8650 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 8651 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+ 9415 sleep 1
+ 9416 sleep 1
+ 9417 sleep 1
+ 9426 sleep 1
+ 9438 sleep 1
+ 9441 sleep 1
+ 9442 sleep 1
+ 9464 sleep 1
+ 9469 sleep 1
+ 9470 sleep 1
+ 9471 sleep 1
+98217 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;
+98218 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5;]
+## N2 via lib/ffmpeg.mjs
+PEAK_MEDIA_FFMPEG = real binary that prints 'No such file or directory' and exits 127:
+   ffmpeg failed: No such file or directory: input.mp4 | exit 1
+PEAK_MEDIA_FFMPEG = path that doesn't exist:
+   ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE | exit 3
+# note: the processes listed in the 'left 1.2 s later' line belong to the full eval suite running concurrently (its own watched steps), not to this probe; the same check run alone earlier (suite idle) listed none

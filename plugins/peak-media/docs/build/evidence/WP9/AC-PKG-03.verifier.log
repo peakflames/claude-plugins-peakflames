@@ -1,0 +1,75 @@
+## grep -ri peakflames (runtime tree, incl. ignored files on disk)
+Mon Nov  9 12:54:55 EST 2026
+grep exit=1 (1 = no hits)
+## git-tracked only
+exit=1
+## file names
+exit=1
+## examples dirs and their files
+skills/video-capture/examples/deck/brief.md
+skills/video-capture/examples/deck/index.html
+skills/video-capture/examples/deck/script.md
+skills/video-capture/examples/deck/storyboard.mjs
+skills/video-capture/examples/ui-demo/captions-alt.css
+skills/video-capture/examples/ui-demo/index.html
+skills/video-capture/examples/ui-demo/storyboard.mjs
+## asset-like files in examples
+exit=1
+## where peakflames does appear (excluded areas)
+README.md
+docs/build/acceptance.md
+docs/build/decisions.md
+docs/build/evidence/WP2/AC-BASE-01.log
+docs/build/evidence/WP3a/AC-TTS-07.log
+docs/build/evidence/WP4/AC-BASE-08.r2.log
+docs/build/evidence/WP4/AC-BASE-08.verifier.log
+docs/build/evidence/WP4/AC-PLT-02.log
+docs/build/evidence/WP4/AC-PLT-03.log
+docs/build/evidence/WP4/AC-VND-02.log
+docs/build/evidence/WP6/AC-ASM-06.log
+docs/build/evidence/WP6/AC-BASE-11.log
+docs/build/evidence/WP7a/AC-BASE-09.log
+docs/build/evidence/WP7a/AC-REC-02.log
+docs/build/evidence/WP7a/AC-REC-04.log
+docs/build/evidence/WP7a/f3-live-takes.json
+docs/build/evidence/WP7b/AC-REC-08.log
+docs/build/evidence/WP7b/AC-REC-08.r2.log
+docs/build/evidence/WP7b/AC-REC-09-deck.take.json
+docs/build/evidence/WP7b/AC-REC-09-reproduce.json
+docs/build/evidence/WP7b/AC-REC-09-ui-default.take.json
+docs/build/evidence/WP7b/AC-REC-09.log
+docs/build/evidence/WP8/AC-ORC-02-04-checker-attacks.verifier.log
+docs/build/evidence/WP8/AC-ORC-05.verifier.log
+docs/build/evidence/WP8/orc-01-runbook.verifier-r2.log
+docs/build/evidence/WP8/runbook-paste.r2.log
+docs/build/fixtures/F3/brief.md
+docs/build/fixtures/F3/plates.json
+docs/build/fixtures/F4/brief.md
+docs/build/plan.md
+docs/build/references/openspec-vs-peak-workflow.md
+docs/build/wp/WP1/verify-1.md
+docs/build/wp/WP1/verify-2.md
+docs/build/wp/WP10/brief.md
+docs/build/wp/WP2/brief.md
+docs/build/wp/WP2/verify-1.md
+docs/build/wp/WP3a/verify-1.md
+docs/build/wp/WP3b/verify-1.md
+docs/build/wp/WP4/verify-1.md
+docs/build/wp/WP4/verify-2.md
+docs/build/wp/WP4/verify-3.md
+docs/build/wp/WP5/verify-1.md
+docs/build/wp/WP6/brief.md
+docs/build/wp/WP6/verify-1.md
+docs/build/wp/WP6/verify-2.md
+docs/build/wp/WP7a/verify-1.md
+docs/build/wp/WP7b/verify-1.md
+docs/build/wp/WP8/brief.md
+docs/build/wp/WP8/kickoff.md
+docs/build/wp/WP8/orc-01-runbook.md
+docs/build/wp/WP8/verify-1.md
+docs/build/wp/WP8/verify-2.md
+docs/build/wp/WP8/verify-3.md
+docs/build/wp/WP9/brief.md
+docs/build/wp/WP9/pkg-02-05-runbook.md
+docs/reference/narration-writing.md
+docs/web2video-plan.md

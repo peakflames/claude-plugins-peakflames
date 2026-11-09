@@ -102,7 +102,9 @@ export function runTests(ids, evals) {
   const res = new Map(ids.map((id) => [id, 'no-test']));
   if (!ids.length) return res;
   const pattern = `^(${ids.join('|')}):`;
-  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${pattern}`, evals], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  // a glob, not the folder: Node 22's --test doesn't expand a directory argument
+  const files = existsSync(evals) && statSync(evals).isDirectory() ? path.join(evals, '**', '*.test.mjs') : evals;
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${pattern}`, files], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   for (const line of (r.stdout ?? '').split('\n')) {
     const m = /^(ok|not ok) \d+ - (AC-[A-Z]+-\d+):/.exec(line.trimStart());
     if (m) {

@@ -7,9 +7,8 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, chmodSync
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import os from 'node:os';
 import path from 'node:path';
-import { ROOT, run, baseline } from '../helpers/run.mjs';
+import { ROOT, run, baseline, tmpDir } from '../helpers/run.mjs';
 import { CAPTURE, DECK, LOCAL_PAGE, deckSpine, makeF3Project } from './helpers/projects.mjs';
 import { spec, framesFor, FrameGrid } from '../../skills/video-capture/scripts/capture.mjs';
 import { browserPath } from '../../lib/hf.mjs';
@@ -22,7 +21,7 @@ const STORYBOARD = path.join(DECK, 'storyboard.mjs');
 
 let tmp, spineFile, spineDoc;
 before(() => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'pm-capture-eval-'));
+  tmp = tmpDir('pm-capture-eval-');
   ({ file: spineFile, manifest: spineDoc } = deckSpine(tmp));
 });
 after(() => { if (tmp) rmSync(tmp, { recursive: true, force: true }); });

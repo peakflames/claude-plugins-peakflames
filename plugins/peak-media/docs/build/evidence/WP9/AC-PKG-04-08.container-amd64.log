@@ -1,0 +1,27 @@
+## container: x86_64 · Debian GNU/Linux 12 (bookworm) · node v22.23.4 · npm 10.9.9
+## step 1 — the documented prerequisites (README): ffmpeg, and on Linux the headless browser's shared libraries
+apt-get install -y --no-install-recommends ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libxcomposite1 libxdamage1
+ffmpeg: ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026 the FFmpeg developers
+## step 2 — setup.sh --check before setup (expect one line, exit 3)
+setup.sh: runtime deps not installed in /root/.cache/peak-media/deps/88b6dff0a77c — run /repo/plugins/peak-media/scripts/setup.sh
+exit 3
+## step 3 — AC-PKG-04 and AC-PKG-08 (each test runs setup.sh itself, then F1 / F0)
+# F1: spine 20773 ms (3 beats) + outro 3000 ms → out/final.mp4; PASS  /tmp/tmp.la9Z5YUT1j/pm-pkg04-Hz6BsB/out/final.mp4
+✔ AC-PKG-04: setup.sh, then the F1 brief end to end with no key (fake/tone spine, default pack) — passes with no manual steps (151142.632511ms)
+✔ AC-PKG-08: setup + F0 in a headless environment — passes, or prints one line naming what is missing (32403.015903ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 184604.877246
+## step 4 — setup.sh --check after
+peak-media ready: deps /root/.cache/peak-media/deps/88b6dff0a77c
+exit 0
+## browser libraries missing after setup (ldd):
+none
+## TMPDIR left after the run: 929 entries
+      1 node-compile
+      1 pulse

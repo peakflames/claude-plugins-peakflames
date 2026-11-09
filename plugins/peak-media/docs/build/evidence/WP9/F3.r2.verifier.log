@@ -1,0 +1,3 @@
+# F3 r2 probe: setup.sh --check run via a path containing a single quote
+peak-media ready: deps /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c
+exit 0

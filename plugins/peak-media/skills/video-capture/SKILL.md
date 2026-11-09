@@ -107,7 +107,8 @@ Not for designed motion graphics, kinetic text or slides you are building from s
   (`spine --lead-ms …`; the deck loop needs about 950 ms). A narrated take with **no** detected
   change fails too: fades of ~300 ms or longer score under 0.02 per frame. Shorten the transitions
   or lower `--scene-threshold`; `--expect-cuts n` pins the expected count (`0` for a take that
-  really has none).
+  really has none). **For a deck, always pass `--expect-cuts <slides − 1>`:** without it, a take
+  where some slide changes are detected and others missed still passes.
 - **probe-spec** (`lib/verify/probe-spec.mjs out/demo.mp4 --size 1280x720`) confirms the delivery
   spec.
 - **The take summary** reports any `say()` that started after its clip; a few hundred ms in a deck

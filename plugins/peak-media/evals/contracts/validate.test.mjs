@@ -1,9 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, cpSync } from 'node:fs';
-import os from 'node:os';
+import { readFileSync, writeFileSync, mkdirSync, cpSync } from 'node:fs';
 import path from 'node:path';
-import { run, fx, ROOT, baseline } from '../helpers/run.mjs';
+import { run, fx, ROOT, baseline, tmpDir } from '../helpers/run.mjs';
 
 const V = 'scripts/validate.mjs';
 const B = path.join(ROOT, 'docs', 'build', 'fixtures');
@@ -41,7 +40,7 @@ test('AC-CON-02: six bad fixtures each fail and name the field', () => {
 });
 
 test('AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field', () => {
-  const out = path.join(mkdtempSync(path.join(os.tmpdir(), 'pm-con03-')), 'manifest.json');
+  const out = path.join(tmpDir('pm-con03-'), 'manifest.json');
   const legacyPath = fx('legacy-narration.json');
   const r = run(V, ['--from-legacy', legacyPath, '--out', out]);
   assert.equal(r.code, 0, r.stdout + r.stderr);
@@ -61,7 +60,7 @@ test('AC-BASE-02: validate baseline (help, version, bad input, no stack, no netw
 });
 
 test('validate: cross-reference checks (not AC-bound)', () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'pm-xref-'));
+  const dir = tmpDir('pm-xref-');
   const m = JSON.parse(readFileSync(fx('neutral-brief', 'spine', 'manifest.json'), 'utf8'));
   const check = (name, doc, re) => {
     const p = path.join(dir, name);
