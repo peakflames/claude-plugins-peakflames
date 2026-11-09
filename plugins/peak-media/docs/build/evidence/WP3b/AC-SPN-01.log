@@ -1,0 +1,117 @@
+## AC-SPN-01 — F1 (20 s target) with fake/tone: brief → script → spine; network spy preloaded
+$ spine --brief brief.md --budget
+budget  20.0 s at 165 wpm, 3 beat(s) × 500 ms padding → about 51 words
+  hook               14 words  ≈ 5.6 s
+  compare            27 words  ≈ 10.3 s
+  close               9 words  ≈ 3.8 s
+script  50 words (on budget)
+exit=0
+$ spine --brief brief.md --tts-model fake/tone --cache-dir cache
+  n  words      s     wpm
+  1     14    5.09     165
+  2     27    9.82     165
+  3      9    3.27     165
+clips  0/3 cached · exported to narr/spine/clips
+beat  hook               0.00 s  +5.70 s
+beat  compare            5.70 s  +10.42 s
+beat  close             16.12 s  +3.88 s
+wrote narr/spine/manifest.json and narr/spine/narration.wav
+PASS  runtime 20.00 s against a 20.0 s target (+0.0%)
+exit=0
+$ node scripts/validate.mjs spine/manifest.json
+ok    spine/manifest.json (spine v1)
+exit=0
+$ node -e "const m=require('./spine/manifest.json');console.log('totalMs', m.totalMs, 'target', m.targetMs, 'within ±10%:', Math.abs(m.totalMs-m.targetMs)<=m.targetMs*0.1)"
+totalMs 20000 target 20000 within ±10%: true
+exit=0
+$ ffprobe -v error -show_entries format=duration:stream=sample_rate,channels -of compact spine/narration.wav
+stream|sample_rate=48000|channels=1
+format|duration=20.000000
+exit=0
+## spine/manifest.json
+{
+  "schemaVersion": 1,
+  "kind": "narration",
+  "targetMs": 20000,
+  "totalMs": 20000,
+  "model": "fake/tone",
+  "voice": "Achird",
+  "style": "",
+  "audioOffsetMs": 0,
+  "command": [
+    "node",
+    "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs",
+    "--brief",
+    "brief.md",
+    "--tts-model",
+    "fake/tone",
+    "--cache-dir",
+    "cache"
+  ],
+  "narrate": true,
+  "audio": "narration.wav",
+  "beats": [
+    {
+      "id": "hook",
+      "startMs": 0,
+      "durationMs": 5697,
+      "clipNs": [
+        1
+      ],
+      "onScreenText": "OpenSpec vs. Peak Workflow: who checks the work?"
+    },
+    {
+      "id": "compare",
+      "startMs": 5697,
+      "durationMs": 10424,
+      "clipNs": [
+        2
+      ],
+      "onScreenText": "OpenSpec: one AI writes and reviews. Peak Workflow: a separate session passes or fails each requirement."
+    },
+    {
+      "id": "close",
+      "startMs": 16121,
+      "durationMs": 3879,
+      "clipNs": [
+        3
+      ],
+      "onScreenText": "OpenSpec: speed. Peak Workflow: proof."
+    }
+  ],
+  "clips": [
+    {
+      "n": 1,
+      "beat": "hook",
+      "text": "<Warm> Two tools, one promise: spec before code. They differ on who checks the work.",
+      "style": "",
+      "startMs": 250,
+      "durationMs": 5091,
+      "words": 14,
+      "wpm": 165,
+      "file": "328ed22ead14cf8e841af859c6d405f6ef4037ae1ec7aa7ad4bbe8e0698b4828.wav"
+    },
+    {
+      "n": 2,
+      "beat": "compare",
+      "text": "OpenSpec stays fast: one AI writes and reviews each change. Peak Workflow gives each requirement an ID, and a separate reviewer session passes or fails each one.",
+      "style": "",
+      "startMs": 5947,
+      "durationMs": 9818,
+      "words": 27,
+      "wpm": 165,
+      "file": "aa2a485170a4b9844eefbb9816223e40b6bdd2a762f511929a9c4fb1521c3fa0.wav"
+    },
+    {
+      "n": 3,
+      "beat": "close",
+      "text": "<Confident> OpenSpec wins on speed. Peak Workflow wins on proof.",
+      "style": "",
+      "startMs": 16371,
+      "durationMs": 3273,
+      "words": 9,
+      "wpm": 165,
+      "file": "633d96bf87be849daac1f7d329fe1000e8085da14d234fe8a3db20c76ac4a947.wav"
+    }
+  ]
+}

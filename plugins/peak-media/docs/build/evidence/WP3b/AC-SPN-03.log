@@ -1,0 +1,14 @@
+## AC-SPN-03 — gaps between beats in the AC-SPN-01 manifest, then check-cuts at the beat boundaries
+$ node -e "const m=require('./spine/manifest.json');for(let i=1;i<m.clips.length;i++){const p=m.clips[i-1],c=m.clips[i];const g=c.startMs-(p.startMs+p.durationMs);console.log('clip',p.n,'->',c.n,'gap',g,'ms',g>=400?'ok':'FAIL')}"
+clip 1 -> 2 gap 606 ms ok
+clip 2 -> 3 gap 606 ms ok
+exit=0
+$ node lib/verify/check-cuts.mjs spine/narration.wav --cuts 5697,16121 --min-silence-ms 400 --expect-cuts 2
+ok    cut at 0:05.697 — silence 606 ms
+ok    cut at 0:16.121 — silence 606 ms
+PASS  2 cut(s), 0 failing — spine/narration.wav
+exit=0
+## rerun (cache)
+$ spine --brief brief.md --tts-model fake/tone --cache-dir cache | grep cached
+clips  3/3 cached · exported to narr/spine/clips
+exit=0

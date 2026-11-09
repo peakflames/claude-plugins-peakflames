@@ -1,0 +1,82 @@
+## AC-BASE-06 — spine entry point baseline
+$ spine --help
+spine — turn brief.md + script.md into the timed spine every plate hangs on
+
+Usage: spine [options]
+
+Reads the brief's runtime and beat list, and script.md (one "## <beat-id>" section per beat,
+one paragraph each). With narration it synthesizes one clip per beat, lays them out with
+--lead-ms/--tail-ms of silence inside each beat (so beats are separated by at least 400 ms),
+and writes spine/narration.wav + spine/manifest.json. Without narration (--no-narrate, or no
+PEAK_MEDIA_OPENROUTER_API_KEY (or legacy TTS_OPENROUTER_API_KEY) for a real model) it writes spine/beatgrid.json and a silent spine/narration.wav, with
+no network calls. Narration is on by default when PEAK_MEDIA_OPENROUTER_API_KEY is set or --tts-model is fake/tone.
+Exit 1 (files still written) when the runtime is outside the target ±10%: resize script.md.
+
+Options:
+      --brief <file>          The video brief (runtime and beat list) (default: brief.md)
+      --script <file>         Narration script (default: script.md next to the brief)
+      --out <dir>             Spine folder (default: spine/ next to the brief)
+      --target-ms <ms>        Target runtime (overrides the brief)
+      --narrate               Require narration (fails without PEAK_MEDIA_OPENROUTER_API_KEY unless --tts-model fake/tone)
+      --no-narrate            Write a beat grid (no voice, no network)
+      --tts-model <model>     TTS model (fake/tone for offline tests) (default: google/gemini-3.8-flash-lite-tts)
+      --voice <name>          TTS voice (default: Achird)
+      --style <text>          Style instructions sent with every clip (default: )
+      --lead-ms <ms>          Silence before the clip inside each beat (≥ 200) (default: 250)
+      --tail-ms <ms>          Silence after the clip inside each beat (≥ 200) (default: 250)
+      --max-hold-ms <ms>      Most extra hold added per beat when the spine runs short of the target (default: 1000)
+      --bpm <n>               Beat-grid tempo; beat lengths snap to whole beats (default: 120)
+      --audio-offset-ms <ms>  Recorded in the manifest for laying narration onto picture (default: 0)
+      --cache-dir <dir>       TTS clip cache (default: ~/.cache/peak-media/tts)
+      --export-clips <dir>    Copy every clip here (default: <out>/clips)
+      --debug-requests        Log TTS requests (key redacted)
+      --budget                Print the word budget per beat and exit (no synthesis, no network)
+      --wpm <n>               Speaking rate for --budget (measure yours with sample-voice) (default: 165)
+  -h, --help                  Show this help and exit
+      --version               Print the plugin version and exit
+
+Examples:
+  spine --brief brief.md --budget
+  spine --brief brief.md --tts-model fake/tone
+  spine --brief brief.md --voice Achird --style "Clear, friendly explainer tone."
+  spine --brief brief.md --no-narrate
+exit=0
+$ spine --version
+0.1.0
+exit=0
+$ cat .claude-plugin/plugin.json | grep version
+  "version": "0.1.0"
+exit=0
+$ spine --bogus
+spine: Unknown option '--bogus'
+Run 'spine --help' for usage.
+exit=2
+$ spine --brief nope.md
+spine: cannot read brief grid/nope.md: no such file
+exit=1
+$ spine --brief brief.md --narrate --no-narrate
+spine: --narrate and --no-narrate are mutually exclusive
+Run 'spine --help' for usage.
+exit=2
+$ spine --brief brief.md --lead-ms 50
+spine: --lead-ms must be ≥ 200 (DEC-13/29: beats need ≥ 400 ms of silence between them), got 50
+Run 'spine --help' for usage.
+exit=2
+$ spine --brief brief.md --bpm x
+spine: --bpm expects a number, got 'x'
+Run 'spine --help' for usage.
+exit=2
+$ spine --brief brief.md --tts-model nope/model
+spine: unknown --tts-model 'nope/model' (expected fake/tone, google/gemini-3.8-flash-lite-tts, google/gemini-3.8-flash-tts, microsoft/mai-voice-2.1-flash, microsoft/mai-voice-2.1)
+Run 'spine --help' for usage.
+exit=2
+$ spine --brief brief.md --narrate
+spine: narration needs PEAK_MEDIA_OPENROUTER_API_KEY (or legacy TTS_OPENROUTER_API_KEY) — export it, or drop --narrate to write a beat grid
+exit=3
+$ spine --brief docs/build/fixtures/F1/run/ev/bad/brief.md
+spine: script.md: beat 'hook' has 2 paragraphs — write one paragraph per beat (merge them, or split the beat)
+exit=1
+$ spine stray
+spine: unexpected argument 'stray'
+Run 'spine --help' for usage.
+exit=2
