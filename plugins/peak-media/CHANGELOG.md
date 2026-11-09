@@ -18,5 +18,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Spine TTS layer** (`lib/tts`, `sample-voice`) — OpenRouter speech with zero data retention on every request, cache-compatible with the old recorder (plus legacy cache dirs), an offline `fake/tone` provider, and a wpm table that warns on slow clips.
 - **`video-plates` skill and `render-plate`** — motion (kinetic type) and slide (deck) templates driven by brand tokens and local GSAP; each plate renders alone to its planned duration, with lint/strict checks, contact sheets, and a text-fit guard (27 px minimum).
 - **Vendored HyperFrames references** — six HyperFrames skills from a pinned upstream commit, kept as read-only references (Apache-2.0, telemetry lines removed, every change listed in `VENDORED.md`).
+- **`video-assemble` skill** — `assemble` composites rendered plates onto the spine, checks every cut lands in silence (failing with the timecode), appends the brand outro and writes `out/final.mp4` to the delivery spec (`--export 1080p60` option).
+- **`remux-audio`** — lays music and SFX stems under the narration (music about 12 dB under the voice, ducked between lines) without re-encoding the picture.
 - **Neutral default brand pack** — `brand-packs/default` with Inter and JetBrains Mono (OFL, bundled woff2), design tokens, a placeholder logo, a 3 s outro and music rules; no music ships, and a rebrand is a re-render with `--brand`.
 - **`validate` script** — checks any contract file against its schema plus cross-references, and imports a legacy `narration.json` as a spine manifest.

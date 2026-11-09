@@ -14,7 +14,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP3b | verified | wp/WP3b/verify-1.md |
 | WP4 | verified | wp/WP4/verify-2.md |
 | WP5 | verified | wp/WP5/verify-1.md |
-| WP6 | not-started | — |
+| WP6 | verified (ASM-06 awaits user listen) | wp/WP6/verify-2.md |
 | WP7a | not-started | — |
 | WP7b | not-started | — |
 | WP8 | not-started | — |
@@ -58,12 +58,12 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-BRD-01 | §7 | WP5 | G `brand-packs/default` · W validate · T it passes; every font has a licence file | script | PASS | evidence/WP5/AC-BRD-01.log |
 | AC-BRD-02 | design §1.10 | WP5 | G F1 plate 1 rendered with the default pack and with a second synthetic pack · W both contact sheets are compared · T colours and fonts differ, and nothing but `--brand` changed | still | PASS | evidence/WP5/AC-BRD-02-verifier-default.jpg, evidence/WP5/AC-BRD-02-verifier-alt.jpg |
 | AC-BRD-03 | §7 | WP5 | G the plugin tree · W search for audio files · T no music ships | script | PASS | evidence/WP5/AC-BRD-03.log |
-| AC-ASM-01 | kickoff milestone | WP6 | G the F1 manifest and plate MP4s · W assemble · T every plate cut lands in a silent gap (`check-cuts --min-silence-ms 300`) | script | not-started | — |
-| AC-ASM-02 | design rule | WP6 | G the review MP4 · W music and SFX stems are remuxed · T the md5 of the video stream (`-map 0:v -f md5`) is unchanged | script | not-started | — |
-| AC-ASM-03 | D7 | WP6 | G `out/final.mp4` · W probe-spec · T the spec passes and duration = spine + outro ±1 frame | script | not-started | — |
-| AC-ASM-04 | §7 | WP6 | G no music supplied · W assemble · T it succeeds with narration only | script | not-started | — |
-| AC-ASM-05 | kickoff | WP6 | G the brand pack outro · W assemble · T the final contact sheet's last frames show the outro | still | not-started | — |
-| AC-ASM-06 | design stage 8 | WP6 | G a user-supplied track and SFX · W the music pass, then the SFX pass · T the user listens and approves the levels (narration −16 LUFS, music ducked) | manual | not-started | — |
+| AC-ASM-01 | kickoff milestone | WP6 | G the F1 manifest and plate MP4s · W assemble · T every plate cut lands in a silent gap (`check-cuts --min-silence-ms 300`) | script | PASS | evidence/WP6/AC-ASM-01.r2.log |
+| AC-ASM-02 | design rule | WP6 | G the review MP4 · W music and SFX stems are remuxed · T the md5 of the video stream (`-map 0:v -f md5`) is unchanged | script | PASS | evidence/WP6/AC-ASM-02.r2.log |
+| AC-ASM-03 | D7 | WP6 | G `out/final.mp4` · W probe-spec · T the spec passes and duration = spine + outro ±1 frame | script | PASS | evidence/WP6/AC-ASM-03.r2.log |
+| AC-ASM-04 | §7 | WP6 | G no music supplied · W assemble · T it succeeds with narration only | script | PASS | evidence/WP6/AC-ASM-04.r2.log |
+| AC-ASM-05 | kickoff | WP6 | G the brand pack outro · W assemble · T the final contact sheet's last frames show the outro | still | PASS | evidence/WP6/AC-ASM-05-verifier-r2.jpg |
+| AC-ASM-06 | design stage 8 | WP6 | G a user-supplied track and SFX · W the music pass, then the SFX pass · T the user listens and approves the levels (narration −16 LUFS, music ducked) | manual | blocked: needs user listen on the real F1 mix (levels PASS in verify-2) | evidence/WP6/AC-ASM-06.r2.log |
 | AC-REC-01 | D1 | WP7a | G `capture --help` · W parsed · T it lists `--storyboard --out --mp4 --viewport --no-captions --caption-css --url --debug-requests --audio-offset-ms --spine` and no narration flags; a test parses each flag | script | not-started | — |
 | AC-REC-02 | D2 | WP7a | G a missing Chromium or ffmpeg, or a bad `--spine` · W capture · T exits non-zero in under 2 s with no browser launch | script | not-started | — |
 | AC-REC-03 | D6 | WP7a | G `examples/deck/storyboard.mjs` (original loop) · W it runs in silent, captions and spine-timed modes · T it runs unmodified in all three | script | not-started | — |
@@ -100,5 +100,5 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-BASE-08 | orch §5 baseline | WP4 | G the `render-plate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP4/AC-BASE-08.r2.log |
 | AC-BASE-09 | orch §5 baseline | WP7a | G the `capture` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
 | AC-BASE-10 | orch §5 baseline | WP7b | G the `check-take` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
-| AC-BASE-11 | orch §5 baseline | WP6 | G the `assemble` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
-| AC-BASE-12 | orch §5 baseline | WP6 | G the `remux-audio` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
+| AC-BASE-11 | orch §5 baseline | WP6 | G the `assemble` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-11.r2.log |
+| AC-BASE-12 | orch §5 baseline | WP6 | G the `remux-audio` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-12.r2.log |
