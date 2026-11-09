@@ -1,0 +1,85 @@
+# AC-ORC-05 verifier probes 2026-11-09T13:55:57Z HEAD 1aed81f
+## F1 spine, fake/tone at the real 26 s target (scratch dir)
+PASS  runtime 23.77 s against a 26.0 s target (-8.6%)
+## F1 beat grid (--no-narrate)
+PASS  runtime 26.00 s against a 26.0 s target (+0.0%)
+## beats (manifest)
+hook 0 6591
+compare 6591 11682
+close 18273 5500
+## beats (beatgrid)
+hook 0 7500
+compare 7500 12500
+close 20000 6000
+## fixture plate times (stale)
+p1-hook hook 0 6500
+p2-table compare 6500 7500
+p3-close close 14000 6000
+## 1. stale F1 fixture -> --spine manifest -o
+p1-hook          hook               0 ms +6591 ms  (was 0 +6500)
+p2-table         compare         6591 ms +11682 ms  (was 6500 +7500)
+p3-close         close          18273 ms +5500 ms  (was 14000 +6000)
+PASS  retimed 3 plate(s) from manifest.json (3 changed) → /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.UR6XiFJWLF/n/plates.json
+exit 0
+fixture unchanged
+p1-hook 0 6591 == beat
+p2-table 6591 11682 == beat
+p3-close 18273 5500 == beat
+all equal: true | spine: spine/manifest.json | brand: /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media/brand-packs/default
+ok    /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.UR6XiFJWLF/n/plates.json (plates v1)
+ok    /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.UR6XiFJWLF/n/spine/manifest.json (spine v1)
+validate exit 0
+p1-hook          hook               0 ms +6591 ms  (unchanged)
+p2-table         compare         6591 ms +11682 ms  (unchanged)
+p3-close         close          18273 ms +5500 ms  (unchanged)
+PASS  3 plate(s) on their beat times (manifest.json)
+check exit 0
+## 2. beatgrid spine, in place via plates.json "spine"
+p1-hook          hook               0 ms +7500 ms  (was 0 +6500)
+p2-table         compare         7500 ms +12500 ms  (was 6500 +7500)
+p3-close         close          20000 ms +6000 ms  (was 14000 +6000)
+FAIL  3 of 3 plate(s) off their beat times — run retime-plates /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.UR6XiFJWLF/g/plates.json
+check(before) exit 1
+p1-hook          hook               0 ms +7500 ms  (was 0 +6500)
+p2-table         compare         7500 ms +12500 ms  (was 6500 +7500)
+p3-close         close          20000 ms +6000 ms  (was 14000 +6000)
+PASS  retimed 3 plate(s) from beatgrid.json (3 changed) → /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.UR6XiFJWLF/g/plates.json
+exit 0
+all equal: true
+ok    /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.UR6XiFJWLF/g/plates.json (plates v1)
+validate exit 0
+## 3. one-plate-per-beat refusals (stderr, exit, file unchanged)
+--- missing beat
+exit 1
+retime-plates: beat 'compare' has no plate — add one plate for it to plates.json
+(file unchanged)
+stderr lines: 1, stack lines: 0
+--- unknown beat
+exit 1
+retime-plates: plate 'p3-close' names beat 'outro', which is not in the spine (beats: hook, compare, close) — fix its beat (+1 more)
+(file unchanged)
+stderr lines: 1, stack lines: 0
+--- two plates on one beat
+exit 1
+retime-plates: beat 'hook' has 2 plates (p1-hook, p1b-hook) — one plate per beat: merge them, or split the beat in script.md and rerun the spine
+(file unchanged)
+stderr lines: 1, stack lines: 0
+--- two problems (dup + missing)
+exit 1
+retime-plates: beat 'hook' has 2 plates (p1-hook, p3-close) — one plate per beat: merge them, or split the beat in script.md and rerun the spine (+1 more)
+(file unchanged)
+stderr lines: 1, stack lines: 0
+--- duplicate plate id on distinct beats
+exit 1
+retime-plates: retimed plates.json would not validate: plates[1].id: duplicate plate id 'p1-hook'
+(file unchanged)
+stderr lines: 1, stack lines: 0
+--- empty plates
+exit 1
+retime-plates: beat 'hook' has no plate — add one plate for it to plates.json (+2 more)
+(file unchanged)
+stderr lines: 1, stack lines: 0
+--- plates out of beat order
+exit 0
+(FILE CHANGED)
+stderr lines: 0, stack lines: 0
