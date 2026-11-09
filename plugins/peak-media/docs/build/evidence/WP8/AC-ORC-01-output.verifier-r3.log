@@ -1,0 +1,31 @@
+## probe-spec out/final.mp4
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    duration (±1 frame): 37000 ms
+PASS  /Users/schaveyt/tmp/peak-media-orc-01/out/final.mp4
+exit=0
+
+## check-cuts review/review.mp4 --cuts 7010,16940,28470
+ok    cut at 0:07.010 — silence 1181 ms
+ok    cut at 0:16.940 — silence 832 ms
+ok    cut at 0:28.470 — silence 935 ms
+PASS  3 cut(s), 0 failing — /Users/schaveyt/tmp/peak-media-orc-01/review/review.mp4
+exit=0
+
+## check-cuts out/final.mp4 --cuts 7010,16940,28470
+ok    cut at 0:07.010 — silence 1181 ms
+ok    cut at 0:16.940 — silence 832 ms
+ok    cut at 0:28.470 — silence 935 ms
+PASS  3 cut(s), 0 failing — /Users/schaveyt/tmp/peak-media-orc-01/out/final.mp4
+exit=0
+
+## contact-sheet
+docs/build/evidence/WP8/AC-ORC-01-final.verifier-r3.jpg (38 frames, 4×10): 00.00 01.00 02.00 03.00 04.00 05.00 06.00 07.00 08.00 09.00 10.00 11.00 12.00 13.00 14.00 15.00 16.00 17.00 18.00 19.00 20.00 21.00 22.00 23.00 24.00 25.00 26.00 27.00 28.00 29.00 30.00 31.00 32.00 33.00 34.00 35.00 36.00 36.97
+exit=0
