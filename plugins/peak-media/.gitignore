@@ -6,3 +6,4 @@ docs/build/**/*.webm
 docs/build/**/*.wav
 docs/build/**/*.mov
 docs/build/fixtures/**/run/
+.DS_Store
