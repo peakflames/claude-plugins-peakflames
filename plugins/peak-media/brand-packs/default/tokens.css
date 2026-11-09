@@ -1,0 +1,70 @@
+/* peak-media default brand pack — design tokens.
+   Neutral on purpose: a dark slate canvas, near-white type, one blue accent.
+   Every plate reads only these custom properties, so a rebrand is a new pack + a re-render.
+   Fonts are local woff2 files (OFL, see fonts/<family>/OFL.txt); nothing is fetched at render time. */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('fonts/inter/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('fonts/inter/inter-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('fonts/jetbrains-mono/jetbrains-mono-latin-700-normal.woff2') format('woff2');
+}
+
+:root {
+  /* colour */
+  --color-bg: #0f1115;
+  --color-fg: #f4f4f5;
+  --color-accent: #4f8cff;
+  --color-muted: #9aa0aa;
+  --color-surface: #1a1d24;
+
+  /* type */
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --weight-body: 400;
+  --weight-display: 700;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+
+  /* spacing (multiples of 8 px at 720p) */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-6: 48px;
+  --space-8: 64px;
+
+  /* size (720p frame; scale with the frame height) */
+  --size-display: 80px;
+  --size-title: 56px;
+  --size-body: 32px;
+  --size-caption: 28px;
+  --size-mono: 26px;
+  --radius: 12px;
+}
