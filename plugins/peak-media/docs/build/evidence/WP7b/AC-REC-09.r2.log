@@ -1,0 +1,26 @@
+## mutation: commandFor skips --caption-css
+diff --git a/plugins/peak-media/skills/video-capture/scripts/capture.mjs b/plugins/peak-media/skills/video-capture/scripts/capture.mjs
+index 6b380f3..436d671 100644
+--- a/plugins/peak-media/skills/video-capture/scripts/capture.mjs
++++ b/plugins/peak-media/skills/video-capture/scripts/capture.mjs
+@@ -310,7 +310,7 @@ export function commandFor(values, script = fileURLToPath(import.meta.url)) {
+   const cmd = ['node', script];
+   for (const [k, o] of Object.entries(spec.options)) {
+     const v = values[k];
+-    if (v === undefined || v === false) continue;
++    if (v === undefined || v === false || k === 'caption-css') continue; // VERIFIER MUTATION
+     if (o.type === 'boolean') { cmd.push(`--${k}`); continue; }
+     let s = String(v);
+     if (PATH_FLAGS.has(k) || (k === 'url' && !isUrl(s))) s = path.resolve(s);
+✖ AC-REC-09: the take manifest validates against the v1 spine schema and command[] reproduces the take (75019.488166ms)
+ℹ pass 0
+ℹ fail 1
+✖ AC-REC-09: the take manifest validates against the v1 spine schema and command[] reproduces the take (75019.488166ms)
+  AssertionError [ERR_ASSERTION]: command[] has --caption-css
+    actual: false,
+    expected: true,
+
+# reproduction deltas in the full-suite run (second - first)
+videoMs 14233 -> 14200
+caption startMs deltas -33,-31,-32,-13,-22
+# mutation reverted: git checkout -- capture.mjs; git status clean apart from verifier evidence

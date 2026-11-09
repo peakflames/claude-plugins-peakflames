@@ -1,0 +1,94 @@
+## env: node v26.8.1, ffmpeg version 9.0.2 C
+## A. deck as shipped (200 ms fades), spine --lead-ms 950, fake/tone
+spine=0
+/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck.mp4: 643 frames at 30 fps = 21433 ms (spine; 3 say(), wall 21470 ms)
+/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck.take.json: take manifest
+capture=0
+$ check-take deck.mp4 
+ok    scene change at 0:06.700 — silence 1200 ms
+ok    scene change at 0:15.200 — silence 1200 ms
+PASS  2 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck.mp4
+exit=0
+$ check-take deck.mp4 --expect-cuts 2
+ok    scene change at 0:06.700 — silence 1200 ms
+ok    scene change at 0:15.200 — silence 1200 ms
+PASS  2 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck.mp4
+exit=0
+$ check-take deck.mp4 --expect-cuts 3
+FAIL  expected 3 scene change(s), found 2 at threshold 0.02
+ok    scene change at 0:06.700 — silence 1200 ms
+ok    scene change at 0:15.200 — silence 1200 ms
+FAIL  2 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck.mp4
+exit=1
+$ check-take deck.mp4 --expect-cuts 0
+FAIL  expected 0 scene change(s), found 2 at threshold 0.02
+ok    scene change at 0:06.700 — silence 1200 ms
+ok    scene change at 0:15.200 — silence 1200 ms
+FAIL  2 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck.mp4
+exit=1
+## B. deck copy with 500 ms fades (temp copy outside repo)
+transition: opacity 500ms ease, transform 500ms ease
+transition: width 500ms ease
+/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck500.mp4: 643 frames at 30 fps = 21433 ms (spine; 3 say(), wall 21463 ms)
+/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck500.take.json: take manifest
+capture=0
+$ check-take deck500.mp4
+FAIL  no scene changes found on a narrated take at threshold 0.02 — gradual fades score below it: lower --scene-threshold, or pass --expect-cuts 0 if the take really has none — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck500.mp4
+exit=1
+$ check-take deck500.mp4 | wc -l
+       1
+$ check-take deck500.mp4 --json (ok,error,cuts)
+exit=1
+{"ok":false,"error":"no scene changes found on a narrated take at threshold 0.02 — gradual fades score below it: lower --scene-threshold, or pass --expect-cuts 0 if the take really has none","cuts":0,"silentTrack":false}
+$ check-take deck500.mp4 --expect-cuts 0
+note  no scene changes found
+PASS  0 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck500.mp4
+exit=0
+$ check-take deck500.mp4 --scene-threshold 0.005
+ok    scene change at 0:06.733 — silence 1200 ms
+ok    scene change at 0:15.167 — silence 1200 ms
+ok    scene change at 0:15.200 — silence 1200 ms
+ok    scene change at 0:15.300 — silence 1200 ms
+PASS  4 scene change(s) at threshold 0.005, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/deck500.mp4
+exit=0
+## C. synthetic narrated, no change (4 s continuous tone)
+$ check-take flat.mp4 
+FAIL  no scene changes found on a narrated take at threshold 0.02 — gradual fades score below it: lower --scene-threshold, or pass --expect-cuts 0 if the take really has none — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/flat.mp4
+exit=1
+$ check-take flat.mp4 --expect-cuts 0
+note  no scene changes found
+PASS  0 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/flat.mp4
+exit=0
+$ check-take flat.mp4 --expect-cuts 1
+FAIL  expected 1 scene change(s), found 0 at threshold 0.02 — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/flat.mp4
+exit=1
+## D. silent track, no change
+note  no scene changes found
+note  the audio is silent for the whole take (silent or captions-only): every scene change passes
+PASS  0 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/silent.mp4
+exit=0
+## E. captions-only ui-demo --mp4
+/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/ui.mp4: 429 frames at 30 fps = 14300 ms (captions; 5 say(), wall 14313 ms)
+/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/ui.take.json: take manifest
+capture=0
+note  the audio is silent for the whole take (silent or captions-only): every scene change passes
+ok    scene change at 0:00.100 — silence 14300 ms
+ok    scene change at 0:06.433 — silence 14300 ms
+ok    scene change at 0:08.767 — silence 14300 ms
+ok    scene change at 0:11.767 — silence 14300 ms
+ok    scene change at 0:13.800 — silence 14300 ms
+PASS  5 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/ui.mp4
+exit=0
+## F. bad --expect-cuts
+$ --expect-cuts=-1
+check-take: --expect-cuts must be a whole number >= 0, got -1
+Run 'check-take --help' for usage.
+exit=2
+$ --expect-cuts=1.5
+check-take: --expect-cuts must be a whole number >= 0, got 1.5
+Run 'check-take --help' for usage.
+exit=2
+$ --expect-cuts=x
+check-take: --expect-cuts expects a number, got 'x'
+Run 'check-take --help' for usage.
+exit=2
