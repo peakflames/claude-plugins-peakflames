@@ -101,3 +101,8 @@ All rendered with `--brand brand-packs/default`: #0f1115 background, #f4f4f5 tex
 - **Added — `render-plate` entry point**: scaffolds from templates, refreshes the brand pack and local GSAP, and adds `--lint` (HyperFrames lint + check --strict), `--sheet` contact sheets and `--storyboard` stills.
 - **Added — motion and slide templates**: kinetic type and a deck layout (bullets or table rows) that take colours, fonts and easing only from brand tokens.
 - **Added — vendored HyperFrames references**: six skills trimmed per DEC-07, loaded through explicit Read steps in `vendored-map.md`; changes logged in `VENDORED.md`.
+
+## Round 2 (Lead, after verify-2)
+
+- N-1: `overflow-wrap: anywhere` on slide bullets and table cells; a long URL now wraps inside the frame (checked on a contact sheet, lint+check ok).
+- N-2, N-4 left as nits; N-3 (HF low-disk message dropped) fixed in `lib/hf.mjs` by the Lead on the integration branch.

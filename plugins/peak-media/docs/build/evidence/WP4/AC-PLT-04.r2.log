@@ -1,0 +1,44 @@
+# AC-PLT-04 r2 — verifier-wp4-r2-a91e50a1 — direct hyperframes 0.9.25 with DEC-26 env, brand-packs/default
+p1-hook lint exit=0 findings={} 
+p1-hook check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f1/plates/p1-hook/.hyperframes/artifacts/checks/7a8a7caa-dbbe-4289-9010-63f9a66639bc.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] check: loading the page
+[hyperframes] 
+p2-table lint exit=0 findings={} 
+p2-table check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f1/plates/p2-table/.hyperframes/artifacts/checks/3d58582c-39fa-4ac5-bc7f-4deac9b05919.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebG
+p3-close lint exit=0 findings={} 
+p3-close check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f1/plates/p3-close/.hyperframes/artifacts/checks/80e02c0b-a589-4c0c-a2d1-7b27b347ea60.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebG
+s1-unit lint exit=0 findings={} 
+s1-unit check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f2/plates/s1-unit/.hyperframes/artifacts/checks/123d2959-15f0-47bc-8c77-58442c56a91f.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL
+s2-ids lint exit=0 findings={} 
+s2-ids check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f2/plates/s2-ids/.hyperframes/artifacts/checks/fd399078-8676-4581-9133-46786586ec95.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL 
+s3-verify lint exit=0 findings={} 
+s3-verify check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f2/plates/s3-verify/.hyperframes/artifacts/checks/aea8ec54-39f0-4397-9e59-8376a96de821.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (Web
+s4-openspec lint exit=0 findings={} 
+s4-openspec check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f2/plates/s4-openspec/.hyperframes/artifacts/checks/a46b406f-b04c-4d78-84a2-83e5a2d9e7a8.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (W
+s5-peak lint exit=0 findings={} 
+s5-peak check--strict exit=0 findings=unparsed: [hyperframes] check: the report is saved to /tmp/vwp4r2/f2/plates/s5-peak/.hyperframes/artifacts/checks/d996960c-41f3-4262-adbf-b680e8edac1a.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL
+
+## check --strict saved reports (parsed by verifier)
+p1-hook ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 13/13
+p2-table ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 53/53
+p3-close ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 9/9
+s1-unit ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 26/26
+s2-ids ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 26/26
+s3-verify ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 26/26
+s4-openspec ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 22/22
+s5-peak ok=true strict=true errors=0 warnings=0 infos=1 (audio_none) contrast 22/22
