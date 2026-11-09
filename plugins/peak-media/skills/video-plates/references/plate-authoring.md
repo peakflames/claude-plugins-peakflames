@@ -41,9 +41,11 @@ makes a rebrand one command (`render-plate plates.json --all --brand <new pack>`
    a flash. The templates keep the first line (motion) or the logo/footer (slide) visible at 0 s.
 8. **Fit text in code, deterministically:** shrink the font in 1 px steps until the block fits
    (see the templates). Keep text inside the 90% action-safe box; reading text — slide counters
-   included — never goes below 27 px at 720p (3.75% of the frame height). The motion template keeps
-   one row per line down to 7% of the height, then wraps and shrinks to that floor; render-plate
-   rejects a plate whose text can't fit at the floor ("shorten text or split the beat").
+   included — never goes below 27 px at 720p (3.75% of the frame height). The motion template lets
+   each line wrap onto two balanced rows while its type stays large (≥ 7.8% of the height, 56 px
+   at 720p). Only if the text still doesn't fit does it let words break and shrink, down to the
+   27 px reading floor. render-plate rejects a plate whose text can't fit at the 27 px floor
+   ("shorten text or split the beat").
 
 ## One idea per plate
 
@@ -55,8 +57,8 @@ Slides: a title + ≤ 4 bullets, or a title + ≤ 5 table rows.
 
 | Kind | Template | Input from plates.json | Layout |
 |---|---|---|---|
-| `motion` | `templates/motion/index.html` | `text[]` (or `intent`) → one `.line` each | Centered block, accent bar, lines rise in staggered, last line in the accent colour, slow push-in |
-| `slide` | `templates/slide/index.html` | `text[0]` = title, rest = bullets; if the lines hold `\|` cells they are table rows and the title is `intent` | Deck: title + accent rule, bullets (`Label: text` gets an accented label) or a table (first column bold accent), logo + `n / N` counter footer, progress line |
+| `motion` | `templates/motion/index.html` | `text[]` (or `intent`) → one `.line` each | One large block centred in the safe area (up to 80% × 66% of the frame), accent bar, lines rise in staggered. The last line is the emphasis: accent colour, full size; earlier lines at 0.72×. A long line wraps onto two balanced rows (`text-wrap: balance`) before the type shrinks; earlier lines stay ≥ 56 px at 720p unless the text can't fit. Slow push-in |
+| `slide` | `templates/slide/index.html` | `text[0]` = title, rest = bullets; if the lines hold `\|` cells they are table rows and the title is `intent` | Deck: title + accent rule, bullets (`Label: text` gets an accented label) or a table (first column bold accent; other columns weighted by content). The body is set as large as the content box allows; the leftover height becomes row padding. The title is on screen at 0 s; bullets or rows enter one at a time, evenly spaced from 0.5 s, the last settled by about 60% of the plate. Logo + `n / N` counter footer, progress line |
 
 The templates are a starting point. For anything richer (a zoom over a real screenshot, a
 diagram, a chart), scaffold with `--scaffold-only`, then edit `plates/<id>/index.html` by hand;

@@ -1,0 +1,24 @@
+# verifier-wp4l-a9349ae4 — WP4 layout follow-up — HEAD 5151294 (layout commit 5cf766c). $VT = verifier temp dir (deleted after the run).
+## computed styles at timeline end, chrome-headless-shell 152 (hyperframes cache) via playwright-core, served over 127.0.0.1, all remote requests aborted (none made)
+## sizes in px; reveal = time each row/bullet/line is fully settled (s); block/body boxes [l,t,r,b]; bad = boxes outside 1280x720 or overflowing
+### F1
+p1-hook {"dur":7.123,"sizes":{".line":{"min":69.8,"max":97,"all":[69.8,69.8,97]}},"reveal":[0.3,1.23,1.83],"revealFrac":[0.04,0.17,0.26],"bad":[],"block":{"box":[301,115,979,605],"wFrac":0.53,"hFrac":0.68,"cx":0.5,"cy":0.5},"rows":[1,2,2],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+p2-table {"dur":12.163,"sizes":{".title":{"min":61.2,"max":61.2,"all":[61.2]},".cell":{"min":40,"max":40,"all":[40,40,40,40,40,40,40,40,40,40,40,40]},".counter":{"min":27,"max":27,"all":[27]}},"reveal":[0.93,3.03,5.13,7.23],"revealFrac":[0.08,0.25,0.42,0.59],"bad":[],"body":{"box":[102,224,1178,622],"contentBox":[102,101,1178,626],"fillH":0.99,"bodyW":1},"cols":"321.594px 183.031px 482.594px","fonts":["Inter 400","Inter 700"],"bg":"rgb(15, 17, 21)"}
+p3-close {"dur":6.563,"sizes":{".line":{"min":64.8,"max":90,"all":[64.8,90]}},"reveal":[0.3,1.23],"revealFrac":[0.05,0.19],"bad":[],"block":{"box":[117,216,1163,504],"wFrac":0.82,"hFrac":0.4,"cx":0.5,"cy":0.5},"rows":[1,2],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+### adversarial (own plates.json each, 4000 ms, --lint --sheet, all exit 0)
+a1-longline: $VT/adv/a1-longline/renders/plates/a1-longline.mp4 (4000 ms, planned 4000) lint+check ok sheet $VT/adv/a1-longline/review/contact-a1-longline.jpg
+a1-longline exit=0
+a2-tenshort: $VT/adv/a2-tenshort/renders/plates/a2-tenshort.mp4 (4000 ms, planned 4000) lint+check ok sheet $VT/adv/a2-tenshort/review/contact-a2-tenshort.jpg
+a2-tenshort exit=0
+a3-sixbullets: $VT/adv/a3-sixbullets/renders/plates/a3-sixbullets.mp4 (4000 ms, planned 4000) lint+check ok sheet $VT/adv/a3-sixbullets/review/contact-a3-sixbullets.jpg
+a3-sixbullets exit=0
+a4-tableurl: $VT/adv/a4-tableurl/renders/plates/a4-tableurl.mp4 (4000 ms, planned 4000) lint+check ok sheet $VT/adv/a4-tableurl/review/contact-a4-tableurl.jpg
+a4-tableurl exit=0
+a1-longline {"dur":3.95,"sizes":{".line":{"min":56.9,"max":79,"all":[56.9,79]}},"reveal":[0.3,1.23],"revealFrac":[0.08,0.31],"bad":[],"block":{"box":[144,104,1136,616],"wFrac":0.77,"hFrac":0.71,"cx":0.5,"cy":0.5},"rows":[1,5],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+a2-tenshort {"dur":3.95,"sizes":{".line":{"min":37.4,"max":52,"all":[37.4,37.4,37.4,37.4,37.4,37.4,37.4,37.4,37.4,52]}},"reveal":[0.3,0.8,0.97,1.13,1.3,1.43,1.6,1.77,1.93,2.1],"revealFrac":[0.08,0.2,0.25,0.29,0.33,0.36,0.41,0.45,0.49,0.53],"bad":[],"block":{"box":[509,94,771,626],"wFrac":0.2,"hFrac":0.74,"cx":0.5,"cy":0.5},"rows":[1,1,1,1,1,1,1,1,1,1],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+a3-sixbullets {"dur":3.95,"sizes":{".title":{"min":61.2,"max":61.2,"all":[61.2]},".bullet":{"min":36,"max":36,"all":[36,36,36,36,36,36]},".label":{"min":36,"max":36,"all":[36]},".counter":{"min":27,"max":27,"all":[27]}},"reveal":[0.83,1.13,1.43,1.73,2.03,2.33],"revealFrac":[0.21,0.29,0.36,0.44,0.51,0.59],"bad":[],"body":{"box":[102,224,1178,620],"contentBox":[102,101,1178,626],"fillH":0.99,"bodyW":1},"fonts":["Inter 400","Inter 700"],"bg":"rgb(15, 17, 21)"}
+a4-tableurl {"dur":3.95,"sizes":{".title":{"min":61.2,"max":61.2,"all":[61.2]},".cell":{"min":38,"max":38,"all":[38,38,38,38,38,38,38,38,38]},".counter":{"min":27,"max":27,"all":[27]}},"reveal":[0.83,1.57,2.33],"revealFrac":[0.21,0.4,0.59],"bad":[],"body":{"box":[102,224,1178,628],"contentBox":[102,101,1178,626],"fillH":1,"bodyW":1},"cols":"256.719px 223.578px 511.328px","fonts":["Inter 400","Inter 700"],"bg":"rgb(15, 17, 21)"}
+### precise bottoms (content box bottom 626.4, footer top 648)
+a4-tableurl {"bodyBottom":627.59375,"contentBottom":626.40625,"sh":527,"ch":526,"footerTop":648,"lastCellBottom":627.59375}
+p2-table {"bodyBottom":621.75,"contentBottom":626.40625,"sh":526,"ch":526,"footerTop":648,"lastCellBottom":621.75}
+a3-sixbullets {"bodyBottom":619.6875,"contentBottom":626.40625,"sh":526,"ch":526,"footerTop":648,"lastCellBottom":619.6875}
