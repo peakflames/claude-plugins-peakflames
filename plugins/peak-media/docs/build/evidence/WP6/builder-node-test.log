@@ -1,0 +1,36 @@
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (1959.195709ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (673.669708ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (259.844667ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (319.488917ms)
+✔ validate: cross-reference checks (not AC-bound) (1395.584625ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (102.151166ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (100.478ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (33365.341583ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (26737.902167ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (120.147792ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (621.60025ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (523.527792ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (203.318459ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (992.67825ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (1003.030833ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (169.245375ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (131.326625ms)
+✔ AC-BASE-03: contact-sheet baseline (409.12525ms)
+✔ AC-BASE-04: probe-spec baseline (318.792334ms)
+✔ AC-BASE-05: check-cuts baseline (247.354916ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (975.110917ms)
+✔ AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a ≥300 ms silent gap (6830.030333ms)
+✔ AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream md5 unchanged (18122.832833ms)
+✔ AC-ASM-03: out/final.mp4 passes probe-spec and lasts spine + outro ±1 frame (32132.371125ms)
+✔ AC-ASM-04: no music supplied — assembly succeeds with narration only (and a beat grid gets a silent track) (17487.355541ms)
+✔ AC-ASM-05: the final contact sheet ends on the brand outro (4999.448708ms)
+✔ AC-BASE-11: assemble --help lists every flag, --version = plugin.json, bad input is one line with no stack (1107.318416ms)
+✔ AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, bad input is one line with no stack (1118.376458ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 105388.549375

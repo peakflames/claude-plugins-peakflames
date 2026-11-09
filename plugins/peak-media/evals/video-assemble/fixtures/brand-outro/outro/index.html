@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- Assembly test outro: logo + sign-off on the brand background, 3 s. GSAP is staged into
+     vendor/ by assemble at render time (never a CDN, never shipped in the pack). -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<link rel="stylesheet" href="../tokens.css">
+<script src="vendor/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; background: var(--color-bg); }
+  #root { width: 100%; height: 100%; font-family: var(--font-display); color: var(--color-fg); }
+  #stage { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; }
+  #logo { width: 220px; height: 220px; }
+  #title { font-size: 72px; font-weight: 800; letter-spacing: -0.02em; }
+  #bar { width: 520px; height: 14px; background: var(--color-accent); transform-origin: left center; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="3" data-width="1280" data-height="720" data-fps="30">
+  <div id="stage" class="clip" data-start="0" data-duration="3" data-track-index="0">
+    <img id="logo" src="../logo.svg" alt="">
+    <div id="title">THANKS FOR WATCHING</div>
+    <div id="bar"></div>
+  </div>
+</div>
+<script>
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo("#logo", { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.5, ease: "power3.out" }, 0.1);
+  tl.fromTo("#title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+  tl.fromTo("#bar", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power2.out" }, 0.5);
+  window.__timelines["main"] = tl;
+  tl.seek(0);
+</script>
+</body>
+</html>

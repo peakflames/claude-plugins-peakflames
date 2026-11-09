@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "name": "Assembly test pack (visible outro)",
+  "tokens": "tokens.css",
+  "fonts": [],
+  "logo": "logo.svg",
+  "outro": {
+    "composition": "outro/index.html",
+    "durationMs": 3000
+  },
+  "music": {
+    "rules": "music-rules.md"
+  }
+}

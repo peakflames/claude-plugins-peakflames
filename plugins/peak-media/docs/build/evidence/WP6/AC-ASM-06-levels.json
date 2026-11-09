@@ -1,0 +1,122 @@
+{
+  "ac": "AC-ASM-06",
+  "status": "blocked: needs user listen",
+  "narration": "macOS say (Samantha, 215 wpm, atempo 1.00/1.00/1.00) fitted to the F1 clip windows",
+  "music": "synthetic A-minor pad, 2 Hz pulse (helpers/fixtures.mjs musicWav)",
+  "sfx": "synthetic whoosh + low thud into each cut (6.5 s, 14.0 s), --sfx-db -6",
+  "targets": {
+    "narrationLufs": -16,
+    "musicLufsBeforeDucking": -28,
+    "truePeakCeilingDbfs": -1
+  },
+  "files": {
+    "AC-ASM-06-pass0-narration-only.mp4": {
+      "integratedLufs": -16,
+      "lraLu": 7.7,
+      "truePeakDbfs": -4.9
+    },
+    "AC-ASM-06-pass1-music.mp4": {
+      "integratedLufs": -16.5,
+      "lraLu": 6.8,
+      "truePeakDbfs": -3.7
+    },
+    "AC-ASM-06-pass2-music-sfx.mp4": {
+      "integratedLufs": -16.3,
+      "lraLu": 6.1,
+      "truePeakDbfs": -4.8
+    },
+    "AC-ASM-06-final.mp4": {
+      "integratedLufs": -16.5,
+      "lraLu": 8.5,
+      "truePeakDbfs": -4.9
+    }
+  },
+  "pass1MusicLevels": {
+    "video": "<listen>/project/review/review.mp4",
+    "out": "<listen>/AC-ASM-06-pass1-music.mp4",
+    "durationMs": 20000,
+    "videoMd5": "cd6084c7bf900612fd527b3e125abb40",
+    "narration": {
+      "source": "<listen>/project/review/review.mp4",
+      "targetLufs": -16,
+      "gainDb": 0,
+      "lufs": -16,
+      "truePeakDb": -4.9
+    },
+    "music": {
+      "source": "<listen>/music.wav",
+      "targetLufs": -28,
+      "gainDb": -12.3,
+      "lufs": -28.1,
+      "ducked": true,
+      "underVoiceRmsDb": -44.7,
+      "inGapsRmsDb": -30.5,
+      "duckDb": 14.2,
+      "speechWindows": [
+        {
+          "startMs": 219,
+          "endMs": 3824
+        },
+        {
+          "startMs": 6718,
+          "endMs": 11698
+        },
+        {
+          "startMs": 14218,
+          "endMs": 18089
+        }
+      ]
+    },
+    "mix": {
+      "lufs": -16.5,
+      "truePeakDb": -3.7
+    }
+  },
+  "pass2MusicSfxLevels": {
+    "video": "<listen>/project/review/review.mp4",
+    "out": "<listen>/AC-ASM-06-pass2-music-sfx.mp4",
+    "durationMs": 20000,
+    "videoMd5": "cd6084c7bf900612fd527b3e125abb40",
+    "narration": {
+      "source": "<listen>/project/review/review.mp4",
+      "targetLufs": -16,
+      "gainDb": 0,
+      "lufs": -16,
+      "truePeakDb": -4.9
+    },
+    "music": {
+      "source": "<listen>/music.wav",
+      "targetLufs": -28,
+      "gainDb": -12.3,
+      "lufs": -28.1,
+      "ducked": true,
+      "underVoiceRmsDb": -44.7,
+      "inGapsRmsDb": -30.5,
+      "duckDb": 14.2,
+      "speechWindows": [
+        {
+          "startMs": 219,
+          "endMs": 3824
+        },
+        {
+          "startMs": 6718,
+          "endMs": 11698
+        },
+        {
+          "startMs": 14218,
+          "endMs": 18089
+        }
+      ]
+    },
+    "sfx": {
+      "source": "<listen>/sfx.wav",
+      "gainDb": -6,
+      "lufs": -21.3,
+      "truePeakDb": -10.9
+    },
+    "mix": {
+      "lufs": -16.3,
+      "truePeakDb": -4.8
+    }
+  }
+}
