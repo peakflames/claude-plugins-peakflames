@@ -16,7 +16,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP5 | verified | wp/WP5/verify-1.md |
 | WP6 | verified | wp/WP6/verify-2.md |
 | WP7a | verified | wp/WP7a/verify-1.md |
-| WP7b | not-started | — |
+| WP7b | verified | wp/WP7b/verify-2.md |
 | WP8 | not-started | — |
 | WP9 | not-started | — |
 | WP10 | not-started | — |
@@ -68,12 +68,12 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-REC-02 | D2 | WP7a | G a missing Chromium or ffmpeg, or a bad `--spine` · W capture · T exits non-zero in under 2 s with no browser launch | script | PASS | evidence/WP7a/AC-REC-02.log |
 | AC-REC-03 | D6 | WP7a | G `examples/deck/storyboard.mjs` (original loop) · W it runs in silent, captions and spine-timed modes · T it runs unmodified in all three | script | PASS | evidence/WP7a/AC-REC-03.log, evidence/WP7a/AC-REC-03-verifier-modes.jpg |
 | AC-REC-04 | DEC-06 | WP7a | G F3 with a 3-clip spine · W capture · T the plate duration equals the planned duration ±1 frame | script | PASS | evidence/WP7a/AC-REC-04.log, evidence/WP7a/AC-REC-04-verifier-f3.jpg |
-| AC-REC-05 | D7 | WP7b | G the recorder `--mp4` output · W probe-spec · T it passes | script | not-started | — |
-| AC-REC-06 | D8 | WP7b | G a sync page that flips a full-frame colour on each `say()`, with fake tones · W capture (run alone) · T median offset ≤ 120 ms and worst ≤ 200 ms | script | not-started | — |
-| AC-REC-07 | D9 | WP7b | G the narrated example deck · W `check-take` · T every scene change (threshold 0.02) is inside silence (−40 dB, ≥ 900 ms) | script | not-started | — |
-| AC-REC-08 | D10 | WP7b | G the ui-demo · W stills are sampled inside each `say()` window · T the caption text shows; with `--no-captions` it doesn't; `--caption-css` changes the style | still | not-started | — |
-| AC-REC-09 | D11 | WP7b | G a take · W the manifest is written · T it validates; `command[]` reproduces the take | script | not-started | — |
-| AC-REC-10 | D3 | WP7b | G the key is unset · W the captions-only example runs · T it passes with 0 OpenRouter calls | script | not-started | — |
+| AC-REC-05 | D7 | WP7b | G the recorder `--mp4` output · W probe-spec · T it passes | script | PASS | evidence/WP7b/AC-REC-05.log |
+| AC-REC-06 | D8 | WP7b | G a sync page that flips a full-frame colour on each `say()`, with fake tones · W capture (run alone) · T median offset ≤ 120 ms and worst ≤ 200 ms | script | PASS | evidence/WP7b/AC-REC-06.r2.log |
+| AC-REC-07 | D9 | WP7b | G the narrated example deck · W `check-take` · T every scene change (threshold 0.02) is inside silence (−40 dB, ≥ 900 ms) | script | PASS | evidence/WP7b/AC-REC-07.r2.log |
+| AC-REC-08 | D10 | WP7b | G the ui-demo · W stills are sampled inside each `say()` window · T the caption text shows; with `--no-captions` it doesn't; `--caption-css` changes the style | still | PASS | evidence/WP7b/AC-REC-08-verifier-default.jpg, evidence/WP7b/AC-REC-08-verifier-no-captions.jpg, evidence/WP7b/AC-REC-08-verifier-caption-css.jpg |
+| AC-REC-09 | D11 | WP7b | G a take · W the manifest is written · T it validates; `command[]` reproduces the take | script | PASS | evidence/WP7b/AC-REC-09.r2.log |
+| AC-REC-10 | D3 | WP7b | G the key is unset · W the captions-only example runs · T it passes with 0 OpenRouter calls | script | PASS | evidence/WP7b/AC-REC-10.log |
 | AC-ORC-01 | kickoff milestone | WP8 | G the F1 brief and a fresh session · W `/peak-media:plate-factory` runs · T it reaches `out/final.mp4`, and the transcript shows each gate 0–9 in order | manual | not-started | — |
 | AC-ORC-02 | design stage 4 | WP8 | G the same run · W the transcript is checked · T the storyboard contact sheet is produced and approved **before** any `plates/<id>/index.html` is written | script (transcript grep) | not-started | — |
 | AC-ORC-03 | design stage 6 | WP8 | G the same run · W the transcript is checked · T at most 3 self-review rounds per plate, then a separate reviewer agent call | script | not-started | — |
@@ -99,6 +99,6 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-BASE-07 | orch §5 baseline | WP3a | G the `sample-voice` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP3a/AC-BASE-07.log |
 | AC-BASE-08 | orch §5 baseline | WP4 | G the `render-plate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP4/AC-BASE-08.r2.log |
 | AC-BASE-09 | orch §5 baseline | WP7a | G the `capture` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP7a/AC-BASE-09.log |
-| AC-BASE-10 | orch §5 baseline | WP7b | G the `check-take` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
+| AC-BASE-10 | orch §5 baseline | WP7b | G the `check-take` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP7b/AC-BASE-10.log |
 | AC-BASE-11 | orch §5 baseline | WP6 | G the `assemble` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-11.r2.log |
 | AC-BASE-12 | orch §5 baseline | WP6 | G the `remux-audio` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-12.r2.log |
