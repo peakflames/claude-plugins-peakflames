@@ -1,0 +1,16 @@
+verifier reproduction of AC-TTS-08 — verifier-written fetch stub returns raw s16le PCM (1.5 s, 300 Hz, 24 kHz, 72001 bytes = odd) for Gemini and MAI; clip cached via synthesizeClips; ffprobe reads it
+PATH /tmp/vt8.GNoB/cache/0e383babe090d8fbfc150a07464e86121ff700ce58e6289bdbcbf4fb97eb1ef4.wav durationMs=1500 sampleRate=24000 channels=1 source=synth
+PATH /tmp/vt8.GNoB/cache/79308eb5d3028b73f09a1275dbaa283f48a09cd751ec49666204a810c7aaee56.wav durationMs=1500 sampleRate=24000 channels=1 source=synth
+body: {"model":"google/gemini-3.8-flash-lite-tts","input":"…","voice":"Achird","response_format":"pcm","provider":{"zdr":true}}
+body: {"model":"microsoft/mai-voice-2.1-flash","input":"…","voice":"en-GB-Emily:MAI-Voice-2.1-Flash","response_format":"pcm","provider":{"zdr":true}}
+ffprobe 0e383babe090d8fbfc150a07464e86121ff700ce58e6289bdbcbf4fb97eb1ef4.wav: codec_name=pcm_s16le|sample_rate=24000|channels=1|bits_per_sample=16 format_name=wav|duration=1.500000 
+size=72044 (44 header + 72000 data expected = 72044)
+ffprobe 79308eb5d3028b73f09a1275dbaa283f48a09cd751ec49666204a810c7aaee56.wav: codec_name=pcm_s16le|sample_rate=24000|channels=1|bits_per_sample=16 format_name=wav|duration=1.500000 
+size=72044 (44 header + 72000 data expected = 72044)
+--- ffmpeg decode check (errors would print):
+decode ok 0e383babe090d8fbfc150a07464e86121ff700ce58e6289bdbcbf4fb97eb1ef4.wav
+decode ok 79308eb5d3028b73f09a1275dbaa283f48a09cd751ec49666204a810c7aaee56.wav
+
+== node --test
+✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (98.730334ms)
+ℹ ffprobe: pcm_s16le 24000 Hz 1 ch, 3529 ms, 169456 bytes

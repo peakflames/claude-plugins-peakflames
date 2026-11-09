@@ -119,13 +119,15 @@ An expanded profile adds `new`, `continue`, `ff` (fast-forward), `verify`, `bulk
 
 ### What makes it different
 - **Stable requirement IDs.** Every scenario is `Scenario: [TOR-NN-XXXXXXX]`. Epics list the TORs they satisfy in a *Requirements Anchors* table, and verification checks against those exact IDs.
+- **Each requirement has a status, traced to its tests.** Wrapup finds the tests that cite each TOR ID (or, for `# Verification: operator-observed` scenarios, the manual checklist in `tests/manual/`), checks the Given/When/Then, and records PASS/FAIL per TOR. A non-PASS TOR can close only with an explicit human waiver. `/status` reports coverage per TOR across epics.
+- **The human's own checks are recorded.** Before the handoff, wrapup asks the operator whether they did any manual verification beyond the automated gates. If they did, it asks them to describe it and records their words verbatim in the epic handoff and the PR body, so the record shows what was checked by a person, not just by tests.
 - **Independent verification is enforced.** Wrapup refuses to run in the same session that implemented the epic, so the verifier does not inherit the implementer's rationalizations. It defaults to a stronger model than the one that typically implements.
 - **Git as the approval system.** Planning artifacts live on `docs/` branches, and merging is the sign-off. Work happens on `feature/epic-*` and `hotfix/` branches.
 - **Baseline requirements derived automatically.** Tool hygiene requirements (versioning, logging, exit codes, errors) and UX requirements (screen states, focus, contrast, reduced motion) are derived from CLAUDE.md, so they aren't forgotten.
 - **A right-sized path for small work.** `/triage` routes each request to HEAVY, EPIC or TRIVIAL, and `/quick-fix` handles fixes under about 2 hours without epic ceremony.
 
 ### Strengths
-- Traceable end to end: vision → TOR → epic → verification
+- Traceable end to end: vision → TOR → epic → test → PASS/FAIL, plus the human's recorded manual checks
 - Verification is structural (fresh session, stronger model, Given/When/Then for each TOR), not just advisory
 - Covers the whole product lifecycle, including discovery, UX and planning
 - Fits formal or client-facing work where you must show the requirement was met
@@ -147,11 +149,11 @@ An expanded profile adds `new`, `continue`, `ff` (fast-forward), `verify`, `bulk
 | **Scope** | Spec, then implement, then archive | Vision, ConOps, mockup, requirements, plan, implement, verify |
 | **Spec format** | Markdown requirements (SHALL/MUST) with WHEN/THEN bullets | Gherkin `.feature.md` with Given/When/Then |
 | **Requirement IDs** | None | `TOR-NN-XXXXXXX` on every scenario |
-| **Traceability** | Implicit (folder and capability names) | Explicit: tracing sidecars and Requirements Anchors tables |
+| **Traceability** | Implicit (folder and capability names) | Explicit: tracing sidecars, Requirements Anchors tables, and each TOR traced to the tests that cite it |
 | **Living spec** | Yes: deltas merge into `openspec/specs/` | Yes: the feature files *are* the baseline, revised through `docs/` branches |
 | **Brownfield support** | Strong (designed around deltas) | Supported (brownfield discovery, `/triage`, `/add`) |
 | **Human gates** | Proposal review (by convention) | `docs/` branch merges, epic wrapup, PRs |
-| **Verification** | `/opsx:verify`: same-model AI review, advisory, never blocks | `/wrapup-epic`: fresh session, stronger model, PASS/FAIL per TOR |
+| **Verification** | `/opsx:verify`: same-model AI review, advisory, never blocks | `/wrapup-epic`: fresh session, stronger model, PASS/FAIL per TOR traced to its tests; non-PASS needs a human waiver; the operator's manual checks recorded verbatim |
 | **Deterministic tooling** | CLI: validate, archive, list, view | Skills use git and the filesystem; integrity rests on the branch and sidecar structure |
 | **Planning and dependencies** | None (each change stands alone) | Phases, epic dependency graph, status sidecars |
 | **Small fixes** | Same loop (some find it overkill) | `/triage` → `/quick-fix` fast path |
@@ -190,9 +192,9 @@ An expanded profile adds `new`, `continue`, `ff` (fast-forward), `verify`, `bulk
 
 - **Hook:** "Two tools, same promise: no code until we agree on the spec. They disagree about *who checks the work*."
 - **OpenSpec demo beat:** `/opsx:propose` → show the four files → `/opsx:apply` → `/opsx:archive`, and the delta merging into the living spec.
-- **peak-workflow demo beat:** a TOR ID in a feature file → the epic's Requirements Anchors table → `/wrapup-epic` refusing to run in the implementer's session.
+- **peak-workflow demo beat:** a TOR ID in a feature file → the epic's Requirements Anchors table → `/wrapup-epic` refusing to run in the implementer's session → the per-TOR PASS/FAIL table traced to tests → the operator asked "did you check anything by hand?" and their answer recorded in the PR.
 - **Key contrast line:** spec-aware vs. spec-accountable.
-- **Honest close:** OpenSpec wins on speed and reach; peak-workflow wins on proof. Pick based on whether you need to *show your work*.
+- **Honest close:** OpenSpec wins on speed and reach; peak-workflow wins on a record you can audit: every requirement traced to its test and status, plus what a human checked. Pick based on whether you need to *show your work*.
 
 ---
 

@@ -1,0 +1,79 @@
+verifier reproduction of AC-BASE-07 — sample-voice, no-network preload, keys unset, isolated cache
+== --help
+sample-voice — read one paragraph with several voices and report wpm for each
+
+Usage: sample-voice [--voices A,B,C] [--text "..." | --text-file f] [options]
+
+Writes <out-dir>/<voice>.wav for each voice and prints one line per voice: words,
+seconds, wpm, sample rate, and whether the clip came from the cache. Needs
+PEAK_MEDIA_OPENROUTER_API_KEY (legacy: TTS_OPENROUTER_API_KEY) unless --tts-model fake/tone. Clips are cached in
+~/.cache/peak-media/tts/ (PEAK_MEDIA_TTS_CACHE overrides).
+
+Options:
+      --voices <list>      Comma-separated voices (Gemini names, or MAI short ids) (default: Achird,Kore,Puck)
+      --text <paragraph>   Paragraph to read (default: a neutral sample paragraph)
+      --text-file <file>   Read the paragraph from a file instead
+      --tts-model <model>  TTS model (see references/voices.md; fake/tone for offline tests) (default: google/gemini-3.8-flash-lite-tts)
+      --style <text>       Delivery style, sent as instructions (Gemini only)
+      --out-dir <dir>      Where the WAVs go (default: voice-samples)
+      --debug-requests     Log each OpenRouter request/response to stderr (key redacted)
+      --json               Print the results as JSON instead of lines
+  -h, --help               Show this help and exit
+      --version            Print the plugin version and exit
+
+Examples:
+  sample-voice --voices Achird,Kore,Puck --style "Clear, friendly explainer tone."
+  sample-voice --tts-model microsoft/mai-voice-2.1-flash --voices en-GB-Emily,en-US-Harper
+exit=0
+== flags declared in spec.options vs listed in --help
+--voices:4 --text:3 --text-file:2 --tts-model:3 --style:2 --out-dir:1 --debug-requests:1 --json:1 --help:1 --version:1 
+== --version
+0.1.0
+exit=0 plugin.json=0.1.0
+(bad-input cases run under bash so arguments word-split)
+== bad input: --nope
+exit=2
+sample-voice: Unknown option '--nope'
+Run 'sample-voice --help' for usage.
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input: --voices Nope
+exit=2
+sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+Run 'sample-voice --help' for usage.
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input: --voices ,
+exit=2
+sample-voice: --voices is empty — e.g. --voices Achird,Kore,Puck
+Run 'sample-voice --help' for usage.
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input: --tts-model bogus/model
+exit=2
+sample-voice: unknown --tts-model 'bogus/model' — use one of google/gemini-3.8-flash-lite-tts, google/gemini-3.8-flash-tts, microsoft/mai-voice-2.1-flash, microsoft/mai-voice-2.1, fake/tone
+Run 'sample-voice --help' for usage.
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input: --text-file /nonexistent.txt
+exit=2
+sample-voice: --text-file not found: /nonexistent.txt
+Run 'sample-voice --help' for usage.
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input: extra-arg
+exit=2
+sample-voice: unexpected argument 'extra-arg'
+Run 'sample-voice --help' for usage.
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input: --text x --text-file /etc/hosts
+exit=2
+sample-voice: pass --text or --text-file, not both
+Run 'sample-voice --help' for usage.
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input: --voices Achird
+exit=3
+sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)
+stderr lines excl. usage hint: 1  stack-trace lines: 0  network: 0
+== bad input with whitespace text
+sample-voice: the paragraph is empty — pass --text "..."
+Run 'sample-voice --help' for usage.
+exit=2
+
+== node --test
+✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (663.712208ms)

@@ -18,6 +18,7 @@ Neutral default pack per DEC-15: `brand.json` (v1 schema), `tokens.css` with all
 
 - `brand-packs/default/**`
 - `evals/fixtures/brand-alt/` (second synthetic pack)
+- `evals/brand/` (evals)
 
 ## Acceptance criteria
 

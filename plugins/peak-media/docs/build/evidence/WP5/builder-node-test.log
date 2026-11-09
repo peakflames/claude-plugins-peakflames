@@ -1,0 +1,34 @@
+✔ AC-BRD-01: brand-packs/default validates and every font has a licence file (1050.764416ms)
+✔ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (63709.120416ms)
+✔ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (27442.929042ms)
+✔ AC-BRD-03: the plugin tree ships no music or other audio files (27.007208ms)
+✔ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (32910.636167ms)
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (2386.018334ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (1756.625833ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (251.223208ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (446.606125ms)
+✔ validate: cross-reference checks (not AC-bound) (3264.028834ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (109.179542ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (97.85625ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (13428.041166ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (12732.369417ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (10.483208ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (673.440167ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (340.574208ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (155.084542ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (883.789833ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (2442.995792ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (178.525208ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (153.464ms)
+✔ AC-BASE-03: contact-sheet baseline (422.882875ms)
+✔ AC-BASE-04: probe-spec baseline (509.933917ms)
+✔ AC-BASE-05: check-cuts baseline (466.583334ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (1219.224375ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 125275.259375
