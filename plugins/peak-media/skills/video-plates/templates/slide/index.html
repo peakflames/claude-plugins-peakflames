@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- peak-media slide plate template: deck layout. Title with an accent rule, then bullets
+     (a "Label: text" bullet gets an accented label) or table rows (lines holding "|" cells),
+     a logo and slide counter in the footer, and a progress line along the bottom edge.
+     render-plate fills the double-braced placeholders. Brand comes only from brand/tokens.css
+     (colours, fonts, easing) and the pack's logo; GSAP is the local copy in vendor/ (never a CDN). -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width={{WIDTH}}, height={{HEIGHT}}">
+<link rel="stylesheet" href="brand/tokens.css">
+<script src="vendor/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: {{WIDTH}}px; height: {{HEIGHT}}px; overflow: hidden; background: var(--color-bg); }
+  #root { width: 100%; height: 100%; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-body); }
+  #deck { width: 100%; height: 100%; }
+  #content { position: absolute; left: 8%; right: 8%; top: 14%; bottom: 16%; display: flex; flex-direction: column; }
+  .title { font-family: var(--font-display); font-weight: 700; font-size: calc({{HEIGHT}}px * 0.085); line-height: 1.08; letter-spacing: -0.02em; }
+  .rule { width: calc({{HEIGHT}}px * 0.11); height: calc({{HEIGHT}}px * 0.009); margin: calc({{HEIGHT}}px * 0.035) 0 calc({{HEIGHT}}px * 0.05); background: var(--color-accent); border-radius: 2px; transform-origin: 0% 50%; }
+  #body { font-size: calc({{HEIGHT}}px * 0.06); line-height: 1.3; }
+  .bullets { list-style: none; display: flex; flex-direction: column; gap: 0.7em; }
+  .bullet { position: relative; padding-left: 1.1em; }
+  .bullet::before { content: ""; position: absolute; left: 0; top: 0.5em; width: 0.38em; height: 0.38em; background: var(--color-accent); border-radius: 0.06em; }
+  .label { font-weight: 700; color: var(--color-accent); }
+  .table { display: grid; column-gap: 1.2em; }
+  .row { display: contents; }
+  .cell { padding: 0.5em 0; border-top: 1px solid color-mix(in srgb, var(--color-fg) 22%, var(--color-bg)); }
+  .cell.head { font-weight: 700; color: var(--color-accent); }
+  #footer { position: absolute; left: 8%; right: 8%; bottom: 6%; height: calc({{HEIGHT}}px * 0.05); display: flex; align-items: center; justify-content: space-between; }
+  #logo { height: 100%; width: auto; }
+  .counter { font-family: var(--font-mono); font-size: calc({{HEIGHT}}px * 0.03); }
+  #progress { position: absolute; left: 0; bottom: 0; width: 100%; height: calc({{HEIGHT}}px * 0.008); background: var(--color-accent); transform-origin: 0% 50%; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="{{DURATION_S}}" data-width="{{WIDTH}}" data-height="{{HEIGHT}}" data-fps="{{FPS}}">
+  <div id="deck">
+    <div id="content">
+{{BODY}}
+    </div>
+    <div id="footer">
+      <img id="logo" src="{{LOGO}}" alt="">
+{{COUNTER}}
+    </div>
+    <div id="progress"></div>
+  </div>
+</div>
+<script>
+  // Brand easing token (cubic-bezier) as a GSAP ease; falls back to a GSAP name.
+  function tokenEase(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const m = /^cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)$/.exec(v);
+    if (!m) return fallback;
+    const [x1, y1, x2, y2] = m.slice(1).map(Number);
+    const bz = (a, b, t) => 3 * a * t * (1 - t) * (1 - t) + 3 * b * t * t * (1 - t) + t * t * t;
+    return (x) => {
+      let lo = 0, hi = 1, t = x;
+      for (let i = 0; i < 30; i++) { t = (lo + hi) / 2; if (bz(x1, x2, t) < x) lo = t; else hi = t; }
+      return bz(y1, y2, t);
+    };
+  }
+  document.fonts.ready.then(() => {
+    const D = {{DURATION_S}}, H = {{HEIGHT}};
+    const content = document.getElementById("content");
+    const body = document.getElementById("body");
+    // Fit once, deterministically: shrink the body (then the title) until the content box holds it.
+    if (body) {
+      let size = H * 0.06;
+      while (content.scrollHeight > content.clientHeight + 1 && size > H * 0.032) { size -= 1; body.style.fontSize = size + "px"; }
+    }
+    const title = document.getElementById("title");
+    let ts = H * 0.085;
+    while ((content.scrollHeight > content.clientHeight + 1 || title.scrollWidth > title.clientWidth + 1) && ts > H * 0.05) { ts -= 1; title.style.fontSize = ts + "px"; }
+
+    const ease = tokenEase("--ease-out", "power3.out");
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#title", { opacity: 0, y: H * 0.03 }, { opacity: 1, y: 0, duration: 0.55, ease }, 0.1);
+    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease }, 0.3);
+    const groups = document.querySelector(".table")
+      ? gsap.utils.toArray(".row").map((r) => r.querySelectorAll(".cell"))
+      : gsap.utils.toArray(".bullet").map((el) => [el]);
+    const step = Math.min(0.4, (D * 0.35) / Math.max(1, groups.length));
+    groups.forEach((g, i) => {
+      tl.fromTo(g, { opacity: 0, x: H * -0.03 }, { opacity: 1, x: 0, duration: 0.5, ease }, 0.6 + i * step);
+    });
+    tl.fromTo("#progress", { scaleX: 0 }, { scaleX: 1, duration: D - 0.05, ease: "none" }, 0);
+    window.__timelines["main"] = tl;
+  });
+</script>
+</body>
+</html>

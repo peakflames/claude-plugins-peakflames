@@ -1,0 +1,56 @@
+{
+  "project": "tmp/ev2",
+  "brand": "evals/fixtures/brand-min",
+  "plates": [
+    {
+      "id": "s1-unit",
+      "kind": "slide",
+      "dir": "tmp/ev2/plates/s1-unit",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev2/renders/plates/s1-unit.mp4",
+      "durationMs": 5000,
+      "sheet": "tmp/ev2/review/contact-s1-unit.jpg"
+    },
+    {
+      "id": "s2-ids",
+      "kind": "slide",
+      "dir": "tmp/ev2/plates/s2-ids",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev2/renders/plates/s2-ids.mp4",
+      "durationMs": 5000,
+      "sheet": "tmp/ev2/review/contact-s2-ids.jpg"
+    },
+    {
+      "id": "s3-verify",
+      "kind": "slide",
+      "dir": "tmp/ev2/plates/s3-verify",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev2/renders/plates/s3-verify.mp4",
+      "durationMs": 5000,
+      "sheet": "tmp/ev2/review/contact-s3-verify.jpg"
+    },
+    {
+      "id": "s4-openspec",
+      "kind": "slide",
+      "dir": "tmp/ev2/plates/s4-openspec",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev2/renders/plates/s4-openspec.mp4",
+      "durationMs": 5000,
+      "sheet": "tmp/ev2/review/contact-s4-openspec.jpg"
+    },
+    {
+      "id": "s5-peak",
+      "kind": "slide",
+      "dir": "tmp/ev2/plates/s5-peak",
+      "scaffolded": true,
+      "lint": "ok",
+      "mp4": "tmp/ev2/renders/plates/s5-peak.mp4",
+      "durationMs": 5000,
+      "sheet": "tmp/ev2/review/contact-s5-peak.jpg"
+    }
+  ]
+}

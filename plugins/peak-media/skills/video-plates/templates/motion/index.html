@@ -1,7 +1,8 @@
 <!doctype html>
-<!-- peak-media motion plate template (minimal, WP2). Kinetic type: each line rises in, staggered.
-     Placeholders (double-braced): WIDTH HEIGHT FPS DURATION_S LINES.
-     Brand comes only from brand/tokens.css; GSAP is the local copy in vendor/ (never a CDN). -->
+<!-- peak-media motion plate template: kinetic type. An accent bar grows, then each line rises in,
+     staggered; the last line carries the accent colour; the block drifts slowly so no stretch is static.
+     render-plate (and the WP2 skeleton) fill the double-braced placeholders: size, fps, duration, lines. Brand comes only from brand/tokens.css
+     (colours, fonts, easing); GSAP is the local copy in vendor/ (never a CDN). -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,27 +12,62 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: {{WIDTH}}px; height: {{HEIGHT}}px; overflow: hidden; background: var(--color-bg); }
-  #root { width: 100%; height: 100%; font-family: var(--font-display); color: var(--color-fg); }
-  #stage { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc({{HEIGHT}}px * 0.02); }
-  .line { font-size: calc({{HEIGHT}}px * 0.11); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; opacity: 0; }
-  .line:nth-child(even) { color: var(--color-accent); }
+  #root { width: 100%; height: 100%; background: var(--color-bg); font-family: var(--font-display); color: var(--color-fg); }
+  #stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  #block { position: relative; display: flex; flex-direction: column; gap: 0.12em; padding-left: 0.55em; max-width: 84%; }
+  #bar { position: absolute; left: 0; top: 0.08em; bottom: 0.08em; width: 0.14em; background: var(--color-accent); border-radius: 0.07em; transform-origin: 50% 0%; }
+  .line { font-size: 1em; font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; white-space: nowrap; }
+  .line:last-child { color: var(--color-accent); }
 </style>
 </head>
 <body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="{{DURATION_S}}" data-width="{{WIDTH}}" data-height="{{HEIGHT}}" data-fps="{{FPS}}">
-  <div id="stage" class="clip" data-start="0" data-duration="{{DURATION_S}}" data-track-index="0">
+  <div id="stage">
+    <div id="block">
+      <div id="bar"></div>
 {{LINES}}
+    </div>
   </div>
 </div>
 <script>
-  const tl = gsap.timeline({ paused: true });
-  const lines = gsap.utils.toArray(".line");
-  const step = Math.min(0.4, ({{DURATION_S}} * 0.5) / Math.max(1, lines.length));
-  lines.forEach((el, i) => {
-    tl.fromTo(el, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.1 + i * step);
+  // Brand easing token (cubic-bezier) as a GSAP ease; falls back to a GSAP name.
+  function tokenEase(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const m = /^cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)$/.exec(v);
+    if (!m) return fallback;
+    const [x1, y1, x2, y2] = m.slice(1).map(Number);
+    const bz = (a, b, t) => 3 * a * t * (1 - t) * (1 - t) + 3 * b * t * t * (1 - t) + t * t * t;
+    return (x) => {
+      let lo = 0, hi = 1, t = x;
+      for (let i = 0; i < 30; i++) { t = (lo + hi) / 2; if (bz(x1, x2, t) < x) lo = t; else hi = t; }
+      return bz(y1, y2, t);
+    };
+  }
+  // Largest font size (deterministic, measured once) at which every line fits the frame.
+  function fit(block, lines, W, H) {
+    let size = H * 0.12;
+    const fits = () => lines.every((l) => l.scrollWidth <= W * 0.8) && block.offsetHeight <= H * 0.72;
+    block.style.fontSize = size + "px";
+    while (!fits() && size > H * 0.035) { size -= 1; block.style.fontSize = size + "px"; }
+    return size;
+  }
+  document.fonts.ready.then(() => {
+    const D = {{DURATION_S}}, W = {{WIDTH}}, H = {{HEIGHT}};
+    const block = document.getElementById("block");
+    const lines = gsap.utils.toArray(".line");
+    fit(block, lines, W, H);
+    const ease = tokenEase("--ease-out", "power3.out");
+    const tl = gsap.timeline({ paused: true });
+    const step = Math.min(0.45, (D * 0.4) / Math.max(1, lines.length));
+    tl.fromTo("#bar", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease }, 0);
+    // The first line is on screen at frame 0 (no blank frame after a cut) and settles; the rest rise in.
+    lines.forEach((el, i) => {
+      if (i === 0) tl.fromTo(el, { opacity: 1, y: H * 0.02 }, { opacity: 1, y: 0, duration: 0.6, ease }, 0);
+      else tl.fromTo(el, { opacity: 0, y: H * 0.05 }, { opacity: 1, y: 0, duration: 0.6, ease }, 0.15 + i * step);
+    });
+    tl.fromTo(block, { scale: 1 }, { scale: 1.035, duration: D - 0.05, ease: "none" }, 0);
+    window.__timelines["main"] = tl;
   });
-  window.__timelines["main"] = tl;
-  tl.seek(0);
 </script>
 </body>
 </html>

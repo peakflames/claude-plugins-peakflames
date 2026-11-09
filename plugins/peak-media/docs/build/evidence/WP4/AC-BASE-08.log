@@ -1,0 +1,69 @@
+$ render-plate --version
+exit 0
+0.1.0
+
+$ render-plate --help
+exit 0
+render-plate — render motion/slide plates from plates.json, each alone, to renders/plates/<id>.mp4
+
+Usage: render-plate [options] <plates.json> (<plate-id>... | --all)
+
+For each plate: plates/<id>/index.html is kept if it exists (hand-authored) or written from the
+template for its kind (templates/motion, templates/slide); brand/ (the brand pack) and
+vendor/gsap.min.js are refreshed; the composition is rendered on its own at the plates.json
+fps and size; the MP4 must last durationMs ±1 frame. Live plates are refused (use video-capture).
+Project folders (plates/, renders/plates/, review/) live next to plates.json unless --out is given.
+
+Options:
+      --all              Every motion and slide plate in plates.json (live plates are skipped)
+      --brand <pack>     Brand pack folder or brand.json (overrides plates.json "brand")
+      --out <dir>        Project folder for plates/, renders/plates/ and review/ (default: the plates.json folder)
+      --sheet            Also write review/contact-<id>.jpg (a frame every --every)
+      --every <time>     Contact-sheet interval with --sheet, e.g. 0.5s or 250ms (default: 0.5s)
+      --lint             Run hyperframes lint and check --strict on each plate before rendering; any failure stops
+      --storyboard       Do not render: snapshot one key frame per plate into review/storyboard.jpg (stage 4)
+      --scaffold-only    Only prepare plates/<id>/ (template, brand, GSAP); do not render
+      --rescaffold       Overwrite an existing plates/<id>/index.html from the template
+      --quality <value>  HyperFrames render quality (default: standard)
+      --json             Print the results as JSON
+  -h, --help             Show this help and exit
+      --version          Print the plugin version and exit
+
+Examples:
+  render-plate plates.json --all --sheet
+  render-plate plates.json p2-table --lint
+  render-plate plates.json --all --storyboard
+  render-plate docs/build/fixtures/F1/plates.json --all --brand brand-packs/default --out /tmp/f1
+
+$ render-plate 
+exit 2
+render-plate: expected at least 1 argument(s), got 0
+Run 'render-plate --help' for usage.
+
+$ render-plate /nonexistent/plates.json --all
+exit 1
+render-plate: cannot read /nonexistent/plates.json: no such file
+
+$ render-plate docs/build/fixtures/F1/plates.json --brand evals/fixtures/brand-min
+exit 2
+render-plate: name plate id(s) after plates.json, or pass --all
+Run 'render-plate --help' for usage.
+
+$ render-plate docs/build/fixtures/F1/plates.json nope --brand evals/fixtures/brand-min
+exit 1
+render-plate: no plate 'nope' in docs/build/fixtures/F1/plates.json (plates: p1-hook, p2-table, p3-close)
+
+$ render-plate docs/build/fixtures/F1/plates.json --all --brand /nonexistent/pack
+exit 1
+render-plate: brand pack not found: /nonexistent/pack — fix "brand" in docs/build/fixtures/F1/plates.json or pass --brand <pack>
+
+$ render-plate docs/build/fixtures/F1/plates.json --all --quality ultra
+exit 2
+render-plate: --quality must be one of draft, looks, standard, high, delivery, got 'ultra'
+Run 'render-plate --help' for usage.
+
+$ render-plate docs/build/fixtures/F1/plates.json --bogus
+exit 2
+render-plate: Unknown option '--bogus'
+Run 'render-plate --help' for usage.
+
