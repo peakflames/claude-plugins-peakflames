@@ -51,7 +51,8 @@ export function render(dir, out, { fps, quality = 'standard', wrap } = {}) {
   if (fps) args.push('--fps', String(fps));
   const r = hf(args, { wrap });
   if (r.code !== 0 || !existsSync(out)) {
-    const msg = (r.stderr + r.stdout).trim().split('\n').filter((l) => /error|fail/i.test(l)).at(-1) ?? 'no output';
+    const lines = (r.stderr + r.stdout).trim().split('\n');
+    const msg = lines.find((l) => /disk space/i.test(l)) ?? lines.filter((l) => /error|fail/i.test(l)).at(-1) ?? 'no output';
     throw new CliError(`render failed for ${dir}: ${msg.trim()}`);
   }
   return out;
