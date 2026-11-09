@@ -1,0 +1,13 @@
+
+=================== AC-REC-08: three ui-demo takes; stills at the middle of each caption/say window
+no-captions exit=0
+caption-css exit=0
+default says [[1,100,3333],[2,3434,3000],[3,6435,2333],[4,8768,3000],[5,11769,2000]] captions [[1,101,3333,"A small to-do list. Type a task and press Enter."],[2,3435,2999,"New tasks land at the bottom of the list."],[3,6435,2333,"Tick a task when it is done."],[4,8768,3000,"Filters show what is left, or what is done."],[5,11769,2000,"Clear done tasks to tidy up."]]
+default at 1768ms,4935ms,7602ms,10268ms,12769ms
+/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/docs/build/evidence/WP7b/AC-REC-08-verifier-default.jpg (5 frames, 3×2): 01.77 04.93 07.60 10.27 12.77
+nocap says [[1,32,3333],[2,3365,3000],[3,6365,2333],[4,8698,3000],[5,11698,2000]] captions []
+no-captions at 1699ms,4865ms,7532ms,10198ms,12698ms
+/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/docs/build/evidence/WP7b/AC-REC-08-verifier-no-captions.jpg (5 frames, 3×2): 01.70 04.87 07.53 10.20 12.70
+css says [[1,45,3333],[2,3378,3000],[3,6379,2333],[4,8713,3000],[5,11713,2000]] captions [[1,46,3333,"A small to-do list. Type a task and press Enter."],[2,3379,2999,"New tasks land at the bottom of the list."],[3,6379,2333,"Tick a task when it is done."],[4,8713,3000,"Filters show what is left, or what is done."],[5,11713,2000,"Clear done tasks to tidy up."]]
+caption-css at 1713ms,4879ms,7546ms,10213ms,12713ms
+/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/docs/build/evidence/WP7b/AC-REC-08-verifier-caption-css.jpg (5 frames, 3×2): 01.71 04.88 07.55 10.21 12.71

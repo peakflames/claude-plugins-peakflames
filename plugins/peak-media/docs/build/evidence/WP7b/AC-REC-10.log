@@ -1,0 +1,32 @@
+
+=================== AC-REC-10: keys unset (env -u), captions-only ui-demo under the loopback-only guard
+0
+(0 = both unset)
+capture exit=0
+requests:
+capture: request GET http://127.0.0.1:PORT/index.html
+NETWORK-ATTEMPT lines: 0
+openrouter mentions: 0
+mode captions engine overlay audio {"clips":0,"lufs":null}
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+PASS  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/ui-default.mp4
+probe-spec exit=0
+note  the audio is silent for the whole take (silent or captions-only): every scene change passes
+ok    scene change at 0:00.100 — silence 14267 ms
+ok    scene change at 0:03.433 — silence 14267 ms
+ok    scene change at 0:06.433 — silence 14267 ms
+ok    scene change at 0:08.767 — silence 14267 ms
+ok    scene change at 0:11.767 — silence 14267 ms
+ok    scene change at 0:13.767 — silence 14267 ms
+PASS  6 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/ui-default.mp4
+check-take exit=0
+guard control:
+NETWORK-ATTEMPT https://openrouter.ai/api/v1/audio/speech

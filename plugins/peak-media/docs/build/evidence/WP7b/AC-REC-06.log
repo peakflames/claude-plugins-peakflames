@@ -1,0 +1,83 @@
+none 0 {"run":0,"engine":"overlay","captionsShown":0,"sayLate":[0,0,0,2,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+overlay 0 {"run":0,"engine":"overlay","captionsShown":6,"sayLate":[0,0,0,5,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+dom 0 {"run":0,"engine":"dom","captionsShown":6,"sayLate":[0,0,0,8,0,0],"offsets":[16.6,17,17.3,51,18,18.3],"median":17.65,"worst":51,"first":16.6}
+none 1 {"run":1,"engine":"overlay","captionsShown":0,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+overlay 1 {"run":1,"engine":"overlay","captionsShown":6,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+dom 1 {"run":1,"engine":"dom","captionsShown":6,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+none 2 {"run":2,"engine":"overlay","captionsShown":0,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+overlay 2 {"run":2,"engine":"overlay","captionsShown":6,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+dom 2 {"run":2,"engine":"dom","captionsShown":6,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+none 3 {"run":3,"engine":"overlay","captionsShown":0,"sayLate":[0,0,0,0,0,1],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+overlay 3 {"run":3,"engine":"overlay","captionsShown":6,"sayLate":[0,0,1,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+dom 3 {"run":3,"engine":"dom","captionsShown":6,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+none 4 {"run":4,"engine":"overlay","captionsShown":0,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,50.6,17.6,18,18.3],"median":17.8,"worst":50.6,"first":16.6}
+overlay 4 {"run":4,"engine":"overlay","captionsShown":6,"sayLate":[0,0,0,0,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+dom 4 {"run":4,"engine":"dom","captionsShown":6,"sayLate":[0,0,0,1,0,0],"offsets":[16.6,17,17.3,17.6,18,18.3],"median":17.450000000000003,"worst":18.3,"first":16.6}
+{
+  "none": {
+    "takes": 5,
+    "flips": 30,
+    "median": 17.6,
+    "worst": 50.6,
+    "perTakeWorst": [
+      18.3,
+      18.3,
+      18.3,
+      18.3,
+      50.6
+    ],
+    "firstSay": [
+      16.6,
+      16.6,
+      16.6,
+      16.6,
+      16.6
+    ],
+    "over200": 0,
+    "over120": 0
+  },
+  "overlay": {
+    "takes": 5,
+    "flips": 30,
+    "median": 17.450000000000003,
+    "worst": 18.3,
+    "perTakeWorst": [
+      18.3,
+      18.3,
+      18.3,
+      18.3,
+      18.3
+    ],
+    "firstSay": [
+      16.6,
+      16.6,
+      16.6,
+      16.6,
+      16.6
+    ],
+    "over200": 0,
+    "over120": 0
+  },
+  "dom": {
+    "takes": 5,
+    "flips": 30,
+    "median": 17.450000000000003,
+    "worst": 51,
+    "perTakeWorst": [
+      51,
+      18.3,
+      18.3,
+      18.3,
+      18.3
+    ],
+    "firstSay": [
+      16.6,
+      16.6,
+      16.6,
+      16.6,
+      16.6
+    ],
+    "over200": 0,
+    "over120": 0
+  }
+}

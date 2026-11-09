@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // capture — play a live page in real time, drive it with a storyboard, and screen-capture it.
-// Engine (DEC-06): Playwright page.screencast.start({fps, onFrame}); t0 is the timestamp of the
-// first onFrame, and every say()/wait() is timed against that same clock. Frames are placed on a
-// constant-rate grid by their own timestamps (frame k covers t0 + k/fps), so a take is exactly
+// Engine (DEC-06/DEC-35): Playwright page.screencast.start({fps, onFrame}); t0 is the timestamp of
+// the first onFrame, and every say()/wait() is timed against that same clock. Frames are placed on
+// a constant-rate grid by their own timestamps (frame k covers t0 + k/fps), so a take is exactly
 // round(ms × fps / 1000) frames. With a spine, say() plays to the manifest's clip timing — no TTS
-// here (plate-factory §6, one timing model). Narration mux, captions styling, check-take and the
-// take manifest are video-capture's next stage (WP7b).
+// here (plate-factory §6, one timing model). Captions are drawn with screencast.showOverlay
+// (injected DOM as the fallback). --mp4 lays the spine's clips at the logged say() times plus
+// --audio-offset-ms at -16 LUFS (D7), and every take writes a take manifest (D11).
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, rmSync, mkdtempSync, linkSync, copyFileSync, createReadStream } from 'node:fs';
 import { createServer } from 'node:http';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -16,11 +17,19 @@ import { runCli, CliError, EXIT, usageError, PLUGIN_ROOT } from '../../../lib/cl
 import { validateFile } from '../../../lib/schemas.mjs';
 import { requireNode } from '../../../lib/preflight.mjs';
 import { requireFfmpeg, ffmpeg } from '../../../lib/ffmpeg.mjs';
+import { lookup as cacheLookup, defaultCacheDir, legacyCacheDirs } from '../../../lib/tts/cache.mjs';
+import { levelStem, silentStem, RATE } from '../../video-assemble/scripts/audio.mjs';
 import { resolveDep, depRoot, pins } from '../../../lib/deps.mjs';
 import { browserPath } from '../../../lib/hf.mjs';
 
 const SETUP = path.join(PLUGIN_ROOT, 'scripts', 'setup.sh');
 const OUT_EXT = ['.mp4', '.webm', '.mkv'];
+/** Watchdog: a spine-timed take aborts once it runs this far past its window. */
+export const OVERRUN_GRACE_MS = 2000;
+/** Watchdog for takes with no window (silent, captions): the default --max-ms. */
+export const DEFAULT_MAX_MS = 600_000;
+/** Warm-up before t0: evaluate/paint round trips so the first say() isn't late (WP7a nit). */
+export const WARMUP_ROUNDS = 6;
 
 export const DEFAULT_CAPTION_CSS = `
 .pm-caption-wrap { position: fixed; left: 0; right: 0; bottom: 6%; display: flex; justify-content: center; pointer-events: none; z-index: 2147483647; }
@@ -57,7 +66,7 @@ export function spineWindow(spine, plate) {
   const clips = (spine.clips ?? [])
     .filter((c) => c.startMs >= startMs && c.startMs < startMs + durationMs)
     .sort((a, b) => a.startMs - b.startMs)
-    .map((c) => ({ n: c.n, beat: c.beat, text: c.text, atMs: c.startMs - startMs, durationMs: c.durationMs }));
+    .map((c) => ({ n: c.n, beat: c.beat, text: c.text, atMs: c.startMs - startMs, durationMs: c.durationMs, file: c.file, spineStartMs: c.startMs }));
   return { startMs, durationMs, clips };
 }
 
@@ -197,6 +206,27 @@ export async function planTake(values) {
     throw new CliError(`plate '${plates.plate.id}' ends at ${plates.plate.startMs + plates.plate.durationMs} ms, past the spine's totalMs ${spine.totalMs}`);
   }
   const audioOffsetMs = values['audio-offset-ms'] ?? (spine ? spine.audioOffsetMs ?? 0 : -100);
+  if (!Number.isInteger(audioOffsetMs)) throw usageError(`--audio-offset-ms must be a whole number of ms, got ${audioOffsetMs}`);
+
+  const maxMs = values['max-ms'];
+  if (maxMs !== undefined && !(Number.isFinite(maxMs) && maxMs > 0)) throw usageError(`--max-ms must be a positive number of ms, got ${maxMs}`);
+  // watchdog: a spine-timed take may not run more than 2 s past its window; any other take is capped at --max-ms (default 10 min)
+  const watchdogMs = maxMs ?? (window ? window.durationMs + OVERRUN_GRACE_MS : DEFAULT_MAX_MS);
+
+  const primary = mp4 ?? out;
+  const manifest = values.manifest ? path.resolve(values.manifest) : manifestPathFor(primary);
+  if (path.extname(manifest).toLowerCase() !== '.json') throw usageError(`--manifest must end in .json, got '${path.basename(manifest)}'`);
+
+  // --mp4 narration: every clip in the window needs its audio before a browser opens
+  let sources = null;
+  if (mp4 && window?.clips.length) {
+    sources = new Map();
+    for (const c of window.clips) {
+      const src = clipSource(spineFile, spine, c);
+      if (!src) throw new CliError(`no audio for spine clip ${c.n} (${c.file ?? 'no file'}): not in ${path.join(path.dirname(spineFile), 'clips')}, the TTS cache or the spine's audio — rerun spine for this manifest`);
+      sources.set(c.n, src);
+    }
+  }
 
   // tools: ffmpeg, the pinned Playwright, the pinned Chrome
   requireFfmpeg();
@@ -217,27 +247,214 @@ export async function planTake(values) {
 
   const captions = !values['no-captions'];
   const mode = spine ? 'spine' : captions ? 'captions' : 'silent';
-  return { values, plates, storyboard, sb, out, mp4, viewport, size, fps, captions, captionCss, spineFile, spine, window, audioOffsetMs, chrome, pwEntry, page, mode };
+  const captionEngineChoice = values['caption-engine'] ?? 'overlay';
+  return { values, plates, storyboard, sb, out, mp4, viewport, size, fps, captions, captionCss, captionEngine: captionEngineChoice, spineFile, spine, window, audioOffsetMs, chrome, pwEntry, page, mode, manifest, sources, watchdogMs };
+}
+
+/** Narration loudness of the --mp4 deliverable (D7). */
+export const NARRATION_LUFS = -16;
+
+/**
+ * Where a spine clip's audio comes from, for the mux: the spine's exported clips/ folder, then the
+ * TTS cache (and its legacy dirs), then a slice of the spine's narration WAV. Null if none exists.
+ */
+export function clipSource(spineFile, spine, clip, env = process.env) {
+  const dir = path.dirname(spineFile);
+  if (clip.file) {
+    const exported = path.join(dir, 'clips', clip.file);
+    if (existsSync(exported) && statSync(exported).size > 44) return { file: exported };
+    const hit = cacheLookup(clip.file, defaultCacheDir(env), legacyCacheDirs(env));
+    if (hit) return { file: hit.path };
+  }
+  if (spine.audio) {
+    const wav = path.resolve(dir, spine.audio);
+    if (existsSync(wav)) return { file: wav, startMs: clip.spineStartMs, durationMs: clip.durationMs };
+  }
+  return null;
+}
+
+const sec = (ms) => (ms / 1000).toFixed(6);
+
+/**
+ * The narration track for a take: each placed clip at its position (logged say() start plus the
+ * audio offset), summed, padded to the take's length, then levelled to NARRATION_LUFS.
+ * placed: [{source:{file,startMs?,durationMs?}, atMs}]. Returns the levelled WAV and its loudness.
+ */
+export function mixNarration(placed, { durationMs, dir }) {
+  const out = path.join(dir, 'narration.wav');
+  if (!placed.length) { silentStem(out, durationMs); return { file: out, lufs: -Infinity, clips: 0 }; }
+  const raw = path.join(dir, 'narration-raw.wav');
+  const args = ['-y'];
+  const chains = [];
+  placed.forEach((p, i) => {
+    if (p.source.startMs !== undefined) args.push('-ss', sec(p.source.startMs), '-t', sec(p.source.durationMs));
+    args.push('-i', p.source.file);
+    const f = [`aresample=${RATE}`, `aformat=sample_fmts=fltp:sample_rates=${RATE}:channel_layouts=stereo`];
+    if (p.atMs < 0) f.push(`atrim=start=${sec(-p.atMs)}`, 'asetpts=PTS-STARTPTS');
+    else if (p.atMs > 0) f.push(`adelay=delays=${Math.round(p.atMs)}:all=1`);
+    chains.push(`[${i}:a]${f.join(',')}[a${i}]`);
+  });
+  const ins = placed.map((_, i) => `[a${i}]`).join('');
+  const mix = placed.length > 1 ? `${ins}amix=inputs=${placed.length}:normalize=0:duration=longest:dropout_transition=0,` : `${ins}`;
+  const graph = `${chains.join(';')};${mix}apad=whole_dur=${sec(durationMs)},atrim=end=${sec(durationMs)}[mix]`;
+  args.push('-filter_complex', graph, '-map', '[mix]', '-c:a', 'pcm_f32le', '-ar', String(RATE), '-ac', '2', raw);
+  ffmpeg(args, { what: 'narration mix' });
+  const lv = levelStem(raw, out, { durationMs, lufs: NARRATION_LUFS });
+  return { file: out, lufs: Number.isFinite(lv.lufs) ? Number(lv.lufs.toFixed(1)) : -Infinity, truePeakDb: lv.truePeakDb, gainDb: lv.gainDb, clips: placed.length };
+}
+
+const PATH_FLAGS = new Set(['storyboard', 'out', 'mp4', 'caption-css', 'spine', 'plates', 'manifest']);
+
+/** argv that reproduces the take: paths made absolute, so it runs from any directory. */
+export function commandFor(values, script = fileURLToPath(import.meta.url)) {
+  const cmd = ['node', script];
+  for (const [k, o] of Object.entries(spec.options)) {
+    const v = values[k];
+    if (v === undefined || v === false) continue;
+    if (o.type === 'boolean') { cmd.push(`--${k}`); continue; }
+    let s = String(v);
+    if (PATH_FLAGS.has(k) || (k === 'url' && !isUrl(s))) s = path.resolve(s);
+    cmd.push(`--${k}`, s);
+  }
+  return cmd;
+}
+
+/** Default take-manifest path: next to the deliverable, <name>.take.json. */
+export const manifestPathFor = (file) => path.join(path.dirname(file), `${path.basename(file, path.extname(file))}.take.json`);
+
+/**
+ * The take manifest (D11): a v1 spine manifest describing the take. Narrated takes (clips laid
+ * from a spine) are kind "narration" with the laid clips; every other take is kind "beatgrid" with
+ * "narrate": false and a nominal bpm. Both carry captions[] and one beat, "take", spanning the take.
+ */
+export function takeManifest(plan, take, { command, manifestFile, placed = [] }) {
+  const videoMs = Math.max(1, take.videoMs);
+  const rel = (f) => (f ? path.relative(path.dirname(manifestFile), f) || path.basename(f) : undefined);
+  const captions = take.captionTimings.map((c) => ({ n: c.n, text: c.text, startMs: Math.max(0, c.startMs), durationMs: Math.max(1, c.durationMs) }));
+  const narrated = placed.length > 0;
+  const beat = { id: 'take', startMs: 0, durationMs: videoMs, clipNs: narrated ? placed.map((p) => p.spineClip.n) : [] };
+  const doc = {
+    schemaVersion: 1,
+    kind: narrated ? 'narration' : 'beatgrid',
+    targetMs: plan.window ? Math.max(1, plan.window.durationMs) : videoMs,
+    totalMs: videoMs,
+  };
+  if (narrated) Object.assign(doc, { model: plan.spine.model, voice: plan.spine.voice, style: plan.spine.style ?? '' });
+  Object.assign(doc, { audioOffsetMs: Math.round(plan.audioOffsetMs), command, narrate: narrated });
+  if (!narrated) doc.bpm = plan.spine?.kind === 'beatgrid' && plan.spine.bpm ? plan.spine.bpm : 60;
+  if (plan.spineFile) doc.spine = rel(plan.spineFile);
+  doc.videoMs = videoMs;
+  doc.wallMs = take.wallMs;
+  if (!narrated) beat.onScreenText = captions.map((c) => c.text).filter(Boolean).join(' / ') || '(no captions)';
+  doc.beats = [beat];
+  doc.clips = placed.map((p) => {
+    const startMs = Math.min(videoMs - 1, Math.max(0, Math.round(p.atMs)));
+    const c = p.spineClip;
+    return {
+      n: c.n, beat: 'take', text: c.text, style: c.style ?? '', startMs,
+      durationMs: Math.max(1, Math.min(c.durationMs, videoMs - startMs)), words: c.words, wpm: c.wpm, file: c.file,
+      'x-spineBeat': c.beat, 'x-spineStartMs': c.startMs, 'x-sayN': p.say.n, 'x-lateMs': p.say.lateMs ?? 0,
+    };
+  });
+  doc.captions = captions;
+  doc['x-take'] = {
+    mode: take.mode, storyboard: rel(take.storyboard), url: take.url, plate: take.plate, fps: take.fps, width: take.width, height: take.height,
+    frames: take.frames, out: rel(take.out), mp4: rel(take.mp4), captionEngine: take.captionEngine,
+    ...(take.audio && { audio: take.audio }),
+    says: take.says.map((s) => ({ n: s.n, text: s.text, narrate: s.narrate, startMs: s.startMs, durationMs: s.durationMs, caption: s.caption, ...(s.clip && { clip: s.clip, plannedMs: s.plannedMs, lateMs: s.lateMs }) })),
+  };
+  return doc;
 }
 
 const log = (msg) => process.stderr.write(`capture: ${msg}\n`);
 
-/** Encode the image sequence to `file` (.mp4 picture-only plate, .webm/.mkv take, or the --mp4 deliverable with a silent AAC track). */
-function encode(pattern, n, file, { fps, size, viewport, deliverable = false }) {
+/**
+ * Encode the image sequence to `file`: an .mp4 picture-only plate, a .webm/.mkv take, or the --mp4
+ * deliverable (D7: H.264 High, yuv420p, AAC 48 kHz, faststart) with `audio` (a WAV) or a silent AAC track.
+ */
+function encode(pattern, n, file, { fps, size, deliverable = false, audio = null }) {
   mkdirSync(path.dirname(file), { recursive: true });
   const ext = path.extname(file).toLowerCase();
   // screencast JPEGs are full range; convert to limited-range yuv420p (the delivery spec)
   const vf = [`scale=${size.width}:${size.height}:flags=lanczos:in_range=pc:out_range=tv`, 'setsar=1', 'format=yuv420p'];
   const args = ['-y', '-v', 'error', '-framerate', String(fps), '-start_number', '0', '-i', pattern];
-  if (deliverable) args.push('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo');
+  if (deliverable) {
+    if (audio) args.push('-i', audio); else args.push('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo');
+    args.push('-map', '0:v:0', '-map', '1:a:0');
+  }
   args.push('-frames:v', String(n), '-vf', vf.join(','), '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-r', String(fps));
   if (ext === '.webm') args.push('-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '32', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '4');
   else args.push('-c:v', 'libx264', '-profile:v', 'high', '-preset', 'veryfast', '-crf', '18');
-  if (deliverable) args.push('-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-t', (n / fps).toFixed(6));
+  if (deliverable) args.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-t', (n / fps).toFixed(6));
   if (ext === '.mp4') args.push('-movflags', '+faststart');
   args.push(file);
   ffmpeg(args, { what: `encoding ${path.basename(file)}` });
 }
+
+/**
+ * Caption drawing (DEC-06, DEC-36): --caption-engine overlay (default) uses screencast.showOverlay,
+ * which renders into the captured frames only; if the Playwright build lacks it, or it fails, the
+ * caption falls back to the page DOM. --caption-engine dom injects it into the page DOM from the
+ * start. show(text) resolves to an idempotent remove().
+ */
+function captionEngine(page, css, choice = 'overlay') {
+  const html = (text) => `<style>${css}</style><div class="pm-caption-wrap"><div class="pm-caption">${esc(text)}</div></div>`;
+  const dom = {
+    name: 'dom',
+    async show(text) {
+      const id = `pm-caption-${Math.random().toString(36).slice(2)}`;
+      await page.evaluate(({ id, css, text }) => {
+        if (!document.getElementById('pm-caption-style')) {
+          const st = document.createElement('style'); st.id = 'pm-caption-style'; st.textContent = css; document.documentElement.appendChild(st);
+        }
+        const wrap = document.createElement('div'); wrap.className = 'pm-caption-wrap'; wrap.id = id;
+        const box = document.createElement('div'); box.className = 'pm-caption'; box.textContent = text;
+        wrap.appendChild(box); document.documentElement.appendChild(wrap);
+      }, { id, css, text });
+      let done = false;
+      return () => { if (done) return Promise.resolve(); done = true; return page.evaluate((id) => document.getElementById(id)?.remove(), id).catch(() => {}); };
+    },
+  };
+  const overlay = {
+    name: 'overlay',
+    async show(text) {
+      // showOverlay(html, {duration}) resolves only when the overlay is removed, which would stall
+      // the storyboard; show it open-ended and remove it on our own clock instead.
+      const o = await page.screencast.showOverlay(html(text));
+      let done = false;
+      return () => { if (done) return Promise.resolve(); done = true; return Promise.resolve(o?.[Symbol.asyncDispose]?.() ?? o?.dispose?.()).catch(() => {}); };
+    },
+  };
+  const noOverlay = typeof page.screencast?.showOverlay !== 'function';
+  if (choice === 'overlay' && noOverlay) log('this Playwright has no screencast.showOverlay; drawing captions in the page instead');
+  const engine = { name: choice === 'dom' || noOverlay ? 'dom' : 'overlay' };
+  engine.show = async (text) => {
+    if (engine.name === 'overlay') {
+      try { return await overlay.show(text); } catch (e) {
+        log(`showOverlay failed (${String(e?.message ?? e).split('\n')[0]}); drawing captions in the page instead`);
+        engine.name = 'dom';
+      }
+    }
+    return dom.show(text);
+  };
+  return engine;
+}
+
+/**
+ * Warm-up before t0 (WP7a nit): round trips through evaluate + two animation frames and, with
+ * captions on, a caption shown and removed, so the first say() pays no cold-start cost (the
+ * first showOverlay call alone measured ~100 ms). Runs before the screencast starts: nothing of
+ * it is captured.
+ */
+async function warmUp(page, engine, captions) {
+  if (process.env.PEAK_MEDIA_CAPTURE_WARMUP === '0') return;
+  for (let i = 0; i < WARMUP_ROUNDS; i++) {
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+    if (captions && i < 2) { const remove = await engine.show('warm-up'); await remove(); }
+  }
+}
+
+let aborted = false; // set when the watchdog aborts a take; the entry point then makes sure the process exits
 
 /** Run one take. Returns the take summary. */
 export async function capture(plan) {
@@ -271,6 +488,9 @@ export async function capture(plan) {
     // live sites keep laying out after 'load' (lazy diagrams, fonts); let them settle, briefly
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
 
+    const engine = captionEngine(page, captionCss, plan.captionEngine);
+    await warmUp(page, engine, captions);
+
     // ---- the clock: t0 = timestamp of the first onFrame (DEC-06) ----
     const grid = new FrameGrid(tmp, fps);
     const wallStart = Date.now();
@@ -279,19 +499,43 @@ export async function capture(plan) {
     const t0 = await Promise.race([grid.ready, new Promise((_, rej) => { firstFrameTimer = setTimeout(() => rej(new CliError('no screencast frame within 10 s of start — the page may not be rendering')), 10_000); })])
       .finally(() => clearTimeout(firstFrameTimer)); // don't keep the process alive after the first frame
     const now = () => performance.timeOrigin + performance.now() - t0; // ms since t0, same clock as frame timestamps
-    const sleepUntil = async (ms) => { for (let d = ms - now(); d > 0; d = ms - now()) await new Promise((r) => setTimeout(r, Math.min(d, 1000))); };
+    // timers wake ~5 ms early, then yield with setImmediate to the exact ms (timer slack would make say() late)
+    const sleepUntil = async (ms) => {
+      for (let d = ms - now(); d > 0; d = ms - now()) {
+        await new Promise((r) => (d > 6 ? setTimeout(r, Math.min(d - 5, 1000)) : setImmediate(r)));
+      }
+    };
 
     let voiceEndsAt = 0, n = 0;
     const says = [];
-    const showCaption = async (text, ms) => {
+    const captionTimings = []; // {n, text, startMs, durationMs} as shown (the manifest's captions[])
+    const timers = new Set();
+    let current = null; // the caption on screen: {cap, remove, timer}
+    // Caption work runs on its own queue, so say() returns on the clock and the storyboard's next
+    // action is never held up by overlay round trips (they measured up to ~200 ms).
+    let captionQueue = Promise.resolve();
+    const hideCurrent = async () => {
+      const c = current;
+      if (!c) return;
+      current = null; clearTimeout(c.timer); timers.delete(c.timer);
+      c.cap.durationMs = Math.max(1, Math.min(c.cap.durationMs, Math.round(now() - c.cap.startMs)));
+      await c.remove();
+    };
+    const showCaption = (sayN, text, ms) => {
       if (!captions || !text || ms <= 0) return false;
-      const html = `<style>${captionCss}</style><div class="pm-caption-wrap"><div class="pm-caption">${esc(text)}</div></div>`;
-      // showOverlay(html, {duration}) resolves only when the overlay is removed, which would stall
-      // the storyboard; show it open-ended and remove it on our own clock instead.
-      const shownAt = now();
-      const overlay = await page.screencast.showOverlay(html);
-      const remove = () => Promise.resolve(overlay?.[Symbol.asyncDispose]?.() ?? overlay?.dispose?.()).catch(() => {});
-      setTimeout(remove, Math.max(0, ms - (now() - shownAt)));
+      const endsAt = now() + ms;
+      captionQueue = captionQueue.then(async () => {
+        await hideCurrent(); // one caption at a time: a new say() replaces the one still showing
+        const left = endsAt - now();
+        if (left <= 0) return;
+        const shownAt = now();
+        const remove = await engine.show(text);
+        const entry = { cap: { n: sayN, text, startMs: Math.round(shownAt), durationMs: Math.max(1, Math.round(endsAt - shownAt)) }, remove };
+        captionTimings.push(entry.cap);
+        entry.timer = setTimeout(() => { timers.delete(entry.timer); if (current === entry) current = null; remove(); }, Math.max(0, endsAt - now()));
+        timers.add(entry.timer);
+        current = entry;
+      }).catch((e) => log(`caption ${sayN} not drawn: ${String(e?.message ?? e).split('\n')[0]}`));
       return true;
     };
     const say = async (text = '', opts = {}) => {
@@ -307,33 +551,55 @@ export async function capture(plan) {
         const startMs = now();
         Object.assign(rec, { clip: clip.n, plannedMs: Math.round(at), startMs: Math.round(startMs), lateMs: Math.max(0, Math.round(startMs - at)), durationMs: clip.durationMs });
         voiceEndsAt = at + clip.durationMs;
-        rec.caption = await showCaption(text, voiceEndsAt - now());
+        rec.caption = showCaption(n, text, voiceEndsAt - now());
       } else {
         const startMs = now();
         const hold = holdMs(text || spoken);
         Object.assign(rec, { startMs: Math.round(startMs), durationMs: hold });
         voiceEndsAt = startMs + hold;
         // captions-only: with no voice, a voice-only line is shown so the viewer can read it
-        rec.caption = await showCaption(text || (mode === 'captions' ? spoken : ''), hold);
+        rec.caption = showCaption(n, text || (mode === 'captions' ? spoken : ''), hold);
       }
       says.push(rec);
     };
     const api = {
       page, say,
       waitForVoice: () => sleepUntil(voiceEndsAt),
-      wait: (ms) => new Promise((r) => setTimeout(r, Math.max(0, Number(ms) || 0))),
+      wait: (ms) => new Promise((r) => { const t = setTimeout(() => { timers.delete(t); r(); }, Math.max(0, Number(ms) || 0)); timers.add(t); }),
       mode, fps, viewport, elapsedMs: () => now(),
     };
 
+    // watchdog (WP7a nit): a spine-timed take may run at most OVERRUN_GRACE_MS past its window;
+    // any take stops at --max-ms. Either way a hung storyboard step can't stall the take forever.
+    let watchdogTimer;
+    const watchdog = new Promise((_, rej) => {
+      watchdogTimer = setTimeout(() => {
+        aborted = true;
+        rej(new CliError(win && plan.values['max-ms'] === undefined
+          ? `storyboard still running ${Math.round(now())} ms in, more than ${OVERRUN_GRACE_MS} ms past the ${plan.plates ? `plate's planned ${win.durationMs} ms` : `spine's ${win.durationMs} ms`} — aborted (a step may be hanging, or its waits are too long)`
+          : `take aborted at --max-ms ${plan.watchdogMs} ms — the storyboard may be hanging (e.g. a selector wait with no timeout); raise --max-ms for a longer take`));
+      }, Math.max(0, plan.watchdogMs - now()));
+    });
+
     log(`t0 anchored on the first frame; running ${path.basename(plan.storyboard)}`);
     try {
-      await plan.sb.fn(api);
-    } catch (e) {
-      if (e instanceof CliError) throw e;
-      const at = String(e?.stack ?? '').split('\n').find((l) => l.includes(plan.storyboard))?.trim().replace(/^at\s+/, '') ?? '';
-      throw new CliError(`storyboard failed: ${String(e?.message ?? e).split('\n')[0]}${at ? ` (${at})` : ''}`);
+      await Promise.race([
+        (async () => {
+          try {
+            await plan.sb.fn(api);
+          } catch (e) {
+            if (e instanceof CliError) throw e;
+            const at = String(e?.stack ?? '').split('\n').find((l) => l.includes(plan.storyboard))?.trim().replace(/^at\s+/, '') ?? '';
+            throw new CliError(`storyboard failed: ${String(e?.message ?? e).split('\n')[0]}${at ? ` (${at})` : ''}`);
+          }
+          await sleepUntil(voiceEndsAt);
+        })(),
+        watchdog,
+      ]);
+    } finally {
+      clearTimeout(watchdogTimer);
+      if (aborted) { for (const t of timers) clearTimeout(t); timers.clear(); }
     }
-    await sleepUntil(voiceEndsAt);
     const ranMs = now();
     let endMs = ranMs;
     if (win) {
@@ -344,24 +610,49 @@ export async function capture(plan) {
       await sleepUntil(win.durationMs + tol); // hold the last picture to the end of the window
       endMs = win.durationMs;
     }
+    await captionQueue; // caption work still queued settles before the screencast stops
+    if (current) { // the caption still showing ends with the take
+      const c = current; current = null; clearTimeout(c.timer); timers.delete(c.timer);
+      c.cap.durationMs = Math.max(1, Math.min(c.cap.durationMs, Math.round(endMs - c.cap.startMs)));
+    }
+    for (const t of timers) clearTimeout(t);
     await page.screencast.stop();
     const wallMs = Date.now() - wallStart;
     await browser.close(); browser = null;
 
     const frames = framesFor(endMs, fps);
+    const videoMs = (frames * 1000) / fps;
     const { pattern, unique } = grid.finish(frames);
-    const opts = { fps, size, viewport };
+    const opts = { fps, size };
+    // narration (D7): each spine clip at its logged say() time on the spine clock (plannedMs: the
+    // clip start minus the offset) plus the audio offset — i.e. where the spine puts it. A late
+    // say() moves the picture, not the voice, so waitForVoice() (the clip's planned end) and the
+    // laid audio agree, and the take sounds exactly like the assembled video will.
+    const placed = says.filter((s) => s.clip).map((s) => ({
+      say: s, spineClip: plan.spine.clips.find((c) => c.n === s.clip), source: plan.sources?.get(s.clip), atMs: s.plannedMs + audioOffsetMs,
+    }));
     if (plan.out) encode(pattern, frames, plan.out, { ...opts, deliverable: false });
-    if (plan.mp4) encode(pattern, frames, plan.mp4, { ...opts, deliverable: true });
+    let audio = null;
+    if (plan.mp4) {
+      audio = mixNarration(placed.filter((p) => p.source), { durationMs: videoMs, dir: tmp });
+      encode(pattern, frames, plan.mp4, { ...opts, deliverable: true, audio: audio.file });
+      log(audio.clips ? `narration: ${audio.clips} clip(s) laid at their say() times ${audioOffsetMs >= 0 ? '+' : ''}${audioOffsetMs} ms, ${audio.lufs} LUFS` : 'audio: silent AAC track (no narration in this take)');
+    }
     const late = says.filter((s) => s.lateMs > 1000 / fps); // later than one frame
     if (late.length) log(`${late.length} say() call(s) started after their clip: ${late.map((s) => `#${s.n} +${s.lateMs} ms`).join(', ')}`);
-    return {
-      mode, out: plan.out, mp4: plan.mp4, storyboard: plan.storyboard, url,
+    const take = {
+      mode, out: plan.out, mp4: plan.mp4, manifest: plan.manifest, storyboard: plan.storyboard, url,
       plate: plan.plates?.plate.id ?? null, spine: plan.spineFile ?? null,
       window: win ? { startMs: win.startMs, durationMs: win.durationMs, clips: win.clips.length } : null,
       fps, width: size.width, height: size.height, frames, uniqueFrames: unique,
-      videoMs: Math.round((frames * 1000) / fps), wallMs, ranMs: Math.round(ranMs), audioOffsetMs, captions, says,
+      videoMs: Math.round(videoMs), wallMs, ranMs: Math.round(ranMs), audioOffsetMs, captions, captionEngine: captions ? engine.name : null,
+      captionTimings, says,
+      audio: audio && { clips: audio.clips, lufs: Number.isFinite(audio.lufs) ? audio.lufs : null },
     };
+    const doc = takeManifest(plan, take, { command: commandFor(plan.values), manifestFile: plan.manifest, placed });
+    mkdirSync(path.dirname(plan.manifest), { recursive: true });
+    writeFileSync(plan.manifest, JSON.stringify(doc, null, 2) + '\n');
+    return take;
   } finally {
     if (browser) await browser.close().catch(() => {});
     if (server) await server.close();
@@ -381,22 +672,31 @@ spine's) planned duration. Otherwise say() holds for reading time (about 3 words
 and the take ends when the storyboard returns and the last say() has finished.
 The page is --url, else the plate's live.url, else the storyboard's exported \`url\`, else an
 index.html next to the storyboard; local files are served on 127.0.0.1. Pre-flight (Chromium,
-ffmpeg, the pinned Playwright, a valid --spine) runs before any browser opens.
+ffmpeg, the pinned Playwright, a valid --spine, the spine clips' audio for --mp4) runs before any
+browser opens. Captions (default) are a neutral bottom-centre bar; --caption-css restyles them.
+--mp4 is the deliverable (H.264 High, yuv420p, AAC 48 kHz, faststart): a spine-timed take gets the
+spine's clips at their say() times on the spine clock plus --audio-offset-ms (a late say() moves the
+picture, not the voice), levelled to -16 LUFS; other takes
+get a silent AAC track. Every take writes a take manifest (v1 spine schema). A watchdog aborts a
+spine-timed take 2 s past its window, and any take at --max-ms. Check a take with check-take.mjs.
 Storyboard API: references/storyboard-api.md.`,
   options: {
     storyboard: { type: 'string', arg: 'file.mjs', desc: 'Storyboard module: export default async ({ page, say, waitForVoice, wait }) => { … }' },
     out: { type: 'string', arg: 'file', desc: 'The take: .webm, .mkv or .mp4 (picture only) (default with --plate: <project>/renders/plates/<id>.mp4)' },
-    mp4: { type: 'string', arg: 'file.mp4', desc: 'Also write an H.264/AAC MP4 with faststart (silent audio track)' },
+    mp4: { type: 'string', arg: 'file.mp4', desc: 'Also write the deliverable: H.264 High/AAC 48 kHz MP4 with faststart; spine clips laid at their say() times plus --audio-offset-ms at -16 LUFS, else a silent AAC track' },
     viewport: { type: 'string', arg: 'WxH', desc: 'Browser viewport (default: the plate\'s live.viewport, else 1280x720)' },
     'no-captions': { type: 'boolean', desc: 'Draw no captions (silent mode without --spine)' },
     'caption-css': { type: 'string', arg: 'file.css', desc: 'Caption style sheet (classes .pm-caption-wrap, .pm-caption) replacing the neutral default' },
+    'caption-engine': { type: 'string', arg: 'overlay|dom', choices: ['overlay', 'dom'], desc: 'How captions are drawn: overlay = screencast.showOverlay, in the captured frames only (default); dom = injected into the page (visible to page scripts; no overlay frame delays)' },
     url: { type: 'string', arg: 'url|file', desc: 'Page to load: http(s) URL or local .html file/folder (overrides the plate and storyboard)' },
     'debug-requests': { type: 'boolean', desc: 'Log every page request, failure and HTTP error to stderr' },
-    'audio-offset-ms': { type: 'number', arg: 'ms', desc: 'Audio placement offset. Spine-timed: say() fires at clip start minus this (default: the spine\'s audioOffsetMs); otherwise recorded for the mux (default: -100)' },
+    'audio-offset-ms': { type: 'number', arg: 'ms', desc: 'Audio placement offset. Spine-timed: say() fires at clip start minus this (default: the spine\'s audioOffsetMs); otherwise only recorded in the take manifest (default: -100)' },
     spine: { type: 'string', arg: 'manifest.json', desc: 'Spine manifest: say() plays to its clip timing (spine-timed mode)' },
     plates: { type: 'string', arg: 'plates.json', desc: 'Project plate list; with --plate, supplies storyboard, url, viewport, fps, size, spine and the planned window' },
     plate: { type: 'string', arg: 'id', desc: 'The live plate to capture (needs --plates)' },
     fps: { type: 'number', desc: 'Capture frame rate (default: plates.json fps, else 30)' },
+    manifest: { type: 'string', arg: 'file.json', desc: 'Where to write the take manifest (default: <take>.take.json next to --mp4, else --out)' },
+    'max-ms': { type: 'number', arg: 'ms', desc: `Abort a take that runs longer than this (default: the spine window + ${OVERRUN_GRACE_MS} ms, else ${DEFAULT_MAX_MS})` },
     json: { type: 'boolean', desc: 'Print the take summary as JSON' },
   },
   examples: [
@@ -415,6 +715,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     else {
       process.stdout.write(`${take.out ?? take.mp4}: ${take.frames} frames at ${take.fps} fps = ${take.videoMs} ms (${take.mode}; ${take.says.length} say(), wall ${take.wallMs} ms)\n`);
       if (take.out && take.mp4) process.stdout.write(`${take.mp4}: H.264/AAC deliverable\n`);
+      process.stdout.write(`${take.manifest}: take manifest\n`);
     }
   });
+  // a watchdog abort can leave a hung storyboard's own timers behind; don't let them hold the process
+  if (aborted) setTimeout(() => process.exit(), 300).unref();
 }

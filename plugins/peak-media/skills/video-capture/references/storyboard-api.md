@@ -52,7 +52,9 @@ overlap the beat, such as a slide change.
   audio plays regardless.
 - **Too many `say()` calls.** A `say()` with no clip left in the window is an error.
 - **Overrunning.** A storyboard that runs past the window by more than one frame is an error:
-  shorten its waits, or lengthen the beat in the spine.
+  shorten its waits, or lengthen the beat in the spine. A watchdog aborts a take that is still
+  running 2 s past its window, so a hung step (a selector wait with no timeout) can't stall it.
+  Takes with no window stop at `--max-ms` (default 10 minutes).
 - **Short storyboards.** If it finishes early, the last picture keeps recording live until the
   window ends.
 - **`--audio-offset-ms`** shifts every clip: `say()` fires at the clip start minus the offset. The
@@ -61,12 +63,31 @@ overlap the beat, such as a slide change.
   ends, then waits 900 ms. On a spine with short lead-ins, each `say()` therefore starts after its
   clip. That is expected: the slide change lands in the silence between clips, which is the point
   of the loop.
+- **Late `say()` moves the picture, not the voice.** `--mp4` lays each clip where the spine puts
+  it (the `say()` time on the spine clock plus `--audio-offset-ms`), so the take sounds exactly like
+  the assembled video. A late `say()` is reported, and recorded in the take manifest.
+- **Gaps for `check-take`.** `check-take` wants every scene change inside a silence of at least
+  900 ms. The deck loop changes the slide 250 ms into the gap and speaks 1150 ms in, so give its
+  spine long lead-ins: `spine --brief examples/deck/brief.md --tts-model fake/tone --lead-ms 950`.
+  The default 250 ms lead-in leaves gaps of about 730 ms, which `check-take` rejects.
 
 ## Captions
 
 Captions are drawn with Playwright's `page.screencast.showOverlay`, which renders into the
-captured frames. The default style is a neutral bottom-centre dark bar. `--caption-css <file>`
-replaces it; style the `.pm-caption-wrap` (positioning) and `.pm-caption` (text box) classes.
+captured frames only (the page's DOM is untouched); `--caption-engine dom` injects them into the
+page instead (see SKILL.md for when). If the Playwright build has no `showOverlay`,
+or it fails, the caption is injected into the page DOM instead, with the same classes and style.
+
+- **Default style:** neutral: a bottom-centre, semi-opaque dark bar with white system sans text.
+- **`--caption-css <file>`** replaces it. Style `.pm-caption-wrap` (positioning, full width) and
+  `.pm-caption` (the text box). `examples/ui-demo/captions-alt.css` is a worked example.
+- **`--no-captions`** draws none.
+- **Timing:** one caption at a time. In captions and silent modes a caption holds for reading
+  time, about 3 words/s and at least 1.5 s; in spine-timed mode it holds until its clip ends. A new
+  `say()` replaces a caption still showing. A voice-only `say("", { narrate })` shows no caption,
+  except in captions mode, where `narrate` is shown so the viewer can read it.
+- Before t0 the capture warms up (page round trips, one caption shown and removed) so the first
+  `say()` is not late; none of it is captured.
 
 ## Which page loads
 
@@ -108,8 +129,18 @@ await waitForVoice();
 
 - **`--out`** is the picture-only take: `.mp4` (H.264), `.webm` (VP9) or `.mkv`. It has exactly
   `round(ms × fps / 1000)` frames.
-- **`--mp4`** also writes an H.264/AAC file with faststart and a silent audio track.
-- **`--json`** prints the take summary: mode, frames, `videoMs`, `wallMs`, and each `say()` with
-  its start, clip and lateness.
+- **`--mp4`** writes the deliverable: H.264 High, yuv420p, AAC 48 kHz, faststart. A spine-timed
+  take carries the spine's clips, each at its `say()` time on the spine clock plus
+  `--audio-offset-ms`, levelled to −16 LUFS. Clip audio comes from the spine's `clips/` folder,
+  the TTS cache or the spine's `narration.wav`, checked before the browser opens. Silent and
+  captions-only takes get a silent AAC track.
+- **The take manifest** (`<take>.take.json` next to `--mp4`, else `--out`; `--manifest` moves it)
+  is a v1 spine manifest. `command[]` reproduces the take (absolute paths). A narrated take is
+  `kind: "narration"` with the clips as laid; any other take is `kind: "beatgrid"`,
+  `"narrate": false`, a nominal `bpm` of 60, and one beat whose `onScreenText` joins the captions.
+  Both carry `captions[]` (`n`, `text`, `startMs`, `durationMs` as shown), `videoMs`, `wallMs`,
+  `spine` (relative path) and `x-take` (mode, every `say()` with its lateness, caption engine).
+- **`--json`** prints the take summary: mode, frames, `videoMs`, `wallMs`, each `say()` with
+  its start, clip and lateness, the caption timings and the audio.
 - **`--debug-requests`** logs every page request and failure to stderr. Turn it on when a live site
   misbehaves.

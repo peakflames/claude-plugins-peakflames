@@ -1,0 +1,73 @@
+{
+  "deck": {
+    "ok": true,
+    "file": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.Wg6zPSLG3k/tmp/pm-capture-wp7b-9oPnbF/deck.mp4",
+    "hasAudio": true,
+    "edgeMs": 100,
+    "durMs": 21433,
+    "minSilenceMs": 900,
+    "source": "scene>0.02",
+    "cuts": [
+      {
+        "cutMs": 6700,
+        "timecode": "0:06.700",
+        "ok": true,
+        "edge": false,
+        "silenceMs": 1200,
+        "gap": {
+          "startMs": 6405,
+          "endMs": 7605
+        }
+      },
+      {
+        "cutMs": 6767,
+        "timecode": "0:06.767",
+        "ok": true,
+        "edge": false,
+        "silenceMs": 1200,
+        "gap": {
+          "startMs": 6405,
+          "endMs": 7605
+        }
+      },
+      {
+        "cutMs": 15233,
+        "timecode": "0:15.233",
+        "ok": true,
+        "edge": false,
+        "silenceMs": 1200,
+        "gap": {
+          "startMs": 14878,
+          "endMs": 16078
+        }
+      }
+    ],
+    "threshold": 0.02,
+    "noiseDb": -40,
+    "silentTrack": false
+  },
+  "control": {
+    "ok": false,
+    "failing": [
+      {
+        "timecode": "0:00.267"
+      },
+      {
+        "timecode": "0:02.600"
+      },
+      {
+        "timecode": "0:04.933"
+      },
+      {
+        "timecode": "0:07.267"
+      },
+      {
+        "timecode": "0:09.600"
+      },
+      {
+        "timecode": "0:11.933"
+      }
+    ]
+  },
+  "noChangeGuard": "FAIL  no scene changes found on a narrated take at threshold 0.02 — gradual fades score below it: lower --scene-threshold, or pass --expect-cuts 0 if the take really has none — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.Wg6zPSLG3k/tmp/pm-capture-wp7b-9oPnbF/narrated-no-change.mp4"
+}
