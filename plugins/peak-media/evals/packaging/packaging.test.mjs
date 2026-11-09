@@ -151,7 +151,47 @@ test('watchdog: a step that never exits is stopped, its process group killed, an
   const h = run(path.relative(ROOT, hang), [], { timeoutMs: 1500 });
   assert.equal(h.timedOut, true);
   assert.equal(h.code, null);
-  assert.match(h.stderr, /eval step timed out after 2 s: /);
+  assert.match(h.stderr, /eval step timed out after 1\.5 s: /);
+});
+
+test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s whole process group and leaves no temp folder (WP9 verify-2 N1; not AC-bound)', async () => {
+  const { spawn } = await import('node:child_process');
+  const { mkdirSync } = await import('node:fs');
+  for (const [sig, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+    const dir = tmpDir('pm-interrupt-');
+    const tmp = path.join(dir, 'tmp');
+    mkdirSync(tmp);
+    // a node process blocked in a watched step whose own child sleeps
+    const script = path.join(dir, 'step.mjs');
+    writeFileSync(script, `import { runWatched } from ${JSON.stringify(path.join(ROOT, 'lib', 'watchdog.mjs'))};\n`
+      + `runWatched('/bin/sh', ['-c', 'echo $PPID > ${dir}/pg; sleep 120 & echo $! > ${dir}/pid; wait'], { timeoutMs: 600000 });\n`);
+    const child = spawn(process.execPath, [script], { env: { ...process.env, TMPDIR: tmp }, stdio: 'ignore' });
+    const exited = new Promise((res) => child.on('exit', (c, s) => res({ c, s })));
+    const until = async (cond, ms, what) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) assert.fail(`${sig}: ${what}`); await new Promise((r) => setTimeout(r, 100)); } };
+    await until(() => existsSync(path.join(dir, 'pid')) && readFileSync(path.join(dir, 'pid'), 'utf8').trim(), 15_000, 'the step started');
+    const pg = Number(readFileSync(path.join(dir, 'pg'), 'utf8')), sleeper = Number(readFileSync(path.join(dir, 'pid'), 'utf8'));
+    assert.equal(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')).length, 1, 'the step has its temp folder while it runs');
+    child.kill(sig);
+    const { s } = await exited;
+    assert.equal(s, sig, `node ended by ${sig} (shell exit code ${code})`);
+    const groupAlive = () => { try { process.kill(-pg, 0); return true; } catch { return false; } };
+    await until(() => !groupAlive(), 5000, `the step's process group ${pg} is gone`);
+    assert.throws(() => process.kill(sleeper, 0), /ESRCH/, 'the step\'s child is gone');
+    assert.deepEqual(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')), [], 'no pm-run-* temp folder left');
+  }
+});
+
+test('watchdog: "not found" only when the binary does not exist, not from a real binary\'s exit 127 (WP9 verify-2 N2; not AC-bound)', async () => {
+  const { runWatched } = await import('../../lib/watchdog.mjs');
+  const dir = tmpDir('pm-enoent-');
+  const bin = path.join(dir, 'exits127');
+  writeFileSync(bin, '#!/bin/sh\necho "No such file or directory: input.mp4" >&2\nexit 127\n');
+  chmodSync(bin, 0o755);
+  const real = runWatched(bin, [], { timeoutMs: 10_000 });
+  assert.equal(real.status, 127);
+  assert.equal(real.error, undefined, 'a real binary exiting 127 is not "not found"');
+  assert.equal(runWatched(path.join(dir, 'nope'), [], { timeoutMs: 10_000 }).error?.code, 'ENOENT');
+  assert.equal(runWatched('pm-no-such-binary-xyz', [], { timeoutMs: 10_000 }).error?.code, 'ENOENT');
 });
 
 test('AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps', () => {

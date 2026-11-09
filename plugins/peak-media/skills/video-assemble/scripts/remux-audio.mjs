@@ -3,7 +3,6 @@
 // touching the picture: the video stream is copied (never re-encoded), narration is held
 // at -16 LUFS, and music is ducked under the voice with a sidechain compressor.
 import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,8 +15,7 @@ const round1 = (n) => (Number.isFinite(n) ? Math.round(n * 10) / 10 : n === -Inf
 
 /** md5 of the encoded video packets (`-map 0:v -c copy -f md5`). Unchanged by a remux. */
 export function videoStreamMd5(file) {
-  const r = spawnSync(ffmpegBin(), ['-v', 'error', '-nostdin', '-i', file, '-map', '0:v', '-c', 'copy', '-f', 'md5', '-'], { encoding: 'utf8' });
-  if (r.status !== 0) throw new CliError(`cannot read the video stream of ${file}`);
+  const r = ffmpeg(['-v', 'error', '-i', file, '-map', '0:v', '-c', 'copy', '-f', 'md5', '-'], { what: `reading the video stream of ${file}` });
   return r.stdout.trim().replace(/^MD5=/, '');
 }
 

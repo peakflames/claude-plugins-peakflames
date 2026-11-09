@@ -53,7 +53,7 @@ NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
 [ "$NODE_MAJOR" -ge 22 ] || die "Node 22+ required (found $(node -v)) — install it from https://nodejs.org" 3
 command -v npm >/dev/null 2>&1 || die "npm not found — it ships with Node; reinstall Node 22+" 3
 FFMPEG="${PEAK_MEDIA_FFMPEG:-ffmpeg}"; FFPROBE="${PEAK_MEDIA_FFPROBE:-ffprobe}"
-HINT="install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)"
+HINT="install it (macOS: brew install ffmpeg)"
 "$FFMPEG" -version >/dev/null 2>&1 || die "ffmpeg not found — $HINT" 3
 "$FFPROBE" -version >/dev/null 2>&1 || die "ffprobe not found — $HINT" 3
 
@@ -118,7 +118,7 @@ else
     say "browser: using $SHELL_BIN (export HYPERFRAMES_BROWSER_PATH to make it permanent)"
   else
     case "$(uname -s)/$(uname -m)" in
-      Linux/aarch64|Linux/arm64) die "no headless browser build exists for Linux arm64 — use macOS or an x86_64 Linux host, or set HYPERFRAMES_BROWSER_PATH" 3 ;;
+      Linux/aarch64|Linux/arm64) die "peak-media supports macOS only — there is no render browser for Linux arm64" 3 ;;
     esac
     say "browser: downloading the render browser"
     node "$HF" browser ensure >"$DEPS/browser.log" 2>&1 || die "browser download failed — see $DEPS/browser.log (or set HYPERFRAMES_BROWSER_PATH)" 1

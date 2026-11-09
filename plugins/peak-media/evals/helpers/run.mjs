@@ -34,7 +34,7 @@ export function run(script, args = [], opts = {}) {
   // per-step watchdog (lib/watchdog.mjs): a hung step fails its test in one line instead of hanging the suite
   const limit = (Number(process.env.PEAK_MEDIA_EVAL_STEP_TIMEOUT_S) || 0) * 1000 || opts.timeoutMs || 30 * 60_000;
   const r = runWatched(bin, argv, { cwd: opts.cwd ?? ROOT, env: { ...process.env, ...opts.env }, timeoutMs: limit });
-  if (r.timedOut) return { code: null, stdout: r.stdout, stderr: `${r.stderr}eval step timed out after ${Math.round(limit / 1000)} s: ${script} ${args.join(' ')}\n`, ms: Date.now() - t0, timedOut: true };
+  if (r.timedOut) return { code: null, stdout: r.stdout, stderr: `${r.stderr}eval step timed out after ${limit / 1000} s: ${script} ${args.join(' ')}\n`, ms: Date.now() - t0, timedOut: true };
   return { code: r.status, stdout: r.stdout, stderr: r.stderr, ms: Date.now() - t0 };
 }
 

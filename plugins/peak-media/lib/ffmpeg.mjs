@@ -7,12 +7,12 @@ import { runWatched, stepTimeoutMs, fmtDuration } from './watchdog.mjs';
 // Watchdog defaults (PEAK_MEDIA_STEP_TIMEOUT_S overrides): far above any real encode or probe here.
 const FFMPEG_TIMEOUT_MS = 30 * 60_000;
 const FFPROBE_TIMEOUT_MS = 2 * 60_000;
-const timedOut = (what, ms) => new CliError(`${what} timed out after ${fmtDuration(ms)} with no exit — stopped it; if this repeats, check the machine (emulated Linux?) or raise PEAK_MEDIA_STEP_TIMEOUT_S`);
+const timedOut = (what, ms) => new CliError(`${what} timed out after ${fmtDuration(ms)} with no exit — stopped it; if the input is very long, raise PEAK_MEDIA_STEP_TIMEOUT_S`);
 
 export const ffmpegBin = () => process.env.PEAK_MEDIA_FFMPEG || 'ffmpeg';
 export const ffprobeBin = () => process.env.PEAK_MEDIA_FFPROBE || 'ffprobe';
 
-const INSTALL_HINT = 'install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE';
+const INSTALL_HINT = 'install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE';
 
 export function hasBinary(bin) {
   const r = spawnSync(bin, ['-version'], { encoding: 'utf8' });

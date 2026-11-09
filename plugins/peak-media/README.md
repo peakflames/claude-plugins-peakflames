@@ -178,7 +178,13 @@ pass `--brand <pack>` to `render-plate` and `assemble`. A rebrand is a re-render
 Every render and ffmpeg step runs under a watchdog: if it doesn't finish (default 30 min for a
 render or an encode, 10 min for other HyperFrames commands, 2 min for a probe), it is stopped and
 the run fails with one line naming the step. Raise or lower every limit at once with
-`PEAK_MEDIA_STEP_TIMEOUT_S=<seconds>`.
+`PEAK_MEDIA_STEP_TIMEOUT_S=<seconds>`. Stopping a run (Ctrl-C, or cancelling the command) also
+stops the step it was running.
+
+## Known limits
+
+- After `hyperframes lint`/`check`, HyperFrames keeps a warm headless browser running in the
+  background for about 5 minutes; it exits on its own.
 
 ## Music and sound effects
 

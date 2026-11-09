@@ -72,6 +72,15 @@ Round 1 ran AC-PKG-04/08 in linux/amd64 and arm64 `node:22-slim` containers (log
 - macOS AC-PKG-04, AC-PKG-08 and the watchdog eval: pass (evidence/WP9/AC-PKG-04-08.macos.r2.log).
 - `ac-run --wp WP9`: all six script ACs pass (evidence/WP9/ac-run-WP9.r2.log); `--trace`: 79 ACs, 0 problems.
 
+## Round 3 (verify-2 fixes)
+
+- **N1** `lib/watchdog.mjs`: a background watcher in the step's `sh` checks every second that node is alive; once node is gone it removes the `pm-run-*` folder and `kill -KILL -- -<group>`. Eval: a node process blocked in a watched step with a sleeping child gets SIGINT, then SIGTERM; each time node ends by that signal, the step's whole group is gone within 5 s and no `pm-run-*` folder is left. Mutation-checked (fails without the watcher).
+- **N2** "not found" (ENOENT) only when the binary path doesn't exist or isn't on PATH, checked before spawning; a real binary exiting 127 is reported as its exit. Eval added.
+- **N3** setup.sh ffmpeg hint and the Linux arm64 line, lib/ffmpeg.mjs install hint and timeout text: macOS wording only.
+- **N4** README "Known limits": HyperFrames' warm-check browser lingers ~5 min after lint/check (upstream).
+- Results: full suite, fresh TMPDIR: **103/103 pass**, 423 s (evidence/WP9/AC-PKG-06-suite.r3.log); TMPDIR afterwards only Node's `node-compile-cache`. `ac-run --wp WP9`: six script ACs pass (evidence/WP9/ac-run-WP9.r3.log); `--trace`: 79 ACs, 0 problems.
+- **N5** `remux-audio.mjs` `videoStreamMd5` goes through `ffmpeg()` (watchdog); the eval helper's timeout message shows the exact limit (`1.5 s`).
+
 ## Open
 
 - **AC-PKG-02 — blocked: needs user.** Needs the branch pushed (user approval), then the install check in `pkg-02-05-runbook.md`.
@@ -81,6 +90,7 @@ Round 1 ran AC-PKG-04/08 in linux/amd64 and arm64 `node:22-slim` containers (log
 
 ## Deviations from the brief
 
-- Ownership widened per the Lead notes and the 2026-11-09 Lead decisions (setup.sh, lib/hf.mjs, ac-run.mjs).
+- Ownership widened per the Lead notes and the 2026-11-09 Lead decisions (setup.sh, lib/hf.mjs, ac-run.mjs), and by the verify-1 F1 fix: new `lib/watchdog.mjs`, `lib/ffmpeg.mjs`, and `skills/video-assemble/scripts/remux-audio.mjs` (verify-2 N5).
+- verify-2 N1: JS signal handlers can't run while node is blocked in the watchdog's synchronous wait, so instead of node-side handlers the step's `sh` wrapper watches node: when node is gone (Ctrl-C, SIGTERM, crash) it deletes the step's temp folder and kills the step's process group. Node itself ends by the signal (shell exit 130/143); no handlers to remove.
 - "WP4 N-2/N-3" read as verify-3's (slide template); verify-2's N-3 was already fixed by the Lead in `lib/hf.mjs`.
 - AC-PKG-04/08 now follow DEC-41 (macOS only), as worded by the Lead.
