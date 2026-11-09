@@ -1,9 +1,9 @@
 // Helpers for evals: run a plugin entry point and capture its output.
-import { spawnSync } from 'node:child_process';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
+import { runWatched } from '../../lib/watchdog.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const fx = (...p) => path.join(ROOT, 'evals', 'fixtures', ...p);
@@ -31,7 +31,10 @@ export function run(script, args = [], opts = {}) {
   const pre = opts.network ? [] : ['--import', path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')];
   const t0 = Date.now();
   const [bin, argv] = script.endsWith('.sh') ? ['bash', [path.join(ROOT, script), ...args]] : [process.execPath, [...pre, path.join(ROOT, script), ...args]];
-  const r = spawnSync(bin, argv, { encoding: 'utf8', cwd: opts.cwd ?? ROOT, env: { ...process.env, ...opts.env } });
+  // per-step watchdog (lib/watchdog.mjs): a hung step fails its test in one line instead of hanging the suite
+  const limit = (Number(process.env.PEAK_MEDIA_EVAL_STEP_TIMEOUT_S) || 0) * 1000 || opts.timeoutMs || 30 * 60_000;
+  const r = runWatched(bin, argv, { cwd: opts.cwd ?? ROOT, env: { ...process.env, ...opts.env }, timeoutMs: limit });
+  if (r.timedOut) return { code: null, stdout: r.stdout, stderr: `${r.stderr}eval step timed out after ${Math.round(limit / 1000)} s: ${script} ${args.join(' ')}\n`, ms: Date.now() - t0, timedOut: true };
   return { code: r.status, stdout: r.stdout, stderr: r.stderr, ms: Date.now() - t0 };
 }
 

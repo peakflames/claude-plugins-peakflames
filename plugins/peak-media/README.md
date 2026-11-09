@@ -30,27 +30,16 @@ it to change without a release.
 
 | Need | Why | Check |
 |---|---|---|
+| **macOS** | The only supported platform in 0.1.0 | |
 | **Node.js 22 or newer** (with npm) | Every script is Node; HyperFrames needs 22 | `node -v` |
 | **ffmpeg and ffprobe** | Encoding, loudness, cut checks | `ffmpeg -version` |
 | **About 600 MB of disk** for the runtime, plus room for renders | Runtime deps ≈ 140 MB, render browser ≈ 400 MB; a 1–2 minute video needs a few hundred MB more while it is built | |
 | **Network** for setup, and for narration | Setup downloads the pinned packages and a headless browser once; rendering is offline | |
 
-Install ffmpeg with `brew install ffmpeg` (macOS) or `sudo apt-get install ffmpeg` (Debian/Ubuntu).
+Install ffmpeg with `brew install ffmpeg`.
 
-**Linux:** the headless browser also needs a few system libraries that slim images and servers
-often lack. On Debian/Ubuntu:
-
-```bash
-sudo apt-get install ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-  libatspi2.0-0 libxcomposite1 libxdamage1
-```
-
-If one is still missing, `setup.sh` says which, in one line, with the `apt-get` command.
-
-macOS (Apple silicon or Intel) and Linux x86_64 are supported, including headless machines and
-containers. **Linux on ARM (arm64) is not:** there is no headless browser build for it, so setup
-stops with a one-line message. On an ARM machine, use macOS or an x86_64 (amd64) Linux host or
-container.
+**peak-media 0.1.0 supports macOS only** (Apple silicon or Intel). Linux and Windows are not
+supported.
 
 ## Setup
 
@@ -168,8 +157,14 @@ my-pack/
   fonts/<family>/   # woff2 files + their licence
   logo.svg
   outro/index.html  # the closing card, a HyperFrames composition
-  music-rules.md    # what music suits the brand, and its levels
+  music-rules.md    # what music suits the brand, its levels, and the pack's approved tracks
+  music/            # optional: tracks you have the rights to, each listed in music-rules.md
+                    #   and in brand.json "x-tracks" (title, file, credit)
+  sfx/              # optional: sound effects (CC0 or your own), each with its source URL,
+                    #   licence, duration and peak offset recorded
 ```
+
+At the music stage, name a track or SFX file from the pack's `music/` or `sfx/` folder (or any folder you choose).
 
 The plugin ships one neutral pack, `brand-packs/default` (Inter and JetBrains Mono, a placeholder
 logo, and an outro card that reads **"Your Name"**). It is a starting point, not a brand. To use
@@ -177,6 +172,13 @@ your own, copy the default pack outside the plugin folder, edit it, and point th
 *"use the brand pack at ~/brand/my-pack"* at the brief stage, or set `"brand"` in `plates.json`, or
 pass `--brand <pack>` to `render-plate` and `assemble`. A rebrand is a re-render with a different
 `--brand`; nothing else changes. Check a pack with `node <plugin>/scripts/validate.mjs my-pack/brand.json`.
+
+## When a step hangs
+
+Every render and ffmpeg step runs under a watchdog: if it doesn't finish (default 30 min for a
+render or an encode, 10 min for other HyperFrames commands, 2 min for a probe), it is stopped and
+the run fails with one line naming the step. Raise or lower every limit at once with
+`PEAK_MEDIA_STEP_TIMEOUT_S=<seconds>`.
 
 ## Music and sound effects
 

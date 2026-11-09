@@ -57,7 +57,7 @@ HINT="install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get inst
 "$FFMPEG" -version >/dev/null 2>&1 || die "ffmpeg not found — $HINT" 3
 "$FFPROBE" -version >/dev/null 2>&1 || die "ffprobe not found — $HINT" 3
 
-DEPS=$(node --input-type=module -e "const m = await import('$ROOT/lib/deps.mjs'); process.stdout.write(m.depsDir())") \
+DEPS=$(PM_ROOT="$ROOT" node --input-type=module -e "const { pathToFileURL } = await import('node:url'); const m = await import(pathToFileURL(process.env.PM_ROOT + '/lib/deps.mjs').href); process.stdout.write(m.depsDir())") \
   || die "could not resolve the deps folder (is $ROOT intact?)" 1
 LOCK=$(basename "$DEPS")
 MARK="$DEPS/.installed"
@@ -76,8 +76,9 @@ browser_ok() {
 browser_starts() {
   if [ "$SKIP_BROWSER" = 1 ] && [ -z "${HYPERFRAMES_BROWSER_PATH:-}" ]; then return 0; fi
   local why
-  why=$(node --input-type=module -e "
-    const m = await import('$ROOT/lib/hf.mjs');
+  why=$(PM_ROOT="$ROOT" node --input-type=module -e "
+    const { pathToFileURL } = await import('node:url');
+    const m = await import(pathToFileURL(process.env.PM_ROOT + '/lib/hf.mjs').href);
     const c = m.browserCheck(process.env.HYPERFRAMES_BROWSER_PATH || m.browserPath());
     if (!c.ok) { process.stdout.write(c.message); process.exit(1); }" 2>/dev/null) && return 0
   die "${why:-render browser cannot start — run $ROOT/scripts/setup.sh (or set HYPERFRAMES_BROWSER_PATH)}" 3

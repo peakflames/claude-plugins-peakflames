@@ -26,11 +26,11 @@ README (install, prerequisites, key setup, three modes), final VENDORED.md (HF s
 - **AC-PKG-01** (script) — G the repo · W check · T `plugin.json` version = the top CHANGELOG entry; marketplace.json lists peak-media
 - **AC-PKG-02** (manual) — G `/plugin marketplace add peakflames/claude-plugins-peakflames#feature/new-peak-media-plugin` · W install · T the 5 peak-media skills are listed, and `web2video` is not
 - **AC-PKG-03** (script) — G the plugin tree · W `grep -ri peakflames` over the runtime tree (`skills/ lib/ schemas/ brand-packs/ vendor/ scripts/ evals/`, so `docs/` and the plugin.json author/repository fields are excluded) · T 0 hits; no brand assets in examples
-- **AC-PKG-04** (script + manual) — G a clean Linux container (node:22) · W `setup.sh` then the F1 neutral eval · T it passes with no manual steps; macOS is checked once by hand
+- **AC-PKG-04** (script) — G macOS with the prerequisites · W `setup.sh` then the F1 neutral eval · T it passes with no manual steps
 - **AC-PKG-05** (manual) — G a fresh session with only the plugin · W it is asked for (a) a 20 s explainer and (b) a captioned live-capture demo · T both pass using only SKILL.md files; a reviewer agent checks D7–D10
 - **AC-PKG-06** (script) — G `evals/` · W `node --test plugins/peak-media/evals` · T at least one eval per skill, and all pass
 - **AC-PKG-07** (script) — G VENDORED.md · W check · T each vendor folder has source, commit, date, licence and a list of local changes; GSAP and fonts are listed as fetched or bundled
-- **AC-PKG-08** (script) — G a headless or cloud environment (CI container) · W setup + F0 · T it passes, or prints the one-line message for what's missing
+- **AC-PKG-08** (script) — G macOS · W setup + F0 with a prerequisite missing (ffmpeg, browser, key) · T it prints the one-line message for what's missing
 - **AC-PKG-09** (manual) — G README · W read · T it covers install steps, prerequisites, the key setup, and the three modes
 
 ## Lead notes (2026-11-09)

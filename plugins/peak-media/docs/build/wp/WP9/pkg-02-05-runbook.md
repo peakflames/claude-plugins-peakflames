@@ -43,8 +43,7 @@ In that session:
    Note which data folder it used (`$CLAUDE_PLUGIN_DATA` or `~/.cache/peak-media`).
 
 Record the result in `evidence/WP9/AC-PKG-02-user.md`: the `/plugin` skill list (paste or a JPEG
-screenshot), the date, and pass/fail. Afterwards `rm -rf ~/tmp/pm-pkg02` removes the isolated
-config.
+screenshot), the date, and pass/fail. Keep `~/tmp/pm-pkg02`: PKG-05 uses its config.
 
 ## AC-PKG-05 — cold start from SKILL.md only
 
@@ -124,4 +123,8 @@ Spawn a general-purpose agent with this prompt, filling in `<dir>`, `<mp4>` and 
 
 `evidence/WP9/AC-PKG-05-(a|b).md` per run: the prompt, the session id, the gate lines (a), the
 "only SKILL.md" check, the reviewer's verdict lines, and the final contact sheet as a JPEG. No
-MP4/WAV in the repo. Afterwards `rm -rf ~/tmp/pm-pkg05`.
+MP4/WAV in the repo.
+
+## Cleanup (after PKG-05)
+
+`rm -rf ~/tmp/pm-pkg05 ~/tmp/pm-pkg02` (the second removes the isolated Claude Code config).

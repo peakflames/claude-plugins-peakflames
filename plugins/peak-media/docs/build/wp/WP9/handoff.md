@@ -12,13 +12,13 @@ afterwards. No MP4/WAV/MP3 in the repo; `.DS_Store` strays deleted.
 |---|---|---|
 | AC-PKG-01 | `evals/packaging/packaging.test.mjs`: plugin.json version = top CHANGELOG entry; marketplace.json lists `peak-media` once, `source: ./plugins/peak-media` | evidence/WP9/AC-PKG-01.log |
 | AC-PKG-03 | Walks `skills lib schemas brand-packs vendor scripts evals` (file names and bytes) for the brand name, case-insensitive: 0 hits. Examples carry no images, fonts, audio or logo/brand/outro files | evidence/WP9/AC-PKG-03.log |
-| AC-PKG-04 | Test runs `setup.sh`, then F1 end to end with no key: fake/tone spine at 20 s → `retime-plates` → `render-plate --all` (default pack) → `assemble` → `probe-spec` (size, fps, spine + 3 s outro). Run in a clean node:22-slim linux/amd64 container (see Container) and on macOS | evidence/WP9/AC-PKG-04-08.container-amd64.log, evidence/WP9/AC-PKG-04-08.macos.log |
+| AC-PKG-04 | (macOS, DEC-41) Test runs `setup.sh`, then F1 end to end with no key: fake/tone spine at 20 s → `retime-plates` → `render-plate --all` (default pack) → `assemble` → `probe-spec` (size, fps, spine + 3 s outro) | evidence/WP9/AC-PKG-04-08.macos.r2.log |
 | AC-PKG-06 | Test: exactly the five DEC-21 skills (no `web2video`), each SKILL.md names itself, each `evals/<skill>/` has ≥ 1 test. "All pass" = the full suite | evidence/WP9/AC-PKG-06-suite.log |
 | AC-PKG-07 | Test parses VENDORED.md: every `vendor/*` folder has Destination, Source URL, 40-char commit, date, licence (+ LICENSE file) and ≥ 3 local-change bullets; GSAP row `Fetched` from npm; every font folder (`brand-packs/*/fonts/*`, `evals/fixtures/*/fonts/*`) `Bundled` with source, version, date, sha256, licence, local changes and its OFL.txt | evidence/WP9/AC-PKG-07.log |
-| AC-PKG-08 | Test: with no deps, `setup.sh --check` is one line naming setup.sh (exit 3); with no ffmpeg, one line with the install command; with a browser that can't start, one line; skeleton F0 with no deps is one line. Then `setup.sh` for real: if it can't finish it must be one line; otherwise F0 renders and passes probe-spec | evidence/WP9/AC-PKG-04-08.container-amd64.log, evidence/WP9/AC-PKG-08.container-arm64.log, evidence/WP9/AC-PKG-08.container-amd64-qemu.log, evidence/WP9/AC-PKG-04-08.macos.log |
+| AC-PKG-08 | (macOS, DEC-41) Test: after `setup.sh`, each missing prerequisite gives one line, non-zero exit, no stack — ffmpeg (`setup.sh --check` and F0), runtime deps (`--check`, and F0 when no dev `node_modules`), a render browser that can't start (`--check` and F0's render), the narration key (`spine --narrate` with no key, < 5 s). With nothing missing, F0 passes | evidence/WP9/AC-PKG-04-08.macos.r2.log |
 
 Also delivered:
-- **README.md** — install (marketplace add / install, `#develop` for unreleased), prerequisites (Node 22+, ffmpeg, Linux browser libraries, disk, arm64 note), `setup.sh`, the key (`PEAK_MEDIA_OPENROUTER_API_KEY`, ZDR note), the three modes, the five skills, the house voice, brand packs (placeholder "Your Name" outro, `--brand`), music/SFX (none ships), project layout. No pinned version strings (AC-SKL-07).
+- **README.md** — install (marketplace add / install, `#develop` for unreleased), prerequisites (macOS only, Node 22+, ffmpeg, disk, network), `setup.sh`, the key (`PEAK_MEDIA_OPENROUTER_API_KEY`, ZDR note), the three modes, the five skills, the house voice, brand packs (placeholder "Your Name" outro, `--brand`), music/SFX (none ships), project layout. No pinned version strings (AC-SKL-07).
 - **VENDORED.md (final)** — summary table; HyperFrames section (WP4's text kept, `Fetched` row renamed `Date`); bundled fonts table (from WP5's handoff); fetched-by-setup table (GSAP, HyperFrames CLI, Playwright, ajv, browser — versions point at `lib/pins.json`).
 - **marketplace.json** — peak-media entry (description from plugin.json); `metadata.version` not bumped (DEC-19).
 - **Eval temp dirs** — `tmpDir(prefix)` in `evals/helpers/run.mjs` (deleted on process exit; `PEAK_MEDIA_KEEP_TMP=1` keeps them); every eval switched from `mkdtempSync(os.tmpdir…)`.
@@ -53,29 +53,34 @@ Also delivered:
 - `node --test "plugins/peak-media/evals/**/*.test.mjs"` with a fresh TMPDIR: **100/100 pass**, 398 s (evidence/WP9/AC-PKG-06-suite.log). TMPDIR afterwards holds only `node-compile-cache` (Node's own); no `pm-*` folders (evidence/WP9/tmpdir-after-suite.log).
 - `ac-run --wp WP9`: all six script ACs pass (evidence/WP9/ac-run-WP9.log). `ac-run --trace`: 79 ACs, 12 briefs, 0 problems.
 
-### Container (AC-PKG-04 / -08)
+### Container runs (superseded by DEC-41)
 
-Colima VM (`--disk 8`, vz + Rosetta), image `node:22-slim` (Debian 12, Node 22.23.4), worktree mounted read-only. Script (`tmp/wp9/in-container.sh`, gitignored, quoted in the logs): `apt-get install --no-install-recommends ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libxcomposite1 libxdamage1` (the README's prerequisites), `setup.sh --check` (one line, exit 3), then `node --test --test-name-pattern='^AC-PKG-0[48]:' 'evals/packaging/*.test.mjs'` (each test runs `setup.sh` itself).
+Round 1 ran AC-PKG-04/08 in linux/amd64 and arm64 `node:22-slim` containers (logs `evidence/WP9/*.container-*.log` kept as history). The user then made v0.1.0 macOS-only (DEC-41), so there is no container run in round 2 and no Linux eval remains.
 
-| Run | Result |
-|---|---|
-| linux/amd64 (Rosetta), with the README's packages | **AC-PKG-04 pass** (F1 20.8 s + outro, probe-spec PASS, 151 s), **AC-PKG-08 pass**; `setup.sh --check` after: ready; ldd: nothing missing |
-| linux/arm64 (native) | AC-PKG-08 pass via its one-line branch (`no headless browser build exists for Linux arm64 …`); AC-PKG-04 fails as expected (documented as unsupported) |
-| linux/amd64 under qemu (no Rosetta) | Chrome itself crashes under qemu (`Assertion failed: p_rcu_reader->depth != 0 … qemu/rcu.h`); the new browser check reports it in one line. Emulator limit, not ours |
-| first amd64 run, ffmpeg only (before the fix) | setup said "ready" but every render failed `no output`: the browser lacked libnspr4/libnss3/… — what led to the browserCheck change |
+## Round 2 (verify-1 fixes, DEC-41)
 
-A first Rosetta attempt had the fake/tone spine idle in `epoll` for 12 min; a standalone rerun of the spine and the full rerun both finished normally, so it is recorded as a one-off. All containers and the image were removed; the VM was stopped and deleted with its data disk (`colima delete -f --data`).
+- **F1 watchdog.** New `lib/watchdog.mjs` `runWatched()`: the child runs detached (own process group) under `sh`, with stdout/stderr to files and the exit status written to a file; the caller polls for that file (no reliance on the child-exit signal reaching node) and past the deadline kills the group with `process.kill(-pid, 'SIGKILL')`. Used by `lib/hf.mjs` `hf()`/`render()` (render-plate, assemble's outro render, lint/check/snapshot, `browser path`), `browserCheck`, and `lib/ffmpeg.mjs` `ffmpeg()`/`probe()`. Defaults: render 30 min, other HyperFrames 10 min, ffmpeg 30 min, ffprobe 2 min, browser start 1 min; `PEAK_MEDIA_STEP_TIMEOUT_S` overrides all (README "When a step hangs"). A timeout fails with one line naming the step and the limit. The eval `run()` helper uses the same watchdog (default 30 min per step, `opts.timeoutMs`, `PEAK_MEDIA_EVAL_STEP_TIMEOUT_S`) and returns `code: null` + a one-line reason. New eval `watchdog: …` (packaging) proves it: a fake ffprobe that waits on a `sleep` child fails `probe-spec` in one line within 2 s and the sleeper is gone; `hf()` with a sleeping wrap throws the one-line timeout; a never-ending script fails its eval step. Whether this changes the Rosetta container result is untested (no containers after DEC-41).
+- **F2** runbook: `~/tmp/pm-pkg02` is kept for PKG-05; cleanup moved to a final section after PKG-05.
+- **F3** `setup.sh` passes `$ROOT` to node in `PM_ROOT` (both inline imports, incl. the older `deps.mjs` one), not inside the JS string.
+- **F4** `.gitignore`: `docs/build/**/*.mp3` and `*.m4a`.
+- **F5** README brand-pack tree: optional `music/` (listed in `music-rules.md` and brand.json `x-tracks`) and `sfx/` (CC0 or own, with source URL, licence, duration, peak offset) per DEC-39/40.
+- **DEC-41 (user, macOS only):** acceptance.md AC-PKG-04/08 rows and the brief reworded as instructed (Lead-granted edits); DEC-41 added to decisions.md; README says macOS only and drops the Linux package list and arm64 note; AC-PKG-04 asserts darwin; AC-PKG-08 rewritten to the macOS "prerequisite missing" form. `render()` now puts the browser check's message first, and browser messages say "run setup.sh to fetch the render browser" (no Linux advice). setup.sh keeps its existing Linux one-liners.
+
+### Round 2 results
+
+- Full suite, fresh TMPDIR: **101/101 pass**, 394 s (evidence/WP9/AC-PKG-06-suite.r2.log); TMPDIR afterwards held only Node's `node-compile-cache`.
+- macOS AC-PKG-04, AC-PKG-08 and the watchdog eval: pass (evidence/WP9/AC-PKG-04-08.macos.r2.log).
+- `ac-run --wp WP9`: all six script ACs pass (evidence/WP9/ac-run-WP9.r2.log); `--trace`: 79 ACs, 0 problems.
 
 ## Open
 
 - **AC-PKG-02 — blocked: needs user.** Needs the branch pushed (user approval), then the install check in `pkg-02-05-runbook.md`.
 - **AC-PKG-05 — blocked: needs user.** Fresh-session cold start (a) explainer, (b) captioned TodoMVC demo, plus reviewer-agent D7–D10 prompt: runbook.
 - **AC-PKG-09 — blocked: needs user** (read the README).
-- **AC-PKG-04 macOS manual check** — the eval passes on this Mac (log above); the "checked once by hand" part is the user's.
 - Root `README.md` plugin table doesn't list peak-media (not an owned file); CHANGELOG bullets for WP9 are for the Lead.
 
 ## Deviations from the brief
 
 - Ownership widened per the Lead notes and the 2026-11-09 Lead decisions (setup.sh, lib/hf.mjs, ac-run.mjs).
 - "WP4 N-2/N-3" read as verify-3's (slide template); verify-2's N-3 was already fixed by the Lead in `lib/hf.mjs`.
-- Container: linux/amd64 via Rosetta on Apple silicon (no native amd64 host here); see Container above.
+- AC-PKG-04/08 now follow DEC-41 (macOS only), as worded by the Lead.

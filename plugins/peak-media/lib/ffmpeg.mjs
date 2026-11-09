@@ -2,6 +2,12 @@
 // binaries (tests point them at a missing path to simulate "not installed").
 import { spawnSync } from 'node:child_process';
 import { CliError, EXIT } from './cli.mjs';
+import { runWatched, stepTimeoutMs, fmtDuration } from './watchdog.mjs';
+
+// Watchdog defaults (PEAK_MEDIA_STEP_TIMEOUT_S overrides): far above any real encode or probe here.
+const FFMPEG_TIMEOUT_MS = 30 * 60_000;
+const FFPROBE_TIMEOUT_MS = 2 * 60_000;
+const timedOut = (what, ms) => new CliError(`${what} timed out after ${fmtDuration(ms)} with no exit — stopped it; if this repeats, check the machine (emulated Linux?) or raise PEAK_MEDIA_STEP_TIMEOUT_S`);
 
 export const ffmpegBin = () => process.env.PEAK_MEDIA_FFMPEG || 'ffmpeg';
 export const ffprobeBin = () => process.env.PEAK_MEDIA_FFPROBE || 'ffprobe';
@@ -26,7 +32,9 @@ function lastLine(s) {
 
 /** Run ffmpeg with args; returns {stdout, stderr}. Throws CliError on failure. */
 export function ffmpeg(args, { what = 'ffmpeg', input } = {}) {
-  const r = spawnSync(ffmpegBin(), ['-hide_banner', '-nostdin', ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, input });
+  const ms = stepTimeoutMs(FFMPEG_TIMEOUT_MS);
+  const r = runWatched(ffmpegBin(), ['-hide_banner', '-nostdin', ...args], { input, timeoutMs: ms });
+  if (r.timedOut) throw timedOut(what, ms);
   if (r.error) throw new CliError(`ffmpeg not found — ${INSTALL_HINT}`, EXIT.MISSING_PREREQ);
   if (r.status !== 0) throw new CliError(`${what} failed: ${lastLine(r.stderr)}`);
   return { stdout: r.stdout, stderr: r.stderr };
@@ -34,7 +42,9 @@ export function ffmpeg(args, { what = 'ffmpeg', input } = {}) {
 
 /** ffprobe -show_streams -show_format as JSON. */
 export function probe(file) {
-  const r = spawnSync(ffprobeBin(), ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', file], { encoding: 'utf8' });
+  const ms = stepTimeoutMs(FFPROBE_TIMEOUT_MS);
+  const r = runWatched(ffprobeBin(), ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', file], { timeoutMs: ms });
+  if (r.timedOut) throw timedOut(`ffprobe of ${file}`, ms);
   if (r.error) throw new CliError(`ffprobe not found — ${INSTALL_HINT}`, EXIT.MISSING_PREREQ);
   if (r.status !== 0) throw new CliError(`cannot read ${file} as media: ${lastLine(r.stderr) || 'ffprobe failed'}`);
   return JSON.parse(r.stdout);

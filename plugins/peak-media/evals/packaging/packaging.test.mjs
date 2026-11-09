@@ -1,9 +1,10 @@
 // WP9 packaging: AC-PKG-01, -03, -04, -06, -07, -08.
-// AC-PKG-04 and -08 run setup.sh for real (a no-op when the runtime is already installed), then a
-// no-key end-to-end video: in a clean Linux container they are the "setup, then F1 / F0" checks.
+// AC-PKG-04 and -08 run setup.sh for real (a no-op when the runtime is already installed). v0.1.0 is
+// macOS-only (DEC-41): -04 is setup then the no-key F1 video; -08 is setup + F0 with a prerequisite
+// missing (ffmpeg, the render browser, the narration key), each reported in one line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync, existsSync, copyFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
 import path from 'node:path';
 import { run, ROOT, pluginVersion, tmpDir } from '../helpers/run.mjs';
 import { depsDir as depsRoot } from '../../lib/deps.mjs';
@@ -119,7 +120,42 @@ test('packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs 
   assert.deepEqual(media, [], 'no audio or video files in the plugin');
 });
 
-test('AC-PKG-04: setup.sh, then the F1 brief end to end with no key (fake/tone spine, default pack) — passes with no manual steps', () => {
+test('watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound)', async () => {
+  const dir = tmpDir('pm-watchdog-');
+  const pidFile = path.join(dir, 'sleeper.pid');
+  // fake ffmpeg/ffprobe: answers -version, otherwise starts a sleeper child and waits on it forever-ish
+  const fake = path.join(dir, 'fake-ff');
+  writeFileSync(fake, `#!/bin/sh\ncase "$1" in -version) echo "ffmpeg version fake"; exit 0;; esac\nsleep 120 & echo $! > '${pidFile}'\nwait\n`);
+  chmodSync(fake, 0o755);
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  const r = run('lib/verify/probe-spec.mjs', [path.join(F0, 'plates.json')], { env: { PEAK_MEDIA_FFMPEG: fake, PEAK_MEDIA_FFPROBE: fake, PEAK_MEDIA_STEP_TIMEOUT_S: '2' } });
+  assert.equal(r.code, 1, r.stdout + r.stderr);
+  assert.ok(r.ms < 15_000, `stopped promptly (${r.ms} ms)`);
+  assert.equal(lines(r.stderr).length, 1, r.stderr);
+  assert.match(r.stderr, /ffprobe of .* timed out after 2 s with no exit — stopped it/);
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  assert.ok(!alive(pid), `the step's own child (sleep, pid ${pid}) was killed with its group`);
+
+  // hyperframes: hf() under the same watchdog (the wrap runs a sleeper in place of the CLI)
+  const { hf } = await import('../../lib/hf.mjs');
+  process.env.PEAK_MEDIA_STEP_TIMEOUT_S = '2';
+  try {
+    const t0 = Date.now();
+    assert.throws(() => hf(['render', dir], { wrap: ['/bin/sh', '-c', 'sleep 120', '--'] }), /hyperframes render timed out after 2 s with no exit — stopped it; .*setup\.sh --check/);
+    assert.ok(Date.now() - t0 < 15_000);
+  } finally { delete process.env.PEAK_MEDIA_STEP_TIMEOUT_S; }
+
+  // the eval helper's own per-step watchdog: a script that never exits fails its step in one line
+  const hang = path.join(dir, 'hang.mjs');
+  writeFileSync(hang, 'setInterval(() => {}, 1000);\n');
+  const h = run(path.relative(ROOT, hang), [], { timeoutMs: 1500 });
+  assert.equal(h.timedOut, true);
+  assert.equal(h.code, null);
+  assert.match(h.stderr, /eval step timed out after 2 s: /);
+});
+
+test('AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps', () => {
+  assert.equal(process.platform, 'darwin', 'v0.1.0 supports macOS only (DEC-41)');
   const setup = run('scripts/setup.sh', [], { network: true });
   assert.equal(setup.code, 0, `setup.sh: ${setup.stdout}${setup.stderr}`);
   assert.match(lines(setup.stdout).at(-1), /^peak-media ready: /);
@@ -146,44 +182,38 @@ test('AC-PKG-04: setup.sh, then the F1 brief end to end with no key (fake/tone s
   process.stdout.write(`# F1: spine ${manifest.totalMs} ms (${manifest.beats.length} beats) + outro 3000 ms → ${path.relative(dir, final)}; ${lines(spec.stdout).at(-1)}\n`);
 });
 
-test('AC-PKG-08: setup + F0 in a headless environment — passes, or prints one line naming what is missing', () => {
-  // what is missing: each prerequisite reports one line naming the fix, before any install
-  const empty = tmpDir('pm-pkg08-data-');
-  const noDeps = run('scripts/setup.sh', ['--check'], { env: { CLAUDE_PLUGIN_DATA: empty } });
-  assert.equal(noDeps.code, 3, noDeps.stdout + noDeps.stderr);
-  assert.equal(lines(noDeps.stdout + noDeps.stderr).length, 1, noDeps.stderr);
-  assert.match(noDeps.stderr, /runtime deps not installed .* run .*scripts\/setup\.sh/);
-  const noFfmpeg = run('scripts/setup.sh', ['--check'], { env: { PEAK_MEDIA_FFMPEG: path.join(empty, 'no-ffmpeg') } });
-  assert.equal(noFfmpeg.code, 3);
-  assert.deepEqual(lines(noFfmpeg.stdout + noFfmpeg.stderr), ['setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)']);
-  const badBrowser = run('scripts/setup.sh', ['--check'], { env: { HYPERFRAMES_BROWSER_PATH: '/usr/bin/false' } });
-  if (existsSync(path.join(depsRoot(), '.installed'))) { // deps present: the browser is started once and its failure named
-    assert.equal(badBrowser.code, 3, badBrowser.stdout + badBrowser.stderr);
-    assert.equal(lines(badBrowser.stdout + badBrowser.stderr).length, 1, badBrowser.stderr);
-    assert.match(badBrowser.stderr, /^setup\.sh: render browser can't start/);
-  }
-  if (!existsSync(path.join(ROOT, 'node_modules'))) { // a dev checkout with its own node_modules can't lack deps
-    const skel = run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', tmpDir('pm-pkg08-miss-')], { env: { ...NO_KEY, CLAUDE_PLUGIN_DATA: empty } });
-    assert.notEqual(skel.code, 0);
-    assert.equal(lines(skel.stderr).length, 1, skel.stderr);
-    assert.match(skel.stderr, /dependency '.+'.* — run .*scripts\/setup\.sh/);
-    assert.doesNotMatch(skel.stderr, /\n\s+at /);
-  }
-
-  // then setup for real: where it can't finish (no network, no browser build for this platform),
-  // it must stop with one line naming what's missing; where it can, F0 (beat grid → motion plate →
-  // composite) passes
+test('AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing', () => {
   const setup = run('scripts/setup.sh', ['-q'], { network: true });
-  if (setup.code !== 0) {
-    assert.equal(lines(setup.stdout + setup.stderr).length, 1, `one line: ${setup.stdout}${setup.stderr}`);
-    assert.match(setup.stderr, /^setup\.sh: .+ — /, 'names the problem and the fix');
-    process.stdout.write(`# setup could not finish here; its one-line message: ${setup.stderr.trim()}\n`);
-    return;
-  }
-  const out = tmpDir('pm-pkg08-');
-  const skel = run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', out], { env: NO_KEY });
-  assert.equal(skel.code, 0, skel.stdout + skel.stderr);
-  const spec = run('lib/verify/probe-spec.mjs', [path.join(out, 'out', 'final.mp4'), '--size', '1280x720', '--duration-ms', '3000']);
-  assert.equal(spec.code, 0, spec.stdout + spec.stderr);
+  assert.equal(setup.code, 0, setup.stdout + setup.stderr);
+  const one = (r, re, what) => {
+    assert.notEqual(r.code, 0, `${what}: non-zero exit`);
+    assert.equal(lines(r.stdout + r.stderr).length, 1, `${what}: one line — ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, re, what);
+    assert.doesNotMatch(r.stderr, /\n\s+at /, `${what}: no stack trace`);
+  };
+  const empty = tmpDir('pm-pkg08-data-');
+  const f0 = (env) => run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', tmpDir('pm-pkg08-')], { env: { ...NO_KEY, ...env } });
+
+  // ffmpeg
+  const noFf = { PEAK_MEDIA_FFMPEG: path.join(empty, 'no-ffmpeg') };
+  one(run('scripts/setup.sh', ['--check'], { env: noFf }), /^setup\.sh: ffmpeg not found — install it \(macOS: brew install ffmpeg/, 'setup --check without ffmpeg');
+  one(f0(noFf), /ffmpeg not found — install it \(macOS: brew install ffmpeg/, 'F0 without ffmpeg');
+  // the runtime deps (before setup has run)
+  one(run('scripts/setup.sh', ['--check'], { env: { CLAUDE_PLUGIN_DATA: empty } }), /runtime deps not installed .* run .*scripts\/setup\.sh/, 'setup --check without deps');
+  if (!existsSync(path.join(ROOT, 'node_modules'))) one(f0({ CLAUDE_PLUGIN_DATA: empty }), /dependency '.+'.* — run .*scripts\/setup\.sh/, 'F0 without deps');
+  // the render browser (present but can't start)
+  const badBrowser = { HYPERFRAMES_BROWSER_PATH: '/usr/bin/false' };
+  one(run('scripts/setup.sh', ['--check'], { env: badBrowser }), /^setup\.sh: render browser can't start .* — run .*setup\.sh to fetch the render browser/, 'setup --check with a broken browser');
+  one(f0(badBrowser), /render failed for .*: render browser can't start .* — run .*setup\.sh to fetch the render browser/, 'F0 with a broken browser');
+  // the narration key (F0 itself needs none: a beat grid; asking for narration without a key fails up front)
+  const dir = tmpDir('pm-pkg08-key-');
+  for (const f of ['brief.md', 'script.md']) copyFileSync(path.join(F1, f), path.join(dir, f));
+  const t0 = Date.now();
+  one(run('skills/video-spine/scripts/spine.mjs', ['--brief', path.join(dir, 'brief.md'), '--narrate'], { env: NO_KEY }), /PEAK_MEDIA_OPENROUTER_API_KEY/, 'narration without a key');
+  assert.ok(Date.now() - t0 < 5000, 'the key check fails fast, before any synthesis');
+
+  // and with nothing missing, F0 passes
+  const ok = run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', tmpDir('pm-pkg08-ok-')], { env: NO_KEY });
+  assert.equal(ok.code, 0, ok.stdout + ok.stderr);
   assert.equal(run('scripts/setup.sh', ['--version']).stdout.trim(), pluginVersion());
 });

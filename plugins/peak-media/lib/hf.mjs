@@ -5,6 +5,11 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { CliError, EXIT, PLUGIN_ROOT } from './cli.mjs';
 import { depRoot, pins } from './deps.mjs';
+import { runWatched, stepTimeoutMs, fmtDuration } from './watchdog.mjs';
+
+// Watchdog defaults (PEAK_MEDIA_STEP_TIMEOUT_S overrides): a plate renders in seconds to minutes.
+const RENDER_TIMEOUT_MS = 30 * 60_000;
+const HF_TIMEOUT_MS = 10 * 60_000;
 
 const SETUP = path.join(PLUGIN_ROOT, 'scripts', 'setup.sh');
 
@@ -38,10 +43,14 @@ export function hfBin() {
 }
 
 /** Run a hyperframes subcommand. Returns {code, stdout, stderr}. */
-export function hf(args, { cwd, env, timeoutMs = 20 * 60 * 1000, wrap } = {}) {
+export function hf(args, { cwd, env, timeoutMs = HF_TIMEOUT_MS, wrap } = {}) {
   const cmd = [process.execPath, hfBin(), ...args];
   const [bin, ...rest] = wrap ? [...wrap, ...cmd] : cmd;
-  const r = spawnSync(bin, rest, { cwd, env: hfEnv(env), encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, timeout: timeoutMs });
+  const ms = stepTimeoutMs(timeoutMs);
+  const r = runWatched(bin, rest, { cwd, env: hfEnv(env), timeoutMs: ms });
+  if (r.timedOut) {
+    throw new CliError(`hyperframes ${args[0]} timed out after ${fmtDuration(ms)} with no exit — stopped it; the render browser may have crashed: run ${SETUP} --check, or raise PEAK_MEDIA_STEP_TIMEOUT_S`);
+  }
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
@@ -49,16 +58,14 @@ export function hf(args, { cwd, env, timeoutMs = 20 * 60 * 1000, wrap } = {}) {
 export function render(dir, out, { fps, quality = 'standard', wrap } = {}) {
   const args = ['render', dir, '-o', out, '--quiet', '--quality', quality, '--no-best-effort'];
   if (fps) args.push('--fps', String(fps));
-  const r = hf(args, { wrap });
+  const r = hf(args, { wrap, timeoutMs: RENDER_TIMEOUT_MS });
   if (r.code !== 0 || !existsSync(out)) {
     const lines = (r.stderr + r.stdout).trim().split('\n');
-    let msg = lines.find((l) => /disk space/i.test(l)) ?? lines.filter((l) => /error|fail|✗/i.test(l)).at(-1);
-    if (!msg) {
-      // nothing recognisable from HyperFrames: a browser that can't start is the usual cause
-      const b = browserPath();
-      const chk = b ? browserCheck(b) : { ok: false, message: `render browser missing — run ${SETUP} (or set HYPERFRAMES_BROWSER_PATH)` };
-      msg = chk.ok ? lines.filter((l) => l.trim()).at(-1) ?? 'no output from HyperFrames' : chk.message;
-    }
+    // a browser that can't start is the usual cause: its check names the fix, so it goes first
+    const b = browserPath();
+    const chk = b ? browserCheck(b) : { ok: false, message: `render browser missing — run ${SETUP} (or set HYPERFRAMES_BROWSER_PATH)` };
+    const msg = !chk.ok ? chk.message
+      : lines.find((l) => /disk space/i.test(l)) ?? lines.filter((l) => /error|fail|✗/i.test(l)).at(-1) ?? lines.filter((l) => l.trim()).at(-1) ?? 'no output from HyperFrames';
     throw new CliError(`render failed for ${dir}: ${msg.trim()}`);
   }
   return out;
@@ -97,7 +104,8 @@ const LIB_PACKAGES = {
  */
 export function browserCheck(bin) {
   if (!bin || !existsSync(bin)) return { ok: false, message: `render browser not found at ${bin} — run ${SETUP} (or set HYPERFRAMES_BROWSER_PATH)` };
-  const r = spawnSync(bin, ['--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', 'about:blank'], { encoding: 'utf8', timeout: 60_000 });
+  const r = runWatched(bin, ['--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', 'about:blank'], { timeoutMs: stepTimeoutMs(60_000) });
+  if (r.timedOut) return { ok: false, message: `render browser didn't answer within ${fmtDuration(stepTimeoutMs(60_000))} (${bin}) — run ${SETUP} to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium` };
   if (r.status === 0 && /<html/i.test(r.stdout ?? '')) return { ok: true };
   if (process.platform === 'linux') {
     const ldd = spawnSync('ldd', [bin], { encoding: 'utf8' });
@@ -109,5 +117,5 @@ export function browserCheck(bin) {
     }
   }
   const why = `${r.error?.message ?? ''}\n${r.stderr ?? ''}`.split('\n').map((l) => l.trim()).filter(Boolean).at(-1) ?? `exit ${r.status}`;
-  return { ok: false, message: `render browser can't start (${bin}): ${why.slice(0, 300)} — point HYPERFRAMES_BROWSER_PATH at a Chromium that runs here, or use macOS or an x86_64 Linux host` };
+  return { ok: false, message: `render browser can't start (${bin}): ${why.slice(0, 300)} — run ${SETUP} to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium` };
 }
