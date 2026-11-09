@@ -29,7 +29,7 @@
   .cell.head { font-weight: 700; color: var(--color-accent); }
   #footer { position: absolute; left: 8%; right: 8%; bottom: 6%; height: calc({{HEIGHT}}px * 0.05); display: flex; align-items: center; justify-content: space-between; }
   #logo { height: 100%; width: auto; }
-  .counter { font-family: var(--font-mono); font-size: calc({{HEIGHT}}px * 0.03); }
+  .counter { font-family: var(--font-mono); font-size: calc({{HEIGHT}}px * 0.0375); }
   #progress { position: absolute; left: 0; bottom: 0; width: 100%; height: calc({{HEIGHT}}px * 0.008); background: var(--color-accent); transform-origin: 0% 50%; }
 </style>
 </head>
@@ -67,7 +67,7 @@
     // Fit once, deterministically: shrink the body (then the title) until the content box holds it.
     if (body) {
       let size = H * 0.06;
-      while (content.scrollHeight > content.clientHeight + 1 && size > H * 0.032) { size -= 1; body.style.fontSize = size + "px"; }
+      while (content.scrollHeight > content.clientHeight + 1 && size > Math.ceil(H * 0.0375)) { size -= 1; body.style.fontSize = size + "px"; }
     }
     const title = document.getElementById("title");
     let ts = H * 0.085;
@@ -75,14 +75,14 @@
 
     const ease = tokenEase("--ease-out", "power3.out");
     const tl = gsap.timeline({ paused: true });
-    tl.fromTo("#title", { opacity: 0, y: H * 0.03 }, { opacity: 1, y: 0, duration: 0.55, ease }, 0.1);
-    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease }, 0.3);
+    tl.fromTo("#title", { opacity: 1, y: H * 0.015 }, { opacity: 1, y: 0, duration: 0.55, ease }, 0); // on screen at frame 0
+    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease }, 0.1);
     const groups = document.querySelector(".table")
       ? gsap.utils.toArray(".row").map((r) => r.querySelectorAll(".cell"))
       : gsap.utils.toArray(".bullet").map((el) => [el]);
     const step = Math.min(0.4, (D * 0.35) / Math.max(1, groups.length));
     groups.forEach((g, i) => {
-      tl.fromTo(g, { opacity: 0, x: H * -0.03 }, { opacity: 1, x: 0, duration: 0.5, ease }, 0.6 + i * step);
+      tl.fromTo(g, { opacity: 0, x: H * -0.03 }, { opacity: 1, x: 0, duration: 0.5, ease }, 0.4 + i * step);
     });
     tl.fromTo("#progress", { scaleX: 0 }, { scaleX: 1, duration: D - 0.05, ease: "none" }, 0);
     window.__timelines["main"] = tl;

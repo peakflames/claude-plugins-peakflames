@@ -139,26 +139,53 @@ export function storyboard(items, { project, atFrac = 0.7 }) {
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 }
 
+/** Smallest reading size the templates may shrink to: 27 px at 720p (vendored-map step 11). */
+export const MIN_TEXT = 0.0375;
+
+/**
+ * Conservative pre-render estimate (no browser): would the plate's text fit the template's text box
+ * at the MIN_TEXT floor, wrapping allowed? Bold sans averages under 0.6 em per character. A plate
+ * that can't is rejected with one line naming it, before anything is scaffolded or rendered.
+ */
+export function checkTextFits(plate, { width, height }) {
+  if (plate.kind !== 'motion' && plate.kind !== 'slide') return;
+  const floor = MIN_TEXT * height;
+  const perRow = Math.max(1, Math.floor((0.8 * width) / (0.6 * floor)));
+  const raw = lines(plate);
+  const table = plate.kind === 'slide' && raw.some((l) => l.includes('|'));
+  const cols = table ? Math.max(...raw.map((l) => l.split('|').length)) : 1;
+  // a table row is as tall as its tallest cell
+  const rows = raw.reduce((n, l) => n + Math.max(...(table ? l.split('|') : [l]).map((c) => Math.max(1, Math.ceil(c.trim().length / Math.max(1, Math.floor(perRow / cols)))))), 0);
+  const box = plate.kind === 'motion' ? 0.72 * height : 0.55 * height; // slide: content box minus the title
+  const gap = plate.kind === 'slide' ? 0.7 : 0.12;
+  const need = rows * floor * 1.3 + Math.max(0, raw.length - 1) * floor * gap;
+  if (need > box) {
+    throw new CliError(`plate ${plate.id}: on-screen text (${raw.join(' ').length} chars) can't fit the frame at the ${Math.round(floor)} px minimum — shorten "text" or split the beat in plates.json (one idea per plate)`);
+  }
+}
+
 /** Load + validate plates.json and the brand pack; pick the plates to work on. */
 export async function loadPlan(platesFile, { ids = [], all = false, brand } = {}) {
   if (!existsSync(platesFile)) throw new CliError(`cannot read ${platesFile}: no such file`);
   const v = await validateFile(platesFile, 'plates');
   if (!v.ok) throw fail(platesFile, v.errors);
   const plan = JSON.parse(readFileSync(platesFile, 'utf8'));
-  const brandDir = path.resolve(brandDirOf(brand ?? path.resolve(path.dirname(platesFile), plan.brand)));
-  if (!existsSync(brandDir)) throw new CliError(`brand pack not found: ${brandDir} — fix "brand" in ${platesFile} or pass --brand <pack>`);
-  const bv = await validateFile(brandDir, 'brand');
-  if (!bv.ok) throw fail(`brand pack ${brandDir}`, bv.errors);
   if (!all && !ids.length) throw new CliError('name plate id(s) after plates.json, or pass --all', EXIT.USAGE);
   if (all && ids.length) throw new CliError('pass plate ids or --all, not both', EXIT.USAGE);
   const byId = new Map(plan.plates.map((p) => [p.id, p]));
   for (const id of ids) if (!byId.has(id)) throw new CliError(`no plate '${id}' in ${platesFile} (plates: ${[...byId.keys()].join(', ')})`);
   const chosen = all ? plan.plates.filter((p) => p.kind !== 'live') : ids.map((id) => byId.get(id));
+  const skipped = all ? plan.plates.filter((p) => p.kind === 'live').map((p) => p.id) : [];
   const live = chosen.find((p) => p.kind === 'live');
   if (live) throw new CliError(`plate ${live.id} is kind 'live' — it is played and screen-captured, not rendered: use video-capture (skills/video-capture/scripts/capture.mjs)`);
   if (!chosen.length) throw new CliError(`no motion or slide plates in ${platesFile} (live plates use video-capture)`);
+  for (const p of chosen) checkTextFits(p, plan);
+  const brandDir = path.resolve(brandDirOf(brand ?? path.resolve(path.dirname(platesFile), plan.brand)));
+  if (!existsSync(brandDir)) throw new CliError(`brand pack not found: ${brandDir} — fix "brand" in ${platesFile} or pass --brand <pack>`);
+  const bv = await validateFile(brandDir, 'brand');
+  if (!bv.ok) throw fail(`brand pack ${brandDir}`, bv.errors);
   const slides = plan.plates.filter((p) => p.kind === 'slide').sort((a, b) => a.startMs - b.startMs).map((p) => p.id);
-  return { plan, brandDir, chosen: [...chosen].sort((a, b) => a.startMs - b.startMs), slides };
+  return { plan, brandDir, chosen: [...chosen].sort((a, b) => a.startMs - b.startMs), slides, skipped };
 }
 
 const spec = {
@@ -181,7 +208,7 @@ Project folders (plates/, renders/plates/, review/) live next to plates.json unl
     storyboard: { type: 'boolean', desc: 'Do not render: snapshot one key frame per plate into review/storyboard.jpg (stage 4)' },
     'scaffold-only': { type: 'boolean', desc: 'Only prepare plates/<id>/ (template, brand, GSAP); do not render' },
     rescaffold: { type: 'boolean', desc: 'Overwrite an existing plates/<id>/index.html from the template' },
-    quality: { type: 'string', desc: 'HyperFrames render quality', default: 'standard', choices: ['draft', 'looks', 'standard', 'high', 'delivery'] },
+    quality: { type: 'string', arg: 'level', desc: 'HyperFrames render quality: draft, looks, standard, high or delivery', default: 'standard', choices: ['draft', 'looks', 'standard', 'high', 'delivery'] },
     json: { type: 'boolean', desc: 'Print the results as JSON' },
   },
   positionals: { min: 1, max: Infinity },
@@ -203,7 +230,8 @@ export async function main({ values, positionals: [platesArg, ...ids] }) {
   const everyMs = parseMs(values.every);
   if (values.storyboard && values['scaffold-only']) throw new CliError('pass --storyboard or --scaffold-only, not both', EXIT.USAGE);
   const platesFile = path.resolve(platesArg);
-  const { plan, brandDir, chosen, slides } = await loadPlan(platesFile, { ids, all: values.all, brand: values.brand });
+  const { plan, brandDir, chosen, slides, skipped } = await loadPlan(platesFile, { ids, all: values.all, brand: values.brand });
+  if (!values.json) for (const id of skipped) process.stdout.write(`${id}: skipped (live plate — render it with video-capture)\n`);
   const project = path.resolve(values.out ?? path.dirname(platesFile));
   const rendering = !values['scaffold-only'] && !values.storyboard;
   preflight({ ffmpeg: true, deps: ['gsap'], hyperframes: !values['scaffold-only'] });
@@ -244,7 +272,7 @@ export async function main({ values, positionals: [platesArg, ...ids] }) {
     board = storyboard(prepared, { project });
     if (!values.json) process.stdout.write(`storyboard: ${board}\n`);
   }
-  if (values.json) process.stdout.write(JSON.stringify({ project, brand: brandDir, plates: results, storyboard: board }, null, 2) + '\n');
+  if (values.json) process.stdout.write(JSON.stringify({ project, brand: brandDir, plates: results, skipped, storyboard: board }, null, 2) + '\n');
   return EXIT.OK;
 }
 

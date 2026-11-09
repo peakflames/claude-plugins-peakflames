@@ -18,6 +18,8 @@
   #bar { position: absolute; left: 0; top: 0.08em; bottom: 0.08em; width: 0.14em; background: var(--color-accent); border-radius: 0.07em; transform-origin: 50% 0%; }
   .line { font-size: 1em; font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; white-space: nowrap; }
   .line:last-child { color: var(--color-accent); }
+  #block.wrap { width: 84%; }
+  #block.wrap .line { white-space: normal; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -44,12 +46,15 @@
     };
   }
   // Largest font size (deterministic, measured once) at which every line fits the frame.
+  // Pass 1 keeps one row per line down to 7% of the height; pass 2 lets lines wrap and shrinks
+  // to the reading floor (3.75% = 27 px at 720p). render-plate rejects text that can't fit there.
   function fit(block, lines, W, H) {
-    let size = H * 0.12;
-    const fits = () => lines.every((l) => l.scrollWidth <= W * 0.8) && block.offsetHeight <= H * 0.72;
-    block.style.fontSize = size + "px";
-    while (!fits() && size > H * 0.035) { size -= 1; block.style.fontSize = size + "px"; }
-    return size;
+    const fits = () => lines.every((l) => l.scrollWidth <= l.clientWidth + 1) && block.offsetWidth <= W * 0.84 + 1 && block.offsetHeight <= H * 0.72;
+    const set = (s) => { block.style.fontSize = s + "px"; };
+    for (let s = Math.round(H * 0.12); s >= Math.round(H * 0.07); s--) { set(s); if (fits()) return s; }
+    block.classList.add("wrap");
+    for (let s = Math.round(H * 0.09); s >= Math.ceil(H * 0.0375); s--) { set(s); if (fits()) return s; }
+    return Math.ceil(H * 0.0375);
   }
   document.fonts.ready.then(() => {
     const D = {{DURATION_S}}, W = {{WIDTH}}, H = {{HEIGHT}};

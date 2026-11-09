@@ -62,6 +62,39 @@ All rendered with `--brand evals/fixtures/brand-min` (#111 background, #f5f5f5 t
 - Added `--storyboard`, `--scaffold-only`, `--rescaffold`, `--every`, `--quality`, `--json`, `--out` beyond the brief's flags.
 - No change to `lib/`, the schemas, `decisions.md`, `acceptance.md`, `plan.md` or `CHANGELOG.md`.
 
+## Round 1 fixes (after verify-1)
+
+Merged `feature/new-peak-media-plugin` (`--no-ff`, no conflicts). That brought in WP5's `brand-packs/default`, WP3a's `lib/tts` and the approved F1 texts. The verifier's report and evidence are committed unchanged (`*-verifier-*`, `AC-*.log`, `verifier-suite.log`).
+
+- **F-1 (motion overflow)** — `templates/motion/index.html`:
+  - Pass 1 keeps one row per line down to 7% of the height.
+  - Pass 2 lets lines wrap (`overflow-wrap: anywhere`, block 84% wide) and shrinks to the 27 px floor (3.75% of the height).
+  - `render-plate` now checks every chosen plate before scaffolding (`checkTextFits`, a conservative 0.6 em/char estimate). Text that can't fit at the floor fails with one line: `plate <id>: on-screen text (N chars) can't fit the frame at the 27 px minimum — shorten "text" or split the beat…`.
+  - New evals: `AC-PLT-01: an over-long motion line wraps inside the frame` renders the verifier's ~115-char line and asserts the left and right 4% strips of the last frame are background. `AC-PLT-01: text that cannot fit at the 27 px floor fails fast…` checks the one-line error and that nothing is scaffolded.
+  - Still of the wrapped line: `evidence/WP4/F-1-long-line-wrap.jpg`. The long line wraps to 4 rows of Inter inside the frame.
+- **F-2 (27 px floor)** — the slide counter is now `0.0375 × H` (27 px at 720p), and the body fit loop stops at `ceil(0.0375 × H)`.
+- **F-3** — the slide title is on screen at frame 0 and settles 1.5% of the height upward over 0.55 s. The rule grows from 0.1 s and the items enter from 0.4 s.
+- **F-4** — plate-id and `--all` checks (and the text-fit check) now run before the brand pack is resolved.
+- **F-5** — `--help` lists the quality values: `--quality <level>  HyperFrames render quality: draft, looks, standard, high or delivery (default: standard)`.
+- **F-6** — `--all` prints `<id>: skipped (live plate — render it with video-capture)` for each live plate, and `--json` adds a `skipped[]` array. The eval asserts the line.
+- **Evals**: they now render with `brand-packs/default` instead of `brand-min`. `plate-authoring.md` rule 8 documents the floor and the wrap.
+
+### Default-pack sheets (replacing the AC-PLT-02/03 sheets; the verifier's are kept)
+
+All rendered with `--brand brand-packs/default`: #0f1115 background, #f4f4f5 text, #4f8cff accent, Inter (bold display, regular body), JetBrains Mono counter, and the pack's square logo. Every plate passed `--lint` (lint + check --strict). Every duration equals plan: 6500, 7500 and 6000 ms, then 5 × 5000 ms.
+
+- **p1-hook** (approved text): "Two tools." is on screen at frame 0. "One promise: spec before code." enters by 1.0 s and the blue "Who checks the work?" by 1.5 s. Each line fits on one row. The block is centred with the accent bar and well inside the frame.
+- **p2-table**: the title "Head-to-head on four dimensions" is on screen at frame 0. Rows enter one by one from 0.5 s and all 4 are in by about 2 s.
+  - Columns: bold blue row heads, then the OpenSpec value, then the Peak Workflow value.
+  - "each requirement traced to its test + status" wraps cleanly to 2 lines, and "—" sits in the Human-checks row.
+  - The text is above the 27 px floor and nothing clips.
+- **p3-close**: two lines, the second ("Peak Workflow wins on an auditable record.") in blue. Both are on one row; the block is sized to that longer line, so the type is smaller than p1's but well above the floor. Both lines are in by 1.0 s.
+- **s1–s5**:
+  - The title is on screen at frame 0 and the bullets are in by about 1.0–1.5 s.
+  - s1–s3 have blue `OpenSpec:` / `peak-workflow:` labels; s2's and s3's second bullets wrap cleanly to 2 lines. s4–s5 have plain bullets.
+  - The logo and the mono `n / 5` counter (now 27 px) sit in the footer, and the progress line runs along the bottom. There is no overflow on any slide.
+- `F2-storyboard.jpg` was regenerated with the default pack.
+
 ## Suggested CHANGELOG bullets (0.1.0)
 
 - **Added — `video-plates` skill**: renders `motion` and `slide` plates from `plates.json`, each alone, to `renders/plates/<id>.mp4` at the planned duration ±1 frame.

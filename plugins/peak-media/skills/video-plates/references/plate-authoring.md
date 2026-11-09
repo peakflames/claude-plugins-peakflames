@@ -40,7 +40,10 @@ makes a rebrand one command (`render-plate plates.json --all --brand <new pack>`
 7. **Something on screen at frame 0.** Plates are hard-cut together; a blank first frame reads as
    a flash. The templates keep the first line (motion) or the logo/footer (slide) visible at 0 s.
 8. **Fit text in code, deterministically:** shrink the font in 1 px steps until the block fits
-   (see the templates). Keep text inside the 90% action-safe box; reading text ≥ 27 px at 720p.
+   (see the templates). Keep text inside the 90% action-safe box; reading text — slide counters
+   included — never goes below 27 px at 720p (3.75% of the frame height). The motion template keeps
+   one row per line down to 7% of the height, then wraps and shrinks to that floor; render-plate
+   rejects a plate whose text can't fit at the floor ("shorten text or split the beat").
 
 ## One idea per plate
 

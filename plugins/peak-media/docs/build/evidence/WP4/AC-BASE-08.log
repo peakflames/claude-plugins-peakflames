@@ -24,7 +24,7 @@ Options:
       --storyboard       Do not render: snapshot one key frame per plate into review/storyboard.jpg (stage 4)
       --scaffold-only    Only prepare plates/<id>/ (template, brand, GSAP); do not render
       --rescaffold       Overwrite an existing plates/<id>/index.html from the template
-      --quality <value>  HyperFrames render quality (default: standard)
+      --quality <level>  HyperFrames render quality: draft, looks, standard, high or delivery (default: standard)
       --json             Print the results as JSON
   -h, --help             Show this help and exit
       --version          Print the plugin version and exit

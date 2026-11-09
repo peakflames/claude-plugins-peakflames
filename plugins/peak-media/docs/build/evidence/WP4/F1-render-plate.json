@@ -1,6 +1,6 @@
 {
   "project": "tmp/ev1",
-  "brand": "evals/fixtures/brand-min",
+  "brand": "brand-packs/default",
   "plates": [
     {
       "id": "p1-hook",
@@ -32,5 +32,6 @@
       "durationMs": 6000,
       "sheet": "tmp/ev1/review/contact-p3-close.jpg"
     }
-  ]
+  ],
+  "skipped": []
 }

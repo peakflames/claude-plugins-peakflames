@@ -1,6 +1,6 @@
 {
   "project": "tmp/ev2",
-  "brand": "evals/fixtures/brand-min",
+  "brand": "brand-packs/default",
   "plates": [
     {
       "id": "s1-unit",
@@ -52,5 +52,6 @@
       "durationMs": 5000,
       "sheet": "tmp/ev2/review/contact-s5-peak.jpg"
     }
-  ]
+  ],
+  "skipped": []
 }
