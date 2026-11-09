@@ -1,21 +1,22 @@
 # F1 — explainer-short script
 
-<!-- 20 s target, 3 beats. Budget: (20 s − 3 × 0.5 s padding) × 165 wpm ÷ 60 ≈ 51 words; this script is 50. -->
+<!-- 20 s target, 3 beats. Budget: (20 s − 3 × 0.5 s padding) × 165 wpm ÷ 60 ≈ 51 words; this script is 50.
+     Approved by the user 2026-11-08 (AC-SPN-04). No <style> tags: Gemini may read them aloud. -->
 
 ## hook
 
-<Warm> Two tools, one promise: spec before code. They differ on who checks the work.
+Two tools, one promise: spec before code. They differ on who checks the work.
 
 On screen: OpenSpec vs. Peak Workflow: who checks the work?
 
 ## compare
 
-OpenSpec stays fast: one AI writes and reviews each change. Peak Workflow gives each requirement an ID, and a separate reviewer session passes or fails each one.
+OpenSpec: the same AI writes and reviews each change. Peak Workflow traces every requirement to its test and status, and records what the human checked beyond the tests.
 
-On screen: OpenSpec: one AI writes and reviews. Peak Workflow: a separate session passes or fails each requirement.
+On screen: OpenSpec: same AI reviews. Peak Workflow: every requirement traced to its test + status; human checks recorded.
 
 ## close
 
-<Confident> OpenSpec wins on speed. Peak Workflow wins on proof.
+OpenSpec wins on speed. Peak Workflow wins on an auditable record.
 
-On screen: OpenSpec: speed. Peak Workflow: proof.
+On screen: OpenSpec: speed. Peak Workflow: an auditable record.
