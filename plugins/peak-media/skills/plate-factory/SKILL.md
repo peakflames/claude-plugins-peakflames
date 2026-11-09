@@ -67,7 +67,8 @@ has each stage's steps, commands and gate-line format. Read
 - **No animation before the storyboard is approved.** Until `GATE 4 storyboard: APPROVED`, don't
   Write or Edit any `plates/<id>/index.html` and don't run `render-plate` without `--storyboard`.
   Storyboard changes go into `plates.json` (text, intent, kind, assets), then
-  `render-plate plates.json --all --storyboard --rescaffold`.
+  `render-plate plates.json --all --storyboard --rescaffold`. Re-running the storyboard later
+  reopens gate 4: no plate writes until the user approves again.
 - **Read `vendor/hyperframes/hyperframes/references/runtimes.md` before the first plate**, as
   listed in `skills/video-plates/references/vendored-map.md` (stage 4 does this).
 - **Build plates in this session**, not in subagents. Subagents are only for the stage-1 cold

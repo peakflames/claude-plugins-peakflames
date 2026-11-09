@@ -14,10 +14,13 @@ Reads a Claude Code session JSONL (~/.claude/projects/<project>/<session>.jsonl)
 transcripts in <session>/subagents/, then reports PASS/FAIL with the offending JSONL line for:
   AC-ORC-01  GATE 0–9 lines each pass, first passes in order (user gates asked with AskUserQuestion,
              a cold-read Agent before gate 1, gate 9 names out/final.mp4) — the transcript part only
-  AC-ORC-02  render-plate --storyboard ran and gate 4 was APPROVED before any plate was written
-  AC-ORC-03  1–3 self-review rounds per plate (Read review/<id>-r<N>.jpg), then a reviewer Agent
+  AC-ORC-02  no plate written while the storyboard is open (before the first approval, or after a
+             storyboard re-run or a REJECTED gate 4 until it is approved again)
+  AC-ORC-03  every rendered plate has 1–3 self-review rounds (contact-sheet runs on
+             renders/plates/<id>.mp4) before the reviewer Agent naming review-rubric
   AC-ORC-04  runtimes.md Read before the first plate was written
-Gate-line format and the "plate written" rule: skills/plate-factory/references/stages.md.
+Rules (gate lines, plate writes, rounds, the storyboard window): skills/plate-factory/references/
+stages.md § "What the transcript check counts".
 Exit 0 when all pass, 1 when any fails.`,
   options: {
     subagents: { type: 'string', arg: 'dir', desc: 'Subagent transcripts folder (default: <session>/subagents beside the JSONL)' },

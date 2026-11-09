@@ -50,13 +50,33 @@ GATE <n> <name>: <RESULT> — <evidence>
   user answered yes to. A **check** gate reports the check you just ran.
 - Write `FAIL`/`REJECTED` when the gate doesn't hold, fix, and run the stage again until it
   does. Never write a passing line for a later stage before the earlier one has passed.
-- The lines are checked mechanically (`evals/plate-factory/check-transcript.mjs`): keep the
-  names, results and the `—` exactly as above.
+- Write the line plainly, starting the line with `GATE` (bold around it is fine). Never preview
+  or quote a gate line: one in a code block, a `>` quote, a bullet or inline code doesn't count,
+  and a plain one written before the user answered counts as approving without asking.
 
-**"A plate is written"** means a Write or Edit of `plates/<id>/index.html`, a shell command that
-writes one, or a `render-plate` call without `--storyboard`. None of these may happen before
-`GATE 4 storyboard: APPROVED`. The template scaffold `render-plate --storyboard` makes is not
-authoring (DEC-37).
+### What the transcript check counts
+
+The lines and the order of your tool calls are checked mechanically
+(`evals/plate-factory/check-transcript.mjs`), so keep the names, results and the `—` exactly as
+above, and follow these rules:
+
+- **A plate is written** by a Write or Edit of `plates/<id>/index.html`; by any `render-plate`
+  run without `--storyboard` (with or without `node`); or by a shell command that writes the file:
+  a redirect onto it, `tee`, `cp`/`mv`/`ln`/`install`/`rsync`/`dd`/`touch`, `sed -i`/`perl -i`, or
+  any interpreter (python, node, perl…) in a command that names it. Read a plate with Read, never
+  with an interpreter. The template scaffold `render-plate --storyboard` makes is not authoring
+  (DEC-37).
+- **The storyboard window.** The storyboard is open at the start, after every
+  `render-plate --storyboard` run and after every `GATE 4 storyboard: REJECTED`. It closes at a
+  `GATE 4 storyboard: APPROVED` line that follows an `AskUserQuestion` asked since it opened. No
+  plate may be written while it is open: re-running the storyboard after approval reopens it until
+  the user approves again.
+- **A self-review round** is one `contact-sheet` run on `renders/plates/<id>.mp4` before the
+  reviewer call, whatever the sheet's name. Every rendered plate needs 1–3 of them. Sheets made
+  after the reviewer (`<id>-fix<N>.jpg`) and the stage-5 `render-plate --sheet` are not rounds.
+- **The reviewer** is the first `Agent` call whose prompt names `review-rubric.md`; it comes after
+  every plate's rounds.
+- **`runtimes.md`** is Read (with Read, not cat) before the first plate is written.
 
 ---
 
@@ -185,14 +205,23 @@ rendered at its `durationMs` with lint clean and no blocker or major defect is o
 1. `AskUserQuestion`: a music track (path, or none) and an SFX stem (path, or none). The plugin
    ships no music. Copy what the user gives into `audio/` and note its credit in
    `audio/CREDITS.md` (`PM/brand-packs/<pack>/music-rules.md`).
-2. Music pass, then SFX pass, each from the narration-only review (picture copied, never re-rendered):
-   `node "PM/skills/video-assemble/scripts/remux-audio.mjs" review/review.mp4 --music audio/<track> -o review/review-music.mp4`, then
-   `… review/review.mp4 --music audio/<track> --sfx audio/<sfx> -o review/review-mix.mp4 --levels review/levels.json`.
-   Defaults: music −28 LUFS under the voice, `--duck-db 6`, SFX −20 LUFS.
-3. Report the levels (mix LUFS, true peak, `belowVoiceDb`). `AskUserQuestion`: listen to
-   `review/review-mix.mp4` (or `review/review.mp4` with no stems); adjust `--music-lufs`/`--duck-db`
-   on request and ask again. Yes → `GATE 8 audio: APPROVED — review/review-mix.mp4 (review/levels.json)`
-   (no stems: `— review/review.mp4 (narration only)`).
+2. Each pass starts from the narration-only `review/review.mp4` (picture copied, never
+   re-rendered). `RX` = `node "PM/skills/video-assemble/scripts/remux-audio.mjs" review/review.mp4`.
+   The file the user listens to is always the last one in the row:
+
+   | Stems | Commands | User listens to |
+   |---|---|---|
+   | none | — | `review/review.mp4` |
+   | music only | `RX --music audio/<track> -o review/review-mix.mp4 --levels review/levels.json` | `review/review-mix.mp4` |
+   | SFX only | `RX --sfx audio/<sfx> -o review/review-mix.mp4 --levels review/levels.json` | `review/review-mix.mp4` |
+   | music + SFX | music pass `RX --music audio/<track> -o review/review-music.mp4` (check it), then `RX --music audio/<track> --sfx audio/<sfx> -o review/review-mix.mp4 --levels review/levels.json` | `review/review-mix.mp4` |
+
+   Defaults: music −28 LUFS under the voice, `--duck-db 6`, SFX −20 LUFS. (Stage 9's `assemble`
+   with any stem also writes `review/review-mix.mp4` and `review/levels.json`.)
+3. Report the levels (mix LUFS, true peak, `belowVoiceDb`). `AskUserQuestion`: listen to the file
+   from the table; adjust `--music-lufs`/`--duck-db` on request, rerun, and ask again. Yes →
+   `GATE 8 audio: APPROVED — review/review-mix.mp4 (review/levels.json)` (no stems:
+   `— review/review.mp4 (narration only)`).
 
 ## Stage 9 — Export (check gate: spec + final contact sheet)
 

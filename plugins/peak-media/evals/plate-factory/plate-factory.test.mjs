@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, baseline, ROOT } from '../helpers/run.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
-import { loadTranscript, checkAll, checkGates, checkStoryboardFirst, checkSelfReview, checkRuntimesFirst } from './transcript.mjs';
+import { loadTranscript, checkAll, checkGates, checkStoryboardFirst, checkSelfReview, checkRuntimesFirst, plateWrites } from './transcript.mjs';
 import { fixtureFiles } from './fixtures/generate.mjs';
 
 const HERE = path.join(ROOT, 'evals', 'plate-factory');
@@ -52,8 +52,11 @@ test('checker: gate lines are strict about names, results and the user being ask
   noAsk.forEach((e, i) => { e.seq = i; });
   assert.match(checkGates(noAsk).message, /gate 4 storyboard APPROVED without an AskUserQuestion/);
   ev.forEach((e, i) => { e.seq = i; });
-  // markdown dressing around a gate line is tolerated
+  // bold around a gate line is tolerated; a quoted, bulleted, inline-code or fenced one is not the gate
   assert.ok(checkGates(mutate((t) => t.replace(/^(GATE 0 .*)$/m, '**$1**'))).ok);
+  for (const wrap of ['> $1', '- $1', '`$1`', '```\n$1\n```']) {
+    assert.match(checkGates(mutate((t) => t.replace(/^(GATE 0 .*)$/m, wrap))).message, /no passing gate line for gate\(s\) 0/, wrap);
+  }
 });
 
 test('AC-ORC-02: storyboard produced and approved before any plates/<id>/index.html is written (transcript check)', () => {
@@ -62,7 +65,7 @@ test('AC-ORC-02: storyboard produced and approved before any plates/<id>/index.h
   assert.match(good.message, /storyboard produced \(line \d+\) and approved \(line \d+\) before the first plate write/);
   const bad = checkStoryboardFirst(load('bad-plate-before-approval'));
   assert.equal(bad.ok, false);
-  assert.match(bad.message, /plate written before the storyboard was approved .*Write plates\/p1-hook\/index\.html \(line \d+\)/);
+  assert.match(bad.message, /plate written before the storyboard was approved.*Write plates\/p1-hook\/index\.html \(line \d+\)/);
   assert.ok(Number.isInteger(bad.line));
   // DEC-37: a render-plate call without --storyboard before approval also counts as writing a plate
   const ev = load('good');
@@ -70,11 +73,31 @@ test('AC-ORC-02: storyboard produced and approved before any plates/<id>/index.h
   const early = { ...ev[at - 1], kind: 'tool_use', name: 'Bash', input: { command: 'node /x/skills/video-plates/scripts/render-plate.mjs plates.json p1-hook' } };
   const ev2 = [...ev.slice(0, at), early, ...ev.slice(at)];
   ev2.forEach((e, i) => { e.seq = i; });
-  assert.match(checkStoryboardFirst(ev2).message, /before the storyboard was approved .*render-plate/);
-  // …but the --storyboard scaffold and a --help call do not
-  const ev3 = [...ev.slice(0, at), { ...early, input: { command: 'node /x/render-plate.mjs plates.json --all --storyboard --rescaffold && node /x/render-plate.mjs --help' } }, ...ev.slice(at)];
+  assert.match(checkStoryboardFirst(ev2).message, /before the storyboard was approved.*render-plate/);
+  // …but a --help call does not, and neither does the --storyboard scaffold
+  const ev3 = [...ev.slice(0, at), { ...early, input: { command: 'node /x/render-plate.mjs --help' } }, ...ev.slice(at)];
   ev3.forEach((e, i) => { e.seq = i; });
   assert.ok(checkStoryboardFirst(ev3).ok);
+  assert.deepEqual(plateWrites([{ ...early, input: { command: 'node /x/render-plate.mjs plates.json --all --storyboard --rescaffold' } }]), []);
+  // round 1: more writers, the latest gate-4 state, and only real gate lines
+  const cases = [
+    ['bad-bare-render', /before the storyboard was approved: Bash render-plate\.mjs" plates\.json p1-hook \(line \d+\)/],
+    ['bad-python-write', /before the storyboard was approved: Bash .*python3 -c .*\(line \d+\)/],
+    ['bad-storyboard-reopened', /plate written while the storyboard was reopened .*Edit plates\/p3-close\/index\.html \(line \d+\)/],
+    ['bad-quoted-gate', /plate written before the storyboard was approved: Edit plates\/p1-hook\/index\.html \(line \d+\)/],
+    ['bad-unasked-gate', /had no AskUserQuestion since the storyboard opened, so it doesn't count: Edit plates\/p1-hook\/index\.html/],
+  ];
+  for (const [name, re] of cases) {
+    const r = byId(checkAll(load(name)));
+    assert.equal(r['AC-ORC-02'].ok, false, name);
+    assert.match(r['AC-ORC-02'].message, re, name);
+    for (const id of ['AC-ORC-03']) assert.ok(r[id].ok, `${name} ${id}: ${r[id].message}`);
+  }
+  // shell reads of a plate are not writes; shell writes are
+  const bash = (command) => plateWrites([{ ...early, input: { command } }]).length;
+  for (const c of ['cat plates/p1/index.html', 'grep -c tl plates/p1/index.html 2>/dev/null', 'wc -l plates/p1/index.html > /tmp/n']) assert.equal(bash(c), 0, c);
+  for (const c of ['cat > plates/p1/index.html <<EOF\n<html>\nEOF', 'echo x >> plates/p1/index.html', 'tee plates/p1/index.html < a', 'cp t.html plates/p1/index.html',
+    "sed -i '' s/a/b/ plates/p1/index.html", 'node -e "require(\'fs\').writeFileSync(\'plates/p1/index.html\', \'\')"', 'FOO=1 ./render-plate.mjs plates.json p1']) assert.equal(bash(c), 1, c);
   const cli = run(CHECKER, [session('bad-plate-before-approval')]);
   assert.equal(cli.code, 1);
   assert.match(cli.stdout, /^FAIL {2}AC-ORC-02 .*\(line \d+\)$/m);
@@ -86,11 +109,20 @@ test('AC-ORC-03: at most 3 self-review rounds per plate, then a separate reviewe
   assert.match(good.message, /p1-hook×1, p2-table×2, p3-close×1 .*reviewer Agent at line \d+/);
   const four = checkSelfReview(load('bad-four-rounds'));
   assert.equal(four.ok, false);
-  assert.match(four.message, /plate 'p2-table' has 4 self-review rounds \(max 3\): review\/p2-table-r4\.jpg \(line \d+\)/);
+  assert.match(four.message, /plate 'p2-table' has 4 self-review rounds before the reviewer \(max 3\): contact-sheet run #4 \(line \d+\)/);
+  // round 1: a re-used sheet name is still a round; a rendered plate with no round fails
+  const reused = checkSelfReview(load('bad-sheet-reused'));
+  assert.equal(reused.ok, false);
+  assert.match(reused.message, /plate 'p2-table' has 4 self-review rounds before the reviewer/);
+  const zero = checkSelfReview(load('bad-plate-no-rounds'));
+  assert.equal(zero.ok, false);
+  assert.match(zero.message, /plate 'p3-close' was rendered but has no self-review round .* \(line \d+\)/);
+  // sheets made after the reviewer (fix confirmations) are not rounds
+  assert.match(good.message, /p2-table×2/);
   const none = checkSelfReview(load('bad-no-reviewer'));
   assert.equal(none.ok, false);
   assert.match(none.message, /no separate reviewer Agent call/);
-  for (const [name, id] of [['bad-four-rounds', 'AC-ORC-03'], ['bad-no-reviewer', 'AC-ORC-03']]) {
+  for (const [name, id] of [['bad-four-rounds', 'AC-ORC-03'], ['bad-no-reviewer', 'AC-ORC-03'], ['bad-sheet-reused', 'AC-ORC-03'], ['bad-plate-no-rounds', 'AC-ORC-03']]) {
     const cli = run(CHECKER, [session(name)]);
     assert.equal(cli.code, 1);
     assert.match(cli.stdout, new RegExp(`^FAIL {2}${id} .*\\(line \\d+\\)$`, 'm'));
@@ -192,6 +224,18 @@ test('AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and
     assert.match(lines[0], re, what);
     assert.equal(readFileSync(f, 'utf8'), was, `${what}: nothing written`);
   }
+
+  // round 1: a project folder works; plates out of beat order get a warning on stderr and exit 0
+  const folder = project();
+  const fr = run(RETIME, [path.dirname(folder)]);
+  assert.equal(fr.code, 0, fr.stderr);
+  assert.deepEqual(readJson(folder).plates.map((p) => p.startMs), got.plates.map((p) => p.startMs));
+  const swapped = project((p) => { [p.plates[0], p.plates[2]] = [p.plates[2], p.plates[0]]; return p; });
+  const sw = run(RETIME, [swapped]);
+  assert.equal(sw.code, 0, sw.stderr);
+  assert.match(sw.stderr, /^retime-plates: warning: plates are not in beat order \('p2-table' on beat 'compare' is listed after 'p3-close' on beat 'close'\)/);
+  assert.equal(sw.stderr.trim().split('\n').length, 1);
+  assert.equal(run(RETIME, [path.dirname(folder)]).stderr, '', 'beat order: no warning');
 });
 
 test('AC-BASE-13: retime-plates --help/--version/bad input follow the baseline', (t) => {
@@ -199,11 +243,13 @@ test('AC-BASE-13: retime-plates --help/--version/bad input follow the baseline',
   const notJson = path.join(tmp, 'plates.json');
   writeFileSync(notJson, '{ nope');
   const noSpine = project((p) => { p.spine = 'spine/beatgrid.json'; return p; }); // only manifest.json exists
+  const emptyDir = scratch('pm-base13-dir-');
   baseline(t, assert, RETIME, {
     flags: ['--out', '--spine', '--check', '--json'],
-    badArgs: [[], ['--bogus'], [path.join(tmp, 'missing.json')], [notJson], [noSpine], [notJson, '--check', '--out', 'x.json'], [notJson, notJson]],
+    badArgs: [[], ['--bogus'], [path.join(tmp, 'missing.json')], [notJson], [noSpine], [notJson, '--check', '--out', 'x.json'], [notJson, notJson], [emptyDir]],
   });
   const r = run(RETIME, [noSpine]);
   assert.match(r.stderr, /spine not found: .*beatgrid\.json — the spine here is manifest\.json: pass --spine /, 'the error names the fix');
   assert.ok(!existsSync(path.join(tmp, 'x.json')));
+  assert.match(run(RETIME, [emptyDir]).stderr, /is a folder with no plates\.json — pass the plates\.json path/);
 });

@@ -80,4 +80,48 @@ The "line" it reports is the line number in the JSONL file. It names the subagen
 
 - **Not verified here: how `--plugin-dir` sets `CLAUDE_PLUGIN_DATA`.** If it points to a fresh folder, stage 0's `setup.sh --check` reports deps missing, and the skill asks before running `setup.sh` (~135 MB). The runbook says so.
 - **Not verified here: `${CLAUDE_PLUGIN_ROOT}` substitution.** SKILL.md relies on it being substituted in skill text, as the sibling skills do. If the run shows it isn't substituted in Bash, every skill needs the same fix (not WP8-specific).
-- The repo `CLAUDE.md` loads in the ORC-01 session because `tmp/orc-01` is inside the repo. The runbook warns the user to refuse any branch or commit attempts.
+- The repo `CLAUDE.md` loads in the ORC-01 session because `tmp/orc-01` is inside the repo. The runbook warns the user to refuse any branch or commit attempts. *(Superseded in round 1: the scratch project moved to `~/peak-media-orc-01`.)*
+
+## Round 1 fixes (verify-1, Lead decisions)
+
+All nine findings are fixed. The rules are now written down in `references/stages.md` § "What the transcript check counts".
+
+1. **Rounds counted by sheet runs (findings 1 and 2).** A self-review round is now one main-thread `contact-sheet` run on `renders/plates/<id>.mp4`, whatever its output name, made before the reviewer. The reviewer is the first `Agent` call whose prompt names `review-rubric`.
+   - Every rendered plate needs 1–3 rounds. A plate counts as rendered if a Write/Edit touches its `index.html`, or it is named in `render-plate <id>` or `capture --plate <id>`.
+   - A `render-plate --all` without `--storyboard` names no ids, so it can't add plates to that list.
+   - Sheets made after the reviewer (`-fix<N>`) don't count. Neither does the stage-5 `render-plate --sheet`.
+   - New fixtures: `bad-sheet-reused` (`-r1.jpg` made 4 times) and `bad-plate-no-rounds` (p3-close rendered, never sheeted).
+2. **AC-ORC-02 uses the latest gate-4 state (finding 3).** The storyboard is open at the start, after every `render-plate --storyboard` run, and after every `GATE 4 … REJECTED`. It closes at an APPROVED line that has an `AskUserQuestion` since it opened. Any plate write while it is open fails. New fixture: `bad-storyboard-reopened`.
+3. **More plate writers caught (finding 5).**
+   - `render-plate` is now caught however it is started: with `node`, as a bare `…/render-plate.mjs`, or behind `VAR=x` or `env`.
+   - A Bash command that names `plates/<id>/index.html` counts as a write when it:
+     - redirects onto that file;
+     - writes it with `tee`, `cp`, `mv`, `ln`, `install`, `rsync`, `dd`, `touch` or `truncate`;
+     - edits it with `sed -i` or `perl -i`;
+     - runs any interpreter (python, node, perl, ruby, deno, bun, php).
+   - Reads are not writes: `cat`, `grep … 2>/dev/null`, and `wc … > /tmp/x` all pass.
+   - Known trade-off: an interpreter that only *reads* the plate, or a `cp` *from* it, counts as a write. stages.md says to Read plates with Read.
+   - New fixtures: `bad-python-write` and `bad-bare-render`.
+4. **Gate-line rule (finding 6).**
+   - A gate line counts only if the line starts with `GATE` (or `**GATE …**`) and sits outside ``` or ~~~ fences.
+   - A `>` quote, a bullet or inline code doesn't count.
+   - A plain APPROVED line with no `AskUserQuestion` since the storyboard opened doesn't close gate 4 for AC-ORC-02.
+   - AC-ORC-01 already failed such a line. stages.md now says never to preview or quote a gate line.
+   - New fixtures: `bad-quoted-gate` (fenced and `>` quoted, then an Edit) and `bad-unasked-gate`.
+5. **Runbook moved out of the repo (findings 4 and 8).**
+   - The scratch project is now `ORC=~/peak-media-orc-01`.
+   - The user sets `PM`: this worktree's `plugins/peak-media` until WP8 merges, then `$REPO/plugins/peak-media`. All paths come from `$PM`.
+   - The §5 project folder is now `~/.claude/projects/$(echo "$ORC" | sed 's#[^A-Za-z0-9]#-#g')`. Cleanup is `rm -rf "$ORC"`.
+   - The brief `sed` now also drops the "Used by" line and the `` (`fake/tone` in CI) `` aside. I checked the output.
+6. **Gate 8 names the file the user hears (finding 7).** stages.md gives a table for each combination: none → `review.mp4`; music only, SFX only, or music + SFX → `review-mix.mp4` (written with `--levels review/levels.json`). `review-music.mp4` appears only as the intermediate pass when there is both music and SFX. The runbook has the same table, and says to listen to `review-mix.mp4` for this run (music only).
+7. **retime-plates (finding 9).**
+   - Plates out of beat order: a one-line warning on stderr, exit 0, times still set, order kept.
+   - **A project folder is accepted** and resolves to `<folder>/plates.json`, as documented in `--help`. A folder with no `plates.json` gives a one-line error.
+
+**Results**
+- `node --test evals/plate-factory`: 9/9 pass. 13 fixtures: the good run passes, and each bad one fails its rule. Only `bad-unasked-gate` also fails AC-ORC-01, which is correct.
+- `ac-run --wp WP8`: all five script ACs pass.
+- `ac-run --trace`: PASS, 79 ACs, 0 problems.
+- Logs: `evidence/WP8/*.r1.log`, `checker-fixtures.r1.log`.
+
+AC-ORC-01..04 are still `blocked: needs user AC-ORC-01 run`.

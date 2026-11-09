@@ -64,16 +64,17 @@ export function retime(plates, spine) {
 const spec = {
   name: 'retime-plates',
   summary: 'set each plate\'s startMs/durationMs from its spine beat (one plate per beat)',
-  usage: 'retime-plates [options] <plates.json>',
+  usage: 'retime-plates [options] <plates.json|project-folder>',
   description: `
-Reads plates.json and its spine (the "spine" path in plates.json, or --spine): spine/manifest.json
+Reads plates.json (or <folder>/plates.json when given a project folder) and its spine (the "spine" path in plates.json, or --spine): spine/manifest.json
 for narration or spine/beatgrid.json for a beat grid. Every plate takes its beat's startMs and
 durationMs, so plate cuts fall in the silent gaps between beats. Each spine beat must have exactly
 one plate: a plate naming an unknown beat, a beat with no plate, or two plates on one beat is
 refused with the plate or beat named. The result is validated against plates.v1.json and written
 in place (or to --out; relative spine/brand paths are rebased). Run it after every spine run.
 Exit 0 ok, 1 refused or invalid (nothing written), 2 usage. --check writes nothing and exits 1
-if any plate's times would change.`,
+if any plate's times would change. Plates listed out of beat order are kept in their order, with a
+warning on stderr (exit 0): the plate list reads best in beat order.`,
   options: {
     out: { type: 'string', short: 'o', arg: 'file', desc: 'Write the retimed plates.json here (default: in place)' },
     spine: { type: 'string', arg: 'file', desc: 'Spine manifest.json or beatgrid.json (default: plates.json "spine"); also sets "spine"' },
@@ -85,12 +86,17 @@ if any plate's times would change.`,
     'retime-plates plates.json',
     'retime-plates plates.json --spine spine/beatgrid.json',
     'retime-plates plates.json --check',
+    'retime-plates my-video/',
   ],
 };
 
 async function main({ values, positionals }) {
   if (values.check && values.out) throw new CliError('pass --check or --out, not both', EXIT.USAGE);
-  const src = path.resolve(positionals[0]);
+  let src = path.resolve(positionals[0]);
+  if (existsSync(src) && statSync(src).isDirectory()) {
+    src = path.join(src, 'plates.json');
+    if (!existsSync(src)) throw new CliError(`${positionals[0]} is a folder with no plates.json — pass the plates.json path`);
+  }
   const doc = readJson(src, 'plates file');
   if (doc === null || typeof doc !== 'object' || !Array.isArray(doc.plates)) throw new CliError(`${positionals[0]} has no plates[] — not a plates.json`);
   const srcDir = path.dirname(src);
@@ -122,6 +128,11 @@ async function main({ values, positionals }) {
   const v = await validateDoc('plates', doc, out);
   if (!v.ok) throw new CliError(`retimed plates.json would not validate: ${v.errors[0].field}: ${v.errors[0].message}`);
 
+  const order = new Map(spine.beats.map((b, i) => [b.id, i]));
+  const outOfOrder = doc.plates.findIndex((p, i) => i > 0 && order.get(p.beat) < order.get(doc.plates[i - 1].beat));
+  if (outOfOrder > 0) {
+    process.stderr.write(`retime-plates: warning: plates are not in beat order ('${doc.plates[outOfOrder].id}' on beat '${doc.plates[outOfOrder].beat}' is listed after '${doc.plates[outOfOrder - 1].id}' on beat '${doc.plates[outOfOrder - 1].beat}') — times are still set; reorder plates.json to match the spine\n`);
+  }
   const moved = changes.filter((c) => c.from[0] !== c.to[0] || c.from[1] !== c.to[1]);
   if (values.json) process.stdout.write(JSON.stringify({ plates: out, spine: spinePath, changed: moved.length, changes }, null, 2) + '\n');
   else {

@@ -117,6 +117,43 @@ export const VARIANTS = {
     s.splice(idx(s, (x) => x[0] === 'edit') + 1, 0, step);
     return s;
   },
+  // round 1 (verify-1 finding 1): the same sheet name made and Read again counts as another round
+  'bad-sheet-reused': (s) => {
+    const at = idx(s, (x) => x[0] === 'read' && x[1].endsWith('p2-table-r2.jpg')) + 1;
+    const again = () => [['edit', `${P}/plates/p2-table/index.html`], ['bash', RP('plates.json p2-table --lint'), 'ok'],
+      ['bash', SHEET('renders/plates/p2-table.mp4', 'review/p2-table-r1.jpg'), 'ok'], ['read', `${P}/review/p2-table-r1.jpg`]];
+    s.splice(at, 0, ...again(), ...again());
+    return s;
+  },
+  // finding 2: a rendered plate with no self-review round
+  'bad-plate-no-rounds': (s) => s.filter((x) => !(x[1]?.includes?.('p3-close-r1.jpg'))),
+  // finding 3: the storyboard is reopened (re-run + REJECTED) and a plate is edited before it is re-approved
+  'bad-storyboard-reopened': (s) => {
+    s.splice(idx(s, (x) => x[0] === 'agent' && x[1] === 'Independent plate review'), 0,
+      ['bash', RP('plates.json --all --storyboard --rescaffold'), 'storyboard: review/storyboard.jpg'],
+      ['read', `${P}/review/storyboard.jpg`],
+      ['say', 'The close needs a new layout.\n\nGATE 4 storyboard: REJECTED — review/storyboard.jpg'],
+      ['edit', `${P}/plates/p3-close/index.html`],
+      ['ask', 'Storyboard (review/storyboard.jpg), new close layout. Approve?', 'Approve'],
+      ['say', 'GATE 4 storyboard: APPROVED — review/storyboard.jpg']);
+    return s;
+  },
+  // finding 5: writers the first checker missed — python, and render-plate run without `node`
+  'bad-python-write': (s) => { s.splice(sayIdx(s, 4) - 1, 0, ['bash', `cd ${P} && python3 -c "open('plates/p1-hook/index.html','w').write('<html></html>')"`, '']); return s; },
+  'bad-bare-render': (s) => { s.splice(sayIdx(s, 4) - 1, 0, ['bash', `cd ${P} && "${ROOT}/skills/video-plates/scripts/render-plate.mjs" plates.json p1-hook`, 'ok p1-hook']); return s; },
+  // finding 6: a quoted or unasked gate-4 line is not the approval
+  'bad-quoted-gate': (s) => {
+    s.splice(sayIdx(s, 4) - 1, 0,
+      ['say', 'Once you approve, I will write:\n\n```\nGATE 4 storyboard: APPROVED — review/storyboard.jpg\n```\n\n> GATE 4 storyboard: APPROVED — review/storyboard.jpg'],
+      ['edit', `${P}/plates/p1-hook/index.html`]);
+    return s;
+  },
+  'bad-unasked-gate': (s) => {
+    s.splice(sayIdx(s, 4) - 1, 0,
+      ['say', 'GATE 4 storyboard: APPROVED — review/storyboard.jpg'],
+      ['edit', `${P}/plates/p1-hook/index.html`]);
+    return s;
+  },
 };
 
 const SESSION = '00000000-0000-4000-8000-00000000f1f1';
