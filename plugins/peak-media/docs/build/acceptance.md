@@ -15,7 +15,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP4 | verified | wp/WP4/verify-3.md |
 | WP5 | verified | wp/WP5/verify-1.md |
 | WP6 | verified | wp/WP6/verify-2.md |
-| WP7a | not-started | — |
+| WP7a | verified | wp/WP7a/verify-1.md |
 | WP7b | not-started | — |
 | WP8 | not-started | — |
 | WP9 | not-started | — |
@@ -64,10 +64,10 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-ASM-04 | §7 | WP6 | G no music supplied · W assemble · T it succeeds with narration only | script | PASS | evidence/WP6/AC-ASM-04.r2.log |
 | AC-ASM-05 | kickoff | WP6 | G the brand pack outro · W assemble · T the final contact sheet's last frames show the outro | still | PASS | evidence/WP6/AC-ASM-05-verifier-r2.jpg |
 | AC-ASM-06 | design stage 8 | WP6 | G a user-supplied track and SFX · W the music pass, then the SFX pass · T the user listens and approves the levels (narration −16 LUFS, music ducked) | manual | PASS | evidence/WP6/AC-ASM-06-user-listen.md, evidence/WP6/AC-ASM-06.r2.log |
-| AC-REC-01 | D1 | WP7a | G `capture --help` · W parsed · T it lists `--storyboard --out --mp4 --viewport --no-captions --caption-css --url --debug-requests --audio-offset-ms --spine` and no narration flags; a test parses each flag | script | not-started | — |
-| AC-REC-02 | D2 | WP7a | G a missing Chromium or ffmpeg, or a bad `--spine` · W capture · T exits non-zero in under 2 s with no browser launch | script | not-started | — |
-| AC-REC-03 | D6 | WP7a | G `examples/deck/storyboard.mjs` (original loop) · W it runs in silent, captions and spine-timed modes · T it runs unmodified in all three | script | not-started | — |
-| AC-REC-04 | DEC-06 | WP7a | G F3 with a 3-clip spine · W capture · T the plate duration equals the planned duration ±1 frame | script | not-started | — |
+| AC-REC-01 | D1 | WP7a | G `capture --help` · W parsed · T it lists `--storyboard --out --mp4 --viewport --no-captions --caption-css --url --debug-requests --audio-offset-ms --spine` and no narration flags; a test parses each flag | script | PASS | evidence/WP7a/AC-REC-01.log |
+| AC-REC-02 | D2 | WP7a | G a missing Chromium or ffmpeg, or a bad `--spine` · W capture · T exits non-zero in under 2 s with no browser launch | script | PASS | evidence/WP7a/AC-REC-02.log |
+| AC-REC-03 | D6 | WP7a | G `examples/deck/storyboard.mjs` (original loop) · W it runs in silent, captions and spine-timed modes · T it runs unmodified in all three | script | PASS | evidence/WP7a/AC-REC-03.log, evidence/WP7a/AC-REC-03-verifier-modes.jpg |
+| AC-REC-04 | DEC-06 | WP7a | G F3 with a 3-clip spine · W capture · T the plate duration equals the planned duration ±1 frame | script | PASS | evidence/WP7a/AC-REC-04.log, evidence/WP7a/AC-REC-04-verifier-f3.jpg |
 | AC-REC-05 | D7 | WP7b | G the recorder `--mp4` output · W probe-spec · T it passes | script | not-started | — |
 | AC-REC-06 | D8 | WP7b | G a sync page that flips a full-frame colour on each `say()`, with fake tones · W capture (run alone) · T median offset ≤ 120 ms and worst ≤ 200 ms | script | not-started | — |
 | AC-REC-07 | D9 | WP7b | G the narrated example deck · W `check-take` · T every scene change (threshold 0.02) is inside silence (−40 dB, ≥ 900 ms) | script | not-started | — |
@@ -98,7 +98,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-BASE-06 | orch §5 baseline | WP3b | G the `spine` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP3b/AC-BASE-06.log |
 | AC-BASE-07 | orch §5 baseline | WP3a | G the `sample-voice` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP3a/AC-BASE-07.log |
 | AC-BASE-08 | orch §5 baseline | WP4 | G the `render-plate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP4/AC-BASE-08.r2.log |
-| AC-BASE-09 | orch §5 baseline | WP7a | G the `capture` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
+| AC-BASE-09 | orch §5 baseline | WP7a | G the `capture` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP7a/AC-BASE-09.log |
 | AC-BASE-10 | orch §5 baseline | WP7b | G the `check-take` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | not-started | — |
 | AC-BASE-11 | orch §5 baseline | WP6 | G the `assemble` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-11.r2.log |
 | AC-BASE-12 | orch §5 baseline | WP6 | G the `remux-audio` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-12.r2.log |

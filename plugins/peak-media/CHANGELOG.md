@@ -20,5 +20,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Vendored HyperFrames references** — six HyperFrames skills from a pinned upstream commit, kept as read-only references (Apache-2.0, telemetry lines removed, every change listed in `VENDORED.md`).
 - **`video-assemble` skill** — `assemble` composites rendered plates onto the spine, checks every cut lands in silence (failing with the timecode), appends the brand outro and writes `out/final.mp4` to the delivery spec (`--export 1080p60` option).
 - **`remux-audio`** — lays music and SFX stems under the narration (music about 12 dB under the voice, ducked between lines) without re-encoding the picture.
+- **`capture` (video-capture)** — plays a live page in real time from a storyboard and screen-captures it with Playwright `page.screencast`, timed to the spine; silent, captions or spine-timed mode, and a live plate lasts its planned duration to the frame. Pages answering HTTP errors are refused.
+- **Storyboard API reference and example deck** — `references/storyboard-api.md` and a neutral 3-slide deck whose storyboard runs unchanged in all three modes.
 - **Neutral default brand pack** — `brand-packs/default` with Inter and JetBrains Mono (OFL, bundled woff2), design tokens, a placeholder logo, a 3 s outro and music rules; no music ships, and a rebrand is a re-render with `--brand`.
 - **`validate` script** — checks any contract file against its schema plus cross-references, and imports a legacy `narration.json` as a spine manifest.
