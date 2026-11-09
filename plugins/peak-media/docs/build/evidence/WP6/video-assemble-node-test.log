@@ -1,0 +1,16 @@
+✔ AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a ≥300 ms silent gap (12932.739458ms)
+✔ AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream md5 unchanged (18623.179667ms)
+✔ default levels: music sits 6–12 dB under the voice (not more), rises between lines, SFX hits are audible (4332.040709ms)
+✔ AC-ASM-03: out/final.mp4 passes probe-spec and lasts spine + outro ±1 frame (40687.360791ms)
+✔ AC-ASM-04: no music supplied — assembly succeeds with narration only (and a beat grid gets a silent track) (11300.215167ms)
+✔ AC-ASM-05: the final contact sheet ends on the brand outro (4580.175792ms)
+✔ AC-BASE-11: assemble --help lists every flag, --version = plugin.json, bad input is one line with no stack (760.192583ms)
+✔ AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, bad input is one line with no stack (683.581833ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 115866.620833

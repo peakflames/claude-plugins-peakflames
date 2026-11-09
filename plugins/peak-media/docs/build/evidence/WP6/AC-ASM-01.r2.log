@@ -1,0 +1,43 @@
+# AC-ASM-01 r2 — real F1 run (fake/tone spine, WP4 plates, default brand)
+$ assemble <f1> --brand brand-packs/default
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 623 frames)
+cuts      2 plate cut(s) in silence (≥300 ms)
+outro     rendered renders/outro-c27a5bcdb7fe6660.mp4 at 30 fps
+final     out/final.mp4 1280x720@30, 23773 ms (spine 20773 + outro 3000) — spec PASS
+$TMPDIR/f1/out/final.mp4
+exit=0
+
+$ check-cuts review/review.mp4 --cuts 5591,16273 --min-silence-ms 300 --expect-cuts 2
+ok    cut at 0:05.591 — silence 500 ms
+ok    cut at 0:16.273 — silence 500 ms
+PASS  2 cut(s), 0 failing — $TMPDIR/f1/review/review.mp4
+exit=0
+
+$ check-cuts review/review.mp4 --min-silence-ms 300 --expect-cuts 2   (scene detection)
+ok    cut at 0:05.600 — silence 500 ms
+ok    cut at 0:16.267 — silence 500 ms
+PASS  2 cut(s), 0 failing — $TMPDIR/f1/review/review.mp4
+exit=0
+
+$ check-cuts out/final.mp4 --min-silence-ms 300 (scene detection, incl. outro cut)
+ok    cut at 0:05.600 — silence 500 ms
+ok    cut at 0:16.267 — silence 500 ms
+ok    cut at 0:20.767 — silence 3244 ms
+PASS  3 cut(s), 0 failing — $TMPDIR/f1/out/final.mp4
+exit=0
+
+# AC-ASM-01 r2 negative: 1 kHz tone 5300-6300 ms over the 5591 ms cut; stale out/final.mp4 and review/review-mix.mp4 planted
+$ assemble <bad> --brand brand-packs/default
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 623 frames)
+assemble: cut not in a ≥300 ms silence at 0:05.591 (p1-hook|p2-table: over sound) — re-time the spine beat or move the plate boundary; review left at $TMPDIR/bad/review/review.mp4
+exit=1
+$ ls out/ review/
+$TMPDIR/bad/out:
+
+$TMPDIR/bad/review:
+assemble.json
+review.mp4
+out/final.mp4 absent (N-1 fixed)
+review/review-mix.mp4 absent

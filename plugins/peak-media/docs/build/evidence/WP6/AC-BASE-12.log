@@ -1,0 +1,75 @@
+# AC-BASE-12 — verifier-wp6-r1-90efea8d, worktree a2ed450, 2026-11-09T00:23:54Z; cwd /tmp/vwp6 (verifier-built F1 project)
+  "version": "0.1.0"
+## remux-audio --help
+remux-audio — lay music/SFX stems under the narration of a rendered MP4 (video copied, never re-encoded)
+
+Usage: remux-audio <video.mp4> --out <file.mp4> [--music <file>] [--sfx <file>] [options]
+
+The input's audio is the narration (or pass --narration). It is levelled to --narration-lufs,
+the music bed to --music-lufs and ducked under the voice by a sidechain compressor, and the
+SFX stem is added at --sfx-db. Stems are timeline-aligned from 0 and trimmed or padded to the
+video length. The video stream is copied: its md5 (-map 0:v -c copy -f md5) is unchanged.
+Run each pass (music, then music + SFX) from the narration-only review MP4.
+
+Options:
+  -o, --out <file.mp4>         Output MP4 (must differ from the input)
+      --music <file>           Music bed stem (any audio file ffmpeg reads)
+      --sfx <file>             SFX stem, already placed on the timeline
+      --narration <file>       Narration source (default: the input video's audio)
+      --narration-lufs <LUFS>  Narration loudness (default: -16)
+      --music-lufs <LUFS>      Music bed loudness before ducking (default: -28)
+      --sfx-db <dB>            Gain applied to the SFX stem (default: 0)
+      --no-duck                Do not duck the music under the narration
+      --fade-ms <ms>           Music fade-out at the end (default: 1000)
+      --levels <file.json>     Also write the levels report (LUFS, true peak, ducking) here
+      --json                   Print the levels report as JSON
+  -h, --help                   Show this help and exit
+      --version                Print the plugin version and exit
+
+Examples:
+  remux-audio review/review.mp4 --music audio/music.wav -o review/review-music.mp4
+  remux-audio review/review.mp4 --music audio/music.wav --sfx audio/sfx.wav -o review/review-mix.mp4 --levels review/levels.json
+exit 0
+## remux-audio --version
+0.1.0
+exit 0
+## remux-audio 
+remux-audio: expected at least 1 argument(s), got 0
+Run 'remux-audio --help' for usage.
+exit 2
+## remux-audio --bogus
+remux-audio: Unknown option '--bogus'
+Run 'remux-audio --help' for usage.
+exit 2
+## remux-audio /nope/x.mp4 -o x.mp4 --music stems/music.wav
+remux-audio: cannot read /nope/x.mp4: no such file
+exit 1
+## remux-audio out-nomusic/review/review.mp4 --music stems/music.wav
+remux-audio: --out <file.mp4> is required
+Run 'remux-audio --help' for usage.
+exit 2
+## remux-audio out-nomusic/review/review.mp4 -o x.mp4
+remux-audio: nothing to mix — pass --music and/or --sfx
+Run 'remux-audio --help' for usage.
+exit 2
+## remux-audio out-nomusic/review/review.mp4 --music stems/music.wav -o out-nomusic/review/review.mp4
+remux-audio: --out must differ from the input video (the input keeps the narration-only mix)
+Run 'remux-audio --help' for usage.
+exit 2
+## remux-audio out-nomusic/review/review.mp4 --music proj/renders/plates/p1-hook.mp4 -o x.mp4
+remux-audio: --music proj/renders/plates/p1-hook.mp4 has no audio stream
+exit 1
+## remux-audio proj/plates.json --music stems/music.wav -o x.mp4
+remux-audio: cannot read proj/plates.json as media: proj/plates.json: Invalid data found when processing input
+exit 1
+## remux-audio out-nomusic/review/review.mp4 --music stems/music.wav -o x.mp4 --music-lufs 3
+remux-audio: --narration-lufs and --music-lufs must be negative (e.g. -16)
+Run 'remux-audio --help' for usage.
+exit 2
+## remux-audio out-nomusic/review/review.mp4 --music /nope.wav -o x.mp4
+remux-audio: --music /nope.wav: no such file
+exit 1
+## remux-audio out-nomusic/review/review.mp4 --music stems/music.wav -o x.mp4 --fade-ms -1
+remux-audio: --fade-ms must be >= 0
+Run 'remux-audio --help' for usage.
+exit 2

@@ -1,0 +1,64 @@
+# AC-BASE-11 r2 — assemble
+plugin.json version: 0.1.0
+$ assemble --version
+0.1.0
+stderr(0 lines): 
+exit=0
+
+$ assemble --help | grep -c -- '--'
+16
+flags in parseArgs/options vs help:
+  --brand listed
+  --export listed
+  --json listed
+  --min-silence-ms listed
+  --music listed
+  --out listed
+  --outro listed
+  --renders listed
+  --rerender-outro listed
+  --sfx listed
+$ assemble 
+stderr(2 lines): assemble: expected at least 1 argument(s), got 0
+Run 'assemble --help' for usage.
+exit=2
+
+$ assemble /nonexistent
+stderr(1 lines): assemble: cannot read /nonexistent: no such file or folder
+exit=1
+
+$ assemble $TMPDIR/f1 --export 4k
+stderr(2 lines): assemble: --export must be one of source, 1080p60, got '4k'
+Run 'assemble --help' for usage.
+exit=2
+
+$ assemble $TMPDIR/badplates.json
+stderr(1 lines): assemble: $TMPDIR/badplates.json: spine: is required; brand: is required; fps: is required; width: is required; height: is required; plates: is required
+exit=1
+
+$ assemble $TMPDIR/f1 --brand /nope
+stderr(1 lines): assemble: brand pack not found: /nope — pass --brand <pack folder>
+exit=1
+
+$ assemble $TMPDIR/f1 --music /nope.wav
+stderr(1 lines): assemble: --music /nope.wav: no such file
+exit=1
+
+$ assemble $TMPDIR/f1 --min-silence-ms -5
+stderr(2 lines): assemble: --min-silence-ms must be >= 0
+Run 'assemble --help' for usage.
+exit=2
+
+$ assemble $TMPDIR/f1 --bogus
+stderr(2 lines): assemble: Unknown option '--bogus'
+Run 'assemble --help' for usage.
+exit=2
+
+$ assemble $TMPDIR/f1 --outro /nope.mp4
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 623 frames)
+cuts      2 plate cut(s) in silence (≥300 ms)
+stderr(1 lines): assemble: --outro /nope.mp4: no such file
+exit=1
+
+network: 0 matches of fetch/http in video-assemble scripts
