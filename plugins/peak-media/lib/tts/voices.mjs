@@ -22,7 +22,7 @@ export const MAI_VOICES = [
   'en-US-Harper', 'en-US-Iris', 'en-US-Jasper', 'en-US-Olivia', 'en-US-Sage',
 ];
 
-export const DEFAULT_VOICES = { gemini: 'Achird', mai: 'en-GB-Emily', fake: 'Achird' };
+export const DEFAULT_VOICES = { gemini: 'Rasalgethi', mai: 'en-GB-Emily', fake: 'Rasalgethi' };
 
 // Microsoft's other locales (cs-CZ … zh-CN) aren't listed; any id of this shape is accepted for MAI.
 const MAI_ID = /^([a-z]{2,3})-([A-Za-z]{2,4})-([A-Za-z]+)$/;

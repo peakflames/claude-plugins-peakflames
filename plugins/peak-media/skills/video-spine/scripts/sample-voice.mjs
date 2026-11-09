@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
 import { requireFfmpeg, probe } from '../../../lib/ffmpeg.mjs';
-import { checkTtsOptions, synthesizeClips, cacheSummary, wpmReport, DEFAULT_MODEL } from '../../../lib/tts/index.mjs';
+import { checkTtsOptions, synthesizeClips, cacheSummary, wpmReport, DEFAULT_MODEL, DEFAULT_STYLE } from '../../../lib/tts/index.mjs';
 
 export const DEFAULT_TEXT = 'Here is a short paragraph for comparing narrators. It has a question, a list of three things, and a closing line. Which voice sounds most like the video you have in mind?';
 
@@ -21,11 +21,11 @@ seconds, wpm, sample rate, and whether the clip came from the cache. Needs
 PEAK_MEDIA_OPENROUTER_API_KEY (legacy: TTS_OPENROUTER_API_KEY) unless --tts-model fake/tone. Clips are cached in
 ~/.cache/peak-media/tts/ (PEAK_MEDIA_TTS_CACHE overrides).`,
   options: {
-    voices: { type: 'string', arg: 'list', default: 'Achird,Kore,Puck', desc: 'Comma-separated voices (Gemini names, or MAI short ids)' },
+    voices: { type: 'string', arg: 'list', default: 'Rasalgethi,Achird,Kore', desc: 'Comma-separated voices (Gemini names, or MAI short ids)' },
     text: { type: 'string', arg: 'paragraph', desc: 'Paragraph to read (default: a neutral sample paragraph)' },
     'text-file': { type: 'string', arg: 'file', desc: 'Read the paragraph from a file instead' },
     'tts-model': { type: 'string', arg: 'model', default: DEFAULT_MODEL, desc: 'TTS model (see references/voices.md; fake/tone for offline tests)' },
-    style: { type: 'string', arg: 'text', desc: 'Delivery style, sent as instructions (Gemini only)' },
+    style: { type: 'string', arg: 'text', desc: 'Delivery style, sent as instructions (Gemini only; "" for none)', default: DEFAULT_STYLE },
     'out-dir': { type: 'string', arg: 'dir', default: 'voice-samples', desc: 'Where the WAVs go' },
     'debug-requests': { type: 'boolean', desc: 'Log each OpenRouter request/response to stderr (key redacted)' },
     json: { type: 'boolean', desc: 'Print the results as JSON instead of lines' },

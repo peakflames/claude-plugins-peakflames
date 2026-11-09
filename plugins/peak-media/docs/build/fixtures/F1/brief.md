@@ -2,8 +2,8 @@
 
 - **Used by:** WP3a/3b (spine), WP4 (plates), WP5 (rebrand), WP6 (assembly), WP8 (orchestrator)
 - **Audience:** developers choosing a spec-driven workflow for AI coding
-- **Runtime:** 20 s target (±10%), 1280×720, 30 fps
-- **Spine:** narration (`fake/tone` in CI; real TTS optional)
+- **Runtime:** 26 s target (±10%), paced for learning, 1280×720, 30 fps
+- **Spine:** narration — voice Rasalgethi, style "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning." (`fake/tone` in CI)
 - **Brand:** default pack
 - **Source:** `../../references/openspec-vs-peak-workflow.md` §4 and §7
 

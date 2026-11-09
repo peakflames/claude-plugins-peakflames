@@ -40,7 +40,7 @@ test('AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, 
   assert.doesNotThrow(() => checkTtsOptions({ narrate: true, env: { PEAK_MEDIA_OPENROUTER_API_KEY: KEY } }));
   assert.doesNotThrow(() => checkTtsOptions({ model: 'fake/tone', narrate: true, env: {} }), 'fake/tone needs no key');
   assert.deepEqual(
-    { model: checkTtsOptions({ voice: 'achird' }).model, voice: checkTtsOptions({ voice: 'achird' }).voice },
+    { model: checkTtsOptions({ voice: 'rasalgethi' }).model, voice: checkTtsOptions({ voice: 'rasalgethi' }).voice },
     { model: DEFAULT_MODEL, voice: DEFAULT_VOICE }, 'Gemini names are case-insensitive',
   );
   assert.equal(checkTtsOptions({ model: 'microsoft/mai-voice-2.1', voice: 'en-gb-emily' }).voice, 'en-GB-Emily');
@@ -99,7 +99,7 @@ test('AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesi
     // Entry point, legacy dir given through the env override.
     const env = isoEnv({ PEAK_MEDIA_TTS_LEGACY_DIRS: legacy });
     const out = path.join(tmp('legacy-out'), 'o');
-    const s = run(SV, ['--tts-model', 'fake/tone', '--voices', 'Achird', '--text', text, '--out-dir', out], { env });
+    const s = run(SV, ['--tts-model', 'fake/tone', '--voices', 'Achird', '--style', '', '--text', text, '--out-dir', out], { env });
     assert.equal(s.code, 0, s.stderr);
     assert.match(s.stdout, /Achird .* 1\.23 s .* cached/);
     assert.match(s.stdout, /1\/1 cached/);

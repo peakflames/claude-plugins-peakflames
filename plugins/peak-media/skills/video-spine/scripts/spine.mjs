@@ -8,7 +8,7 @@ import path from 'node:path';
 import { runCli, CliError, EXIT, usageError } from '../../../lib/cli.mjs';
 import { ffmpeg, requireFfmpeg } from '../../../lib/ffmpeg.mjs';
 import { validateDoc } from '../../../lib/schemas.mjs';
-import { DEFAULT_MODEL, DEFAULT_VOICE, checkTtsOptions, synthesizeClips, wpmReport } from '../../../lib/tts/index.mjs';
+import { DEFAULT_MODEL, DEFAULT_VOICE, DEFAULT_STYLE, checkTtsOptions, synthesizeClips, wpmReport } from '../../../lib/tts/index.mjs';
 
 const ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 const KEY_ENV = 'PEAK_MEDIA_OPENROUTER_API_KEY'; // DEC-30; legacy fallback below
@@ -145,7 +145,7 @@ Exit 1 (files still written) when the runtime is outside the target ±10%: resiz
     'no-narrate': { type: 'boolean', desc: 'Write a beat grid (no voice, no network)' },
     'tts-model': { type: 'string', arg: 'model', desc: 'TTS model (fake/tone for offline tests)', default: DEFAULT_MODEL },
     voice: { type: 'string', arg: 'name', desc: 'TTS voice', default: DEFAULT_VOICE },
-    style: { type: 'string', arg: 'text', desc: 'Style instructions sent with every clip', default: '' },
+    style: { type: 'string', arg: 'text', desc: 'Style instructions sent with every clip ("" for none)', default: DEFAULT_STYLE },
     'lead-ms': { type: 'number', arg: 'ms', desc: 'Silence before the clip inside each beat (≥ 200)', default: 250 },
     'tail-ms': { type: 'number', arg: 'ms', desc: 'Silence after the clip inside each beat (≥ 200)', default: 250 },
     'max-hold-ms': { type: 'number', arg: 'ms', desc: 'Most extra hold added per beat when the spine runs short of the target', default: 1000 },
@@ -161,7 +161,7 @@ Exit 1 (files still written) when the runtime is outside the target ±10%: resiz
   examples: [
     'spine --brief brief.md --budget',
     'spine --brief brief.md --tts-model fake/tone',
-    'spine --brief brief.md --voice Achird --style "Clear, friendly explainer tone."',
+    'spine --brief brief.md --voice Rasalgethi --style "… Speak with a British accent."',
     'spine --brief brief.md --no-narrate',
   ],
 };

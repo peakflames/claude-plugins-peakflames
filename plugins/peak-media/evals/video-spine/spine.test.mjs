@@ -29,7 +29,8 @@ const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
 let narr; // F1 narrated with fake/tone, shared by AC-SPN-01 and AC-SPN-03
 before(() => {
   const dir = project();
-  const r = run(SPINE, ['--brief', path.join(dir, 'brief.md'), '--tts-model', 'fake/tone', '--cache-dir', path.join(dir, 'cache')], { env: NO_KEY });
+  // F1's brief targets 26 s for the real voice (~127 wpm); fake/tone reads at 165 wpm, so the AC runs at the original 20 s target.
+  const r = run(SPINE, ['--brief', path.join(dir, 'brief.md'), '--target-ms', '20000', '--tts-model', 'fake/tone', '--cache-dir', path.join(dir, 'cache')], { env: NO_KEY });
   narr = { dir, r, manifest: path.join(dir, 'spine', 'manifest.json'), wav: path.join(dir, 'spine', 'narration.wav') };
 });
 
@@ -42,7 +43,7 @@ test('AC-SPN-01: F1 brief → script → spine with fake/tone; manifest.totalMs 
   const m = readJson(narr.manifest);
   assert.equal(m.kind, 'narration');
   assert.equal(m.model, 'fake/tone');
-  assert.equal(m.targetMs, 20000, 'target read from the brief');
+  assert.equal(m.targetMs, 20000, 'target from --target-ms');
   assert.ok(within(m.totalMs, 20000), `totalMs ${m.totalMs} within 18000–22000`);
   assert.deepEqual(m.beats.map((b) => b.id), parseBrief(readFileSync(path.join(F1, 'brief.md'), 'utf8')).beats, 'one beat per brief beat, in order');
   assert.equal(m.clips.length, 3);
@@ -55,7 +56,7 @@ test('AC-SPN-01: F1 brief → script → spine with fake/tone; manifest.totalMs 
 
 test('AC-SPN-02: F1 with the key unset → beatgrid.json validates, 0 OpenRouter calls, runtime within ±10%', async () => {
   const dir = project();
-  const r = run(SPINE, ['--brief', path.join(dir, 'brief.md')], { env: NO_KEY });
+  const r = run(SPINE, ['--brief', path.join(dir, 'brief.md'), '--target-ms', '20000'], { env: NO_KEY });
   assert.equal(r.code, 0, r.stderr + r.stdout);
   assert.doesNotMatch(r.stderr, /NETWORK-ATTEMPT/, 'network spy saw no calls');
   assert.match(r.stdout, /PEAK_MEDIA_OPENROUTER_API_KEY .*is not set/);

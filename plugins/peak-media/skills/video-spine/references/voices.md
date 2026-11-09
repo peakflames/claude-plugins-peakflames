@@ -37,7 +37,7 @@ instead.
 
 ## Gemini
 
-Default `Achird`. Names match case-insensitively. Labels are Google's.
+Default `Rasalgethi`, with the house style "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning." (it reads at about 127 wpm, so budget scripts at ~125–130 wpm, not 165). For a British accent, append "Speak with a British accent." to the style. Names match case-insensitively. Labels are Google's.
 
 | Voice | Label | Voice | Label | Voice | Label |
 | --- | --- | --- | --- | --- | --- |

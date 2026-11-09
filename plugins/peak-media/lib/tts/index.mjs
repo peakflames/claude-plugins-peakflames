@@ -12,7 +12,9 @@ import { synthesize, requireKey, KEY_ENV, LEGACY_KEY_ENV } from './openrouter.mj
 import { pcmToWav, wavInfo } from './wav.mjs';
 
 export const DEFAULT_MODEL = 'google/gemini-3.8-flash-lite-tts';
-export const DEFAULT_VOICE = 'Achird';
+export const DEFAULT_VOICE = 'Rasalgethi';
+// DEC-33: the user's chosen house delivery (Gemini only; MAI ignores style).
+export const DEFAULT_STYLE = 'No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning.';
 export { MODELS, GEMINI_VOICES, MAI_VOICES, DEFAULT_VOICES, KEY_ENV, LEGACY_KEY_ENV, countWords, defaultCacheDir, legacyCacheDirs, wavInfo };
 
 /** '<sha256 hex of model\0voice\0style\0text>.wav' — byte-compatible with the old recorder (D4). */
