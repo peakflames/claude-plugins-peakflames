@@ -37,7 +37,7 @@ instead.
 
 ## Gemini
 
-Default `Rasalgethi`, with the house style "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning." (it reads at about 127 wpm, so budget scripts at ~125–130 wpm, not 165). For a British accent, append "Speak with a British accent." to the style. On its own that can drift: in a 2026-11-08 test, Gemini dropped the accent on the one clip that opened with `<Matter-of-fact>`. Putting the accent in every mood tag (`<Matter-of-fact, British accent>`) as well as the style is the reliable form. Names match case-insensitively. Labels are Google's.
+Default `Rasalgethi`, with the house style "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning." (it reads at about 127 wpm, so budget scripts at ~125–130 wpm, not 165). Accents set through the style are not reliable with Rasalgethi: in a 2026-11-08 test (style, per-tag and accent-first variants), Gemini dropped a British accent on a 28-word clip every time. If you need an accent, pick a voice that is natively accented (e.g. MAI `en-GB-Emily`) instead of instructing one. Names match case-insensitively. Labels are Google's.
 
 | Voice | Label | Voice | Label | Voice | Label |
 | --- | --- | --- | --- | --- | --- |
