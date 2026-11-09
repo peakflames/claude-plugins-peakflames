@@ -96,3 +96,7 @@ Branch `feature/peak-media-wp6`, based on `feature/new-peak-media-plugin` @ c5eb
 ## Lead change after round 1
 
 - Music defaults: `--music-lufs -28` (under the voice, about 12 dB below narration) and `--duck-db 6` (about −22 LUFS between lines). The round-1 reading made the bed swell to about −14 LUFS between lines, louder than the voice. Evals now expect 9–15 dB under the voice.
+
+## Round 2 (verify-2)
+
+- All ACs PASS on real merged inputs; B-1/S-1/S-2/N-1 fixed. S-3 (F1 plates.json timings vs the real spine) is a Lead fixture fix in the F1 end-to-end run. N-2/N-3 left as nits.
