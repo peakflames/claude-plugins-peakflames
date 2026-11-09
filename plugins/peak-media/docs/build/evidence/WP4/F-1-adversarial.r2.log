@@ -1,0 +1,65 @@
+# F-1 adversarial r2 — verifier-wp4-r2-a91e50a1 — one plates.json per plate under /tmp/vwp4r2/adv/<id>/, brand-packs/default
+a1-longline motion ["Short opener.","Every requirement in the plan is traced to a test, the test result, and a human sign-off recorded in the pull request."]
+a1b-hugeline motion ["This line keeps going and going well past anything a viewer could read in one beat of a short video This line keeps going and going well past anything a viewer could read in one beat of a short video This line keeps going and going well past anything a viewer could read in one beat of a short video This line keeps going and going well past anything a viewer could read in one beat of a short video This line keeps going and going well past anything a viewer could read in one beat of a short video"]
+a2-manyshort motion ["Step 1.","Step 2.","Step 3.","Step 4.","Step 5.","Step 6.","Step 7.","Step 8.","Step 9.","Step 10."]
+a2b-toomany motion ["Step 1.","Step 2.","Step 3.","Step 4.","Step 5.","Step 6.","Step 7.","Step 8.","Step 9.","Step 10.","Step 11.","Step 12.","Step 13.","Step 14.","Step 15.","Step 16."]
+a3-word25 motion ["Antidisestablishmentarian"]
+a3b-word25-slide slide ["Unbroken word","Antidisestablishmentarian in a bullet","Label: AntidisestablishmentarianAntidisest"]
+a3c-token60-slide slide ["Long token","see https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+a4-8bullets slide ["Eight bullets","bullet number 1","bullet number 2","bullet number 3","bullet number 4","bullet number 5","bullet number 6","bullet number 7","bullet number 8"]
+a4b-6bullets slide ["Six bullets","bullet number 1","bullet number 2","bullet number 3","bullet number 4","bullet number 5","bullet number 6"]
+
+## render-plate <id> --lint --scaffold-only
+== a1-longline
+a1-longline: /tmp/vwp4r2/adv/a1-longline/plates/a1-longline (scaffolded) lint+check ok
+exit=0
+== a1b-hugeline
+a1b-hugeline: /tmp/vwp4r2/adv/a1b-hugeline/plates/a1b-hugeline (scaffolded) lint+check ok
+exit=0
+== a2-manyshort
+a2-manyshort: /tmp/vwp4r2/adv/a2-manyshort/plates/a2-manyshort (scaffolded) lint+check ok
+exit=0
+== a2b-toomany
+render-plate: plate a2b-toomany: on-screen text (134 chars) can't fit the frame at the 27 px minimum — shorten "text" or split the beat in plates.json (one idea per plate)
+exit=1
+== a3-word25
+a3-word25: /tmp/vwp4r2/adv/a3-word25/plates/a3-word25 (scaffolded) lint+check ok
+exit=0
+== a3b-word25-slide
+a3b-word25-slide: /tmp/vwp4r2/adv/a3b-word25-slide/plates/a3b-word25-slide (scaffolded) lint+check ok
+exit=0
+== a3c-token60-slide
+render-plate: plate a3c-token60-slide: hyperframes check --strict failed — text_box_overflow Text extends outside its nearest visual/container box. (fix /tmp/vwp4r2/adv/a3c-token60-slide/plates/a3c-token60-slide/index.html)
+exit=1
+== a4-8bullets
+render-plate: plate a4-8bullets: on-screen text (141 chars) can't fit the frame at the 27 px minimum — shorten "text" or split the beat in plates.json (one idea per plate)
+exit=1
+== a4b-6bullets
+a4b-6bullets: /tmp/vwp4r2/adv/a4b-6bullets/plates/a4b-6bullets (scaffolded) lint+check ok
+exit=0
+
+## computed styles / bounds (measure.mjs)
+a1-longline {"out":{".line":{"minPx":65,"maxPx":65,"fam":"Inter, system-ui, sans-serif","color":"rgb(79, 140, 255)"}},"bad":[],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+a1b-hugeline {"out":{".line":{"minPx":44,"maxPx":44,"fam":"Inter, system-ui, sans-serif","color":"rgb(79, 140, 255)"}},"bad":[],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+a2-manyshort {"out":{".line":{"minPx":43,"maxPx":43,"fam":"Inter, system-ui, sans-serif","color":"rgb(79, 140, 255)"}},"bad":[],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+a3-word25 {"out":{".line":{"minPx":83,"maxPx":83,"fam":"Inter, system-ui, sans-serif","color":"rgb(79, 140, 255)"}},"bad":[],"fonts":["Inter 700"],"bg":"rgb(15, 17, 21)"}
+a3b-word25-slide {"out":{".title":{"minPx":61.2,"maxPx":61.2,"fam":"Inter, system-ui, sans-serif","color":"rgb(244, 244, 245)"},".bullet":{"minPx":43.2,"maxPx":43.2,"fam":"Inter, system-ui, sans-serif","color":"rgb(244, 244, 245)"},".counter":{"minPx":27,"maxPx":27,"fam":"\"JetBrains Mono\", ui-monospace, monospace","color":"rgb(244, 244, 245)"},".label":{"minPx":43.2,"maxPx":43.2,"fam":"Inter, system-ui, sans-serif","color":"rgb(79, 140, 255)"}},"bad":[],"fonts":["Inter 400","Inter 700"],"bg":"rgb(15, 17, 21)"}
+a3c-token60-slide {"out":{".title":{"minPx":61.2,"maxPx":61.2,"fam":"Inter, system-ui, sans-serif","color":"rgb(244, 244, 245)"},".bullet":{"minPx":43.2,"maxPx":43.2,"fam":"Inter, system-ui, sans-serif","color":"rgb(244, 244, 245)"},".counter":{"minPx":27,"maxPx":27,"fam":"\"JetBrains Mono\", ui-monospace, monospace","color":"rgb(244, 244, 245)"}},"bad":["bullet[102,235,1178,347 hOverflow]"],"fonts":["Inter 400","Inter 700"],"bg":"rgb(15, 17, 21)"}
+a4b-6bullets {"out":{".title":{"minPx":61.2,"maxPx":61.2,"fam":"Inter, system-ui, sans-serif","color":"rgb(244, 244, 245)"},".bullet":{"minPx":33.2,"maxPx":33.2,"fam":"Inter, system-ui, sans-serif","color":"rgb(244, 244, 245)"},".counter":{"minPx":27,"maxPx":27,"fam":"\"JetBrains Mono\", ui-monospace, monospace","color":"rgb(244, 244, 245)"}},"bad":[],"fonts":["Inter 400","Inter 700"],"bg":"rgb(15, 17, 21)"}
+
+## full render attempt (no --lint) — blocked by host disk: HyperFrames 'Low disk space, 1.0 GB free'; render-plate surfaces only 'no output'
+render-plate: render failed for /tmp/vwp4r2/adv/a1-longline/plates/a1-longline: no output
+exit=1
+render-plate: render failed for /tmp/vwp4r2/adv/a1b-hugeline/plates/a1b-hugeline: no output
+exit=1
+render-plate: render failed for /tmp/vwp4r2/adv/a2-manyshort/plates/a2-manyshort: no output
+exit=1
+render-plate: render failed for /tmp/vwp4r2/adv/a3-word25/plates/a3-word25: no output
+exit=1
+render-plate: render failed for /tmp/vwp4r2/adv/a3b-word25-slide/plates/a3b-word25-slide: no output
+exit=1
+render-plate: render failed for /tmp/vwp4r2/adv/a3c-token60-slide/plates/a3c-token60-slide: no output
+exit=1
+render-plate: render failed for /tmp/vwp4r2/adv/a4b-6bullets/plates/a4b-6bullets: no output
+exit=1
+Stills therefore via --storyboard (HF snapshot at 70%): AC-PLT-02-verifier-r2-F1-adversarial.jpg (row-major: a1-longline, a1b-hugeline, a2-manyshort, a3-word25 / a3b-word25-slide, a3c-token60-slide, a4b-6bullets)

@@ -1,0 +1,26 @@
+# verifier runs
+## node --test plugins/peak-media/evals
+✔ AC-VND-01: every vendor folder is referenced by vendored-map.md (no orphans) (2.209625ms)
+✔ AC-VND-01: the map tells the agent to Read runtimes.md before the first plate (0.479333ms)
+✔ AC-VND-02: no `hyperframes events` telemetry line anywhere in the vendor tree; LICENSE is present (7.475959ms)
+✔ AC-VND-02: vendored skills are references, not registered skills (no SKILL.md under vendor/) (1.935583ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 83871.095167
+## ac-run --wp WP4
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-PLT-01 | script | pass | not-started | — |
+| AC-PLT-02 | still | — | not-started | — |
+| AC-PLT-03 | still | — | not-started | — |
+| AC-PLT-04 | script | pass | not-started | — |
+| AC-VND-01 | script | pass | not-started | — |
+| AC-VND-02 | script | pass | not-started | — |
+| AC-BASE-08 | script | pass | not-started | — |
+## ac-run --trace
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
