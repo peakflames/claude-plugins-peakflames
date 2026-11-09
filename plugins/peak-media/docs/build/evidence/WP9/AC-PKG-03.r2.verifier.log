@@ -1,0 +1,9 @@
+# AC-PKG-03 r2: grep -ri peakflames over runtime tree (contents, tracked file names)
+content hits: 0
+binary-file hits: 0
+file-name hits: 0
+example dirs file types:
+   1 css
+   2 html
+   2 md
+   2 mjs

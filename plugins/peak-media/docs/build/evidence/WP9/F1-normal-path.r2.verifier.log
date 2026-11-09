@@ -1,0 +1,16 @@
+# F1 r2 verifier probe: runWatched() normal path (exit codes, stdout/stderr, stdin, cwd, env, 300 MB stdout, ENOENT mapping, CPU while waiting)
+exit 0 + stdout              {"status":0,"timedOut":false,"out":"hi\n","errOut":"oops\n","outLen":3}
+exit 3                       {"status":3,"timedOut":false,"out":"","errOut":"","outLen":0}
+stdin input                  {"status":0,"timedOut":false,"out":"from-stdin","errOut":"","outLen":10}
+killed by SIGKILL            {"status":137,"timedOut":false,"out":"","errOut":"","outLen":0}
+missing bin (PATH)           {"status":127,"timedOut":false,"err":"ENOENT","out":"","errOut":"pm-watchdog: no-such-bin-xyz: command not found\n","outLen":0}
+missing bin (abs)            {"status":127,"timedOut":false,"err":"ENOENT","out":"","errOut":"pm-watchdog: /nope/ffmpeg: No such file or directory\n","outLen":0}
+not executable               {"status":126,"timedOut":false,"out":"","errOut":"pm-watchdog: /etc/hosts: Permission denied\n","outLen":0}
+arg with spaces/quotes       {"status":0,"timedOut":false,"out":"a b|it's|$HOME|","errOut":"","outLen":15}
+cwd honoured                 {"status":0,"timedOut":false,"out":"/private/tmp\n","errOut":"","outLen":13}
+env honoured                 {"status":0,"timedOut":false,"out":"yes\n","errOut":"","outLen":4}
+300 MB stdout len 300000000
+bin exits 127 itself         {"status":127,"timedOut":false,"err":"ENOENT","out":"","errOut":"file not found\n","outLen":0}
+spawnSync ref: missing abs -> ENOENT ; /etc/hosts -> EACCES
+wait 5 s: wall 5077 ms; parent CPU user+sys 15 ms
+20x true: 116 ms
