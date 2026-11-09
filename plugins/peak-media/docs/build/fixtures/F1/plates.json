@@ -16,7 +16,7 @@
       "assets": [],
       "text": [
         "Two tools.",
-        "Same promise.",
+        "One promise: spec before code.",
         "Who checks the work?"
       ]
     },
@@ -31,8 +31,8 @@
       "text": [
         "Unit of work | change | epic",
         "Requirement IDs | none | TOR-NN-XXXXXXX",
-        "Verification | advisory, same model | fresh session, PASS/FAIL",
-        "Ceremony | low | medium–high"
+        "Verification | same AI reviews | each requirement traced to its test + status",
+        "Human checks | \u2014 | recorded in the PR"
       ]
     },
     {
@@ -41,11 +41,11 @@
       "kind": "motion",
       "startMs": 14000,
       "durationMs": 6000,
-      "intent": "Speed vs proof",
+      "intent": "Speed vs an auditable record",
       "assets": [],
       "text": [
         "OpenSpec wins on speed.",
-        "peak-workflow wins on proof."
+        "Peak Workflow wins on an auditable record."
       ]
     }
   ]
