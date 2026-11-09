@@ -1,0 +1,11 @@
+$ node --test --test-reporter=spec --test-name-pattern='^AC-BASE-07:' plugins/peak-media/evals/video-spine/
+✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (890.554291ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 996.841042
+exit=0

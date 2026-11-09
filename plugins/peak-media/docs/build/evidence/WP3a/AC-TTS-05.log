@@ -1,0 +1,19 @@
+$ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-05:' plugins/peak-media/evals/video-spine/
+✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (60.440209ms)
+ℹ 
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        19   6.91  165      no
+2        25  18.18   82      no
+3        21   7.64  165      no
+median 165 wpm · 0/3 cached
+WARN slow clip 2: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 610.491042
+exit=0

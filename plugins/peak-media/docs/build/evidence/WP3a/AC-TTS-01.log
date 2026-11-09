@@ -1,0 +1,14 @@
+$ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-01:' plugins/peak-media/evals/video-spine/
+✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (440.016875ms)
+ℹ --voice Nope: exit 2 in 47 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+ℹ key unset: exit 3 in 42 ms — sample-voice: narration needs TTS_OPENROUTER_API_KEY — export TTS_OPENROUTER_API_KEY=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)
+ℹ ffmpeg missing: exit 3 in 348 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.8345
+exit=0

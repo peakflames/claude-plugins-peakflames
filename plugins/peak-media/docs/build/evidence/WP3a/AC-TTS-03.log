@@ -1,0 +1,13 @@
+$ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-03:' plugins/peak-media/evals/video-spine/
+✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (273.32025ms)
+ℹ lib: clip reused from pm-tts-legacy-MrHNLC/…/tts, calls=0, 1234 ms
+ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  $TMPDIR/pm-tts-legacy-out-1bmnnR/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 635.63925
+exit=0
