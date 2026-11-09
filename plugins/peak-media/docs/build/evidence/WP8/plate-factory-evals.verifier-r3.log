@@ -1,0 +1,20 @@
+✔ checker fixtures match generate.mjs (no hand edits, no real transcript) (18.249708ms)
+✔ checker: the good run passes every rule; the CLI exits 0 (41.0335ms)
+✔ checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render; a for-loop over plates) (120.126125ms)
+✔ skill docs: every stage ends with its literal gate line, and SKILL.md makes them output-style proof (2.041333ms)
+✔ checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else (1.196583ms)
+✔ checker: gate lines are strict about names, results and the user being asked (1.1345ms)
+✔ AC-ORC-02: storyboard produced and approved before any plates/<id>/index.html is written (transcript check) (47.88925ms)
+✔ AC-ORC-03: at most 3 self-review rounds per plate, then a separate reviewer Agent call (transcript check) (156.755417ms)
+✔ AC-ORC-04: runtimes.md is Read before the first plate is written (transcript check) (38.411042ms)
+✔ AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and refuses anything but one plate per beat (872.940542ms)
+✔ AC-BASE-13: retime-plates --help/--version/bad input follow the baseline (499.930542ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2187.1645
+exit=0
