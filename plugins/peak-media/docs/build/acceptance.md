@@ -18,7 +18,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP7a | verified | wp/WP7a/verify-1.md |
 | WP7b | verified | wp/WP7b/verify-2.md |
 | WP8 | verified | wp/WP8/verify-3.md |
-| WP9 | not-started | — |
+| WP9 | in-progress | — |
 | WP10 | not-started | — |
 
 ## Register
