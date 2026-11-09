@@ -20,30 +20,55 @@ Set three variables in the shell you'll launch from:
   - **After the merge**, use `$REPO/plugins/peak-media` on `feature/new-peak-media-plugin`.
 - `RUN`: the scratch video project you created, `~/tmp/peak-media-orc-01`, **outside the repo**. This way the session can't see the repo's CLAUDE.md, the finished `tmp/f1-e2e/` project, the F1 fixtures or the plugin source as project files.
 
+The code blocks in this runbook have no `#` comments, so they paste cleanly into zsh with
+`interactivecomments` off. Paste them as they are.
+
+Until WP8 is merged, set `PM` like this:
+
 ```bash
 REPO=~/github/peakflames/claude-plugins-peakflames
-PM="$REPO/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media"   # after the WP8 merge: PM="$REPO/plugins/peak-media"
+PM="$REPO/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media"
 RUN=~/tmp/peak-media-orc-01
-git -C "$PM" log --oneline -1                             # the WP8 head (or the merge commit)
-bash "$PM/scripts/setup.sh" --check                       # expect: ready (exit 0)
-echo ${PEAK_MEDIA_OPENROUTER_API_KEY:+key set}            # expect: key set (else the run makes a silent beat grid)
-df -h ~ | tail -1                                         # keep ≥ 1 GB free
 ```
 
-Fill the scratch project (the folder already exists; it should be empty). It gets the F1 brief, minus the build notes (the "Used by" line, the
-`fake/tone` aside and the closing paragraphs), with its source doc next to it.
+After the WP8 merge, use this line instead of the `PM=` line above:
 
 ```bash
-ls -A "$RUN"            # expect nothing (or only what you put there on purpose)
+PM="$REPO/plugins/peak-media"
+```
+
+Then check that the run can start:
+
+```bash
+git -C "$PM" log --oneline -1
+bash "$PM/scripts/setup.sh" --check
+echo ${PEAK_MEDIA_OPENROUTER_API_KEY:+key set}
+df -h ~ | tail -1
+```
+
+What each check should show:
+- `git log`: the WP8 head, or the merge commit after the merge.
+- `setup.sh --check`: `ready`, exit 0.
+- The key check: `key set`. If nothing prints, the run will make a silent beat grid.
+- `df`: at least 1 GB free.
+
+Fill the scratch project. The folder already exists, and `ls -A` should list nothing (or only
+what you put there on purpose). It gets the F1 brief, minus the build notes (the "Used by" line,
+the `fake/tone` aside and the closing paragraphs), with its source doc next to it.
+
+```bash
+ls -A "$RUN"
 mkdir -p "$RUN/source"
 cp "$PM/docs/build/references/openspec-vs-peak-workflow.md" "$RUN/source/"
-sed -e '/^Script approved/,$d' \
-    -e '/^- \*\*Used by:\*\*/d' \
-    -e 's# (`fake/tone` in CI)##' \
-    -e 's#`../../references/openspec-vs-peak-workflow.md`#`source/openspec-vs-peak-workflow.md`#' \
-    "$PM/docs/build/fixtures/F1/brief.md" > "$RUN/brief.md"
-cat "$RUN/brief.md"     # Audience, Runtime 26 s, Spine, Brand, Source → source/…, 3 beats; no "Used by", no fake/tone
+sed -e '/^Script approved/,$d' -e '/^- \*\*Used by:\*\*/d' -e 's# (`fake/tone` in CI)##' -e 's#`../../references/openspec-vs-peak-workflow.md`#`source/openspec-vs-peak-workflow.md`#' "$PM/docs/build/fixtures/F1/brief.md" > "$RUN/brief.md"
+cat "$RUN/brief.md"
 ```
+
+The brief should show:
+- Audience, Runtime 26 s, Spine, Brand;
+- Source pointing to `source/…`;
+- 3 beats;
+- no "Used by" line and no fake/tone.
 
 ## 2. Launch a fresh session with the plugin loaded
 
@@ -111,10 +136,16 @@ named after the launch folder (each `/` and other non-alphanumeric character bec
 
 ```bash
 P=~/.claude/projects/$(echo "$RUN" | sed 's#[^A-Za-z0-9]#-#g')
-S=$(ls -t "$P"/*.jsonl | head -1); echo "$S"             # the session JSONL
-ls "${S%.jsonl}/subagents" 2>/dev/null                    # cold reader + reviewer transcripts
+S=$(ls -t "$P"/*.jsonl | head -1)
+echo "$S"
+ls "${S%.jsonl}/subagents"
 node "$PM/evals/plate-factory/check-transcript.mjs" "$S"
 ```
+
+The block prints, in order:
+- the session JSONL path;
+- the subagent transcripts (the cold reader and the reviewer);
+- the checker's report.
 
 Expect four `PASS` lines: AC-ORC-01's gate order, AC-ORC-02, AC-ORC-03 and AC-ORC-04. Any `FAIL`
 names the JSONL line. Tell the Lead the session id (the JSONL file name) and the result. Don't

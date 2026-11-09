@@ -34,6 +34,17 @@ test('checker: the good run passes every rule; the CLI exits 0', () => {
   assert.equal((cli.stdout.match(/^PASS {2}AC-ORC-0[1-4] /gm) ?? []).length, 4, cli.stdout);
 });
 
+test('checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render)', () => {
+  for (const name of ['good-bold-head', 'good-retried-round']) {
+    for (const r of checkAll(load(name))) assert.ok(r.ok, `${name} ${r.id}: ${r.message}`);
+    assert.equal(run(CHECKER, [session(name)]).code, 0, name);
+  }
+  assert.ok(load('good-bold-head').some((e) => e.kind === 'text' && /^\*\*GATE 4 storyboard: APPROVED\*\* — /m.test(e.text)), 'fixture really bolds only the head');
+  assert.match(checkSelfReview(load('good-retried-round')).message, /p2-table×3/);
+  const redirected = plateWrites(load('good-retried-round')).find((w) => / > out 2>&1/.test(w.event.input.command ?? ''));
+  assert.deepEqual(redirected.plates, ['p2-table'], 'a redirect target is not a plate id');
+});
+
 test('checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else', () => {
   const rs = byId(checkAll(load('bad-gate-order')));
   assert.equal(rs['AC-ORC-01'].ok, false);
@@ -186,7 +197,8 @@ test('AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and
   const out = path.join(spineDir, 'plates.json');
   const r = run(RETIME, [fixture, '--spine', manifest, '-o', out]);
   assert.equal(r.code, 0, r.stderr + r.stdout);
-  assert.match(r.stdout, /^PASS {2}retimed 3 plate\(s\) from manifest\.json \(3 changed\)/m);
+  assert.match(r.stdout, /^PASS {2}retimed 3 plate\(s\) from \S*spine\/manifest\.json \(3 changed\) → \S*plates\.json$/m);
+  assert.ok(r.stdout.includes(`from ${manifest} `), 'the --spine path is reported as given');
   assert.equal(readFileSync(fixture, 'utf8'), before, 'fixture not modified');
   const got = readJson(out);
   for (const p of got.plates) {
@@ -229,6 +241,7 @@ test('AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and
   const folder = project();
   const fr = run(RETIME, [path.dirname(folder)]);
   assert.equal(fr.code, 0, fr.stderr);
+  assert.ok(fr.stdout.trim().endsWith(`→ ${folder}`), `folder mode names the plates.json: ${fr.stdout}`);
   assert.deepEqual(readJson(folder).plates.map((p) => p.startMs), got.plates.map((p) => p.startMs));
   const swapped = project((p) => { [p.plates[0], p.plates[2]] = [p.plates[2], p.plates[0]]; return p; });
   const sw = run(RETIME, [swapped]);
@@ -252,4 +265,12 @@ test('AC-BASE-13: retime-plates --help/--version/bad input follow the baseline',
   assert.match(r.stderr, /spine not found: .*beatgrid\.json — the spine here is manifest\.json: pass --spine /, 'the error names the fix');
   assert.ok(!existsSync(path.join(tmp, 'x.json')));
   assert.match(run(RETIME, [emptyDir]).stderr, /is a folder with no plates\.json — pass the plates\.json path/);
+  // round 2: -o into a missing folder is one line, before anything is printed; --spine is reported as given
+  const missingOut = path.join(tmp, 'nope', 'plates.json');
+  const mo = run(RETIME, [noSpine, '--spine', path.join(path.dirname(noSpine), 'spine', 'manifest.json'), '-o', missingOut]);
+  assert.equal(mo.code, 1);
+  assert.equal(mo.stdout, '', 'nothing printed before the error');
+  assert.equal(mo.stderr.trim(), `retime-plates: cannot write ${missingOut}: folder ${path.dirname(missingOut)} does not exist — create it first`);
+  const ns = run(RETIME, [noSpine, '--spine', 'nope/manifest.json']);
+  assert.equal(ns.stderr.trim(), 'retime-plates: spine not found: nope/manifest.json — run the spine first (video-spine)');
 });

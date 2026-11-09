@@ -148,6 +148,21 @@ export const VARIANTS = {
       ['edit', `${P}/plates/p1-hook/index.html`]);
     return s;
   },
+  // round 2 (verify-2): legitimate runs the checker must still pass
+  // finding 2: every gate line bolded only on its head, `**GATE n name: RESULT** — evidence`
+  'good-bold-head': (s) => s.map((x) => (x[0] === 'say' ? [x[0], x[1].replace(/^(GATE \d+ [a-z-]+: [A-Z]+)/m, '**$1**')] : x)),
+  // finding 3: round 3 of p2-table, whose first sheet run errors and is re-run (3 rounds, not 4);
+  // finding 4: that render's output is redirected (`> out 2>&1` is not a plate id)
+  'good-retried-round': (s) => {
+    const at = idx(s, (x) => x[0] === 'read' && x[1].endsWith('p2-table-r2.jpg')) + 1;
+    s.splice(at, 0,
+      ['edit', `${P}/plates/p2-table/index.html`],
+      ['bash', `${RP('plates.json p2-table --lint')} > out 2>&1`, ''],
+      ['bash-err', `cd ${P} && ${node('lib/verify/contact-sheet.mjs', 'renders/plates/p2-table.mp4 --evry 0.5s -o review/p2-table-r3.jpg')}`, 'Exit code 2\ncontact-sheet: Unknown option \'--evry\''],
+      ['bash', SHEET('renders/plates/p2-table.mp4', 'review/p2-table-r3.jpg'), 'wrote review/p2-table-r3.jpg'],
+      ['read', `${P}/review/p2-table-r3.jpg`]);
+    return s;
+  },
   'bad-unasked-gate': (s) => {
     s.splice(sayIdx(s, 4) - 1, 0,
       ['say', 'GATE 4 storyboard: APPROVED — review/storyboard.jpg'],
@@ -170,15 +185,16 @@ export function render(steps, { sidechain = false, agentId = null, t0 = T0, step
     lines.push({ parentUuid: parent, isSidechain: sidechain, ...(agentId && { agentId }), type, message: { role: type, content }, uuid: u, timestamp: ts(), sessionId: SESSION, ...extra });
     parent = u;
   };
-  const call = (name, input, out) => {
+  const call = (name, input, out, isError = false) => {
     const id = `toolu_${agentId ?? 'main'}_${String(++tool).padStart(4, '0')}`;
     push('assistant', [{ type: 'tool_use', id, name, input }]);
-    push('user', [{ tool_use_id: id, type: 'tool_result', content: out }]);
+    push('user', [{ tool_use_id: id, type: 'tool_result', content: out, ...(isError && { is_error: true }) }]);
   };
   for (const [op, a, b, c] of steps) {
     if (op === 'user') push('user', a);
     else if (op === 'say') push('assistant', [{ type: 'text', text: a }]);
     else if (op === 'bash') call('Bash', { command: a, description: 'run' }, b ?? '');
+    else if (op === 'bash-err') call('Bash', { command: a, description: 'run' }, b ?? 'Exit code 1', true);
     else if (op === 'read') call('Read', { file_path: a }, `(contents of ${path.basename(a)})`);
     else if (op === 'write') call('Write', { file_path: a, content: '…' }, `File created successfully at: ${a}`);
     else if (op === 'edit') call('Edit', { file_path: a, old_string: 'a', new_string: 'b' }, `The file ${a} has been updated.`);

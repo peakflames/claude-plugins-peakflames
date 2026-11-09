@@ -93,8 +93,10 @@ warning on stderr (exit 0): the plate list reads best in beat order.`,
 async function main({ values, positionals }) {
   if (values.check && values.out) throw new CliError('pass --check or --out, not both', EXIT.USAGE);
   let src = path.resolve(positionals[0]);
+  let shown = positionals[0]; // the plates.json as the user would name it
   if (existsSync(src) && statSync(src).isDirectory()) {
     src = path.join(src, 'plates.json');
+    shown = path.join(positionals[0], 'plates.json');
     if (!existsSync(src)) throw new CliError(`${positionals[0]} is a folder with no plates.json — pass the plates.json path`);
   }
   const doc = readJson(src, 'plates file');
@@ -102,21 +104,27 @@ async function main({ values, positionals }) {
   const srcDir = path.dirname(src);
   const out = values.out ? path.resolve(values.out) : src;
   const outDir = path.dirname(out);
+  if (values.out) {
+    if (!existsSync(outDir) || !statSync(outDir).isDirectory()) throw new CliError(`cannot write ${values.out}: folder ${path.dirname(values.out)} does not exist — create it first`);
+    if (existsSync(out) && statSync(out).isDirectory()) throw new CliError(`cannot write ${values.out}: it is a folder — pass a file path such as ${path.join(values.out, 'plates.json')}`);
+  }
 
-  let spinePath;
-  if (values.spine) spinePath = path.resolve(values.spine);
+  let spinePath; let spineShown; // spineShown: --spine as given, or plates.json's "spine" next to the plates file
+  if (values.spine) { spinePath = path.resolve(values.spine); spineShown = values.spine; }
   else {
-    if (typeof doc.spine !== 'string' || !doc.spine) throw new CliError(`${positionals[0]} has no "spine" path — pass --spine spine/manifest.json`);
+    if (typeof doc.spine !== 'string' || !doc.spine) throw new CliError(`${shown} has no "spine" path — pass --spine spine/manifest.json`);
     spinePath = path.resolve(srcDir, doc.spine);
+    spineShown = path.isAbsolute(doc.spine) ? doc.spine : path.join(path.dirname(shown), doc.spine);
   }
   if (!existsSync(spinePath)) {
-    const other = path.join(path.dirname(spinePath), path.basename(spinePath) === 'beatgrid.json' ? 'manifest.json' : 'beatgrid.json');
-    const hint = existsSync(other) ? ` — the spine here is ${path.basename(other)}: pass --spine ${path.relative(process.cwd(), other)}` : ' — run the spine first (video-spine)';
-    throw new CliError(`spine not found: ${path.relative(process.cwd(), spinePath) || spinePath}${hint}`);
+    const otherName = path.basename(spinePath) === 'beatgrid.json' ? 'manifest.json' : 'beatgrid.json';
+    const other = path.join(path.dirname(spinePath), otherName);
+    const hint = existsSync(other) ? ` — the spine here is ${otherName}: pass --spine ${path.join(path.dirname(spineShown), otherName)}` : ' — run the spine first (video-spine)';
+    throw new CliError(`spine not found: ${spineShown}${hint}`);
   }
   const spine = readJson(spinePath, 'spine');
   const sv = await validateDoc('spine', spine, spinePath);
-  if (!sv.ok) throw new CliError(`spine ${path.basename(spinePath)} is invalid: ${sv.errors[0].field}: ${sv.errors[0].message} — rerun the spine`);
+  if (!sv.ok) throw new CliError(`spine ${spineShown} is invalid: ${sv.errors[0].field}: ${sv.errors[0].message} — rerun the spine`);
 
   const { problems, changes } = retime(doc, spine);
   if (problems.length) throw new CliError(problems[0] + (problems.length > 1 ? ` (+${problems.length - 1} more)` : ''));
@@ -134,6 +142,11 @@ async function main({ values, positionals }) {
     process.stderr.write(`retime-plates: warning: plates are not in beat order ('${doc.plates[outOfOrder].id}' on beat '${doc.plates[outOfOrder].beat}' is listed after '${doc.plates[outOfOrder - 1].id}' on beat '${doc.plates[outOfOrder - 1].beat}') — times are still set; reorder plates.json to match the spine\n`);
   }
   const moved = changes.filter((c) => c.from[0] !== c.to[0] || c.from[1] !== c.to[1]);
+  if (!values.check) {
+    try { writeFileSync(out, JSON.stringify(doc, null, 2) + '\n'); } catch (e) {
+      throw new CliError(`cannot write ${values.out ?? shown}: ${e.code ?? e.message}`);
+    }
+  }
   if (values.json) process.stdout.write(JSON.stringify({ plates: out, spine: spinePath, changed: moved.length, changes }, null, 2) + '\n');
   else {
     for (const c of changes) {
@@ -144,14 +157,13 @@ async function main({ values, positionals }) {
   }
   if (values.check) {
     if (moved.length) {
-      process.stdout.write(`FAIL  ${moved.length} of ${changes.length} plate(s) off their beat times — run retime-plates ${positionals[0]}\n`);
+      process.stdout.write(`FAIL  ${moved.length} of ${changes.length} plate(s) off their beat times — run retime-plates ${shown}\n`);
       return EXIT.FAIL;
     }
     process.stdout.write(`PASS  ${changes.length} plate(s) on their beat times (${path.basename(spinePath)})\n`);
     return EXIT.OK;
   }
-  writeFileSync(out, JSON.stringify(doc, null, 2) + '\n');
-  if (!values.json) process.stdout.write(`PASS  retimed ${changes.length} plate(s) from ${path.basename(spinePath)} (${moved.length} changed) → ${values.out ?? positionals[0]}\n`);
+  if (!values.json) process.stdout.write(`PASS  retimed ${changes.length} plate(s) from ${spineShown} (${moved.length} changed) → ${values.out ?? shown}\n`);
   return EXIT.OK;
 }
 

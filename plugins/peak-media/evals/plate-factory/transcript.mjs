@@ -79,7 +79,8 @@ const askedBetween = (events, lo, hi) => events.some((e) => isAsk(e) && e.seq > 
 
 /**
  * Gate lines the main thread wrote. A gate line counts only as the assistant's own marker: a line
- * of a text block that starts with `GATE ` (or `**GATE ` … `**`), outside ``` / ~~~ fences. A
+ * of a text block that starts with `GATE ` or `**GATE ` (bold may cover the whole line or only
+ * its head: `**GATE 4 storyboard: APPROVED** — …`), outside ``` / ~~~ fences. A
  * quoted (`> GATE …`), bulleted or inline-code (`` `GATE …` ``) line doesn't count.
  * Returns {n, name, result, evidence, event, k}.
  */
@@ -92,7 +93,8 @@ export function gateLines(events) {
       const l = raw.trim();
       if (/^(```|~~~)/.test(l)) { fenced = !fenced; continue; }
       if (fenced) continue;
-      const m = GATE_RE.exec(l.replace(/^\*\*(GATE .*?)\*\*$/, '$1')); // must start with GATE (or **GATE)
+      // must start with GATE or **GATE; bold anywhere on the line (whole line or only the head) is dropped
+      const m = /^(\*\*)?GATE /.test(l) ? GATE_RE.exec(l.replace(/\*\*/g, '').trim()) : null;
       if (m) out.push({ n: Number(m[1]), name: m[2], result: m[3], evidence: (m[4] ?? '').trim(), event: e, k: out.length });
     }
   }
@@ -177,6 +179,7 @@ function renderIds(seg) {
   const ids = [];
   const valued = new Set(['--brand', '--out', '--every', '--quality']);
   for (let k = i + 1; k < toks.length; k++) {
+    if (/^(\d*>|&>|<|\|)/.test(toks[k])) break; // a redirect ends the arguments (`> out 2>&1`)
     if (valued.has(toks[k])) { k++; continue; }
     if (new RegExp(`^${ID}$`).test(toks[k])) ids.push(toks[k]);
   }
@@ -258,9 +261,11 @@ export function checkSelfReview(events) {
   const id = 'AC-ORC-03';
   const reviewer = events.find((e) => isMain(e) && isTool(e, 'Agent', 'Task') && /review-rubric/.test(`${e.input.prompt ?? ''} ${e.input.description ?? ''}`));
   const cut = reviewer ? reviewer.seq : Infinity;
+  const errored = new Set(events.filter((e) => e.kind === 'tool_result' && e.isError).map((e) => e.id));
   const rounds = new Map(); // plate -> [events]
   for (const e of events) {
     if (!isMain(e) || !isTool(e, 'Bash') || e.seq > cut) continue;
+    if (errored.has(e.id)) continue; // a sheet run that failed (is_error) and was retried is not a round
     for (const s of segments(e.input.command ?? '')) {
       if (!runs(s, 'contact-sheet')) continue;
       const m = RENDER_MP4_RE.exec(s);

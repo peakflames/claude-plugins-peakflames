@@ -125,3 +125,33 @@ All nine findings are fixed. The rules are now written down in `references/stage
 - Logs: `evidence/WP8/*.r1.log`, `checker-fixtures.r1.log`.
 
 AC-ORC-01..04 are still `blocked: needs user AC-ORC-01 run`.
+
+## Round 2 fixes (verify-2, Lead decisions)
+
+1. **Runbook pastes cleanly (blocker).**
+   - **Comments moved out:** no code block has a `#` comment any more; each block is followed by a prose note of what to expect.
+   - **Post-merge `PM=`:** now its own one-line block.
+   - **Brief `sed`:** now one line, with no `\` continuations.
+   - **Tested:** every block except the `claude` launch went through `zsh -f -i`, with `interactivecomments` confirmed off and `RUN` pointed at a scratch folder. Nothing was written to the user's `~/tmp/peak-media-orc-01`.
+   - **Result:** no `command not found` and no glob errors. `PM`/`RUN` are set, `setup.sh --check` reports ready, and the brief comes out right. The only `#` left is inside single-quoted `sed` programs.
+   - **Evidence:** `evidence/WP8/runbook-paste.r2.log`.
+2. **Head-bold gate lines count.** A line starting with `GATE` or `**GATE` has every `**` dropped before matching, so `**GATE 4 storyboard: APPROVED** — …` counts. stages.md shows that form. New good fixture: `good-bold-head`, all ten lines in that form, passes all four checks.
+3. **An errored sheet run isn't a round.** A `contact-sheet` call whose `tool_result` has `is_error` is skipped. New good fixture: `good-retried-round`. p2-table's round 3 first fails (bad flag, `is_error`) and is re-run; the run passes with `p2-table×3`.
+4. **Redirects aren't plate ids.** `renderIds` stops at the first redirect or pipe token (`>`, `2>&1`, `&>`, `<`, `|`). `good-retried-round` renders with `> out 2>&1`, and only `p2-table` is registered.
+5. **retime-plates messages.**
+   - **`-o` into a missing folder:** fails with one line before anything is printed: `cannot write <file>: folder <dir> does not exist — create it first`. An `-o` that is a folder is refused the same way. I chose an error over creating the folder.
+   - **Write order:** the file is written before the table and the PASS line, and any write error is a one-line `CliError`.
+   - **Spine paths:** reported as given. `--spine` is shown verbatim; otherwise it is plates.json's `spine` joined to the plates path as typed. This applies to "not found", "invalid" and the PASS line.
+   - **Folder mode:** the PASS/FAIL lines name `<folder>/plates.json`.
+6. **Known limits (findings 5–7)** are now listed in stages.md § "What the transcript check counts", with no code change:
+   - an unread sheet still counts as a round;
+   - a plate rendered only by `--all` isn't known to need a round;
+   - `bash -c`, `timeout`, a folder-target `cp`, and `curl -o` writes go unseen;
+   - an unrelated `AskUserQuestion` can unlock gate 4.
+
+**Results**
+- `node --test evals/plate-factory`: 10/10 pass. The new test covers the two legitimate variants.
+- 15 fixtures: the three `good*` runs pass all four checks; every bad fixture fails its rule.
+- `ac-run --wp WP8`: all five script ACs pass.
+- `ac-run --trace`: PASS, 79 ACs, 0 problems.
+- Logs: `evidence/WP8/*.r2.log`.

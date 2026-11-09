@@ -50,7 +50,8 @@ GATE <n> <name>: <RESULT> — <evidence>
   user answered yes to. A **check** gate reports the check you just ran.
 - Write `FAIL`/`REJECTED` when the gate doesn't hold, fix, and run the stage again until it
   does. Never write a passing line for a later stage before the earlier one has passed.
-- Write the line plainly, starting the line with `GATE` (bold around it is fine). Never preview
+- Write the line plainly, starting the line with `GATE`. Bold is fine, around the whole line or
+  only its head (`**GATE 4 storyboard: APPROVED** — review/storyboard.jpg`). Never preview
   or quote a gate line: one in a code block, a `>` quote, a bullet or inline code doesn't count,
   and a plain one written before the user answered counts as approving without asking.
 
@@ -73,10 +74,20 @@ above, and follow these rules:
   the user approves again.
 - **A self-review round** is one `contact-sheet` run on `renders/plates/<id>.mp4` before the
   reviewer call, whatever the sheet's name. Every rendered plate needs 1–3 of them. Sheets made
-  after the reviewer (`<id>-fix<N>.jpg`) and the stage-5 `render-plate --sheet` are not rounds.
+  after the reviewer (`<id>-fix<N>.jpg`), the stage-5 `render-plate --sheet`, and a sheet run
+  that errored (and was re-run) are not rounds.
 - **The reviewer** is the first `Agent` call whose prompt names `review-rubric.md`; it comes after
   every plate's rounds.
 - **`runtimes.md`** is Read (with Read, not cat) before the first plate is written.
+
+**Known limits** (accepted; follow the stages and they don't arise):
+
+- A sheet that is made but never Read still counts as a round, and a plate rendered only by
+  `render-plate --all` (no id) isn't known to need a round: render each plate alone, Read each sheet.
+- Writers it doesn't see: `bash -c "…render-plate…"`, `timeout … render-plate …`, `cp … plates/<id>/`
+  (folder target) and `curl -o plates/<id>/index.html`. Don't write plates that way.
+- Any `AskUserQuestion` after the storyboard opens unlocks gate 4; the check can't tell whether the
+  answer was about the storyboard. Ask about the storyboard, then write the gate line.
 
 ---
 
