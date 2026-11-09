@@ -1,0 +1,16 @@
+# AC-BRD-03 verifier scan 2026-11-09T00:05:28Z
+--- 1. find over the whole plugins/peak-media tree (incl. gitignored), by extension:
+(end; exit=1)
+--- 2. file(1) MIME scan of every file for audio/* or video/*:
+(end; exit=1)
+--- 3. git-tracked media at da50385 (whole repo):
+(end; exit=1)
+--- 4. node_modules present in tree?
+--- 5. brand.json audio fields:
+(end; exit=1)
+ M docs/build/evidence/WP5/AC-BRD-02-alt.json
+ M docs/build/evidence/WP5/AC-BRD-02-default.json
+?? docs/build/evidence/WP5/AC-BRD-02-verifier-alt.jpg
+?? docs/build/evidence/WP5/AC-BRD-02-verifier-default.jpg
+?? docs/build/evidence/WP5/AC-BRD-02.log
+?? docs/build/evidence/WP5/AC-BRD-03.log

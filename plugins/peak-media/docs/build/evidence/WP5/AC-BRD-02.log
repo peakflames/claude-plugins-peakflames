@@ -1,0 +1,24 @@
+# AC-BRD-02 verifier run 2026-11-09T00:05:02Z
+route: node docs/build/tools/skeleton.mjs --fixture <tmp p1-hook-only fixture> --brand <pack> --out <tmp>
+docs/build/evidence/WP5/AC-BRD-02-verifier-default.jpg (14 frames, 4×4): 00.00 00.50 01.00 01.50 02.00 02.50 03.00 03.50 04.00 04.50 05.00 05.50 06.00 06.47
+sheet default exit=0
+duration default: 6.500000
+docs/build/evidence/WP5/AC-BRD-02-verifier-alt.jpg (14 frames, 4×4): 00.00 00.50 01.00 01.50 02.00 02.50 03.00 03.50 04.00 04.50 05.00 05.50 06.00 06.47
+sheet alt exit=0
+duration alt: 6.500000
+--- plate index.html diff (default vs alt):
+IDENTICAL
+--- scaffold dir diff excluding brand/:
+Files /tmp/vwp5/out-default/plates/p1-hook/.hyperframes/history-id and /tmp/vwp5/out-alt/plates/p1-hook/.hyperframes/history-id differ
+Files /tmp/vwp5/out-default/plates/p1-hook/.hyperframes/video-state.json and /tmp/vwp5/out-alt/plates/p1-hook/.hyperframes/video-state.json differ
+--- brand/ diff (expected: tokens.css, brand.json, fonts):
+Files /tmp/vwp5/out-default/plates/p1-hook/brand/brand.json and /tmp/vwp5/out-alt/plates/p1-hook/brand/brand.json differ
+Only in /tmp/vwp5/out-default/plates/p1-hook/brand/fonts: inter
+Only in /tmp/vwp5/out-default/plates/p1-hook/brand/fonts: jetbrains-mono
+Only in /tmp/vwp5/out-alt/plates/p1-hook/brand/fonts: playfair-display
+Only in /tmp/vwp5/out-alt/plates/p1-hook/brand/fonts: space-mono
+Files /tmp/vwp5/out-default/plates/p1-hook/brand/tokens.css and /tmp/vwp5/out-alt/plates/p1-hook/brand/tokens.css differ
+--- framemd5 equal?
+DIFFERENT
+pixel(4,4)@3s default: 0f1115
+pixel(4,4)@3s alt: f5f1e6

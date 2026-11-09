@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "name": "Default (neutral)",
+  "tokens": "tokens.css",
+  "fonts": [
+    {
+      "family": "Inter",
+      "files": ["fonts/inter/inter-latin-400-normal.woff2", "fonts/inter/inter-latin-700-normal.woff2"],
+      "license": "fonts/inter/OFL.txt"
+    },
+    {
+      "family": "JetBrains Mono",
+      "files": ["fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2", "fonts/jetbrains-mono/jetbrains-mono-latin-700-normal.woff2"],
+      "license": "fonts/jetbrains-mono/OFL.txt"
+    }
+  ],
+  "logo": "logo.svg",
+  "outro": {
+    "composition": "outro/index.html",
+    "durationMs": 3000
+  },
+  "music": {
+    "rules": "music-rules.md"
+  }
+}
