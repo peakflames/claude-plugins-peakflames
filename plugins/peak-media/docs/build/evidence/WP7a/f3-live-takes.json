@@ -1,0 +1,128 @@
+[
+  {
+    "plate": "r1-feature",
+    "url": "https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md",
+    "plannedMs": 7030,
+    "exit": 0,
+    "take": {
+      "mode": "spine",
+      "out": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.kGAylGYI6J/f3live/renders/plates/r1-feature.mp4",
+      "mp4": null,
+      "url": "https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md",
+      "plate": "r1-feature",
+      "spine": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.kGAylGYI6J/f3live/spine/manifest.json",
+      "window": {
+        "startMs": 0,
+        "durationMs": 7030,
+        "clips": 1
+      },
+      "fps": 30,
+      "width": 1280,
+      "height": 720,
+      "frames": 211,
+      "uniqueFrames": 80,
+      "videoMs": 7033,
+      "wallMs": 7083,
+      "ranMs": 4616,
+      "audioOffsetMs": 0,
+      "captions": true,
+      "says": [
+        {
+          "n": 1,
+          "text": "In peak-workflow, every requirement is a Gherkin scenario with a stable ID.",
+          "narrate": null,
+          "clip": 1,
+          "plannedMs": 250,
+          "startMs": 319,
+          "lateMs": 69,
+          "durationMs": 4364,
+          "caption": true
+        }
+      ]
+    }
+  },
+  {
+    "plate": "r2-anchor",
+    "url": "https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md",
+    "plannedMs": 7393,
+    "exit": 0,
+    "take": {
+      "mode": "spine",
+      "out": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.kGAylGYI6J/f3live/renders/plates/r2-anchor.mp4",
+      "mp4": null,
+      "url": "https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md",
+      "plate": "r2-anchor",
+      "spine": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.kGAylGYI6J/f3live/spine/manifest.json",
+      "window": {
+        "startMs": 7030,
+        "durationMs": 7393,
+        "clips": 1
+      },
+      "fps": 30,
+      "width": 1280,
+      "height": 720,
+      "frames": 222,
+      "uniqueFrames": 93,
+      "videoMs": 7400,
+      "wallMs": 7447,
+      "ranMs": 4979,
+      "audioOffsetMs": 0,
+      "captions": true,
+      "says": [
+        {
+          "n": 1,
+          "text": "That ID is what the epic plans against, and what the verifier checks.",
+          "narrate": null,
+          "clip": 2,
+          "plannedMs": 250,
+          "startMs": 545,
+          "lateMs": 295,
+          "durationMs": 4727,
+          "caption": true
+        }
+      ]
+    }
+  },
+  {
+    "plate": "r3-openspec",
+    "url": "https://openspec.dev/docs/quickstart",
+    "plannedMs": 5575,
+    "exit": 0,
+    "take": {
+      "mode": "spine",
+      "out": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.kGAylGYI6J/f3live/renders/plates/r3-openspec.mp4",
+      "mp4": null,
+      "url": "https://openspec.dev/docs/quickstart",
+      "plate": "r3-openspec",
+      "spine": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.kGAylGYI6J/f3live/spine/manifest.json",
+      "window": {
+        "startMs": 14423,
+        "durationMs": 5575,
+        "clips": 1
+      },
+      "fps": 30,
+      "width": 1280,
+      "height": 720,
+      "frames": 167,
+      "uniqueFrames": 85,
+      "videoMs": 5567,
+      "wallMs": 5646,
+      "ranMs": 4492,
+      "audioOffsetMs": 0,
+      "captions": true,
+      "says": [
+        {
+          "n": 1,
+          "text": "OpenSpec takes the lighter road: propose, apply, archive.",
+          "narrate": null,
+          "clip": 3,
+          "plannedMs": 250,
+          "startMs": 317,
+          "lateMs": 67,
+          "durationMs": 2909,
+          "caption": true
+        }
+      ]
+    }
+  }
+]

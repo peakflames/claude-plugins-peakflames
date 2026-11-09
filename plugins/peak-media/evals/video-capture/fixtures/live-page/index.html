@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Local stand-in page for live-plate evals</title>
+<style>
+  body { margin: 0; background: #fff; color: #1f2328; font: 18px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 48px 32px 1200px; }
+  h1 { font-size: 40px; border-bottom: 1px solid #d1d9e0; padding-bottom: 8px; }
+  h2 { font-size: 28px; border-bottom: 1px solid #d1d9e0; padding-bottom: 6px; margin-top: 56px; }
+  p, li { color: #31363c; }
+  .filler { color: #6b737c; }
+  table { border-collapse: collapse; } td, th { border: 1px solid #d1d9e0; padding: 6px 12px; }
+</style>
+</head>
+<body>
+<!-- Offline stand-in used only by the video-capture evals: long enough to scroll, and it holds the
+     phrases the F3 storyboards glide to (they fall back to a plain scroll when a phrase is missing). -->
+<main>
+  <h1>Workflow handbook</h1>
+  <p>This page is served from 127.0.0.1 so the capture evals need no internet.</p>
+  <h2>Prerequisites</h2>
+  <p class="filler">Install the tools, open a terminal, and check out the repository.</p>
+  <p class="filler">Each step below is short. Read it once, then run it.</p>
+  <h2>Quick start</h2>
+  <ol><li>Discover the product.</li><li>Capture the requirements.</li><li>Plan the work.</li><li>Build and verify.</li></ol>
+  <p class="filler">The quick start takes about fifteen minutes on a small project.</p>
+  <h2>Philosophy</h2>
+  <p>The formal requirements baseline lives in Gherkin-style feature files, and every scenario carries a stable requirement ID.</p>
+  <p class="filler">Tests come from requirements, not from the implementation.</p>
+  <p class="filler">A change of meaning gets a new ID rather than an edit.</p>
+  <h2>Branches</h2>
+  <p class="filler">Work accumulates on an integration branch and is released from the main line.</p>
+  <h2>TOR Requirement IDs</h2>
+  <table><tr><th>Part</th><th>Meaning</th></tr><tr><td>TOR</td><td>Requirement prefix</td></tr><tr><td>NN</td><td>Feature file number</td></tr></table>
+  <p class="filler">Example: an ID lives in exactly one feature file.</p>
+  <p>IDs are stable once merged and never reused. They are foreign keys — plans, tests and handoffs all reference them by ID.</p>
+  <h2>The workflow</h2>
+  <p>Three steps: propose a change, apply it, then archive it.</p>
+  <p class="filler">Each step writes a small file next to the code.</p>
+  <h2>Archive</h2>
+  <p>When the change ships, archive it so the specs stay current.</p>
+</main>
+</body>
+</html>
