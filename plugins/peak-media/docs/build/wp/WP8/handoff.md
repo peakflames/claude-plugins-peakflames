@@ -80,7 +80,7 @@ The "line" it reports is the line number in the JSONL file. It names the subagen
 
 - **Not verified here: how `--plugin-dir` sets `CLAUDE_PLUGIN_DATA`.** If it points to a fresh folder, stage 0's `setup.sh --check` reports deps missing, and the skill asks before running `setup.sh` (~135 MB). The runbook says so.
 - **Not verified here: `${CLAUDE_PLUGIN_ROOT}` substitution.** SKILL.md relies on it being substituted in skill text, as the sibling skills do. If the run shows it isn't substituted in Bash, every skill needs the same fix (not WP8-specific).
-- The repo `CLAUDE.md` loads in the ORC-01 session because `tmp/orc-01` is inside the repo. The runbook warns the user to refuse any branch or commit attempts. *(Superseded in round 1: the scratch project moved to `~/peak-media-orc-01`.)*
+- The repo `CLAUDE.md` loads in the ORC-01 session because `tmp/orc-01` is inside the repo. The runbook warns the user to refuse any branch or commit attempts. *(Superseded in round 1: the scratch project moved to `~/tmp/peak-media-orc-01`.)*
 
 ## Round 1 fixes (verify-1, Lead decisions)
 
@@ -109,7 +109,7 @@ All nine findings are fixed. The rules are now written down in `references/stage
    - AC-ORC-01 already failed such a line. stages.md now says never to preview or quote a gate line.
    - New fixtures: `bad-quoted-gate` (fenced and `>` quoted, then an Edit) and `bad-unasked-gate`.
 5. **Runbook moved out of the repo (findings 4 and 8).**
-   - The scratch project is now `ORC=~/peak-media-orc-01`.
+   - The scratch project is now `RUN=~/tmp/peak-media-orc-01`, the folder the user created (Lead update). The runbook only adds files to it and doesn't delete it first; I didn't touch it.
    - The user sets `PM`: this worktree's `plugins/peak-media` until WP8 merges, then `$REPO/plugins/peak-media`. All paths come from `$PM`.
    - The §5 project folder is now `~/.claude/projects/$(echo "$ORC" | sed 's#[^A-Za-z0-9]#-#g')`. Cleanup is `rm -rf "$ORC"`.
    - The brief `sed` now also drops the "Used by" line and the `` (`fake/tone` in CI) `` aside. I checked the output.

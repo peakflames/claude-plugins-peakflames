@@ -18,30 +18,31 @@ Set three variables in the shell you'll launch from:
   - **Until WP8 is merged**, use the WP8 Builder's worktree:
     `$REPO/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media` (branch `feature/peak-media-wp8`).
   - **After the merge**, use `$REPO/plugins/peak-media` on `feature/new-peak-media-plugin`.
-- `ORC`: the scratch video project, **outside the repo**. This way the session can't see the repo's CLAUDE.md, the finished `tmp/f1-e2e/` project, the F1 fixtures or the plugin source as project files.
+- `RUN`: the scratch video project you created, `~/tmp/peak-media-orc-01`, **outside the repo**. This way the session can't see the repo's CLAUDE.md, the finished `tmp/f1-e2e/` project, the F1 fixtures or the plugin source as project files.
 
 ```bash
 REPO=~/github/peakflames/claude-plugins-peakflames
 PM="$REPO/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media"   # after the WP8 merge: PM="$REPO/plugins/peak-media"
-ORC=~/peak-media-orc-01
+RUN=~/tmp/peak-media-orc-01
 git -C "$PM" log --oneline -1                             # the WP8 head (or the merge commit)
 bash "$PM/scripts/setup.sh" --check                       # expect: ready (exit 0)
 echo ${PEAK_MEDIA_OPENROUTER_API_KEY:+key set}            # expect: key set (else the run makes a silent beat grid)
 df -h ~ | tail -1                                         # keep ≥ 1 GB free
 ```
 
-Make the scratch project. It gets the F1 brief, minus the build notes (the "Used by" line, the
+Fill the scratch project (the folder already exists; it should be empty). It gets the F1 brief, minus the build notes (the "Used by" line, the
 `fake/tone` aside and the closing paragraphs), with its source doc next to it.
 
 ```bash
-rm -rf "$ORC" && mkdir -p "$ORC/source"
-cp "$PM/docs/build/references/openspec-vs-peak-workflow.md" "$ORC/source/"
+ls -A "$RUN"            # expect nothing (or only what you put there on purpose)
+mkdir -p "$RUN/source"
+cp "$PM/docs/build/references/openspec-vs-peak-workflow.md" "$RUN/source/"
 sed -e '/^Script approved/,$d' \
     -e '/^- \*\*Used by:\*\*/d' \
     -e 's# (`fake/tone` in CI)##' \
     -e 's#`../../references/openspec-vs-peak-workflow.md`#`source/openspec-vs-peak-workflow.md`#' \
-    "$PM/docs/build/fixtures/F1/brief.md" > "$ORC/brief.md"
-cat "$ORC/brief.md"     # Audience, Runtime 26 s, Spine, Brand, Source → source/…, 3 beats; no "Used by", no fake/tone
+    "$PM/docs/build/fixtures/F1/brief.md" > "$RUN/brief.md"
+cat "$RUN/brief.md"     # Audience, Runtime 26 s, Spine, Brand, Source → source/…, 3 beats; no "Used by", no fake/tone
 ```
 
 ## 2. Launch a fresh session with the plugin loaded
@@ -51,7 +52,7 @@ only. The path is absolute, so it doesn't depend on the launch folder. Launch **
 project**, so the video project is the session's working folder:
 
 ```bash
-cd "$ORC" && claude --plugin-dir "$PM"
+cd "$RUN" && claude --plugin-dir "$PM"
 ```
 
 - Don't use plan mode. Any permission mode works; with prompts on, allow the `node "$PM/…"`
@@ -79,25 +80,25 @@ and 9 itself. Each gate ends with a line like `GATE 4 storyboard: APPROVED — r
 | 1 script | a ~50-word script with a cold-read result | Approve if every beat is CLEAR and it reads like the approved F1 script (`$PM/docs/build/fixtures/F1/script.md`). Otherwise paste that script's three paragraphs and tell it to use them |
 | 2 spine | `PASS runtime …` within 23.4–28.6 s | (nothing to answer) |
 | 3 plates | 3 plates: p1-hook (motion), p2-table (slide), p3-close (motion), times from the spine | Yes |
-| 4 storyboard | `review/storyboard.jpg`, one line per plate | Open `$ORC/review/storyboard.jpg`. Approve if the text is right and readable. Known nit: the hook's first line sits alone above centre for ~1 s |
+| 4 storyboard | `review/storyboard.jpg`, one line per plate | Open `$RUN/review/storyboard.jpg`. Approve if the text is right and readable. Known nit: the hook's first line sits alone above centre for ~1 s |
 | 5 pipeline | p1 rendered, lint clean | (nothing) |
 | 6 build | self-review rounds, then a reviewer agent, fixes | (nothing) |
 | 7 composite | `review/review.mp4`, cuts in silence | (nothing) |
 | 8 audio | asks for music and SFX | See below |
-| 9 export | `out/final.mp4`, final contact sheet | (nothing). Open `$ORC/out/final.mp4` if you like |
+| 9 export | `out/final.mp4`, final contact sheet | (nothing). Open `$RUN/out/final.mp4` if you like |
 
 **Gate 8.**
 - **Music:** `~/github/peakflames/peakflames-videos/videos/2026-10-peak-workflow-short/audio/src/groove-sauce.mp3`. It's your own track and is used locally only; nothing is committed.
 - **SFX:** none.
 
-With music only, the session makes one pass, `remux-audio … --music … -o review/review-mix.mp4 --levels review/levels.json`. **Listen to `$ORC/review/review-mix.mp4`** and approve the levels. The file you listen to for each choice:
+With music only, the session makes one pass, `remux-audio … --music … -o review/review-mix.mp4 --levels review/levels.json`. **Listen to `$RUN/review/review-mix.mp4`** and approve the levels. The file you listen to for each choice:
 
 | Your answer | Listen to |
 |---|---|
-| no music, no SFX | `$ORC/review/review.mp4` (narration only) |
-| music only (this run) | `$ORC/review/review-mix.mp4` |
-| SFX only | `$ORC/review/review-mix.mp4` |
-| music + SFX | `$ORC/review/review-mix.mp4`. `review-music.mp4` is the intermediate music-only pass |
+| no music, no SFX | `$RUN/review/review.mp4` (narration only) |
+| music only (this run) | `$RUN/review/review-mix.mp4` |
+| SFX only | `$RUN/review/review-mix.mp4` |
+| music + SFX | `$RUN/review/review-mix.mp4`. `review-music.mp4` is the intermediate music-only pass |
 
 If the session stops at an error it can't fix, note the stage and the message for the Lead. Don't
 fix it by hand: a hand fix is a finding, not a pass.
@@ -106,10 +107,10 @@ fix it by hand: a hand fix is a finding, not a pass.
 
 Exit the session (`/exit`). Its transcript is the newest JSONL in the Claude Code project folder
 named after the launch folder (each `/` and other non-alphanumeric character becomes `-`, so
-`~/peak-media-orc-01` → `-Users-<you>-peak-media-orc-01`):
+`~/tmp/peak-media-orc-01` → `-Users-<you>-tmp-peak-media-orc-01`):
 
 ```bash
-P=~/.claude/projects/$(echo "$ORC" | sed 's#[^A-Za-z0-9]#-#g')
+P=~/.claude/projects/$(echo "$RUN" | sed 's#[^A-Za-z0-9]#-#g')
 S=$(ls -t "$P"/*.jsonl | head -1); echo "$S"             # the session JSONL
 ls "${S%.jsonl}/subagents" 2>/dev/null                    # cold reader + reviewer transcripts
 node "$PM/evals/plate-factory/check-transcript.mjs" "$S"
@@ -124,4 +125,5 @@ The Verifier then:
 - keeps its output and a contact sheet of `out/final.mp4` under `evidence/WP8/` (no MP4);
 - asks you to confirm the listen for AC-ORC-01.
 
-Clean up when the Verifier is done: `rm -rf "$ORC"`.
+Clean up when the Verifier is done: empty the folder with `rm -rf "$RUN"/*`, or remove it with
+`rm -rf "$RUN"`.
