@@ -14,7 +14,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP3b | verified | wp/WP3b/verify-1.md |
 | WP4 | verified | wp/WP4/verify-2.md |
 | WP5 | verified | wp/WP5/verify-1.md |
-| WP6 | verified (ASM-06 awaits user listen) | wp/WP6/verify-2.md |
+| WP6 | verified | wp/WP6/verify-2.md |
 | WP7a | not-started | — |
 | WP7b | not-started | — |
 | WP8 | not-started | — |
@@ -63,7 +63,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-ASM-03 | D7 | WP6 | G `out/final.mp4` · W probe-spec · T the spec passes and duration = spine + outro ±1 frame | script | PASS | evidence/WP6/AC-ASM-03.r2.log |
 | AC-ASM-04 | §7 | WP6 | G no music supplied · W assemble · T it succeeds with narration only | script | PASS | evidence/WP6/AC-ASM-04.r2.log |
 | AC-ASM-05 | kickoff | WP6 | G the brand pack outro · W assemble · T the final contact sheet's last frames show the outro | still | PASS | evidence/WP6/AC-ASM-05-verifier-r2.jpg |
-| AC-ASM-06 | design stage 8 | WP6 | G a user-supplied track and SFX · W the music pass, then the SFX pass · T the user listens and approves the levels (narration −16 LUFS, music ducked) | manual | blocked: needs user listen on the real F1 mix (levels PASS in verify-2) | evidence/WP6/AC-ASM-06.r2.log |
+| AC-ASM-06 | design stage 8 | WP6 | G a user-supplied track and SFX · W the music pass, then the SFX pass · T the user listens and approves the levels (narration −16 LUFS, music ducked) | manual | PASS | evidence/WP6/AC-ASM-06-user-listen.md, evidence/WP6/AC-ASM-06.r2.log |
 | AC-REC-01 | D1 | WP7a | G `capture --help` · W parsed · T it lists `--storyboard --out --mp4 --viewport --no-captions --caption-css --url --debug-requests --audio-offset-ms --spine` and no narration flags; a test parses each flag | script | not-started | — |
 | AC-REC-02 | D2 | WP7a | G a missing Chromium or ffmpeg, or a bad `--spine` · W capture · T exits non-zero in under 2 s with no browser launch | script | not-started | — |
 | AC-REC-03 | D6 | WP7a | G `examples/deck/storyboard.mjs` (original loop) · W it runs in silent, captions and spine-timed modes · T it runs unmodified in all three | script | not-started | — |
