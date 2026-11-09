@@ -33,6 +33,7 @@ IDs are stable. A decision is changed by adding a new entry that supersedes it, 
 | DEC-27 | Contact-sheet timecodes are drawn as 7-segment digits with ffmpeg `drawbox`, not `drawtext` | Homebrew ffmpeg 9.0.2 is built without `drawtext` (no freetype); drawbox works on every build, needs no font, and stays deterministic |
 | DEC-28 | `setup.sh` runs `npm ci --ignore-scripts` | No runtime dep needs an install script (esbuild resolves its platform binary from optional deps); keeps installs deterministic and avoids npm's install-script prompts |
 | DEC-29 | `check-cuts` also requires a cut to sit at least `--edge-ms` (default 100 ms) inside its silence, file start/end excepted; `--expect-cuts n` fails when the cut count differs | WP2 verify-1 F-4/F-5: a cut on the first sound of a word passed. The spine's lead/tail padding (≥200 ms) clears 100 ms comfortably |
+| DEC-30 | The OpenRouter key is read from `PEAK_MEDIA_OPENROUTER_API_KEY`, falling back to the legacy `TTS_OPENROUTER_API_KEY`. Messages and docs name the new variable; "no key" means both are unset | User set `PEAK_MEDIA_OPENROUTER_API_KEY` (2026-11-08). A plugin-prefixed name avoids clashes; the fallback keeps old web2video setups working |
 
 ## Contract changes
 
