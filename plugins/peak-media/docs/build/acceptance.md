@@ -10,7 +10,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 |---|---|---|
 | WP1 | verified | wp/WP1/verify-2.md |
 | WP2 | verified | wp/WP2/verify-1.md |
-| WP3a | verified (TTS-07 awaits user listen) | wp/WP3a/verify-1.md |
+| WP3a | verified | wp/WP3a/verify-1.md |
 | WP3b | not-started | — |
 | WP4 | not-started | — |
 | WP5 | verified | wp/WP5/verify-1.md |
@@ -43,7 +43,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-TTS-04 | D12 | WP3a | G F1 with the fake provider · W spine runs twice · T run 2 reports "N/N cached" with 0 calls; exported clips put into an empty cache reproduce the run | script | PASS | evidence/WP3a/AC-TTS-04.log |
 | AC-TTS-05 | D13 | WP3a | G one fake clip slowed 2× · W spine runs · T the wpm table prints and the warning names that clip | script | PASS | evidence/WP3a/AC-TTS-05.log |
 | AC-TTS-06 | D15 | WP3a | G 3 Gemini voices (fake transport in eval; live in AC-TTS-07) · W `sample-voice` · T 3 WAVs and 3 wpm lines | script | PASS | evidence/WP3a/AC-TTS-06.log |
-| AC-TTS-07 | D14 | WP3a | G the user's key · W one Gemini and one MAI clip are synthesized with `--debug-requests` · T speech is audible at a plausible wpm; the log shows `"zdr":true` and the key is redacted; PCM sample rate is recorded in decisions.md | manual | blocked: needs user listen (mechanical checks PASS in verify-1) | evidence/WP3a/AC-TTS-07-gemini-debug.log, evidence/WP3a/AC-TTS-07-mai-debug.log |
+| AC-TTS-07 | D14 | WP3a | G the user's key · W one Gemini and one MAI clip are synthesized with `--debug-requests` · T speech is audible at a plausible wpm; the log shows `"zdr":true` and the key is redacted; PCM sample rate is recorded in decisions.md | manual | PASS | evidence/WP3a/AC-TTS-07-user-listen.md, evidence/WP3a/AC-TTS-07-gemini-debug.log, evidence/WP3a/AC-TTS-07-mai-debug.log |
 | AC-TTS-08 | DEC-03 | WP3a | G a PCM response · W the clip is cached · T it is a valid WAV (ffprobe reads its rate and channels) | script | PASS | evidence/WP3a/AC-TTS-08.log |
 | AC-SPN-01 | kickoff milestone | WP3b | G F1 (target 20 s) and the fake provider · W brief → script → spine · T `manifest.totalMs` is within 20 s ±10% and validates | script | not-started | — |
 | AC-SPN-02 | D3 | WP3b | G F1 with the key unset · W spine runs · T `beatgrid.json` validates, there are 0 OpenRouter calls (network spy), and runtime is within ±10% | script | not-started | — |
