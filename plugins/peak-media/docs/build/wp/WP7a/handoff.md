@@ -74,3 +74,8 @@ Branch `feature/peak-media-wp7a`, based on `feature/new-peak-media-plugin` @ 6aa
 
 - **`capture` (video-capture)** — plays a live page in real time from a storyboard and screen-captures it with Playwright `page.screencast`. It runs in silent, captions or spine-timed mode, and a live plate lasts its planned duration to the frame.
 - **Storyboard API reference and example deck** — `references/storyboard-api.md` and a neutral 3-slide deck whose storyboard runs unchanged in all three modes.
+
+## Round 1 (Lead, after verify-1)
+
+- Should-fix: the 10 s first-frame timer is cleared once the first frame arrives (a 200 ms take now exits in ~3 s, was ~11 s).
+- Nits left for WP7b/WP9: overrun only detected after the storyboard returns; first say() lag (+17–83 ms) — a warm-up would help; frames rounded to nearest slot (±½ frame).

@@ -1,0 +1,114 @@
+# AC-BASE-09 verifier run 2026-11-09T03:24:39Z
+plugin.json version: 0.1.0
+
+## --version under no-network preload
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --version
+exit=0
+stdout lines=1  stderr:
+stack trace: none
+0.1.0
+
+## --help under no-network preload
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --help
+exit=0
+stdout lines=37  stderr:
+stack trace: none
+
+## no args
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs
+exit=2
+stdout lines=0  stderr:
+capture: --storyboard <file.mjs> is required (or --plates/--plate naming a live plate)
+Run 'capture --help' for usage.
+stack trace: none
+
+## unknown flag
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --bogus
+exit=2
+stdout lines=0  stderr:
+capture: Unknown option '--bogus'
+Run 'capture --help' for usage.
+stack trace: none
+
+## bad viewport
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/tiny.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4 --viewport 1281x720
+exit=2
+stdout lines=0  stderr:
+capture: --viewport 1281x720: width and height must be even (H.264 needs it)
+Run 'capture --help' for usage.
+stack trace: none
+
+## bad fps
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/tiny.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4 --fps 0
+exit=2
+stdout lines=0  stderr:
+capture: --fps must be a whole number from 1 to 60, got 0
+Run 'capture --help' for usage.
+stack trace: none
+
+## --plate without --plates
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --plate r1
+exit=2
+stdout lines=0  stderr:
+capture: --plate needs --plates <plates.json>
+Run 'capture --help' for usage.
+stack trace: none
+
+## storyboard with no default export
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/noexport.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4
+exit=1
+stdout lines=0  stderr:
+capture: storyboard /tmp/v7a-tools/noexport.mjs must export a default async function ({ page, say, waitForVoice, wait }) => { … }
+stack trace: none
+
+## unknown plate id
+$ capture node --import /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/evals/helpers/no-network.mjs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --plates /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/f3/plates.json --plate nope
+exit=1
+stdout lines=0  stderr:
+capture: plate 'nope' is not in /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/f3/plates.json (plates: r1-feature, r2-anchor, r3-openspec)
+stack trace: none
+
+## storyboard throws (browser runs; expected failure)
+$ capture node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/throws.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4 --no-captions
+exit=1
+stdout lines=0  stderr:
+capture: launching browser (1280x720, 30 fps, mode silent)
+capture: t0 anchored on the first frame; running throws.mjs
+capture: storyboard failed: boom from storyboard (Object.default [as fn] (file:///private/tmp/v7a-tools/throws.mjs:1:80))
+stack trace: none
+
+## 4 say() on a 3-clip spine
+$ capture node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/four-says.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4 --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/deckspine/manifest.json
+exit=1
+stdout lines=0  stderr:
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running four-says.mjs
+capture: say() #4 has no spine clip — the spine holds 3 clip(s); add a beat to the script or drop a say()
+stack trace: none
+
+## storyboard overruns the spine window
+$ capture node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/overrun.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4 --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/deckspine/manifest.json
+exit=1
+stdout lines=0  stderr:
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running overrun.mjs
+capture: storyboard ran 25263 ms, past the spine's 20000 ms — shorten its waits or lengthen the beat
+stack trace: none
+
+## HTTP 404 page (local server)
+$ capture node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/tiny.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4 --url http://127.0.0.1:61081/missing.html
+exit=1
+stdout lines=0  stderr:
+capture: launching browser (1280x720, 30 fps, mode captions)
+capture: http://127.0.0.1:61081/missing.html answered HTTP 404 — check the URL (live pages move); nothing was captured
+stack trace: none
+
+## HTTP 404 page (live: openspec.dev/docs/the-workflow)
+$ capture node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/scripts/capture.mjs --storyboard /tmp/v7a-tools/tiny.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/x.mp4 --url https://openspec.dev/docs/the-workflow
+exit=1
+stdout lines=0  stderr:
+capture: launching browser (1280x720, 30 fps, mode captions)
+capture: https://openspec.dev/docs/the-workflow answered HTTP 404 — check the URL (live pages move); nothing was captured
+stack trace: none
+
+no output file left behind after failures: none

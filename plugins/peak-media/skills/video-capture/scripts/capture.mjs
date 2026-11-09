@@ -275,7 +275,9 @@ export async function capture(plan) {
     const grid = new FrameGrid(tmp, fps);
     const wallStart = Date.now();
     await page.screencast.start({ fps, size: viewport, quality: 90, onFrame: (f) => grid.onFrame(f) });
-    const t0 = await Promise.race([grid.ready, new Promise((_, rej) => setTimeout(() => rej(new CliError('no screencast frame within 10 s of start — the page may not be rendering')), 10_000))]);
+    let firstFrameTimer;
+    const t0 = await Promise.race([grid.ready, new Promise((_, rej) => { firstFrameTimer = setTimeout(() => rej(new CliError('no screencast frame within 10 s of start — the page may not be rendering')), 10_000); })])
+      .finally(() => clearTimeout(firstFrameTimer)); // don't keep the process alive after the first frame
     const now = () => performance.timeOrigin + performance.now() - t0; // ms since t0, same clock as frame timestamps
     const sleepUntil = async (ms) => { for (let d = ms - now(); d > 0; d = ms - now()) await new Promise((r) => setTimeout(r, Math.min(d, 1000))); };
 
