@@ -12,7 +12,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP2 | verified | wp/WP2/verify-1.md |
 | WP3a | verified | wp/WP3a/verify-1.md |
 | WP3b | verified | wp/WP3b/verify-1.md |
-| WP4 | verified | wp/WP4/verify-2.md |
+| WP4 | verified | wp/WP4/verify-3.md |
 | WP5 | verified | wp/WP5/verify-1.md |
 | WP6 | verified | wp/WP6/verify-2.md |
 | WP7a | not-started | — |
@@ -50,8 +50,8 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-SPN-03 | DEC-13 | WP3b | G the F1 manifest · W the gaps between beats are inspected · T each is ≥ 400 ms, and `check-cuts` on `narration.wav` at the beat boundaries passes | script | PASS | evidence/WP3b/AC-SPN-03.log |
 | AC-SPN-04 | design stage 1 | WP3b | G the F1 `script.md` · W a cold-reader agent reads it with no context · T no beat is flagged unclear; the user approves | manual | PASS | evidence/WP3b/AC-SPN-04-user-approval.md, evidence/WP3b/AC-SPN-04-cold-read-final.md |
 | AC-PLT-01 | kickoff milestone | WP4 | G F1 `plates.json` · W `render-plate` runs for each plate · T each MP4's duration equals the planned `durationMs` ±1 frame | script | PASS | evidence/WP4/AC-PLT-01.r2.log |
-| AC-PLT-02 | kickoff milestone | WP4 | G every rendered plate · W contact-sheet · T one sheet per plate; the Verifier confirms the brand fonts and colours, with no overflow or clipping | still | PASS | evidence/WP4/AC-PLT-02-verifier-r2-p1-hook.jpg, evidence/WP4/AC-PLT-02-verifier-r2-p2-table.jpg, evidence/WP4/AC-PLT-02-verifier-r2-p3-close.jpg |
-| AC-PLT-03 | design §5 | WP4 | G F2 (5 slides) · W the deck is rendered · T 5 slide plates; the sheet shows deck layout and readable text | still | PASS | evidence/WP4/AC-PLT-03-verifier-r2-s1-unit.jpg, evidence/WP4/AC-PLT-03-verifier-r2-s5-peak.jpg, evidence/WP4/AC-PLT-03.r2.log |
+| AC-PLT-02 | kickoff milestone | WP4 | G every rendered plate · W contact-sheet · T one sheet per plate; the Verifier confirms the brand fonts and colours, with no overflow or clipping | still | PASS | evidence/WP4/AC-PLT-02-verifier-layout-p1-hook.jpg, evidence/WP4/AC-PLT-02-verifier-layout-p2-table.jpg, evidence/WP4/AC-PLT-02-verifier-layout-p3-close.jpg |
+| AC-PLT-03 | design §5 | WP4 | G F2 (5 slides) · W the deck is rendered · T 5 slide plates; the sheet shows deck layout and readable text | still | PASS | evidence/WP4/AC-PLT-03-verifier-layout-s1-unit.jpg, evidence/WP4/AC-PLT-03.layout.log |
 | AC-PLT-04 | DEC-07 | WP4 | G every plate · W `hyperframes lint` and `check --strict` · T 0 errors | script | PASS | evidence/WP4/AC-PLT-04.r2.log |
 | AC-VND-01 | DEC-07 | WP4 | G `vendored-map.md` · W the script checks every listed path, and checks that every vendor folder is referenced · T no missing files, no orphan folders | script | PASS | evidence/WP4/AC-VND-01.r2.log |
 | AC-VND-02 | DEC-07 | WP4 | G the vendor tree · W grep `hyperframes events` · T 0 hits; LICENSE is present | script | PASS | evidence/WP4/AC-VND-02.r2.log |
