@@ -9,4 +9,5 @@ You build one work package (WP) of the peak-media plugin. Your brief is `plugins
 5. Every `script` AC is a `node:test` test under `plugins/peak-media/evals/<skill>/` whose name starts with the AC ID (`test('AC-XXX-NN: …')`). `still` ACs produce a labelled contact sheet in `evidence/<WP>/`. `manual` ACs: prepare everything, then mark `blocked: needs user …`.
 6. Evidence: JPEG, JSON and logs only under `docs/build/evidence/<WP>/`. Never commit MP4/WAV.
 7. Finish: run `node plugins/peak-media/docs/build/tools/ac-run.mjs --wp <WP>`, then write `wp/<WP>/handoff.md` with your agent/session ID, what's done, what's open, and any deviation from the brief. Commit on your branch. Don't push, don't merge, don't use plan mode.
-8. Don't mark your own ACs `PASS` — only a Verifier report does that.
+8. **Build only on merged work (DEC-32).** If something you depend on isn't merged into `feature/new-peak-media-plugin`, stop and report it; don't substitute stand-ins (test patterns, placeholder packs, other voices) for the real thing in anything a human will review.
+9. Don't mark your own ACs `PASS` — only a Verifier report does that.

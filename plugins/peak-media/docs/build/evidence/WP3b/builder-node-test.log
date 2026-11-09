@@ -1,0 +1,34 @@
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (1720.055916ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (913.019917ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (330.867167ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (306.719291ms)
+✔ validate: cross-reference checks (not AC-bound) (1661.948ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (138.855292ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (146.067292ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (27435.167458ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (18430.495208ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (13.433459ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (622.38725ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (463.714833ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (186.983209ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (1145.996042ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (1159.351708ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (172.72575ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (133.208417ms)
+✔ AC-BASE-03: contact-sheet baseline (344.342625ms)
+✔ AC-BASE-04: probe-spec baseline (313.495542ms)
+✔ AC-BASE-05: check-cuts baseline (416.037875ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (1063.481042ms)
+✔ AC-SPN-01: F1 brief → script → spine with fake/tone; manifest.totalMs within 20 s ±10% and validates (172.036917ms)
+✔ AC-SPN-02: F1 with the key unset → beatgrid.json validates, 0 OpenRouter calls, runtime within ±10% (547.066334ms)
+✔ AC-SPN-03: F1 manifest gaps between beats are ≥ 400 ms and check-cuts passes at every beat boundary (116.168584ms)
+✔ AC-BASE-06: spine baseline (help lists every flag, version, one-line errors, no stack, no network) (1556.019167ms)
+✔ spine: script.md parsing, layout rules and a second (neutral) brief (not AC-bound) (129.776875ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 60503.906459

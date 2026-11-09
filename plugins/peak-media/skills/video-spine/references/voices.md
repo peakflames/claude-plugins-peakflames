@@ -59,10 +59,10 @@ Accent comes from `--style` rather than the voice, e.g. `"Speak with a
 British accent."`, so pick a voice for its timbre. A new style without that
 sentence drops the accent.
 
-OpenRouter's docs say Gemini 3.8 models read `input` as written, so a mood
-tag such as `<Warm>` may be spoken aloud. The wpm table catches it: a clip
-whose tag was read runs well below the median wpm and gets a slow-clip
-warning that names it.
+Mood tags such as `<Warm>` at the start of a paragraph, or mid-paragraph, are
+performed, not read: they shape the delivery and are not counted as words (see
+`narration-writing.md`). A tagged clip can run slower than the same words without
+a tag, so expect some wpm spread across a script.
 
 ## MAI
 

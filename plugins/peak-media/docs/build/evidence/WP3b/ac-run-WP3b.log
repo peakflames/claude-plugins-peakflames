@@ -1,0 +1,12 @@
+$ node plugins/peak-media/docs/build/tools/ac-run.mjs --wp WP3b
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-SPN-01 | script | pass | not-started | — |
+| AC-SPN-02 | script | pass | not-started | — |
+| AC-SPN-03 | script | pass | not-started | — |
+| AC-SPN-04 | manual | — | not-started | — |
+| AC-BASE-06 | script | pass | not-started | — |
+exit=0
+$ node plugins/peak-media/docs/build/tools/ac-run.mjs --trace
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+exit=0
