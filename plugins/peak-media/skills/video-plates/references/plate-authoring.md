@@ -42,9 +42,10 @@ makes a rebrand one command (`render-plate plates.json --all --brand <new pack>`
 8. **Fit text in code, deterministically:** shrink the font in 1 px steps until the block fits
    (see the templates). Keep text inside the 90% action-safe box; reading text — slide counters
    included — never goes below 27 px at 720p (3.75% of the frame height). The motion template lets
-   each line wrap onto two balanced rows while its type stays large (≥ 7.8% of the height), then
-   lets words break and shrinks to that floor; render-plate
-   rejects a plate whose text can't fit at the floor ("shorten text or split the beat").
+   each line wrap onto two balanced rows while its type stays large (≥ 7.8% of the height, 56 px
+   at 720p). Only if the text still doesn't fit does it let words break and shrink, down to the
+   27 px reading floor. render-plate rejects a plate whose text can't fit at the 27 px floor
+   ("shorten text or split the beat").
 
 ## One idea per plate
 

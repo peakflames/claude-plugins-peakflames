@@ -1,0 +1,16 @@
+# verifier-wp4l-a9349ae4 — WP4 layout follow-up — HEAD 5151294 (layout commit 5cf766c). $VT = verifier temp dir (deleted after the run).
+## render-plate --lint printed 'lint+check ok' for all 3 F1, 5 F2 and 4 adversarial plates (see AC-PLT-01/02 layout logs)
+## direct hyperframes via lib/hf.mjs: lint; check --strict --no-cache --json
+p1-hook lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+p2-table lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+p3-close lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+s1-unit lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+s2-ids lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+s3-verify lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+s4-openspec lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+s5-peak lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+a1-longline lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+a2-tenshort lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+a3-sixbullets lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+a4-tableurl lint exit 0 ◇  0 errors, 0 warnings | check --strict exit 0 ok true errors undefined warnings undefined
+## template grep: Date.now|Math.random|new Date|performance.now|setTimeout|setInterval|requestAnimationFrame|https?://|//cdn|@import -> 0 hits in skills/video-plates/templates/

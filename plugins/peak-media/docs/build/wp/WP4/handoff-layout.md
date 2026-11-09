@@ -52,6 +52,22 @@ What the after-sheets show:
 - `ac-run --wp WP4`: PLT-01, PLT-04, VND-01, VND-02 and BASE-08 scripts pass. PLT-02 and PLT-03 are still ACs, so there is no run.
 - `ac-run --trace`: PASS, 77 ACs, 12 briefs, 0 problems.
 
+## Round 2 (verify-3 S-1, N-4)
+
+- **S-1**: added `evals/video-plates/layout.test.mjs`. It scaffolds F1 and F2 (no render), loads each plate with a probe in HyperFrames' pinned headless browser (file:// only), seeks the template's own GSAP timeline and measures the page. There are 4 tests:
+  - `layout: motion close plate keeps display text >= 56 px and wraps its long line instead of shrinking`
+  - `layout: settled motion text block is centred in the frame within 2% both ways`
+  - `layout: the last table row (and last bullet) has settled by 60% of the slide plate`
+  - `layout: slide body stays inside the content box and nothing reaches the footer`
+
+  I mutation-checked each one by temporarily breaking the template, and each failed with a one-line reason:
+  - no-wrap: close lines 36.7 px;
+  - left-aligned stage: off-centre by 14.5%;
+  - reveal ending at 90%: last row opacity 0 at 0.6 D;
+  - content box reaching into the footer: "Human checks" past the footer.
+- **N-4**: `plate-authoring.md` rule 8 now names the 56 px (7.8%) target and the 27 px reading floor separately.
+- N-1, N-2 and N-3 are left as they are, per the Lead.
+
 ## Open / for the Verifier
 
 - Status is not marked PASS here (builder rule 9). AC-PLT-02 and AC-PLT-03 are `still` ACs whose sheets now differ, so a Verifier should re-check them on these sheets.
