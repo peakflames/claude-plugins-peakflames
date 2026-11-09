@@ -1,0 +1,64 @@
+# WP3a deferred re-checks through spine.mjs — TTS-05 2026-11-09T00:25:30Z HEAD 0dce4ae; keys unset; network spy; fresh cache per run
+## PEAK_MEDIA_FAKE_SLOW=1
+$ nokey PEAK_MEDIA_FAKE_SLOW=1 node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t5-1 --tts-model fake/tone --cache-dir $T/c7 --target-ms 30000
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14  10.18   82      no
+2        28  10.18  165      no
+3        11   4.00  165      no
+median 165 wpm · 0/3 cached
+warn  slow clip 1: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+clips  0/3 cached · exported to $T/t5-1/clips
+beat  hook               0.00 s  +11.68 s
+beat  compare           11.68 s  +11.68 s
+beat  close             23.36 s  +5.50 s
+wrote $T/t5-1/manifest.json and $T/t5-1/narration.wav
+PASS  runtime 28.86 s against a 30.0 s target (-3.8%)
+exit=0
+## PEAK_MEDIA_FAKE_SLOW=2
+$ nokey PEAK_MEDIA_FAKE_SLOW=2 node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t5-2 --tts-model fake/tone --cache-dir $T/c7 --target-ms 30000
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165      no
+2        28  20.36   82      no
+3        11   4.00  165      no
+median 165 wpm · 0/3 cached
+warn  slow clip 2: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+clips  0/3 cached · exported to $T/t5-2/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +20.86 s
+beat  close             26.45 s  +4.50 s
+wrote $T/t5-2/manifest.json and $T/t5-2/narration.wav
+PASS  runtime 30.95 s against a 30.0 s target (+3.2%)
+exit=0
+## PEAK_MEDIA_FAKE_SLOW=3
+$ nokey PEAK_MEDIA_FAKE_SLOW=3 node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t5-3 --tts-model fake/tone --cache-dir $T/c7 --target-ms 30000
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165      no
+2        28  10.18  165      no
+3        11   8.00   83      no
+median 165 wpm · 0/3 cached
+warn  slow clip 3: 83 wpm vs median 165 — a mood tag may have been read aloud; check its text
+clips  0/3 cached · exported to $T/t5-3/clips
+beat  hook               0.00 s  +6.59 s
+beat  compare            6.59 s  +11.68 s
+beat  close             18.27 s  +9.50 s
+wrote $T/t5-3/manifest.json and $T/t5-3/narration.wav
+PASS  runtime 27.77 s against a 30.0 s target (-7.4%)
+exit=0
+## unslowed control
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t5-0 --tts-model fake/tone --cache-dir $T/c7
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165      no
+2        28  10.18  165      no
+3        11   4.00  165      no
+median 165 wpm · 0/3 cached
+clips  0/3 cached · exported to $T/t5-0/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/t5-0/manifest.json and $T/t5-0/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0

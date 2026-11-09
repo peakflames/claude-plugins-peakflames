@@ -1,0 +1,9 @@
+# ac-run --wp WP3b 2026-11-09T00:26:49Z HEAD 0dce4ae; keys unset
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-SPN-01 | script | pass | not-started | — |
+| AC-SPN-02 | script | pass | not-started | — |
+| AC-SPN-03 | script | pass | not-started | — |
+| AC-SPN-04 | manual | — | not-started | — |
+| AC-BASE-06 | script | pass | not-started | — |
+exit=0
