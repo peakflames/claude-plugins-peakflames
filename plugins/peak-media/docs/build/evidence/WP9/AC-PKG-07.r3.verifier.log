@@ -1,0 +1,24 @@
+# AC-PKG-07 r3 verifier
+vendor/ changed since 7328282: []
+vendor/ changed since r1 base a79e511: []
+plugins/peak-media/vendor/hyperframes/
+27:| Source | https://github.com/heygen-com/hyperframes |
+28:| Commit | `327e20208c3f542841de670cce54754473f58d30` (DEC-07 names it `327e20208c3f`) |
+29:| Date | 2026-11-08, fetched as the GitHub archive of that commit (`codeload.github.com/heygen-com/hyperframes/tar.gz/327e20208c3f`) |
+30:| Licence | Apache-2.0 — upstream `LICENSE` copied unchanged to `vendor/hyperframes/LICENSE` |
+33:| Local changes | Listed in full under "Local changes" below |
+15:| Inter, JetBrains Mono | Bundled | `brand-packs/default/fonts/` | OFL 1.1 |
+16:| Playfair Display, Space Mono | Bundled (eval fixture only) | `evals/fixtures/brand-alt/fonts/` | OFL 1.1 |
+17:| GSAP | Fetched | data dir, then copied into each video project | GSAP Standard "no charge" License |
+58:- Removed `assets/frame-presets/` (all frame presets, incl. their fonts and OFL texts).
+84:## Bundled: fonts
+86:Each family was fetched with `npm pack` from its `@fontsource` package; the latin 400 and 700
+91:| Inter | Bundled | `brand-packs/default/fonts/inter/` | npm `@fontsource/inter` | 5.3.0 | 2026-11-08 | `02034af8d41dcc67ac8eab88f642e129bb8a2e8922abf30229c32725f54d8fd6` | OFL 1.1 (The Inter Project Authors) | none |
+92:| JetBrains Mono | Bundled | `brand-packs/default/fonts/jetbrains-mono/` | npm `@fontsource/jetbrains-mono` | 5.3.0 | 2026-11-08 | `1bbea47d1387406da5b6ccc4184cc61eae6851cc0db5c1d9bbd088ea9daa0b4a` | OFL 1.1 (The JetBrains Mono Project Authors) | none |
+93:| Playfair Display | Bundled | `evals/fixtures/brand-alt/fonts/playfair-display/` | npm `@fontsource/playfair-display` | 5.3.0 | 2026-11-08 | `564e61951ecc3e962793cd50395f718cda6350cb934f9000dbe0139c768dc023` | OFL 1.1, Reserved Font Name "Playfair Display" (shipped unmodified) | none |
+94:| Space Mono | Bundled | `evals/fixtures/brand-alt/fonts/space-mono/` | npm `@fontsource/space-mono` | 5.3.0 | 2026-11-08 | `e0cd78cb7aa93e772905297d8d5ad2a3d9eea7a6a12f281a3940a28ec01c19eb` | OFL 1.1 (The Space Mono Project Authors) | none |
+SKILL.reference.md: 6  SKILL.md under vendor: 0  'hyperframes events': 0
+OFL ok plugins/peak-media/brand-packs/default/fonts/jetbrains-mono
+OFL ok plugins/peak-media/brand-packs/default/fonts/inter
+OFL ok plugins/peak-media/evals/fixtures/brand-alt/fonts/space-mono
+OFL ok plugins/peak-media/evals/fixtures/brand-alt/fonts/playfair-display

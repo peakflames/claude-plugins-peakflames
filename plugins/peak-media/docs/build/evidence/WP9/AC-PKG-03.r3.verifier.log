@@ -1,0 +1,5 @@
+# AC-PKG-03 r3 verifier: grep -rIi peakflames over the runtime tree (plugins/peak-media/{skills,lib,schemas,brand-packs,vendor,scripts,evals})
+content hits (text): 0
+binary-file hits: 0
+file names: 0
+example asset types:    1 css    2 html    2 md    2 mjs 
