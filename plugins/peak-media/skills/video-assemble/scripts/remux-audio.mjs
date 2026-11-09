@@ -37,7 +37,7 @@ const isMixed = (file) => String(probe(file).format.tags?.comment ?? '').startsW
  * remuxAudio({video, out, music?, sfx?, narration?, narrationLufs, musicLufs, duckDb, sfxLufs, sfxDb, duck, fadeMs})
  * Returns the levels report.
  */
-export const DEFAULTS = { narrationLufs: -16, musicLufs: -22, duckDb: 8, sfxLufs: -20, sfxDb: 0, fadeMs: 1000 };
+export const DEFAULTS = { narrationLufs: -16, musicLufs: -28, duckDb: 6, sfxLufs: -20, sfxDb: 0, fadeMs: 1000 };
 export function remuxAudio({ video, out, music, sfx, narration, narrationLufs = DEFAULTS.narrationLufs, musicLufs = DEFAULTS.musicLufs, duckDb = DEFAULTS.duckDb,
   sfxLufs = DEFAULTS.sfxLufs, sfxDb = DEFAULTS.sfxDb, duck = true, fadeMs = DEFAULTS.fadeMs }) {
   if (!music && !sfx) throw new CliError('nothing to mix — pass --music and/or --sfx', EXIT.USAGE);

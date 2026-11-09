@@ -70,7 +70,7 @@ test('AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream 
   assert.equal(md5v(out), before, 'video stream md5 (-map 0:v -c copy -f md5) unchanged');
   const lv = JSON.parse(r.stdout);
   assert.ok(Math.abs(lv.narration.lufs - -16) <= 0.5, `narration ${lv.narration.lufs} LUFS`);
-  assert.ok(lv.music.belowVoiceDb >= 6 && lv.music.belowVoiceDb <= 12, `music ${lv.music.belowVoiceDb} dB under the voice`);
+  assert.ok(lv.music.belowVoiceDb >= 9 && lv.music.belowVoiceDb <= 15, `music ${lv.music.belowVoiceDb} dB under the voice`);
   assert.ok(lv.mix.truePeakDb <= -1, `mix true peak ${lv.mix.truePeakDb} dBFS`);
   // music pass, then SFX pass: each pass re-runs from the narration-only review; the picture never changes
   const pass1 = path.join(tmp, 'remux', 'pass1-music.mp4');
@@ -83,12 +83,12 @@ test('AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream 
   const out2 = path.join(tmp, 'with-music');
   const rep = assembleJson([proj, '--music', music, '--sfx', sfx, '--out', out2, '--outro', first.outro.mp4]);
   assert.equal(md5v(path.join(out2, 'review', 'review-mix.mp4')), md5v(path.join(out2, 'review', 'review.mp4')));
-  assert.ok(rep.mix.music.belowVoiceDb >= 6 && rep.mix.music.belowVoiceDb <= 12);
+  assert.ok(rep.mix.music.belowVoiceDb >= 9 && rep.mix.music.belowVoiceDb <= 15);
   assert.ok(rep.final.ok);
 });
 
 // Supports the AC-ASM-06 listening gate: with the default levels the music and SFX are audible.
-test('default levels: music sits 6–12 dB under the voice (not more), rises between lines, SFX hits are audible', () => {
+test('default levels: music sits 9–15 dB under the voice, rises between lines, SFX hits are audible', () => {
   const review = path.join(proj, 'review', 'review.mp4');
   const mixed = path.join(tmp, 'levels', 'music-only.mp4');
   assert.equal(run(REMUX, [review, '--music', music, '-o', mixed]).code, 0);
@@ -101,7 +101,7 @@ test('default levels: music sits 6–12 dB under the voice (not more), rises bet
   };
   for (const [a, b] of [[1, 5.5], [7.5, 13], [15, 19]]) { // inside the F1 clip windows
     const below = win(review, a, b) - win(est, a, b);
-    assert.ok(below >= 6 && below <= 12, `music ${below.toFixed(1)} dB under the voice at ${a}–${b} s`);
+    assert.ok(below >= 9 && below <= 15, `music ${below.toFixed(1)} dB under the voice at ${a}–${b} s`);
   }
   const gap = win(est, 6.0, 6.7); // the 700 ms pause between clips 1 and 2 (release, then attack)
   assert.ok(gap > win(est, 1, 5.5) + 2, `music rises between lines (${gap} LUFS)`);

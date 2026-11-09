@@ -92,3 +92,7 @@ Branch `feature/peak-media-wp6`, based on `feature/new-peak-media-plugin` @ c5eb
 - **`video-assemble` skill** — composites rendered plates onto the spine into a review MP4 with narration at −16 LUFS and fails with the timecode when a plate cut isn't in silence.
 - **`assemble` export** — appends the brand outro (staged like a plate, rendered at the export fps, cached) and writes `out/final.mp4` (source or `--export 1080p60`), checked against the delivery spec and spine + outro duration.
 - **`remux-audio`** — lays music and SFX stems under the narration (music −22 LUFS under the voice, 8 dB look-ahead duck, SFX hits −20 LUFS, true-peak limiter); the video stream is copied and its md5 is unchanged.
+
+## Lead change after round 1
+
+- Music defaults: `--music-lufs -28` (under the voice, about 12 dB below narration) and `--duck-db 6` (about −22 LUFS between lines). The round-1 reading made the bed swell to about −14 LUFS between lines, louder than the voice. Evals now expect 9–15 dB under the voice.

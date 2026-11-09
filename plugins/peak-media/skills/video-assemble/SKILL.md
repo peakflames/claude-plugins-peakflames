@@ -60,14 +60,14 @@ Run either with `--help` for every flag. Expected failures are one line naming t
    | Flag | Default | Meaning |
    |---|---|---|
    | `--narration-lufs` | −16 | narration loudness (always levelled; never time-stretched) |
-   | `--music-lufs` | −22 | music loudness **under the voice**, i.e. about 6 dB below the narration, so it is clearly audible |
-   | `--duck-db` | 8 | how much louder the music is between lines than under the voice (it ducks 150 ms before each line and recovers over 350 ms; pauses under 500 ms stay ducked). `--no-duck` = 0 |
+   | `--music-lufs` | −28 | music loudness **under the voice**, about 12 dB below the narration: audible without competing |
+   | `--duck-db` | 6 | how much louder the music is between lines than under the voice (it ducks 150 ms before each line and recovers over 350 ms; pauses under 500 ms stay ducked). `--no-duck` = 0 |
    | `--sfx-lufs` | −20 | loudness of each SFX hit (silence between hits does not count) |
    | `--sfx-db` | 0 | extra trim on the SFX stem after `--sfx-lufs` |
 
    A true-peak limiter at −1.5 dBFS guards the mix. The levels report gives each stem's
    LUFS, the mix LUFS and true peak, and the measured music level under the voice
-   (`belowVoiceDb`, expect about 6). If the music fights the voice, lower `--music-lufs`;
+   (`belowVoiceDb`, expect about 12). If the music fights the voice, lower `--music-lufs`;
    if it swells too much between lines, lower `--duck-db`. The user listens and approves the levels — that
    is the stage-8 gate; don't skip it.
    `remux-audio` refuses an already-mixed MP4 as the narration source (pass `--narration`
