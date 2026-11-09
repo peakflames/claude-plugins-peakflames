@@ -151,7 +151,7 @@ Exit 1 (files still written) when the runtime is outside the target ±10%: resiz
     'max-hold-ms': { type: 'number', arg: 'ms', desc: 'Most extra hold added per beat when the spine runs short of the target', default: 1000 },
     bpm: { type: 'number', arg: 'n', desc: 'Beat-grid tempo; beat lengths snap to whole beats', default: 120 },
     'audio-offset-ms': { type: 'number', arg: 'ms', desc: 'Recorded in the manifest for laying narration onto picture', default: 0 },
-    'cache-dir': { type: 'string', arg: 'dir', desc: 'TTS clip cache (default: ~/.cache/peak-media/tts)' },
+    'cache-dir': { type: 'string', arg: 'dir', desc: 'TTS clip cache (default: $PEAK_MEDIA_TTS_CACHE or ~/.cache/peak-media/tts)' },
     'export-clips': { type: 'string', arg: 'dir', desc: 'Copy every clip here (default: <out>/clips)' },
     'debug-requests': { type: 'boolean', desc: 'Log TTS requests (key redacted)' },
     budget: { type: 'boolean', desc: 'Print the word budget per beat and exit (no synthesis, no network)' },
@@ -228,7 +228,8 @@ async function main({ values: v }, argv) {
     silentWav(audioFile, totalMs);
   } else {
     requireFfmpeg();
-    const cacheDir = path.resolve(v['cache-dir'] ?? path.join(os.homedir(), '.cache', 'peak-media', 'tts'));
+    // only pass a cache dir when asked, so lib/tts applies its default (and PEAK_MEDIA_TTS_CACHE)
+    const cacheDir = v['cache-dir'] ? path.resolve(v['cache-dir']) : undefined;
     const exportDir = path.resolve(v['export-clips'] ?? path.join(outDir, 'clips'));
     const results = await synthesizeClips({
       clips: script.map((b, i) => ({ n: i + 1, text: b.text, ...(b.style !== undefined && { style: b.style }) })),

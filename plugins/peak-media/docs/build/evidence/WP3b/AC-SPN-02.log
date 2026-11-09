@@ -1,60 +1,34 @@
-## AC-SPN-02 — F1 with PEAK_MEDIA_OPENROUTER_API_KEY and TTS_OPENROUTER_API_KEY unset; network spy preloaded (any attempt prints NETWORK-ATTEMPT)
-$ spine --brief brief.md
+# AC-SPN-02 verifier run 2026-11-09T00:24:14Z HEAD 0dce4ae
+keys in env: PEAK_MEDIA_OPENROUTER_API_KEY=unset TTS_OPENROUTER_API_KEY=unset
+## default model (no --tts-model), no key, network spy
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/s2
 note  PEAK_MEDIA_OPENROUTER_API_KEY (or TTS_OPENROUTER_API_KEY) is not set: writing a beat grid (no voice). Set it, or pass --tts-model fake/tone, for narration
-beat  hook               0.00 s  +6.00 s
-beat  compare            6.00 s  +9.50 s
-beat  close             15.50 s  +4.50 s
-wrote grid/spine/beatgrid.json and grid/spine/narration.wav
+beat  hook               0.00 s  +5.50 s
+beat  compare            5.50 s  +9.50 s
+beat  close             15.00 s  +5.00 s
+wrote $T/s2/beatgrid.json and $T/s2/narration.wav
 PASS  runtime 20.00 s against a 20.0 s target (+0.0%)
 exit=0
-$ node scripts/validate.mjs spine/beatgrid.json
-ok    spine/beatgrid.json (spine v1)
+network attempts (NETWORK-ATTEMPT lines above): 0
+kind beatgrid narrate false bpm 120 targetMs 20000 totalMs 20000 dev% 0.00 within±10%: true clips 0
+[{"id":"hook","startMs":0,"durationMs":5500,"clipNs":[],"onScreenText":"OpenSpec vs. Peak Workflow: who checks the work?"},{"id":"compare","startMs":5500,"durationMs":9500,"clipNs":[],"onScreenText":"OpenSpec: same AI reviews. Peak Workflow: every requirement traced to its test + status; human checks recorded."},{"id":"close","startMs":15000,"durationMs":5000,"clipNs":[],"onScreenText":"OpenSpec: speed. Peak Workflow: an auditable record."}]
+$ node $P/scripts/validate.mjs $T/s2/beatgrid.json
+ok    $T/s2/beatgrid.json (spine v1)
 exit=0
-$ ls spine
+$ ls s2
 beatgrid.json
 narration.wav
+no manifest.json
+## spy sanity check: the spy does catch a fetch
+$ nokey node --import $P/evals/helpers/no-network.mjs -e fetch('https://openrouter.ai/api/v1/audio/speech').catch(e=>console.log('caught',e.message))
+NETWORK-ATTEMPT https://openrouter.ai/api/v1/audio/speech
+caught network blocked (https://openrouter.ai/api/v1/audio/speech)
 exit=0
-## spine/beatgrid.json
-{
-  "schemaVersion": 1,
-  "kind": "beatgrid",
-  "targetMs": 20000,
-  "totalMs": 20000,
-  "bpm": 120,
-  "command": [
-    "node",
-    "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs",
-    "--brief",
-    "brief.md"
-  ],
-  "narrate": false,
-  "audio": "narration.wav",
-  "beats": [
-    {
-      "id": "hook",
-      "startMs": 0,
-      "durationMs": 6000,
-      "clipNs": [],
-      "onScreenText": "OpenSpec vs. Peak Workflow: who checks the work?"
-    },
-    {
-      "id": "compare",
-      "startMs": 6000,
-      "durationMs": 9500,
-      "clipNs": [],
-      "onScreenText": "OpenSpec: one AI writes and reviews. Peak Workflow: a separate session passes or fails each requirement."
-    },
-    {
-      "id": "close",
-      "startMs": 15500,
-      "durationMs": 4500,
-      "clipNs": [],
-      "onScreenText": "OpenSpec: speed. Peak Workflow: proof."
-    }
-  ],
-  "clips": []
-}
-## --no-narrate with a (fake) key present
-$ PEAK_MEDIA_OPENROUTER_API_KEY=sk-or-test-not-a-key spine --brief brief.md --no-narrate | tail -1
+## --no-narrate with fake model also writes beatgrid, no network
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/s2c --no-narrate --tts-model fake/tone
+beat  hook               0.00 s  +5.50 s
+beat  compare            5.50 s  +9.50 s
+beat  close             15.00 s  +5.00 s
+wrote $T/s2c/beatgrid.json and $T/s2c/narration.wav
 PASS  runtime 20.00 s against a 20.0 s target (+0.0%)
 exit=0

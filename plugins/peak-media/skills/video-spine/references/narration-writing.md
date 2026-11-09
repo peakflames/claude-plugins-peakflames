@@ -39,6 +39,9 @@ them.
   performed, not read: `<Energetic and excited>`, `<Tone becomes informative>`,
   `<Confident>`, `<Thoughtful>`, `<Engaged>`, `<Animated>`, `<Warm>`, plus
   `<short pause>` and `<chuckle>`. Tags don't count toward the word budget.
+- **Keep tags understated.** Prefer `<Warm>`, `<Matter-of-fact>`, `<Calm and confident>`,
+  `<Thoughtful>` over hype (`<Energetic and excited>`, `<Animated>`); explainers land
+  better when the voice informs rather than sells.
 - **Accent lives in `--style`, not the voice.** Replacing the style drops the
   accent. To keep one, append it: `"...creators. Speak with a British accent."`
 - **Pick a voice by ear.** Run `scripts/sample-voice.mjs` on the opening

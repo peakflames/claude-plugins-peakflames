@@ -44,3 +44,9 @@ Marked `// STUB — replaced by WP3a`. It implements the agreed API, but only `f
 ## Suggested CHANGELOG bullet
 
 - **`video-spine` skill and `spine` script**: turn a brief and a beat-tagged `script.md` into `spine/manifest.json` + `narration.wav`, or into a no-network `beatgrid.json` when there's no key. Beats sit at least 400 ms apart, with a ±10% runtime gate, a wpm table and `--budget` sizing.
+
+## Round 1 fixes (Lead, after verify-1)
+
+- S1: `spine.mjs` passes `--cache-dir` only when given, so `PEAK_MEDIA_TTS_CACHE` and the lib default apply.
+- S2: superseded by DEC-31 (user): mood tags are performed, not read. The SKILL/narration guidance stands; narration-writing.md now says to keep tags understated.
+- S3: user kept the approved wording; understated tags added to the F1 script (evidence/WP3b/AC-SPN-04-user-approval.md).

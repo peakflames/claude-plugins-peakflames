@@ -1,5 +1,5 @@
-## AC-BASE-06 — spine entry point baseline
-$ spine --help
+# AC-BASE-06 verifier run 2026-11-09T00:24:44Z HEAD 0dce4ae; keys unset; every run under the network spy
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --help
 spine — turn brief.md + script.md into the timed spine every plate hangs on
 
 Usage: spine [options]
@@ -41,42 +41,103 @@ Examples:
   spine --brief brief.md --voice Achird --style "Clear, friendly explainer tone."
   spine --brief brief.md --no-narrate
 exit=0
-$ spine --version
+## flags in spec vs --help
+listed --brief
+listed --script
+listed --out
+listed --target-ms
+listed --narrate
+listed --no-narrate
+listed --tts-model
+listed --voice
+listed --style
+listed --lead-ms
+listed --tail-ms
+listed --max-hold-ms
+listed --bpm
+listed --audio-offset-ms
+listed --cache-dir
+listed --export-clips
+listed --debug-requests
+listed --budget
+listed --wpm
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --version
 0.1.0
 exit=0
-$ cat .claude-plugin/plugin.json | grep version
-  "version": "0.1.0"
-exit=0
+plugin.json version: 0.1.0
+## bad inputs
 $ spine --bogus
 spine: Unknown option '--bogus'
 Run 'spine --help' for usage.
-exit=2
-$ spine --brief nope.md
-spine: cannot read brief grid/nope.md: no such file
-exit=1
-$ spine --brief brief.md --narrate --no-narrate
+exit=2 lines=1 stack=0 net=0
+$ spine extra-positional
+spine: unexpected argument 'extra-positional'
+Run 'spine --help' for usage.
+exit=2 lines=1 stack=0 net=0
+$ spine --brief $T/nope.md
+spine: cannot read brief $T/nope.md: no such file
+exit=1 lines=1 stack=0 net=0
+$ spine --brief $T/bad/noruntime.md --no-narrate
+spine: $T/bad/noruntime.md gives no runtime — add a line like "Runtime: 20 s", or pass --target-ms
+exit=1 lines=1 stack=0 net=0
+$ spine --brief $T/bad/brief.md --no-narrate
+spine: script.md: beat 'hook' has 2 paragraphs — write one paragraph per beat (merge them, or split the beat)
+exit=1 lines=1 stack=0 net=0
+$ spine --brief $T/bad/m/brief.md --no-narrate
+spine: script.md beats (close, hook) must match the brief's beats in order (hook, close)
+exit=1 lines=1 stack=0 net=0
+$ spine --brief $T/bad/e/brief.md --no-narrate
+spine: script.md has no beats — add one "## <beat-id>" heading per beat, each followed by its paragraph
+exit=1 lines=1 stack=0 net=0
+$ spine --brief $T/bad/u/brief.md --no-narrate
+spine: script.md line 1: beat id 'Hook Beat' must be lowercase letters, digits and dashes
+exit=1 lines=1 stack=0 net=0
+$ spine --brief $P/docs/build/fixtures/F1/brief.md --out $T/b1 --narrate --no-narrate
 spine: --narrate and --no-narrate are mutually exclusive
 Run 'spine --help' for usage.
-exit=2
-$ spine --brief brief.md --lead-ms 50
-spine: --lead-ms must be ≥ 200 (DEC-13/29: beats need ≥ 400 ms of silence between them), got 50
+exit=2 lines=1 stack=0 net=0
+$ spine --brief $P/docs/build/fixtures/F1/brief.md --out $T/b1 --bpm 0
+spine: --bpm must be > 0, got 0
 Run 'spine --help' for usage.
-exit=2
-$ spine --brief brief.md --bpm x
-spine: --bpm expects a number, got 'x'
+exit=2 lines=1 stack=0 net=0
+$ spine --brief $P/docs/build/fixtures/F1/brief.md --out $T/b1 --target-ms 10
+spine: --target-ms must be ≥ 1000, got 10
 Run 'spine --help' for usage.
-exit=2
-$ spine --brief brief.md --tts-model nope/model
-spine: unknown --tts-model 'nope/model' (expected fake/tone, google/gemini-3.8-flash-lite-tts, google/gemini-3.8-flash-tts, microsoft/mai-voice-2.1-flash, microsoft/mai-voice-2.1)
+exit=2 lines=1 stack=0 net=0
+$ spine --brief $P/docs/build/fixtures/F1/brief.md --out $T/b1 --tail-ms abc
+spine: --tail-ms expects a number, got 'abc'
 Run 'spine --help' for usage.
-exit=2
-$ spine --brief brief.md --narrate
-spine: narration needs PEAK_MEDIA_OPENROUTER_API_KEY (or legacy TTS_OPENROUTER_API_KEY) — export it, or drop --narrate to write a beat grid
-exit=3
-$ spine --brief docs/build/fixtures/F1/run/ev/bad/brief.md
-spine: script.md: beat 'hook' has 2 paragraphs — write one paragraph per beat (merge them, or split the beat)
-exit=1
-$ spine stray
-spine: unexpected argument 'stray'
+exit=2 lines=1 stack=0 net=0
+$ spine --brief $P/docs/build/fixtures/F1/brief.md --out $T/b1 --audio-offset-ms 1.5
+spine: --audio-offset-ms must be a whole number of ms
 Run 'spine --help' for usage.
-exit=2
+exit=2 lines=1 stack=0 net=0
+$ spine --brief $P/docs/build/fixtures/F1/brief.md --script $T/missing.md --out $T/b1
+spine: cannot read script $T/missing.md: no such file
+exit=1 lines=1 stack=0 net=0
+$ spine --brief $T/bad/l/brief.md --out $T/b2 --tts-model fake/tone --cache-dir $T/cache
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165     yes
+2        28  10.18  165     yes
+3        11   4.00  165     yes
+median 165 wpm · 3/3 cached
+clips  3/3 cached · exported to $T/b2/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/b2/manifest.json and $T/b2/narration.wav
+spine: runtime 20.77 s against a 5.0 s target (+315.5%) is outside ±10% — resize script.md (words ≈ s × wpm ÷ 60; see --budget) and rerun
+exit=1 lines=12 stack=0 net=0
+$ spine --brief $P/docs/build/fixtures/F1/brief.md --out $T/b1 --tts-model nope/model
+spine: unknown --tts-model 'nope/model' — use one of google/gemini-3.8-flash-lite-tts, google/gemini-3.8-flash-tts, microsoft/mai-voice-2.1-flash, microsoft/mai-voice-2.1, fake/tone
+Run 'spine --help' for usage.
+exit=2 lines=1 stack=0 net=0
+## budget (no synthesis, no network)
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --budget
+budget  20.0 s at 165 wpm, 3 beat(s) × 500 ms padding → about 51 words
+  hook               14 words  ≈ 5.6 s
+  compare            28 words  ≈ 10.7 s
+  close              11 words  ≈ 4.5 s
+script  53 words (on budget)
+exit=0
