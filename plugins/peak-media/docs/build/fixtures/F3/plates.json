@@ -43,7 +43,7 @@
       "intent": "OpenSpec workflow page",
       "assets": [],
       "live": {
-        "url": "https://openspec.dev/docs/the-workflow",
+        "url": "https://openspec.dev/docs/quickstart",
         "storyboard": "storyboard-openspec.mjs",
         "viewport": "1280x720"
       }
