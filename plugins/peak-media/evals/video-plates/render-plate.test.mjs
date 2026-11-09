@@ -2,17 +2,16 @@
 // Renders use the default brand pack (brand-packs/default, WP5) via --brand.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, cpSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
-import os from 'node:os';
+import { writeFileSync, cpSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { run, baseline, ROOT, fx } from '../helpers/run.mjs';
+import { run, baseline, ROOT, fx, tmpDir } from '../helpers/run.mjs';
 
 const SCRIPT = 'skills/video-plates/scripts/render-plate.mjs';
 const F1 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F1');
 const F2 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F2');
 const BRAND = path.join(ROOT, 'brand-packs', 'default'); // WP5's pack (merged)
-const tmp = (p) => mkdtempSync(path.join(os.tmpdir(), `pm-plt-${p}-`));
+const tmp = (p) => tmpDir(`pm-plt-${p}-`);
 
 /** A plates.json with one live plate next to a copy of F1's spine. */
 function liveFixture() {

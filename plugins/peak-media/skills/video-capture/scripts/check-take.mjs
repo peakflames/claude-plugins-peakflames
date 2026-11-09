@@ -89,7 +89,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       process.stdout.write(`${c.ok ? 'ok  ' : 'FAIL'}  scene change at ${c.timecode} — ${c.gap ? `silence ${c.silenceMs} ms` : 'over sound'}${c.ok ? '' : c.edge ? ` (within ${r.edgeMs} ms of the silence edge)` : c.gap ? ` (need ≥ ${r.minSilenceMs} ms)` : ' (move it into a pause between clips)'}\n`);
     }
     const bad = r.cuts.filter((c) => !c.ok).length;
-    process.stdout.write(`${r.ok ? 'PASS' : 'FAIL'}  ${r.cuts.length} scene change(s) at threshold ${th}, ${bad} not in a ≥ ${r.minSilenceMs} ms silence — ${file}\n`);
+    const summary = `${r.cuts.length} scene change(s) at threshold ${th}, ${bad} not in a ≥ ${r.minSilenceMs} ms silence`;
+    // the last line carries the reason when the take fails on the count, not only on a cut
+    process.stdout.write(`${r.ok ? 'PASS' : 'FAIL'}  ${r.error ? `${r.error}; ` : ''}${summary} — ${file}\n`);
     return r.ok ? EXIT.OK : EXIT.FAIL;
   });
 }

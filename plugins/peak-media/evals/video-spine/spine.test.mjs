@@ -2,10 +2,9 @@
 // Only the documented lib/tts API is assumed (fake/tone provider), never the stub's internals.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, copyFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import os from 'node:os';
+import { copyFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { run, baseline, ROOT, fx } from '../helpers/run.mjs';
+import { run, baseline, ROOT, fx, tmpDir } from '../helpers/run.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
 import { durationMs } from '../../lib/ffmpeg.mjs';
 import { checkCuts } from '../../lib/verify/check-cuts.mjs';
@@ -18,7 +17,7 @@ const within = (ms, target, tol = 0.1) => Math.abs(ms - target) <= target * tol;
 
 /** A fresh project folder holding F1's brief.md and script.md (fixtures stay untouched). */
 function project(script) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'pm-spine-'));
+  const dir = tmpDir('pm-spine-');
   copyFileSync(path.join(F1, 'brief.md'), path.join(dir, 'brief.md'));
   if (script === undefined) copyFileSync(path.join(F1, 'script.md'), path.join(dir, 'script.md'));
   else if (script !== null) writeFileSync(path.join(dir, 'script.md'), script);
@@ -136,7 +135,7 @@ test('spine: script.md parsing, layout rules and a second (neutral) brief (not A
   assert.equal(grid.at(-1).startMs + grid.at(-1).durationMs, 9000);
   assert.ok(grid.every((g) => g.durationMs % 500 === 0 && g.durationMs >= 2000));
   // neutral fixture: same tool, different brief and beats
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'pm-spine-neutral-'));
+  const dir = tmpDir('pm-spine-neutral-');
   copyFileSync(fx('neutral-brief', 'brief.md'), path.join(dir, 'brief.md'));
   writeFileSync(path.join(dir, 'script.md'), '## intro\nMorning is the best time to water.\n\n## why\nLess water evaporates, and the leaves dry before night.\n\n## tip\nWater the roots, early.\n');
   const r = run(SPINE, ['--brief', path.join(dir, 'brief.md'), '--no-narrate'], { env: NO_KEY });

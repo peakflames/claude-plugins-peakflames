@@ -11,14 +11,14 @@
 // Set PEAK_MEDIA_EVIDENCE_DIR to keep the stills, measurements and manifests (JPEG/JSON only).
 import { test as nodeTest, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, statSync, mkdirSync, copyFileSync } from 'node:fs';
+import { rmSync, writeFileSync, readFileSync, existsSync, statSync, mkdirSync, copyFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { ROOT, run, baseline } from '../helpers/run.mjs';
+import { ROOT, run, baseline, tmpDir } from '../helpers/run.mjs';
 import { CAPTURE, SPINE, DECK, NO_KEY } from './helpers/projects.mjs';
 import { measureSync } from './helpers/sync.mjs';
-import { waitUntilAlone } from './helpers/alone.mjs';
+import { waitUntilAlone, siblings } from './helpers/alone.mjs';
 import { COLOURS } from './fixtures/sync/storyboard.mjs';
 import { CAPTIONS } from '../../skills/video-capture/examples/ui-demo/storyboard.mjs';
 import { spec as checkTakeSpec } from '../../skills/video-capture/scripts/check-take.mjs';
@@ -43,7 +43,7 @@ let tmp, cache, alone;
 before(async () => {
   alone = await waitUntilAlone();
   if (!alone.alone) process.stderr.write(`warning: other eval files still running after ${alone.waitedMs} ms; timing tests run anyway\n`);
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'pm-capture-wp7b-'));
+  tmp = tmpDir('pm-capture-wp7b-');
   cache = path.join(tmp, 'tts-cache');
   if (EVIDENCE) mkdirSync(EVIDENCE, { recursive: true });
 });
@@ -221,10 +221,13 @@ test('AC-REC-06: on a sync page that flips a full-frame colour on each say(), wi
   };
   const runs = [measure(false, 1), measure(true, 1), measure(false, 2), measure(true, 2)]; // interleaved
   const modes = { voiceOnly: stats(runs.filter((r) => !r.captions)), captioned: stats(runs.filter((r) => r.captions)) };
+  // re-check after the takes: a sibling that started during them would have shared the CPU
+  const siblingsAfterTakes = siblings().length;
   keep('AC-REC-06-sync.json', {
     note: 'offsetMs = first frame of the colour - tone onset (picture lags sound when > 0); each frame time carries up to ±16.7 ms (½ frame) of grid rounding. Both modes asserted; no retry.',
-    ranAlone: alone, ...modes, runs,
+    ranAlone: { ...alone, siblingsAfterTakes, aloneThroughout: alone.alone && siblingsAfterTakes === 0 }, ...modes, runs,
   });
+  if (siblingsAfterTakes) process.stderr.write(`warning: ${siblingsAfterTakes} other eval file(s) were running when the sync takes ended\n`);
   for (const [mode, s] of Object.entries(modes)) {
     assert.ok(Math.abs(s.median) <= 120, `${mode}: median offset ${s.median} ms <= 120 ms (${s.offsets.join(', ')})`);
     assert.ok(Math.abs(s.worst) <= 200, `${mode}: worst offset ${s.worst} ms <= 200 ms (${s.offsets.join(', ')})`);

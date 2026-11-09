@@ -70,7 +70,9 @@
     const title = document.getElementById("title");
     const table = document.querySelector(".table");
     // Fit once, deterministically. The title first: shrink until it sits on at most two rows.
-    const over = () => content.scrollHeight > content.clientHeight + 1 || content.scrollWidth > content.clientWidth + 1;
+    // scroll sizes are whole pixels, so the body's own bottom edge is checked too (no sub-pixel overrun)
+    const over = () => content.scrollHeight > content.clientHeight + 1 || content.scrollWidth > content.clientWidth + 1
+      || (body && body.getBoundingClientRect().bottom > content.getBoundingClientRect().bottom + 0.5);
     let ts = H * 0.085;
     while ((title.scrollWidth > title.clientWidth + 1 || title.offsetHeight > ts * 1.08 * 2 + 1) && ts > H * 0.05) { ts -= 1; title.style.fontSize = ts + "px"; }
     // Then the body: the largest size (table cells from 7.5%, bullets from 6.5% of the height) at which
@@ -79,6 +81,9 @@
       const floor = Math.ceil(H * 0.0375);
       // Table columns: the first sized to its longest head, the others share the rest in proportion
       // to (their longest one-row width)^k. At each size, k = 1, 0.5, 0 (equal) are tried in turn.
+      // First pass: only layouts where no ordinary word (up to 20 characters) is split across rows,
+      // so a long token such as a URL can't squeeze a neighbour's word apart; if no size down to the
+      // floor manages that, the second pass accepts any layout that fits.
       let tries = [null];
       if (table) {
         const cells = [...table.querySelectorAll(".cell")];
@@ -88,13 +93,25 @@
         cells.forEach((c) => { c.style.whiteSpace = ""; });
         tries = [1, 0.5, 0].map((k) => "max-content " + natural.slice(1).map((w) => `minmax(0, ${Math.pow(w, k).toFixed(3)}fr)`).join(" "));
       }
-      const attempt = (s) => {
+      const ctx = document.createElement("canvas").getContext("2d");
+      const splitsWord = () => [...table.querySelectorAll(".cell")].some((c) => {
+        const cs = getComputedStyle(c);
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const room = c.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + 0.5;
+        return c.textContent.split(/\s+/).some((w) => w && w.length <= 20 && ctx.measureText(w).width > room);
+      });
+      const attempt = (s, whole) => {
         body.style.fontSize = s + "px";
-        for (const cols of tries) { if (cols) table.style.gridTemplateColumns = cols; if (!over()) return true; }
+        for (const cols of tries) {
+          if (cols) table.style.gridTemplateColumns = cols;
+          if (!over() && !(whole && table && splitsWord())) return true;
+        }
         return false;
       };
-      let size = Math.round(H * (table ? 0.075 : 0.065));
-      while (!attempt(size) && size > floor) size -= 1;
+      const start = Math.round(H * (table ? 0.075 : 0.065));
+      let size = start;
+      while (!attempt(size, true) && size > floor) size -= 1;
+      if (size <= floor && !attempt(size, true)) { size = start; while (!attempt(size, false) && size > floor) size -= 1; }
       // still too tall at the floor: give the room back from the title
       while (over() && ts > H * 0.05) { ts -= 1; title.style.fontSize = ts + "px"; }
       // Rows share the height left under the title: spread it as padding, so the rule lines sit evenly.

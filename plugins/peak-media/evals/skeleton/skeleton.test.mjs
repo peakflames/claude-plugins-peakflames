@@ -2,10 +2,9 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import os from 'node:os';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { run, ROOT, fx } from '../helpers/run.mjs';
+import { run, ROOT, fx, tmpDir } from '../helpers/run.mjs';
 
 const SKEL = 'docs/build/tools/skeleton.mjs';
 const F0 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F0');
@@ -14,7 +13,7 @@ const NO_KEY = { TTS_OPENROUTER_API_KEY: '' };
 let out;
 
 before(() => {
-  out = mkdtempSync(path.join(os.tmpdir(), 'pm-skl-'));
+  out = tmpDir('pm-skl-');
   const r = run(SKEL, ['--fixture', F0, '--brand', BRAND, '--out', out], { env: NO_KEY });
   assert.equal(r.code, 0, r.stderr);
 });
@@ -35,7 +34,7 @@ test('AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 
 });
 
 test('AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5', () => {
-  const out2 = mkdtempSync(path.join(os.tmpdir(), 'pm-skl2-'));
+  const out2 = tmpDir('pm-skl2-');
   const r = run(SKEL, ['--fixture', F0, '--brand', BRAND, '--out', out2], { env: NO_KEY });
   assert.equal(r.code, 0, r.stderr);
   const a = framemd5(path.join(out, 'renders', 'plates', 'p1.mp4'));
@@ -62,7 +61,7 @@ test('AC-SKL-06: with outbound network blocked, the F0 plate still renders (font
   if (!wrap) { t.skip('no network isolation available on this host'); return; }
   const probe = spawnSync(wrap[0], [...wrap.slice(1), process.execPath, '-e', 'fetch("https://example.com").then(()=>process.exit(0),()=>process.exit(7))']);
   assert.equal(probe.status, 7, 'isolation really blocks outbound network');
-  const out3 = mkdtempSync(path.join(os.tmpdir(), 'pm-skl3-'));
+  const out3 = tmpDir('pm-skl3-');
   const r = spawnSync(wrap[0], [...wrap.slice(1), process.execPath, path.join(ROOT, SKEL), '--fixture', F0, '--brand', BRAND, '--out', out3], { encoding: 'utf8', env: { ...process.env, ...NO_KEY } });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(framemd5(path.join(out3, 'renders', 'plates', 'p1.mp4')), framemd5(path.join(out, 'renders', 'plates', 'p1.mp4')), 'offline render matches online render');

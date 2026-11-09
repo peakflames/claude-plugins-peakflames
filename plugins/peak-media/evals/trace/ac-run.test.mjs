@@ -1,16 +1,15 @@
 // WP2 traceability tool (AC-TRC-01/02).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { run } from '../helpers/run.mjs';
+import { run, tmpDir } from '../helpers/run.mjs';
 
 const AC = 'docs/build/tools/ac-run.mjs';
 const row = (id, wp, status = 'not-started', ev = '—') => `| ${id} | src | ${wp} | G x · W y · T z | script | ${status} | ${ev} |`;
 
 function fixture({ rows, briefs, files = {} }) {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'pm-trace-'));
+  const root = tmpDir('pm-trace-');
   writeFileSync(path.join(root, 'acceptance.md'), `# r\n\n| WP | Status | Verify report |\n|---|---|---|\n${Object.keys(briefs).map((w) => `| ${w} | not-started | — |`).join('\n')}\n\n| ID | source | WP | gwt | method | status | evidence |\n|---|---|---|---|---|---|---|\n${rows.join('\n')}\n`);
   for (const [wp, ids] of Object.entries(briefs)) { mkdirSync(path.join(root, 'wp', wp), { recursive: true }); writeFileSync(path.join(root, 'wp', wp, 'brief.md'), `# ${wp}\n\n${ids.map((i) => `- **${i}**`).join('\n')}\n`); }
   for (const [f, s] of Object.entries(files)) { mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); writeFileSync(path.join(root, f), s); }

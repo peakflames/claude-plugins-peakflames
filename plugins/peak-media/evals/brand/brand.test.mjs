@@ -4,10 +4,10 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, existsSync, cpSync, rmSync, openSync, readSync, closeSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, existsSync, cpSync, rmSync, openSync, readSync, closeSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { run, ROOT, fx } from '../helpers/run.mjs';
+import { run, ROOT, fx, tmpDir } from '../helpers/run.mjs';
 
 const SKEL = 'docs/build/tools/skeleton.mjs';
 const DEFAULT = path.join(ROOT, 'brand-packs', 'default');
@@ -75,7 +75,7 @@ test('AC-BRD-01: brand-packs/default validates and every font has a licence file
 
 test('default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout', () => {
   const brand = JSON.parse(readFileSync(path.join(DEFAULT, 'brand.json'), 'utf8'));
-  const out = mkdtempSync(path.join(os.tmpdir(), 'pm-outro-'));
+  const out = tmpDir('pm-outro-');
   const dir = path.join(out, 'outro');
   mkdirSync(path.join(dir, 'vendor'), { recursive: true });
   cpSync(path.join(DEFAULT, brand.outro.composition), path.join(dir, 'index.html'));
@@ -102,7 +102,7 @@ function plateOneFixture() {
   const f1 = JSON.parse(readFileSync(path.join(F1, 'plates.json'), 'utf8'));
   const plate = f1.plates.find((p) => p.id === 'p1-hook');
   assert.equal(plate.kind, 'motion');
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'pm-brd02-fx-'));
+  const dir = tmpDir('pm-brd02-fx-');
   mkdirSync(path.join(dir, 'spine'));
   writeFileSync(path.join(dir, 'spine', 'beatgrid.json'), JSON.stringify({
     schemaVersion: 1, kind: 'beatgrid', targetMs: plate.durationMs, totalMs: plate.durationMs, bpm: 120, command: [], narrate: false,
@@ -117,9 +117,9 @@ test('AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack diffe
   const { dir, plate } = plateOneFixture();
   const outs = {};
   // evidence files are written only when asked (PEAK_MEDIA_EVIDENCE=1), so a normal test run leaves the tree clean
-  const sheetDir = process.env.PEAK_MEDIA_EVIDENCE ? EVIDENCE : mkdtempSync(path.join(os.tmpdir(), 'pm-brd02-sheets-'));
+  const sheetDir = process.env.PEAK_MEDIA_EVIDENCE ? EVIDENCE : tmpDir('pm-brd02-sheets-');
   for (const [name, pack] of [['default', DEFAULT], ['alt', ALT]]) {
-    const out = mkdtempSync(path.join(os.tmpdir(), `pm-brd02-${name}-`));
+    const out = tmpDir(`pm-brd02-${name}-`);
     const r = run(SKEL, ['--fixture', dir, '--brand', pack, '--out', out], { env: NO_KEY });
     assert.equal(r.code, 0, r.stderr);
     outs[name] = { out, pack, mp4: path.join(out, 'renders', 'plates', `${plate.id}.mp4`) };
@@ -204,21 +204,21 @@ test('re-check WP2 F-9: F0 renders offline with brand-packs/default, identical t
   if (!wrap) { t.skip('no network isolation available on this host'); return; }
   const probe = spawnSync(wrap[0], [...wrap.slice(1), process.execPath, '-e', 'fetch("https://example.com").then(()=>process.exit(0),()=>process.exit(7))']);
   assert.equal(probe.status, 7, 'isolation really blocks outbound network');
-  const online = mkdtempSync(path.join(os.tmpdir(), 'pm-brd-on-'));
+  const online = tmpDir('pm-brd-on-');
   const r1 = run(SKEL, ['--fixture', F0, '--brand', DEFAULT, '--out', online], { env: NO_KEY });
   assert.equal(r1.code, 0, r1.stderr);
-  const offline = mkdtempSync(path.join(os.tmpdir(), 'pm-brd-off-'));
+  const offline = tmpDir('pm-brd-off-');
   const r2 = spawnSync(wrap[0], [...wrap.slice(1), process.execPath, path.join(ROOT, SKEL), '--fixture', F0, '--brand', DEFAULT, '--out', offline], { encoding: 'utf8', env: { ...process.env, ...NO_KEY } });
   assert.equal(r2.status, 0, r2.stderr);
   const md5On = framemd5(path.join(online, 'renders', 'plates', 'p1.mp4'));
   assert.equal(framemd5(path.join(offline, 'renders', 'plates', 'p1.mp4')), md5On, 'offline render matches online render');
   // control: the same pack with its font files removed renders differently, so the woff2 files were used
-  const nofonts = mkdtempSync(path.join(os.tmpdir(), 'pm-brd-nofont-'));
+  const nofonts = tmpDir('pm-brd-nofont-');
   cpSync(DEFAULT, nofonts, { recursive: true });
   const brand = JSON.parse(readFileSync(path.join(nofonts, 'brand.json'), 'utf8'));
   rmSync(path.join(nofonts, 'fonts'), { recursive: true, force: true });
   writeFileSync(path.join(nofonts, 'brand.json'), JSON.stringify({ ...brand, fonts: [] }, null, 2));
-  const out3 = mkdtempSync(path.join(os.tmpdir(), 'pm-brd-nofont-out-'));
+  const out3 = tmpDir('pm-brd-nofont-out-');
   const r3 = spawnSync(wrap[0], [...wrap.slice(1), process.execPath, path.join(ROOT, SKEL), '--fixture', F0, '--brand', nofonts, '--out', out3], { encoding: 'utf8', env: { ...process.env, ...NO_KEY } });
   assert.equal(r3.status, 0, r3.stderr);
   assert.notEqual(framemd5(path.join(out3, 'renders', 'plates', 'p1.mp4')), md5On, 'removing the woff2 files changes the render');

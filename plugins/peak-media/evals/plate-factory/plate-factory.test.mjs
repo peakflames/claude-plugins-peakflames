@@ -2,10 +2,9 @@
 // AC-ORC-01, which itself is the user's manual run), and retime-plates (AC-ORC-05, AC-BASE-13).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, copyFileSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
-import os from 'node:os';
+import { copyFileSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
-import { run, baseline, ROOT } from '../helpers/run.mjs';
+import { run, baseline, ROOT, tmpDir } from '../helpers/run.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
 import { loadTranscript, checkAll, checkGates, checkStoryboardFirst, checkSelfReview, checkRuntimesFirst, plateWrites, expandLoops, gateLines, GATES } from './transcript.mjs';
 import { fixtureFiles } from './fixtures/generate.mjs';
@@ -191,7 +190,7 @@ test('AC-ORC-04: runtimes.md is Read before the first plate is written (transcri
 // ---- retime-plates ---------------------------------------------------------------------------
 
 const scratchDirs = [];
-const scratch = (prefix) => { const d = mkdtempSync(path.join(os.tmpdir(), prefix)); scratchDirs.push(d); return d; };
+const scratch = (prefix) => { const d = tmpDir(prefix); scratchDirs.push(d); return d; };
 after(() => { for (const d of scratchDirs) rmSync(d, { recursive: true, force: true }); });
 
 let spineDir; // an F1 spine from fake/tone (beats differ from the fixture plates.json's 20 s-era times)
