@@ -1,6 +1,8 @@
 <!doctype html>
-<!-- peak-media motion plate template: kinetic type. An accent bar grows, then each line rises in,
-     staggered; the last line carries the accent colour; the block drifts slowly so no stretch is static.
+<!-- peak-media motion plate template: kinetic type. One large text block, centred in the safe area;
+     an accent bar grows, then each line rises in, staggered. The last line is the emphasis (accent
+     colour, full size); lines before it are set smaller. A long line wraps onto two balanced rows
+     before the type shrinks. The block drifts slowly so no stretch is static.
      render-plate (and the WP2 skeleton) fill the double-braced placeholders: size, fps, duration, lines. Brand comes only from brand/tokens.css
      (colours, fonts, easing); GSAP is the local copy in vendor/ (never a CDN). -->
 <html lang="en">
@@ -14,12 +16,12 @@
   html, body { width: {{WIDTH}}px; height: {{HEIGHT}}px; overflow: hidden; background: var(--color-bg); }
   #root { width: 100%; height: 100%; background: var(--color-bg); font-family: var(--font-display); color: var(--color-fg); }
   #stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-  #block { position: relative; display: flex; flex-direction: column; gap: 0.12em; padding-left: 0.55em; max-width: 84%; }
-  #bar { position: absolute; left: 0; top: 0.08em; bottom: 0.08em; width: 0.14em; background: var(--color-accent); border-radius: 0.07em; transform-origin: 50% 0%; }
-  .line { font-size: 1em; font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; white-space: nowrap; }
+  #block { position: relative; display: flex; flex-direction: column; gap: 0.18em; padding-left: 0.6em; width: 80%; }
+  #bar { position: absolute; left: 0; top: 0.08em; bottom: 0.08em; width: 0.12em; background: var(--color-accent); border-radius: 0.06em; transform-origin: 50% 0%; }
+  .line { font-size: 1em; font-weight: 700; letter-spacing: -0.025em; line-height: 1.06; text-wrap: balance; }
+  .line.lead { font-size: var(--lead, 0.72em); letter-spacing: -0.015em; line-height: 1.12; }
   .line:last-child { color: var(--color-accent); }
-  #block.wrap { width: 84%; }
-  #block.wrap .line { white-space: normal; overflow-wrap: anywhere; }
+  #block.tight .line { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -45,32 +47,59 @@
       return bz(y1, y2, t);
     };
   }
-  // Largest font size (deterministic, measured once) at which every line fits the frame.
-  // Pass 1 keeps one row per line down to 7% of the height; pass 2 lets lines wrap and shrinks
-  // to the reading floor (3.75% = 27 px at 720p). render-plate rejects text that can't fit there.
+  // Rows a line wraps onto, and the width of its widest row (text is left-aligned).
+  function rowsOf(el) {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const tops = new Set([...r.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top)));
+    return { rows: tops.size, width: r.getBoundingClientRect().width };
+  }
+  // Largest type (deterministic, measured once) that fills the safe area. Lines before the last are
+  // set at LEAD x the size, so the last line stays the emphasis.
+  //   Pass 1: whole words, each line on at most two balanced rows, block within 80% x 66% of the
+  //           frame, smallest line no less than 7.8% of the height (56 px at 720p).
+  //   Pass 2: words may break, any rows, block within 84% x 72%, smallest line down to the floor.
+  //   Pass 3: every line the same size, down to the reading floor (3.75% = 27 px at 720p).
+  // render-plate rejects text that can't fit at the floor before anything is rendered.
   function fit(block, lines, W, H) {
-    const fits = () => lines.every((l) => l.scrollWidth <= l.clientWidth + 1) && block.offsetWidth <= W * 0.84 + 1 && block.offsetHeight <= H * 0.72;
+    const LEAD = lines.length > 1 ? 0.72 : 1, floor = Math.ceil(H * 0.0375);
+    const ok = (maxRows, wMax, hMax) => lines.every((l) => l.scrollWidth <= l.clientWidth + 1 && rowsOf(l).rows <= maxRows)
+      && block.offsetWidth <= W * wMax + 1 && block.offsetHeight <= H * hMax;
     const set = (s) => { block.style.fontSize = s + "px"; };
-    for (let s = Math.round(H * 0.12); s >= Math.round(H * 0.07); s--) { set(s); if (fits()) return s; }
-    block.classList.add("wrap");
-    for (let s = Math.round(H * 0.09); s >= Math.ceil(H * 0.0375); s--) { set(s); if (fits()) return s; }
-    return Math.ceil(H * 0.0375);
+    lines.slice(0, -1).forEach((l) => l.classList.add("lead"));
+    for (let s = Math.round(H * 0.15); s * LEAD >= H * 0.078; s--) { set(s); if (ok(2, 0.8, 0.66)) return s; }
+    block.classList.add("tight");
+    block.style.width = "84%";
+    for (let s = Math.round(H * 0.11); s * LEAD >= floor; s--) { set(s); if (ok(Infinity, 0.84, 0.72)) return s; }
+    block.style.setProperty("--lead", "1em");
+    for (let s = Math.round(H * 0.09); s >= floor; s--) { set(s); if (ok(Infinity, 0.84, 0.72)) return s; }
+    return floor;
+  }
+  // Shrink the block to its widest row so the composition centres on the text, not on an empty box.
+  // Kept only if no line re-wraps.
+  function hug(block, lines) {
+    const before = lines.map((l) => rowsOf(l).rows).join();
+    const pad = parseFloat(getComputedStyle(block).paddingLeft);
+    const prev = block.style.width;
+    block.style.width = Math.ceil(Math.max(...lines.map((l) => rowsOf(l).width)) + pad + 2) + "px";
+    if (lines.map((l) => rowsOf(l).rows).join() !== before) block.style.width = prev;
   }
   document.fonts.ready.then(() => {
     const D = {{DURATION_S}}, W = {{WIDTH}}, H = {{HEIGHT}};
     const block = document.getElementById("block");
     const lines = gsap.utils.toArray(".line");
     fit(block, lines, W, H);
+    hug(block, lines);
     const ease = tokenEase("--ease-out", "power3.out");
     const tl = gsap.timeline({ paused: true });
-    const step = Math.min(0.45, (D * 0.4) / Math.max(1, lines.length));
+    const step = Math.min(0.6, (D * 0.4) / Math.max(1, lines.length));
     tl.fromTo("#bar", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease }, 0);
     // The first line is on screen at frame 0 (no blank frame after a cut) and settles; the rest rise in.
     lines.forEach((el, i) => {
       if (i === 0) tl.fromTo(el, { opacity: 1, y: H * 0.02 }, { opacity: 1, y: 0, duration: 0.6, ease }, 0);
       else tl.fromTo(el, { opacity: 0, y: H * 0.05 }, { opacity: 1, y: 0, duration: 0.6, ease }, 0.15 + i * step);
     });
-    tl.fromTo(block, { scale: 1 }, { scale: 1.035, duration: D - 0.05, ease: "none" }, 0);
+    tl.fromTo(block, { scale: 1 }, { scale: 1.03, duration: D - 0.05, ease: "none" }, 0);
     window.__timelines["main"] = tl;
   });
 </script>
