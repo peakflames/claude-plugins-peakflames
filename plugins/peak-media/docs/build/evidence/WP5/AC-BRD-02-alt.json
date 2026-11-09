@@ -1,0 +1,64 @@
+{
+  "out": "docs/build/evidence/WP5/AC-BRD-02-alt.jpg",
+  "video": "$TMPDIR/pm-brd02-alt-ZkQLNf/renders/plates/p1-hook.mp4",
+  "frames": [
+    {
+      "ms": 0,
+      "label": "00.00"
+    },
+    {
+      "ms": 500,
+      "label": "00.50"
+    },
+    {
+      "ms": 1000,
+      "label": "01.00"
+    },
+    {
+      "ms": 1500,
+      "label": "01.50"
+    },
+    {
+      "ms": 2000,
+      "label": "02.00"
+    },
+    {
+      "ms": 2500,
+      "label": "02.50"
+    },
+    {
+      "ms": 3000,
+      "label": "03.00"
+    },
+    {
+      "ms": 3500,
+      "label": "03.50"
+    },
+    {
+      "ms": 4000,
+      "label": "04.00"
+    },
+    {
+      "ms": 4500,
+      "label": "04.50"
+    },
+    {
+      "ms": 5000,
+      "label": "05.00"
+    },
+    {
+      "ms": 5500,
+      "label": "05.50"
+    },
+    {
+      "ms": 6000,
+      "label": "06.00"
+    },
+    {
+      "ms": 6467,
+      "label": "06.47"
+    }
+  ],
+  "cols": 4,
+  "rows": 4
+}

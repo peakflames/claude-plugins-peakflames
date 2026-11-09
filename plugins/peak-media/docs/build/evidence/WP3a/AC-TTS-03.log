@@ -1,0 +1,18 @@
+verifier reproduction of AC-TTS-03 — legacy-only WAV, fake/tone, keys unset
+seeded (python wave module, 22050 Hz, 777 ms silence — fake/tone would make 48 kHz tone): legacy/rwi/tts/3aef57a71dc5fbd1a4185c744e34c8bf206dd70a278df92e11e9ada8bd65cbf4.wav
+== sample-voice CLI (no-network preload)
+Achird   11 words    0.78 s  849 wpm  22050 Hz mono  cached  /tmp/vt3.YEi9/out/Achird.wav
+fake/tone · median 849 wpm · 1/1 cached
+exit=0
+out WAV: stream|sample_rate=22050|channels=1 format|duration=0.776961 
+legacy unchanged: yes
+adopted into own cache: 3aef57a71dc5fbd1a4185c744e34c8bf206dd70a278df92e11e9ada8bd65cbf4.wav
+== library with onCall counter (fresh own cache)
+calls=0 source=legacy cached=true durationMs=777 sampleRate=22050
+== control: same text, no legacy dir
+calls=1 source=synth durationMs=4000 sampleRate=48000
+
+== node --test
+✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (198.934334ms)
+ℹ lib: clip reused from pm-tts-legacy-ZG2ktf/…/tts, calls=0, 1234 ms
+ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/pm-tts-legacy-out-tDbfB9/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached

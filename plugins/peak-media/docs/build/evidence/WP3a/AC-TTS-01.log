@@ -1,0 +1,48 @@
+verifier reproduction of AC-TTS-01 — both PEAK_MEDIA_OPENROUTER_API_KEY and TTS_OPENROUTER_API_KEY unset (env -u), no-network preload, isolated cache
+env check: PEAK_MEDIA_OPENROUTER_API_KEY set? no
+== (a) --voices Nope
+exit=2 elapsed_ms=62
+stderr (2 lines):
+sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+Run 'sample-voice --help' for usage.
+stdout: 
+network attempts: 0
+== (a') --voices Nope via MAI model
+exit=2 elapsed_ms=53
+stderr (2 lines):
+sample-voice: unknown --voice 'Nope' for microsoft/mai-voice-2.1-flash — use an MAI short id such as en-GB-Emily or en-US-Harper (see skills/video-spine/references/voices.md)
+Run 'sample-voice --help' for usage.
+stdout: 
+network attempts: 0
+== (b) key unset, real Gemini model
+exit=3 elapsed_ms=54
+stderr (1 lines):
+sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)
+stdout: 
+network attempts: 0
+== (b') key unset, MAI model
+exit=3 elapsed_ms=51
+stderr (1 lines):
+sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)
+stdout: 
+network attempts: 0
+== (c) ffmpeg missing (simulated, PEAK_MEDIA_FFMPEG=/nonexistent)
+exit=3 elapsed_ms=53
+stderr (1 lines):
+sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+stdout: 
+network attempts: 0
+== (c') ffprobe missing (simulated)
+exit=3 elapsed_ms=74
+stderr (1 lines):
+sample-voice: ffprobe not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+stdout: 
+network attempts: 0
+cache dir after runs: 0 entries
+
+== node --test (AC-TTS-01 subtest)
+✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (211.287833ms)
+ℹ --voice Nope: exit 2 in 76 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+ℹ key unset: exit 3 in 70 ms — sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)
+ℹ ffmpeg missing: exit 3 in 62 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (1.069834ms)
