@@ -95,7 +95,9 @@ above, and follow these rules:
 
 Each stage below ends with **"End the stage with:"** and the literal gate line to emit. Fill in the
 `<…>` parts and write it on its own line in your reply before starting the next stage, every
-time, whatever output style or brevity setting is active. "Show" means put it in the chat, as
+time, whatever output style or brevity setting is active. **A stage may not begin until the
+previous stage's gate line has been written**: before a stage's first command, confirm the
+previous gate line is in your replies, and if it isn't, write it now (or finish that stage first). "Show" means put it in the chat, as
 text, before the `AskUserQuestion`; give every file as an absolute path (`<abs>/…` below is the
 video project's absolute path) so the user can open it.
 
@@ -123,14 +125,27 @@ End the stage with: `GATE 0 brief: APPROVED — brief.md`
 2. Size first: `node "PM/skills/video-spine/scripts/spine.mjs" --brief brief.md --budget --wpm <rate>`.
    The house voice reads at about **127 wpm**; for another voice measure it with `sample-voice.mjs`.
    Beat grid: 165.
-3. Write `script.md` (format in video-spine § Stage 1), to the budget. If `script.md` already
-   exists, check it against the budget and the brief's beats instead of rewriting it.
-4. **Cold read:** one `Agent` call whose prompt holds only the script text and the audience from
+3. Write `script.md` (format in video-spine § Stage 1), to the budget. **Keep the brief's
+   wording**: where a beat in the brief gives the words (a quoted line), use them as written. If
+   `script.md` already exists, check it against the budget and the brief's beats instead of
+   rewriting it.
+4. **Runtime check, before any TTS.** Count the spoken words (mood tags like `<Warm>` and
+   `On screen:` lines don't count) and estimate the runtime at the house rate:
+   `estimate s = words × 60 ÷ 127 + 0.5 s per beat` (the spine's lead/tail padding; DEC-33/34).
+   It must be within ±10% of the brief's target. Otherwise say so at this gate, with the numbers,
+   so the user can trim words or move the target now, not after synthesis at stage 2.
+5. **Cold read:** one `Agent` call whose prompt holds only the script text and the audience from
    the brief: no file paths, no repo, no tools. Ask it to mark each beat CLEAR or UNCLEAR, say
-   what confused it and which lines sound like hype. Fix UNCLEAR beats and read again.
-5. **Show:** `<abs>/script.md` in full, its word count against the budget, and the cold-read
-   verdict per beat (`hook: CLEAR — …`).
-6. `AskUserQuestion`: approve the script?
+   what confused it and which lines sound like hype. **Don't apply its findings yourself.** Turn
+   them into a batch of proposed changes, each with the beat, the original line and the proposed
+   line.
+6. **Show:** `<abs>/script.md` in full (as written, findings not applied), its word count and
+   runtime estimate against the target (flag it if outside ±10%), the cold-read verdict per beat
+   (`hook: CLEAR — …`), and the numbered proposed changes (`1. compare — original: "…" →
+   proposed: "…"`), or "no changes proposed".
+7. `AskUserQuestion`: which proposed changes to apply (each, all, none) and whether to approve the
+   script. Apply only what the user picks; the user's wording wins. If words or the target
+   changed, redo step 4, show the result and ask again.
 
 End the stage with: `GATE 1 script: APPROVED — script.md (<words> words, cold read <k>/<n> CLEAR)`
 
@@ -227,10 +242,16 @@ and Read `review/<id>-fix<N>.jpg` (made the same way; it is not a self-review ro
 holds when every plate has rendered at its `durationMs` with lint clean and no blocker or major
 defect is open.
 
+**Stage 6 ends here, not at the reviewer.** It ends once the reviewer's fixes are re-rendered,
+re-sheeted (`-fix<N>.jpg`) and Read. Write the GATE 6 line at that point, before any assemble
+command.
+
 End the stage with: `GATE 6 build: PASS — <n> plates; reviewer: <k> defects, <k> fixed`
 
 ## Stage 7 — Composite (check gate: every cut in a silent gap)
 
+0. **First confirm `GATE 6 build: PASS — …` was written.** If it wasn't, write it now (the
+   reviewer's fixes must already be re-rendered and Read), then continue.
 1. `node "PM/skills/video-assemble/scripts/assemble.mjs" .` (no stems) — writes
    `review/review.mp4` and checks every plate cut with `check-cuts --min-silence-ms 300`.
 2. `node "PM/lib/verify/contact-sheet.mjs" review/review.mp4 --every 1s -o review/contact-review.jpg`; Read it.

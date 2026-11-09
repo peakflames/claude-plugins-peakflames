@@ -190,3 +190,34 @@ The run was session `26fa3b2e-…`, project `~/tmp/peak-media-orc-01`. I read it
 - Logs: `evidence/WP8/*.r3.log`.
 
 **Open:** AC-ORC-01 needs a second live run with the round-3 skill, so that the gate 5, 6 and 7 lines appear. The runbook is unchanged and still valid. Before that run, the user should empty `RUN` or point it at a fresh folder.
+
+## Round 4 fixes (the user's run 2)
+
+Run 2 was session `d5e1f46c-…`. I read it only; nothing was copied or modified. The checker was not changed.
+
+Result on the run-2 transcript (`evidence/WP8/orc-run2-checker.r4.log`):
+- AC-ORC-01 FAIL, only on the missing GATE 6 line. After the reviewer's fixes (lines 856–948), the session went straight to stage 7 and wrote GATE 7.
+- AC-ORC-02, AC-ORC-03 and AC-ORC-04 PASS.
+
+The user accepted run 2 for AC-ORC-01 with that deviation; the Lead records it.
+
+These are skill-text fixes only:
+
+1. **No stage before the previous gate line.**
+   - SKILL.md and the stages.md preamble now say a stage may not begin until the previous stage's gate line has been written. Before a stage's first command, check that the line is there; if not, write it now or finish that stage.
+   - Stage 6 now spells out that it ends only after the reviewer's fixes are re-rendered, re-sheeted and Read, and that the GATE 6 line comes before any assemble command.
+   - Stage 7 now opens with step 0: "First confirm `GATE 6 build: PASS — …` was written. If it wasn't, write it now".
+2. **The user's wording wins (Todd's gate-1 feedback).**
+   - SKILL.md has a rule for this. Stage 1 says to keep the brief's wording (its quoted lines are used as written).
+   - Cold-read findings are never applied by the session itself. They become a numbered batch of proposed changes (beat, original line → proposed line), shown alongside the unchanged `script.md`.
+   - The `AskUserQuestion` asks which changes to apply (each, all, or none), and only those are applied.
+3. **Runtime checked before TTS (run 2's gate 2 first failed at 33.7 s against a 30 s target).**
+   - Stage 1 now has a runtime check before the cold read: spoken words (tags and `On screen:` lines excluded) × 60 ÷ 127 + 0.5 s per beat (the spine's lead and tail padding; DEC-33/34), against the target ±10%.
+   - An estimate outside the range is flagged at gate 1 with the numbers, so the user can trim or move the target there. If the words or the target change, the check is redone.
+
+**Results**
+- The `skill docs` test now also asserts the new rules: no stage before the previous gate line, stage 7's step 0, the wording rule, proposed changes with original and proposed line, and the runtime estimate placed before the gate-1 question.
+- `node --test evals/plate-factory`: 11/11 pass.
+- `ac-run --wp WP8`: all five script ACs pass.
+- `ac-run --trace`: PASS, 79 ACs, 0 problems.
+- Logs: `evidence/WP8/*.r4.log`.

@@ -22,6 +22,14 @@ and audio never forces a re-render.
 ten stages, including the mechanical ones (2, 5, 6, 7, 9) that need no answer from the user, and
 **whatever output style or brevity setting is active**: a concise style shortens your prose, never
 the gate lines. A stage without its gate line is not finished; the run is checked for all ten.
+**A stage may not begin until the previous stage's gate line has been written.** Before the first
+command of any stage, check that the previous gate line is in your replies; if it isn't, write it
+now (or go back and finish that stage). Stage 6 in particular ends only after the reviewer's fixes
+are re-rendered and re-sheeted; then write `GATE 6 build: …`, then start stage 7.
+
+**The user's wording wins.** Keep the brief's wording in the script. Never rewrite the user's
+lines on your own or apply cold-read findings before the user picks: present them as a batch of
+proposed changes (original line → proposed line) and apply only the ones the user chooses.
 
 **Show what the user approves.** Before each user gate's `AskUserQuestion`, put the thing being
 approved in the chat, with absolute paths so the user can open files: gate 0 the whole `brief.md`,

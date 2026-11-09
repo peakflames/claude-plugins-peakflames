@@ -61,6 +61,17 @@ test('skill docs: every stage ends with its literal gate line, and SKILL.md make
   assert.match(skill, /Every stage ends with its gate line/);
   assert.match(skill, /whatever output style/);
   for (const n of [0, 1, 3, 4, 8]) assert.match(stages, new RegExp(`## Stage ${n} [\\s\\S]*?\\*\\*Show:\\*\\*[\\s\\S]*?End the stage with: \`GATE ${n} `), `stage ${n} shows what is approved`);
+  // round 4 (run 2): no stage starts before the previous gate line; stage 7 re-checks GATE 6;
+  // gate 1 keeps the user's wording, proposes cold-read changes, and checks runtime before TTS
+  assert.match(skill, /A stage may not begin until the previous stage's gate line has been written/);
+  assert.match(stages, /A stage may not begin until the\s+previous stage's gate line has been written/);
+  assert.match(stages, /## Stage 7 [^\n]*\n\n0\. \*\*First confirm `GATE 6 build: PASS — …` was written\.\*\*/);
+  assert.match(skill, /The user's wording wins/);
+  const stage1 = stages.slice(stages.indexOf('## Stage 1 '), stages.indexOf('## Stage 2 '));
+  assert.match(stage1, /Don't apply its findings yourself/);
+  assert.match(stage1, /original line and the proposed\s+line/);
+  assert.match(stage1, /words × 60 ÷ 127 \+ 0\.5 s per beat/);
+  assert.ok(stage1.indexOf('Runtime check, before any TTS') < stage1.indexOf('AskUserQuestion'), 'runtime is checked before the gate-1 question');
 });
 
 test('checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else', () => {

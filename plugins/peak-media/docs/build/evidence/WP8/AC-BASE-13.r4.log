@@ -1,0 +1,14 @@
+plugin.json version: 0.1.0
+node v26.8.1, 2026-11-09T15:35Z, round 4
+
+$ node --test --test-name-pattern=^AC-BASE-13: plugins/peak-media/evals/plate-factory
+✔ AC-BASE-13: retime-plates --help/--version/bad input follow the baseline (506.850083ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 797.58975
+exit=0
