@@ -75,7 +75,8 @@ above, and follow these rules:
 - **A self-review round** is one `contact-sheet` run on `renders/plates/<id>.mp4` before the
   reviewer call, whatever the sheet's name. Every rendered plate needs 1–3 of them. Sheets made
   after the reviewer (`<id>-fix<N>.jpg`), the stage-5 `render-plate --sheet`, and a sheet run
-  that errored (and was re-run) are not rounds.
+  that errored (and was re-run) are not rounds. A simple `for id in a b c; do …$id…; done` loop
+  over literal plate ids is counted per plate, but prefer one plate per command.
 - **The reviewer** is the first `Agent` call whose prompt names `review-rubric.md`; it comes after
   every plate's rounds.
 - **`runtimes.md`** is Read (with Read, not cat) before the first plate is written.
@@ -91,6 +92,13 @@ above, and follow these rules:
 
 ---
 
+
+Each stage below ends with **"End the stage with:"** and the literal gate line to emit. Fill in the
+`<…>` parts and write it on its own line in your reply before starting the next stage, every
+time, whatever output style or brevity setting is active. "Show" means put it in the chat, as
+text, before the `AskUserQuestion`; give every file as an absolute path (`<abs>/…` below is the
+video project's absolute path) so the user can open it.
+
 ## Stage 0 — Brief (user gate)
 
 1. `bash "PM/scripts/setup.sh" --check`. If it isn't ready, ask, then run `setup.sh` (network).
@@ -101,9 +109,12 @@ above, and follow these rules:
    brand pack path (default `PM/brand-packs/default`), export (`source` or `1080p60`).
 3. Voice: with `PEAK_MEDIA_OPENROUTER_API_KEY` (or legacy `TTS_OPENROUTER_API_KEY`) set the spine
    narrates in the house voice (Rasalgethi, measured style); without it, a silent beat grid
-   carries on-screen text. Say which one this run will get.
-4. `AskUserQuestion`: runtime, beats, size/fps, brand, voice or beat grid, export. Yes →
-   `GATE 0 brief: APPROVED — brief.md`.
+   carries on-screen text.
+4. **Show:** `<abs>/brief.md` in full; whether the run is narrated or a beat grid; and, with the
+   default pack, that its outro is a placeholder card reading "Your Name" (a real pack replaces it).
+5. `AskUserQuestion`: runtime, beats, size/fps, brand, voice or beat grid, export.
+
+End the stage with: `GATE 0 brief: APPROVED — brief.md`
 
 ## Stage 1 — Script (cold read, then user gate)
 
@@ -117,8 +128,11 @@ above, and follow these rules:
 4. **Cold read:** one `Agent` call whose prompt holds only the script text and the audience from
    the brief: no file paths, no repo, no tools. Ask it to mark each beat CLEAR or UNCLEAR, say
    what confused it and which lines sound like hype. Fix UNCLEAR beats and read again.
-5. `AskUserQuestion` with the script and the cold-read result. Yes →
-   `GATE 1 script: APPROVED — script.md (<words> words, cold read <k>/<n> CLEAR)`.
+5. **Show:** `<abs>/script.md` in full, its word count against the budget, and the cold-read
+   verdict per beat (`hook: CLEAR — …`).
+6. `AskUserQuestion`: approve the script?
+
+End the stage with: `GATE 1 script: APPROVED — script.md (<words> words, cold read <k>/<n> CLEAR)`
 
 ## Stage 2 — Spine (check gate: runtime within ±10%)
 
@@ -127,9 +141,11 @@ above, and follow these rules:
 2. The last line must be `PASS  runtime …`. Read the wpm table: a clip far slower than the rest
    means a tag was read aloud; fix that line.
 3. Narration: `node "PM/lib/verify/check-cuts.mjs" spine/narration.wav --cuts <each beat's startMs after the first, comma-separated> --min-silence-ms 400`.
-4. `GATE 2 spine: PASS — spine/manifest.json <totalMs> ms (target <targetMs> ±10%)` (or
-   `spine/beatgrid.json`). On `FAIL`, change words in `script.md` and go back to stage 1's
-   approval; never stretch the spine by hand.
+4. On `FAIL`, change words in `script.md` and go back to stage 1's approval; never stretch the
+   spine by hand.
+
+End the stage with: `GATE 2 spine: PASS — spine/manifest.json <totalMs> ms (target <targetMs> ±10%)`
+(or `spine/beatgrid.json`).
 
 ## Stage 3 — Plate list (user gate)
 
@@ -145,8 +161,11 @@ above, and follow these rules:
    beat's `startMs`/`durationMs`. It refuses a missing, unknown or doubled beat; fix the list.
    Rerun it after every spine run.
 3. `node "PM/scripts/validate.mjs" plates.json` must print `ok`.
-4. `AskUserQuestion` with a table: id, kind, start–end, intent, on-screen text. Yes →
-   `GATE 3 plates: APPROVED — plates.json (<n> plates, retimed from <spine file>)`.
+4. **Show:** `<abs>/plates.json` as a table with columns id, beat, kind, start (ms), duration (ms),
+   intent, text.
+5. `AskUserQuestion`: approve the plate list?
+
+End the stage with: `GATE 3 plates: APPROVED — plates.json (<n> plates, retimed from <spine file>)`
 
 ## Stage 4 — Storyboard (user gate, before any animation)
 
@@ -160,24 +179,30 @@ above, and follow these rules:
    For a `live` plate, screenshot its page's first state with playwright-cli into
    `review/storyboard/<id>.png`.
 3. Read `review/storyboard.jpg` (and any live stills). Check it against `review-rubric.md` § A.
-4. `AskUserQuestion` with the sheet path and one line per plate: time range, on-screen text,
-   planned motion. Changes go into `plates.json` (text, intent, kind, assets), then
-   `render-plate plates.json --all --storyboard --rescaffold`, and ask again.
-   Yes → `GATE 4 storyboard: APPROVED — review/storyboard.jpg`. The approved stills are the spec
-   for stage 6.
+4. **Show:** the absolute path `<abs>/review/storyboard.jpg` (and any live stills), then one line
+   per plate: id, time range, on-screen text, planned motion.
+5. `AskUserQuestion`: approve the storyboard before any animation? Changes go into `plates.json`
+   (text, intent, kind, assets), then `render-plate plates.json --all --storyboard --rescaffold`;
+   show and ask again.
+
+End the stage with: `GATE 4 storyboard: APPROVED — review/storyboard.jpg`
+
+The approved stills are the spec for stage 6.
 
 ## Stage 5 — Pipeline test (check gate)
 
 1. `node "PM/skills/video-plates/scripts/render-plate.mjs" plates.json <first plate id> --lint --sheet`
    (a `live` first plate: `capture.mjs --plates plates.json --plate <id>`).
 2. Read `review/contact-<id>.jpg`: frames render, fonts and brand colours load, the first frame
-   isn't blank.
-3. `GATE 5 pipeline: PASS — renders/plates/<id>.mp4 (<durationMs> ms, lint clean)`. A missing
-   dependency is `FAIL`: run setup, repeat.
+   isn't blank. A missing dependency is `FAIL`: run setup, repeat.
+
+End the stage with: `GATE 5 pipeline: PASS — renders/plates/<id>.mp4 (<durationMs> ms, lint clean)`
 
 ## Stage 6 — Build plates (check gate: self-review ×3, then one reviewer)
 
 Read `review-rubric.md`. For each plate, Read the vendored-map steps its content needs (5–14).
+Work on **one plate per command**: one `render-plate <id>` and one `contact-sheet` per Bash call,
+not a loop over plates.
 
 **Self-review, per plate, rounds N = 1, 2, 3 at most:**
 
@@ -198,18 +223,21 @@ nothing else, and answer in the format of `review-rubric.md` § C:
 
 Then fix every `blocker` and `major` defect, each in its named plate only: re-render that plate
 and Read `review/<id>-fix<N>.jpg` (made the same way; it is not a self-review round). Fix
-`minor` ones when cheap. At most one more reviewer call, on the fixed plates only.
+`minor` ones when cheap. At most one more reviewer call, on the fixed plates only. The gate
+holds when every plate has rendered at its `durationMs` with lint clean and no blocker or major
+defect is open.
 
-`GATE 6 build: PASS — <n> plates; reviewer: <k> defects, <k> fixed` when every plate has
-rendered at its `durationMs` with lint clean and no blocker or major defect is open.
+End the stage with: `GATE 6 build: PASS — <n> plates; reviewer: <k> defects, <k> fixed`
 
 ## Stage 7 — Composite (check gate: every cut in a silent gap)
 
 1. `node "PM/skills/video-assemble/scripts/assemble.mjs" .` (no stems) — writes
    `review/review.mp4` and checks every plate cut with `check-cuts --min-silence-ms 300`.
 2. `node "PM/lib/verify/contact-sheet.mjs" review/review.mp4 --every 1s -o review/contact-review.jpg`; Read it.
-3. `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in ≥300 ms silence)`. A cut not in
-   silence is fixed at the source (the spine beat, then `retime-plates`, then re-render that plate).
+3. A cut not in silence is fixed at the source (the spine beat, then `retime-plates`, then
+   re-render that plate).
+
+End the stage with: `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in ≥300 ms silence)`
 
 ## Stage 8 — Music, then SFX (user gate: the user listens)
 
@@ -229,10 +257,15 @@ rendered at its `durationMs` with lint clean and no blocker or major defect is o
 
    Defaults: music −28 LUFS under the voice, `--duck-db 6`, SFX −20 LUFS. (Stage 9's `assemble`
    with any stem also writes `review/review-mix.mp4` and `review/levels.json`.)
-3. Report the levels (mix LUFS, true peak, `belowVoiceDb`). `AskUserQuestion`: listen to the file
-   from the table; adjust `--music-lufs`/`--duck-db` on request, rerun, and ask again. Yes →
-   `GATE 8 audio: APPROVED — review/review-mix.mp4 (review/levels.json)` (no stems:
-   `— review/review.mp4 (narration only)`).
+3. **Show:** the absolute path of the file to listen to (`<abs>/review/review-mix.mp4`, or
+   `<abs>/review/review.mp4` with no stems) and its measured levels: integrated LUFS and true
+   peak of the mix (from `review/levels.json`, or `review/assemble.json` with no stems), plus
+   `belowVoiceDb` when there is music.
+4. `AskUserQuestion`: listen and approve the levels? Adjust `--music-lufs`/`--duck-db` on request,
+   rerun, show and ask again.
+
+End the stage with: `GATE 8 audio: APPROVED — review/review-mix.mp4 (review/levels.json)`
+(no stems: `GATE 8 audio: APPROVED — review/review.mp4 (narration only)`).
 
 ## Stage 9 — Export (check gate: spec + final contact sheet)
 
@@ -241,5 +274,6 @@ rendered at its `durationMs` with lint clean and no blocker or major defect is o
    `out/final.mp4` with probe-spec (and duration = spine + outro).
 2. `node "PM/lib/verify/contact-sheet.mjs" out/final.mp4 --every 1s -o review/contact-final.jpg`;
    Read it: the plates in order, the last frames show the brand outro.
-3. `GATE 9 export: PASS — out/final.mp4 (<duration> s, probe-spec PASS, outro on review/contact-final.jpg)`.
-   Tell the user where the file is.
+3. Tell the user the absolute path of `<abs>/out/final.mp4`.
+
+End the stage with: `GATE 9 export: PASS — out/final.mp4 (<duration> s, probe-spec PASS, outro on review/contact-final.jpg)`

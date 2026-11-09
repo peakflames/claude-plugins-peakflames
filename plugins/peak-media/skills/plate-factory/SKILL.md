@@ -17,6 +17,18 @@ voice) sets the clock; each beat gets one **plate** (`motion`, `slide` or `live`
 own; assembly puts the plates on the spine. Stills are approved before any animation is written,
 and audio never forces a re-render.
 
+**Every stage ends with its gate line**, written on its own line in your reply, e.g.
+`GATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)`. This holds for all
+ten stages, including the mechanical ones (2, 5, 6, 7, 9) that need no answer from the user, and
+**whatever output style or brevity setting is active**: a concise style shortens your prose, never
+the gate lines. A stage without its gate line is not finished; the run is checked for all ten.
+
+**Show what the user approves.** Before each user gate's `AskUserQuestion`, put the thing being
+approved in the chat, with absolute paths so the user can open files: gate 0 the whole `brief.md`,
+gate 1 the whole `script.md` and the cold-read verdict per beat, gate 3 the plate table, gate 4
+the storyboard path and one line per plate, gate 8 the file to listen to and its measured levels.
+`references/stages.md` says exactly what for each.
+
 The plugin root is `${CLAUDE_PLUGIN_ROOT}`. Wherever a reference file writes `PM/` or
 `${CLAUDE_PLUGIN_ROOT}/`, use this path, quoted, in the command.
 

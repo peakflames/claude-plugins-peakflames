@@ -110,6 +110,23 @@ function firstPasses(events) {
   return { lines, first: GATES.map((_, n) => lines.find((g) => g.n === n && passed(g)) ?? null) };
 }
 
+/**
+ * Expand simple `for X in a b c; do …; done` loops (literal words only, no nesting) into one copy
+ * of the body per word with $X / ${X} substituted, so `for id in p2 p3; do render-plate … $id; …`
+ * is attributed to each plate. Loops over globs, variables or command output are left as they are.
+ */
+export function expandLoops(cmd) {
+  const loop = /\bfor\s+([A-Za-z_]\w*)\s+in\s+([^;\n]*?)\s*(?:;|\n)\s*do\b([\s\S]*?)(?:;|\n)\s*done\b/g;
+  return String(cmd).replace(loop, (whole, v, list, body) => {
+    const words = list.trim().split(/\s+/).filter(Boolean);
+    if (!words.length || words.some((w) => /[$*?`(){}[\]]/.test(w))) return whole;
+    const re = new RegExp(`\\$\\{${v}\\}|\\$${v}\\b`, 'g');
+    return words.map((w) => body.trim().replace(/^;+|;+$/g, '').replace(re, w.replace(/^["']|["']$/g, ''))).join('\n');
+  });
+}
+
+const commandOf = (e) => expandLoops(e.input?.command ?? '');
+
 /** Split a shell command into simple commands (on &&, ||, ;, |, newlines). */
 const segments = (cmd) => String(cmd).split(/&&|\|\||[;|\n]/).map((s) => s.trim()).filter(Boolean);
 
@@ -161,9 +178,13 @@ export function plateWrites(events) {
       const m = PLATE_HTML_RE.exec(p);
       if (m && p.endsWith('index.html')) out.push({ event: e, plate: m[1], how: `${e.name} ${p.slice(p.lastIndexOf('plates/'))}` });
     } else if (e.name === 'Bash') {
-      const cmd = String(e.input.command ?? '');
-      const render = segments(cmd).find((s) => runs(s, 'render-plate') && !/--storyboard\b/.test(s) && !/(^|\s)(--help|-h|--version)\b/.test(s));
-      if (render) { out.push({ event: e, plate: renderIds(render)[0] ?? null, plates: renderIds(render), how: `Bash ${brief(render.slice(render.indexOf('render-plate')), 70)}` }); continue; }
+      const cmd = commandOf(e);
+      const renders = segments(cmd).filter((s) => runs(s, 'render-plate') && !/--storyboard\b/.test(s) && !/(^|\s)(--help|-h|--version)\b/.test(s));
+      if (renders.length) {
+        const plates = [...new Set(renders.flatMap(renderIds))]; // every plate the command renders (loops expanded)
+        out.push({ event: e, plate: plates[0] ?? null, plates, how: `Bash ${brief(renders[0].slice(renders[0].indexOf('render-plate')), 70)}` });
+        continue;
+      }
       const id = shellPlateWrite(cmd);
       if (id) out.push({ event: e, plate: id, how: `Bash ${brief(cmd, 70)}` });
     }
@@ -226,7 +247,7 @@ export function checkStoryboardFirst(events) {
   const writes = plateWrites(events);
   const gate4 = gateLines(events).filter((g) => g.n === 4);
   const timeline = [
-    ...events.filter((e) => isTool(e, 'Bash') && segments(e.input.command ?? '').some((s) => runs(s, 'render-plate') && /--storyboard\b/.test(s))).map((e) => ({ seq: e.seq, k: -1, what: 'storyboard', event: e })),
+    ...events.filter((e) => isTool(e, 'Bash') && segments(commandOf(e)).some((s) => runs(s, 'render-plate') && /--storyboard\b/.test(s))).map((e) => ({ seq: e.seq, k: -1, what: 'storyboard', event: e })),
     ...gate4.map((g) => ({ seq: g.event.seq, k: g.k, what: g.result, event: g.event })),
     ...writes.map((w) => ({ seq: w.event.seq, k: Infinity, what: 'write', w, event: w.event })),
   ].sort((a, b) => a.seq - b.seq || a.k - b.k);
@@ -266,7 +287,7 @@ export function checkSelfReview(events) {
   for (const e of events) {
     if (!isMain(e) || !isTool(e, 'Bash') || e.seq > cut) continue;
     if (errored.has(e.id)) continue; // a sheet run that failed (is_error) and was retried is not a round
-    for (const s of segments(e.input.command ?? '')) {
+    for (const s of segments(commandOf(e))) {
       if (!runs(s, 'contact-sheet')) continue;
       const m = RENDER_MP4_RE.exec(s);
       if (m) rounds.set(m[1], [...(rounds.get(m[1]) ?? []), e]);
@@ -276,7 +297,7 @@ export function checkSelfReview(events) {
   for (const w of plateWrites(events)) for (const p of w.plates ?? (w.plate ? [w.plate] : [])) if (!rendered.has(p)) rendered.set(p, w.event);
   for (const e of events) {
     if (!isTool(e, 'Bash')) continue;
-    for (const s of segments(e.input.command ?? '')) {
+    for (const s of segments(commandOf(e))) {
       const m = runs(s, 'capture') && /--plate\s+["']?([a-z0-9][a-z0-9-]*)/.exec(s);
       if (m && !rendered.has(m[1])) rendered.set(m[1], e);
     }

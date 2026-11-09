@@ -155,3 +155,38 @@ AC-ORC-01..04 are still `blocked: needs user AC-ORC-01 run`.
 - `ac-run --wp WP8`: all five script ACs pass.
 - `ac-run --trace`: PASS, 79 ACs, 0 problems.
 - Logs: `evidence/WP8/*.r2.log`.
+
+## Round 3 fixes (the user's live AC-ORC-01 run 1)
+
+The run was session `26fa3b2e-…`, project `~/tmp/peak-media-orc-01`. I read it only; nothing was copied or modified. It reached `out/final.mp4`, and the user approved every user gate. The round-2 checker gave `FAIL AC-ORC-01 (no gate 5, 6, 7 lines)` and `FAIL AC-ORC-03 (p2-compare: no round)`.
+
+1. **Gate lines can't be skipped (real skill defect).** The session wrote no GATE line for stages 5, 6 and 7, probably because of the user's "Concise" output style. The checker stays strict.
+   - **SKILL.md** now says up front, in bold: every stage ends with its gate line, the mechanical ones too, *whatever output style or brevity setting is active*. A stage without its line is not finished.
+   - **stages.md:** each of the ten stages now ends with `End the stage with: \`GATE n name: … — …\``, giving the literal line.
+   - **New test** (`skill docs: …`): checks there are exactly ten closing lines, in order, that their names and results match the checker's `GATES`, and that the checker parses each one. It also checks that SKILL.md keeps the output-style rule.
+2. **Loops over plates (checker false FAIL).**
+   - **Loop expansion:** `expandLoops` expands a simple `for X in a b c; do …$X/${X}…; done` over literal words into one body per word. Globs, variables and `$(…)` are left alone.
+   - **Where it applies:** it runs before every Bash command is attributed, covering plate writes, storyboard runs, sheet rounds and `capture --plate`.
+   - **All plates in a command:** `plateWrites` now records every plate a command renders, not just the first.
+   - **New good fixture:** `good-loop`, where round 1 of p2-table and p3-close runs in one loop; it passes with `p2-table×2, p3-close×1`.
+   - **stages.md** stage 6 now says to work on one plate per command and not loop over plates; the rules section notes that loops are counted per plate.
+3. **Show what is approved (user feedback).** SKILL.md has a short rule, and stages.md has a **Show:** step before each user gate's `AskUserQuestion`, with absolute paths (`<abs>/…`):
+   - **Gate 0:** `brief.md` in full, narrated or beat grid, and a note that the default pack's outro is a placeholder "Your Name" card.
+   - **Gate 1:** `script.md` in full, word count against the budget, and the cold-read verdict per beat.
+   - **Gate 3:** the plate table (id, beat, kind, start, duration, intent, text).
+   - **Gate 4:** the absolute path of `review/storyboard.jpg`, plus one line per plate.
+   - **Gate 8:** the absolute path of the file to listen to, plus the mix's integrated LUFS, true peak and `belowVoiceDb` (with music).
+4. **The real transcript re-checked** (`evidence/WP8/orc-run1-checker.r3.log`):
+   - AC-ORC-01 FAIL, only on the missing gate 5, 6, 7 lines. That is the true result for that run.
+   - AC-ORC-02 PASS.
+   - AC-ORC-03 PASS (`p1-hook×2, p2-compare×1, p3-close×1, p4-result×1`).
+   - AC-ORC-04 PASS.
+
+**Results**
+- `node --test evals/plate-factory`: 11/11 pass.
+- 16 fixtures: the four `good*` runs pass all four checks; every bad fixture fails its rule.
+- `ac-run --wp WP8`: all five script ACs pass.
+- `ac-run --trace`: PASS, 79 ACs, 0 problems.
+- Logs: `evidence/WP8/*.r3.log`.
+
+**Open:** AC-ORC-01 needs a second live run with the round-3 skill, so that the gate 5, 6 and 7 lines appear. The runbook is unchanged and still valid. Before that run, the user should empty `RUN` or point it at a fresh folder.

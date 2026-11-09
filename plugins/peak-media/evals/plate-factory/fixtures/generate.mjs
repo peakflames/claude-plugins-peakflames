@@ -163,6 +163,17 @@ export const VARIANTS = {
       ['read', `${P}/review/p2-table-r3.jpg`]);
     return s;
   },
+  // round 3 (the user's live run): round 1 of two plates rendered and sheeted in one `for id in …` loop
+  'good-loop': (s) => {
+    // drop each plate's first render and its r1 sheet run, then put the loop where p2-table's round 1 was
+    const at = idx(s, (x) => x[0] === 'bash' && x[1] === RP('plates.json p2-table --lint'));
+    for (const plate of ['p2-table', 'p3-close']) {
+      s.splice(idx(s, (x) => x[0] === 'bash' && x[1] === RP(`plates.json ${plate} --lint`)), 1);
+      s.splice(idx(s, (x) => x[0] === 'bash' && x[1] === SHEET(`renders/plates/${plate}.mp4`, `review/${plate}-r1.jpg`)), 1);
+    }
+    s.splice(at, 0, ['bash', `cd ${P} && for id in p2-table p3-close; do node "${ROOT}/skills/video-plates/scripts/render-plate.mjs" plates.json $id --lint; node "${ROOT}/lib/verify/contact-sheet.mjs" renders/plates/\${id}.mp4 --every 0.5s -o review/$id-r1.jpg; done`, 'ok p2-table\nwrote review/p2-table-r1.jpg\nok p3-close\nwrote review/p3-close-r1.jpg']);
+    return s;
+  },
   'bad-unasked-gate': (s) => {
     s.splice(sayIdx(s, 4) - 1, 0,
       ['say', 'GATE 4 storyboard: APPROVED — review/storyboard.jpg'],

@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, baseline, ROOT } from '../helpers/run.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
-import { loadTranscript, checkAll, checkGates, checkStoryboardFirst, checkSelfReview, checkRuntimesFirst, plateWrites } from './transcript.mjs';
+import { loadTranscript, checkAll, checkGates, checkStoryboardFirst, checkSelfReview, checkRuntimesFirst, plateWrites, expandLoops, gateLines, GATES } from './transcript.mjs';
 import { fixtureFiles } from './fixtures/generate.mjs';
 
 const HERE = path.join(ROOT, 'evals', 'plate-factory');
@@ -34,8 +34,8 @@ test('checker: the good run passes every rule; the CLI exits 0', () => {
   assert.equal((cli.stdout.match(/^PASS {2}AC-ORC-0[1-4] /gm) ?? []).length, 4, cli.stdout);
 });
 
-test('checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render)', () => {
-  for (const name of ['good-bold-head', 'good-retried-round']) {
+test('checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render; a for-loop over plates)', () => {
+  for (const name of ['good-bold-head', 'good-retried-round', 'good-loop']) {
     for (const r of checkAll(load(name))) assert.ok(r.ok, `${name} ${r.id}: ${r.message}`);
     assert.equal(run(CHECKER, [session(name)]).code, 0, name);
   }
@@ -43,6 +43,24 @@ test('checker: legitimate variants pass every rule (head-bold gate lines; an err
   assert.match(checkSelfReview(load('good-retried-round')).message, /p2-table×3/);
   const redirected = plateWrites(load('good-retried-round')).find((w) => / > out 2>&1/.test(w.event.input.command ?? ''));
   assert.deepEqual(redirected.plates, ['p2-table'], 'a redirect target is not a plate id');
+  // round 3: a `for id in …; do render-plate … $id; contact-sheet …/$id.mp4 …; done` loop counts per plate
+  assert.match(checkSelfReview(load('good-loop')).message, /p1-hook×1, p2-table×2, p3-close×1/);
+  const loop = load('good-loop').find((e) => e.kind === 'tool_use' && /for id in p2-table p3-close/.test(e.input.command ?? ''));
+  assert.ok(loop, 'fixture has the loop');
+  assert.deepEqual(plateWrites([loop]).map((w) => w.plates), [['p2-table', 'p3-close']], 'the loop renders both plates');
+  assert.equal(expandLoops('for id in a b; do echo $id ${id}; done'), 'echo a a\necho b b');
+  assert.equal(expandLoops('for f in *.jpg; do echo $f; done'), 'for f in *.jpg; do echo $f; done', 'globs are left alone');
+});
+
+test('skill docs: every stage ends with its literal gate line, and SKILL.md makes them output-style proof', () => {
+  const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
+  const ends = [...stages.matchAll(/^End the stage with: `(GATE (\d+) ([a-z-]+): (APPROVED|PASS) — [^`]+)`/gm)];
+  assert.deepEqual(ends.map((m) => [Number(m[2]), m[3], m[4]]), GATES.map(([name, kind], n) => [n, name, kind === 'user' ? 'APPROVED' : 'PASS']), 'one closing gate line per stage, in order, matching the checker');
+  for (const m of ends) assert.equal(gateLines([{ kind: 'text', src: 'main', sidechain: false, text: m[1].replace(/<[^>]*>/g, 'x'), seq: 0 }]).length, 1, `checker reads: ${m[1]}`);
+  const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
+  assert.match(skill, /Every stage ends with its gate line/);
+  assert.match(skill, /whatever output style/);
+  for (const n of [0, 1, 3, 4, 8]) assert.match(stages, new RegExp(`## Stage ${n} [\\s\\S]*?\\*\\*Show:\\*\\*[\\s\\S]*?End the stage with: \`GATE ${n} `), `stage ${n} shows what is approved`);
 });
 
 test('checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else', () => {
