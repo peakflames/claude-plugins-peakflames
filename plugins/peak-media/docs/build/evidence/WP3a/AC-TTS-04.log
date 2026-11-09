@@ -1,5 +1,5 @@
 $ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-04:' plugins/peak-media/evals/video-spine/
-✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (105.498083ms)
+✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (78.548667ms)
 ℹ run1 calls=3, run2 calls=0 (3/3 cached), from export calls=0 (3/3 cached)
 ℹ 
 clip  words   sec  wpm  cached
@@ -15,5 +15,5 @@ median 165 wpm · 3/3 cached
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 183.761167
+ℹ duration_ms 151.330708
 exit=0

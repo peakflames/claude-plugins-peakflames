@@ -1,5 +1,5 @@
 $ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-02:' plugins/peak-media/evals/video-spine/
-✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (1.962958ms)
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (3.458917ms)
 ℹ 9/9 legacy clip keys match (model google/gemini-3.8-flash-lite-tts, voice Rasalgethi)
 ℹ tests 1
 ℹ suites 0
@@ -8,5 +8,5 @@ $ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-02:' plugins/pea
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 107.138833
+ℹ duration_ms 110.678833
 exit=0

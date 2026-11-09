@@ -23,7 +23,8 @@ voice. Clips are cached, so a re-run is free.
 | `microsoft/mai-voice-2.1` | MAI | Not sent |
 | `fake/tone` | any name below | Ignored. Offline test tone, no key |
 
-Real models need `TTS_OPENROUTER_API_KEY` (an OpenRouter key). Requests go
+Real models need `PEAK_MEDIA_OPENROUTER_API_KEY` (an OpenRouter key; the
+older `TTS_OPENROUTER_API_KEY` is read as a fallback). Requests go
 to `POST https://openrouter.ai/api/v1/audio/speech` with
 `response_format: "pcm"`. The raw 16-bit mono PCM (24 kHz) is wrapped in a
 WAV header before it is cached.

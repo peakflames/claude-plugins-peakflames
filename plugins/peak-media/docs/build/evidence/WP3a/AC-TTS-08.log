@@ -1,5 +1,5 @@
 $ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-08:' plugins/peak-media/evals/video-spine/
-✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (148.949ms)
+✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (85.649167ms)
 ℹ ffprobe: pcm_s16le 24000 Hz 1 ch, 3529 ms, 169456 bytes
 ℹ tests 1
 ℹ suites 0
@@ -8,5 +8,5 @@ $ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-08:' plugins/pea
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 230.848583
+ℹ duration_ms 146.139542
 exit=0

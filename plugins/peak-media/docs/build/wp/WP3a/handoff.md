@@ -8,10 +8,10 @@ Agent: Builder subagent (claude-opus-5-5), worktree `agent-a9ea22f327c64a0d5`, b
 
 Implemented as specified; names and shapes unchanged. Fields added:
 
-- `checkTtsOptions(...)` also returns `family` (`gemini|mai|fake`) and `warnings[]` (the DEC-04 "Allow Safety Retention" note for narrated Gemini, and a note for MAI ids outside the built-in list). `voice` omitted means the model's default (`Achird`, or `en-GB-Emily` for MAI). Exit codes: unknown model or voice gives 2, missing key gives 3.
+- `checkTtsOptions(...)` also returns `family` (`gemini|mai|fake`) and `warnings[]` (the DEC-04 "Allow Safety Retention" note for narrated Gemini, and a note for MAI ids outside the built-in list). `voice` omitted means the model's default (`Achird`, or `en-GB-Emily` for MAI). Exit codes: unknown model or voice gives 2, missing key gives 3. Key (DEC-30): `PEAK_MEDIA_OPENROUTER_API_KEY`, then the legacy `TTS_OPENROUTER_API_KEY` as a fallback. Errors and docs name the new variable.
 - `synthesizeClips(...)` accepts `legacyDirs` and `env` too. `voice` omitted means the model default. Each result also has `source` (`cache|legacy|synth`), `sampleRate` and `channels`. A clip's own `style` beats the `style` argument. The key is required only when a clip actually has to be synthesized, so a fully cached run works with no key. `onCall` fires once per synthesis, for fake/tone too.
 - `wpmReport(results, { label })` also returns `medianWpm`. Its table ends with `median N wpm · N/M cached`. A clip below `SLOW_RATIO` (0.7) × the median wpm gets a warning naming it (`slow clip 2: …`).
-- Also exported: `cacheSummary(results)` gives `"N/M cached"` (the AC-TTS-04 report string the spine should print), plus `KEY_ENV`, `countWords` (mood tags excluded, matching the legacy `words`), `defaultCacheDir`, `legacyCacheDirs`, `wavInfo`, `MODELS`, `GEMINI_VOICES`, `MAI_VOICES` and `DEFAULT_VOICES`.
+- Also exported: `cacheSummary(results)` gives `"N/M cached"` (the AC-TTS-04 report string the spine should print), plus `KEY_ENV` (`PEAK_MEDIA_OPENROUTER_API_KEY`), `LEGACY_KEY_ENV`, `countWords` (mood tags excluded, matching the legacy `words`), `defaultCacheDir`, `legacyCacheDirs`, `wavInfo`, `MODELS`, `GEMINI_VOICES`, `MAI_VOICES` and `DEFAULT_VOICES`.
 - The `debugRequests` option is either `true` (writes `[debug-requests] {json}` lines to stderr) or a `function(line)`.
 
 ## Done
@@ -32,7 +32,7 @@ Implemented as specified; names and shapes unchanged. Fields added:
 
 `PEAK_MEDIA_FAKE_SLOW=<n>[,<n>…]` makes those `fake/tone` clip numbers `PEAK_MEDIA_FAKE_SLOW_FACTOR` (default 2) times longer. It works in-process through the `env` option and in a subprocess through the environment. A slowed clip is cached like any other, so use an isolated `PEAK_MEDIA_TTS_CACHE`. This is documented in `references/voices.md`.
 
-Test isolation: `PEAK_MEDIA_TTS_CACHE` sets the cache dir, and `PEAK_MEDIA_TTS_LEGACY_DIRS` (path.delimiter list, `''` = none) sets the legacy dirs. Every eval uses temp dirs, and none touches `~/.cache`.
+Test isolation: evals unset both key variables. `PEAK_MEDIA_TTS_CACHE` sets the cache dir, and `PEAK_MEDIA_TTS_LEGACY_DIRS` (path.delimiter list, `''` = none) sets the legacy dirs. Every eval uses temp dirs, and none touches `~/.cache`.
 
 ## ac-run --wp WP3a
 
@@ -55,10 +55,10 @@ Test isolation: `PEAK_MEDIA_TTS_CACHE` sets the cache dir, and `PEAK_MEDIA_TTS_L
 
 ### AC-TTS-07: blocked, needs the user's key
 
-The Lead runs this with the user, from any scratch dir. It uses the real `~/.cache/peak-media/tts/`, which is fine for a live run.
+I did not run it. The key isn't in this agent's environment, and the worktree guard refused `zsh -ic` (the only route the Lead named). I didn't try another way to read the key from `~/.zshrc`. Script: `/tmp/wp3a-scratch/tts07.sh` (isolated cache in `/tmp/tts07`). The Lead can run it with `zsh -ic 'bash /tmp/wp3a-scratch/tts07.sh'`, or run the commands below by hand, then copy `/tmp/tts07/*-debug.log` (already redacted) into `evidence/WP3a/`.
 
 ```bash
-export TTS_OPENROUTER_API_KEY=sk-or-...        # the user's key
+# PEAK_MEDIA_OPENROUTER_API_KEY is already set in ~/.zshrc (run from an interactive zsh)
 P=<repo>/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs
 mkdir -p /tmp/tts07 && cd /tmp/tts07
 node "$P" --voices Achird --style "Clear, friendly, unhurried explainer tone." \
@@ -69,7 +69,7 @@ node "$P" --tts-model microsoft/mai-voice-2.1-flash --voices en-GB-Emily \
   --out-dir mai --debug-requests 2> mai-debug.log
 grep -c '"zdr":true' gemini-debug.log mai-debug.log         # each >= 1
 grep -c 'Bearer \*\*\*REDACTED\*\*\*' gemini-debug.log mai-debug.log
-grep -c "$TTS_OPENROUTER_API_KEY" gemini-debug.log mai-debug.log   # each 0
+grep -cF "$PEAK_MEDIA_OPENROUTER_API_KEY" gemini-debug.log mai-debug.log   # each 0
 afplay gemini/Achird.wav; afplay mai/en-GB-Emily.wav       # listen
 ffprobe -v error -show_entries stream=sample_rate,channels -of csv=p=0 gemini/Achird.wav mai/en-GB-Emily.wav
 ```
@@ -77,7 +77,7 @@ Pass when both clips are clear speech at normal pitch, about 140–200 wpm (the 
 
 ### Notes and deviations
 
-- **AC-TTS-01 says "spine runs"**, but `spine.mjs` is WP3b's. The eval checks the same three failures through `checkTtsOptions` (the API the spine calls) and through the `sample-voice` entry point (`--voices Nope` gives exit 2; key unset gives exit 3 naming `TTS_OPENROUTER_API_KEY`; `PEAK_MEDIA_FFMPEG=/nonexistent` gives exit 3). Each run takes under 100 ms, prints one line and makes no network attempt. AC-TTS-03/04/05 likewise exercise `synthesizeClips` and `wpmReport` with the fake provider. AC-TTS-03 also runs end to end through `sample-voice`. WP3b's spine should re-assert these at the CLI level.
+- **AC-TTS-01 says "spine runs"**, but `spine.mjs` is WP3b's. The eval checks the same three failures through `checkTtsOptions` (the API the spine calls) and through the `sample-voice` entry point (`--voices Nope` gives exit 2; both key variables unset gives exit 3 naming `PEAK_MEDIA_OPENROUTER_API_KEY`; `PEAK_MEDIA_FFMPEG=/nonexistent` gives exit 3). Each run takes under 100 ms, prints one line and makes no network attempt. AC-TTS-03/04/05 likewise exercise `synthesizeClips` and `wpmReport` with the fake provider. AC-TTS-03 also runs end to end through `sample-voice`. WP3b's spine should re-assert these at the CLI level.
 - **Mood tags vs Gemini 3.8.** OpenRouter's TTS guide says Gemini 3.8 models "read `input` verbatim, so delivery directions written into the text may be spoken aloud". The legacy script relies on `<Warm>`-style tags (narration-writing.md, owned by WP3b), and the slow-clip warning is the safety net. Worth checking during AC-TTS-07 by adding a tag to the Gemini line.
 - The MAI voice list is the 12 English voices. Other ids of the form `xx-YY-Name` are accepted with a note, not rejected.
 - No npm dependencies added. No files outside the owned folders touched, apart from the evals and evidence.

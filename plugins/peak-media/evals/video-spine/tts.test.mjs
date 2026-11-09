@@ -27,7 +27,7 @@ const f1Clips = () => F1.clips.map(({ n, text, style }) => ({ n, text, style }))
 /** env for subprocesses: isolated caches, no key unless given. */
 const isoEnv = (extra = {}) => {
   const d = tmp('env');
-  return { PEAK_MEDIA_TTS_CACHE: path.join(d, 'cache'), PEAK_MEDIA_TTS_LEGACY_DIRS: '', TTS_OPENROUTER_API_KEY: '', ...extra };
+  return { PEAK_MEDIA_TTS_CACHE: path.join(d, 'cache'), PEAK_MEDIA_TTS_LEGACY_DIRS: '', PEAK_MEDIA_OPENROUTER_API_KEY: '', TTS_OPENROUTER_API_KEY: '', ...extra };
 };
 const errLines = (r) => r.stderr.trim().split('\n').filter((l) => l && !/^Run '.+ --help' for usage\.$/.test(l));
 
@@ -35,7 +35,9 @@ test('AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, 
   // API the spine calls (WP3b): checked before any network.
   assert.throws(() => checkTtsOptions({ voice: 'Nope' }), (e) => e.code === 2 && /--voice 'Nope'/.test(e.message) && !e.message.includes('\n'));
   assert.throws(() => checkTtsOptions({ model: 'nope/model' }), (e) => e.code === 2 && /--tts-model/.test(e.message));
-  assert.throws(() => checkTtsOptions({ narrate: true, env: {} }), (e) => e.code === 3 && /TTS_OPENROUTER_API_KEY/.test(e.message));
+  assert.throws(() => checkTtsOptions({ narrate: true, env: {} }), (e) => e.code === 3 && /PEAK_MEDIA_OPENROUTER_API_KEY/.test(e.message));
+  assert.doesNotThrow(() => checkTtsOptions({ narrate: true, env: { TTS_OPENROUTER_API_KEY: KEY } }), 'legacy key name is a fallback');
+  assert.doesNotThrow(() => checkTtsOptions({ narrate: true, env: { PEAK_MEDIA_OPENROUTER_API_KEY: KEY } }));
   assert.doesNotThrow(() => checkTtsOptions({ model: 'fake/tone', narrate: true, env: {} }), 'fake/tone needs no key');
   assert.deepEqual(
     { model: checkTtsOptions({ voice: 'achird' }).model, voice: checkTtsOptions({ voice: 'achird' }).voice },
@@ -47,8 +49,8 @@ test('AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, 
 
   // Entry point: sample-voice (spine.mjs is WP3b's and re-asserts this through the same API).
   const cases = [
-    { name: '--voice Nope', args: ['--voices', 'Nope'], env: isoEnv({ TTS_OPENROUTER_API_KEY: KEY }), want: /unknown --voice 'Nope'/ },
-    { name: 'key unset', args: ['--voices', 'Achird'], env: isoEnv(), want: /TTS_OPENROUTER_API_KEY/ },
+    { name: '--voice Nope', args: ['--voices', 'Nope'], env: isoEnv({ PEAK_MEDIA_OPENROUTER_API_KEY: KEY }), want: /unknown --voice 'Nope'/ },
+    { name: 'key unset', args: ['--voices', 'Achird'], env: isoEnv(), want: /PEAK_MEDIA_OPENROUTER_API_KEY/ },
     { name: 'ffmpeg missing', args: ['--tts-model', 'fake/tone'], env: isoEnv({ PEAK_MEDIA_FFMPEG: '/nonexistent/ffmpeg' }), want: /ffmpeg not found — install it/ },
   ];
   for (const c of cases) {
@@ -150,7 +152,7 @@ test('AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs a
   const log = path.join(d, 'requests.jsonl');
   const out = path.join(d, 'samples');
   const style = 'Clear, friendly, unhurried explainer tone.';
-  const env = { ...process.env, ...isoEnv({ TTS_OPENROUTER_API_KEY: KEY, PEAK_MEDIA_FAKE_OR_LOG: log }) };
+  const env = { ...process.env, ...isoEnv({ PEAK_MEDIA_OPENROUTER_API_KEY: KEY, PEAK_MEDIA_FAKE_OR_LOG: log }) };
   const r = spawnSync(process.execPath, [
     '--import', path.join(ROOT, 'evals', 'helpers', 'no-network.mjs'),
     '--import', path.join(ROOT, 'evals', 'video-spine', 'helpers', 'fake-openrouter.mjs'),
@@ -191,7 +193,7 @@ test('AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads', as
   const d = tmp('pcm');
   const calls = [];
   const fetchImpl = makeFakeFetch({ calls });
-  const env = { TTS_OPENROUTER_API_KEY: KEY };
+  const env = { PEAK_MEDIA_OPENROUTER_API_KEY: KEY };
   const text = 'Raw sixteen-bit PCM comes back and gets a proper header.';
   const [r] = await synthesizeClips({ clips: [{ n: 1, text }], cacheDir: path.join(d, 'c'), legacyDirs: [], fetchImpl, env });
   assert.equal(calls.length, 1);
@@ -218,7 +220,7 @@ test('AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads', as
   // Error responses are one line and never echo the key.
   await assert.rejects(
     synthesizeClips({ clips: [{ n: 1, text: 'fails' }], cacheDir: path.join(d, 'c2'), legacyDirs: [], fetchImpl: makeFakeFetch({ status: 401 }), env }),
-    (e) => /TTS_OPENROUTER_API_KEY \(401\)/.test(e.message) && !e.message.includes(KEY) && !e.message.includes('\n'),
+    (e) => /\(401\) — check PEAK_MEDIA_OPENROUTER_API_KEY/.test(e.message) && !e.message.includes(KEY) && !e.message.includes('\n'),
   );
   assert.equal(existsSync(path.join(d, 'c2', cacheKey({ model: DEFAULT_MODEL, voice: DEFAULT_VOICE, style: '', text: 'fails' }))), false, 'nothing cached on failure');
   assert.equal(redact(`Bearer ${KEY}`, KEY), 'Bearer ***REDACTED***');

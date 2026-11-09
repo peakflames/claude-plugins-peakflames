@@ -8,12 +8,12 @@ import { CliError, EXIT } from '../cli.mjs';
 import { MODELS, GEMINI_VOICES, MAI_VOICES, DEFAULT_VOICES, canonicalVoice, familyOf } from './voices.mjs';
 import { cacheKey as key, defaultCacheDir, legacyCacheDirs, lookup, store, adopt } from './cache.mjs';
 import { countWords, fakeToneWav } from './fake.mjs';
-import { synthesize, requireKey, KEY_ENV } from './openrouter.mjs';
+import { synthesize, requireKey, KEY_ENV, LEGACY_KEY_ENV } from './openrouter.mjs';
 import { pcmToWav, wavInfo } from './wav.mjs';
 
 export const DEFAULT_MODEL = 'google/gemini-3.8-flash-lite-tts';
 export const DEFAULT_VOICE = 'Achird';
-export { MODELS, GEMINI_VOICES, MAI_VOICES, DEFAULT_VOICES, KEY_ENV, countWords, defaultCacheDir, legacyCacheDirs, wavInfo };
+export { MODELS, GEMINI_VOICES, MAI_VOICES, DEFAULT_VOICES, KEY_ENV, LEGACY_KEY_ENV, countWords, defaultCacheDir, legacyCacheDirs, wavInfo };
 
 /** '<sha256 hex of model\0voice\0style\0text>.wav' — byte-compatible with the old recorder (D4). */
 export function cacheKey({ model, voice, style = '', text }) {

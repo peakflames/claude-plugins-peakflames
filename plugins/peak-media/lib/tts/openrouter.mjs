@@ -7,7 +7,9 @@ import { CliError, EXIT } from '../cli.mjs';
 import { MODELS, apiVoice } from './voices.mjs';
 
 export const ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
-export const KEY_ENV = 'TTS_OPENROUTER_API_KEY';
+// DEC-30: PEAK_MEDIA_OPENROUTER_API_KEY first, then the legacy TTS_OPENROUTER_API_KEY.
+export const KEY_ENV = 'PEAK_MEDIA_OPENROUTER_API_KEY';
+export const LEGACY_KEY_ENV = 'TTS_OPENROUTER_API_KEY';
 const TIMEOUT_MS = 120000;
 
 /** The JSON body for one clip. Every request opts out of retention (DEC-04). */
@@ -29,7 +31,7 @@ function debugLog(debug, obj, key) {
 }
 
 function explain(status, msg, model) {
-  if (status === 401) return `OpenRouter rejected ${KEY_ENV} (401) — check the key at https://openrouter.ai/settings/keys`;
+  if (status === 401) return `OpenRouter rejected the API key (401) — check ${KEY_ENV} at https://openrouter.ai/settings/keys`;
   if (status === 402) return `OpenRouter says the account is out of credit (402) — add credit or use --tts-model fake/tone`;
   if (status === 404 && MODELS[model]?.family === 'gemini') {
     return `no zero-data-retention endpoint for ${model} (404: ${msg}) — enable "Allow Safety Retention" in OpenRouter privacy settings, or use --tts-model microsoft/mai-voice-2.1-flash`;
@@ -62,7 +64,7 @@ export async function synthesize({ model, voice, style, text, apiKey, fetchImpl 
 }
 
 export function requireKey(env = process.env) {
-  const key = env[KEY_ENV];
+  const key = env[KEY_ENV] || env[LEGACY_KEY_ENV];
   if (!key) throw new CliError(`narration needs ${KEY_ENV} — export ${KEY_ENV}=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)`, EXIT.MISSING_PREREQ);
   return key;
 }

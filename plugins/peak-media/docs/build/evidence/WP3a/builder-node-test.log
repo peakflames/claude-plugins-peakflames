@@ -1,35 +1,35 @@
 $ node --test plugins/peak-media/evals
-✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (1530.983583ms)
-✔ AC-CON-02: six bad fixtures each fail and name the field (659.301458ms)
-✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (732.850084ms)
-✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (891.802709ms)
-✔ validate: cross-reference checks (not AC-bound) (1725.379ms)
-✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (98.487458ms)
-✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (96.286792ms)
-✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (21703.860167ms)
-✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (13068.71425ms)
-✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (11.659834ms)
-✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (580.437792ms)
-✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (275.188584ms)
-✔ ac-run: baseline-style usage errors (not AC-bound) (209.257167ms)
-✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (867.011417ms)
-✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (977.683084ms)
-✔ probe-spec: catches a file that misses the spec (not AC-bound) (221.51825ms)
-✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (613.417625ms)
-✔ AC-BASE-03: contact-sheet baseline (928.919084ms)
-✔ AC-BASE-04: probe-spec baseline (388.388625ms)
-✔ AC-BASE-05: check-cuts baseline (404.220334ms)
-✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (1026.797542ms)
-✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (201.863958ms)
-ℹ --voice Nope: exit 2 in 64 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
-ℹ key unset: exit 3 in 66 ms — sample-voice: narration needs TTS_OPENROUTER_API_KEY — export TTS_OPENROUTER_API_KEY=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)
-ℹ ffmpeg missing: exit 3 in 69 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
-✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (1.220416ms)
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (2106.235584ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (1152.832ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (708.494833ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (1748.636084ms)
+✔ validate: cross-reference checks (not AC-bound) (5804.296292ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (174.097542ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (201.267875ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (44732.02325ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (18522.578958ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (17.642125ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (632.029917ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (692.260625ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (210.240667ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (1375.579084ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (1367.446083ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (147.947292ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (182.534458ms)
+✔ AC-BASE-03: contact-sheet baseline (530.632792ms)
+✔ AC-BASE-04: probe-spec baseline (1742.602167ms)
+✔ AC-BASE-05: check-cuts baseline (411.671583ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (2817.921208ms)
+✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (260.270708ms)
+ℹ --voice Nope: exit 2 in 63 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+ℹ key unset: exit 3 in 124 ms — sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)
+ℹ ffmpeg missing: exit 3 in 68 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (0.8715ms)
 ℹ 9/9 legacy clip keys match (model google/gemini-3.8-flash-lite-tts, voice Rasalgethi)
-✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (275.547083ms)
-ℹ lib: clip reused from pm-tts-legacy-BW6Jnm/…/tts, calls=0, 1234 ms
-ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  $TMPDIR/pm-tts-legacy-out-hPzYzn/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached
-✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (51.724042ms)
+✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (231.053875ms)
+ℹ lib: clip reused from pm-tts-legacy-oxKmHJ/…/tts, calls=0, 1234 ms
+ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  $TMPDIR/pm-tts-legacy-out-I1kWiH/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached
+✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (81.443459ms)
 ℹ run1 calls=3, run2 calls=0 (3/3 cached), from export calls=0 (3/3 cached)
 ℹ 
 clip  words   sec  wpm  cached
@@ -38,7 +38,7 @@ clip  words   sec  wpm  cached
 2        25  9.09  165     yes
 3        21  7.64  165     yes
 median 165 wpm · 3/3 cached
-✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (65.889583ms)
+✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (73.533041ms)
 ℹ 
 clip  words    sec  wpm  cached
 ----  -----  -----  ---  ------
@@ -47,16 +47,16 @@ clip  words    sec  wpm  cached
 3        21   7.64  165      no
 median 165 wpm · 0/3 cached
 WARN slow clip 2: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
-✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (484.026208ms)
+✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (975.599875ms)
 ℹ 
-Achird   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-SsWy4p/samples/Achird.wav
-Kore     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-SsWy4p/samples/Kore.wav
-Puck     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-SsWy4p/samples/Puck.wav
+Achird   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-HeCQds/samples/Achird.wav
+Kore     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-HeCQds/samples/Kore.wav
+Puck     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-HeCQds/samples/Puck.wav
 google/gemini-3.8-flash-lite-tts · median 170 wpm · 0/3 cached
 [debug-requests] {"request":{"method":"POST","url":"https://openrouter.ai/api/v1/audio/speech","headers":{"Authorization":"Bearer ***REDACTED***","Content-Type":"application/json"},"body":{"model":"google/gemini-3.8-flash-lite-tts","input":"Here is a short paragraph for comparing narrators. It has a question, a list of three things, and a closing line. Which voice sounds most like the video you have in mind?","voice":"Achird","response_format":"pcm","provider":{"zdr":true},"instructions":"Clear, friendly, unhurried explainer tone."}}}
-✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (103.206083ms)
+✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (271.065666ms)
 ℹ ffprobe: pcm_s16le 24000 Hz 1 ch, 3529 ms, 169456 bytes
-✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (532.169375ms)
+✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (647.6575ms)
 ℹ tests 29
 ℹ suites 0
 ℹ pass 29
@@ -64,4 +64,4 @@ google/gemini-3.8-flash-lite-tts · median 170 wpm · 0/3 cached
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 42785.877291
+ℹ duration_ms 75488.2155

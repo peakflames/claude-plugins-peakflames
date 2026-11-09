@@ -18,7 +18,7 @@ export const spec = {
   description: `
 Writes <out-dir>/<voice>.wav for each voice and prints one line per voice: words,
 seconds, wpm, sample rate, and whether the clip came from the cache. Needs
-TTS_OPENROUTER_API_KEY unless --tts-model fake/tone. Clips are cached in
+PEAK_MEDIA_OPENROUTER_API_KEY (legacy: TTS_OPENROUTER_API_KEY) unless --tts-model fake/tone. Clips are cached in
 ~/.cache/peak-media/tts/ (PEAK_MEDIA_TTS_CACHE overrides).`,
   options: {
     voices: { type: 'string', arg: 'list', default: 'Achird,Kore,Puck', desc: 'Comma-separated voices (Gemini names, or MAI short ids)' },
