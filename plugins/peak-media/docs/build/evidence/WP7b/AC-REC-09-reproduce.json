@@ -1,0 +1,86 @@
+{
+  "command": [
+    "node",
+    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/scripts/capture.mjs",
+    "--storyboard",
+    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/ui-demo/storyboard.mjs",
+    "--mp4",
+    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.FS3bJTjIQE/tmp/pm-capture-wp7b-zTMALh/ui-caption-css.mp4",
+    "--caption-css",
+    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/ui-demo/captions-alt.css",
+    "--debug-requests",
+    "--manifest",
+    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.FS3bJTjIQE/tmp/pm-capture-wp7b-zTMALh/ui-css-take.json",
+    "--json"
+  ],
+  "first": {
+    "videoMs": 14200,
+    "captions": [
+      {
+        "n": 1,
+        "text": "A small to-do list. Type a task and press Enter.",
+        "startMs": 41,
+        "durationMs": 3331
+      },
+      {
+        "n": 2,
+        "text": "New tasks land at the bottom of the list.",
+        "startMs": 3375,
+        "durationMs": 2998
+      },
+      {
+        "n": 3,
+        "text": "Tick a task when it is done.",
+        "startMs": 6374,
+        "durationMs": 2332
+      },
+      {
+        "n": 4,
+        "text": "Filters show what is left, or what is done.",
+        "startMs": 8710,
+        "durationMs": 2996
+      },
+      {
+        "n": 5,
+        "text": "Clear done tasks to tidy up.",
+        "startMs": 11707,
+        "durationMs": 2000
+      }
+    ]
+  },
+  "second": {
+    "videoMs": 14233,
+    "captions": [
+      {
+        "n": 1,
+        "text": "A small to-do list. Type a task and press Enter.",
+        "startMs": 47,
+        "durationMs": 3333
+      },
+      {
+        "n": 2,
+        "text": "New tasks land at the bottom of the list.",
+        "startMs": 3379,
+        "durationMs": 3000
+      },
+      {
+        "n": 3,
+        "text": "Tick a task when it is done.",
+        "startMs": 6385,
+        "durationMs": 2333
+      },
+      {
+        "n": 4,
+        "text": "Filters show what is left, or what is done.",
+        "startMs": 8719,
+        "durationMs": 3000
+      },
+      {
+        "n": 5,
+        "text": "Clear done tasks to tidy up.",
+        "startMs": 11720,
+        "durationMs": 2000
+      }
+    ]
+  }
+}

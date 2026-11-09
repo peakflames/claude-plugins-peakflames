@@ -1,0 +1,19 @@
+✔ AC-BASE-10: check-take --help lists every flag, --version = plugin.json, bad input is one actionable line, no network (1082.404709ms)
+✔ AC-REC-05: the --mp4 deliverable passes probe-spec (H.264 High, yuv420p, AAC 48 kHz, faststart), narrated at -16 LUFS, otherwise silent AAC (41112.657833ms)
+✔ AC-REC-06: on a sync page that flips a full-frame colour on each say(), with fake tones, the median offset is <= 120 ms and the worst <= 200 ms (50355.621ms)
+✔ AC-REC-07: on the narrated example deck, every scene change (threshold 0.02) lands inside silence (-40 dB, >= 900 ms) (896.255792ms)
+✔ AC-REC-08: ui-demo stills inside each say() window show the caption; --no-captions shows none; --caption-css changes the style (35618.456666ms)
+✔ AC-REC-09: the take manifest validates against the v1 spine schema and command[] reproduces the take (16767.310667ms)
+✔ AC-REC-10: with no key, the captions-only example passes with 0 OpenRouter calls (694.1055ms)
+✔ watchdog: a hanging storyboard is aborted at --max-ms with one line and the process exits (4442.171416ms)
+✔ watchdog: a spine-timed take that overruns its window by more than 2 s is aborted (17313.5ms)
+✔ captions: the injected-DOM fallback draws the caption when showOverlay is not used (3248.376833ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 171656.743333
+wp7b evals exit 0

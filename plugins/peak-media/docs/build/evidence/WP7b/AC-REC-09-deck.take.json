@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "kind": "narration",
+  "targetMs": 21419,
+  "totalMs": 21433,
+  "model": "fake/tone",
+  "voice": "Rasalgethi",
+  "style": "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning.",
+  "audioOffsetMs": 0,
+  "command": [
+    "node",
+    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/scripts/capture.mjs",
+    "--storyboard",
+    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs",
+    "--mp4",
+    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.FS3bJTjIQE/tmp/pm-capture-wp7b-zTMALh/deck.mp4",
+    "--debug-requests",
+    "--spine",
+    "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.FS3bJTjIQE/tmp/pm-capture-wp7b-zTMALh/deck-spine/manifest.json",
+    "--json"
+  ],
+  "narrate": true,
+  "spine": "deck-spine/manifest.json",
+  "videoMs": 21433,
+  "wallMs": 21470,
+  "beats": [
+    {
+      "id": "take",
+      "startMs": 0,
+      "durationMs": 21433,
+      "clipNs": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "clips": [
+    {
+      "n": 1,
+      "beat": "take",
+      "text": "Water your garden in the morning. It is one small habit with three good reasons.",
+      "style": "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning.",
+      "startMs": 950,
+      "durationMs": 5455,
+      "words": 15,
+      "wpm": 165,
+      "file": "d1e929b8a8071800e057d75eafeb882f82d66700f2f38eddf40094d42fa92f9d.wav",
+      "x-spineBeat": "intro",
+      "x-spineStartMs": 950,
+      "x-sayN": 1,
+      "x-lateMs": 220
+    },
+    {
+      "n": 2,
+      "beat": "take",
+      "text": "Cool morning air means less water is lost, and the leaves dry out by noon, so mildew has less chance.",
+      "style": "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning.",
+      "startMs": 7605,
+      "durationMs": 7273,
+      "words": 20,
+      "wpm": 165,
+      "file": "e2a039678a1fa3fdcacfc31503332544fc23ca5e6e13843461615177bc28aae7.wav",
+      "x-spineBeat": "why",
+      "x-spineStartMs": 7605,
+      "x-sayN": 2,
+      "x-lateMs": 0
+    },
+    {
+      "n": 3,
+      "beat": "take",
+      "text": "Aim at the roots, not the leaves. Water deeply, then let the soil dry.",
+      "style": "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning.",
+      "startMs": 16078,
+      "durationMs": 5091,
+      "words": 14,
+      "wpm": 165,
+      "file": "efa2c456dd7d412c42b9c04dba99d0a2912d2495aebbf10d5ebae56b32c7770b.wav",
+      "x-spineBeat": "how",
+      "x-spineStartMs": 16078,
+      "x-sayN": 3,
+      "x-lateMs": 124
+    }
+  ],
+  "captions": [],
+  "x-take": {
+    "mode": "spine",
+    "storyboard": "../../../../../../../../Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs",
+    "url": "http://127.0.0.1:55130/index.html",
+    "plate": null,
+    "fps": 30,
+    "width": 1280,
+    "height": 720,
+    "frames": 643,
+    "mp4": "deck.mp4",
+    "captionEngine": "overlay",
+    "audio": {
+      "clips": 3,
+      "lufs": -16
+    },
+    "says": [
+      {
+        "n": 1,
+        "text": "",
+        "narrate": "Water your garden in the morning. It is one small habit with three good reasons.",
+        "startMs": 1170,
+        "durationMs": 5455,
+        "caption": false,
+        "clip": 1,
+        "plannedMs": 950,
+        "lateMs": 220
+      },
+      {
+        "n": 2,
+        "text": "",
+        "narrate": "Cool morning air means less water is lost, and the leaves dry out by noon, so mildew has less chance.",
+        "startMs": 7605,
+        "durationMs": 7273,
+        "caption": false,
+        "clip": 2,
+        "plannedMs": 7605,
+        "lateMs": 0
+      },
+      {
+        "n": 3,
+        "text": "",
+        "narrate": "Aim at the roots, not the leaves. Water deeply, then let the soil dry.",
+        "startMs": 16202,
+        "durationMs": 5091,
+        "caption": false,
+        "clip": 3,
+        "plannedMs": 16078,
+        "lateMs": 124
+      }
+    ]
+  }
+}

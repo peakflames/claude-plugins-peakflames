@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tasks</title>
+<style>
+  :root { --bg: #eef0f2; --card: #ffffff; --fg: #1d2329; --muted: #6b7580; --line: #dde1e5; --accent: #3a6ea5; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  /* the card sits in the top three quarters; the bottom of the frame stays clear for captions */
+  main { width: 640px; margin: 48px auto 0; background: var(--card); border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06); padding: 28px 32px 20px; }
+  h1 { margin: 0 0 18px; font-size: 30px; font-weight: 700; }
+  form { display: flex; gap: 10px; }
+  input[type=text] { flex: 1; font: inherit; font-size: 20px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; outline: none; }
+  input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(58,110,165,.15); }
+  button { font: inherit; font-size: 17px; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); background: #f7f8f9; color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  ul { list-style: none; margin: 18px 0 0; padding: 0; min-height: 180px; }
+  li { display: flex; align-items: center; gap: 14px; padding: 11px 4px; border-bottom: 1px solid var(--line); font-size: 21px; }
+  li input { width: 22px; height: 22px; accent-color: var(--accent); }
+  li.done span { color: var(--muted); text-decoration: line-through; }
+  li[hidden] { display: none; }
+  footer { display: flex; align-items: center; gap: 8px; margin-top: 16px; color: var(--muted); font-size: 16px; }
+  footer .count { margin-right: auto; }
+  footer button { font-size: 15px; padding: 6px 12px; }
+  footer button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); background: #fff; }
+  .empty { color: var(--muted); font-size: 18px; padding: 14px 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tasks</h1>
+  <form id="add">
+    <input id="new" type="text" placeholder="What needs doing?" autocomplete="off" aria-label="New task">
+    <button class="primary" type="submit">Add</button>
+  </form>
+  <ul id="list"></ul>
+  <footer>
+    <span class="count" id="count">0 left</span>
+    <button type="button" data-filter="all" aria-pressed="true">All</button>
+    <button type="button" data-filter="active" aria-pressed="false">Active</button>
+    <button type="button" data-filter="done" aria-pressed="false">Done</button>
+    <button type="button" id="clear">Clear done</button>
+  </footer>
+</main>
+<script>
+  // A small static to-do app (no network, no storage), for the captioned capture example.
+  const tasks = [];
+  let filter = 'all';
+  const list = document.getElementById('list');
+  function render() {
+    list.innerHTML = '';
+    for (const t of tasks) {
+      const li = document.createElement('li');
+      li.className = t.done ? 'done' : '';
+      li.hidden = (filter === 'active' && t.done) || (filter === 'done' && !t.done);
+      const box = document.createElement('input');
+      box.type = 'checkbox'; box.checked = t.done; box.setAttribute('aria-label', t.text);
+      box.addEventListener('change', () => { t.done = box.checked; render(); });
+      const span = document.createElement('span'); span.textContent = t.text;
+      li.append(box, span); list.append(li);
+    }
+    if (!list.querySelector('li:not([hidden])')) {
+      const p = document.createElement('li'); p.className = 'empty';
+      p.textContent = tasks.length ? 'Nothing here.' : 'No tasks yet.';
+      list.append(p);
+    }
+    const left = tasks.filter((t) => !t.done).length;
+    document.getElementById('count').textContent = `${left} left`;
+    document.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === filter)));
+  }
+  document.getElementById('add').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('new');
+    const text = input.value.trim();
+    if (text) tasks.push({ text, done: false });
+    input.value = '';
+    render();
+  });
+  document.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.filter; render(); }));
+  document.getElementById('clear').addEventListener('click', () => { for (let i = tasks.length - 1; i >= 0; i--) if (tasks[i].done) tasks.splice(i, 1); render(); });
+  render();
+</script>
+</body>
+</html>
