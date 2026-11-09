@@ -59,12 +59,15 @@ export async function synthesize({ model, voice, style, text, apiKey, fetchImpl 
     throw new CliError(redact(explain(res.status, msg.replace(/\s+/g, ' ').trim(), model), apiKey));
   }
   if (buf.length < 2) throw new CliError(`OpenRouter returned no audio for ${model}/${voice}`);
+  // Rate: explicit override, else what the response declares (audio/pcm;rate=24000), else the model table.
   const override = Number(env.PEAK_MEDIA_TTS_PCM_RATE);
-  return { pcm: buf, sampleRate: Number.isFinite(override) && override > 0 ? override : MODELS[model].sampleRate };
+  const declared = Number(/rate=(\d+)/i.exec(type)?.[1]);
+  const sampleRate = Number.isFinite(override) && override > 0 ? override : declared > 0 ? declared : MODELS[model].sampleRate;
+  return { pcm: buf, sampleRate };
 }
 
 export function requireKey(env = process.env) {
   const key = env[KEY_ENV] || env[LEGACY_KEY_ENV];
-  if (!key) throw new CliError(`narration needs ${KEY_ENV} — export ${KEY_ENV}=<your OpenRouter key>, or drop --narrate (offline tests: --tts-model fake/tone)`, EXIT.MISSING_PREREQ);
+  if (!key) throw new CliError(`narration needs ${KEY_ENV} — export ${KEY_ENV}=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)`, EXIT.MISSING_PREREQ);
   return key;
 }

@@ -1,17 +1,36 @@
-$ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-06:' plugins/peak-media/evals/video-spine/
-✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (331.714333ms)
-ℹ 
-Achird   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-4X2my3/samples/Achird.wav
-Kore     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-4X2my3/samples/Kore.wav
-Puck     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  $TMPDIR/pm-tts-sv-4X2my3/samples/Puck.wav
-google/gemini-3.8-flash-lite-tts · median 170 wpm · 0/3 cached
-[debug-requests] {"request":{"method":"POST","url":"https://openrouter.ai/api/v1/audio/speech","headers":{"Authorization":"Bearer ***REDACTED***","Content-Type":"application/json"},"body":{"model":"google/gemini-3.8-flash-lite-tts","input":"Here is a short paragraph for comparing narrators. It has a question, a list of three things, and a closing line. Which voice sounds most like the video you have in mind?","voice":"Achird","response_format":"pcm","provider":{"zdr":true},"instructions":"Clear, friendly, unhurried explainer tone."}}}
-ℹ tests 1
-ℹ suites 0
-ℹ pass 1
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 389.850958
+verifier reproduction of AC-TTS-06 — sample-voice, 3 Gemini voices, fake OpenRouter transport preload + no-network preload; dummy key VERIFIER-DUMMY-KEY-123 (not a real key); real keys unset
 exit=0
+--- stdout
+Achird   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /tmp/vt6.ZM1P/out/Achird.wav
+Zephyr   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /tmp/vt6.ZM1P/out/Zephyr.wav
+Charon   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /tmp/vt6.ZM1P/out/Charon.wav
+google/gemini-3.8-flash-lite-tts · median 170 wpm · 0/3 cached
+--- WAVs
+Achird.wav: codec_name=pcm_s16le|sample_rate=24000|channels=1
+Charon.wav: codec_name=pcm_s16le|sample_rate=24000|channels=1
+Zephyr.wav: codec_name=pcm_s16le|sample_rate=24000|channels=1
+WAV count: 3
+wpm lines: 3
+--- stderr (debug lines, truncated to 200 chars)
+sample-voice: note: zero data retention is requested; Gemini's only ZDR endpoint needs "Allow Safety Retention" on your OpenRouter account — or use --tts-model microsoft/mai-voice-2.1-flash
+[debug-requests] {"request":{"method":"POST","url":"https://openrouter.ai/api/v1/audio/speech","headers":{"Authorization":"Bearer ***REDACTED***","Content-Type":"application/json"},"body":{"model":"go
+[debug-requests] {"response":{"status":200,"contentType":"audio/pcm","bytes":542118,"generationId":"gen-fake"}}
+[debug-requests] {"request":{"method":"POST","url":"https://openrouter.ai/api/v1/audio/speech","headers":{"Authorization":"Bearer ***REDACTED***","Content-Type":"application/json"},"body":{"model":"go
+[debug-requests] {"response":{"status":200,"contentType":"audio/pcm","bytes":542118,"generationId":"gen-fake"}}
+[debug-requests] {"request":{"method":"POST","url":"https://openrouter.ai/api/v1/audio/speech","headers":{"Authorization":"Bearer ***REDACTED***","Content-Type":"application/json"},"body":{"model":"go
+[debug-requests] {"response":{"status":200,"contentType":"audio/pcm","bytes":542118,"generationId":"gen-fake"}}
+dummy key in stderr: 0
+REDACTED markers: 3
+NETWORK-ATTEMPT: 0
+--- request bodies sent (fake transport log)
+https://openrouter.ai/api/v1/audio/speech {"zdr": true} Achird pcm True
+https://openrouter.ai/api/v1/audio/speech {"zdr": true} Zephyr pcm True
+https://openrouter.ai/api/v1/audio/speech {"zdr": true} Charon pcm True
+
+== node --test
+✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (498.435625ms)
+ℹ 
+Achird   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/pm-tts-sv-0SCsae/samples/Achird.wav
+Kore     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/pm-tts-sv-0SCsae/samples/Kore.wav
+Puck     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/pm-tts-sv-0SCsae/samples/Puck.wav
+google/gemini-3.8-flash-lite-tts · median 170 wpm · 0/3 cached

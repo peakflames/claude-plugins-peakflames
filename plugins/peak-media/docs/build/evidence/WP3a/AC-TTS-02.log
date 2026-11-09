@@ -1,12 +1,18 @@
-$ node --test --test-reporter=spec --test-name-pattern='^AC-TTS-02:' plugins/peak-media/evals/video-spine/
-✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (3.458917ms)
+verifier reproduction of AC-TTS-02 — independent Python hashlib (not the plugin's code) over evals/fixtures/legacy-narration.json
+clip 1: MATCH d7dc4939e8318fe263bfd752e3c31bb71cacd4b6e73da78e4ff180293a931fe6.wav file=d7dc4939e8318fe263bfd752e3c31bb71cacd4b6e73da78e4ff180293a931fe6.wav
+clip 2: MATCH 78d589f38c489d1f41046c0b813a1c207c91b4325ec84439645acac1e53af3dc.wav file=78d589f38c489d1f41046c0b813a1c207c91b4325ec84439645acac1e53af3dc.wav
+clip 3: MATCH 5ea4c5309629d55920cb9914dcd456139b92ace0c39a4b3744457a82dbf29b7d.wav file=5ea4c5309629d55920cb9914dcd456139b92ace0c39a4b3744457a82dbf29b7d.wav
+clip 4: MATCH 5825a2b0ceaf96fff06d22b8f383f46a85a9bac225e9da572c821748eb019889.wav file=5825a2b0ceaf96fff06d22b8f383f46a85a9bac225e9da572c821748eb019889.wav
+clip 5: MATCH 4350d66e8a75cb3d0cdba4f70a497c045c502aaded1339edf2fe42d4f059bc50.wav file=4350d66e8a75cb3d0cdba4f70a497c045c502aaded1339edf2fe42d4f059bc50.wav
+clip 6: MATCH 6f25cd34af67e4384575a66bdad0d4206521f05cd09edd40e7ac2fc3f9d81b2e.wav file=6f25cd34af67e4384575a66bdad0d4206521f05cd09edd40e7ac2fc3f9d81b2e.wav
+clip 7: MATCH 29606a19c59216e90e11a2366584e950e679fb3952f12396fa708f5599baacd1.wav file=29606a19c59216e90e11a2366584e950e679fb3952f12396fa708f5599baacd1.wav
+clip 8: MATCH e825e2e594fc242deecf2ce6a283f7fa934188994a4acba3b420da024caf3c0f.wav file=e825e2e594fc242deecf2ce6a283f7fa934188994a4acba3b420da024caf3c0f.wav
+clip 9: MATCH b246280e8cc430e1906db5e3e664b3d47fcd294e71a334a3cf276b223bdbfe82.wav file=b246280e8cc430e1906db5e3e664b3d47fcd294e71a334a3cf276b223bdbfe82.wav
+9/9 match byte for byte (model=google/gemini-3.8-flash-lite-tts, voice=Rasalgethi)
+
+== plugin cacheKey() vs same fixture
+9/9 match via lib/tts cacheKey
+
+== node --test
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (1.069834ms)
 ℹ 9/9 legacy clip keys match (model google/gemini-3.8-flash-lite-tts, voice Rasalgethi)
-ℹ tests 1
-ℹ suites 0
-ℹ pass 1
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 110.678833
-exit=0
