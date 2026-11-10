@@ -1,0 +1,14 @@
+U1 — YouTube "Recommended upload encoding settings"
+URL:       https://support.google.com/youtube/answer/1722171?hl=en
+Read:      2026-11-10 (WP11 builder, via WebFetch; page shows no last-updated date, footer (c)2026 Google)
+
+Container: MP4, no edit lists, moov atom at the front (fast start)
+Audio:     AAC-LC (or Opus / Eclipsa Audio); stereo (or stereo + 5.1); 48 kHz; stereo bitrate 384 kbps
+Video:     H.264, progressive, High Profile, 2 consecutive B-frames, closed GOP of half the frame rate,
+           CABAC, variable bitrate (no limit required; table is a reference), chroma 4:2:0
+Frame rate: encode/upload at the recorded frame rate (24, 25, 30, 48, 50, 60 common)
+SDR 1080p bitrate: 8 Mbps at 24/25/30 fps; 12 Mbps at 48/50/60 fps
+
+Compared with web2video-plan.md §4.6 `youtube` row
+  (1920x1080 @ 30, H.264 High, ~8 Mbps, closed GOP half fps, 2 B-frames, yuv420p, faststart, AAC-LC 48 kHz stereo 384 kbps):
+  -> matches on every value. Additions the plan does not state: CABAC (x264 default for High), VBR, no edit lists.
