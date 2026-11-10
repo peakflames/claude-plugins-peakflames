@@ -11,3 +11,5 @@ Items the Lead does after WP10, before the release.
 - [ ] **WP8 carry-forward:** verify-3 F1 — the transcript checker doesn't catch a stage starting before the previous GATE line (run 2 ran the spine before GATE 1); add a stage→first-command map or list it as a known limit in `stages.md`. F3 — stray blank line / long line in `stages.md`. Test-session memory `~/.claude/projects/-Users-schaveyt-tmp-peak-media-orc-01/memory/show-artifact-before-gate.md` reinforced the gate rule during run 2.
 
 - [ ] **WP9 carry-forward (v0.2):** verify-3 N6 — interrupted/timed-out renders leave HyperFrames' `hf-render-*` and Chrome profile folders in TMPDIR (step is SIGKILLed at once); send SIGTERM, wait 1–2 s, then SIGKILL. WP7b N3 (v2 `kind: "take"`). Repo-root README plugin table and root CHANGELOG don't list peak-media yet — add at release.
+
+- [ ] **WP9 verify-6 carry-forward (v0.2):** I1 — the checker does not enforce re-ask after gate 4 storyboard changes or re-listen after gate 8 re-mix; N7 — status ` -fixed` / `— fixed ❌` counted as fixed; N8 — unknown flags / bad `--duck-db` exit without a GATE FAIL line. Checker can be fooled by deliberate forgery (known limit).

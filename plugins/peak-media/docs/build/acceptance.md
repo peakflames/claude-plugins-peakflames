@@ -18,7 +18,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP7a | verified | wp/WP7a/verify-1.md |
 | WP7b | verified | wp/WP7b/verify-2.md |
 | WP8 | verified | wp/WP8/verify-3.md |
-| WP9 | in-progress | — |
+| WP9 | verified | wp/WP9/verify-6.md |
 | WP10 | not-started | — |
 
 ## Register
@@ -79,15 +79,15 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-ORC-03 | design stage 6 | WP8 | G the same run · W the transcript is checked · T at most 3 self-review rounds per plate, then a separate reviewer agent call | script | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
 | AC-ORC-04 | DEC-07 | WP8 | G the same run · W the transcript is checked · T `runtimes.md` is Read before the first plate is written | script | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
 | AC-ORC-05 | spine timing (WP6 verify-2 S-3) | WP8 | G the F1 fixture `plates.json` (stale 20 s-era times) and an F1 spine manifest · W `retime-plates` runs · T every plate's `startMs`/`durationMs` equals its beat's, the file validates, and a plate list that doesn't map one plate per beat (missing beat, unknown beat, two plates on one beat) exits non-zero naming the plate or beat | script | PASS | evidence/WP8/plate-factory-evals.verifier-r3.log |
-| AC-PKG-01 | D19 | WP9 | G the repo · W check · T `plugin.json` version = the top CHANGELOG entry; marketplace.json lists peak-media | script | not-started | — |
-| AC-PKG-02 | D19 | WP9 | G `/plugin marketplace add peakflames/claude-plugins-peakflames#feature/new-peak-media-plugin` · W install · T the 5 peak-media skills are listed, and `web2video` is not | manual | not-started | — |
-| AC-PKG-03 | D17 | WP9 | G the plugin tree · W `grep -ri peakflames` over the runtime tree (`skills/ lib/ schemas/ brand-packs/ vendor/ scripts/ evals/`, so `docs/` and the plugin.json author/repository fields are excluded) · T 0 hits; no brand assets in examples | script | not-started | — |
-| AC-PKG-04 | D16 | WP9 | G macOS with the prerequisites · W `setup.sh` then the F1 neutral eval · T it passes with no manual steps | script | not-started | — |
-| AC-PKG-05 | D18 | WP9 | G a fresh session with only the plugin · W it is asked for (a) a 20 s explainer and (b) a captioned live-capture demo · T both pass using only SKILL.md files; a reviewer agent checks D7–D10 | manual | not-started | — |
-| AC-PKG-06 | §7 | WP9 | G `evals/` · W `node --test plugins/peak-media/evals` · T at least one eval per skill, and all pass | script | not-started | — |
-| AC-PKG-07 | kickoff | WP9 | G VENDORED.md · W check · T each vendor folder has source, commit, date, licence and a list of local changes; GSAP and fonts are listed as fetched or bundled | script | not-started | — |
-| AC-PKG-08 | §7 | WP9 | G macOS · W setup + F0 with a prerequisite missing (ffmpeg, browser, key) · T it prints the one-line message for what's missing | script | not-started | — |
-| AC-PKG-09 | README | WP9 | G README · W read · T it covers install steps, prerequisites, the key setup, and the three modes | manual | not-started | — |
+| AC-PKG-01 | D19 | WP9 | G the repo · W check · T `plugin.json` version = the top CHANGELOG entry; marketplace.json lists peak-media | script | PASS | evidence/WP9/ac-run-WP9.r6.verifier.log |
+| AC-PKG-02 | D19 | WP9 | G `/plugin marketplace add peakflames/claude-plugins-peakflames#feature/new-peak-media-plugin` · W install · T the 5 peak-media skills are listed, and `web2video` is not | manual | PASS | evidence/WP9/AC-PKG-02-user.md, evidence/WP9/AC-PKG-02-user.jpg |
+| AC-PKG-03 | D17 | WP9 | G the plugin tree · W `grep -ri peakflames` over the runtime tree (`skills/ lib/ schemas/ brand-packs/ vendor/ scripts/ evals/`, so `docs/` and the plugin.json author/repository fields are excluded) · T 0 hits; no brand assets in examples | script | PASS | evidence/WP9/ac-run-WP9.r6.verifier.log |
+| AC-PKG-04 | D16 | WP9 | G macOS with the prerequisites · W `setup.sh` then the F1 neutral eval · T it passes with no manual steps | script | PASS | evidence/WP9/ac-run-WP9.r6.verifier.log |
+| AC-PKG-05 | D18 | WP9 | G a fresh session with only the plugin · W it is asked for (a) a 20 s explainer and (b) a captioned live-capture demo · T both pass using only SKILL.md files; a reviewer agent checks D7–D10 | manual | PASS | evidence/WP9/AC-PKG-05-a-r4.md, evidence/WP9/AC-PKG-05-a-r4-sheet.jpg, evidence/WP9/AC-PKG-05-a.md, evidence/WP9/AC-PKG-05-b.md, evidence/WP9/AC-PKG-05-b-sheet.jpg |
+| AC-PKG-06 | §7 | WP9 | G `evals/` · W `node --test plugins/peak-media/evals` · T at least one eval per skill, and all pass | script | PASS | evidence/WP9/AC-PKG-06-suite.r6.verifier.log |
+| AC-PKG-07 | kickoff | WP9 | G VENDORED.md · W check · T each vendor folder has source, commit, date, licence and a list of local changes; GSAP and fonts are listed as fetched or bundled | script | PASS | evidence/WP9/ac-run-WP9.r6.verifier.log |
+| AC-PKG-08 | §7 | WP9 | G macOS · W setup + F0 with a prerequisite missing (ffmpeg, browser, key) · T it prints the one-line message for what's missing | script | PASS | evidence/WP9/ac-run-WP9.r6.verifier.log |
+| AC-PKG-09 | README | WP9 | G README · W read · T it covers install steps, prerequisites, the key setup, and the three modes | manual | PASS | evidence/WP9/AC-PKG-09-user.md |
 | AC-REAL-01 | kickoff §7 | WP10 | G F4 and the Peakflames pack · W the plugin makes the video · T the final contact sheet is approved and the user listens and approves | manual | not-started | — |
 | AC-REAL-02 | kickoff §7 | WP10 | G the run · W it ends · T `wp/WP10/manual-steps.md` lists every hand step as a next-version backlog item | manual | not-started | — |
 | AC-REAL-03 | DEC-16 | WP10 | G the Peakflames pack · W validate · T it passes; the outro reproduces `#s6`, checked on the contact sheet | script + still | not-started | — |
