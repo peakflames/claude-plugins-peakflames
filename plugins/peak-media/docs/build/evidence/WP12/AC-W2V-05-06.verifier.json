@@ -1,0 +1,343 @@
+{
+  "ui-cursor": {
+    "videoMs": 9733,
+    "cursorEngine": "overlay",
+    "pointer": [
+      {
+        "action": "type",
+        "beat": "add",
+        "x": 603,
+        "y": 152,
+        "atMs": 463
+      },
+      {
+        "action": "type",
+        "beat": "add",
+        "x": 603,
+        "y": 152,
+        "atMs": 930
+      },
+      {
+        "action": "click",
+        "beat": "done",
+        "x": 371,
+        "y": 217,
+        "atMs": 2464
+      },
+      {
+        "action": "click",
+        "beat": "filter",
+        "x": 715,
+        "y": 404,
+        "atMs": 4780
+      },
+      {
+        "action": "click",
+        "beat": "filter",
+        "x": 789,
+        "y": 404,
+        "atMs": 6770
+      },
+      {
+        "action": "click",
+        "beat": "clear",
+        "x": 878,
+        "y": 404,
+        "atMs": 7662
+      },
+      {
+        "action": "click",
+        "beat": "clear",
+        "x": 652,
+        "y": 404,
+        "atMs": 8547
+      }
+    ],
+    "beats": [
+      {
+        "id": "add",
+        "startMs": 12,
+        "endMs": 2012
+      },
+      {
+        "id": "done",
+        "startMs": 2013,
+        "endMs": 4346
+      },
+      {
+        "id": "filter",
+        "startMs": 4346,
+        "endMs": 7230
+      },
+      {
+        "id": "clear",
+        "startMs": 7231,
+        "endMs": 9231
+      }
+    ],
+    "sheetAt": [
+      250,
+      750,
+      1250,
+      1750,
+      2250,
+      2750,
+      3250,
+      3750,
+      4250,
+      4750,
+      5250,
+      5750,
+      6250,
+      6750,
+      7250,
+      7750,
+      8250,
+      8750,
+      9250
+    ]
+  },
+  "ui-no-cursor": {
+    "videoMs": 9167,
+    "cursorEngine": null,
+    "pointer": [
+      {
+        "action": "type",
+        "beat": "add",
+        "x": 603,
+        "y": 152,
+        "atMs": 63
+      },
+      {
+        "action": "type",
+        "beat": "add",
+        "x": 603,
+        "y": 152,
+        "atMs": 530
+      },
+      {
+        "action": "click",
+        "beat": "done",
+        "x": 371,
+        "y": 217,
+        "atMs": 2063
+      },
+      {
+        "action": "click",
+        "beat": "filter",
+        "x": 715,
+        "y": 404,
+        "atMs": 4396
+      },
+      {
+        "action": "click",
+        "beat": "filter",
+        "x": 789,
+        "y": 404,
+        "atMs": 5984
+      },
+      {
+        "action": "click",
+        "beat": "clear",
+        "x": 878,
+        "y": 404,
+        "atMs": 6730
+      },
+      {
+        "action": "click",
+        "beat": "clear",
+        "x": 652,
+        "y": 404,
+        "atMs": 7230
+      }
+    ],
+    "beats": [
+      {
+        "id": "add",
+        "startMs": 12,
+        "endMs": 2012
+      },
+      {
+        "id": "done",
+        "startMs": 2013,
+        "endMs": 4346
+      },
+      {
+        "id": "filter",
+        "startMs": 4346,
+        "endMs": 6679
+      },
+      {
+        "id": "clear",
+        "startMs": 6680,
+        "endMs": 8680
+      }
+    ],
+    "sheetAt": [
+      250,
+      750,
+      1250,
+      1750,
+      2250,
+      2750,
+      3250,
+      3750,
+      4250,
+      4750,
+      5250,
+      5750,
+      6250,
+      6750,
+      7250,
+      7750,
+      8250,
+      8750
+    ]
+  },
+  "two-overlay": {
+    "videoMs": 5500,
+    "captionEngine": "overlay",
+    "pointer": [
+      {
+        "action": "point",
+        "beat": "home",
+        "x": 366,
+        "y": 310,
+        "atMs": 462
+      },
+      {
+        "action": "click",
+        "beat": "details",
+        "x": 366,
+        "y": 310,
+        "atMs": 1563
+      },
+      {
+        "action": "point",
+        "beat": "details",
+        "x": 376,
+        "y": 310,
+        "atMs": 2461
+      },
+      {
+        "action": "point",
+        "beat": "page-two",
+        "x": 360,
+        "y": 310,
+        "atMs": 4888
+      }
+    ],
+    "captions": [
+      {
+        "n": 1,
+        "text": "Home page",
+        "startMs": 12,
+        "durationMs": 1499,
+        "x-beat": "home"
+      },
+      {
+        "n": 2,
+        "text": "Hash route to details",
+        "startMs": 1516,
+        "durationMs": 1496,
+        "x-beat": "details"
+      },
+      {
+        "n": 3,
+        "text": "Page two after goto",
+        "startMs": 3020,
+        "durationMs": 2470,
+        "x-beat": "page-two"
+      }
+    ],
+    "sheetAt": [
+      200,
+      600,
+      1000,
+      1400,
+      1800,
+      2200,
+      2600,
+      3000,
+      3400,
+      3800,
+      4200,
+      4600,
+      5000,
+      5400
+    ]
+  },
+  "two-dom": {
+    "videoMs": 5500,
+    "captionEngine": "dom",
+    "pointer": [
+      {
+        "action": "point",
+        "beat": "home",
+        "x": 366,
+        "y": 310,
+        "atMs": 481
+      },
+      {
+        "action": "click",
+        "beat": "details",
+        "x": 366,
+        "y": 310,
+        "atMs": 1549
+      },
+      {
+        "action": "point",
+        "beat": "details",
+        "x": 376,
+        "y": 310,
+        "atMs": 2445
+      },
+      {
+        "action": "point",
+        "beat": "page-two",
+        "x": 360,
+        "y": 310,
+        "atMs": 4889
+      }
+    ],
+    "captions": [
+      {
+        "n": 1,
+        "text": "Home page",
+        "startMs": 12,
+        "durationMs": 1499,
+        "x-beat": "home"
+      },
+      {
+        "n": 2,
+        "text": "Hash route to details",
+        "startMs": 1515,
+        "durationMs": 1497,
+        "x-beat": "details"
+      },
+      {
+        "n": 3,
+        "text": "Page two after goto",
+        "startMs": 3016,
+        "durationMs": 2475,
+        "x-beat": "page-two"
+      }
+    ],
+    "sheetAt": [
+      200,
+      600,
+      1000,
+      1400,
+      1800,
+      2200,
+      2600,
+      3000,
+      3400,
+      3800,
+      4200,
+      4600,
+      5000,
+      5400
+    ]
+  }
+}
