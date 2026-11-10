@@ -6,10 +6,14 @@ check a narrated take before anyone hears it. Learned from a 4.5-minute,
 
 ## Captions or voice only
 
-| Kind of video | Beat | Storyboard |
+The words live in `script.md`, one `## <beat-id>` section per beat: the
+paragraph is spoken, and the `On screen:` line (else the first sentence) is the
+caption. The storyboard only names the beat: `beat('filter', fn)`.
+
+| Kind of video | `script.md` beat | Capture |
 | --- | --- | --- |
-| Short UI demo, 15 to 40 s | One short caption per action, spoken as written | `say("Filter to just yours")` |
-| Explainer or deck, minutes long | One paragraph per slide or scene, no captions | `say("", { narrate: paragraph })` plus `--no-captions` |
+| Short UI demo, 15 to 40 s | One short sentence per action; `On screen:` the same words | `--spine spine/manifest.json` |
+| Explainer or deck, minutes long | One paragraph per slide or scene | `--spine spine/manifest.json --no-captions` |
 
 A paragraph-length clip flows like a person talking; a string of one-line
 clips sounds like a list being read. Captions on a paragraph only repeat what
@@ -54,20 +58,20 @@ the viewer is already hearing, so drop them with `--no-captions`.
 
 ## Check the take
 
-- **Tags performed, not read.** The recorder prints wpm per clip and warns
-  when one clip runs far slower than the rest. Steady rates (160 to 200 wpm
-  here) mean every tag was performed.
-- **Nothing changes mid-sentence.** Call `waitForVoice()` before every slide
-  move or page change, then confirm each visual change sits in a silent gap:
+- **Tags performed, not read.** `spine` prints wpm per clip. Steady rates
+  (160 to 200 wpm here) mean every tag was performed; one clip far slower
+  than the rest read its tag aloud.
+- **Nothing changes mid-sentence.** Make every slide move or page change
+  between two `beat()` calls, never inside a beat's `fn`: between beats is the
+  silence between clips. Then check the take:
 
   ```bash
-  ffmpeg -i out.mp4 -af silencedetect=noise=-40dB:d=0.9 -f null - 2>&1 | grep -oE "silence_(start|end): [0-9.]+"
-  ffmpeg -i out.mp4 -vf "select='gt(scene,0.02)',showinfo" -an -f null - 2>&1 | grep -oE "pts_time:[0-9.]+"
+  node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/check-take.mjs" out.mp4 --expect-cuts <slides − 1>
   ```
 
-  A threshold of 0.02 catches moves between similar dark slides; 0.08 missed
-  most of them. A single-frame hit mid-speech at an even multiple of the
-  keyframe interval (5.12 s here) is the encoder, not a slide move.
+  It fails any scene change outside a silence of at least 900 ms and lists its
+  timecode. Its default threshold, 0.02, catches moves between similar dark
+  slides; 0.08 missed most of them. Captions and the cursor are not counted.
 
 - **A cold read.** Give only the transcript to a fresh agent playing the
   intended viewer, and ask what they would do next, what confused them, and
@@ -79,23 +83,30 @@ the viewer is already hearing, so drop them with `--no-captions`.
 - The tagged text is the source of truth. A transcript with the tags
   stripped loses the delivery.
 - Gemini reads a line differently on every new synthesis, so the text alone
-  does not reproduce the audio. Record the final take with
-  `--manifest narration.json --export-clips clips/` and keep both with the video.
-- To rebuild that exact audio later, copy the clips into
-  `~/.cache/record-website-interaction/tts/`. The cache key is
+  does not reproduce the audio. Keep the spine folder (`manifest.json` and
+  `clips/`) with the video; capture plays those clips, never a new synthesis.
+- To rebuild that exact audio later, copy the clips into the TTS cache
+  (`$PEAK_MEDIA_TTS_CACHE`, else `~/.cache/peak-media/tts/`). The cache key is
   `sha256(model, voice, style, text)`, so the text, voice, style, and model
   must match character for character.
 
 ## Decks driven by a storyboard
 
+One `## <beat-id>` per slide in `script.md`, and one `beat()` per slide in the
+storyboard. The slide changes between beats, so it lands in the silence:
+
 ```js
-for (const { slide, paragraph } of SCRIPT) {
-  await waitForVoice();                              // previous paragraph finishes first
-  await wait(250);
-  await page.evaluate((n) => window.deckGo(n), slide);
-  await wait(900);                                   // let the slide land before speaking
-  await say("", { narrate: paragraph });
+const SLIDES = ['intro', 'why', 'how'];
+
+export default async function storyboard({ beat, page, wait }) {
+  for (const [n, id] of SLIDES.entries()) {
+    if (n) await wait(250);                           // let the last word ring out
+    await page.evaluate((i) => window.deckGo(i), n); // between beats: lands in silence
+    await wait(900);                                  // let the slide settle before the voice
+    await beat(id);                                   // no fn: the slide is the picture
+  }
 }
-await waitForVoice();
-await wait(1800);
 ```
+
+Build its spine with `--lead-ms 950` so each clip starts after the slide has
+settled.
