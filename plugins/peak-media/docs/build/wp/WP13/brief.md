@@ -52,6 +52,6 @@ U1 (YouTube Help 1722171, read 2026-11-10) confirmed the `youtube` row; U2 confi
 
 - **AC-W2V-10** (script) — G no TTS key and a loopback-only network guard · W the ui-demo is captured in captions and silent mode · T both succeed with zero requests to any TTS host
 - **AC-W2V-11** (script) — G the deck narrated on a fake/tone spine · W capture `--spine` · T each clip's onset in `--out` is at its spine time (± one frame, after the audio offset), and capture made no TTS request
-- **AC-W2V-12** (script) — G the ui-demo · W captured once per preset · T `probe-spec --preset <name>` passes for each (size, fps, codec, profile, audio, faststart, and the preset's encode checks)
+- **AC-W2V-12** (script) — G the ui-demo · W captured once per preset · T `probe-spec --preset <name>` passes for each (size, fps, codec, profile, audio, faststart, and the preset's encode checks per DEC-51: audio bitrate ceiling, x264 settings in the stream)
 - **AC-W2V-13** (script) — G the ui-demo · W `--preset youtube --viewport 1280x720 --fps 25`, and `--plates … --plate … --preset web` · T the first is 1280×720@25 with youtube encode settings; the second exits non-zero with a one-line refusal before a browser opens
 - **AC-W2V-14** (script) — G the deck narrated on a fake/tone spine · W capture with captions on, then `check-take --expect-cuts 2` · T it passes (caption changes and the cursor are not counted as cuts): both slide changes sit in ≥ 900 ms of silence
