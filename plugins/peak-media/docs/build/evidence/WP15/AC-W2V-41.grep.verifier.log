@@ -1,0 +1,5 @@
+$ grep -rnE '\bsay\(|waitForVoice' --include='*.md' skills docs/reference
+hits: 0
+md files scanned: 18
+$ grep -rni peakflames skills lib schemas brand-packs vendor scripts evals | wc -l
+0

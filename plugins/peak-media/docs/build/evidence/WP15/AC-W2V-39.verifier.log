@@ -1,0 +1,10 @@
+✔ AC-W2V-39: F3 live plates on beat() capture to durationMs ±1 frame, picture-only, and assemble accepts them (26659.6045ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 26744.787167
+exit 0

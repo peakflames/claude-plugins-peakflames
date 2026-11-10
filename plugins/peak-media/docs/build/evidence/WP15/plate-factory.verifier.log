@@ -1,0 +1,27 @@
+✔ checker fixtures match generate.mjs (no hand edits, no real transcript) (36.499ms)
+✔ checker: the good run passes every rule; the CLI exits 0 (93.32525ms)
+✔ checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render; a for-loop over plates) (281.081667ms)
+✔ skill docs: every stage ends with its literal gate line, and SKILL.md makes them output-style proof (1.1555ms)
+✔ skill docs + checker: gates 2, 5, 6, 7 are printed by their scripts; an echoed line does not count (WP9 round 5) (6.558958ms)
+✔ scripts print gates 5 and 6: render-plate --pipeline-test and gate build, PASS and FAIL forms (WP9 round 5) (10027.350875ms)
+✔ checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else (1.962333ms)
+✔ checker: gate lines are strict about names, results and the user being asked (1.917291ms)
+✔ AC-ORC-02: storyboard produced and approved before any plates/<id>/index.html is written (transcript check) (102.105792ms)
+✔ AC-ORC-03: at most 3 self-review rounds per plate, then a separate reviewer Agent call (transcript check) (362.445042ms)
+✔ AC-ORC-04: runtimes.md is Read before the first plate is written (transcript check) (93.0315ms)
+✔ AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and refuses anything but one plate per beat (1533.479458ms)
+✔ AC-BASE-13: retime-plates --help/--version/bad input follow the baseline (1239.180458ms)
+✔ round 6: approval with edits — GATE 1 comes after the edit, and a missing one fails (cold start r3) (3.33075ms)
+✔ round 6: a script gate line counts only from a real run of the plugin script (verify-4 F1/F3) (0.514959ms)
+✔ round 6: gate.mjs counts the reviewer's listed defects, checks the VERDICT, and matches sheets by exact id (verify-4 G6/F5) (3.6075ms)
+✔ round 7: a storyboard approved with a change is re-run and asked again; APPROVED without the re-ask fails (verify-5 F2-r5) (3.212416ms)
+✔ round 7: a defect status is an explicit trailing token; gate build prints FAIL on usage errors and missing ffmpeg (verify-5 N1/N2/N4) (240.350166ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14493.115667
+exit 0
