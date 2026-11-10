@@ -107,3 +107,54 @@ The server and browser were closed afterwards (nothing is listening on 4173).
 ## Open
 
 - `acceptance.md` statuses are unchanged (not in my Owns list). The Verifier sets them.
+
+## Fix round 1 (verify-1)
+
+The workflow now has 10 steps. Sign-in moved into step 3, so the gate is still step 6. Spine is 7,
+capture 8, check 9 and hand-off 10.
+
+- **1 (blocker), runtime in captions and silent mode:**
+  - Step 5 sizes each beat to about runtime ÷ beats. It estimates the action (glide ~0.4 s,
+    click settle +0.4 s, typing 45 ms per character) and ends `fn` with a `wait()` hold for the
+    rest. A hold between beats is only for a page or slide change.
+  - Step 9 adds a length check: `videoMs` must be within ±10 % of the target. If it isn't, Claude
+    spreads the difference over the holds and re-captures, with no new gate.
+  - Not yet run against a real take; WP17 UAT confirms 18–22 s and 15 s.
+- **2, the video-spine gates:** step 5 says video-spine's Stage 0/1 are read for the format, the
+  budget and the cold-read method only, and that their user gates are replaced by step 6.
+- **3, legible stills:**
+  - The contact sheet now uses `--width 1280 --cols 2`.
+  - The privacy pass reads the frame edges closely (footers, status bars, sidebars, corners), and
+    reads a full-size still of any doubtful moment (`--at <t>s --cols 1 --width <take width>`).
+  - The contact sheet's time stamp covers each still's top-left corner (finding 10). Claude
+    checks that corner in the step 4 `playwright-cli screenshot`s, which are also read for
+    private data before the plan is written.
+- **4, re-recording:** a new "Re-recording" paragraph under Project folder. If
+  `web2video/<slug>/` exists, Claude skips to step 8 and reruns `command[]` from
+  `out/<slug>.take.json`. It leaves `storyboard.mjs` and `script.md` untouched, and reports a beat
+  error as printed before changing anything.
+- **5, privacy options:** they are now **crop** it out of frame (scroll or viewport), **hide** it,
+  or **re-record with clean data**.
+- **6, cases.md, AC-UAT-07:** a note says the full §4.9 report is expected, and that "path and
+  format only" means nothing is uploaded or sent.
+- **7, cases.md, AC-UAT-08/09:** a note gives the tester's answer to the privacy stop:
+  "Continue — it's a fake demo key."
+- **8, sign-in pages:** sign-in happens at step 3, before exploring. It records nothing, so it is
+  not a second gate. Step 4 and a new login.md §2 explore with `playwright-cli open` →
+  `state-load <session file>` → `goto`, then `delete-data` and `close`. The gate now shows the
+  session file the take will use, not a sign-in plan.
+- **9, build history:** removed from presets.md ("As built" heading, "No fallback was needed").
+- **Lead decision, sign-in wording:**
+  - `skills/video-capture/SKILL.md` "Signed-in pages" step 1 now says Claude runs `capture
+    signin` (with a Bash timeout above `--timeout`) and the user signs in themselves in the
+    window.
+  - login.md no longer offers the `!` alternative.
+- **Also:** the handoff.md checklist includes the length check. The AC-W2V-36 test anchors on the
+  renamed step 3 heading and asserts it found the key-check paragraph.
+- **Tests** (`TMPDIR` per run, deleted after):
+  - `evals/web2video/skill.test.mjs`: 4/4.
+  - `evals/video-capture/docs.test.mjs`: 2/2.
+  - Log: `evidence/WP16/fix1-tests.log`.
+  - Nothing else was run.
+- **Not fixed:** 10 (an engine change: the contact-sheet stamp covers the top-left corner; for the
+  lead-todo) and 11 (no change needed).

@@ -14,7 +14,7 @@ All three are H.264 High, yuv420p, faststart MP4 with an AAC-LC 48 kHz stereo tr
 captions and silent modes). Two destinations in one request → pick for the stricter one and say
 which at the gate.
 
-## As built: what to say at hand-off
+## What to say at hand-off
 
 State the preset and one reason tied to the user's own words, e.g. "Preset `web` (1280×720,
 30 fps): you said it's for the product website, so it's kept small and plays inline." Then, if
@@ -29,8 +29,7 @@ it applies:
   fills 384/256/128 kbps. Expected; the preset bitrate is a ceiling.
 - **`youtube` and voice at 0 ms.** The `youtube` file has no edit lists, so a voice clip at 0 ms
   loses its first ~21 ms. The spine's default 250 ms lead-in avoids it; keep `--lead-ms` ≥ 200.
-- **`hifi` is 60 fps.** No fallback was needed; say so only if the take's report shows another
-  rate (then state the rate it actually is, plainly).
+- **`hifi` is 60 fps.** If the report shows another rate, state the rate it actually is, plainly.
 - **An override was used** (`--viewport`, `--fps`): name it, e.g. "1920×1080 at 30 fps on the
   `web` encode, as you asked".
 

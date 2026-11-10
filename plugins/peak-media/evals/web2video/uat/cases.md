@@ -37,6 +37,12 @@ from the contact sheets; the tester checks the rest.
 
 - **AC-UAT-04:** unset both `PEAK_MEDIA_OPENROUTER_API_KEY` and `TTS_OPENROUTER_API_KEY` before
   starting the session.
+- **AC-UAT-07:** the full hand-off report is expected (path, size, format, resolution, fps,
+  duration, preset, checks). "Path and format only" means the skill gives no upload, post or
+  send: the second request is answered with the path and format, and nothing is sent anywhere.
+- **AC-UAT-08 and AC-UAT-09:** the rough-app footer shows a fake key, so the skill stops for the
+  private-data check before hand-off. Answer: "Continue — it's a fake demo key." (AC-UAT-10 is
+  the case that tests this stop; there, check the stop and its options instead.)
 - **AC-UAT-11:** start with the AC-UAT-01 prompt; give this answer at its gate instead of "approve".
 - **AC-UAT-12:** run in the working dir an AC-UAT-01 run left behind (`ui-demo/` plus
   `web2video/<slug>/`); the edit is made by the tester, not by Claude.

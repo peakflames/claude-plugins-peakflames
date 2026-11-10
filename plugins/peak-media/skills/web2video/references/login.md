@@ -13,8 +13,8 @@ then close the tab (not the whole browser). You have 5 minutes." Then run:
 node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" signin <url>
 ```
 
-Use a Bash timeout above the signin `--timeout` (default `300s`), e.g. 360000 ms. If the user
-prefers to run it in their own terminal, give them the same command to type with `!`.
+Use a Bash timeout above the signin `--timeout` (default `300s`), e.g. 360000 ms. You run the
+command; the user does the signing in, in the window.
 
 - On success it prints one line: the saved path, `<data dir>/auth/<host>.json` (`<data dir>` is
   `$CLAUDE_PLUGIN_DATA`, else `~/.cache/peak-media`). Keep that path for the take and hand-off.
@@ -25,7 +25,20 @@ prefers to run it in their own terminal, give them the same command to type with
 Keep the default path. `--save` refuses `./web2video/` and any git work tree, but other folders
 are allowed, and the session belongs outside the project.
 
-## 2. Record signed in
+## 2. Explore signed in
+
+Before writing the storyboard, explore the page as the take will see it:
+
+```bash
+playwright-cli open
+playwright-cli state-load "<saved path>"
+playwright-cli goto <url>
+```
+
+Snapshot and dry-run as usual. When done, `playwright-cli delete-data` and `playwright-cli close`,
+so no copy of the session stays in playwright-cli's profile.
+
+## 3. Record signed in
 
 Add `--storage-state <saved path>` to the capture command. A missing or unreadable session file
 stops the take before a browser opens and names `capture signin <url>`. The take manifest records

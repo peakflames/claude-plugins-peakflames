@@ -53,7 +53,8 @@ test('AC-W2V-36: narrated with no key — the first commands the skill runs give
   }
 
   // 2. The instruction around it: stop, name the variable, offer captions, open no browser.
-  const para = SKILL.slice(SKILL.lastIndexOf('\n\n', SKILL.indexOf('Narrated: check the key')), SKILL.indexOf('3. **Reachability'));
+  const para = SKILL.slice(SKILL.lastIndexOf('\n\n', SKILL.indexOf('Narrated: check the key')), SKILL.indexOf('3. **Reach the page'));
+  assert.ok(para.length > 100, 'found the key-check paragraph');
   assert.match(para, /check the key now, before anything else runs/);
   assert.match(para, /\*\*stop\*\*/);
   assert.match(para, /PEAK_MEDIA_OPENROUTER_API_KEY/);

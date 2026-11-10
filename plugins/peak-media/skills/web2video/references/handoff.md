@@ -4,7 +4,7 @@ web2video ends at the file. Report it, answer questions about it, and stop.
 
 ## Before you hand off
 
-- probe-spec passed (and check-take, if narrated).
+- The length is within ±10 % of the runtime target; probe-spec passed (and check-take, if narrated).
 - You Read the contact sheet with one still per beat.
 - Every private-data finding has the user's decision, and it was carried out.
 
