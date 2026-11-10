@@ -15,9 +15,9 @@ Chromium, so anything a browser can show can be captured; HyperFrames plates (`v
 the frame-by-frame alternative for designed motion.
 
 Scripts: `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/` (`capture.mjs`, `check-take.mjs`).
-`node capture.mjs --help` and `node capture.mjs signin --help` list every flag; `--version`
-prints the plugin version. If a script says
-a dependency is missing, run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh` and retry. Before
+`node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --help` and the same with
+`signin --help` list every flag; `--version` prints the plugin version. If a script says a
+dependency is missing, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh"` and retry. Before
 writing a storyboard, Read `references/storyboard-api.md`.
 
 ## When to use it
@@ -27,7 +27,7 @@ writing a storyboard, Read `references/storyboard-api.md`.
 - A **narrated** web deck or demo: write the narration with `video-spine` first, then capture with
   `--spine spine/manifest.json`. This skill never synthesizes speech; there are no `--narrate`,
   `--voice` or `--tts-model` flags.
-- **Live plates** in a plate-factory project: `capture --plates plates.json --plate <id>` times the
+- **Live plates** in a plate-factory project: `--plates plates.json --plate <id>` times the
   take to the spine and writes `renders/plates/<id>.mp4` at the plate's exact length.
 
 Not for designed motion graphics, kinetic text or slides you are building from scratch: those are
@@ -45,7 +45,10 @@ it must be run once, in order, by `beat(id, fn?)` in the storyboard.
 | Narrated | `--spine spine/manifest.json` | the spine's `beats[].onScreenText` | the spine's clips at their spine times, −16 LUFS | only to build the spine |
 | Live plate | `--plates plates.json --plate <id>` | the plate's beat, from the project spine | none (picture-only) | only to build the spine |
 
-- `--no-captions` with `--spine` makes a voice-only video.
+- Only a `kind: "narration"` spine makes a narrated take. A beatgrid spine (`spine/beatgrid.json`)
+  times the beats to its grid but runs in captions mode (silent with `--no-captions`), with a
+  silent AAC track.
+- `--no-captions` with a narration spine makes a voice-only video.
 - `script.md` is `video-spine`'s script format: one `## <beat-id>` section per beat, a paragraph,
   an optional `On screen:` line and an optional `Style:` line. The text lives there once; the
   storyboard names beats by id only.
@@ -87,17 +90,22 @@ the spine's lead-in (`spine --lead-ms`, default 250 ms, minimum 200) so no clip 
    captions would cover.
 7. **Capture.**
    ```bash
-   node capture.mjs --storyboard storyboard.mjs --script script.md --out out/demo.mp4                    # captions, web
-   node capture.mjs --storyboard storyboard.mjs --script script.md --out out/demo.mp4 --preset youtube   # captions, youtube
-   node capture.mjs --storyboard storyboard.mjs --script script.md --out out/demo.mp4 --no-captions      # silent
-   node capture.mjs --storyboard storyboard.mjs --spine spine/manifest.json --out out/demo.mp4           # narrated
-   node capture.mjs --plates plates.json --plate p3-demo                                                 # a live plate
+   # captions, web (default preset)
+   node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/demo.mp4
+   # captions, youtube
+   node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/demo.mp4 --preset youtube
+   # silent
+   node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/demo.mp4 --no-captions
+   # narrated
+   node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --spine spine/manifest.json --out out/demo.mp4
+   # a live plate (no --preset)
+   node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --plates plates.json --plate p3-demo
    ```
 8. **Read the report** (see Report) and fix any page errors or late beats.
-9. **Check the take** (see Checks): `probe-spec --preset`, then `check-take` on narrated takes.
+9. **Check the take** (see Checks): probe-spec with `--preset`, then check-take on narrated takes.
 10. **Review stills.** Sample a frame inside each beat (spans are in the report and in
     `x-take.beats[]`) and Read them:
-    `node ${CLAUDE_PLUGIN_ROOT}/lib/verify/contact-sheet.mjs out/demo.mp4 --at 1.7s,4.9s,… -o review/demo.jpg`.
+    `node "${CLAUDE_PLUGIN_ROOT}/lib/verify/contact-sheet.mjs" out/demo.mp4 --at 1.7s,4.9s,… -o review/demo.jpg`.
     Look for: the caption readable and not covering the action, the action finished before the
     next beat, the cursor on its target, no blank or half-loaded frames, nothing private on screen.
 11. **Keep the take manifest** (`out/demo.take.json`) with the video: its `command[]` re-runs the
@@ -133,11 +141,12 @@ Signed-in pages.
 
 ## Cursor
 
-The pointer helpers (`goto`, `click`, `type`, `point`, `scrollTo`, `scrollBy`) draw an arrow
-cursor that glides (~400 ms, eased) to each target, pulses on a click, and stays on screen between
-helpers. It is drawn into the captured frames, not the page. `--no-cursor` turns it off; the
-helpers then act at once, so a take with many pointer steps also runs shorter (no glides). Plain
-`page.click()` and other raw Playwright calls never move the cursor.
+An arrow cursor glides (~400 ms, eased) to the target of `click`, `type` and `point`, and pulses
+on a click. `scrollTo` and `scrollBy` glide it to the scroll container's centre; scrolling the page
+itself shows it where it is. `goto` keeps it in place across the navigation. Once shown, it stays
+on screen between helpers. `--no-cursor` turns it off; the helpers then act at once, so a take
+with many pointer steps also runs shorter (no glides). Plain `page.click()` and other raw
+Playwright calls never move the cursor.
 
 ## Captions
 
@@ -158,8 +167,9 @@ helpers then act at once, so a take with many pointer steps also runs shorter (n
 ## Signed-in pages
 
 1. Ask the user to run, in their own terminal:
-   `node ${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs signin <url>`.
-   A visible Chromium window opens; they sign in by hand and close the tab. The session (cookies
+   `node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" signin <url>`.
+   A visible Chromium window opens; they sign in by hand and close the tab (not the whole
+   browser: quitting the browser saves nothing). The session (cookies
    and local storage) is saved to `<data dir>/auth/<host>.json` (`<data dir>` =
    `$CLAUDE_PLUGIN_DATA`, else `~/.cache/peak-media`), folder 0700, file 0600, and the command
    prints only that path. It gives up after `--timeout` (default `300s`; `5m`, `1500ms` also work)
@@ -169,7 +179,8 @@ helpers then act at once, so a take with many pointer steps also runs shorter (n
 
 The session file is a credential:
 
-- Never put it in the project folder or any git work tree; `--save` refuses both.
+- Never put it in the project folder or any git work tree. `--save` refuses `./web2video/` and any
+  git work tree, but not other folders: keep the default path.
 - Never commit it, print it, or Read it.
 - At hand-off, offer to delete it.
 - No session available: record only the public part, or use a demo account with seeded data.
@@ -186,35 +197,40 @@ wrote out/todo-demo.mp4 (3.8 MB, 1280x720 @ 30 fps, 19.6 s, preset web)
 beats: add 0.00–5.10 s · done 5.10–8.40 s · filter 8.40–13.9 s · clear 13.9–19.1 s
 page errors during take: 1
   TypeError: Cannot read properties of undefined (reading 'id')
-take manifest: out/todo-demo.take.json
+take manifest: /abs/path/out/todo-demo.take.json
 ```
 
 - A live plate's line ends `plate <id>` instead of `preset <p>`.
 - `page errors` appears only when the page threw uncaught errors: the first 5 are listed, then
   `… and N more`. Treat them as findings: the page may have broken on camera.
 - A timed beat that started more than a frame late is logged to stderr as
-  `N beat(s) started after their planned time: 'why' +224 ms` and kept in `x-take.beats[].lateMs`.
-  The voice stays at its spine time; only the picture moves. A few hundred ms in a deck loop is harmless; more means the
-  storyboard does too much before the beat.
+  `capture: N beat(s) started after their planned time: 'why' +224 ms` and kept in
+  `x-take.beats[].lateMs`. The voice stays at its spine time; only the picture moves. A few
+  hundred ms in a deck loop is harmless; more means the storyboard does too much before the beat.
 
 **The take manifest** (`<take>.take.json`) is a v1 spine manifest: `kind: "narration"` with the
 laid clips for a narrated take, else `kind: "beatgrid"`. It carries `beats[]`, `captions[]`,
 `videoMs`, `wallMs`, `command[]` (absolute paths; re-runs the take) and `x-take`:
 
-- `mode`, `preset`, `plate`, `fps`, `width`, `height`, `frames`, `out`
+- `mode`, `preset`, `plate`, `storyboard`, `script`, `url`, `fps`, `width`, `height`, `frames`, `out`
 - `cursor`, `signedIn`, `sizeBytes`, `captionEngine`
-- `beats[]`: `id`, `startMs`, `endMs`, `lateMs` per beat
+- `audio` (narrated takes: the clips as laid and the loudness)
+- `beats[]`, one per beat: `n`, `id`, `text`, `startMs`, `durationMs`, `endMs`, `lateMs`,
+  `caption`, and for timed beats `plannedMs` and `clipNs`
+- `pointer[]`: where each pointer helper acted (`action`, `beat`, `x`, `y`, `atMs`). Use it to
+  pick stills that check the cursor is on its target.
 - `pageErrors[]` (first line of each, at most 20) and `pageErrorCount`
 
 ## Checks
 
 - **probe-spec** confirms the delivery spec of a standalone take:
-  `node ${CLAUDE_PLUGIN_ROOT}/lib/verify/probe-spec.mjs out/demo.mp4 --preset web` (use the take's
-  preset). It checks size, fps, H.264 High, yuv420p, faststart, AAC-LC stereo 48 kHz at no more
-  than the preset's bitrate, and the encoder settings written in the stream (CRF for `web`/`hifi`;
+  `node "${CLAUDE_PLUGIN_ROOT}/lib/verify/probe-spec.mjs" out/demo.mp4 --preset web` (use the
+  take's preset). It checks size, fps, H.264 High, yuv420p, faststart, AAC-LC stereo 48 kHz at no
+  more than the preset's bitrate +15 %, and the encoder settings written in the stream (CRF for `web`/`hifi`;
   for `youtube` the 8 Mbps target, peak, CABAC, closed GOP, 2 B-frames and no edit lists). A
   screen recording encodes far below 8 Mbps; that is expected.
-- **check-take** (`check-take.mjs out/demo.mp4`) runs on a narrated take: every scene change must
+- **check-take** (`node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/check-take.mjs" out/demo.mp4`)
+  runs on a narrated take: every scene change must
   sit inside a silence of at least 900 ms (≤ −40 dB, 100 ms clear of each edge). Pass the `--out`
   MP4; a live plate has no audio and is refused.
   - Captions and the cursor are not scene changes: the bottom `--caption-band` of the frame
@@ -246,9 +262,19 @@ laid clips for a narrated take, else `kind: "beatgrid"`. It carries `beats[]`, `
 
 - `examples/ui-demo/` — a small static to-do app, its `script.md` (beats `add`, `done`, `filter`,
   `clear`) and a captioned storyboard. No key:
-  `capture --storyboard examples/ui-demo/storyboard.mjs --script examples/ui-demo/script.md --out /tmp/ui-demo.mp4`.
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" \
+    --storyboard "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/examples/ui-demo/storyboard.mjs" \
+    --script "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/examples/ui-demo/script.md" --out /tmp/ui-demo.mp4
+  ```
 - `examples/deck/` — a neutral 3-slide deck, its `script.md` (beats `intro`, `why`, `how`) and the
   deck loop; runs in all three modes. Narrated:
-  `spine --brief examples/deck/brief.md --tts-model fake/tone --lead-ms 950 --out /tmp/deck-spine`,
-  then `capture --storyboard examples/deck/storyboard.mjs --spine /tmp/deck-spine/manifest.json --out /tmp/deck.mp4`,
-  then `check-take /tmp/deck.mp4 --expect-cuts 2`.
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" \
+    --brief "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/examples/deck/brief.md" \
+    --tts-model fake/tone --lead-ms 950 --out /tmp/deck-spine
+  node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" \
+    --storyboard "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/examples/deck/storyboard.mjs" \
+    --spine /tmp/deck-spine/manifest.json --out /tmp/deck.mp4
+  node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/check-take.mjs" /tmp/deck.mp4 --expect-cuts 2
+  ```

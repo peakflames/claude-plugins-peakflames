@@ -44,7 +44,32 @@ builder-id: wp15-builder
 - AC-W2V-41 also checks the `signin` subcommand's flags (`--save`, `--timeout`). This goes beyond the AC wording.
 - To satisfy "every flag", SKILL.md now mentions `--version` too.
 
-## For the Lead (no code changed)
+## Fix round 1 (verify-1)
+
+- **1:** SKILL.md now says `--save` refuses `./web2video/` and any git work tree, not other folders, so keep the default path.
+- **2:** the cursor text now matches the code:
+  - `click`, `type` and `point` glide to their target.
+  - `scrollTo` and `scrollBy` glide to the scroll container's centre; scrolling the page shows the cursor where it is.
+  - `goto` doesn't move it.
+  - Changed in SKILL.md, storyboard-api.md and the `capture.mjs --help` description (help string only; the coordinator allowed this).
+- **3:** the deck timing paragraph is corrected: the slide changes ~250 ms after the previous beat ends, and the next `beat()` comes ~1150 ms after it.
+- **4:** the Modes section says only a `kind: "narration"` spine is narrated. A beatgrid spine runs captions or silent, with a silent track.
+- **5:** every runnable example uses `node "${CLAUDE_PLUGIN_ROOT}/skills/…/scripts/<x>.mjs"`: Workflow, Examples, Checks, signin, the storyboard-api deck spine, and contact-sheet/probe-spec under `lib/verify/`.
+- **6:** the `x-take` list is complete:
+  - `storyboard`, `script`, `url`, `audio`
+  - `pointer[]`
+  - every per-beat field
+- **12:** signin says to close the tab, not the whole browser.
+- **Also cheap nits:**
+  - 7: the report sample shows the absolute manifest path, and the late-beat line has its `capture: ` prefix.
+  - 9: the probe-spec audio ceiling is the preset's bitrate +15 %.
+- **Also:** `check-take.mjs --help` drops "(web2video D9, DEC-13)".
+- **Tests:**
+  - `docs.test.mjs`: 2/2.
+  - AC-BASE-09 (capture.test) and AC-BASE-10 (captions-mux): pass.
+- **Open nits (not fixed):** 8 (beat-error examples show only `script.md`), 10 (DOM cursor fallback not mentioned), 11 (beat end shifted by `--audio-offset-ms`). `check-take --help` still cites "(DEC-50)".
+
+## For the Lead (no code changed in the first round)
 
 - `check-take.mjs --help` still says "Defaults are the recorder's (web2video D9, DEC-13)". That is build-process history in user-facing help, and D9 now means the old plan (DEC-44). Suggest dropping the parenthetical.
 - The plan's §4.4 deck example has no `if (n) await wait(250)`. The merged example has it, so the docs follow the code.

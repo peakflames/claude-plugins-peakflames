@@ -42,8 +42,10 @@ screencast frame; every time below is on that clock.
 `target` is a selector string (first match) or a Playwright locator such as
 `page.getByLabel('Buy milk')`. The target is scrolled into view and must be visible.
 
-Every pointer helper glides a visible cursor (~400 ms) before it acts. `--no-cursor` hides it and
-skips the glides, so the same storyboard runs shorter.
+`click`, `type` and `point` glide a visible cursor (~400 ms) to their target before they act.
+`scrollTo` and `scrollBy` glide it to the scroll container's centre; scrolling the page itself
+(`scrollTo` with no nested container, `scrollBy(null)`) shows it where it is, with no glide. `goto`
+doesn't move it. `--no-cursor` hides it and skips the glides, so the same storyboard runs shorter.
 
 ## Beat rules
 
@@ -163,11 +165,17 @@ export default async function storyboard({ beat, page, wait }) {
 }
 ```
 
-The deck changes each slide 1150 ms after the previous beat ends (900 ms before the first), so a
-narrated deck needs a spine with long lead-ins:
-`spine --brief examples/deck/brief.md --tts-model fake/tone --lead-ms 950`. The default 250 ms
-lead-in leaves gaps of about 500 ms: every beat starts late and `check-take` rejects the slide
-changes.
+The deck changes each slide about 250 ms after the previous beat ends and calls the next `beat()`
+about 1150 ms after it (900 ms after the change; 900 ms into the take for the first beat). A
+narrated deck therefore needs a spine with long lead-ins:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" \
+  --brief "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/examples/deck/brief.md" --tts-model fake/tone --lead-ms 950
+```
+
+The default 250 ms lead-in leaves gaps of about 500 ms: every beat starts late and `check-take`
+rejects the slide changes.
 
 **Live plate** (one beat, the plate's `beat` in `plates.json`):
 

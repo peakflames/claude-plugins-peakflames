@@ -99,7 +99,7 @@ export const spec = {
   description: `
 Detects scene changes in the picture (ffmpeg scene score above --scene-threshold) and checks each
 lies inside a silence of the audio (at or below --noise-db, lasting at least --min-silence-ms, with
---edge-ms clear on both sides). Defaults are the recorder's (web2video D9, DEC-13): 0.02, -40 dB,
+--edge-ms clear on both sides). Defaults: 0.02, -40 dB,
 900 ms, 100 ms. Pass the take's --out MP4 from capture: it carries the audio.
 Captions and the cursor are not cuts (DEC-50): the scene score is taken on the picture above the
 caption band (the bottom 25 % of the frame by default; --caption-band 0 scores the whole frame),
