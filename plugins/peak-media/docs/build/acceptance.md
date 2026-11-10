@@ -23,7 +23,7 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | WP9 | verified | wp/WP9/verify-6.md |
 | WP10 | verified | wp/WP10/verify-1.md |
 | WP11 | verified | wp/WP11/verify-1.md |
-| WP12 | not-started | — |
+| WP12 | in-progress | — |
 | WP13 | not-started | — |
 | WP14 | not-started | — |
 | WP15 | not-started | — |
@@ -115,3 +115,11 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | AC-BASE-12 | orch §5 baseline | WP6 | G the `remux-audio` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-12.r2.log |
 | AC-BASE-13 | orch §5 baseline | WP8 | G the `retime-plates` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP8/AC-BASE-13.verifier-r3.log |
 | AC-TRC-03 | web2video plan build | WP11 | G a register with an `AC-W2V-01` row and a test named `AC-W2V-01: …` · W `ac-run --trace` and `ac-run --wp` · T the row is traced like any other ID (orphan detected when unlisted) and its test result is reported | script | PASS | evidence/WP11/AC-TRC-03.verifier.log |
+| AC-W2V-01 | web2video-plan §6 | WP12 | G the ui-demo `script.md` (captions) and the deck narrated on a fake/tone spine · W each beat runs · T the caption shown in each beat is that beat's `On screen:` / spine `onScreenText` (assert from the take manifest `captions[]` and a frame sample) | script | not-started | — |
+| AC-W2V-02 | web2video-plan §6 | WP12 | G a storyboard calling `beat('nope')` · W capture · T non-zero exit before any frame is encoded; the one-line error lists the valid ids | script | not-started | — |
+| AC-W2V-03 | web2video-plan §6 | WP12 | G four storyboards (out of order, repeated, nested, one beat never called) · W capture · T each exits non-zero with a one-line message naming the fix | script | not-started | — |
+| AC-W2V-04 | web2video-plan §6 | WP12 | G a beat whose `fn` outlasts its hold, and one whose hold outlasts `fn` · W capture · T each beat's recorded span ≥ max(fn, hold) and the next beat starts after it | script | not-started | — |
+| AC-W2V-05 | web2video-plan §6 | WP12 | G the ui-demo · W captured with and without `--no-cursor` · T a labelled contact sheet shows the cursor at each click/type target, and none with `--no-cursor` (`evidence/WP12/AC-W2V-05-*.jpg`) | still | not-started | — |
+| AC-W2V-06 | web2video-plan §6 | WP12 | G a two-page fixture with a hash-route link and a `goto` · W captured · T after each navigation exactly one cursor and one caption are visible (`evidence/WP12/AC-W2V-06-*.jpg`) | still | not-started | — |
+| AC-W2V-07 | web2video-plan §6 | WP12 | G a scroll container with ≥ 100 rows · W `scrollBy(container, {y: 1500, ms: 600})` at 30 fps · T at least 10 distinct frames over the scroll | script | not-started | — |
+| AC-W2V-08 | web2video-plan §6 | WP12 | G the repo · W grep `\bsay\(\|waitForVoice` over code files (`*.mjs`, `*.js`, `*.html`) in `skills/`, `evals/`, `docs/build/fixtures/` · T 0 hits (Markdown docs are WP15's; `scripts/setup.sh`'s shell `say` is outside the grep) | script | not-started | — |
