@@ -73,6 +73,19 @@ test('skill docs: every stage ends with its literal gate line, and SKILL.md make
   assert.ok(stage1.indexOf('Runtime check, before any TTS') < stage1.indexOf('AskUserQuestion'), 'runtime is checked before the gate-1 question');
 });
 
+test('skill docs + checker: the automatic stages (2, 5, 6, 7) must print their gate lines too (WP9 AC-PKG-05 run a)', () => {
+  const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
+  const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
+  assert.match(skill, /Automatic stages need their gate line too\.\*\* Stages 2, 5, 6 and 7 have no user stop/);
+  assert.match(skill, /\| Gate line \(required, every stage\) \|/);
+  for (const n of [2, 5, 6, 7]) {
+    assert.match(stages, new RegExp(`No user stop here, so the line is required: write it as text now, before stage ${n + 1}'s first command\\.\\nEnd the stage with: \`GATE ${n} `), `stage ${n} says its line is required`);
+  }
+  // the cold-start failure: user gates printed, automatic ones silent -> AC-ORC-01 names them
+  const ev = load('good').map((e) => (e.kind === 'text' ? { ...e, text: e.text.replace(/^GATE [2567] .*$/gm, '') } : e));
+  assert.match(checkGates(ev).message, /no passing gate line for gate\(s\) 2, 5, 6, 7/);
+});
+
 test('checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else', () => {
   const rs = byId(checkAll(load('bad-gate-order')));
   assert.equal(rs['AC-ORC-01'].ok, false);

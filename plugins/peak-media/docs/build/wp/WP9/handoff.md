@@ -81,6 +81,13 @@ Round 1 ran AC-PKG-04/08 in linux/amd64 and arm64 `node:22-slim` containers (log
 - Results: full suite, fresh TMPDIR: **103/103 pass**, 423 s (evidence/WP9/AC-PKG-06-suite.r3.log); TMPDIR afterwards only Node's `node-compile-cache`. `ac-run --wp WP9`: six script ACs pass (evidence/WP9/ac-run-WP9.r3.log); `--trace`: 79 ACs, 0 problems.
 - **N5** `remux-audio.mjs` `videoStreamMd5` goes through `ffmpeg()` (watchdog); the eval helper's timeout message shows the exact limit (`1.5 s`).
 
+## Round 4 (AC-PKG-05 run a: no GATE 2/5/6/7 lines)
+
+- **Cause (transcript `f4df6d2b…`):** the session printed a gate line only at the top of the turn after a user answer (`GATE n … Starting stage n+1`). Automatic stages ran inside the same turn as the next user gate (2 with 3; 5, 6, 7 with 8) and were reported in plain prose ("The voice-over is recorded…", "The narrated cut is assembled"), never as `GATE` lines.
+- **Fix:** `SKILL.md` gets a short rule above the general one: stages 2, 5, 6, 7 have no user stop, so their `GATE … PASS` line is the only record; write it as visible text the moment the check passes, before the next stage's first command, even mid-turn (a turn running 5→7 prints 5, 6 and 7). The stage table's column is now "Gate line (required, every stage)". `stages.md` adds one line above each automatic stage's closing gate: "No user stop here, so the line is required: write it as text now, before stage N+1's first command."
+- **Results:** full suite, fresh TMPDIR: **104/104 pass**, 428 s (evidence/WP9/AC-PKG-06-suite.r4.log); TMPDIR afterwards only Node's `node-compile-cache`. `ac-run --wp WP9`: six script ACs pass (evidence/WP9/ac-run-WP9.r4.log); `--trace`: 79 ACs, 0 problems. The Lead re-runs the AC-PKG-05 cold start on a reinstall.
+- **Eval:** `plate-factory.test.mjs` checks both docs state the rule for 2/5/6/7, and that the `good` transcript with the 2/5/6/7 lines removed fails AC-ORC-01 with "no passing gate line for gate(s) 2, 5, 6, 7".
+
 ## Open
 
 - **AC-PKG-02 — blocked: needs user.** Needs the branch pushed (user approval), then the install check in `pkg-02-05-runbook.md`.

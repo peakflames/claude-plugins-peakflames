@@ -161,6 +161,7 @@ End the stage with: `GATE 1 script: APPROVED — script.md (<words> words, cold 
 4. On `FAIL`, change words in `script.md` and go back to stage 1's approval; never stretch the
    spine by hand.
 
+No user stop here, so the line is required: write it as text now, before stage 3's first command.
 End the stage with: `GATE 2 spine: PASS — spine/manifest.json <totalMs> ms (target <targetMs> ±10%)`
 (or `spine/beatgrid.json`).
 
@@ -213,6 +214,7 @@ The approved stills are the spec for stage 6.
 2. Read `review/contact-<id>.jpg`: frames render, fonts and brand colours load, the first frame
    isn't blank. A missing dependency is `FAIL`: run setup, repeat.
 
+No user stop here, so the line is required: write it as text now, before stage 6's first command.
 End the stage with: `GATE 5 pipeline: PASS — renders/plates/<id>.mp4 (<durationMs> ms, lint clean)`
 
 ## Stage 6 — Build plates (check gate: self-review ×3, then one reviewer)
@@ -248,6 +250,7 @@ defect is open.
 re-sheeted (`-fix<N>.jpg`) and Read. Write the GATE 6 line at that point, before any assemble
 command.
 
+No user stop here, so the line is required: write it as text now, before stage 7's first command.
 End the stage with: `GATE 6 build: PASS — <n> plates; reviewer: <k> defects, <k> fixed`
 
 ## Stage 7 — Composite (check gate: every cut in a silent gap)
@@ -260,6 +263,7 @@ End the stage with: `GATE 6 build: PASS — <n> plates; reviewer: <k> defects, <
 3. A cut not in silence is fixed at the source (the spine beat, then `retime-plates`, then
    re-render that plate).
 
+No user stop here, so the line is required: write it as text now, before stage 8's first command.
 End the stage with: `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in ≥300 ms silence)`
 
 ## Stage 8 — Music, then SFX (user gate: the user listens)

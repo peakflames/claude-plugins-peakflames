@@ -17,6 +17,12 @@ voice) sets the clock; each beat gets one **plate** (`motion`, `slide` or `live`
 own; assembly puts the plates on the spine. Stills are approved before any animation is written,
 and audio never forces a re-render.
 
+**Automatic stages need their gate line too.** Stages 2, 5, 6 and 7 have no user stop, so the
+`GATE 2/5/6/7 … PASS` line is the only record that they passed. Write each one as visible text the
+moment its check passes, before the next stage's first command — even mid-turn, even when the next
+stage follows straight on. A turn that runs stages 2→3 prints `GATE 2`; a turn that runs 5→7 prints
+`GATE 5`, `GATE 6` and `GATE 7` along the way, then stops at gate 8.
+
 **Every stage ends with its gate line**, written on its own line in your reply, e.g.
 `GATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)`. This holds for all
 ten stages, including the mechanical ones (2, 5, 6, 7, 9) that need no answer from the user, and
@@ -61,7 +67,7 @@ has each stage's steps, commands and gate-line format. Read
 
 ## The stages
 
-| # | Stage | Output | Gate | Gate line |
+| # | Stage | Output | Gate | Gate line (required, every stage) |
 |---|---|---|---|---|
 | 0 | Brief | `brief.md` | user confirms | `GATE 0 brief: APPROVED — brief.md` |
 | 1 | Script | `script.md` | cold-read agent, then user | `GATE 1 script: APPROVED — script.md (…)` |
