@@ -1052,8 +1052,9 @@ with --script the reading time (about 3 words/s, at least 1.5 s; a longer fn len
 with a spine the beat's clip, played at its spine time (no TTS here; beat() waits for the clip's
 start), and the take lasts exactly the plate's (or the spine's) planned duration. An unknown,
 out-of-order, repeated, nested or uncalled beat stops the take. Modes: captions (default),
-silent (--no-captions), narrated (a narration spine). The pointer helpers goto, click, type, point,
-scrollTo and scrollBy glide a visible cursor (--no-cursor hides it) to their target.
+silent (--no-captions), narrated (a narration spine). A visible cursor (--no-cursor hides it)
+glides to the target of click, type and point, and to the scroll container of scrollTo and
+scrollBy (scrolling the page shows it where it is); goto keeps it in place across the navigation.
 The page is --url, else the plate's live.url, else the storyboard's exported \`url\`, else an
 index.html next to the storyboard; local files are served on 127.0.0.1. Pre-flight (Chromium,
 ffmpeg, the pinned Playwright, a valid --script/--spine, the spine clips' audio) runs before any
