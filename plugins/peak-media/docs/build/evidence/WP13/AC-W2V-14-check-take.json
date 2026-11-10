@@ -16,8 +16,8 @@
     "captions": [
       {
         "text": "Water your garden in the morning",
-        "startMs": 951,
-        "durationMs": 5454
+        "startMs": 950,
+        "durationMs": 5455
       },
       {
         "text": "Less water lost, less mildew",
@@ -46,7 +46,7 @@
         "ok": true
       },
       {
-        "timecode": "0:07.633",
+        "timecode": "0:07.600",
         "ok": false
       },
       {
@@ -74,42 +74,42 @@
         "beat": "one",
         "x": 66,
         "y": 62,
-        "atMs": 467
+        "atMs": 464
       },
       {
         "action": "point",
         "beat": "one",
         "x": 1214,
         "y": 62,
-        "atMs": 900
+        "atMs": 896
       },
       {
         "action": "point",
         "beat": "two",
         "x": 1213,
         "y": 452,
-        "atMs": 1955
+        "atMs": 1951
       },
       {
         "action": "point",
         "beat": "two",
         "x": 67,
         "y": 452,
-        "atMs": 2381
+        "atMs": 2379
       },
       {
         "action": "point",
         "beat": "three",
         "x": 1214,
         "y": 62,
-        "atMs": 3614
+        "atMs": 3613
       },
       {
         "action": "point",
         "beat": "three",
         "x": 66,
         "y": 62,
-        "atMs": 4049
+        "atMs": 4047
       }
     ],
     "cuts": 0

@@ -14,7 +14,7 @@ import path from 'node:path';
 import { ROOT, run, tmpDir } from '../helpers/run.mjs';
 import { CAPTURE, SPINE, DECK, NO_KEY, makeF3Project, LOCAL_PAGE } from './helpers/projects.mjs';
 import { toneOnsets } from './helpers/sync.mjs';
-import { PRESETS, presetExpect } from '../../skills/video-capture/scripts/capture.mjs';
+import { PRESETS, presetExpect } from '../../lib/presets.mjs';
 import { probeSpec, x264Options } from '../../lib/verify/probe-spec.mjs';
 import { contactSheet } from '../../lib/verify/contact-sheet.mjs';
 import { browserPath } from '../../lib/hf.mjs';

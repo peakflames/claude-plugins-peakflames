@@ -108,8 +108,22 @@ checked as a band either.** Both are variable-rate in practice. I measured (ffmp
   version bump is WP18). The suite rewrote WP5/WP10 evidence; I restored it and it is not
   committed.
 
+## Follow-up after DEC-51
+
+- **The bitrate checks follow DEC-51 (option a):** ceilings plus the encoder settings. I merged
+  `feature/peak-media-web2video` into this branch to pick it up.
+- **The preset table moved to a new `lib/presets.mjs`**, which WP13 owns for this change. It holds
+  `PRESETS`, `DEFAULT_PRESET`, `presetArgs`, `presetSummary` and `presetExpect`.
+  - `capture.mjs` and `lib/verify/probe-spec.mjs` both import it.
+  - probe-spec no longer imports a skill script.
+  - `capture.mjs` doesn't re-export the presets; `presets.test.mjs` imports them from
+    `lib/presets.mjs`.
+- **Re-run only the affected tests:**
+  - `verify-tools.test.mjs` 9/9, including AC-BASE-04 and the probe-spec `--preset` test.
+  - `capture.test.mjs` AC-BASE-09 and AC-REC-01: pass.
+  - `ac-run --wp WP13`: AC-W2V-10..14 all pass, and the evidence was rewritten by that run.
+  - No full suite, as the coordinator said.
+
 ## Open
 
 - `SKILL.md` and `references/storyboard-api.md` still describe `--mp4` (WP15).
-- probe-spec now imports `capture.mjs`, so `assemble`, `render-plate` and `gate` load it too. It
-  has no side effects, but it is a lib→skill import.

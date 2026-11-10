@@ -38,7 +38,7 @@
   ],
   "plateRefusal": {
     "code": 2,
-    "ms": 88,
+    "ms": 90,
     "stderr": "capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset"
   }
 }

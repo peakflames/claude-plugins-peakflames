@@ -2,13 +2,13 @@
 // probe-spec — assert an MP4 meets the delivery spec (D7): H.264 High, yuv420p,
 // AAC 48 kHz, faststart (moov before mdat), size, and duration within ±N frames.
 // With --preset web|youtube|hifi it also checks that preset's encode (DEC-47); the preset table
-// is video-capture's PRESETS, imported, not copied.
+// is lib/presets.mjs (shared with capture), imported, not copied.
 import { openSync, readSync, closeSync, fstatSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { runCli, CliError, EXIT } from '../cli.mjs';
 import { probe, fpsOf, requireFfmpeg, ffprobeBin } from '../ffmpeg.mjs';
 import { spawnSync } from 'node:child_process';
-import { PRESETS, presetExpect } from '../../skills/video-capture/scripts/capture.mjs';
+import { PRESETS, presetExpect } from '../presets.mjs';
 
 /** Boxes at one level of an MP4, from byte `start` to `end`: [{type, start, size, header}]. */
 function boxesIn(fd, start, end) {
