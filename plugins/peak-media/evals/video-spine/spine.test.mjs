@@ -112,6 +112,7 @@ test('AC-BASE-06: spine baseline (help lists every flag, version, one-line error
   const over = run(SPINE, ['--brief', b(long), '--tts-model', 'fake/tone', '--cache-dir', path.join(long, 'cache')], { env: NO_KEY });
   assert.equal(over.code, 1);
   assert.match(over.stderr.trim(), /^spine: runtime .* outside ±10% — resize script\.md/);
+  assert.match(over.stdout.trim().split('\n').at(-1), /^GATE 2 spine: FAIL — spine\/manifest\.json \d+ ms is outside ±10% of the 26000 ms target$/, 'gate 2 FAIL line (WP9 round 5)');
   assert.equal(over.stderr.trim().split('\n').length, 1);
   assert.ok(existsSync(path.join(long, 'spine', 'manifest.json')));
   // --budget needs no synthesis and no network
@@ -144,4 +145,15 @@ test('spine: script.md parsing, layout rules and a second (neutral) brief (not A
   assert.deepEqual(g.beats.map((x) => x.id), ['intro', 'why', 'tip']);
   assert.ok(g.beats.every((x) => x.onScreenText), 'first sentence used when no On screen line');
   assert.ok((await validateFile(path.join(dir, 'spine', 'beatgrid.json'))).ok);
+});
+
+test('spine prints the GATE 2 line itself when the runtime check passes (WP9 round 5)', () => {
+  const dir = project();
+  const r = run(SPINE, ['--brief', path.join(dir, 'brief.md'), '--target-ms', '20000', '--tts-model', 'fake/tone', '--cache-dir', path.join(dir, 'cache')], { env: NO_KEY });
+  assert.equal(r.code, 0, r.stderr);
+  const m = JSON.parse(readFileSync(path.join(dir, "spine", "manifest.json"), "utf8"));
+  assert.equal(r.stdout.trim().split('\n').at(-1), `GATE 2 spine: PASS — spine/manifest.json ${m.totalMs} ms (target 20000 ±10%)`);
+  const g = run(SPINE, ['--brief', path.join(dir, 'brief.md'), '--target-ms', '20000', '--no-narrate'], { env: NO_KEY });
+  assert.equal(g.code, 0, g.stderr);
+  assert.match(g.stdout.trim().split('\n').at(-1), /^GATE 2 spine: PASS — spine\/beatgrid\.json \d+ ms \(target 20000 ±10%\)$/);
 });

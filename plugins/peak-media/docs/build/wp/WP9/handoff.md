@@ -88,6 +88,20 @@ Round 1 ran AC-PKG-04/08 in linux/amd64 and arm64 `node:22-slim` containers (log
 - **Results:** full suite, fresh TMPDIR: **104/104 pass**, 428 s (evidence/WP9/AC-PKG-06-suite.r4.log); TMPDIR afterwards only Node's `node-compile-cache`. `ac-run --wp WP9`: six script ACs pass (evidence/WP9/ac-run-WP9.r4.log); `--trace`: 79 ACs, 0 problems. The Lead re-runs the AC-PKG-05 cold start on a reinstall.
 - **Eval:** `plate-factory.test.mjs` checks both docs state the rule for 2/5/6/7, and that the `good` transcript with the 2/5/6/7 lines removed fails AC-ORC-01 with "no passing gate line for gate(s) 2, 5, 6, 7".
 
+## Round 5 (cold-start r2: still no GATE 1, 2, 5, 6 — gate lines move into the scripts)
+
+- **Cause (r2 transcript `223063fc…`):** the session printed `GATE n … REJECTED (awaiting approval)` while waiting at user gates and then did not always write the APPROVED line (gate 1); the automatic stages again ran inside other turns with prose only (only GATE 7 appeared). A written rule isn't enough.
+- **Scripts print gates 2, 5, 6, 7** in the SKILL.md table's exact formats, PASS on stdout (exit 0) or `FAIL — <reason>` on stdout plus the usual one-line error (non-zero):
+  - `spine.mjs` → `GATE 2 spine: PASS — spine/manifest.json <ms> ms (target <ms> ±10%)` (or `spine/beatgrid.json`); target from the brief or `--target-ms` (already a flag).
+  - `render-plate.mjs plates.json <first id> --pipeline-test` (new flag: one plate, must be the first motion/slide plate; implies `--lint --sheet`) → `GATE 5 pipeline: PASS — renders/plates/<id>.mp4 (<ms> ms, lint clean)`.
+  - new `skills/plate-factory/scripts/gate.mjs build <plates.json|project>` → `GATE 6 build: PASS — <n> plates; reviewer: <d> defects, <f> fixed`; checks each plate's render (duration ±1 frame, fps, size), a sheet of each final render (sheet mtime ≥ render mtime) and `review/plate-review.md` (the reviewer's report, naming every plate, with `Defects:`/`Fixed:` lines, fixed ≥ defects).
+  - `assemble.mjs` → `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in ≥300 ms silence)` when the cut check passes (to stderr under `--json`). It prints it again on the stage-9 run; the checker counts the first.
+- **SKILL.md / stages.md:** gate lines for 2, 5, 6, 7 come from those commands ("never type or echo these four lines"); the model writes 0, 1, 3, 4, 8, 9, writes a user gate's APPROVED right after the answer, and prints no gate line while waiting (REJECTED only for a refusal). Round-4 prose removed; stage 6 adds "write `review/plate-review.md`, then `gate.mjs build .`". `video-spine` and `video-plates` SKILL.md mention the printed lines.
+- **Checker (`transcript.mjs`):** gates 2/5/6/7 also count from a main-thread Bash result whose command runs that gate's script (`spine`, `render-plate`, `gate`, `assemble`), unless the command itself contains a gate line (`echo "GATE …"`). Fixtures: `good-script-gates` (lines only in script output) passes; `bad-echoed-gate` (`render-plate … && echo "GATE 5 …"`) fails with "no passing gate line for gate(s) 5"; `bad-quoted-gate` still fails AC-ORC-02.
+- **Evals:** spine PASS (narration and beat grid) and FAIL lines; render-plate `--pipeline-test` PASS and FAIL; `gate build` PASS, FAIL (no record, open defect, render newer than its sheets) and baseline; assemble PASS and FAIL; doc and fixture checks.
+- **Results:** full suite, fresh TMPDIR: **107/107 pass**, 440 s (evidence/WP9/AC-PKG-06-suite.r5.log); TMPDIR afterwards only Node's `node-compile-cache`. `ac-run --wp WP9`: six script ACs pass (evidence/WP9/ac-run-WP9.r5.log); `--trace`: 79 ACs, 0 problems. The cold start itself needs the Lead's re-run on a reinstall.
+- Ownership: `skills/video-spine/scripts/spine.mjs` and `skills/video-spine/SKILL.md` (Lead round-5 instruction); new `skills/plate-factory/scripts/gate.mjs` (entry point, baseline-tested; not a register AC).
+
 ## Open
 
 - **AC-PKG-02 — blocked: needs user.** Needs the branch pushed (user approval), then the install check in `pkg-02-05-runbook.md`.

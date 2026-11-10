@@ -262,8 +262,14 @@ async function main({ values: v }, argv) {
   const off = Math.abs(doc.totalMs - targetMs) / targetMs;
   const summary = `${(doc.totalMs / 1000).toFixed(2)} s against a ${(targetMs / 1000).toFixed(1)} s target (${doc.totalMs >= targetMs ? '+' : '-'}${(off * 100).toFixed(1)}%)`;
   process.stdout.write(`wrote ${outFile} and ${audioFile}\n`);
-  if (off > 0.1) throw new CliError(`runtime ${summary} is outside ±10% — resize script.md (words ≈ s × wpm ÷ 60; see --budget) and rerun`);
+  // stage 2's gate line comes from here, not from the model (plate-factory stages.md)
+  const rel = path.relative(path.dirname(path.resolve(v.brief)), outFile) || outFile;
+  if (off > 0.1) {
+    process.stdout.write(`GATE 2 spine: FAIL — ${rel} ${doc.totalMs} ms is outside ±10% of the ${targetMs} ms target\n`);
+    throw new CliError(`runtime ${summary} is outside ±10% — resize script.md (words ≈ s × wpm ÷ 60; see --budget) and rerun`);
+  }
   process.stdout.write(`PASS  runtime ${summary}\n`);
+  process.stdout.write(`GATE 2 spine: PASS — ${rel} ${doc.totalMs} ms (target ${targetMs} ±10%)\n`);
   return EXIT.OK;
 }
 

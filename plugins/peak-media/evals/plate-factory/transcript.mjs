@@ -77,16 +77,35 @@ const isTool = (e, ...names) => e.kind === 'tool_use' && names.includes(e.name);
 const isAsk = (e) => isMain(e) && isTool(e, 'AskUserQuestion');
 const askedBetween = (events, lo, hi) => events.some((e) => isAsk(e) && e.seq > lo && e.seq < hi);
 
+/** Mechanical gates whose line the stage's own script prints (WP9 round 5). */
+export const GATE_SCRIPTS = { 2: 'spine', 5: 'render-plate', 6: 'gate', 7: 'assemble' };
+
 /**
- * Gate lines the main thread wrote. A gate line counts only as the assistant's own marker: a line
- * of a text block that starts with `GATE ` or `**GATE ` (bold may cover the whole line or only
- * its head: `**GATE 4 storyboard: APPROVED** — …`), outside ``` / ~~~ fences. A
- * quoted (`> GATE …`), bulleted or inline-code (`` `GATE …` ``) line doesn't count.
+ * Gate lines of the main thread. A gate line counts as the assistant's own marker: a line of a
+ * text block that starts with `GATE ` or `**GATE ` (bold may cover the whole line or only its head:
+ * `**GATE 4 storyboard: APPROVED** — …`), outside ``` / ~~~ fences. A quoted (`> GATE …`),
+ * bulleted or inline-code (`` `GATE …` ``) line doesn't count. Gates 2, 5, 6 and 7 also count
+ * from the output of a Bash call that runs that gate's script (GATE_SCRIPTS), unless the command
+ * itself contains a gate line (an `echo "GATE …"` or `printf` is not the script's verdict).
  * Returns {n, name, result, evidence, event, k}.
  */
 export function gateLines(events) {
   const out = [];
+  const uses = new Map(events.filter((e) => e.kind === 'tool_use').map((e) => [e.id, e]));
   for (const e of events) {
+    if (e.kind === 'tool_result' && isMain(e)) {
+      const use = uses.get(e.id);
+      if (!use || use.name !== 'Bash') continue;
+      const cmd = commandOf(use);
+      if (/GATE\s+\d/.test(cmd)) continue;
+      for (const raw of e.text.split('\n')) {
+        const m = GATE_RE.exec(raw.trim());
+        if (!m || !GATE_SCRIPTS[m[1]]) continue;
+        if (!segments(cmd).some((s) => runs(s, GATE_SCRIPTS[m[1]]))) continue;
+        out.push({ n: Number(m[1]), name: m[2], result: m[3], evidence: (m[4] ?? '').trim(), event: e, k: out.length, from: 'script' });
+      }
+      continue;
+    }
     if (e.kind !== 'text' || !isMain(e)) continue;
     let fenced = false;
     for (const raw of e.text.split('\n')) {

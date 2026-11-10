@@ -35,7 +35,7 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/video-plates/scripts/render-plate.mjs" <plate
    any missing plate from its kind's template and writes one key frame per plate to
    `review/storyboard.jpg` (+ `review/storyboard/<id>.png`). Read the sheet; the user approves
    it **before** any animation is written or tuned. Wording, layout and asset choices are fixed here.
-2. **Pipeline test.** Render plate 1 alone: `render-plate plates.json <first-id> --sheet`.
+2. **Pipeline test.** Render plate 1 alone: `render-plate plates.json <first-id> --pipeline-test` (lint, render, sheet; prints the `GATE 5 pipeline:` line).
 3. **Build each plate.** Start from the template (`--scaffold-only`) or keep it; for anything the
    template can't show, edit `plates/<id>/index.html` by hand following `plate-authoring.md` and
    the vendored-map Read steps for that kind of content. Rules:

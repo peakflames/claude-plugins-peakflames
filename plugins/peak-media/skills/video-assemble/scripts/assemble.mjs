@@ -142,7 +142,7 @@ export function plateCuts(sorted, totalMs) {
   return [...set].sort((a, b) => a - b);
 }
 
-export async function assemble({ input, brand, renders, out, music, sfx, musicLufs, duckDb, sfxLufs, sfxDb, exportPreset = 'source', minSilenceMs = 300, outro, rerenderOutro = false, renderWrap, log = () => {} }) {
+export async function assemble({ input, brand, renders, out, music, sfx, musicLufs, duckDb, sfxLufs, sfxDb, exportPreset = 'source', minSilenceMs = 300, outro, rerenderOutro = false, renderWrap, log = () => {}, gate = () => {} }) {
   if (!(exportPreset in EXPORTS)) throw new CliError(`--export must be one of ${Object.keys(EXPORTS).join(', ')}`, EXIT.USAGE);
   for (const [flag, f] of [['--music', music], ['--sfx', sfx], ['--outro', outro]]) if (f && !existsSync(f)) throw new CliError(`${flag} ${f}: no such file`);
   const P = await loadProject(input, { brand });
@@ -200,9 +200,12 @@ export async function assemble({ input, brand, renders, out, music, sfx, musicLu
     if (bad.length) {
       writeFileSync(path.join(reviewDir, 'assemble.json'), JSON.stringify(report, null, 2) + '\n');
       const what = bad.map((c) => `${c.timecode} (${c.plates.join('|')}: ${c.gap ? `silence ${c.silenceMs} ms${c.edge ? ', too close to its edge' : ''}` : 'over sound'})`).join(', ');
+      gate(`GATE 7 composite: FAIL — ${rel(outDir, review)}: cut not in a ≥${minSilenceMs} ms silence at ${what}`);
       throw new CliError(`cut not in a ≥${minSilenceMs} ms silence at ${what} — re-time the spine beat or move the plate boundary; review left at ${review}`);
     }
     log(`cuts      ${cuts.length} plate cut(s) in silence (≥${minSilenceMs} ms)`);
+    // stage 7's gate line comes from here, not from the model (plate-factory stages.md)
+    gate(`GATE 7 composite: PASS — ${rel(outDir, review)} (${cuts.length} cuts in ≥${minSilenceMs} ms silence)`);
 
     // 4. optional music / SFX stems: remux, picture copied
     let picture = review;
@@ -303,7 +306,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     requireFfmpeg();
     const r = await assemble({ input, brand: values.brand, renders: values.renders, out: values.out, music: values.music, sfx: values.sfx,
       musicLufs: values['music-lufs'], duckDb: values['duck-db'], sfxLufs: values['sfx-lufs'], sfxDb: values['sfx-db'], exportPreset: values.export, minSilenceMs: values['min-silence-ms'],
-      outro: values.outro, rerenderOutro: values['rerender-outro'], log: values.json ? () => {} : (l) => process.stdout.write(`${l}\n`) });
+      outro: values.outro, rerenderOutro: values['rerender-outro'], log: values.json ? () => {} : (l) => process.stdout.write(`${l}\n`),
+      gate: (l) => (values.json ? process.stderr : process.stdout).write(`${l}\n`) });
     if (values.json) process.stdout.write(JSON.stringify(r, null, 2) + '\n');
     else process.stdout.write(`${r.final.file}\n`);
     return EXIT.OK;

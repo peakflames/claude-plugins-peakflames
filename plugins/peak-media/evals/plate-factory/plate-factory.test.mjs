@@ -2,7 +2,7 @@
 // AC-ORC-01, which itself is the user's manual run), and retime-plates (AC-ORC-05, AC-BASE-13).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync, cpSync, utimesSync } from 'node:fs';
 import path from 'node:path';
 import { run, baseline, ROOT, tmpDir } from '../helpers/run.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
@@ -73,17 +73,70 @@ test('skill docs: every stage ends with its literal gate line, and SKILL.md make
   assert.ok(stage1.indexOf('Runtime check, before any TTS') < stage1.indexOf('AskUserQuestion'), 'runtime is checked before the gate-1 question');
 });
 
-test('skill docs + checker: the automatic stages (2, 5, 6, 7) must print their gate lines too (WP9 AC-PKG-05 run a)', () => {
+test('skill docs + checker: gates 2, 5, 6, 7 are printed by their scripts; an echoed line does not count (WP9 round 5)', () => {
   const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
   const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
-  assert.match(skill, /Automatic stages need their gate line too\.\*\* Stages 2, 5, 6 and 7 have no user stop/);
-  assert.match(skill, /\| Gate line \(required, every stage\) \|/);
+  assert.match(skill, /Stages 2, 5, 6, 7: the script prints it\./);
+  assert.match(skill, /Never type or echo these four lines yourself/);
+  assert.match(skill, /While you\s+wait for an answer, print no gate line/);
+  for (const cmd of ['spine.mjs', '--pipeline-test', 'gate.mjs build', 'assemble.mjs']) assert.ok(skill.includes(cmd), `SKILL.md names ${cmd}`);
   for (const n of [2, 5, 6, 7]) {
-    assert.match(stages, new RegExp(`No user stop here, so the line is required: write it as text now, before stage ${n + 1}'s first command\\.\\nEnd the stage with: \`GATE ${n} `), `stage ${n} says its line is required`);
+    assert.match(stages, new RegExp(`The script prints this line \\(don't write it yourself\\):\\nEnd the stage with: \`GATE ${n} `), `stage ${n}: the script prints its line`);
   }
-  // the cold-start failure: user gates printed, automatic ones silent -> AC-ORC-01 names them
-  const ev = load('good').map((e) => (e.kind === 'text' ? { ...e, text: e.text.replace(/^GATE [2567] .*$/gm, '') } : e));
-  assert.match(checkGates(ev).message, /no passing gate line for gate\(s\) 2, 5, 6, 7/);
+  assert.doesNotMatch(stages, /No user stop here, so the line is required/, 'round-4 prose removed');
+  // the fixtures: lines only in script output pass; an echoed GATE 5 doesn't count
+  assert.ok(checkGates(load('good-script-gates')).ok, checkGates(load('good-script-gates')).message);
+  assert.ok(gateLines(load('good-script-gates')).filter((g) => g.from === 'script').map((g) => g.n).join() === '2,5,6,7');
+  assert.match(checkGates(load('bad-echoed-gate')).message, /no passing gate line for gate\(s\) 5$/);
+  // a user gate (or gate 9) never counts from script output
+  const ev = load('good-script-gates').map((e) => (e.kind === 'tool_result' && /GATE 7 /.test(e.text) ? { ...e, text: `${e.text}\nGATE 9 export: PASS — out/final.mp4` } : e));
+  assert.equal(gateLines(ev).filter((g) => g.from === 'script' && g.n === 9).length, 0);
+  // the cold-start failure: nothing printed for 2/5/6/7 -> AC-ORC-01 names them
+  const silent = load('good').map((e) => (e.kind === 'text' ? { ...e, text: e.text.replace(/^GATE [2567] .*$/gm, '') } : e));
+  assert.match(checkGates(silent).message, /no passing gate line for gate\(s\) 2, 5, 6, 7/);
+});
+
+test('scripts print gates 5 and 6: render-plate --pipeline-test and gate build, PASS and FAIL forms (WP9 round 5)', () => {
+  const proj = scratch('pm-gates-');
+  cpSync(path.join(ROOT, 'docs', 'build', 'fixtures', 'F0'), proj, { recursive: true });
+  const plan = JSON.parse(readFileSync(path.join(proj, 'plates.json'), 'utf8'));
+  plan.brand = path.join(ROOT, 'brand-packs', 'default');
+  writeFileSync(path.join(proj, 'plates.json'), JSON.stringify(plan, null, 2));
+  const RENDER = 'skills/video-plates/scripts/render-plate.mjs', GATE = 'skills/plate-factory/scripts/gate.mjs';
+  const gl = (out) => out.split('\n').filter((l) => l.startsWith('GATE '));
+
+  // gate 5 FAIL: a brand pack that doesn't exist -> FAIL line on stdout, one line on stderr
+  const bad = run(RENDER, [path.join(proj, 'plates.json'), 'p1', '--pipeline-test', '--brand', path.join(proj, 'no-pack')]);
+  assert.equal(bad.code, 1, bad.stderr);
+  assert.equal(gl(bad.stdout).length, 1, bad.stdout);
+  assert.match(gl(bad.stdout)[0], /^GATE 5 pipeline: FAIL — brand pack not found: /);
+  assert.equal(bad.stderr.trim().split('\n').length, 1);
+  // gate 5 PASS
+  const ok = run(RENDER, [path.join(proj, 'plates.json'), 'p1', '--pipeline-test']);
+  assert.equal(ok.code, 0, ok.stdout + ok.stderr);
+  assert.match(gl(ok.stdout)[0], /^GATE 5 pipeline: PASS — renders\/plates\/p1\.mp4 \(\d+ ms, lint clean\)$/);
+  assert.ok(existsSync(path.join(proj, 'review', 'contact-p1.jpg')), 'it sheets the plate');
+
+  // gate 6 FAIL: no review record yet
+  const noRec = run(GATE, ['build', proj]);
+  assert.equal(noRec.code, 1);
+  assert.match(gl(noRec.stdout)[0], /^GATE 6 build: FAIL — no review record at review\/plate-review\.md/);
+  assert.equal(noRec.stderr.trim().split('\n').length, 1);
+  // gate 6 FAIL: a defect left open
+  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1: title clipped (major)\n\nDefects: 1\nFixed: 0\n');
+  assert.match(gl(run(GATE, ['build', proj]).stdout)[0], /^GATE 6 build: FAIL — review\/plate-review\.md: 1 of 1 reviewer defect\(s\) not fixed$/);
+  // gate 6 PASS
+  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1: title clipped (major) — fixed\n\nDefects: 1\nFixed: 1\n');
+  const pass = run(GATE, ['build', proj]);
+  assert.equal(pass.code, 0, pass.stdout + pass.stderr);
+  assert.deepEqual(gl(pass.stdout), ['GATE 6 build: PASS — 1 plates; reviewer: 1 defects, 1 fixed']);
+  // gate 6 FAIL: a render newer than every sheet of it (re-rendered, not re-sheeted)
+  const mp4 = path.join(proj, 'renders', 'plates', 'p1.mp4');
+  const t = new Date(Date.now() + 60_000);
+  utimesSync(mp4, t, t);
+  assert.match(gl(run(GATE, ['build', proj]).stdout)[0], /^GATE 6 build: FAIL — plate p1: no contact sheet of its final render/);
+  // baseline
+  baseline(null, assert, GATE, { flags: [], badArgs: [[], ['nope', proj], ['build', path.join(proj, 'none')]] });
 });
 
 test('checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else', () => {

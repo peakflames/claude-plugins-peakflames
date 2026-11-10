@@ -98,6 +98,23 @@ const reviewerSteps = () => [
 const idx = (steps, pred) => steps.findIndex(pred);
 const sayIdx = (steps, n) => idx(steps, (s) => s[0] === 'say' && s[1].includes(`GATE ${n} `));
 
+/** The good run with gates 2, 5, 6, 7 printed by their scripts and not written by the model. */
+function scriptGates(s) {
+  const drop = (n) => s.splice(sayIdx(s, n), 1);
+  for (const n of [2, 5, 6, 7]) drop(n);
+  const at = (pred) => idx(s, pred);
+  let i = at((x) => x[0] === 'bash' && x[1].includes('spine.mjs') && x[1].endsWith('--brief brief.md'));
+  s[i] = ['bash', s[i][1], `${s[i][2]}\nGATE 2 spine: PASS — spine/manifest.json 25999 ms (target 26000 ±10%)`];
+  i = at((x) => x[0] === 'bash' && x[1] === RP('plates.json p1-hook --lint --sheet'));
+  s[i] = ['bash', RP('plates.json p1-hook --pipeline-test'), 'p1-hook: renders/plates/p1-hook.mp4 (7173 ms, planned 7173) lint+check ok sheet review/contact-p1-hook.jpg\nGATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)'];
+  i = at((x) => x[0] === 'read' && x[1].endsWith('p2-table-fix1.jpg'));
+  s.splice(i + 1, 0, ['write', `${P}/review/plate-review.md`],
+    ['bash', `cd ${P} && ${node('skills/plate-factory/scripts/gate.mjs', 'build .')}`, 'GATE 6 build: PASS — 3 plates; reviewer: 1 defects, 1 fixed']);
+  i = at((x) => x[0] === 'bash' && x[1].endsWith(`${node('skills/video-assemble/scripts/assemble.mjs', '.')}`));
+  s[i] = ['bash', s[i][1], 'cuts      2 plate cut(s) in silence (≥300 ms)\nGATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)'];
+  return s;
+}
+
 /** Bad variants: each breaks exactly one rule. */
 export const VARIANTS = {
   good: (s) => s,
@@ -172,6 +189,15 @@ export const VARIANTS = {
       s.splice(idx(s, (x) => x[0] === 'bash' && x[1] === SHEET(`renders/plates/${plate}.mp4`, `review/${plate}-r1.jpg`)), 1);
     }
     s.splice(at, 0, ['bash', `cd ${P} && for id in p2-table p3-close; do node "${ROOT}/skills/video-plates/scripts/render-plate.mjs" plates.json $id --lint; node "${ROOT}/lib/verify/contact-sheet.mjs" renders/plates/\${id}.mp4 --every 0.5s -o review/$id-r1.jpg; done`, 'ok p2-table\nwrote review/p2-table-r1.jpg\nok p3-close\nwrote review/p3-close-r1.jpg']);
+    return s;
+  },
+  // round 5: the automatic gates' lines come only from their scripts' output
+  'good-script-gates': (s) => scriptGates(s),
+  // ... and an echoed line is not the script's verdict (render-plate ran, but the GATE 5 line was echoed)
+  'bad-echoed-gate': (s) => {
+    s = scriptGates(s);
+    const i = idx(s, (x) => x[0] === 'bash' && x[1].includes('--pipeline-test'));
+    s[i] = ['bash', `${RP('plates.json p1-hook --lint --sheet')} && echo "GATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)"`, 'p1-hook: ok\nGATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)'];
     return s;
   },
   'bad-unasked-gate': (s) => {

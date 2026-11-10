@@ -55,6 +55,7 @@ test('AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a
   const lines = r.stderr.trim().split('\n');
   assert.equal(lines.length, 1, r.stderr);
   assert.match(lines[0], /0:06\.500/);
+  assert.match(r.stdout, /^GATE 7 composite: FAIL — review\/review\.mp4: cut not in a ≥300 ms silence at 0:06\.500/m, 'gate 7 FAIL line (WP9 round 5)');
   assert.doesNotMatch(lines[0], /0:14\.000/, 'only the failing cut is named');
   assert.ok(!existsSync(path.join(bad, 'out', 'final.mp4')), 'no final.mp4 (not even a stale one) after a failed sync check');
 });
@@ -197,4 +198,10 @@ test('AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, 
       [review, '--music', '/no/such.wav', '-o', path.join(tmp, 'o.mp4')], [review, '--music', music, '-o', review],
       [music, '--music', music, '-o', path.join(tmp, 'o.mp4')], [review, '--music', review.replace('.mp4', '.nope'), '-o', 'x.mp4'], [review, '--fade-ms', '-5', '--music', music, '-o', path.join(tmp, 'o.mp4')]],
   });
+});
+
+test('assemble prints the GATE 7 line itself when every cut is in silence (WP9 round 5)', () => {
+  const r = run(ASSEMBLE, [proj, '--outro', first.outro.mp4]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.deepEqual(r.stdout.split('\n').filter((l) => l.startsWith('GATE ')), ['GATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)']);
 });
