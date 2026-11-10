@@ -27,7 +27,7 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | WP13 | verified | wp/WP13/verify-2.md |
 | WP14 | verified | wp/WP14/verify-1.md |
 | WP15 | verified | wp/WP15/verify-1.md |
-| WP16 | not-started | — |
+| WP16 | in-progress | — |
 | WP17 | not-started | — |
 | WP18 | not-started | — |
 
@@ -135,3 +135,6 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | AC-W2V-24 | web2video-plan §6 | WP14 | G a captions take of the ui-demo · W its manifest is validated and `command[]` is re-run · T it validates against the v1 spine schema; the re-run produces the same beat ids, preset and fps, and a frame count within ±1 (a `--script` take runs in real time; spine-timed takes are exact) | script | PASS | evidence/WP14/login-reports.verifier.log |
 | AC-W2V-39 | web2video-plan §6 | WP15 | G the F3 project (`evals/video-capture/helpers/projects.mjs` `makeF3Project`, local page) with its `beat()` storyboards · W each live plate is captured with `--plates --plate`, then `assemble` loads the project · T each plate MP4 lasts its `durationMs` ±1 frame, is picture-only, and `checkRenders` accepts it | script | PASS | evidence/WP15/AC-W2V-39.verifier.log |
 | AC-W2V-41 | web2video-plan §6 | WP15 | G the repo · W grep `\bsay\(\|waitForVoice` over Markdown in `skills/` and `docs/reference/` · T 0 hits; and every flag in `capture --help` appears in `skills/video-capture/SKILL.md` or `references/storyboard-api.md` | script | PASS | evidence/WP15/AC-W2V-41.verifier.log, evidence/WP15/AC-W2V-41.grep.verifier.log |
+| AC-W2V-36 | web2video-plan §6 | WP16 | script half here: G `PEAK_MEDIA_OPENROUTER_API_KEY` and `TTS_OPENROUTER_API_KEY` unset · W the commands web2video's narrated path runs first (`sample-voice` / `spine --budget` as the skill orders them) · T a one-line message naming `PEAK_MEDIA_OPENROUTER_API_KEY`, non-zero exit, and no browser launched; and `SKILL.md` tells Claude to stop there and offer captions. The UAT half is the missing-key UAT case (WP17) | script + UAT | not-started | — |
+| AC-W2V-38 | web2video-plan §6 | WP16 | G the plugin tree incl. `skills/web2video/` and `evals/web2video/` · W `grep -ri` for the brand/org names AC-PKG-03 checks · T 0 hits outside author metadata | script | not-started | — |
+| AC-W2V-40 | web2video-plan §6 | WP16 | G `skills/` · W the packaging test · T exactly six skills with `SKILL.md`, `web2video` included, each `name:` matching its folder, web2video's `description` ending in a `Triggers on:` line, and each `evals/<skill>/` holding a `test(` | script | not-started | — |
