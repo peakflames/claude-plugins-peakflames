@@ -15,3 +15,12 @@ Every step done by hand in WP10, each a candidate for the plugin to do itself ne
 | M8 | The music bed stops at the outro (assemble puts only `outro.audio`, or silence, under the outro), unlike the teaser where music fades under the fire | Let the music stem run on and fade out under the outro |
 | M9 | SFX stems are placed by hand (DEC-40) | Each plate exports a cue list from its timeline labels; assembly builds the SFX stem from it (DEC-40 next version) |
 | M10 | The pack is a plain folder; making it a private GitHub repo (`gh repo create --private`) was not done — it needs the user's go-ahead (DEC-16) | Ask, then create the private repo for the pack |
+
+| # | Step done by hand (WP10b, F4 draft run) | Backlog item |
+|---|---|---|
+| M11 | Copied the source doc (`references/openspec-vs-peak-workflow.md`) into the project as `source.md` before the session started, so plate-factory could read the talking points | Accept a `--source <file>` (or a path in the prompt) at stage 0 and copy it into the project, recorded in `brief.md` |
+| M12 | The session copied `groove-sauce.mp3` from the pack into `audio/` and wrote `audio/CREDITS.md` itself with shell commands | Gate 8 "use the pack's track <id>" copies the track and writes the credit from the pack's `x-tracks` entry in one step |
+| M13 | The session read `music-rules.md` and passed `--music-lufs -28 --duck-db 6` to `assemble.mjs` by hand; music under the voice measured −30.5 LUFS against the −28 target | `assemble --music <pack track id>` reads the pack's levels itself, and reports or corrects the measured under-voice level against the target |
+| M14 | The music credit must still be checked by hand against the exact YouTube Audio Library text before publishing (pack rule) | Store the verified credit string in the pack's `x-tracks` entry and print it with GATE 9 |
+| M15 | The F4 brief's live-capture beats (OpenSpec docs page, GitHub TOR page), the delta-merge motion diagram and the terminal replay were not proposed; every plate is a typographic text stack. Getting them would have needed a prompt naming them | plate-factory proposes `capture` plates when the brief or source names public pages, and diagram/terminal-replay templates for "loop", "merge" and command beats |
+| M16 | Placeholder TOR IDs (`TOR-NN-XXXXXXX`) are on screen; real IDs need the user to name a repo/file | Ask for an example repo at stage 0 when the brief references IDs or files, and use real values |
