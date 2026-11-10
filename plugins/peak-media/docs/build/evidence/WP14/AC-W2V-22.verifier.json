@@ -1,0 +1,39 @@
+{
+  "code": 0,
+  "tokenFromServer": true,
+  "stdout": "wrote <v>/take/login.mp4 (22 kB, 1280x720 @ 30 fps, 3.0 s, preset web)\nbeats: dash 0.01–1.51 s · report 1.51–3.01 s\ntake manifest: <v>/take/login.take.json\n",
+  "stderrTail": [
+    "capture: launching browser (1280x720, 30 fps, mode captions, signed in)",
+    "capture: t0 anchored on the first frame; running storyboard.mjs",
+    "capture: audio: silent AAC track (no narration in this take)",
+    ""
+  ],
+  "signedIn": true,
+  "tokenInManifest": false,
+  "cookiesKeyInManifest": false,
+  "tokenInStdout": false,
+  "tokenInStderr": false,
+  "command": [
+    "node",
+    "<pm>/skills/video-capture/scripts/capture.mjs",
+    "--storyboard",
+    "<pm>/evals/video-capture/fixtures/login/storyboard.mjs",
+    "--script",
+    "<pm>/evals/video-capture/fixtures/login/script.md",
+    "--out",
+    "<v>/take/login.mp4",
+    "--url",
+    "http://127.0.0.1:60370/",
+    "--storage-state",
+    "<v>/take/session.json"
+  ],
+  "frames": [
+    "00.00",
+    "00.50",
+    "01.00",
+    "01.50",
+    "02.00",
+    "02.50",
+    "02.97"
+  ]
+}
