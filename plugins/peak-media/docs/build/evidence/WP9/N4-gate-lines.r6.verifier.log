@@ -1,0 +1,91 @@
+## gate.mjs
+$ node skills/plate-factory/scripts/gate.mjs nope docs/build/fixtures/F1
+  exit=2
+  stdout| GATE 6 build: FAIL — unknown gate 'nope' — the only scripted gate here is 'build' (stage 6)
+  stderr| gate: unknown gate 'nope' — the only scripted gate here is 'build' (stage 6)
+  stderr| Run 'gate --help' for usage.
+$ node skills/plate-factory/scripts/gate.mjs
+  exit=2
+  stdout| 
+  stderr| gate: expected at least 2 argument(s), got 0
+  stderr| Run 'gate --help' for usage.
+$ node skills/plate-factory/scripts/gate.mjs build
+  exit=2
+  stdout| 
+  stderr| gate: expected at least 2 argument(s), got 1
+  stderr| Run 'gate --help' for usage.
+$ node skills/plate-factory/scripts/gate.mjs build docs/build/fixtures/F1 --bogus
+  exit=2
+  stdout| 
+  stderr| gate: Unknown option '--bogus'
+  stderr| Run 'gate --help' for usage.
+$ env PEAK_MEDIA_FFMPEG=/nonexistent/ffmpeg node skills/plate-factory/scripts/gate.mjs build docs/build/fixtures/F1
+  exit=3
+  stdout| GATE 6 build: FAIL — ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  stderr| gate: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+$ env PATH=/tmp/r6probe/nodeonly node skills/plate-factory/scripts/gate.mjs build docs/build/fixtures/F1
+  exit=3
+  stdout| GATE 6 build: FAIL — ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  stderr| gate: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+$ node skills/plate-factory/scripts/gate.mjs build /nonexistent
+  exit=1
+  stdout| GATE 6 build: FAIL — no plates.json at /nonexistent
+  stderr| gate: no plates.json at /nonexistent
+## assemble.mjs
+$ node skills/video-assemble/scripts/assemble.mjs docs/build/fixtures/F1 --min-silence-ms -5
+  exit=2
+  stdout| GATE 7 composite: FAIL — --min-silence-ms must be >= 0
+  stderr| assemble: --min-silence-ms must be >= 0
+  stderr| Run 'assemble --help' for usage.
+$ node skills/video-assemble/scripts/assemble.mjs /nonexistent
+  exit=1
+  stdout| GATE 7 composite: FAIL — cannot read /nonexistent: no such file or folder
+  stderr| assemble: cannot read /nonexistent: no such file or folder
+$ node skills/video-assemble/scripts/assemble.mjs docs/build/fixtures/F1 --music-lufs 5
+  exit=2
+  stdout| GATE 7 composite: FAIL — --music-lufs must be negative (e.g. -16)
+  stderr| assemble: --music-lufs must be negative (e.g. -16)
+  stderr| Run 'assemble --help' for usage.
+$ node skills/video-assemble/scripts/assemble.mjs docs/build/fixtures/F1 --duck-db abc
+  exit=2
+  stdout| 
+  stderr| assemble: --duck-db expects a number, got 'abc'
+  stderr| Run 'assemble --help' for usage.
+$ node skills/video-assemble/scripts/assemble.mjs docs/build/fixtures/F1 --json --min-silence-ms -5
+  exit=2
+  stdout| 
+  stderr| GATE 7 composite: FAIL — --min-silence-ms must be >= 0
+  stderr| assemble: --min-silence-ms must be >= 0
+  stderr| Run 'assemble --help' for usage.
+$ env PATH=/tmp/r6probe/nodeonly node skills/video-assemble/scripts/assemble.mjs docs/build/fixtures/F1
+  exit=3
+  stdout| GATE 7 composite: FAIL — ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  stderr| assemble: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+$ env PEAK_MEDIA_FFMPEG=/nonexistent/ffmpeg node skills/video-assemble/scripts/assemble.mjs docs/build/fixtures/F1
+  exit=3
+  stdout| GATE 7 composite: FAIL — ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  stderr| assemble: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+$ node skills/video-assemble/scripts/assemble.mjs docs/build/fixtures/F1 --bogus
+  exit=2
+  stdout| 
+  stderr| assemble: Unknown option '--bogus'
+  stderr| Run 'assemble --help' for usage.
+$ node skills/video-assemble/scripts/assemble.mjs
+  exit=2
+  stdout| 
+  stderr| assemble: expected at least 1 argument(s), got 0
+  stderr| Run 'assemble --help' for usage.
+## combined output last line on FAIL (N6 check): assemble usage error 2>&1 | tail -1
+Run 'assemble --help' for usage.
+## spine / render-plate no ffmpeg (regression check)
+$ env PATH=/tmp/r6probe/nodeonly node skills/video-spine/scripts/spine.mjs --brief docs/build/fixtures/F1/brief.md
+  exit=0
+  stdout| beat  close             20.00 s  +6.00 s
+  stdout| wrote /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/docs/build/fixtures/F1/spine/beatgrid.json and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/docs/build/fixtures/F1/spine/narration.wav
+  stdout| PASS  runtime 26.00 s against a 26.0 s target (+0.0%)
+  stdout| GATE 2 spine: PASS — spine/beatgrid.json 26000 ms (target 26000 ±10%)
+$ env PATH=/tmp/r6probe/nodeonly node skills/video-plates/scripts/render-plate.mjs docs/build/fixtures/F1/plates.json p1 --pipeline-test
+  exit=2
+  stdout| GATE 5 pipeline: FAIL — --pipeline-test renders the first plate (p1-hook), not p1
+  stderr| render-plate: --pipeline-test renders the first plate (p1-hook), not p1
+  stderr| Run 'render-plate --help' for usage.

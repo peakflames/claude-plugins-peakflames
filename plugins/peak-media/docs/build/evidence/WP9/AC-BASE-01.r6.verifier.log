@@ -1,0 +1,23 @@
+$ bash scripts/setup.sh --help
+setup.sh — install peak-media's pinned runtime dependencies (idempotent)
+
+Usage: setup.sh [options]
+
+Installs the versions in lib/pins.json into ${CLAUDE_PLUGIN_DATA:-~/.cache/peak-media}/deps/<lockhash>/
+and runs 'hyperframes browser ensure'. Needs network only when something is missing.
+Prerequisites it checks: Node 22+, npm, ffmpeg and ffprobe.
+
+Options:
+      --check          Only report what is missing (exit 0 ready, 3 not ready); install nothing
+      --skip-browser   Don't fetch the render browser (e.g. HYPERFRAMES_BROWSER_PATH is set)
+      --data-dir <dir> Use <dir> instead of $CLAUDE_PLUGIN_DATA / ~/.cache/peak-media
+  -q, --quiet          Print only errors and the final line
+  -h, --help           Show this help and exit
+      --version        Print the plugin version and exit
+exit 0
+$ bash scripts/setup.sh --version
+0.1.0
+exit 0
+$ bash scripts/setup.sh --bogus
+setup.sh: unknown option '--bogus'. Run 'setup.sh --help' for usage.
+exit 2
