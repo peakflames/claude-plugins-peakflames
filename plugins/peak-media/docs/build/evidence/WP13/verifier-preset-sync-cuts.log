@@ -1,0 +1,57 @@
+# verifier: narrated deck (fake/tone spine, --lead-ms 950) captured per preset; tone onsets vs spine; stream durations
+web [
+  { spine: 950, onset: 950, err: 0 },
+  { spine: 7605, onset: 7605, err: 0 },
+  { spine: 16078, onset: 16078, err: 0 }
+]
+youtube [
+  { spine: 950, onset: 971.4, err: 21.4 },
+  { spine: 7605, onset: 7626.4, err: 21.4 },
+  { spine: 16078, onset: 16099.4, err: 21.4 }
+]
+hifi [
+  { spine: 950, onset: 950, err: 0 },
+  { spine: 7605, onset: 7605, err: 0 },
+  { spine: 16078, onset: 16078, err: 0 }
+]
+stream|codec_type=video|start_time=0.000000|duration=21.433333
+stream|codec_type=audio|start_time=0.000000|duration=21.433333
+stream|codec_type=video|start_time=0.000000|duration=21.433333
+stream|codec_type=audio|start_time=0.000000|duration=21.454667
+stream|codec_type=video|start_time=0.000000|duration=21.416667
+stream|codec_type=audio|start_time=0.000000|duration=21.416667
+FAIL  expected 2 scene change(s), found 0 at threshold 0.02 — /tmp/wp13v-sync/youtube.mp4
+
+# check-take --expect-cuts 2 per preset (captions on), threshold sweeps, top-75% scene scores at the two slide changes
+=== web
+ok    scene change at 0:06.700 —silence 1200 ms
+ok    scene change at 0:15.167 (a transition over 2 frames) —silence 1200 ms
+PASS  2 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /tmp/wp13v-sync/web.mp4
+exit=0
+=== youtube
+FAIL  expected 2 scene change(s), found 0 at threshold 0.02 — /tmp/wp13v-sync/youtube.mp4
+exit=1
+=== hifi
+FAIL  expected 2 scene change(s), found 0 at threshold 0.02 — /tmp/wp13v-sync/hifi.mp4
+exit=1
+=== youtube --caption-band 0
+FAIL  2 scene change(s) at threshold 0.02, 2 not in a ≥ 900 ms silence — /tmp/wp13v-sync/youtube.mp4
+=== youtube --scene-threshold 0.01
+ok    scene change at 0:06.700 —silence 1200 ms
+ok    scene change at 0:15.167 —silence 1200 ms
+PASS  2 scene change(s) at threshold 0.01 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /tmp/wp13v-sync/youtube.mp4
+=== youtube --scene-threshold 0.005
+ok    scene change at 0:06.700 (a transition over 4 frames) —silence 1200 ms
+ok    scene change at 0:15.167 (a transition over 2 frames) —silence 1200 ms
+PASS  2 scene change(s) at threshold 0.005 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /tmp/wp13v-sync/youtube.mp4
+=== scene scores youtube around 6-7.5s (top 75%)
+=== web same window
+web max top-75% scene score near cut 1 (6-7.5s) and cut 2 (14.5-16s):
+  [6-7.5] max=0.0572 at 6.7
+  [14.5-16] max=0.0562 at 15.166667
+youtube max top-75% scene score near cut 1 (6-7.5s) and cut 2 (14.5-16s):
+  [6-7.5] max=0.0172 at 6.7
+  [14.5-16] max=0.0195 at 15.166667
+hifi max top-75% scene score near cut 1 (6-7.5s) and cut 2 (14.5-16s):
+  [6-7.5] max=0.0172 at 6.7
+  [14.5-16] max=0.0089 at 15.166667

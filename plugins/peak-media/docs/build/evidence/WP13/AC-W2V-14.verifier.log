@@ -1,0 +1,129 @@
+# node --test --test-reporter=spec evals/video-capture/presets.test.mjs (verifier run, 2026-11-10)
+✔ AC-W2V-14: the narrated deck with captions on passes check-take --expect-cuts 2 — captions and the cursor are not cuts; both slide changes sit in >= 900 ms of silence (9377.624458ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97731.192459
+
+# measurements (PEAK_MEDIA_EVIDENCE_DIR)
+{
+  "deck": {
+    "captionBand": 0.25,
+    "cuts": [
+      {
+        "timecode": "0:06.700",
+        "silenceMs": 1200,
+        "ok": true
+      },
+      {
+        "timecode": "0:15.200",
+        "silenceMs": 1200,
+        "ok": true
+      }
+    ],
+    "captions": [
+      {
+        "text": "Water your garden in the morning",
+        "startMs": 951,
+        "durationMs": 5454
+      },
+      {
+        "text": "Less water lost, less mildew",
+        "startMs": 7605,
+        "durationMs": 7273
+      },
+      {
+        "text": "Water the roots deeply, then let the soil dry",
+        "startMs": 16078,
+        "durationMs": 5091
+      }
+    ]
+  },
+  "wholeFrameControl": {
+    "cuts": [
+      {
+        "timecode": "0:00.967",
+        "ok": false
+      },
+      {
+        "timecode": "0:06.400",
+        "ok": false
+      },
+      {
+        "timecode": "0:06.700",
+        "ok": true
+      },
+      {
+        "timecode": "0:07.600",
+        "ok": false
+      },
+      {
+        "timecode": "0:14.900",
+        "ok": false
+      },
+      {
+        "timecode": "0:15.200",
+        "ok": true
+      },
+      {
+        "timecode": "0:16.100",
+        "ok": false
+      },
+      {
+        "timecode": "0:21.167",
+        "ok": false
+      }
+    ]
+  },
+  "cursorGlide": {
+    "pointer": [
+      {
+        "action": "point",
+        "beat": "one",
+        "x": 66,
+        "y": 62,
+        "atMs": 449
+      },
+      {
+        "action": "point",
+        "beat": "one",
+        "x": 1214,
+        "y": 62,
+        "atMs": 888
+      },
+      {
+        "action": "point",
+        "beat": "two",
+        "x": 1213,
+        "y": 452,
+        "atMs": 1953
+      },
+      {
+        "action": "point",
+        "beat": "two",
+        "x": 67,
+        "y": 452,
+        "atMs": 2382
+      },
+      {
+        "action": "point",
+        "beat": "three",
+        "x": 1214,
+        "y": 62,
+        "atMs": 3617
+      },
+      {
+        "action": "point",
+        "beat": "three",
+        "x": 66,
+        "y": 62,
+        "atMs": 4050
+      }
+    ],
+    "cuts": 0
+  }
+}
