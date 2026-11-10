@@ -28,3 +28,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`plate-factory` orchestrator** — `/peak-media:plate-factory` runs brief → script → spine → plate list → storyboard → plates → composite → audio → export, with a gate line per stage; shows each artifact before asking for approval; storyboard stills approved before any animation; up to 3 self-review rounds per plate, then an independent reviewer.
 - **`retime-plates`** — sets every plate's start and duration from its spine beat (one plate per beat), so plate timing always matches the real narration.
 - **`validate` script** — checks any contract file against its schema plus cross-references, and imports a legacy `narration.json` as a spine manifest.
+- **Step watchdog** — every HyperFrames and ffmpeg step fails with one line if it overruns (render 30 min; `PEAK_MEDIA_STEP_TIMEOUT_S` overrides); Ctrl-C stops the running step and removes its temp folder.
+- **Script-printed gate lines** — `spine`, `render-plate --pipeline-test`, the new `gate build` check and `assemble` print the GATE 2/5/6/7 lines themselves; `gate build` counts the reviewer's listed defects.
+- **`audio-options`** — gate 8 offers the brand pack's music tracks and SFX by name, or the audio in a folder the user names; never searches the disk.
+- **README and marketplace entry** — install, macOS prerequisites, key setup, the three modes, known limits; `peak-media` is listed in the marketplace.
