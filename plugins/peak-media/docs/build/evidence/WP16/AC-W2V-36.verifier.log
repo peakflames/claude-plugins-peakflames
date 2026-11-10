@@ -1,0 +1,6 @@
+# AC-W2V-36 verifier run (wp16-verifier-1), node --test evals/web2video/skill.test.mjs
+1:✔ AC-W2V-36: narrated with no key — the first commands the skill runs give one line naming PEAK_MEDIA_OPENROUTER_API_KEY, exit non-zero, launch no browser; SKILL.md stops there and offers captions (170.097125ms)
+
+# manual: sample-voice as SKILL.md writes it, keys unset
+sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)
+exit=3

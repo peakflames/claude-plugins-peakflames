@@ -1,4 +1,4 @@
-// WP9 packaging: AC-PKG-01, -03, -04, -06, -07, -08.
+// WP9 packaging: AC-PKG-01, -03, -04, -06, -07, -08. WP16: AC-W2V-40 (six skills, DEC-45).
 // AC-PKG-04 and -08 run setup.sh for real (a no-op when the runtime is already installed). v0.1.0 is
 // macOS-only (DEC-41): -04 is setup then the no-key F1 video; -08 is setup + F0 with a prerequisite
 // missing (ffmpeg, the render browser, the narration key), each reported in one line.
@@ -10,7 +10,8 @@ import { run, ROOT, pluginVersion, tmpDir } from '../helpers/run.mjs';
 import { depsDir as depsRoot } from '../../lib/deps.mjs';
 
 const REPO = path.resolve(ROOT, '..', '..');
-const SKILLS = ['plate-factory', 'video-spine', 'video-plates', 'video-capture', 'video-assemble']; // DEC-21
+// DEC-45 (supersedes DEC-21's five in part): the five engine skills plus the web2video front door
+const SKILLS = ['plate-factory', 'video-spine', 'video-plates', 'video-capture', 'video-assemble', 'web2video'];
 const NO_KEY = { PEAK_MEDIA_OPENROUTER_API_KEY: '', TTS_OPENROUTER_API_KEY: '' };
 const F0 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F0');
 const F1 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F1');
@@ -57,16 +58,40 @@ test('AC-PKG-03: the runtime tree carries no house-brand name (D17), and the exa
   assert.deepEqual(assets, [], 'examples carry no logos, fonts, images or audio');
 });
 
+const skillDirs = () => readdirSync(path.join(ROOT, 'skills')).filter((d) => existsSync(path.join(ROOT, 'skills', d, 'SKILL.md'))).sort();
+/** Count of top-level test( calls under evals/<skill>/. */
+function evalTests(s) {
+  const evals = files(path.join(ROOT, 'evals', s)).filter((f) => f.endsWith('.test.mjs'));
+  return { files: evals.length, tests: evals.reduce((n, f) => n + (readFileSync(path.join(ROOT, f), 'utf8').match(/^test\(/gm) ?? []).length, 0) };
+}
+const frontmatter = (s) => /^---\n([\s\S]*?)\n---\n/.exec(readFileSync(path.join(ROOT, 'skills', s, 'SKILL.md'), 'utf8'))?.[1];
+
 test('AC-PKG-06: every skill has at least one eval (node --test "plugins/peak-media/evals/**/*.test.mjs")', () => {
-  const skills = readdirSync(path.join(ROOT, 'skills')).filter((d) => existsSync(path.join(ROOT, 'skills', d, 'SKILL.md'))).sort();
-  assert.deepEqual(skills, [...SKILLS].sort(), 'the five skills of DEC-21, and no others (no web2video)');
+  const skills = skillDirs();
+  assert.ok(skills.length >= 5, `found the skills: ${skills}`);
   for (const s of skills) {
-    const name = /^name:\s*(\S+)/m.exec(readFileSync(path.join(ROOT, 'skills', s, 'SKILL.md'), 'utf8'));
-    assert.equal(name?.[1], s, `skills/${s}/SKILL.md names itself ${s}`);
-    const evals = files(path.join(ROOT, 'evals', s)).filter((f) => f.endsWith('.test.mjs'));
-    const tests = evals.reduce((n, f) => n + (readFileSync(path.join(ROOT, f), 'utf8').match(/^test\(/gm) ?? []).length, 0);
-    assert.ok(tests >= 1, `evals/${s}/ has at least one test (found ${tests} in ${evals.length} file(s))`);
+    const { files: n, tests } = evalTests(s);
+    assert.ok(tests >= 1, `evals/${s}/ has at least one test (found ${tests} in ${n} file(s))`);
   }
+});
+
+test('AC-W2V-40: exactly six skills (web2video included), each named for its folder, with a Triggers line and an eval', () => {
+  const skills = skillDirs();
+  assert.deepEqual(skills, [...SKILLS].sort(), 'the six skills of DEC-45 (DEC-21\'s five plus web2video), and no others');
+  for (const s of skills) {
+    const front = frontmatter(s);
+    assert.ok(front, `skills/${s}/SKILL.md has frontmatter`);
+    assert.equal(/^name:\s*(\S+)/m.exec(front)?.[1], s, `skills/${s}/SKILL.md names itself ${s}`);
+    const { files: n, tests } = evalTests(s);
+    assert.ok(tests >= 1, `evals/${s}/ holds a test( (found ${tests} in ${n} file(s))`);
+  }
+  // web2video: a block description (like the other skills) whose last part is the Triggers on: line
+  const block = /^description: \|\n((?: {2}.*\n?)+)/m.exec(frontmatter('web2video'));
+  assert.ok(block, 'web2video has a block description (description: |)');
+  const desc = block[1].split('\n').map((l) => l.trim()).filter(Boolean).join(' ');
+  const at = desc.indexOf('Triggers on:');
+  assert.ok(at > 40, `the description says what the skill does before "Triggers on:": ${desc}`);
+  assert.match(desc.slice(at), /^Triggers on:(?:\s*"[^"]+",?)+\.?$/, 'the description ends with the Triggers on: line (quoted phrases only)');
 });
 
 test('AC-PKG-07: VENDORED.md gives source, commit, date, licence and local changes for every vendor folder; GSAP and fonts are listed', () => {

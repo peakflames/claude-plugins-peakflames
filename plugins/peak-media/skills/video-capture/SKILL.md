@@ -166,9 +166,9 @@ Playwright calls never move the cursor.
 
 ## Signed-in pages
 
-1. Ask the user to run, in their own terminal:
+1. Tell the user a window will open for them to sign in, then run (Bash timeout above `--timeout`):
    `node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" signin <url>`.
-   A visible Chromium window opens; they sign in by hand and close the tab (not the whole
+   A visible Chromium window opens; the user signs in themselves and closes the tab (not the whole
    browser: quitting the browser saves nothing). The session (cookies
    and local storage) is saved to `<data dir>/auth/<host>.json` (`<data dir>` =
    `$CLAUDE_PLUGIN_DATA`, else `~/.cache/peak-media`), folder 0700, file 0600, and the command
