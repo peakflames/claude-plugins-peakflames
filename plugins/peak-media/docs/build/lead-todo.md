@@ -22,3 +22,5 @@ Items the Lead does after WP10, before the release.
 
 - [x] **Peakflames brand pack home (user, 2026-11-10):** manage the brand pack inside the existing `/Users/schaveyt/github/peakflames/peakflames-brand-guidelines` folder (pack currently at its `peak-media-pack/`), and make that whole folder the private GitHub repo (supersedes a separate pack repo in DEC-16). Ask before `git init` / `gh repo create --private` / push. Never commit it to this repo.
   Done 2026-11-10: private repo https://github.com/peakflames/peakflames-brand-guidelines (whole folder, incl. `peak-media-pack/`).
+
+- [ ] **WP12 verify-1 carry-forward (v0.2):** the DOM fallback cursor is untested (the CLI can't force it); `--no-cursor` also shortens a take (no ~400 ms glides) — document in WP15. The `loadStoryboard` error / `--storyboard` help listing the full context is folded into WP13.
