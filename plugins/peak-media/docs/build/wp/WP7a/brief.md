@@ -12,7 +12,7 @@
 
 ## Scope
 
-Playwright `page.screencast.start({path,fps,onFrame})`, t0 anchored on the first `onFrame` timestamp (DEC-06). Storyboard API per web2video D6; `say()` plays to the spine manifest's clip timing (no TTS here). Flags per AC-REC-01. Pre-flight (Chromium, ffmpeg, `--spine` valid) before any browser launch. Fixture F3. Run with no other render-heavy WP active.
+Playwright `page.screencast.start({path,fps,onFrame})`, t0 anchored on the first `onFrame` timestamp (DEC-06). Storyboard API per web2video D6 (plan at `0ea0ea6`, DEC-44); `say()` plays to the spine manifest's clip timing (no TTS here). Flags per AC-REC-01. Pre-flight (Chromium, ffmpeg, `--spine` valid) before any browser launch. Fixture F3. Run with no other render-heavy WP active.
 
 ## Owns
 

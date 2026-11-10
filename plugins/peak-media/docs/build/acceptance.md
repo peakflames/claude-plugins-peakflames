@@ -4,6 +4,8 @@ Generated from `plan.md` §4 in WP0; edited by hand after that. IDs are stable �
 
 Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a verifier report sets `PASS`. Every `PASS` must name an evidence file under `evidence/<WP>/` (checked by `ac-run --trace`).
 
+A `D<n>` in the source column is an item of the original web2video plan at commit `0ea0ea6` (DEC-44); the current `docs/web2video-plan.md` replaced it. Its `AC-W2V-*` and `AC-UAT-*` rows are added here together with the `wp/WP11`–`WP18` briefs that own them, so `ac-run --trace` never sees an orphan. AC-PKG-02 and AC-PKG-06 record 0.1.0's five skills; 0.2.0 adds `web2video` (DEC-45).
+
 ## WP status
 
 | WP | Status | Verify report |
