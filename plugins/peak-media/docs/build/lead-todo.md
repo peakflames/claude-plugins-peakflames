@@ -13,3 +13,5 @@ Items the Lead does after WP10, before the release.
 - [ ] **WP9 carry-forward (v0.2):** verify-3 N6 — interrupted/timed-out renders leave HyperFrames' `hf-render-*` and Chrome profile folders in TMPDIR (step is SIGKILLed at once); send SIGTERM, wait 1–2 s, then SIGKILL. WP7b N3 (v2 `kind: "take"`). Repo-root README plugin table and root CHANGELOG don't list peak-media yet — add at release.
 
 - [ ] **WP9 verify-6 carry-forward (v0.2):** I1 — the checker does not enforce re-ask after gate 4 storyboard changes or re-listen after gate 8 re-mix; N7 — status ` -fixed` / `— fixed ❌` counted as fixed; N8 — unknown flags / bad `--duck-db` exit without a GATE FAIL line. Checker can be fooled by deliberate forgery (known limit).
+
+- [ ] **After WP10 — Peakflames pack follow-up (user, 2026-11-10):** the user wants to do something with the pack at `~/github/peakflames/peakflames-brand-guidelines/peak-media-pack/` once the build is done (likely its own private repo, DEC-16 — ask before `gh repo create --private`). It must never be committed to this repo.
