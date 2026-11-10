@@ -1,0 +1,8 @@
+# AC-W2V-38 verifier run
+docs/build/evidence/WP16/web2video-tests.verifier.log:2:✔ AC-W2V-38: no brand or organization name in the plugin runtime tree, web2video included (author metadata excluded) (19.282417ms)
+docs/build/evidence/WP16/packaging.verifier.log:2:✔ AC-PKG-03: the runtime tree carries no house-brand name (D17), and the examples carry no brand assets (19.633584ms)
+
+# grep -ri peakflames over runtime tree (skills lib schemas brand-packs vendor scripts evals):
+hits=       0
+# web2video files: grep -rniE 'peakflames|archer|anthropic' skills/web2video evals/web2video:
+hits=       0
