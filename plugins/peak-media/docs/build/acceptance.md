@@ -24,7 +24,7 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | WP10 | verified | wp/WP10/verify-1.md |
 | WP11 | verified | wp/WP11/verify-1.md |
 | WP12 | verified | wp/WP12/verify-1.md |
-| WP13 | in-progress | — |
+| WP13 | verified | wp/WP13/verify-2.md |
 | WP14 | not-started | — |
 | WP15 | not-started | — |
 | WP16 | not-started | — |
@@ -123,8 +123,8 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | AC-W2V-06 | web2video-plan §6 | WP12 | G a two-page fixture with a hash-route link and a `goto` · W captured · T after each navigation exactly one cursor and one caption are visible (`evidence/WP12/AC-W2V-06-*.jpg`) | still | PASS | evidence/WP12/AC-W2V-06-overlay.verifier.jpg, evidence/WP12/AC-W2V-06-dom.verifier.jpg |
 | AC-W2V-07 | web2video-plan §6 | WP12 | G a scroll container with ≥ 100 rows · W `scrollBy(container, {y: 1500, ms: 600})` at 30 fps · T at least 10 distinct frames over the scroll | script | PASS | evidence/WP12/AC-W2V-07.verifier.log |
 | AC-W2V-08 | web2video-plan §6 | WP12 | G the repo · W grep `\bsay\(\|waitForVoice` over code files (`*.mjs`, `*.js`, `*.html`) in `skills/`, `evals/`, `docs/build/fixtures/` · T 0 hits (Markdown docs are WP15's; `scripts/setup.sh`'s shell `say` is outside the grep) | script | PASS | evidence/WP12/AC-W2V-08.verifier.log |
-| AC-W2V-10 | web2video-plan §6 | WP13 | G no TTS key and a loopback-only network guard · W the ui-demo is captured in captions and silent mode · T both succeed with zero requests to any TTS host | script | not-started | — |
-| AC-W2V-11 | web2video-plan §6 | WP13 | G the deck narrated on a fake/tone spine · W capture `--spine` · T each clip's onset in `--out` is at its spine time (± one frame, after the audio offset), and capture made no TTS request | script | not-started | — |
-| AC-W2V-12 | web2video-plan §6 | WP13 | G the ui-demo · W captured once per preset · T `probe-spec --preset <name>` passes for each (size, fps, codec, profile, audio, faststart, and the preset's encode checks per DEC-51: audio bitrate ceiling, x264 settings in the stream) | script | not-started | — |
-| AC-W2V-13 | web2video-plan §6 | WP13 | G the ui-demo · W `--preset youtube --viewport 1280x720 --fps 25`, and `--plates … --plate … --preset web` · T the first is 1280×720@25 with youtube encode settings; the second exits non-zero with a one-line refusal before a browser opens | script | not-started | — |
-| AC-W2V-14 | web2video-plan §6 | WP13 | G the deck narrated on a fake/tone spine · W capture with captions on, then `check-take --expect-cuts 2` · T it passes (caption changes and the cursor are not counted as cuts): both slide changes sit in ≥ 900 ms of silence | script | not-started | — |
+| AC-W2V-10 | web2video-plan §6 | WP13 | G no TTS key and a loopback-only network guard · W the ui-demo is captured in captions and silent mode · T both succeed with zero requests to any TTS host | script | PASS | evidence/WP13/ac-run.verifier-2.log, evidence/WP13/AC-W2V-10.verifier.log |
+| AC-W2V-11 | web2video-plan §6 | WP13 | G the deck narrated on a fake/tone spine · W capture `--spine` · T each clip's onset in `--out` is at its spine time (± one frame, after the audio offset), and capture made no TTS request | script | PASS | evidence/WP13/M2-onsets.verifier-2.log |
+| AC-W2V-12 | web2video-plan §6 | WP13 | G the ui-demo · W captured once per preset · T `probe-spec --preset <name>` passes for each (size, fps, codec, profile, audio, faststart, and the preset's encode checks per DEC-51: audio bitrate ceiling, x264 settings in the stream) | script | PASS | evidence/WP13/ac-run.verifier-2.log, evidence/WP13/M2-onsets.verifier-2.log |
+| AC-W2V-13 | web2video-plan §6 | WP13 | G the ui-demo · W `--preset youtube --viewport 1280x720 --fps 25`, and `--plates … --plate … --preset web` · T the first is 1280×720@25 with youtube encode settings; the second exits non-zero with a one-line refusal before a browser opens | script | PASS | evidence/WP13/ac-run.verifier-2.log, evidence/WP13/AC-W2V-13.verifier.log |
+| AC-W2V-14 | web2video-plan §6 | WP13 | G the deck narrated on a fake/tone spine · W capture with captions on, then `check-take --expect-cuts 2` · T it passes (caption changes and the cursor are not counted as cuts): both slide changes sit in ≥ 900 ms of silence | script | PASS | evidence/WP13/M1-1080p-check-take.verifier-2.log, evidence/WP13/AC-W2V-14-deck-captions.verifier.jpg |

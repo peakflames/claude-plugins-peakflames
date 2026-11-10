@@ -24,3 +24,5 @@ Items the Lead does after WP10, before the release.
   Done 2026-11-10: private repo https://github.com/peakflames/peakflames-brand-guidelines (whole folder, incl. `peak-media-pack/`).
 
 - [ ] **WP12 verify-1 carry-forward (v0.2):** the DOM fallback cursor is untested (the CLI can't force it); `--no-cursor` also shortens a take (no ~400 ms glides) — document in WP15. The `loadStoryboard` error / `--storyboard` help listing the full context is folded into WP13.
+
+- [ ] **WP13 verify-2 carry-forward (v0.2):** m3 — check-take's 150 ms merge window is shorter than the deck's 200 ms fade (false fail only; not seen today); n3 — youtube (no edit lists) loses a clip's first 21.3 ms if it starts at 0 ms (`--lead-ms 0`) — document in WP15; n4 — WP13 handoff deviations stale; n5 — check-take text output still says threshold 0.02 on 1080p takes (JSON is right); verify-1 n2 — progressive check passes when ffprobe reports no field order.
