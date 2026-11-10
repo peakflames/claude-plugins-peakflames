@@ -2,11 +2,10 @@
 // the archive step. Headings from openspec.dev's docs; "The workflow"/"Archive" match the eval stand-in.
 import { glideTo } from './glide.mjs';
 
-export default async function storyboard({ page, say, waitForVoice, wait }) {
-  await wait(300);
-  await say('OpenSpec takes the lighter road: propose, apply, archive.');
-  await glideTo(page, { match: '^\\s*(The loop at a glance|The workflow)', ms: 1400, mark: false });
-  await wait(1000);
-  await glideTo(page, { match: '^\\s*(Step 5|Archive)\\b', ms: 1200 });
-  await waitForVoice();
+export default async function storyboard({ beat, page, wait }) {
+  await beat('openspec', async () => {
+    await glideTo(page, { match: '^\\s*(The loop at a glance|The workflow)', ms: 1400, mark: false });
+    await wait(1000);
+    await glideTo(page, { match: '^\\s*(Step 5|Archive)\\b', ms: 1200 });
+  });
 }
