@@ -13,7 +13,7 @@
 
 ## Scope
 
-1. **Widen `ac-run`'s ID pattern** so area codes may contain digits (`AC-W2V-01`). Today `AC-[A-Z]+-\d+` appears at `docs/build/tools/ac-run.mjs` L15, L27 and L109; change all three to `AC-[A-Z0-9]+-\d+` (one shared constant is fine). Add an `AC-TRC-03` test to `evals/trace/ac-run.test.mjs` that builds a fixture register with an `AC-W2V-01` row and proves `--trace` sees it (orphan detection, brief listing) and `--wp` picks up a test named `AC-W2V-01: …`.
+1. **Widen `ac-run`'s ID pattern** so area codes may contain digits (`AC-W2V-nn`). Today `AC-[A-Z]+-\d+` appears at `docs/build/tools/ac-run.mjs` L15, L27 and L109; change all three to `AC-[A-Z0-9]+-\d+` (one shared constant is fine). Add an `AC-TRC-03` test to `evals/trace/ac-run.test.mjs` that builds a fixture register with an `AC-W2V-nn` row and proves `--trace` sees it (orphan detection, brief listing) and `--wp` picks up a test named `AC-W2V-nn: …`.
 2. **Prototype U1–U6** in a scratch dir outside the repo (`$TMPDIR`), using the pinned Playwright from `lib/deps.mjs` (`resolveDep`) and the browser from `lib/hf.mjs` (`browserPath`). Record each result as a dated bullet under **Run-time findings** in `decisions.md`, with the number, the result, and what later WPs must do. Save logs/JSON under `evidence/WP11/U<n>-*.log`.
 
 | # | Question | How | Written fallback |
@@ -38,7 +38,7 @@ Headed prototypes (U4–U6) will open a window on the user's screen; close every
 
 ## Acceptance criteria
 
-- **AC-TRC-03** (script) — G a register with an `AC-W2V-01` row and a test named `AC-W2V-01: …` · W `ac-run --trace` and `ac-run --wp` · T the row is traced like any other ID (orphan detected when unlisted; listed when in a brief) and its test result is reported
+- **AC-TRC-03** (script) — G a register with an `AC-W2V-nn` row and a test named `AC-W2V-nn: …` · W `ac-run --trace` and `ac-run --wp` · T the row is traced like any other ID (orphan detected when unlisted; listed when in a brief) and its test result is reported
 
 The U1–U6 findings have no AC; the Verifier checks each has a dated finding in `decisions.md` with evidence under `evidence/WP11/`.
 
