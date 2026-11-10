@@ -1,0 +1,32 @@
+# node --test --test-reporter=spec evals/video-capture/presets.test.mjs (verifier run, 2026-11-10)
+✔ AC-W2V-10: with no TTS key and a loopback-only network guard, the ui-demo captures in captions and silent mode with zero TTS requests (23592.456583ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97731.192459
+
+# measurements (PEAK_MEDIA_EVIDENCE_DIR)
+{
+  "note": "ui-demo under helpers/loopback-only.mjs with both TTS key variables empty; requests from --debug-requests",
+  "captions": {
+    "out": "ui-web.mp4",
+    "requests": 1,
+    "distinctHosts": [
+      "127.0.0.1:50419"
+    ],
+    "blocked": []
+  },
+  "silent": {
+    "out": "ui-silent.mp4",
+    "requests": 1,
+    "distinctHosts": [
+      "127.0.0.1:50423"
+    ],
+    "blocked": []
+  },
+  "control": "NETWORK-ATTEMPT https://openrouter.ai/api/v1/audio/speech"
+}

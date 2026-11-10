@@ -1,0 +1,17 @@
+✔ AC-W2V-10: with no TTS key and a loopback-only network guard, the ui-demo captures in captions and silent mode with zero TTS requests (23481.7505ms)
+✔ AC-W2V-11: the deck narrated on a fake/tone spine — each clip starts in --out at its spine time (± one frame; within 2 ms on web, youtube and youtube@60), and capture made no TTS request (79406.601041ms)
+✔ AC-W2V-12: the ui-demo captured once per preset passes probe-spec --preset for each (27218.044792ms)
+✔ AC-W2V-13: --preset youtube --viewport 1280x720 --fps 25 records 1280x720@25 with youtube encoding; a plate with --preset is refused before a browser opens (12639.495458ms)
+✔ AC-W2V-14: the narrated deck with captions on passes check-take --expect-cuts 2 — captions and the cursor are not cuts; both slide changes sit in >= 900 ms of silence (9539.261ms)
+✔ AC-W2V-14: at 1080p too — the narrated deck with captions on passes check-take --expect-cuts 2 at --preset youtube and --preset hifi (and youtube@60) (33954.9785ms)
+✔ check-take merge (m1): a group spans at most 150 ms from its first detection, so a chain splits and two cuts 200 ms apart stay two (0.480625ms)
+✔ check-take merge (m2): a failing merged transition is reported at the frame that fails (0.182625ms)
+✔ check-take (m1, end to end): two hard cuts 200 ms apart in silence count as 2 (1384.908292ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 187704.143542

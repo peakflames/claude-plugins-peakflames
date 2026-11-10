@@ -2,7 +2,7 @@
 // same storyboard runs in all three modes:
 //   capture --storyboard storyboard.mjs --script script.md --out deck.mp4 --no-captions   (silent)
 //   capture --storyboard storyboard.mjs --script script.md --out deck.mp4                 (captions)
-//   capture --storyboard storyboard.mjs --spine spine/manifest.json --mp4 deck.mp4        (narrated)
+//   capture --storyboard storyboard.mjs --spine spine/manifest.json --out deck.mp4        (narrated)
 // The page is index.html next to this file (served on 127.0.0.1 by capture). Slide changes
 // happen between beats, so in a narrated take they land in the silence between clips.
 
