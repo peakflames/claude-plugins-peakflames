@@ -10,7 +10,7 @@ const SLIDES = ['intro', 'why', 'how'];
 
 export default async function storyboard({ beat, page, wait }) {
   for (const [n, id] of SLIDES.entries()) {
-    await wait(250);                                  // let the last word ring out
+    if (n) await wait(250);                           // let the last word ring out
     await page.evaluate((i) => window.deckGo(i), n); // between beats: lands in silence
     await wait(900);                                  // let the slide settle before the voice
     await beat(id);                                   // no fn: the slide is the picture

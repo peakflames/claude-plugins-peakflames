@@ -27,7 +27,7 @@ export function toneOnsets(file) {
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /**
- * Pair each colour's first frame with its tone onset. colours: [{name, rgb}] in say() order.
+ * Pair each colour's first frame with its tone onset. colours: [{name, rgb}] in beat order.
  * Returns {fps, rows:[{name, flipFrame, flipMs, onsetMs, offsetMs}], medianMs, worstMs}.
  * offsetMs > 0 means the picture lags the sound. A frame time is quantized to the frame grid, so
  * each offset carries up to ±½ frame of rounding (WP7a verify-1, nit 2).

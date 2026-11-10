@@ -380,8 +380,12 @@ export function takeManifest(plan, take, { command, manifestFile, placed = [] })
   const captions = take.captionTimings.map((c) => ({ n: c.n, text: c.text, startMs: Math.max(0, c.startMs), durationMs: Math.max(1, c.durationMs), 'x-beat': c.beat }));
   const narrated = placed.length > 0;
   const beats = take.beats.map((b) => {
-    const startMs = Math.min(videoMs - 1, Math.max(0, b.startMs));
-    const beat = { id: b.id, startMs, durationMs: Math.max(1, Math.min(b.durationMs, videoMs - startMs)), clipNs: narrated ? placed.filter((p) => p.beat === b).map((p) => p.spineClip.n) : [] };
+    // a late beat moved the picture, not the voice: the beat's span still covers its clips (the schema needs it)
+    const own = narrated ? placed.filter((p) => p.beat === b) : [];
+    const from = Math.min(b.startMs, ...own.map((p) => Math.round(p.atMs)));
+    const to = Math.max(b.startMs + b.durationMs, ...own.map((p) => Math.round(p.atMs) + p.spineClip.durationMs));
+    const startMs = Math.min(videoMs - 1, Math.max(0, from));
+    const beat = { id: b.id, startMs, durationMs: Math.max(1, Math.min(to - startMs, videoMs - startMs)), clipNs: own.map((p) => p.spineClip.n) };
     if (!narrated || b.text) beat.onScreenText = b.text || b.id; // a beatgrid beat needs one (DEC-23)
     return beat;
   });
@@ -456,14 +460,19 @@ function captionEngine(page, css, choice = 'overlay') {
     name: 'dom',
     async show(text) {
       const id = `pm-caption-${Math.random().toString(36).slice(2)}`;
-      await page.evaluate(({ id, css, text }) => {
+      // one caption at a time: drawing replaces any caption already in the page, so a re-draw after
+      // a navigation never doubles up
+      const draw = () => page.evaluate(({ id, css, text }) => {
         if (!document.getElementById('pm-caption-style')) {
           const st = document.createElement('style'); st.id = 'pm-caption-style'; st.textContent = css; document.documentElement.appendChild(st);
         }
-        const wrap = document.createElement('div'); wrap.className = 'pm-caption-wrap'; wrap.id = id;
+        document.querySelectorAll('.pm-caption-wrap[data-pm]').forEach((e) => e.remove());
+        const wrap = document.createElement('div'); wrap.className = 'pm-caption-wrap'; wrap.id = id; wrap.dataset.pm = '1';
         const box = document.createElement('div'); box.className = 'pm-caption'; box.textContent = text;
         wrap.appendChild(box); document.documentElement.appendChild(wrap);
       }, { id, css, text });
+      // a navigation in flight destroys the context: wait for the new document, then draw there
+      try { await draw(); } catch { await page.waitForLoadState('domcontentloaded').catch(() => {}); await draw(); }
       let done = false;
       return () => { if (done) return Promise.resolve(); done = true; return page.evaluate((id) => document.getElementById(id)?.remove(), id).catch(() => {}); };
     },
@@ -499,7 +508,9 @@ const EASE = 'cubic-bezier(.4,0,.2,1)';
 /** A classic arrow pointer: black with a white rim; its tip is at (2,2) of the box. */
 const ARROW = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="30" viewBox="0 0 24 30" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">'
   + '<path d="M2 2 L2 24 L7.5 18.8 L11.4 27.4 L15.6 25.6 L11.8 17.2 L19.4 17.2 Z" fill="#000" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
-const RING = 'border:3px solid rgba(0,0,0,.55);border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.7)';
+// showOverlay strips inline <svg>, so the overlay cursor draws the same arrow as a data-URI background
+const ARROW_BG = `width:24px;height:30px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));background:url("data:image/svg+xml,${encodeURIComponent(ARROW.replace(/ style="[^"]*"/, ''))}") no-repeat`;
+const RING ='border:3px solid rgba(0,0,0,.55);border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.7)';
 
 /**
  * The visible cursor (U3): one screencast.showOverlay per glide whose HTML carries a CSS keyframe
@@ -515,9 +526,9 @@ function cursorEngine(page, { enabled, start, sleep }) {
   const box = (x, y) => `position:fixed;left:0;top:0;margin:-2px 0 0 -2px;pointer-events:none;z-index:2147483647;transform:translate(${x}px,${y}px)`;
   const overlayHtml = ({ from, to, ms, pulse }) => {
     const id = `pmc${++k}`;
-    let css = `.${id}{${box(to.x, to.y)}${ms ? `;animation:${id}g ${ms}ms ${EASE} both` : ''}}`;
+    let css = `.${id}{${box(to.x, to.y)};${ARROW_BG}${ms ? `;animation:${id}g ${ms}ms ${EASE} both` : ''}}`;
     if (ms) css += `@keyframes ${id}g{from{transform:translate(${from.x}px,${from.y}px)}to{transform:translate(${to.x}px,${to.y}px)}}`;
-    let html = `<div class="${id}">${ARROW}</div>`;
+    let html = `<div class="${id}"></div>`;
     if (pulse) {
       css += `.${id}r{position:fixed;left:${to.x - 20}px;top:${to.y - 20}px;width:40px;height:40px;box-sizing:border-box;pointer-events:none;z-index:2147483646;${RING};animation:${id}p 450ms ease-out both}`
         + `@keyframes ${id}p{from{transform:scale(.35);opacity:1}to{transform:scale(1.4);opacity:0}}`;

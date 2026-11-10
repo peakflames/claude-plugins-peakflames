@@ -20,7 +20,7 @@ import { CAPTURE, SPINE, DECK, NO_KEY } from './helpers/projects.mjs';
 import { measureSync } from './helpers/sync.mjs';
 import { waitUntilAlone, siblings } from './helpers/alone.mjs';
 import { COLOURS } from './fixtures/sync/storyboard.mjs';
-import { CAPTIONS } from '../../skills/video-capture/examples/ui-demo/storyboard.mjs';
+import { parseScript } from '../../skills/video-spine/scripts/spine.mjs';
 import { spec as checkTakeSpec } from '../../skills/video-capture/scripts/check-take.mjs';
 import { probeSpec } from '../../lib/verify/probe-spec.mjs';
 import { contactSheet } from '../../lib/verify/contact-sheet.mjs';
@@ -31,6 +31,9 @@ const CHECK_TAKE = 'skills/video-capture/scripts/check-take.mjs';
 const UI = path.join(ROOT, 'skills', 'video-capture', 'examples', 'ui-demo');
 const UI_STORYBOARD = path.join(UI, 'storyboard.mjs');
 const UI_ALT_CSS = path.join(UI, 'captions-alt.css');
+const UI_SCRIPT = path.join(UI, 'script.md');
+/** The ui-demo's captions: each beat's On screen: line in script.md. */
+const CAPTIONS = parseScript(readFileSync(UI_SCRIPT, 'utf8')).map((b) => b.onScreenText);
 const SYNC = path.join(ROOT, 'evals', 'video-capture', 'fixtures', 'sync');
 const LOOPBACK_ONLY = path.join(ROOT, 'evals', 'video-capture', 'helpers', 'loopback-only.mjs');
 const EVIDENCE = process.env.PEAK_MEDIA_EVIDENCE_DIR;
@@ -82,11 +85,12 @@ const memo = (fn) => { let v; return () => (v ??= fn()); };
 
 // ---- the takes (each captured once, shared by the tests below) ----
 
-/** The narrated example deck: a spine whose 1150 ms lead-in fits the deck loop's pause. */
+/** The narrated example deck, voice-only (--no-captions: a caption coming up with each clip would be a
+ *  picture change over speech): a spine whose 950 ms lead-in fits the 900 ms slide settle. */
 const deck = memo(() => {
   const spine = buildSpine(path.join(DECK, 'brief.md'), 'deck-spine', ['--lead-ms', '950']);
   const mp4 = path.join(tmp, 'deck.mp4');
-  const { take } = capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', spine.file, '--mp4', mp4]);
+  const { take } = capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', spine.file, '--mp4', mp4, '--no-captions']);
   return { spine, mp4, take };
 });
 
@@ -94,16 +98,16 @@ const deck = memo(() => {
 const ui = {
   default: memo(() => {
     const mp4 = path.join(tmp, 'ui-default.mp4');
-    const r = capture(['--storyboard', UI_STORYBOARD, '--mp4', mp4], { preload: 'loopback' });
+    const r = capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', mp4], { preload: 'loopback' });
     return { mp4, ...r };
   }),
   'no-captions': memo(() => {
     const mp4 = path.join(tmp, 'ui-no-captions.mp4');
-    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--mp4', mp4, '--no-captions']) };
+    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', mp4, '--no-captions']) };
   }),
   'caption-css': memo(() => {
     const mp4 = path.join(tmp, 'ui-caption-css.mp4');
-    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--mp4', mp4, '--caption-css', UI_ALT_CSS, '--manifest', path.join(tmp, 'ui-css-take.json')]) };
+    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', mp4, '--caption-css', UI_ALT_CSS, '--manifest', path.join(tmp, 'ui-css-take.json')]) };
   }),
 };
 
@@ -111,8 +115,7 @@ const syncSpine = memo(() => buildSpine(path.join(SYNC, 'brief.md'), 'sync-spine
 /** A sync take: voice-only (--no-captions: no overlay at all) or captioned (the default overlay engine). */
 function syncTake(captioned, i = 1) {
   const mp4 = path.join(tmp, `sync-${captioned ? 'captions' : 'voice'}-${i}.mp4`);
-  const { take } = capture(['--storyboard', path.join(SYNC, 'storyboard.mjs'), '--spine', syncSpine().file, '--mp4', mp4, '--audio-offset-ms', '0', ...(captioned ? [] : ['--no-captions'])],
-    { extraEnv: { PEAK_MEDIA_SYNC_CAPTIONS: captioned ? '1' : '0' } });
+  const { take } = capture(['--storyboard', path.join(SYNC, 'storyboard.mjs'), '--spine', syncSpine().file, '--mp4', mp4, '--audio-offset-ms', '0', ...(captioned ? [] : ['--no-captions'])]);
   return { mp4, take };
 }
 let syncMp4; // kept for AC-REC-07's negative control
@@ -140,8 +143,8 @@ function band(file, ms) {
   }
   return { dark, amber, other };
 }
-/** Times inside each say() window: the middle of the caption (or of the say() hold when none shows). */
-const sayMids = (take) => take.says.map((s) => {
+/** Times inside each beat: the middle of its caption (or of the beat when none shows). */
+const beatMids = (take) => take.beats.map((s) => {
   const c = take.captionTimings.find((x) => x.n === s.n);
   return Math.round(c ? c.startMs + c.durationMs / 2 : s.startMs + s.durationMs / 2);
 });
@@ -198,26 +201,26 @@ test('AC-REC-05: the --mp4 deliverable passes probe-spec (H.264 High, yuv420p, A
   keep('AC-REC-05-probe.json', { results, narratedLufs: lufs, captionsOnlyLufs: null });
 });
 
-test('AC-REC-06: on a sync page that flips a full-frame colour on each say(), with fake tones, the median offset is <= 120 ms and the worst <= 200 ms', () => {
+test('AC-REC-06: on a sync page that flips a full-frame colour as each beat starts, with fake tones, the median offset is <= 120 ms and the worst <= 200 ms', () => {
   // Both modes are asserted, two takes each (12 flips per mode): voice-only (--no-captions, as a
   // narrated deck speaks) and captioned (each line drawn with the default showOverlay engine).
   // No retry: the file runs alone (see the header), so one measurement is the result.
   const measure = (captioned, i) => {
     const { mp4, take } = syncTake(captioned, i);
     if (!captioned) syncMp4 = mp4;
-    assert.equal(take.says.length, COLOURS.length);
+    assert.equal(take.beats.length, COLOURS.length);
     assert.equal(take.audio.clips, COLOURS.length, 'every tone is laid');
     assert.equal(take.captionEngine, captioned ? 'overlay' : null);
     const m = measureSync(mp4, COLOURS, FPS);
-    assert.equal(m.onsets.length, COLOURS.length, `one tone onset per say(): ${m.onsets}`);
+    assert.equal(m.onsets.length, COLOURS.length, `one tone onset per beat: ${m.onsets}`);
     for (const row of m.rows) assert.ok(row.offsetMs !== null, `colour ${row.name} appears`);
-    return { captions: captioned, says: take.says.map((s) => ({ n: s.n, plannedMs: s.plannedMs, startMs: s.startMs, lateMs: s.lateMs })), ...m };
+    return { captions: captioned, beats: take.beats.map((s) => ({ n: s.n, id: s.id, plannedMs: s.plannedMs, startMs: s.startMs, lateMs: s.lateMs })), ...m };
   };
   const stats = (rs) => {
     const all = rs.flatMap((r) => r.rows.map((x) => x.offsetMs)).sort((a, b) => a - b);
     const median = all.length % 2 ? all[(all.length - 1) / 2] : (all[all.length / 2 - 1] + all[all.length / 2]) / 2;
     const worst = all.reduce((w, x) => (Math.abs(x) > Math.abs(w) ? x : w), 0);
-    return { median, worst, firstSay: rs.map((r) => r.rows[0].offsetMs), offsets: all };
+    return { median, worst, firstBeat: rs.map((r) => r.rows[0].offsetMs), offsets: all };
   };
   const runs = [measure(false, 1), measure(true, 1), measure(false, 2), measure(true, 2)]; // interleaved
   const modes = { voiceOnly: stats(runs.filter((r) => !r.captions)), captioned: stats(runs.filter((r) => r.captions)) };
@@ -275,16 +278,16 @@ test('AC-REC-07: on the narrated example deck, every scene change (threshold 0.0
   keep('AC-REC-07-check-take.json', { deck: res, control: { ok: false, failing: bad.map((c) => ({ timecode: c.timecode, gap: c.gap })) }, noChangeGuard: none.stdout.trim() });
 });
 
-test('AC-REC-08: ui-demo stills inside each say() window show the caption; --no-captions shows none; --caption-css changes the style', () => {
+test('AC-REC-08: ui-demo stills inside each beat show the caption; --no-captions shows none; --caption-css changes the style', () => {
   const takes = Object.fromEntries(Object.entries(ui).map(([k, f]) => [k, f()]));
   const stats = {};
   for (const [variant, { mp4, take }] of Object.entries(takes)) {
-    assert.equal(take.says.length, CAPTIONS.length);
-    const at = sayMids(take);
+    assert.equal(take.beats.length, CAPTIONS.length);
+    const at = beatMids(take);
     stats[variant] = at.map((ms) => ({ ms, ...band(mp4, ms) }));
     if (EVIDENCE) contactSheet(mp4, { out: path.join(EVIDENCE, `AC-REC-08-${variant}.jpg`), at, cols: 3, width: 640 });
   }
-  // default: a caption per say(), the text as written, a dark bar in the caption band
+  // default: a caption per beat, the text as written in script.md, a dark bar in the caption band
   assert.deepEqual(takes.default.take.captionTimings.map((c) => c.text), CAPTIONS);
   assert.equal(takes.default.take.captionEngine, 'overlay', 'captions are drawn with screencast.showOverlay');
   for (const s of stats.default) assert.ok(s.dark >= 40 && s.amber === 0, `default caption bar at ${s.ms} ms: ${JSON.stringify(s)}`);
@@ -293,17 +296,17 @@ test('AC-REC-08: ui-demo stills inside each say() window show the caption; --no-
   for (const s of stats['no-captions']) assert.ok(s.dark === 0 && s.amber === 0 && s.other === 0, `no caption at ${s.ms} ms: ${JSON.stringify(s)}`);
   // --caption-css: the alternative amber card instead of the dark bar
   for (const s of stats['caption-css']) assert.ok(s.amber >= 100 && s.amber > s.dark, `restyled caption at ${s.ms} ms: ${JSON.stringify(s)}`);
-  // captions hold for reading time from their say(): about 3 words/s, at least 1.5 s. The overlay is
-  // drawn off the storyboard's critical path, so it may appear a little after say() (more under load);
-  // it still comes down at say() + reading time.
+  // a beat holds at least its caption's reading time (about 3 words/s, at least 1.5 s); a longer fn
+  // lengthens it. The overlay is drawn off the storyboard's critical path, so it may appear a little
+  // after the beat starts (more under load); it comes down when the beat ends.
   for (const c of takes.default.take.captionTimings) {
-    const s = takes.default.take.says.find((x) => x.n === c.n);
+    const s = takes.default.take.beats.find((x) => x.n === c.n);
     const words = c.text.split(/\s+/).filter((w) => /\w/.test(w)).length;
-    assert.equal(s.durationMs, Math.max(1500, Math.round((words / 3) * 1000)), `say ${c.n} holds reading time for ${words} words`);
-    assert.ok(c.startMs - s.startMs >= 0 && c.startMs - s.startMs <= 250, `caption ${c.n} appears within 250 ms of its say() (${c.startMs - s.startMs} ms)`);
-    assert.ok(Math.abs(c.startMs + c.durationMs - (s.startMs + s.durationMs)) <= FRAME_MS, `caption ${c.n} comes down at say() + reading time`);
+    assert.ok(s.durationMs >= Math.max(1500, Math.round((words / 3) * 1000)) - 1, `beat ${s.id} holds at least reading time for ${words} words (${s.durationMs} ms)`);
+    assert.ok(c.startMs - s.startMs >= 0 && c.startMs - s.startMs <= 250, `caption ${c.n} appears within 250 ms of its beat (${c.startMs - s.startMs} ms)`);
+    assert.ok(Math.abs(c.startMs + c.durationMs - (s.startMs + s.durationMs)) <= FRAME_MS, `caption ${c.n} comes down when its beat ends`);
   }
-  keep('AC-REC-08-bands.json', { note: 'pixel classes in the bottom-quarter caption band (128x72 scale) at the middle of each say() window', stats });
+  keep('AC-REC-08-bands.json', { note: 'pixel classes in the bottom-quarter caption band (128x72 scale) at the middle of each beat', stats });
 });
 
 test('AC-REC-09: the take manifest validates against the v1 spine schema and command[] reproduces the take', async () => {
@@ -347,7 +350,7 @@ test('AC-REC-09: the take manifest validates against the v1 spine schema and com
   const mp4 = ui['caption-css']().mp4;
   // not circular: command[] must carry every flag of the invocation that made the take (as spawned
   // by capture() above), with paths absolute
-  const given = [['--storyboard', UI_STORYBOARD], ['--mp4', mp4], ['--caption-css', UI_ALT_CSS], ['--manifest', manifests['ui-caption-css']], ['--json'], ['--debug-requests']];
+  const given = [['--storyboard', UI_STORYBOARD], ['--script', UI_SCRIPT], ['--mp4', mp4], ['--caption-css', UI_ALT_CSS], ['--manifest', manifests['ui-caption-css']], ['--json'], ['--debug-requests']];
   for (const [flag, value] of given) {
     const i = args.indexOf(flag);
     assert.ok(i > 0, `command[] has ${flag}`);
@@ -389,13 +392,16 @@ test('AC-REC-10: with no key, the captions-only example passes with 0 OpenRouter
   assert.match(ctl.stderr, /NETWORK-ATTEMPT https:\/\/openrouter\.ai/);
 });
 
-// ---- not ACs: WP7a's open nits (warm-up is measured by AC-REC-06's first say(); the watchdog here) ----
+// ---- not ACs: WP7a's open nits (warm-up is measured by AC-REC-06's first beat; the watchdog here) ----
+
+/** A one-beat script.md in tmp: beat `id` with caption `text`. */
+const oneBeat = (id, text) => { const f = path.join(tmp, `${id}.md`); writeFileSync(f, `## ${id}\n\n${text}\n`); return f; };
 
 test('watchdog: a hanging storyboard is aborted at --max-ms with one line and the process exits', () => {
   const sb = path.join(tmp, 'hang.mjs');
-  writeFileSync(sb, "export default async ({ say }) => { await say('waiting forever'); await new Promise((r) => setTimeout(r, 600000)); };\n");
+  writeFileSync(sb, "export default async ({ beat }) => { await beat('hang', () => new Promise((r) => setTimeout(r, 600000))); };\n");
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, [path.join(ROOT, CAPTURE), '--storyboard', sb, '--url', path.join(UI, 'index.html'), '--out', path.join(tmp, 'hang.webm'), '--max-ms', '2500'], { encoding: 'utf8', env: { ...process.env, ...env() }, timeout: 60000 });
+  const r = spawnSync(process.execPath, [path.join(ROOT, CAPTURE), '--storyboard', sb, '--script', oneBeat('hang', 'Waiting forever.'), '--url', path.join(UI, 'index.html'), '--out', path.join(tmp, 'hang.webm'), '--max-ms', '2500'], { encoding: 'utf8', env: { ...process.env, ...env() }, timeout: 60000 });
   const ms = Date.now() - t0;
   assert.equal(r.status, 1, r.stderr);
   const lines = r.stderr.trim().split('\n').filter((l) => !/^capture: (launching|t0 )/.test(l));
@@ -419,9 +425,9 @@ test('watchdog: a spine-timed take that overruns its window by more than 2 s is 
 
 test('captions: --caption-engine dom draws the caption in the page instead of showOverlay', () => {
   const sb = path.join(tmp, 'dom-caption.mjs');
-  writeFileSync(sb, "export default async ({ say, waitForVoice }) => { await say('Drawn in the page instead'); await waitForVoice(); };\n");
+  writeFileSync(sb, "export default async ({ beat }) => { await beat('dom'); };\n");
   const mp4 = path.join(tmp, 'dom-caption.mp4');
-  const { take } = capture(['--storyboard', sb, '--url', path.join(UI, 'index.html'), '--mp4', mp4, '--caption-engine', 'dom']);
+  const { take } = capture(['--storyboard', sb, '--script', oneBeat('dom', 'Drawn in the page instead.'), '--url', path.join(UI, 'index.html'), '--mp4', mp4, '--caption-engine', 'dom']);
   assert.equal(take.captionEngine, 'dom');
   const c = take.captionTimings[0];
   const s = band(mp4, Math.round(c.startMs + c.durationMs / 2));

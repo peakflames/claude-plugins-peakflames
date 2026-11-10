@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scroll fixture</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #eef0f2; color: #1d2329; font: 18px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  #list { width: 640px; height: 520px; margin: 40px auto 0; overflow: auto; background: #fff; border-radius: 12px; }
+  .row { display: flex; gap: 16px; align-items: center; height: 40px; padding: 0 20px; border-bottom: 1px solid #dde1e5; }
+  .row:nth-child(odd) { background: #f3f6fa; }
+  .row b { width: 60px; } .row i { flex: 1; height: 14px; border-radius: 7px; background: #3a6ea5; opacity: .25; }
+  .row:nth-child(3n) i { opacity: .6; } .row:nth-child(5n) i { background: #b5562b; }
+</style>
+</head>
+<body>
+<!-- AC-W2V-07: a scroll container with 120 rows (4800 px of content in a 520 px box). -->
+<div id="list"></div>
+<script>
+  const list = document.getElementById('list');
+  for (let i = 1; i <= 120; i++) list.insertAdjacentHTML('beforeend', `<div class="row"><b>#${i}</b><i style="max-width:${30 + ((i * 37) % 70)}%"></i></div>`);
+</script>
+</body>
+</html>
