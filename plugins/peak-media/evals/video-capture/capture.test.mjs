@@ -15,9 +15,10 @@ import { browserPath } from '../../lib/hf.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
 import { loadProject, checkRenders } from '../../skills/video-assemble/scripts/assemble.mjs';
 
-const REC01_FLAGS = ['--storyboard', '--out', '--mp4', '--viewport', '--no-captions', '--caption-css', '--url', '--debug-requests', '--audio-offset-ms', '--spine'];
+const REC01_FLAGS = ['--storyboard', '--script', '--out', '--mp4', '--viewport', '--no-captions', '--caption-css', '--url', '--debug-requests', '--audio-offset-ms', '--spine', '--no-cursor'];
 const NARRATION_FLAGS = ['--narrate', '--tts-model', '--voice', '--style', '--export-clips'];
 const STORYBOARD = path.join(DECK, 'storyboard.mjs');
+const DECK_SCRIPT = path.join(DECK, 'script.md');
 
 let tmp, spineFile, spineDoc;
 before(() => {
@@ -65,10 +66,12 @@ test('AC-BASE-09: capture --help lists every flag, --version = plugin.json, bad 
     badArgs: [
       [],                                                           // nothing to capture
       ['--bogus'],                                                  // unknown flag
-      ['--storyboard', path.join(tmp, 'missing.mjs'), '--out', out], // missing storyboard
-      ['--storyboard', STORYBOARD, '--out', path.join(tmp, 'x.avi')], // unsupported container
-      ['--storyboard', STORYBOARD, '--out', out, '--viewport', 'big'], // bad viewport
-      ['--storyboard', STORYBOARD, '--out', out, '--audio-offset-ms', 'soon'], // not a number
+      ['--storyboard', STORYBOARD, '--out', out],                   // no beat source (--script/--spine/--plates)
+      ['--storyboard', path.join(tmp, 'missing.mjs'), '--script', DECK_SCRIPT, '--out', out], // missing storyboard
+      ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', path.join(tmp, 'x.avi')], // unsupported container
+      ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', out, '--viewport', 'big'], // bad viewport
+      ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', out, '--audio-offset-ms', 'soon'], // not a number
+      ['--storyboard', STORYBOARD, '--script', path.join(tmp, 'nope.md'), '--out', out], // missing script
       ['--storyboard', STORYBOARD, '--out', out, '--spine', path.join(tmp, 'nope.json')], // missing spine
       ['--plate', 'r1-feature'],                                    // --plate without --plates
     ],
@@ -81,7 +84,7 @@ test('AC-REC-01: --help lists the recorder flags and no narration flags; each fl
   for (const f of REC01_FLAGS) assert.match(help.stdout, new RegExp(`--${f.slice(2)}\\b`), `--help lists ${f}`);
   for (const f of NARRATION_FLAGS) assert.doesNotMatch(help.stdout, new RegExp(`${f}\\b`), `--help has no narration flag ${f}`);
   for (const f of NARRATION_FLAGS) {
-    const r = run(CAPTURE, ['--storyboard', STORYBOARD, '--out', path.join(tmp, 'n.mp4'), f, ...(f === '--narrate' ? [] : ['x'])]);
+    const r = run(CAPTURE, ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', path.join(tmp, 'n.mp4'), f, ...(f === '--narrate' ? [] : ['x'])]);
     assert.notEqual(r.code, 0, `${f} is rejected`);
     assert.match(r.stderr, /Unknown option/, `${f} is unknown to capture`);
   }
@@ -90,17 +93,19 @@ test('AC-REC-01: --help lists the recorder flags and no narration flags; each fl
   const options = Object.fromEntries(Object.entries(spec.options).map(([k, o]) => [k, { type: o.type === 'number' ? 'string' : o.type }]));
   const css = path.join(tmp, 'cap.css');
   writeFileSync(css, '.pm-caption { color: yellow; }');
-  const sample = { storyboard: STORYBOARD, out: path.join(tmp, 'a.webm'), mp4: path.join(tmp, 'a.mp4'), viewport: '960x540', 'caption-css': css,
+  const sample = { storyboard: STORYBOARD, script: DECK_SCRIPT, out: path.join(tmp, 'a.webm'), mp4: path.join(tmp, 'a.mp4'), viewport: '960x540', 'caption-css': css,
     url: path.join(DECK, 'index.html'), 'audio-offset-ms': '-50', spine: spineFile };
   const argv = REC01_FLAGS.flatMap((f) => (spec.options[f.slice(2)].type === 'boolean' ? [f] : [`${f}=${sample[f.slice(2)]}`]));
   const { values } = parseArgs({ args: argv, options, strict: true });
   for (const f of REC01_FLAGS) assert.ok(values[f.slice(2)] !== undefined, `${f} parsed`);
 
   // and the real CLI accepts each one: with ffmpeg made unavailable the run gets past parsing and
-  // flag validation, then stops at pre-flight (proving no flag was rejected) before any browser
+  // flag validation, then stops at pre-flight (proving no flag was rejected) before any browser.
+  // Every run names exactly one beat source: --script, or --spine when that is the flag under test.
   for (const f of REC01_FLAGS) {
     const k = f.slice(2);
-    const args = ['--storyboard', STORYBOARD, '--out', path.join(tmp, 'b.mp4'), ...(k === 'storyboard' || k === 'out' ? [] : spec.options[k].type === 'boolean' ? [f] : [f, sample[k]])];
+    const source = k === 'spine' || k === 'script' ? [] : ['--script', DECK_SCRIPT];
+    const args = ['--storyboard', STORYBOARD, ...source, '--out', path.join(tmp, 'b.mp4'), ...(k === 'storyboard' || k === 'out' ? [] : spec.options[k].type === 'boolean' ? [f] : [f, sample[k]])];
     const r = run(CAPTURE, args, { env: { PEAK_MEDIA_FFMPEG: path.join(tmp, 'no-ffmpeg') } });
     assert.equal(r.code, 3, `${f}: reaches pre-flight (${r.stderr})`);
     assert.match(r.stderr, /ffmpeg not found/, `${f}: stopped by the simulated missing ffmpeg, not by the flag`);
@@ -108,7 +113,8 @@ test('AC-REC-01: --help lists the recorder flags and no narration flags; each fl
 });
 
 test('AC-REC-02: missing Chromium, missing ffmpeg or a bad --spine exit non-zero in < 2 s with no browser launch', () => {
-  const base = ['--storyboard', STORYBOARD, '--out', path.join(tmp, 'c.mp4')];
+  const noSource = ['--storyboard', STORYBOARD, '--out', path.join(tmp, 'c.mp4')];
+  const base = [...noSource, '--script', DECK_SCRIPT];
   const badSpine = path.join(tmp, 'bad-manifest.json');
   writeFileSync(badSpine, JSON.stringify({ ...spineDoc, schemaVersion: 2 }));
   const notJson = path.join(tmp, 'broken-manifest.json');
@@ -117,9 +123,9 @@ test('AC-REC-02: missing Chromium, missing ffmpeg or a bad --spine exit non-zero
     { name: 'missing Chromium', args: base, env: { HYPERFRAMES_BROWSER_PATH: path.join(tmp, 'no-such-chrome') }, msg: /Chromium not found/ },
     { name: 'missing ffmpeg', args: base, env: { PEAK_MEDIA_FFMPEG: path.join(tmp, 'no-ffmpeg') }, msg: /ffmpeg not found/ },
     { name: 'missing ffprobe', args: base, env: { PEAK_MEDIA_FFPROBE: path.join(tmp, 'no-ffprobe') }, msg: /ffprobe not found/ },
-    { name: 'spine fails the schema', args: [...base, '--spine', badSpine], msg: /not a valid spine manifest: schemaVersion/ },
-    { name: 'spine is not JSON', args: [...base, '--spine', notJson], msg: /not a valid spine manifest/ },
-    { name: 'spine file missing', args: [...base, '--spine', path.join(tmp, 'nope', 'manifest.json')], msg: /no such file/ },
+    { name: 'spine fails the schema', args: [...noSource, '--spine', badSpine], msg: /not a valid spine manifest: schemaVersion/ },
+    { name: 'spine is not JSON', args: [...noSource, '--spine', notJson], msg: /not a valid spine manifest/ },
+    { name: 'spine file missing', args: [...noSource, '--spine', path.join(tmp, 'nope', 'manifest.json')], msg: /no such file/ },
   ];
   for (const c of cases) {
     const spy = launchSpy();
@@ -134,20 +140,22 @@ test('AC-REC-02: missing Chromium, missing ffmpeg or a bad --spine exit non-zero
   // control: the same spy does record a launch when nothing is wrong (so "not launched" means something)
   const spy = launchSpy();
   const tiny = path.join(tmp, 'tiny.mjs');
-  writeFileSync(tiny, "export default async ({ page, wait }) => { await page.setContent('<h1>ok</h1>'); await wait(200); };\n");
-  const ok = run(CAPTURE, ['--storyboard', tiny, '--out', path.join(tmp, 'tiny.mp4')], { env: spy.env });
+  writeFileSync(tiny, "export default async ({ beat, page }) => { await page.setContent('<h1>ok</h1>'); await beat('ok'); };\n");
+  const tinyScript = path.join(tmp, 'tiny.md');
+  writeFileSync(tinyScript, '## ok\n\nOk.\n');
+  const ok = run(CAPTURE, ['--storyboard', tiny, '--script', tinyScript, '--out', path.join(tmp, 'tiny.mp4')], { env: spy.env });
   assert.equal(ok.code, 0, ok.stderr);
   assert.equal(spy.launched(), true, 'control run launches the browser through the spy');
 });
 
-test('AC-REC-03: the example deck storyboard (original loop) runs unmodified in silent, captions and spine-timed modes', () => {
+test('AC-REC-03: the example deck storyboard runs unmodified in silent, captions and narrated modes', () => {
   const src = readFileSync(STORYBOARD, 'utf8');
-  for (const step of ['waitForVoice()', 'wait(250)', 'deckGo', 'wait(900)', "say('', { narrate: paragraph })"]) assert.ok(src.includes(step), `storyboard keeps the original loop: ${step}`);
+  for (const step of ['beat(id)', 'deckGo', 'wait(900)']) assert.ok(src.includes(step), `storyboard keeps the deck loop: ${step}`);
   const before = sha(STORYBOARD);
   const modes = {
-    silent: ['--no-captions'],
-    captions: [],
-    spine: ['--spine', spineFile],
+    silent: ['--script', DECK_SCRIPT, '--no-captions'],
+    captions: ['--script', DECK_SCRIPT],
+    narrated: ['--spine', spineFile],
   };
   const takes = {};
   for (const [mode, extra] of Object.entries(modes)) {
@@ -158,7 +166,7 @@ test('AC-REC-03: the example deck storyboard (original loop) runs unmodified in 
     const take = json(r);
     takes[mode] = take;
     assert.equal(take.mode, mode);
-    assert.equal(take.says.length, 3, `${mode}: one say() per slide`);
+    assert.deepEqual(take.beats.map((b) => b.id), ['intro', 'why', 'how'], `${mode}: one beat per slide, in order`);
     const v = videoFrames(out);
     assert.equal(v.frames, take.frames, `${mode}: the file holds every frame of the take`);
     assert.equal(v.fps, 30);
@@ -166,21 +174,20 @@ test('AC-REC-03: the example deck storyboard (original loop) runs unmodified in 
     assert.ok(take.uniqueFrames >= 3, `${mode}: the picture changes (${take.uniqueFrames} distinct frames)`);
   }
   assert.equal(sha(STORYBOARD), before, 'the storyboard file is unmodified');
-  // silent: no captions; captions: every say() shows one, held for reading time
-  assert.ok(takes.silent.says.every((s) => s.caption === false));
-  assert.ok(takes.captions.says.every((s) => s.caption === true && s.durationMs >= 1500));
-  // spine-timed: say() plays to the spine's clips, waitForVoice waits for each clip, the take is the spine's length
-  const sp = takes.spine;
-  assert.deepEqual(sp.says.map((s) => s.clip), spineDoc.clips.map((c) => c.n));
-  sp.says.forEach((s, i) => {
+  // silent: no captions, the reading hold still paces each beat; captions: one per beat, held >= 1.5 s
+  assert.ok(takes.silent.beats.every((b) => b.caption === false && b.durationMs >= 1500));
+  assert.equal(takes.silent.captionTimings.length, 0);
+  assert.ok(takes.captions.beats.every((b) => b.caption === true && b.durationMs >= 1500));
+  // narrated: each beat plays to its spine clip (clip start - audio offset), the take is the spine's length
+  const sp = takes.narrated;
+  const off = spineDoc.audioOffsetMs ?? 0;
+  sp.beats.forEach((b, i) => {
     const c = spineDoc.clips[i];
-    assert.equal(s.durationMs, c.durationMs, `say #${s.n} holds for clip ${c.n}`);
-    assert.ok(s.startMs >= c.startMs - 5, `say #${s.n} never starts before its clip (${s.startMs} vs ${c.startMs})`);
+    assert.deepEqual(b.clipNs, [c.n], `beat ${b.id} plays clip ${c.n}`);
+    assert.equal(b.plannedMs, c.startMs - off, `beat ${b.id} is planned at its clip's start`);
+    assert.ok(b.startMs >= b.plannedMs - 5, `beat ${b.id} never starts before its clip (${b.startMs} vs ${b.plannedMs})`);
+    assert.ok(Math.abs(b.startMs + b.durationMs - (c.startMs - off + c.durationMs)) <= 1000 / 30 + 5, `beat ${b.id} ends with its clip`);
   });
-  for (let i = 1; i < sp.says.length; i++) {
-    const prevEnd = spineDoc.clips[i - 1].startMs + spineDoc.clips[i - 1].durationMs;
-    assert.ok(sp.says[i].startMs >= prevEnd + 1150 - 30, `waitForVoice held slide ${i + 1} until clip ${i} ended (+250 +900 ms)`);
-  }
   assert.ok(Math.abs(sp.videoMs - spineDoc.totalMs) <= 1000 / 30, `spine take lasts the spine: ${sp.videoMs} vs ${spineDoc.totalMs}`);
 });
 
@@ -194,8 +201,9 @@ test('AC-REC-04: F3 live plates on a 3-clip spine capture to their planned durat
     assert.equal(r.code, 0, `${p.id}: ${r.stderr}`);
     assertLocalOnly(r.stderr, p.id);
     const take = json(r);
-    assert.equal(take.mode, 'spine');
-    assert.equal(take.says.length, 1, `${p.id}: its beat's clip`);
+    assert.equal(take.mode, 'narrated');
+    assert.deepEqual(take.beats.map((b) => b.id), [p.beat], `${p.id}: its plate's beat`);
+    assert.equal(take.beats[0].clipNs.length, 1, `${p.id}: its beat's clip`);
     const out = path.join(proj.dir, 'renders', 'plates', `${p.id}.mp4`);
     assert.equal(take.out, out);
     const v = videoFrames(out);

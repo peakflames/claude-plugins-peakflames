@@ -1,0 +1,16 @@
+# AC-W2V-06 verifier (wp12-verifier-1), 2026-11-10T21:32:20Z
+## ac-run --wp WP12
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-W2V-06 | still | — | not-started | — |
+## node --test evals/video-capture/beat.test.mjs (run alone)
+✔ AC-W2V-06: after a hash-route change and a goto, one cursor and one caption are visible (contact sheets) (15821.225833ms)
+ℹ tests 9
+ℹ pass 9
+ℹ fail 0
+## full suite (TMPDIR=mktemp)
+✔ AC-W2V-06: after a hash-route change and a goto, one cursor and one caption are visible (contact sheets) (16481.900791ms)
+ℹ tests 127
+ℹ pass 126
+ℹ fail 1
+## verifier takes: /tmp/wp12v-scripts/sheets.mjs -> AC-W2V-06-*.verifier.jpg, AC-W2V-05-06.verifier.json

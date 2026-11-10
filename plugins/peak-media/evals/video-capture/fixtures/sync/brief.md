@@ -1,4 +1,4 @@
-# Sync test — colour flips on each say()
+# Sync test — colour flips on each beat
 
 - **Runtime:** 14 s, 1280×720, 30 fps
 - **Spine:** narration (`--tts-model fake/tone`): each clip is a tone at full level from sample 0

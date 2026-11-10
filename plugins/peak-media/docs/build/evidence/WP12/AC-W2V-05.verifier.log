@@ -1,0 +1,16 @@
+# AC-W2V-05 verifier (wp12-verifier-1), 2026-11-10T21:32:20Z
+## ac-run --wp WP12
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-W2V-05 | still | — | not-started | — |
+## node --test evals/video-capture/beat.test.mjs (run alone)
+✔ AC-W2V-05: the arrow cursor is drawn at each click/type target and between them; --no-cursor draws none (contact sheets) (13683.297417ms)
+ℹ tests 9
+ℹ pass 9
+ℹ fail 0
+## full suite (TMPDIR=mktemp)
+✔ AC-W2V-05: the arrow cursor is drawn at each click/type target and between them; --no-cursor draws none (contact sheets) (15270.241ms)
+ℹ tests 127
+ℹ pass 126
+ℹ fail 1
+## verifier takes: /tmp/wp12v-scripts/sheets.mjs -> AC-W2V-05-*.verifier.jpg, AC-W2V-05-06.verifier.json
