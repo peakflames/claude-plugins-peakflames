@@ -77,6 +77,9 @@ test('AC-BASE-09: capture --help lists every flag, --version = plugin.json, bad 
       ['--storyboard', STORYBOARD, '--script', path.join(tmp, 'nope.md'), '--out', out], // missing script
       ['--storyboard', STORYBOARD, '--out', out, '--spine', path.join(tmp, 'nope.json')], // missing spine
       ['--plate', 'r1-feature'],                                    // --plate without --plates
+      ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', out, '--storage-state', path.join(tmp, 'no-session.json')], // missing session (WP14)
+      ['signin'],                                                   // signin without a URL
+      ['signin', 'not-a-url'],                                      // signin with a bad URL
     ],
   });
 });

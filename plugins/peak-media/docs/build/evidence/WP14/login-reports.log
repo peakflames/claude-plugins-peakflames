@@ -1,0 +1,19 @@
+✔ WP14 signin: the target file, refusals, durations (no browser) (1.765375ms)
+✔ WP14 signin: --help/--version, bad input and a missing headed browser are one line, no browser (1081.648208ms)
+✔ WP14 signin: the session is saved 0600 when the last tab closes; only the path is printed (1993.7215ms)
+✔ WP14 signin: --timeout exits non-zero with nothing saved (4952.156959ms)
+✔ WP14 setup.sh --check reports the headed browser like the render browser; --skip-browser skips both (2205.038875ms)
+✔ AC-W2V-21: a missing --storage-state file stops the take before a browser opens, naming capture signin (862.380458ms)
+✔ AC-W2V-22: a take with --storage-state starts signed in; the manifest says signedIn and holds no cookie (10204.4965ms)
+✔ WP14 --headed: the take runs in Playwright's Chromium and records the same frame grid; missing → one line (4142.555208ms)
+✔ AC-W2V-23: page errors — the report prints the first 5 and "… and 2 more"; x-take.pageErrors holds all 7 (25 → 20) (6664.236958ms)
+✔ WP14 report: plates print "plate <id>"; no page-error lines when there are none (0.186ms)
+✔ AC-W2V-24: a captions take of the ui-demo validates against the v1 spine schema and command[] re-runs it (23561.559333ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55750.521375

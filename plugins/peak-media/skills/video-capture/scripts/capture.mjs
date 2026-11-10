@@ -9,8 +9,10 @@
 // screencast.showOverlay (injected DOM as the fallback). A standalone take's --out is the MP4
 // deliverable, encoded to its --preset (DEC-47): the spine's clips at their spine times at -16 LUFS
 // (D7), else a silent AAC track. A plate's --out stays picture-only. Every take writes a take
-// manifest (D11).
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, rmSync, mkdtempSync, linkSync, copyFileSync, createReadStream } from 'node:fs';
+// manifest (D11) and prints a report (size, beats, page errors).
+// `capture signin <url>` (DEC-47/49) opens Playwright's own Chromium headed, lets the user sign in
+// by hand, and saves the session when the last tab closes (U4); --storage-state replays it.
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, rmSync, mkdtempSync, linkSync, copyFileSync, createReadStream, chmodSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
@@ -22,8 +24,9 @@ import { requireNode } from '../../../lib/preflight.mjs';
 import { requireFfmpeg, ffmpeg } from '../../../lib/ffmpeg.mjs';
 import { lookup as cacheLookup, defaultCacheDir, legacyCacheDirs } from '../../../lib/tts/cache.mjs';
 import { levelStem, silentStem, RATE } from '../../video-assemble/scripts/audio.mjs';
-import { resolveDep, depRoot, pins } from '../../../lib/deps.mjs';
+import { resolveDep, depRoot, pins, dataDir } from '../../../lib/deps.mjs';
 import { browserPath } from '../../../lib/hf.mjs';
+import { headedBrowserPath, headedBrowserOk } from '../../../lib/browser.mjs';
 import { parseScript } from '../../video-spine/scripts/spine.mjs';
 import { PRESETS, DEFAULT_PRESET, presetArgs, presetSummary } from '../../../lib/presets.mjs';
 
@@ -231,6 +234,7 @@ export async function planTake(values) {
   const out = values.out ? path.resolve(values.out) : plates && path.join(platesDir, 'renders', 'plates', `${plates.plate.id}.mp4`);
   if (!out) throw usageError('--out <take.mp4> is required: the MP4 the take is written to');
   if (path.extname(out).toLowerCase() !== '.mp4') throw usageError(`--out must end in .mp4, got '${path.basename(out)}'`);
+  const storageState = values['storage-state'] ? readStorageState(values['storage-state']) : null;
 
   // standalone takes record at the preset's viewport and fps unless --viewport/--fps say otherwise
   const preset = plates ? null : values.preset ?? DEFAULT_PRESET;
@@ -280,15 +284,12 @@ export async function planTake(values) {
     }
   }
 
-  // tools: ffmpeg, the pinned Playwright, the pinned Chrome
+  // tools: ffmpeg, the pinned Playwright, the pinned Chrome (and, with --headed, Playwright's Chromium)
   requireFfmpeg();
-  const pwRoot = depRoot('playwright');
-  const pwEntry = resolveDep('playwright');
-  if (!pwRoot || !pwEntry) throw new CliError(`Playwright not installed — run ${SETUP}`, EXIT.MISSING_PREREQ);
-  const pwVersion = JSON.parse(readFileSync(path.join(pwRoot, 'package.json'), 'utf8')).version;
-  if (pwVersion !== pins().playwright) throw new CliError(`Playwright ${pwVersion} found but ${pins().playwright} is pinned — run ${SETUP}`, EXIT.MISSING_PREREQ);
+  const pwEntry = requirePlaywright();
   const chrome = browserPath();
   if (!chrome || !existsSync(chrome)) throw new CliError(`Chromium not found${chrome ? ` at ${chrome}` : ''} — run ${SETUP} (or set HYPERFRAMES_BROWSER_PATH)`, EXIT.MISSING_PREREQ);
+  const headed = values.headed ? requireHeadedBrowser('--headed') : null;
 
   const sb = await loadStoryboard(storyboard);
   const page = values.url ? resolvePage(values.url, process.cwd())
@@ -301,7 +302,40 @@ export async function planTake(values) {
   const mode = spine?.kind === 'narration' ? 'narrated' : captions ? 'captions' : 'silent';
   const captionEngineChoice = values['caption-engine'] ?? 'overlay';
   const cursor = !values['no-cursor'];
-  return { values, plates, storyboard, sb, out, preset, viewport, size, fps, captions, captionCss, captionEngine: captionEngineChoice, cursor, scriptFile, spineFile, spine, window, beats, beatSource, audioOffsetMs, chrome, pwEntry, page, mode, manifest, sources, watchdogMs };
+  return { values, plates, storyboard, sb, out, preset, viewport, size, fps, captions, captionCss, captionEngine: captionEngineChoice, cursor, scriptFile, spineFile, spine, window, beats, beatSource, audioOffsetMs, chrome, headed, storageState, pwEntry, page, mode, manifest, sources, watchdogMs };
+}
+
+/** The pinned Playwright's entry point, or a one-line MISSING_PREREQ error naming setup.sh. */
+function requirePlaywright() {
+  const pwRoot = depRoot('playwright');
+  const pwEntry = resolveDep('playwright');
+  if (!pwRoot || !pwEntry) throw new CliError(`Playwright not installed — run ${SETUP}`, EXIT.MISSING_PREREQ);
+  const pwVersion = JSON.parse(readFileSync(path.join(pwRoot, 'package.json'), 'utf8')).version;
+  if (pwVersion !== pins().playwright) throw new CliError(`Playwright ${pwVersion} found but ${pins().playwright} is pinned — run ${SETUP}`, EXIT.MISSING_PREREQ);
+  return pwEntry;
+}
+
+/** Playwright's own Chromium (DEC-49), which `signin` and `--headed` launch; one line if it is missing. */
+function requireHeadedBrowser(what) {
+  const p = headedBrowserPath();
+  if (!headedBrowserOk(p)) throw new CliError(`${what} needs Playwright's Chromium (the headed browser), not found${p ? ` at ${p}` : ''} — run ${SETUP}`, EXIT.MISSING_PREREQ);
+  return p;
+}
+
+/**
+ * --storage-state pre-flight: the file must exist and be a Playwright storage state (cookies[]).
+ * Returns its absolute path; the contents are never copied anywhere (the manifest says signedIn).
+ */
+export function readStorageState(file) {
+  const f = path.resolve(file);
+  const hint = 'save a session first with: capture signin <url>';
+  if (!existsSync(f) || statSync(f).isDirectory()) throw new CliError(`--storage-state ${f}: no such file — ${hint}`);
+  let doc;
+  try { doc = JSON.parse(readFileSync(f, 'utf8')); } catch (e) {
+    throw new CliError(`--storage-state ${f}: not a readable session file (${String(e?.code ?? e?.message ?? e).split('\n')[0]}) — ${hint}`);
+  }
+  if (!doc || typeof doc !== 'object' || !Array.isArray(doc.cookies)) throw new CliError(`--storage-state ${f}: not a session file (no cookies[]) — ${hint}`);
+  return f;
 }
 
 /** Narration loudness of the deliverable (D7). */
@@ -356,7 +390,7 @@ export function mixNarration(placed, { durationMs, dir }) {
   return { file: out, lufs: Number.isFinite(lv.lufs) ? Number(lv.lufs.toFixed(1)) : -Infinity, truePeakDb: lv.truePeakDb, gainDb: lv.gainDb, clips: placed.length };
 }
 
-const PATH_FLAGS = new Set(['storyboard', 'script', 'out', 'caption-css', 'spine', 'plates', 'manifest']);
+const PATH_FLAGS = new Set(['storyboard', 'script', 'out', 'caption-css', 'spine', 'plates', 'manifest', 'storage-state']);
 
 /** argv that reproduces the take: paths made absolute, so it runs from any directory. */
 export function commandFor(values, script = fileURLToPath(import.meta.url)) {
@@ -421,16 +455,55 @@ export function takeManifest(plan, take, { command, manifestFile, placed = [] })
   doc.captions = captions;
   doc['x-take'] = {
     mode: take.mode, storyboard: rel(take.storyboard), script: rel(take.script), url: take.url, plate: take.plate, fps: take.fps, width: take.width, height: take.height,
-    frames: take.frames, out: rel(take.out), preset: take.preset, captionEngine: take.captionEngine, cursor: take.cursor,
+    frames: take.frames, out: rel(take.out), preset: take.preset, captionEngine: take.captionEngine, cursor: !!take.cursor,
+    signedIn: !!take.signedIn, sizeBytes: take.sizeBytes,
     ...(take.audio && { audio: take.audio }),
-    beats: take.beats.map((b) => ({ n: b.n, id: b.id, text: b.text, startMs: b.startMs, durationMs: b.durationMs, endMs: b.startMs + b.durationMs, caption: b.caption,
-      ...(b.plannedMs !== undefined && { plannedMs: b.plannedMs, lateMs: b.lateMs }), ...(b.clipNs?.length && { clipNs: b.clipNs }) })),
+    beats: take.beats.map((b) => ({ n: b.n, id: b.id, text: b.text, startMs: b.startMs, durationMs: b.durationMs, endMs: b.startMs + b.durationMs, lateMs: b.lateMs ?? 0, caption: b.caption,
+      ...(b.plannedMs !== undefined && { plannedMs: b.plannedMs }), ...(b.clipNs?.length && { clipNs: b.clipNs }) })),
+    // first line of each uncaught page error, at most MAX_MANIFEST_PAGE_ERRORS; the count is all of them
+    pageErrors: (take.pageErrors ?? []).slice(0, MAX_MANIFEST_PAGE_ERRORS),
+    pageErrorCount: (take.pageErrors ?? []).length,
     pointer: take.pointer,
   };
   return doc;
 }
 
 const log = (msg) => process.stderr.write(`capture: ${msg}\n`);
+
+/** Page errors kept in the take manifest, and printed in the report (plan §4.8). */
+export const MAX_MANIFEST_PAGE_ERRORS = 20;
+export const MAX_REPORTED_PAGE_ERRORS = 5;
+
+/** The first line of an uncaught page error, as "TypeError: message". */
+export function errorLine(e) {
+  const s = e instanceof Error || (e && typeof e.message === 'string') ? `${e.name || 'Error'}: ${e.message}` : String(e);
+  return s.split('\n')[0].trim();
+}
+
+/** Seconds to about 3 significant digits: 0.00, 5.10, 13.9, 125. */
+const secs = (ms) => { const v = ms / 1000; return v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0); };
+const sizeText = (bytes) => (bytes >= 100_000 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} kB`);
+
+/**
+ * The after-take report (plan §4.8):
+ *   wrote out/x.mp4 (3.8 MB, 1280x720 @ 30 fps, 19.6 s, preset web)
+ *   beats: add 0.00–5.10 s · done 5.10–8.40 s
+ *   page errors during take: 7          (only when there are any; the first 5, then "… and N more")
+ */
+export function report(take, cwd = process.cwd()) {
+  const rel = path.relative(cwd, take.out);
+  const shown = rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : take.out;
+  const kind = take.preset ? `preset ${take.preset}` : `plate ${take.plate}`;
+  const lines = [`wrote ${shown} (${sizeText(take.sizeBytes ?? 0)}, ${take.width}x${take.height} @ ${take.fps} fps, ${(take.videoMs / 1000).toFixed(1)} s, ${kind})`];
+  if (take.beats.length) lines.push(`beats: ${take.beats.map((b) => `${b.id} ${secs(b.startMs)}–${secs(b.startMs + b.durationMs)} s`).join(' · ')}`);
+  const errs = take.pageErrors ?? [];
+  if (errs.length) {
+    lines.push(`page errors during take: ${errs.length}`);
+    for (const e of errs.slice(0, MAX_REPORTED_PAGE_ERRORS)) lines.push(`  ${e}`);
+    if (errs.length > MAX_REPORTED_PAGE_ERRORS) lines.push(`  … and ${errs.length - MAX_REPORTED_PAGE_ERRORS} more`);
+  }
+  return lines.join('\n') + '\n';
+}
 
 /**
  * Encode the image sequence to `file` (an .mp4). With a preset: the deliverable, encoded to that
@@ -668,10 +741,14 @@ export async function capture(plan) {
   try {
     if (plan.page.kind === 'local') server = await serveDir(plan.page.root);
     const url = plan.page.kind === 'local' ? server.url + encodeURIComponent(plan.page.file) : plan.page.url;
-    log(`launching browser (${viewport.width}x${viewport.height}, ${fps} fps, mode ${mode})`);
-    browser = await chromium.launch({ executablePath: plan.chrome, headless: true });
-    const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+    log(`launching ${plan.headed ? 'headed ' : ''}browser (${viewport.width}x${viewport.height}, ${fps} fps, mode ${mode}${plan.storageState ? ', signed in' : ''})`);
+    // --headed (DEC-49, U5): Playwright's own Chromium in a visible window; same screencast, same grid
+    browser = await chromium.launch({ executablePath: plan.headed ?? plan.chrome, headless: !plan.headed });
+    const context = await browser.newContext({ viewport, deviceScaleFactor: 1, ...(plan.storageState && { storageState: plan.storageState }) });
     const page = await context.newPage();
+    // uncaught page errors (plan §4.8): from the first load to the end of the take
+    const pageErrors = [];
+    page.on('pageerror', (e) => pageErrors.push(errorLine(e)));
     if (typeof page.screencast?.start !== 'function') {
       throw new CliError(`the installed Playwright has no page.screencast.start — capture needs Playwright ${pins().playwright} (run ${SETUP})`, EXIT.MISSING_PREREQ);
     }
@@ -937,6 +1014,7 @@ export async function capture(plan) {
     } else {
       encode(pattern, frames, plan.out, opts); // a plate: picture only
     }
+    const sizeBytes = statSync(plan.out).size;
     const late = records.filter((r) => r.lateMs > 1000 / fps); // later than one frame
     if (late.length) log(`${late.length} beat(s) started after their planned time: ${late.map((r) => `'${r.id}' +${r.lateMs} ms`).join(', ')}`);
     const take = {
@@ -948,6 +1026,7 @@ export async function capture(plan) {
       cursor: plan.cursor, cursorEngine: cursor.name,
       captionTimings, beats: records, pointer,
       audio: audio && { clips: audio.clips, lufs: Number.isFinite(audio.lufs) ? audio.lufs : null },
+      headed: !!plan.headed, signedIn: !!plan.storageState, sizeBytes, pageErrors: [...pageErrors],
     };
     const doc = takeManifest(plan, take, { command: commandFor(plan.values), manifestFile: plan.manifest, placed });
     mkdirSync(path.dirname(plan.manifest), { recursive: true });
@@ -963,7 +1042,7 @@ export async function capture(plan) {
 export const spec = {
   name: 'capture',
   summary: 'play a live page in real time, drive it with a storyboard, and screen-capture it',
-  usage: 'capture --storyboard <file.mjs> (--script script.md | --spine manifest.json) --out <take.mp4> [--preset web|youtube|hifi] [options]   |   capture --plates plates.json --plate <id>',
+  usage: 'capture --storyboard <file.mjs> (--script script.md | --spine manifest.json) --out <take.mp4> [--preset web|youtube|hifi] [options]   |   capture --plates plates.json --plate <id>   |   capture signin <url> (see capture signin --help)',
   description: `
 The storyboard runs one beat(id, fn?) per beat, in order. The beats come from exactly one of
 --script (script.md: "## <id>" sections), --spine (a spine manifest's beats) or --plates/--plate
@@ -987,6 +1066,13 @@ ${Object.keys(PRESETS).map((k) => `  ${k.padEnd(8)} ${presetSummary(k)}`).join('
 --viewport and --fps override the preset's capture size and fps; the encode stays the preset's.
 With --plates/--plate the take is the picture-only plate MP4 video-assemble reads, at plates.json's
 size and fps; --preset is refused there. Every take writes a take manifest (v1 spine schema).
+Signed-in takes: run \`capture signin <url>\` once (you sign in by hand in a visible browser; the
+session is saved to <data dir>/auth/<host>.json, mode 0600, when you close the tab), then pass
+--storage-state <that file>. A missing session file stops the take before a browser opens; the
+take manifest records signedIn: true, never the file's contents. --headed records in a visible
+window of Playwright's Chromium (installed by setup.sh); the frames are the same.
+After every take capture prints the file (bytes, size in px, fps, length, preset or plate), each
+beat's span, and the page's uncaught errors (the first ${MAX_REPORTED_PAGE_ERRORS}; the manifest keeps ${MAX_MANIFEST_PAGE_ERRORS}).
 A watchdog aborts a spine-timed take 2 s past its window, and any take at --max-ms. Check a take
 with check-take.mjs. Storyboard API: references/storyboard-api.md.`,
   options: {
@@ -1008,6 +1094,8 @@ with check-take.mjs. Storyboard API: references/storyboard-api.md.`,
     fps: { type: 'number', desc: 'Capture frame rate, 1-60 (default: plates.json fps, else the preset\'s)' },
     manifest: { type: 'string', arg: 'file.json', desc: 'Where to write the take manifest (default: <take>.take.json next to --out)' },
     'max-ms': { type: 'number', arg: 'ms', desc: `Abort a take that runs longer than this (default: the spine window + ${OVERRUN_GRACE_MS} ms, else ${DEFAULT_MAX_MS})` },
+    'storage-state': { type: 'string', arg: 'file.json', desc: 'Start the take signed in: a session saved by `capture signin` (default place: <data dir>/auth/<host>.json)' },
+    headed: { type: 'boolean', desc: 'Record in a visible window of Playwright\'s Chromium (setup.sh installs it); same frames as headless' },
     json: { type: 'boolean', desc: 'Print the take summary as JSON' },
   },
   examples: [
@@ -1016,19 +1104,139 @@ with check-take.mjs. Storyboard API: references/storyboard-api.md.`,
     'capture --storyboard examples/deck/storyboard.mjs --script examples/deck/script.md --out /tmp/deck.mp4 --no-captions',
     'capture --storyboard examples/deck/storyboard.mjs --spine spine/manifest.json --out /tmp/deck.mp4',
     'capture --plates plates.json --plate r1-feature',
+    'capture signin https://app.example.test',
+    'capture --storyboard storyboard.mjs --script script.md --out out/tour.mp4 --storage-state ~/.cache/peak-media/auth/app.example.test.json',
   ],
 };
 
+// ---- capture signin <url> (DEC-47, DEC-49, U4) ----
+
+/** The default timeout of `capture signin`. */
+export const SIGNIN_TIMEOUT = '300s';
+
+/** "300s" | "5m" | "1500ms" | "300" (seconds) -> ms; a usage error otherwise. */
+export function parseDuration(v, flag = '--timeout') {
+  const m = /^(\d+(?:\.\d+)?)(ms|s|m)?$/.exec(String(v ?? '').trim());
+  if (!m || Number(m[1]) <= 0) throw usageError(`${flag} expects a duration like 300s, 5m or 1500ms, got '${v}'`);
+  return Math.round(Number(m[1]) * ({ ms: 1, s: 1000, m: 60_000 })[m[2] ?? 's']);
+}
+
+/** Where sessions live by default: <data dir>/auth (created 0700). */
+export const authDir = () => path.join(dataDir(), 'auth');
+
+/** The git work tree containing `p` (walking up from it), or null. */
+function gitWorkTree(p) {
+  for (let d = path.resolve(p); ; d = path.dirname(d)) {
+    if (existsSync(path.join(d, '.git'))) return d;
+    if (path.dirname(d) === d) return null;
+  }
+}
+
+/**
+ * Where `capture signin` saves the session. Default: <data dir>/auth/<host>.json. A --save path
+ * inside <cwd>/web2video/ or inside any git work tree is refused: a session is a credential.
+ */
+export function signinTarget(url, save, cwd = process.cwd()) {
+  let u;
+  try { u = new URL(String(url)); } catch { u = null; }
+  if (!u || !/^https?:$/.test(u.protocol)) throw usageError(`signin needs the http(s) URL of the sign-in page, got '${url}'`);
+  const def = path.join(authDir(), `${u.hostname}.json`);
+  if (!save) return { url: u.href, host: u.hostname, file: def, isDefault: true };
+  const file = path.resolve(cwd, save);
+  if (path.extname(file).toLowerCase() !== '.json') throw usageError(`--save must end in .json, got '${path.basename(file)}'`);
+  const project = path.resolve(cwd, 'web2video');
+  const rel = path.relative(project, file);
+  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) throw usageError(`--save ${file} is inside ${project} — a session is a credential and never goes in a project; leave out --save to use ${def}`);
+  const tree = gitWorkTree(path.dirname(file));
+  if (tree) throw usageError(`--save ${file} is inside the git work tree ${tree} — a session is a credential and is never committed; leave out --save to use ${def}`);
+  return { url: u.href, host: u.hostname, file, isDefault: false };
+}
+
+/** Write the session file: its folder 0700 (the default auth folder is forced to 0700), the file 0600. */
+export function writeSession(target, state) {
+  const dir = path.dirname(target.file);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  if (target.isDefault) chmodSync(dir, 0o700);
+  if (existsSync(target.file)) chmodSync(target.file, 0o600);
+  writeFileSync(target.file, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 });
+  chmodSync(target.file, 0o600);
+}
+
+/**
+ * Open Playwright's Chromium headed at the URL; the user signs in by hand and closes the tab.
+ * When the last page closes (U4: the context stays up), save context.storageState(). Exits
+ * non-zero with nothing saved on --timeout, or if the browser quits first.
+ */
+export async function signin(url, values) {
+  requireNode();
+  const target = signinTarget(url, values.save);
+  const ms = parseDuration(values.timeout ?? SIGNIN_TIMEOUT);
+  const pw = await import(pathToFileURL(requirePlaywright()).href);
+  const exe = requireHeadedBrowser('capture signin');
+  const chromium = (pw.default ?? pw).chromium;
+  const browser = await chromium.launch({ executablePath: exe, headless: false });
+  let timer;
+  try {
+    const context = await browser.newContext({ viewport: null });
+    const page = await context.newPage();
+    const lastTabClosed = new Promise((resolve, reject) => {
+      const check = () => { if (context.pages().length === 0) resolve(); };
+      const watch = (p) => p.on('close', () => setImmediate(check));
+      watch(page);
+      context.on('page', watch);
+      browser.on('disconnected', () => reject(new CliError('the browser quit before the tab was closed — nothing saved; run capture signin again and close the tab (not the whole browser) once signed in')));
+      timer = setTimeout(() => reject(new CliError(`not done within ${values.timeout ?? SIGNIN_TIMEOUT} — nothing saved; run capture signin again (raise --timeout if you need longer)`)), ms);
+    });
+    lastTabClosed.catch(() => {});
+    try {
+      await page.goto(target.url, { timeout: 45_000 });
+    } catch (e) {
+      if (!page.isClosed()) throw new CliError(`could not load ${target.url}: ${String(e?.message ?? e).split('\n')[0]}`);
+    }
+    log(`sign in to ${target.host} in the browser window, then close the tab — the session is saved when the last tab closes`);
+    await lastTabClosed;
+    const state = await context.storageState();
+    writeSession(target, state);
+    process.stdout.write(`saved the session to ${target.file} (mode 0600) — record signed in with --storage-state ${target.file}\n`);
+  } finally {
+    clearTimeout(timer);
+    await browser.close().catch(() => {});
+  }
+}
+
+export const signinSpec = {
+  name: 'capture signin',
+  summary: 'sign in by hand in a visible browser and save the session for capture --storage-state',
+  usage: 'capture signin <url> [--save <file.json>] [--timeout 300s]',
+  description: `
+Opens <url> in a visible window of Playwright's Chromium (setup.sh installs it). Sign in by hand,
+then close the tab: the session (cookies and local storage) is saved when the last tab closes, and
+the command exits. Nothing is recorded. The default file is <data dir>/auth/<host>.json
+(<data dir> = $CLAUDE_PLUGIN_DATA, else ~/.cache/peak-media); its folder is 0700, the file 0600.
+The session is a credential: --save refuses a path inside ./web2video/ or inside any git work tree.
+Only the saved path is printed, never the contents. If --timeout passes first, nothing is saved
+and the exit is non-zero. Then record signed in with: capture … --storage-state <file>.`,
+  options: {
+    save: { type: 'string', arg: 'file.json', desc: 'Save the session here instead (not in a project folder or git work tree)' },
+    timeout: { type: 'string', arg: 'duration', default: SIGNIN_TIMEOUT, desc: 'Give up, saving nothing, after this long: 300s, 5m, 1500ms' },
+  },
+  positionals: { min: 1, max: 1 },
+  examples: ['capture signin http://127.0.0.1:4173', 'capture signin https://app.example.test --timeout 10m'],
+};
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await runCli(spec, async ({ values }) => {
+  const argv = process.argv.slice(2);
+  // runCli takes no positionals for a take, so the signin subcommand is dispatched before parsing
+  if (argv[0] === 'signin') await runCli(signinSpec, ({ values, positionals }) => signin(positionals[0], values), argv.slice(1));
+  else await runCli(spec, async ({ values }) => {
     const plan = await planTake(values);
     const take = await capture(plan);
     if (values.json) process.stdout.write(JSON.stringify(take, null, 2) + '\n');
     else {
-      process.stdout.write(`${take.out}: ${take.frames} frames at ${take.fps} fps = ${take.videoMs} ms (${take.mode}; ${take.preset ? `preset ${take.preset}` : 'plate, picture only'}; ${take.beats.length} beat(s), wall ${take.wallMs} ms)\n`);
-      process.stdout.write(`${take.manifest}: take manifest\n`);
+      process.stdout.write(report(take));
+      process.stdout.write(`take manifest: ${take.manifest}\n`);
     }
-  });
+  }, argv);
   // a watchdog abort can leave a hung storyboard's own timers behind; don't let them hold the process
   if (aborted) setTimeout(() => process.exit(), 300).unref();
 }

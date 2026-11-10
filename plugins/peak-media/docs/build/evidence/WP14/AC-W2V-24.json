@@ -1,0 +1,35 @@
+{
+  "frames": [
+    292,
+    292
+  ],
+  "beats": [
+    "add",
+    "done",
+    "filter",
+    "clear"
+  ],
+  "preset": "web",
+  "xTakeKeys": [
+    "mode",
+    "storyboard",
+    "script",
+    "url",
+    "plate",
+    "fps",
+    "width",
+    "height",
+    "frames",
+    "out",
+    "preset",
+    "captionEngine",
+    "cursor",
+    "signedIn",
+    "sizeBytes",
+    "audio",
+    "beats",
+    "pageErrors",
+    "pageErrorCount",
+    "pointer"
+  ]
+}
