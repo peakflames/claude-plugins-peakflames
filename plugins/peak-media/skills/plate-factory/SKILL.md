@@ -58,7 +58,7 @@ SKILL.md before its first stage:
 | Stages | Skill | Entry points |
 |---|---|---|
 | 0–2 | `${CLAUDE_PLUGIN_ROOT}/skills/video-spine/SKILL.md` | `spine.mjs`, `sample-voice.mjs` |
-| 3, 6 | this skill | `skills/plate-factory/scripts/retime-plates.mjs`, `scripts/validate.mjs`, `skills/plate-factory/scripts/gate.mjs` |
+| 3, 6, 8 | this skill | `skills/plate-factory/scripts/retime-plates.mjs`, `scripts/validate.mjs`, `skills/plate-factory/scripts/gate.mjs`, `skills/plate-factory/scripts/audio-options.mjs` |
 | 4–6 (`motion`, `slide`) | `${CLAUDE_PLUGIN_ROOT}/skills/video-plates/SKILL.md` | `render-plate.mjs` |
 | 6 (`live`) | `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/SKILL.md` | `capture.mjs`, `check-take.mjs` |
 | 7–9 | `${CLAUDE_PLUGIN_ROOT}/skills/video-assemble/SKILL.md` | `assemble.mjs`, `remux-audio.mjs` |
@@ -111,4 +111,5 @@ has each stage's steps, commands and gate-line format. Read
 - **Review stills, not video.** Every look at a render is a contact sheet you Read.
 - **Use the brief's real assets.** Never invent product UI, logos or data.
 - Keep everything inside the video project folder (layout in `references/stages.md`). Never
-  put music or keys in it that the user didn't give you.
+  put music or keys in it that the user didn't give you. At stage 8 offer only the brand pack's
+  tracks and SFX (`audio-options.mjs`) or a folder the user names; never search the disk for audio.
