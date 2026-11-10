@@ -19,7 +19,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | WP7b | verified | wp/WP7b/verify-2.md |
 | WP8 | verified | wp/WP8/verify-3.md |
 | WP9 | verified | wp/WP9/verify-6.md |
-| WP10 | not-started | — |
+| WP10 | in-progress (WP10a verified) | wp/WP10/verify-1.md |
 
 ## Register
 
@@ -90,7 +90,7 @@ Status values: `not-started` · `PASS` · `FAIL` · `blocked: <reason>`. Only a 
 | AC-PKG-09 | README | WP9 | G README · W read · T it covers install steps, prerequisites, the key setup, and the three modes | manual | PASS | evidence/WP9/AC-PKG-09-user.md |
 | AC-REAL-01 | kickoff §7 | WP10 | G F4 and the Peakflames pack · W the plugin makes the video · T the final contact sheet is approved and the user listens and approves | manual | not-started | — |
 | AC-REAL-02 | kickoff §7 | WP10 | G the run · W it ends · T `wp/WP10/manual-steps.md` lists every hand step as a next-version backlog item | manual | not-started | — |
-| AC-REAL-03 | DEC-16 | WP10 | G the Peakflames pack · W validate · T it passes; the outro reproduces `#s6`, checked on the contact sheet | script + still | not-started | — |
+| AC-REAL-03 | DEC-16 | WP10 | G the Peakflames pack · W validate · T it passes; the outro reproduces `#s6`, checked on the contact sheet | script + still | PASS | evidence/WP10/AC-REAL-03.verifier.log, evidence/WP10/AC-REAL-03-hstack.verifier.jpg, evidence/WP10/AC-REAL-03-outro-vs-s6.jpg |
 | AC-BASE-01 | orch §5 baseline | WP2 | G the `setup.sh` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP2/AC-BASE-01.log |
 | AC-BASE-02 | orch §5 baseline | WP1 | G the `validate` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP1/AC-BASE-02.log |
 | AC-BASE-03 | orch §5 baseline | WP2 | G the `contact-sheet` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP2/AC-BASE-03.log |

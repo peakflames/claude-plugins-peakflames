@@ -15,3 +15,5 @@ Items the Lead does after WP10, before the release.
 - [ ] **WP9 verify-6 carry-forward (v0.2):** I1 — the checker does not enforce re-ask after gate 4 storyboard changes or re-listen after gate 8 re-mix; N7 — status ` -fixed` / `— fixed ❌` counted as fixed; N8 — unknown flags / bad `--duck-db` exit without a GATE FAIL line. Checker can be fooled by deliberate forgery (known limit).
 
 - [ ] **After WP10 — Peakflames pack follow-up (user, 2026-11-10):** the user wants to do something with the pack at `~/github/peakflames/peakflames-brand-guidelines/peak-media-pack/` once the build is done (likely its own private repo, DEC-16 — ask before `gh repo create --private`). It must never be committed to this repo.
+
+- [ ] **WP10a verify-1 carry-forward (v0.2):** m1 — gate 8 `audio-options` tests (`stage 8: …`) are not tied to an AC ID; nits — missing x-sfx manifest is silent; any JSON accepted as brand.json; `evals/real` rewrites committed evidence and renders the teaser on every full run; music stops at the outro (manual-steps M8).
