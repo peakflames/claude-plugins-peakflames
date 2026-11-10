@@ -1,0 +1,40 @@
+# M1 (verifier-2): narrated deck, fake/tone spine --lead-ms 950, captions on; my own captures; check-take --expect-cuts 2 per preset, then --caption-band 0 control; then raw scene scores above the caption band at <=30 fps
+== youtube
+video,1920,1080,30/1,21.433333
+audio,0/0,21.454667
+ok    scene change at 0:06.700 —silence 1200 ms
+ok    scene change at 0:15.167 —silence 1200 ms
+PASS  2 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /tmp/wp13v2/deck-youtube.mp4
+exit=0
+{"ok":true,"threshold":0.02,"eff":0.008889,"scoredFps":30,"cuts":[{"t":"0:06.700","ms":6700,"ok":true,"silenceMs":1200,"gap":{"startMs":6405,"endMs":7605},"frames":1},{"t":"0:15.167","ms":15167,"ok":true,"silenceMs":1200,"gap":{"startMs":14878,"endMs":16078},"frames":1}]}
+caption-band 0 control: ok false cuts 8 overSound 6
+== youtube60
+video,1920,1080,60/1,21.416667
+audio,0/0,21.438000
+ok    scene change at 0:06.733 —silence 1200 ms
+ok    scene change at 0:15.167 (a transition over 2 frames) —silence 1200 ms
+PASS  2 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /tmp/wp13v2/deck-youtube60.mp4
+exit=0
+{"ok":true,"threshold":0.02,"eff":0.008889,"scoredFps":30,"cuts":[{"t":"0:06.733","ms":6733,"ok":true,"silenceMs":1200,"gap":{"startMs":6405,"endMs":7605},"frames":1},{"t":"0:15.167","ms":15167,"ok":true,"silenceMs":1200,"gap":{"startMs":14878,"endMs":16078},"frames":2}]}
+caption-band 0 control: ok false cuts 8 overSound 6
+== hifi
+video,1920,1080,60/1,21.416667
+audio,0/0,21.416667
+ok    scene change at 0:06.733 —silence 1200 ms
+ok    scene change at 0:15.167 (a transition over 2 frames) —silence 1200 ms
+PASS  2 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /tmp/wp13v2/deck-hifi.mp4
+exit=0
+{"ok":true,"threshold":0.02,"eff":0.008889,"scoredFps":30,"cuts":[{"t":"0:06.733","ms":6733,"ok":true,"silenceMs":1200,"gap":{"startMs":6405,"endMs":7605},"frames":1},{"t":"0:15.167","ms":15167,"ok":true,"silenceMs":1200,"gap":{"startMs":14878,"endMs":16078},"frames":2}]}
+caption-band 0 control: ok false cuts 8 overSound 6
+-- web scores (crop 75%, <=30fps, scene>0.003)
+
+-- youtube scores (crop 75%, <=30fps, scene>0.003)
+
+-- hifi scores (crop 75%, <=30fps, scene>0.003)
+
+-- web
+pts_time:6.666667	scene_score=0.016308 pts_time:6.7	scene_score=0.034272 pts_time:6.766667	scene_score=0.013139 pts_time:6.8	scene_score=0.013759 pts_time:6.833333	scene_score=0.012098 pts_time:15.066667	scene_score=0.003108 pts_time:15.166667	scene_score=0.044093 pts_time:15.233333	scene_score=0.007516 pts_time:15.266667	scene_score=0.009848 pts_time:15.3	scene_score=0.011621 pts_time:15.333333	scene_score=0.005547 
+-- youtube
+pts_time:6.7	scene_score=0.017155 pts_time:6.733333	scene_score=0.006017 pts_time:6.766667	scene_score=0.003118 pts_time:6.8	scene_score=0.006670 pts_time:6.833333	scene_score=0.006220 pts_time:15.166667	scene_score=0.019713 pts_time:15.233333	scene_score=0.003499 pts_time:15.266667	scene_score=0.004329 pts_time:15.3	scene_score=0.005112 
+-- hifi
+pts_time:6.7	scene_score=0.007331 pts_time:6.733333	scene_score=0.020359 pts_time:6.766667	scene_score=0.007818 pts_time:6.8	scene_score=0.006252 pts_time:6.833333	scene_score=0.006415 pts_time:15.166667	scene_score=0.009080 pts_time:15.2	scene_score=0.012338 pts_time:15.266667	scene_score=0.008385 pts_time:15.3	scene_score=0.004796 
