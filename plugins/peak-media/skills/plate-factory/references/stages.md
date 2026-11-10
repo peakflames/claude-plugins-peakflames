@@ -296,9 +296,17 @@ End the stage with: `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in �
 
 ## Stage 8 — Music, then SFX (user gate: the user listens)
 
-1. `AskUserQuestion`: a music track (path, or none) and an SFX stem (path, or none). The plugin
-   ships no music. Copy what the user gives into `audio/` and note its credit in
-   `audio/CREDITS.md` (`PM/brand-packs/<pack>/music-rules.md`).
+1. Find what you may offer, in this order, and never search the disk for audio:
+   - **The brand pack's tracks and SFX:** `node "PM/skills/plate-factory/scripts/audio-options.mjs" plates.json`
+     lists the active pack's `x-tracks` (title, file, credit, approved levels) and its SFX manifest.
+   - **Else a folder the user names:** ask for one, then
+     `node "PM/skills/plate-factory/scripts/audio-options.mjs" --folder <dir>` lists its audio files.
+   - **Else narration only.** The plugin ships no music.
+
+   `AskUserQuestion`: a music track and an SFX stem, offering the listed ones by name (title and
+   credit), plus "a folder I name" and "none". Copy what the user picks into `audio/` and note its
+   credit in `audio/CREDITS.md` (the pack's `music-rules.md` says how). A pack track listed with
+   levels starts at those levels (`--music-lufs`, `--duck-db`).
 2. Each pass starts from the narration-only `review/review.mp4` (picture copied, never
    re-rendered). `RX` = `node "PM/skills/video-assemble/scripts/remux-audio.mjs" review/review.mp4`.
    The file the user listens to is always the last one in the row:

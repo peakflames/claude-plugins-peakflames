@@ -1,0 +1,36 @@
+✔ AC-BRD-01: brand-packs/default validates and every font has a licence file (356.011375ms)
+✔ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (8496.598333ms)
+✔ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (34130.289084ms)
+✔ AC-BRD-03: the plugin tree ships no music or other audio files (102.582542ms)
+✔ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (21967.56875ms)
+✔ stage 8: audio-options lists the pack's x-tracks and SFX by name, with credit and levels (167.949834ms)
+✔ stage 8: a pack with no tracks says so (ask for a folder, else narration only); a missing listed file fails in one line (169.061875ms)
+✔ stage 8: --folder lists only the audio files directly in the folder the user named (168.053292ms)
+✔ stage 8: stages.md tells the agent to offer pack tracks, then a named folder, then narration only (2.041166ms)
+✔ checker fixtures match generate.mjs (no hand edits, no real transcript) (40.267333ms)
+✔ checker: the good run passes every rule; the CLI exits 0 (90.178166ms)
+✔ checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render; a for-loop over plates) (273.152334ms)
+✔ skill docs: every stage ends with its literal gate line, and SKILL.md makes them output-style proof (1.148667ms)
+✔ skill docs + checker: gates 2, 5, 6, 7 are printed by their scripts; an echoed line does not count (WP9 round 5) (5.624375ms)
+✔ scripts print gates 5 and 6: render-plate --pipeline-test and gate build, PASS and FAIL forms (WP9 round 5) (16306.621083ms)
+✔ checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else (3.115ms)
+✔ checker: gate lines are strict about names, results and the user being asked (3.301667ms)
+✔ AC-ORC-02: storyboard produced and approved before any plates/<id>/index.html is written (transcript check) (99.565833ms)
+✔ AC-ORC-03: at most 3 self-review rounds per plate, then a separate reviewer Agent call (transcript check) (320.628125ms)
+✔ AC-ORC-04: runtimes.md is Read before the first plate is written (transcript check) (89.525458ms)
+✔ AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and refuses anything but one plate per beat (1439.456916ms)
+✔ AC-BASE-13: retime-plates --help/--version/bad input follow the baseline (1205.097916ms)
+✔ round 6: approval with edits — GATE 1 comes after the edit, and a missing one fails (cold start r3) (5.4345ms)
+✔ round 6: a script gate line counts only from a real run of the plugin script (verify-4 F1/F3) (1.02525ms)
+✔ round 6: gate.mjs counts the reviewer's listed defects, checks the VERDICT, and matches sheets by exact id (verify-4 G6/F5) (4.318625ms)
+✔ round 7: a storyboard approved with a change is re-run and asked again; APPROVED without the re-ask fails (verify-5 F2-r5) (4.933333ms)
+✔ round 7: a defect status is an explicit trailing token; gate build prints FAIL on usage errors and missing ffmpeg (verify-5 N1/N2/N4) (216.30125ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 65152.942166
+exit 0

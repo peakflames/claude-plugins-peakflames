@@ -1,0 +1,15 @@
+✔ AC-REAL-03: the real brand pack validates and its outro reproduces the reference outro (#s6) (63155.045125ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 63213.822584
+exit 0
+$ validate /Users/schaveyt/github/peakflames/peakflames-brand-guidelines/peak-media-pack
+ok    /Users/schaveyt/github/peakflames/peakflames-brand-guidelines/peak-media-pack/brand.json (brand v1)
+x-tracks: Groove Sauce; sfx entries: 0
+outro rendered: 4000 ms (brand.json durationMs 4000)
+SSIM pack outro vs #s6 (scaled to 1280x720), 0.8-4 s, 96 frames: mean 0.9976, min 0.9972
