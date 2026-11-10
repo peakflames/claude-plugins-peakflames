@@ -22,7 +22,7 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | WP8 | verified | wp/WP8/verify-3.md |
 | WP9 | verified | wp/WP9/verify-6.md |
 | WP10 | verified | wp/WP10/verify-1.md |
-| WP11 | in-progress | — |
+| WP11 | verified | wp/WP11/verify-1.md |
 | WP12 | not-started | — |
 | WP13 | not-started | — |
 | WP14 | not-started | — |
@@ -114,4 +114,4 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | AC-BASE-11 | orch §5 baseline | WP6 | G the `assemble` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-11.r2.log |
 | AC-BASE-12 | orch §5 baseline | WP6 | G the `remux-audio` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP6/AC-BASE-12.r2.log |
 | AC-BASE-13 | orch §5 baseline | WP8 | G the `retime-plates` entry point · W run with `--help`, `--version`, and bad input · T `--help` lists every flag; bad input → non-zero exit + one-line actionable error; no stack trace on expected failures; `--version` = plugin.json; no network unless needed | script | PASS | evidence/WP8/AC-BASE-13.verifier-r3.log |
-| AC-TRC-03 | web2video plan build | WP11 | G a register with an `AC-W2V-01` row and a test named `AC-W2V-01: …` · W `ac-run --trace` and `ac-run --wp` · T the row is traced like any other ID (orphan detected when unlisted) and its test result is reported | script | not-started | — |
+| AC-TRC-03 | web2video plan build | WP11 | G a register with an `AC-W2V-01` row and a test named `AC-W2V-01: …` · W `ac-run --trace` and `ac-run --wp` · T the row is traced like any other ID (orphan detected when unlisted) and its test result is reported | script | PASS | evidence/WP11/AC-TRC-03.verifier.log |

@@ -1,8 +1,8 @@
 U6 — headed Chromium with what setup.sh installs (2026-11-10, macOS arm64, Playwright 1.65.0)
 
-playwright entry: /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c/node_modules/playwright/index.js
-browserPath(): /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell
-playwright chromium.executablePath(): /Users/schaveyt/Library/Caches/ms-playwright/chromium-1254/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+playwright entry: ~/.cache/peak-media/deps/88b6dff0a77c/node_modules/playwright/index.js
+browserPath(): ~/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell
+playwright chromium.executablePath(): ~/Library/Caches/ms-playwright/chromium-1254/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
 A executablePath=browserPath(): OK version=152.0.7977.30 headlessUA=true
 B playwright own chromium (no executablePath): OK version=158.0.8127.18 headlessUA=false
 C channel=chrome: OK version=157.0.8103.39 headlessUA=false
@@ -12,7 +12,7 @@ notes:
   ~/.cache/hyperframes/chrome holds only chrome-headless-shell; setup.sh installs nothing else
   (npm ci --ignore-scripts, then `hyperframes browser ensure`).
 - B uses ~/Library/Caches/ms-playwright/chromium-1254 (Chrome for Testing 158 = Playwright 1.65.0's pinned revision).
-  NOT installed by setup.sh: ms-playwright/.links points at /Users/schaveyt/tmp/pm-pkg05/demo/tools/node_modules/playwright-core
+  NOT installed by setup.sh: ms-playwright/.links points at ~/tmp/pm-pkg05/demo/tools/node_modules/playwright-core
   (installed 2026-11-09 18:46 by an unrelated project). A clean machine would not have it.
 - C uses /Applications/Google Chrome.app (user-installed, Chrome 157). Present on this Mac only because the user installed it.
 - Every browser was closed (browser.close() in finally).
