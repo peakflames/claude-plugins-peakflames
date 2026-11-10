@@ -1,37 +1,115 @@
 {
-  "note": "tone onsets (end of each ≥200 ms silence at -40 dB) in the --out MP4 vs the spine clip start; beat planned = clip start − audioOffsetMs",
-  "fps": 30,
-  "audioOffsetMs": 0,
-  "rows": [
-    {
-      "n": 1,
-      "beat": "intro",
-      "spineStartMs": 950,
-      "onsetMs": 950,
-      "errMs": 0,
-      "beatPlannedMs": 950,
-      "beatStartMs": 950,
-      "lateMs": 0
-    },
-    {
-      "n": 2,
-      "beat": "why",
-      "spineStartMs": 7605,
-      "onsetMs": 7605,
-      "errMs": 0,
-      "beatPlannedMs": 7605,
-      "beatStartMs": 7605,
-      "lateMs": 0
-    },
-    {
-      "n": 3,
-      "beat": "how",
-      "spineStartMs": 16078,
-      "onsetMs": 16078,
-      "errMs": 0,
-      "beatPlannedMs": 16078,
-      "beatStartMs": 16078,
-      "lateMs": 0
-    }
-  ]
+  "note": "tone onsets (end of each ≥200 ms silence at -40 dB) in the --out MP4 vs the spine clip start; beat planned = clip start − audioOffsetMs. youtube writes no edit lists, so capture drops the AAC priming from the mix instead",
+  "toleranceMs": 2,
+  "web": {
+    "preset": "web",
+    "fps": 30,
+    "audioOffsetMs": 0,
+    "rows": [
+      {
+        "n": 1,
+        "beat": "intro",
+        "spineStartMs": 950,
+        "onsetMs": 950,
+        "errMs": 0,
+        "beatPlannedMs": 950,
+        "beatStartMs": 950,
+        "lateMs": 0
+      },
+      {
+        "n": 2,
+        "beat": "why",
+        "spineStartMs": 7605,
+        "onsetMs": 7605,
+        "errMs": 0,
+        "beatPlannedMs": 7605,
+        "beatStartMs": 7605,
+        "lateMs": 0
+      },
+      {
+        "n": 3,
+        "beat": "how",
+        "spineStartMs": 16078,
+        "onsetMs": 16078,
+        "errMs": 0,
+        "beatPlannedMs": 16078,
+        "beatStartMs": 16078,
+        "lateMs": 0
+      }
+    ]
+  },
+  "youtube": {
+    "preset": "youtube",
+    "fps": 30,
+    "audioOffsetMs": 0,
+    "rows": [
+      {
+        "n": 1,
+        "beat": "intro",
+        "spineStartMs": 950,
+        "onsetMs": 950,
+        "errMs": 0,
+        "beatPlannedMs": 950,
+        "beatStartMs": 950,
+        "lateMs": 0
+      },
+      {
+        "n": 2,
+        "beat": "why",
+        "spineStartMs": 7605,
+        "onsetMs": 7605,
+        "errMs": 0,
+        "beatPlannedMs": 7605,
+        "beatStartMs": 7605,
+        "lateMs": 0
+      },
+      {
+        "n": 3,
+        "beat": "how",
+        "spineStartMs": 16078,
+        "onsetMs": 16078,
+        "errMs": 0,
+        "beatPlannedMs": 16078,
+        "beatStartMs": 16078,
+        "lateMs": 0
+      }
+    ]
+  },
+  "youtube@60": {
+    "preset": "youtube",
+    "fps": 60,
+    "audioOffsetMs": 0,
+    "rows": [
+      {
+        "n": 1,
+        "beat": "intro",
+        "spineStartMs": 950,
+        "onsetMs": 950,
+        "errMs": 0,
+        "beatPlannedMs": 950,
+        "beatStartMs": 950,
+        "lateMs": 0
+      },
+      {
+        "n": 2,
+        "beat": "why",
+        "spineStartMs": 7605,
+        "onsetMs": 7605,
+        "errMs": 0,
+        "beatPlannedMs": 7605,
+        "beatStartMs": 7605,
+        "lateMs": 0
+      },
+      {
+        "n": 3,
+        "beat": "how",
+        "spineStartMs": 16078,
+        "onsetMs": 16078,
+        "errMs": 0,
+        "beatPlannedMs": 16078,
+        "beatStartMs": 16078,
+        "lateMs": 0
+      }
+    ]
+  }
 }

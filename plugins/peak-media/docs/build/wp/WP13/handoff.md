@@ -124,6 +124,49 @@ checked as a band either.** Both are variable-rate in practice. I measured (ffmp
   - `ac-run --wp WP13`: AC-W2V-10..14 all pass, and the evidence was rewritten by that run.
   - No full suite, as the coordinator said.
 
+## Fix round 1 (verify-1)
+
+- **M1 — check-take missed slide changes at 1080p. Fixed in `check-take.mjs`.**
+  - `--scene-threshold` is now defined for a 1280x720 take. A larger frame is scored against
+    threshold × 1280·720 / (width·height). Pages are laid out in CSS px at deviceScaleFactor 1, so
+    the same change covers less of a bigger frame, and ffmpeg's scene score is a per-pixel average.
+  - A take above 30 fps is sampled at 30 fps (`fps=30`) before scoring.
+  - The JSON reports `effectiveThreshold` and `scoredFps`. `--help` explains both.
+  - New test: "AC-W2V-14: at 1080p too". It runs the narrated deck with captions on at
+    `--preset youtube`, `hifi` and `youtube --fps 60`, and each passes `--expect-cuts 2` with both
+    cuts in silence.
+  - Before the fix: the verifier's `verifier-preset-sync-cuts.log`, and
+    `evidence/WP13/fix1-before-M1-check-take-yt60.log` (the old check-take finds 0 on youtube@60).
+- **M2 — youtube narration was 21.4 ms late. Fixed in `lib/presets.mjs`.**
+  - With no edit list (youtube), capture drops the AAC encoder delay (`AAC_PRIMING_SAMPLES` = 1024)
+    from the start of the mix: `atrim=start_sample=1024,asetpts,apad`. The decoded sound, priming
+    included, then lines up with the picture.
+  - AC-W2V-11 now runs on web, youtube and youtube@60. It asserts each onset is within ±2 ms of its
+    spine time (all three measure 0 ms), as well as within one frame.
+  - Before the fix: the verifier measured +21.4 ms (`AC-W2V-11.verifier.log`).
+  - The audio stream is still about 21 ms longer than the video: the encoder's tail. The start is
+    aligned.
+- **m1 — the merge chained without a bound.**
+  - Detections now join a group only within 150 ms of the group's first detection. Before, each
+    detection was compared to the previous one with no limit.
+  - A chain splits into bounded groups, and two cuts 200 ms apart stay two.
+  - A two-frame fade (15.167/15.200 s) still counts as one.
+  - Tests: `check-take merge (m1)` (unit) and `check-take (m1, end to end)` (a synthetic take with
+    hard cuts at 2.0 and 2.2 s finds 2).
+- **m2 — the wrong timecode for a failing transition.**
+  - A failing merged transition is now reported at the failing frame's `cutMs`/`timecode`. Its span
+    is in `startMs`/`endMs`/`frames`.
+  - Test: `check-take merge (m2)`.
+  - The three m1/m2 tests fail against the verify-1 `check-take.mjs`
+    (`evidence/WP13/fix1-before-m1-m2.log`) and pass now.
+- **n1 is fixed:** youtube no longer passes `-keyint_min`/`min-keyint`, which x264 clamped to
+  keyint/2+1. `scenecut=0` keeps every GOP exactly g frames. **n2 is unchanged:** ffprobe reports
+  `field_order` for these files.
+- **Results:**
+  - `ac-run --wp WP13`: AC-W2V-10..14 all pass.
+  - Full suite: 136/137. The only failure is AC-PKG-01, which is expected until WP18. The suite
+    rewrote WP5/WP10 evidence; I restored it and it is not committed.
+
 ## Open
 
 - `SKILL.md` and `references/storyboard-api.md` still describe `--mp4` (WP15).

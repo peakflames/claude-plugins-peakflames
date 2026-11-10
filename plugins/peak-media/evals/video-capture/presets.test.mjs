@@ -18,6 +18,7 @@ import { PRESETS, presetExpect } from '../../lib/presets.mjs';
 import { probeSpec, x264Options } from '../../lib/verify/probe-spec.mjs';
 import { contactSheet } from '../../lib/verify/contact-sheet.mjs';
 import { browserPath } from '../../lib/hf.mjs';
+import { mergeTransitions } from '../../skills/video-capture/scripts/check-take.mjs';
 
 const UI = path.join(ROOT, 'skills', 'video-capture', 'examples', 'ui-demo');
 const UI_STORYBOARD = path.join(UI, 'storyboard.mjs');
@@ -79,17 +80,24 @@ const uiSilent = memo(() => {
   return { out, ...capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--out', out, '--no-captions']) };
 });
 
-/** The example deck narrated on a fake/tone spine (950 ms lead, so the first slide settles), captions on. */
-const deck = memo(() => {
+/** The example deck's fake/tone spine (950 ms lead, so the first slide settles). */
+const deckSpine = memo(() => {
   const dir = path.join(tmp, 'deck', 'spine');
   const r = run(SPINE, ['--brief', path.join(DECK, 'brief.md'), '--tts-model', 'fake/tone', '--out', dir, '--cache-dir', cache, '--lead-ms', '950'], { env: { ...NO_KEY, PEAK_MEDIA_TTS_CACHE: cache } });
   assert.equal(r.code, 0, r.stderr);
   const file = path.join(dir, 'manifest.json');
   const doc = JSON.parse(readFileSync(file, 'utf8'));
   assert.equal(doc.kind, 'narration');
-  const out = path.join(tmp, 'deck-narrated.mp4');
-  return { spine: { file, doc }, out, ...capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', file, '--out', out]) };
+  return { file, doc };
 });
+/** The deck narrated on that spine, captions on, per variant: web (default), youtube, youtube@60, hifi. */
+const DECK_VARIANTS = { web: [], youtube: ['--preset', 'youtube'], 'youtube@60': ['--preset', 'youtube', '--fps', '60'], hifi: ['--preset', 'hifi'] };
+const deckTakes = Object.fromEntries(Object.entries(DECK_VARIANTS).map(([name, extra]) => [name, memo(() => {
+  const spine = deckSpine();
+  const out = path.join(tmp, `deck-${name.replace('@', '-')}.mp4`);
+  return { name, spine, out, ...capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', spine.file, '--out', out, ...extra]) };
+})]));
+const deck = deckTakes.web;
 
 // ---------------------------------------------------------------------------------------------
 
@@ -111,25 +119,34 @@ test('AC-W2V-10: with no TTS key and a loopback-only network guard, the ui-demo 
   keep('AC-W2V-10-network.json', { note: 'ui-demo under helpers/loopback-only.mjs with both TTS key variables empty; requests from --debug-requests', ...report, control: ctl.stderr.trim() });
 });
 
-test('AC-W2V-11: the deck narrated on a fake/tone spine — each clip starts in --out at its spine time (± one frame), and capture made no TTS request', () => {
-  const d = deck();
-  assert.equal(d.take.mode, 'narrated');
-  assert.equal(d.take.out, d.out);
-  assertNoTts(d.stderr, 'narrated deck');
-  const fps = d.take.fps, frame = 1000 / fps;
-  const off = d.spine.doc.audioOffsetMs ?? 0;
-  const onsets = toneOnsets(d.out).filter((ms) => ms < d.take.videoMs - 50); // silencedetect also closes a silence at the end
-  assert.equal(onsets.length, d.spine.doc.clips.length, `one onset per clip: ${onsets}`);
-  const rows = d.spine.doc.clips.map((c, i) => {
-    const beat = d.take.beats.find((b) => b.clipNs?.includes(c.n));
-    return { n: c.n, beat: beat.id, spineStartMs: c.startMs, onsetMs: Number(onsets[i].toFixed(1)), errMs: Number((onsets[i] - c.startMs).toFixed(1)), beatPlannedMs: beat.plannedMs, beatStartMs: beat.startMs, lateMs: beat.lateMs };
-  });
-  for (const r of rows) {
-    assert.ok(Math.abs(r.errMs) <= frame, `clip ${r.n}: onset ${r.onsetMs} ms vs spine ${r.spineStartMs} ms (±${frame.toFixed(1)} ms)`);
-    assert.equal(r.beatPlannedMs, r.spineStartMs - off, `beat ${r.beat} is planned at its clip's start minus the audio offset (${off} ms)`);
+/** Max error allowed between a clip's sound onset in --out and its spine time, on every preset (WP13 fix round 1, M2). */
+const ONSET_TOL_MS = 2;
+
+test('AC-W2V-11: the deck narrated on a fake/tone spine — each clip starts in --out at its spine time (± one frame; within 2 ms on web, youtube and youtube@60), and capture made no TTS request', () => {
+  const report = {};
+  for (const name of ['web', 'youtube', 'youtube@60']) {
+    const d = deckTakes[name]();
+    assert.equal(d.take.mode, 'narrated');
+    assert.equal(d.take.out, d.out);
+    assertNoTts(d.stderr, `narrated deck (${name})`);
+    const fps = d.take.fps, frame = 1000 / fps;
+    const off = d.spine.doc.audioOffsetMs ?? 0;
+    const onsets = toneOnsets(d.out).filter((ms) => ms < d.take.videoMs - 50); // silencedetect also closes a silence at the end
+    assert.equal(onsets.length, d.spine.doc.clips.length, `${name}: one onset per clip: ${onsets}`);
+    const rows = d.spine.doc.clips.map((c, i) => {
+      const beat = d.take.beats.find((b) => b.clipNs?.includes(c.n));
+      return { n: c.n, beat: beat.id, spineStartMs: c.startMs, onsetMs: Number(onsets[i].toFixed(1)), errMs: Number((onsets[i] - c.startMs).toFixed(1)), beatPlannedMs: beat.plannedMs, beatStartMs: beat.startMs, lateMs: beat.lateMs };
+    });
+    for (const r of rows) {
+      assert.ok(Math.abs(r.errMs) <= frame, `${name} clip ${r.n}: onset ${r.onsetMs} ms vs spine ${r.spineStartMs} ms (±${frame.toFixed(1)} ms, one frame)`);
+      assert.ok(Math.abs(r.errMs) <= ONSET_TOL_MS, `${name} clip ${r.n}: onset ${r.onsetMs} ms vs spine ${r.spineStartMs} ms (±${ONSET_TOL_MS} ms)`);
+      assert.equal(r.beatPlannedMs, r.spineStartMs - off, `${name}: beat ${r.beat} is planned at its clip's start minus the audio offset (${off} ms)`);
+    }
+    report[name] = { preset: d.take.preset, fps, audioOffsetMs: off, rows };
   }
-  keep('AC-W2V-11-onsets.json', { note: 'tone onsets (end of each ≥200 ms silence at -40 dB) in the --out MP4 vs the spine clip start; beat planned = clip start − audioOffsetMs', fps, audioOffsetMs: off, rows });
+  keep('AC-W2V-11-onsets.json', { note: 'tone onsets (end of each ≥200 ms silence at -40 dB) in the --out MP4 vs the spine clip start; beat planned = clip start − audioOffsetMs. youtube writes no edit lists, so capture drops the AAC priming from the mix instead', toleranceMs: ONSET_TOL_MS, ...report });
 });
+
 
 test('AC-W2V-12: the ui-demo captured once per preset passes probe-spec --preset for each', () => {
   const report = {};
@@ -228,4 +245,67 @@ test('AC-W2V-14: the narrated deck with captions on passes check-take --expect-c
     wholeFrameControl: { cuts: whole.cuts.map((c) => ({ timecode: c.timecode, ok: c.ok })) },
     cursorGlide: { pointer: g.take.pointer, cuts: JSON.parse(glide.stdout).cuts.length },
   });
+});
+
+test('AC-W2V-14: at 1080p too — the narrated deck with captions on passes check-take --expect-cuts 2 at --preset youtube and --preset hifi (and youtube@60)', () => {
+  // WP13 verify-1 M1: before the fix the threshold was the same at any size and rate, and these
+  // takes found 0 scene changes (slide changes scored 0.009–0.0195 against 0.02)
+  const report = {};
+  for (const name of ['youtube', 'hifi', 'youtube@60']) {
+    const d = deckTakes[name]();
+    assert.equal(d.take.captionTimings.length, d.spine.doc.beats.length, `${name}: captions are on`);
+    const r = run(CHECK_TAKE, [d.out, '--expect-cuts', '2', '--json']);
+    const res = JSON.parse(r.stdout);
+    assert.equal(r.code, 0, `${name}: check-take --expect-cuts 2 passes: ${r.stdout}`);
+    const clips = d.spine.doc.clips;
+    res.cuts.forEach((c, i) => {
+      assert.ok(c.ok && c.silenceMs >= 900, `${name}: slide change at ${c.timecode} sits in ${c.silenceMs} ms of silence`);
+      assert.ok(c.cutMs > clips[i].startMs + clips[i].durationMs && c.cutMs < clips[i + 1].startMs, `${name}: slide change ${i + 1} (${c.timecode}) is between clips`);
+    });
+    assert.equal(res.scoredFps, 30, `${name}: scored at 30 fps`);
+    assert.ok(Math.abs(res.effectiveThreshold - (0.02 * 1280 * 720) / (1920 * 1080)) < 1e-6, `${name}: threshold scaled to the frame area (${res.effectiveThreshold})`);
+    // control: captions still don't count at 1080p (the whole frame finds more, over speech)
+    const whole = JSON.parse(run(CHECK_TAKE, [d.out, '--caption-band', '0', '--json']).stdout);
+    assert.ok(whole.cuts.length > 2 && !whole.ok, `${name}: with --caption-band 0 the captions read as cuts`);
+    report[name] = { size: `${d.take.width}x${d.take.height}`, fps: d.take.fps, effectiveThreshold: res.effectiveThreshold, scoredFps: res.scoredFps, cuts: res.cuts.map((c) => ({ timecode: c.timecode, silenceMs: c.silenceMs, ok: c.ok, frames: c.frames ?? 1 })), wholeFrameCuts: whole.cuts.length };
+  }
+  keep('AC-W2V-14-1080p.json', { note: 'narrated deck, captions on, check-take --expect-cuts 2 per 1080p preset; threshold 0.02 at 1280x720, scaled by area, scored at <= 30 fps', ...report });
+});
+
+// ---- check-take's transition merge (WP13 verify-1 m1, m2): not ACs, no capture ----
+
+const cut = (ms, ok = true) => ({ cutMs: ms, timecode: `${ms}`, ok, gap: ok ? { startMs: 0, endMs: 10_000 } : null, silenceMs: ok ? 10_000 : 0 });
+
+test('check-take merge (m1): a group spans at most 150 ms from its first detection, so a chain splits and two cuts 200 ms apart stay two', () => {
+  // a chain every 100 ms over 800 ms: before the fix it was one 9-frame "transition"
+  const chain = mergeTransitions([0, 100, 200, 300, 400, 500, 600, 700, 800].map((ms) => cut(ms + 4000)));
+  assert.ok(chain.length >= 4, `the chain splits into bounded groups (${chain.map((c) => `${c.cutMs}+${c.frames ?? 1}`)})`);
+  for (const g of chain) assert.ok((g.endMs ?? g.cutMs) - (g.startMs ?? g.cutMs) < 150, 'no group spans 150 ms or more');
+  // two hard cuts 200 ms apart: two scene changes
+  assert.equal(mergeTransitions([cut(2000), cut(2200)]).length, 2);
+  // a fade scoring on consecutive frames (33 ms apart) is still one transition
+  const fade = mergeTransitions([cut(15167), cut(15200)]);
+  assert.equal(fade.length, 1);
+  assert.deepEqual([fade[0].startMs, fade[0].endMs, fade[0].frames], [15167, 15200, 2]);
+});
+
+test('check-take merge (m2): a failing merged transition is reported at the frame that fails', () => {
+  const [g] = mergeTransitions([cut(2000), cut(2066, false), cut(2100)]);
+  assert.equal(g.ok, false);
+  assert.equal(g.cutMs, 2066, 'the failing frame, not the group\'s first');
+  assert.equal(g.timecode, '2066');
+  assert.deepEqual([g.startMs, g.endMs, g.frames], [2000, 2100, 3]);
+});
+
+test('check-take (m1, end to end): two hard cuts 200 ms apart in silence count as 2', () => {
+  // red | blue at 2.0 s | green at 2.2 s, all in silence, then a tone from 4 s
+  const f = path.join(tmp, 'two-cuts.mp4');
+  const r = spawnSync('ffmpeg', ['-v', 'error', '-y',
+    '-f', 'lavfi', '-i', 'color=c=red:s=1280x720:r=30:d=2', '-f', 'lavfi', '-i', 'color=c=blue:s=1280x720:r=30:d=0.2', '-f', 'lavfi', '-i', 'color=c=green:s=1280x720:r=30:d=3.8',
+    '-f', 'lavfi', '-i', "aevalsrc='if(lt(t,4),0,0.5*sin(2*PI*440*t))':s=48000:d=6",
+    '-filter_complex', '[0:v][1:v][2:v]concat=n=3:v=1:a=0[v]', '-map', '[v]', '-map', '3:a', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', f]);
+  assert.equal(r.status, 0, String(r.stderr));
+  const res = JSON.parse(run(CHECK_TAKE, [f, '--json', '--caption-band', '0']).stdout);
+  assert.deepEqual(res.cuts.map((c) => c.cutMs), [2000, 2200], `two scene changes (${res.cuts.map((c) => c.timecode)})`);
+  assert.equal(run(CHECK_TAKE, [f, '--expect-cuts', '2']).code, 0);
 });
