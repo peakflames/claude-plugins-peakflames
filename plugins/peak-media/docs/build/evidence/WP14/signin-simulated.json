@@ -1,0 +1,12 @@
+{
+  "save": "<tmp>/signin/session.json",
+  "mode": "0600",
+  "cookies": [
+    {
+      "name": "session",
+      "httpOnly": true,
+      "value": "<redacted>"
+    }
+  ],
+  "stdout": "saved the session to <save> (mode 0600) — record signed in with --storage-state <save>"
+}

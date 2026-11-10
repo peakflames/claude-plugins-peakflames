@@ -1,0 +1,25 @@
+# signin --save refusals by hand (wp14-verifier-1). Launch spy: PEAK_MEDIA_HEADED_BROWSER_PATH -> a
+# script that touches <v>/headed.launched and exits 1 (so no window can open). <v> is a macOS temp dir
+# reached through the /var -> /private/var symlink; <real-v> is its realpath. cwd = <v>/proj, which has web2video/.
+
+$ capture signin http://127.0.0.1:4173 --save web2video/s.json
+capture signin: --save /private<v>/proj/web2video/s.json is inside /private<v>/proj/web2video — ...; leave out --save to use ~/.cache/peak-media/auth/127.0.0.1.json
+exit 2, no launch
+
+$ capture signin http://127.0.0.1:4173 --save <worktree>/plugins/peak-media/docs/s.json
+capture signin: --save ... is inside the git work tree <worktree> — ...; leave out --save to use ~/.cache/peak-media/auth/127.0.0.1.json
+exit 2, no launch
+
+$ capture signin http://127.0.0.1:4173 --save <v>/proj/web2video/sub/x.json     (absolute, via the /var symlink)
+NOT refused: the browser was launched (spy marker headed.launched written; spy exit 1 -> "capture signin:
+unexpected error: browserType.launch: ..." multi-line call log, exit 70)
+
+$ cd <real-v>/proj; capture signin http://127.0.0.1:4173 --save <real-v>/proj/web2video/sub/x.json
+capture signin: --save <real-v>/proj/web2video/sub/x.json is inside <real-v>/proj/web2video — ...
+exit 2, no launch
+
+=> signinTarget compares path.resolve(cwd, 'web2video') (cwd is realpath'd by the OS) with the
+   unresolved --save path; a symlinked spelling of the same folder slips past the web2video/ check.
+   The git-work-tree check is unaffected (it walks the filesystem).
+
+$ capture signin --version -> 0.1.0 (plugin.json 0.1.0)

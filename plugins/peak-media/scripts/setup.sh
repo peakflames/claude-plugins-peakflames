@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # setup.sh — install peak-media's pinned runtime deps (HyperFrames, Playwright, GSAP, ajv)
-# into the plugin data dir and make sure a render browser is present. Safe to re-run.
+# into the plugin data dir and make sure the render browser and the headed browser (Playwright's
+# own Chromium, for capture signin/--headed, DEC-49) are present. Safe to re-run.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,12 +17,15 @@ $NAME — install peak-media's pinned runtime dependencies (idempotent)
 Usage: $NAME [options]
 
 Installs the versions in lib/pins.json into \${CLAUDE_PLUGIN_DATA:-~/.cache/peak-media}/deps/<lockhash>/
-and runs 'hyperframes browser ensure'. Needs network only when something is missing.
+and runs 'hyperframes browser ensure' (the render browser). Also installs Playwright's own
+Chromium for the pinned Playwright (the headed browser for 'capture signin' and 'capture --headed',
+about 376 MB) into \${CLAUDE_PLUGIN_DATA:-~/.cache/peak-media}/browsers/.
+Needs network only when something is missing.
 Prerequisites it checks: Node 22+, npm, ffmpeg and ffprobe.
 
 Options:
       --check          Only report what is missing (exit 0 ready, 3 not ready); install nothing
-      --skip-browser   Don't fetch the render browser (e.g. HYPERFRAMES_BROWSER_PATH is set)
+      --skip-browser   Don't fetch the render or the headed browser (e.g. HYPERFRAMES_BROWSER_PATH is set)
       --data-dir <dir> Use <dir> instead of \$CLAUDE_PLUGIN_DATA / ~/.cache/peak-media
   -q, --quiet          Print only errors and the final line
   -h, --help           Show this help and exit
@@ -71,6 +75,16 @@ browser_ok() {
   [ -f "$HF" ] && node "$HF" browser path >/dev/null 2>&1
 }
 
+# The headed browser (DEC-49): Playwright's Chromium in <data dir>/browsers, resolved by lib/browser.mjs.
+BROWSERS=$(PM_ROOT="$ROOT" node --input-type=module -e "const { pathToFileURL } = await import('node:url'); const m = await import(pathToFileURL(process.env.PM_ROOT + '/lib/browser.mjs').href); process.stdout.write(m.browsersDir())") \
+  || die "could not resolve the browsers folder (is $ROOT intact?)" 1
+headed_ok() {
+  PM_ROOT="$ROOT" node --input-type=module -e "
+    const { pathToFileURL } = await import('node:url');
+    const m = await import(pathToFileURL(process.env.PM_ROOT + '/lib/browser.mjs').href);
+    process.exit(m.headedBrowserOk() ? 0 : 1);" 2>/dev/null
+}
+
 # Start the browser once: a binary that is present but can't run (e.g. missing system libraries on
 # a slim Linux image) is reported in one line naming the libraries and the apt command.
 browser_starts() {
@@ -88,6 +102,7 @@ if [ "$CHECK_ONLY" = 1 ]; then
   deps_ok || die "runtime deps not installed in $DEPS — run $ROOT/scripts/setup.sh" 3
   [ "$SKIP_BROWSER" = 1 ] || browser_ok || die "render browser missing — run $ROOT/scripts/setup.sh (or set HYPERFRAMES_BROWSER_PATH)" 3
   browser_starts
+  [ "$SKIP_BROWSER" = 1 ] || headed_ok || die "headed browser missing (Playwright's Chromium, for capture signin/--headed) — run $ROOT/scripts/setup.sh" 3
   echo "peak-media ready: deps $DEPS"
   exit 0
 fi
@@ -126,4 +141,20 @@ else
 fi
 
 browser_starts
+
+# --- headed browser (DEC-49) --------------------------------------------------------
+if [ "$SKIP_BROWSER" = 1 ]; then
+  say "headed browser: skipped"
+elif headed_ok; then
+  say "headed browser: present"
+else
+  say "headed browser: downloading Playwright's Chromium (about 376 MB) into $BROWSERS"
+  mkdir -p "$BROWSERS" 2>/dev/null || die "cannot create $BROWSERS — pass --data-dir <writable folder>" 1
+  PW_CLI="$DEPS/node_modules/playwright/cli.js"
+  [ -f "$PW_CLI" ] || die "Playwright CLI missing from $DEPS — delete $MARK and run $ROOT/scripts/setup.sh again" 1
+  PLAYWRIGHT_BROWSERS_PATH="$BROWSERS" node "$PW_CLI" install --no-shell chromium >"$DEPS/headed-browser.log" 2>&1 \
+    || die "headed browser download failed — see $DEPS/headed-browser.log" 1
+  headed_ok || die "headed browser still missing after the download — see $DEPS/headed-browser.log" 1
+fi
+
 echo "peak-media ready: deps $DEPS · $("$FFMPEG" -version | head -1 | cut -d' ' -f1-3)"
