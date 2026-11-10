@@ -204,4 +204,9 @@ test('assemble prints the GATE 7 line itself when every cut is in silence (WP9 r
   const r = run(ASSEMBLE, [proj, '--outro', first.outro.mp4]);
   assert.equal(r.code, 0, r.stderr);
   assert.deepEqual(r.stdout.split('\n').filter((l) => l.startsWith('GATE ')), ['GATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)']);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'GATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)', 'printed last, so `| tail -n 1` keeps it (verify-4 F2)');
+  // a run that fails before the cut check prints a FAIL line (verify-4 F4)
+  const early = run(ASSEMBLE, [proj, '--renders', path.join(tmp, 'no-renders-here')]);
+  assert.equal(early.code, 1);
+  assert.match(early.stdout.trim().split('\n').at(-1), /^GATE 7 composite: FAIL — plate '.+': no render at /);
 });

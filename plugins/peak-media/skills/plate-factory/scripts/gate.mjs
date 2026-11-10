@@ -14,6 +14,50 @@ import { probeSpec } from '../../../lib/verify/probe-spec.mjs';
 export const REVIEW = path.join('review', 'plate-review.md');
 const mtime = (f) => statSync(f).mtimeMs;
 
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Is `file` (a review/ JPEG name) a sheet of plate `id`: contact-<id>, <id>-r<N> or <id>-fix<N>? */
+export function isSheetOf(file, id) {
+  return new RegExp(`^(contact-${esc(id)}|${esc(id)}-(r|fix)\\d+)\\.jpe?g$`, 'i').test(file);
+}
+
+const SEVERITIES = ['blocker', 'major', 'minor'];
+// review-rubric.md § C: `<plate-id> @<time>s [severity] <#>: <what> → <fix>`; bullets, bold and
+// brackets around the severity are tolerated. Stage 6 appends ` — fixed` or ` — open` to each.
+const DEFECT_RE = /^\s*(?:[-*+]\s+)?\**([a-z0-9][a-z0-9-]*)\**\s+@\s*[\d.]+\s*s\b\s*\**\[?\s*(blocker|major|minor)\s*\]?\**(.*)$/i;
+const VERDICT_RE = /^\s*(?:[-*+]\s+)?\**verdict\**\s*:?\**\s*(\d+)\s*blockers?\s*,\s*(\d+)\s*majors?\s*,\s*(\d+)\s*minors?/im;
+
+/**
+ * Parse review/plate-review.md: the reviewer's own report (review-rubric.md § C), one line per
+ * defect, each ending ` — fixed` or ` — open`, and its VERDICT line. Counts come from the listed
+ * lines, never from a summary the model wrote; the VERDICT must agree with them.
+ */
+export function parseReview(text, plateIds) {
+  const problems = [];
+  const defects = [];
+  for (const line of text.split('\n')) {
+    const m = DEFECT_RE.exec(line);
+    if (!m) continue;
+    const status = /(?:—|–|-{1,2})\s*(fixed|open|not fixed)\s*\.?\s*\**\s*$/i.exec(m[3])?.[1]?.toLowerCase() ?? null;
+    defects.push({ plate: m[1], severity: m[2].toLowerCase(), status, line: line.trim() });
+  }
+  const v = VERDICT_RE.exec(text);
+  if (!v) problems.push(`${REVIEW} has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered`);
+  else {
+    const want = { blocker: Number(v[1]), major: Number(v[2]), minor: Number(v[3]) };
+    for (const sev of SEVERITIES) {
+      const got = defects.filter((d) => d.severity === sev).length;
+      if (got !== want[sev]) problems.push(`${REVIEW}: the VERDICT says ${want[sev]} ${sev} but ${got} ${sev} defect line(s) are listed — list every defect the reviewer reported, one per line`);
+    }
+  }
+  for (const d of defects) {
+    if (!plateIds.includes(d.plate)) problems.push(`${REVIEW}: defect for unknown plate '${d.plate}': ${d.line}`);
+    if (!d.status) problems.push(`${REVIEW}: defect line has no " — fixed" or " — open" at its end: ${d.line}`);
+    else if (d.status !== 'fixed' && d.severity !== 'minor') problems.push(`${REVIEW}: ${d.severity} defect not fixed: ${d.line}`);
+  }
+  return { problems, defects, fixed: defects.filter((d) => d.status === 'fixed').length };
+}
+
 /** Problems with stage 6's output in `project` for the plates in `plan`; [] when the gate holds. */
 export function checkBuild(plan, project) {
   const problems = [];
@@ -25,21 +69,17 @@ export function checkBuild(plan, project) {
     const ps = probeSpec(mp4, { durationMs: p.durationMs, fps: plan.fps, width: plan.width, height: plan.height, audio: false });
     const bad = ps.checks.filter((c) => /^(duration|width|height|fps)/.test(c.name) && !c.ok);
     if (bad.length) problems.push(`plate ${p.id}: ${bad.map((c) => `${c.name} is ${c.actual}, planned ${c.expected}`).join('; ')}`);
-    // the last look at a plate must be a sheet of its final render
-    const own = sheets.filter((f) => f.includes(p.id)).map((f) => path.join(reviewDir, f));
-    if (!own.some((f) => mtime(f) >= mtime(mp4))) problems.push(`plate ${p.id}: no contact sheet of its final render in review/ (sheet it after the last re-render)`);
+    // the last look at a plate must be a non-empty sheet of its final render
+    const own = sheets.filter((f) => isSheetOf(f, p.id)).map((f) => path.join(reviewDir, f));
+    if (!own.some((f) => mtime(f) >= mtime(mp4) && statSync(f).size > 0)) problems.push(`plate ${p.id}: no contact sheet of its final render in review/ (contact-${p.id}.jpg, ${p.id}-r<N>.jpg or ${p.id}-fix<N>.jpg, made after the last re-render)`);
   }
   const rec = path.join(project, REVIEW);
   let defects = null, fixed = null;
-  if (!existsSync(rec)) problems.push(`no review record at ${REVIEW} — save the independent reviewer's report there, with "Defects: <n>" and "Fixed: <n>" lines`);
+  if (!existsSync(rec)) problems.push(`no review record at ${REVIEW} — save the independent reviewer's report there as it answered, with " — fixed" or " — open" after each defect line`);
   else {
-    const text = readFileSync(rec, 'utf8');
-    defects = Number(/^\s*\**defects\**:\s*(\d+)/im.exec(text)?.[1] ?? NaN);
-    fixed = Number(/^\s*\**fixed\**:\s*(\d+)/im.exec(text)?.[1] ?? NaN);
-    if (!Number.isInteger(defects) || !Number.isInteger(fixed)) problems.push(`${REVIEW} has no "Defects: <n>" and "Fixed: <n>" lines`);
-    else if (fixed < defects) problems.push(`${REVIEW}: ${defects - fixed} of ${defects} reviewer defect(s) not fixed`);
-    const unnamed = plan.plates.filter((p) => !text.includes(p.id)).map((p) => p.id);
-    if (unnamed.length) problems.push(`${REVIEW} doesn't cover plate(s) ${unnamed.join(', ')}`);
+    const r = parseReview(readFileSync(rec, 'utf8'), plan.plates.map((p) => p.id));
+    problems.push(...r.problems);
+    defects = r.defects.length; fixed = r.fixed;
   }
   return { problems, defects, fixed };
 }
@@ -50,9 +90,11 @@ const spec = {
   usage: 'gate build <plates.json|project-folder>',
   description: `
 build: every plate in plates.json has renders/plates/<id>.mp4 at its planned duration (±1 frame),
-fps and size; a contact sheet in review/ (file name containing the plate id) made after its final
-render; and review/plate-review.md, the independent reviewer's report, with "Defects: <n>" and
-"Fixed: <n>" lines (fixed must equal defects) naming every plate. Prints the GATE 6 line.
+fps and size; a contact sheet of its final render in review/ (contact-<id>.jpg, <id>-r<N>.jpg or
+<id>-fix<N>.jpg); and review/plate-review.md: the independent reviewer's report as it answered
+(review-rubric.md § C), one line per defect ending " — fixed" or " — open", and its VERDICT line.
+Defects are counted from those lines; the VERDICT must agree; every blocker and major must be
+fixed (a minor may stay open). Prints the GATE 6 line.
 Exit 0 PASS, 1 FAIL (one line on stderr), 2 usage.`,
   options: {},
   positionals: { min: 2, max: 2 },

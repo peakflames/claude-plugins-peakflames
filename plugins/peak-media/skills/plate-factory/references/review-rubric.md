@@ -58,3 +58,6 @@ VERDICT: <n> blocker, <n> major, <n> minor
 
 Name the plate and the frame time for every defect. Report only what the sheets show; don't guess
 at code. With nothing to report, write `VERDICT: 0 blocker, 0 major, 0 minor`.
+
+(The orchestrator saves this answer to `review/plate-review.md` and marks each defect line
+` — fixed` or ` — open`; `gate.mjs build` reads that file.)

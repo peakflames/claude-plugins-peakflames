@@ -26,7 +26,9 @@ and audio never forces a re-render.
   `FAIL`, fix and rerun the command.
 - **Stages 0, 1, 3, 4, 8, 9: you write it**, on its own line in your reply, e.g.
   `GATE 3 plates: APPROVED — plates.json (3 plates, retimed from spine/manifest.json)`. A user
-  gate's `APPROVED` line goes right after the user's answer, before the next command. While you
+  gate's `APPROVED` line goes right after the user's answer, before the next command; an
+  approval that comes with changes ("apply 1, approved") means: apply them, then write the
+  `APPROVED` line, then start the next stage. While you
   wait for an answer, print no gate line (`REJECTED` is only for an answer that turns it down).
 - This holds **whatever output style or brevity setting is active**: a concise style shortens
   your prose, never the gate lines.

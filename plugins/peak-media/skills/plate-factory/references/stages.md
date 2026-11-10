@@ -76,15 +76,16 @@ above, and follow these rules:
   the user approves again.
 - **A self-review round** is one `contact-sheet` run on `renders/plates/<id>.mp4` before the
   reviewer call, whatever the sheet's name. Every rendered plate needs 1–3 of them. Sheets made
-  after the reviewer (`<id>-fix<N>.jpg`), the stage-5 `render-plate --sheet`, and a sheet run
+  after the reviewer (`<id>-fix<N>.jpg`), the stage-5 `render-plate --pipeline-test` sheet, and a sheet run
   that errored (and was re-run) are not rounds. A simple `for id in a b c; do …$id…; done` loop
   over literal plate ids is counted per plate, but prefer one plate per command.
 - **The reviewer** is the first `Agent` call whose prompt names `review-rubric.md`; it comes after
   every plate's rounds.
 - **`runtimes.md`** is Read (with Read, not cat) before the first plate is written.
 - **Gate lines from scripts.** Gates 2, 5, 6 and 7 count from the output of a Bash call that runs
-  that gate's script (`spine`, `render-plate`, `gate`, `assemble`), as well as from your text. A
-  command that contains a gate line itself (`echo "GATE 5 …"`) doesn't count.
+  that gate's script (`spine`, `render-plate`, `gate`, `assemble`), as well as from your text.
+  Trimming the output is fine (`2>&1 | tail -5`: every script prints its gate line last); adding
+  `echo`, `cat` or another command to the same call is not (see Known limits).
 
 **Known limits** (accepted; follow the stages and they don't arise):
 
@@ -96,7 +97,14 @@ above, and follow these rules:
   answer was about the storyboard. Ask about the storyboard, then write the gate line.
 - The check only orders each gate's first passing line. It doesn't see a stage that **starts**
   before the previous gate line (e.g. the spine run before `GATE 1`, or `assemble` before
-  `GATE 6`). The rule below still holds: write gate n−1's line before stage n's first command.
+  `GATE 6`). The rule below still holds: write gate n−1's line (or run its gate script) before
+  stage n's first command.
+- A gate line from a script counts only when the Bash call runs the plugin's script
+  (`…/skills/<skill>/scripts/<script>.mjs`, not `--help`/`--version`) with nothing else that could
+  print text: `cd`, `VAR=value`, `| tail`, `| head`, `| grep`, writing a file (`cat > f <<'EOF'`)
+  and the plugin's other tools (`contact-sheet`, …) are fine; `echo`, `cat f` or another program
+  in the same call isn't. `bash -c '…'` around the run is unwrapped. A copy of the script
+  under another `…/skills/<skill>/scripts/` path would still be credited.
 
 ---
 
@@ -155,6 +163,9 @@ End the stage with: `GATE 0 brief: APPROVED — brief.md`
 7. `AskUserQuestion`: which proposed changes to apply (each, all, none) and whether to approve the
    script. Apply only what the user picks; the user's wording wins. If words or the target
    changed, redo step 4, show the result and ask again.
+8. **Approved with changes** ("apply 1, approved"): apply the picked changes, then write the
+   `GATE 1` line below, then run the spine. The same holds at every user gate: edits first, then
+   the `APPROVED` line, then the next stage's first command.
 
 End the stage with: `GATE 1 script: APPROVED — script.md (<words> words, cold read <k>/<n> CLEAR)`
 
@@ -257,8 +268,10 @@ defect is open.
 **Stage 6 ends here, not at the reviewer.** Once the reviewer's fixes are re-rendered,
 re-sheeted (`-fix<N>.jpg`) and Read:
 
-1. Write the reviewer's report to `review/plate-review.md`, naming every plate, with two lines
-   `Defects: <n>` (blocker + major found) and `Fixed: <n>`.
+1. Write the reviewer's report to `review/plate-review.md` **as it answered** (review-rubric.md
+   § C): every defect line, one per line, each with ` — fixed` or ` — open` added at its end, and
+   its `VERDICT:` line. Don't summarise or drop lines: `gate.mjs` counts the defect lines, checks
+   them against the VERDICT, and fails on an open blocker or major.
 2. `node "PM/skills/plate-factory/scripts/gate.mjs" build .` — checks every plate's render
    (duration, fps, size), a sheet of each final render, and the review record, and prints the
    `GATE 6 build:` line. On `FAIL`, fix what it names and rerun.

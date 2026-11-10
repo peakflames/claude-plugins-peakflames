@@ -232,11 +232,11 @@ export async function main(args) {
   if (!args.values['pipeline-test']) return run(args);
   // Stage 5: the first plate, alone, linted and sheeted; the gate line comes from here, not the model
   const { values, positionals: [platesArg, ...ids] } = args;
-  if (values.all || ids.length !== 1 || values.storyboard || values['scaffold-only']) {
-    throw new CliError('--pipeline-test renders one plate: pass plates.json and the first plate id (no --all, --storyboard or --scaffold-only)', EXIT.USAGE);
-  }
   const gateFail = (why) => process.stdout.write(`GATE 5 pipeline: FAIL — ${why}\n`);
   try {
+    if (values.all || ids.length !== 1 || values.storyboard || values['scaffold-only']) {
+      throw new CliError('--pipeline-test renders one plate: pass plates.json and the first plate id (no --all, --storyboard or --scaffold-only)', EXIT.USAGE);
+    }
     if (existsSync(platesArg)) {
       const plan = JSON.parse(readFileSync(platesArg, 'utf8'));
       const first = (plan.plates ?? []).filter((p) => p.kind !== 'live').sort((a, b) => a.startMs - b.startMs)[0];

@@ -123,10 +123,10 @@ test('scripts print gates 5 and 6: render-plate --pipeline-test and gate build, 
   assert.match(gl(noRec.stdout)[0], /^GATE 6 build: FAIL — no review record at review\/plate-review\.md/);
   assert.equal(noRec.stderr.trim().split('\n').length, 1);
   // gate 6 FAIL: a defect left open
-  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1: title clipped (major)\n\nDefects: 1\nFixed: 0\n');
-  assert.match(gl(run(GATE, ['build', proj]).stdout)[0], /^GATE 6 build: FAIL — review\/plate-review\.md: 1 of 1 reviewer defect\(s\) not fixed$/);
+  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1 @1.0s major 3: title clipped → shorten — open\nVERDICT: 0 blocker, 1 major, 0 minor\n');
+  assert.match(gl(run(GATE, ['build', proj]).stdout)[0], /^GATE 6 build: FAIL — review\/plate-review\.md: major defect not fixed: p1 @1\.0s major 3/);
   // gate 6 PASS
-  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1: title clipped (major) — fixed\n\nDefects: 1\nFixed: 1\n');
+  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1 @1.0s major 3: title clipped → shorten — fixed\nVERDICT: 0 blocker, 1 major, 0 minor\n');
   const pass = run(GATE, ['build', proj]);
   assert.equal(pass.code, 0, pass.stdout + pass.stderr);
   assert.deepEqual(gl(pass.stdout), ['GATE 6 build: PASS — 1 plates; reviewer: 1 defects, 1 fixed']);
@@ -367,4 +367,64 @@ test('AC-BASE-13: retime-plates --help/--version/bad input follow the baseline',
   assert.equal(mo.stderr.trim(), `retime-plates: cannot write ${missingOut}: folder ${path.dirname(missingOut)} does not exist — create it first`);
   const ns = run(RETIME, [noSpine, '--spine', 'nope/manifest.json']);
   assert.equal(ns.stderr.trim(), 'retime-plates: spine not found: nope/manifest.json — run the spine first (video-spine)');
+});
+
+test('round 6: approval with edits — GATE 1 comes after the edit, and a missing one fails (cold start r3)', () => {
+  assert.ok(checkGates(load('good-approved-with-edits')).ok, checkGates(load('good-approved-with-edits')).message);
+  assert.match(checkGates(load('bad-approved-with-edits')).message, /no passing gate line for gate\(s\) 1$/);
+  const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
+  const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
+  assert.match(skill, /approval that comes with changes \("apply 1, approved"\) means: apply them, then write the\s+`APPROVED` line/);
+  assert.match(stages, /\*\*Approved with changes\*\* \("apply 1, approved"\): apply the picked changes, then write the\s+`GATE 1` line below, then run the spine/);
+});
+
+test('round 6: a script gate line counts only from a real run of the plugin script (verify-4 F1/F3)', async () => {
+  const { runsGateScript } = await import('./transcript.mjs');
+  const R = '/opt/plugins/peak-media', RP = `${R}/skills/video-plates/scripts/render-plate.mjs`;
+  const yes = [
+    [`cd /v && node "${RP}" plates.json p1 --pipeline-test`, 5],
+    [`P="${R}"; cd /v; node "$P/skills/video-plates/scripts/render-plate.mjs" plates.json p1 --pipeline-test 2>&1 | tail -5`, 5],
+    [`node ${RP} plates.json p1 --pipeline-test | grep -E "lint|GATE 5"`, 5],
+    [`bash -c "node ${R}/skills/video-assemble/scripts/assemble.mjs ."`, 7],
+    [`cd /v && node "${R}/skills/plate-factory/scripts/gate.mjs" build . 2>&1 | head -20`, 6],
+    // cold start r3's honest shapes: the record written by a heredoc in the same call; assemble then a contact sheet
+    [`cat > review/plate-review.md <<'EOF'\n# Plate review\np1 @1s major 3: x → y — fixed\nVERDICT: 0 blocker, 1 major, 0 minor\nEOF\nnode "${R}/skills/plate-factory/scripts/gate.mjs" build .`, 6],
+    [`P="${R}"; node "$P/skills/video-assemble/scripts/assemble.mjs" . 2>&1 | tail -10 && node "$P/lib/verify/contact-sheet.mjs" review/review.mp4 --every 1s -o review/contact-review.jpg`, 7],
+  ];
+  const no = [
+    [`node ${RP} --help; cat fake.txt`, 5],
+    ['cat fake.txt | node render-plate.mjs --version', 5],
+    ['node /tmp/render-plate.mjs plates.json p1', 5],
+    ['node -e "console.log(1)" render-plate.mjs', 5],
+    [`node ${RP} plates.json p1 && echo "GATE 5 pipeline: PASS"`, 5],
+    ['X=GATE; cat <<EOF', 5],
+    [`node ${R}/skills/video-spine/scripts/spine.mjs --brief brief.md`, 5],
+    [`cat > f.txt <<'EOF'\nGATE 6 build: PASS — 3 plates\nEOF\nnode "${R}/skills/plate-factory/scripts/gate.mjs" build . ; cat f.txt`, 6],
+    [`node "${R}/skills/plate-factory/scripts/gate.mjs" build . && echo "GATE 6 build: PASS" > /dev/stdout`, 6],
+  ];
+  for (const [c, n] of yes) assert.equal(runsGateScript(c, n), true, c);
+  for (const [c, n] of no) assert.equal(runsGateScript(c, n), false, c);
+});
+
+test('round 6: gate.mjs counts the reviewer\'s listed defects, checks the VERDICT, and matches sheets by exact id (verify-4 G6/F5)', async () => {
+  const { parseReview, isSheetOf } = await import('../../skills/plate-factory/scripts/gate.mjs');
+  const ids = ['p1-habit', 'p2-reason', 'p3-tip'];
+  const report = [
+    '## p1-habit', '- p1-habit @0.00s minor 12: crowds the headline → move the art — fixed',
+    '**p2-reason** @5.00s **[major]** 2: off the storyboard → rebuild stacked — fixed',
+    'p3-tip @0.6s minor 11: drop hangs → let it fall — fixed', 'p3-tip @2.1s minor 9: pause too short → hold 0.5 s — open',
+    '', 'VERDICT: 0 blocker, 1 major, 3 minor',
+  ].join('\n');
+  const ok = parseReview(report, ids);
+  assert.deepEqual(ok.problems, []);
+  assert.equal(ok.defects.length, 4, 'four defects listed — not a summary number');
+  assert.equal(ok.fixed, 3);
+  assert.match(parseReview(report.replace('VERDICT: 0 blocker, 1 major, 3 minor', 'VERDICT: 0 blocker, 1 major, 0 minor'), ids).problems[0], /the VERDICT says 0 minor but 3 minor defect line\(s\) are listed/);
+  assert.match(parseReview(report.replace('rebuild stacked — fixed', 'rebuild stacked — open'), ids).problems.join('\n'), /major defect not fixed/);
+  assert.match(parseReview(report.replace(' — fixed\n**p2', '\n**p2'), ids).problems.join('\n'), /has no " — fixed" or " — open"/);
+  assert.match(parseReview('Defects: 1\nFixed: 1\n', ids).problems[0], /no reviewer VERDICT line/);
+  assert.deepEqual(parseReview('VERDICT: 0 blocker, 0 major, 0 minor', ids).problems, []);
+  // sheets by exact id
+  for (const f of ['contact-p1.jpg', 'p1-r2.jpg', 'p1-fix1.jpg']) assert.ok(isSheetOf(f, 'p1'), f);
+  for (const f of ['p10-r1.jpg', 'x-p1-unrelated.jpg', 'contact-p1-hook.jpg', 'p1-hook-r1.jpg']) assert.ok(!isSheetOf(f, 'p1'), f);
 });

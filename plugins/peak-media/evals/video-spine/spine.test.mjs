@@ -153,6 +153,9 @@ test('spine prints the GATE 2 line itself when the runtime check passes (WP9 rou
   assert.equal(r.code, 0, r.stderr);
   const m = JSON.parse(readFileSync(path.join(dir, "spine", "manifest.json"), "utf8"));
   assert.equal(r.stdout.trim().split('\n').at(-1), `GATE 2 spine: PASS — spine/manifest.json ${m.totalMs} ms (target 20000 ±10%)`);
+  const early = run(SPINE, ['--brief', path.join(dir, 'nope.md')], { env: NO_KEY });
+  assert.notEqual(early.code, 0);
+  assert.match(early.stdout.trim(), /^GATE 2 spine: FAIL — cannot read brief .*nope\.md/, 'an early failure prints the FAIL line too (verify-4 F4)');
   const g = run(SPINE, ['--brief', path.join(dir, 'brief.md'), '--target-ms', '20000', '--no-narrate'], { env: NO_KEY });
   assert.equal(g.code, 0, g.stderr);
   assert.match(g.stdout.trim().split('\n').at(-1), /^GATE 2 spine: PASS — spine\/beatgrid\.json \d+ ms \(target 20000 ±10%\)$/);

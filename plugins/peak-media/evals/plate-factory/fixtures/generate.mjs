@@ -98,6 +98,15 @@ const reviewerSteps = () => [
 const idx = (steps, pred) => steps.findIndex(pred);
 const sayIdx = (steps, n) => idx(steps, (s) => s[0] === 'say' && s[1].includes(`GATE ${n} `));
 
+/** Gate 1 answered "Apply 1, as you suggest. Approved.", the edit made, then (or not) the GATE 1 line. */
+function approvedWithEdits(s, writeGate) {
+  const ask = idx(s, (x) => x[0] === 'ask' && x[1].startsWith('Script'));
+  s[ask] = ['ask', 'Script (50 words, cold read 2/3 CLEAR). Proposed: 1. compare — "…" → "…". Apply which, and approve?', 'Apply 1, as you suggest. Approved.'];
+  const gate = sayIdx(s, 1);
+  s.splice(gate, 1, ['edit', `${P}/script.md`], ...(writeGate ? [['say', 'Applied change 1.\n\nGATE 1 script: APPROVED — script.md (50 words, cold read 2/3 CLEAR)']] : []));
+  return s;
+}
+
 /** The good run with gates 2, 5, 6, 7 printed by their scripts and not written by the model. */
 function scriptGates(s) {
   const drop = (n) => s.splice(sayIdx(s, n), 1);
@@ -109,7 +118,7 @@ function scriptGates(s) {
   s[i] = ['bash', RP('plates.json p1-hook --pipeline-test'), 'p1-hook: renders/plates/p1-hook.mp4 (7173 ms, planned 7173) lint+check ok sheet review/contact-p1-hook.jpg\nGATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)'];
   i = at((x) => x[0] === 'read' && x[1].endsWith('p2-table-fix1.jpg'));
   s.splice(i + 1, 0, ['write', `${P}/review/plate-review.md`],
-    ['bash', `cd ${P} && ${node('skills/plate-factory/scripts/gate.mjs', 'build .')}`, 'GATE 6 build: PASS — 3 plates; reviewer: 1 defects, 1 fixed']);
+    ['bash', `cd ${P} && ${node('skills/plate-factory/scripts/gate.mjs', 'build .')} 2>&1 | tail -3`, 'GATE 6 build: PASS — 3 plates; reviewer: 1 defects, 1 fixed']);
   i = at((x) => x[0] === 'bash' && x[1].endsWith(`${node('skills/video-assemble/scripts/assemble.mjs', '.')}`));
   s[i] = ['bash', s[i][1], 'cuts      2 plate cut(s) in silence (≥300 ms)\nGATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)'];
   return s;
@@ -200,6 +209,10 @@ export const VARIANTS = {
     s[i] = ['bash', `${RP('plates.json p1-hook --lint --sheet')} && echo "GATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)"`, 'p1-hook: ok\nGATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)'];
     return s;
   },
+  // round 6 (cold start r3): the script is approved with an edit; GATE 1 is written after the edit
+  'good-approved-with-edits': (s) => approvedWithEdits(s, true),
+  // ... and without the GATE 1 line (the session went from the edit straight to the spine)
+  'bad-approved-with-edits': (s) => approvedWithEdits(s, false),
   'bad-unasked-gate': (s) => {
     s.splice(sayIdx(s, 4) - 1, 0,
       ['say', 'GATE 4 storyboard: APPROVED — review/storyboard.jpg'],

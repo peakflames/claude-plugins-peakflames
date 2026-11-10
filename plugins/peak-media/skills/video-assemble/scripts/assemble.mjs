@@ -304,12 +304,23 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (!(values['min-silence-ms'] >= 0)) throw new CliError('--min-silence-ms must be >= 0', EXIT.USAGE);
     checkLevels(values);
     requireFfmpeg();
-    const r = await assemble({ input, brand: values.brand, renders: values.renders, out: values.out, music: values.music, sfx: values.sfx,
-      musicLufs: values['music-lufs'], duckDb: values['duck-db'], sfxLufs: values['sfx-lufs'], sfxDb: values['sfx-db'], exportPreset: values.export, minSilenceMs: values['min-silence-ms'],
-      outro: values.outro, rerenderOutro: values['rerender-outro'], log: values.json ? () => {} : (l) => process.stdout.write(`${l}\n`),
-      gate: (l) => (values.json ? process.stderr : process.stdout).write(`${l}\n`) });
+    // the GATE 7 line is held and printed last, so `… | tail -n 3` keeps it; a run that fails
+    // before the cut check prints a FAIL line instead
+    let gateLine = null;
+    const gateOut = (l) => (values.json ? process.stderr : process.stdout).write(`${l}\n`);
+    let r;
+    try {
+      r = await assemble({ input, brand: values.brand, renders: values.renders, out: values.out, music: values.music, sfx: values.sfx,
+        musicLufs: values['music-lufs'], duckDb: values['duck-db'], sfxLufs: values['sfx-lufs'], sfxDb: values['sfx-db'], exportPreset: values.export, minSilenceMs: values['min-silence-ms'],
+        outro: values.outro, rerenderOutro: values['rerender-outro'], log: values.json ? () => {} : (l) => process.stdout.write(`${l}\n`),
+        gate: (l) => { gateLine = l; } });
+    } catch (e) {
+      gateOut(gateLine ?? `GATE 7 composite: FAIL — ${String(e.message ?? e).split('\n')[0]}`);
+      throw e;
+    }
     if (values.json) process.stdout.write(JSON.stringify(r, null, 2) + '\n');
     else process.stdout.write(`${r.final.file}\n`);
+    gateOut(gateLine);
     return EXIT.OK;
   });
 }
