@@ -1,0 +1,30 @@
+# AC-ASM-06 r2 — mechanical levels only (manual gate stays BLOCKED: needs user listen)
+# Input: real F1 review.mp4 from AC-ASM-01.r2 (fake/tone spine, WP4 plates, default brand).
+# Stems (synthetic, in $TMPDIR, deleted): music = 110+165+220 Hz bed, 22 s; sfx = 1.5 kHz 150 ms hits at 5.40, 16.10, 20.00 s.
+# Defaults: --music-lufs -28 --duck-db 6 --sfx-lufs -20. Measured with ffmpeg ebur128 (peak=true) on decoded audio.
+# Music isolated as (music-pass − narration); SFX as (music+sfx − music-pass). Residual error floor: -70 LUFS (gated out), TP -78.8 dBFS.
+
+$ remux-audio review.mp4 --music music.wav --sfx sfx.wav -o rm-mix.mp4 --levels levels.json
+
+narration -16 LUFS (gain 0 dB)
+music     -28.1 LUFS under the voice (12.3 dB below it), +6 dB between lines
+sfx       -20 LUFS (gain 5 dB)
+mix       -15.6 LUFS, true peak -8.4 dBFS
+levels.json: narration.lufs -16, music.bedLufs -22.1, music.underVoiceLufs -28.1, music.belowVoiceDb 12.3, sfx.lufs -20, mix.lufs -15.6, mix.truePeakDb -8.4
+
+## independent ebur128
+narration (review.mp4, whole):            I=-16.0 LUFS TP=-14.9 dBFS
+speech window 0.250-5.341 s:   narration -15.8 | music residual -28.0 LUFS  -> 12.2 dB below
+speech window 5.841-16.023 s:  narration -15.8 | music residual -28.0 LUFS  -> 12.2 dB below
+speech window 16.523-20.523 s: narration -15.8 | music residual -28.4 LUFS  -> 12.6 dB below
+F1 500 ms gaps (5.341-5.841, 16.023-16.523): music residual -24.6 LUFS (duck only partly released: 150 ms attack + 350 ms release > 500 ms gap)
+F1 tail 20.523-20.767: music below gate (end fade)
+music between lines (F1 narration with clip 2 muted 9-12 s, passed via --narration; interior 9.5-11.5 s): I=-22.0 LUFS TP=-16.7 dBFS
+sfx residual (mix − music pass, gated integrated): I=-20.0 LUFS TP=-16.0 dBFS
+sfx residual (sfx-only pass − narration):          I=-20.0 LUFS TP=-16.1 dBFS
+full mix rm-mix.mp4:   I=-15.6 LUFS TP=-8.4 dBFS
+music pass rm-music:   I=-15.7 LUFS TP=-11.9 dBFS
+gap variant mix:       I=-16.1 LUFS TP=-8.4 dBFS
+limiter stress (--music-lufs -14 --sfx-db 20): I=-11.2 LUFS TP=-1.4 dBFS (<= -1 dBFS)
+
+verdict: mechanical levels match the Lead's targets; listening approval still required (BLOCKED).

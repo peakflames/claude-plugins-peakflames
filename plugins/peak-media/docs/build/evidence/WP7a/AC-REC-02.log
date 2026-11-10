@@ -1,0 +1,71 @@
+# AC-REC-02 verifier run 2026-11-09T03:17:47Z — spawn spy preloaded (node --import spy.mjs patches child_process.*)
+## positive control: a real take (spy must see the browser launch)
+$ HYPERFRAMES_BROWSER_PATH=/Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell capture --storyboard /tmp/v7a-tools/tiny.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/ctl.webm --no-captions
+capture: launching browser (1280x720, 30 fps, mode silent)
+capture: t0 anchored on the first frame; running tiny.mjs
+/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/ctl.webm: 6 frames at 30 fps = 200 ms (silent; 0 say(), wall 230 ms)
+exit=0  elapsed=11.295s  chromium-spawns=1  headless-shell procs before=0 after=0
+spawns logged:
+    spawnSync ffmpeg -version
+    spawnSync ffprobe -version
+    spawn /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back
+    spawnSync ffmpeg -hide_banner -nostdin -y -v error -framerate 30 -start_number 0 -i /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/pm-capture-pA971M/seq/%07d.jpg -frames:v 6 -vf scale=1280:720:flags=lanczos:in_range=pc:out_range=tv,setsar=1,format=yuv420p -pix_fmt yuv420p -color_ran
+
+## Chromium missing
+$ HYPERFRAMES_BROWSER_PATH=/nonexistent/chrome capture --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/a.webm
+capture: Chromium not found at /nonexistent/chrome — run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/scripts/setup.sh (or set HYPERFRAMES_BROWSER_PATH)
+exit=3  elapsed=.107s  chromium-spawns=0
+0  headless-shell procs before=0 after=0
+spawns logged:
+    spawnSync ffmpeg -version
+    spawnSync ffprobe -version
+
+## ffmpeg missing
+$ PEAK_MEDIA_FFMPEG=/nonexistent capture --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/a.webm
+capture: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3  elapsed=.056s  chromium-spawns=0
+0  headless-shell procs before=0 after=0
+spawns logged:
+    spawnSync /nonexistent -version
+
+## ffprobe missing
+$ PEAK_MEDIA_FFPROBE=/nonexistent capture --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/a.webm
+capture: ffprobe not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3  elapsed=.077s  chromium-spawns=0
+0  headless-shell procs before=0 after=0
+spawns logged:
+    spawnSync ffmpeg -version
+    spawnSync /nonexistent -version
+
+## bad --spine (schema-invalid)
+$ X=1 capture --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/a.webm --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/bad-spine.json
+capture: --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/bad-spine.json is not a valid spine manifest: model is required; voice is required; style is required; audioOffsetMs is required; narrate is required; targetMs is required; beats is required; clips is required; totalMs must be integer
+exit=1  elapsed=.121s  chromium-spawns=0
+0  headless-shell procs before=0 after=0
+spawns logged:
+
+## bad --spine (not JSON)
+$ X=1 capture --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/a.webm --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/garbage.json
+capture: --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/garbage.json is not a valid spine manifest: (file) is not valid JSON: Unexpected token 'o', "not json " is not valid JSON
+exit=1  elapsed=.060s  chromium-spawns=0
+0  headless-shell procs before=0 after=0
+spawns logged:
+
+## bad --spine (missing file)
+$ X=1 capture --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/a.webm --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/none.json
+capture: --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/none.json: no such file — point it at spine/manifest.json (or beatgrid.json)
+exit=1  elapsed=.055s  chromium-spawns=0
+0  headless-shell procs before=0 after=0
+spawns logged:
+
+## Chromium missing, no env override (hf browser path lookup)
+$ PATH=/usr/bin:/bin:/opt/homebrew/bin HOME=/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk capture --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.e8eIV5hzTk/a.webm
+capture: Playwright not installed — run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a6cdd21f9d50fab77/plugins/peak-media/scripts/setup.sh
+exit=3  elapsed=.100s  chromium-spawns=0
+0  headless-shell procs before=0 after=0
+spawns logged:
+    spawnSync ffmpeg -version
+    spawnSync ffprobe -version
+
+
+Note: in the lines above, "chromium-spawns=0" followed by a stray "0" is an artefact of the verifier's grep -c helper (it prints 0 and the fallback echo prints 0 again); the spawn list beneath each case is the authority.

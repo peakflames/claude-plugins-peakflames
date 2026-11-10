@@ -1,0 +1,36 @@
+Runbook bash blocks pasted into 'zsh -f -i' (interactivecomments off), RUN redirected to a scratch folder; the launch block and the post-merge PM line are skipped. Block 6 errors are expected (no session exists for the scratch RUN).
+
+6 bash blocks
+block 2: skipped (launch / post-merge PM)
+block 5: skipped (launch / post-merge PM)
+0
+=== block 1
+=== block 3
+8d6dc78 docs(peak-media): WP8 verify-2 report and evidence
+peak-media ready: deps /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c
+
+/dev/disk3s5   228Gi   187Gi   9.9Gi    95%    2.2M  104M    2%   /System/Volumes/Data
+=== block 4
+# F1 — explainer-short
+
+- **Audience:** developers choosing a spec-driven workflow for AI coding
+- **Runtime:** 26 s target (±10%), paced for learning, 1280×720, 30 fps
+- **Spine:** narration — voice Rasalgethi, style "No-nonsense tech content creator. Plain, measured delivery: honest facts and conclusions only, no hype, no sales tone. Paced for learning."
+- **Brand:** default pack
+- **Source:** `source/openspec-vs-peak-workflow.md` §4 and §7
+
+## Beats
+
+1. **hook** (motion) — "Two tools, one promise: spec before code. They differ on who checks the work."
+2. **compare** (slide) — head-to-head table, 4 rows: unit of work, requirement IDs, verification (traced to tests + status), human checks (recorded)
+3. **close** (motion) — "OpenSpec wins on speed. Peak Workflow wins on an auditable record."
+
+=== block 6
+
+=== PM=[/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media] RUN=[$TMPDIR/paste/RUN]
+
+--- stderr ---
+%  groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus groguschaveyhaus% zsh: no matches found: /Users/schaveyt/.claude/projects/-var-folders-2n-ccyy63-91bz46s53b7rdtshh0000gn-T-tmp-1KGPdmYEMr-paste-RUN/*.jsonl
+%  groguschaveyhaus groguschaveyhaus% ls: /subagents: No such file or directory
+%  groguschaveyhaus% check-transcript: no such transcript: /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-abeb5dcaa90418466
+%  groguschaveyhaus groguschaveyhaus% 

@@ -1,0 +1,31 @@
+verifier check of AC-TTS-07 (manual; live run done by the Lead with the user's key — verifier made NO network call and read no key)
+inputs: /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a9ea22f327c64a0d5/plugins/peak-media/docs/build/evidence/WP3a/AC-TTS-07-{gemini,mai}-debug.log (identical to /tmp/tts07/*-debug.log: yes), /tmp/tts07/gemini/Achird.wav, /tmp/tts07/mai/en-GB-Emily.wav
+
+== 1. debug logs
+AC-TTS-07-gemini-debug.log: '"zdr":true' x1; 'sk-or' x0; Authorization values: "Authorization":"Bearer ***REDACTED***" ; model/voice: "model":"google/gemini-3.8-flash-lite-tts" "voice":"Achird"; response: "status":200,"contentType":"audio/pcm;rate=24000;channels=1","bytes":309120
+  tokens >=32 chars of [A-Za-z0-9_-] (key-shape scan): gen-tts-1794182663-cKvYp9rwoZ5xE5FXkC0z   (generation ids only)
+AC-TTS-07-mai-debug.log: '"zdr":true' x1; 'sk-or' x0; Authorization values: "Authorization":"Bearer ***REDACTED***" ; model/voice: "model":"microsoft/mai-voice-2.1-flash" "voice":"en-GB-Emily:MAI-Voice-2.1-Flash"; response: "status":200,"contentType":"audio/pcm;rate=24000;channels=1","bytes":340800
+  tokens >=32 chars of [A-Za-z0-9_-] (key-shape scan): gen-tts-1794182666-lOF3WtxUAELfLQiGecgI   (generation ids only)
+
+== 2. WAV format (ffprobe)
+/tmp/tts07/gemini/Achird.wav: codec_name=pcm_s16le|sample_rate=24000|channels=1|bits_per_sample=16 duration=6.440000 
+/tmp/tts07/mai/en-GB-Emily.wav: codec_name=pcm_s16le|sample_rate=24000|channels=1|bits_per_sample=16 duration=7.100000 
+
+== 3. loudness (ffmpeg ebur128) and silence (silencedetect -40 dB, 0.25 s)
+/tmp/tts07/gemini/Achird.wav:  I: -19.3 LUFS  LRA: 1.3 LU  | gaps: silence_duration: 0.444583 silence_duration: 0.302875 silence_duration: 0.336333 
+/tmp/tts07/mai/en-GB-Emily.wav:  I: -16.8 LUFS  LRA: 2.0 LU  | gaps: silence_duration: 0.929583 silence_duration: 0.30425 
+== 3b. tone-vs-speech (verifier pure-Python frame analysis, 20 ms frames)
+/tmp/tts07/gemini/Achird.wav: 24000 Hz 1 ch 6.44s | frames(20ms)=321 active(>300 rms)=236 (74%) | rms mean=3358 CV=0.62 | zcr-est-Hz median=600 CV=1.29 | peak=29242
+/tmp/tts07/mai/en-GB-Emily.wav: 24000 Hz 1 ch 7.10s | frames(20ms)=354 active(>300 rms)=256 (72%) | rms mean=4361 CV=0.70 | zcr-est-Hz median=775 CV=1.14 | peak=30073
+interpretation: a steady tone gives RMS CV ~0 and ZCR CV ~0; silence gives ~0% active frames. Speech: high RMS CV (>0.5), ZCR CV (>0.3), syllabic gaps.
+control (fake/tone 440 Hz clip): /tmp/vt4.5BUe/sv/Achird.wav: 48000 Hz 1 ch 11.64s | frames(20ms)=581 active(>300 rms)=581 (100%) | rms mean=6951 CV=0.01 | zcr-est-Hz median=425 CV=0.03 | peak=9830
+
+== 4. wpm
+text: This is a short test of the narration voice. If you can hear it clearly, the voice pipeline works.  -> 19 words (same text both clips)
+Achird.wav: 6.440000 s -> 177 wpm (plausible band 120-200)
+en-GB-Emily.wav: 7.100000 s -> 161 wpm (plausible band 120-200)
+
+== 5. decisions.md (main checkout) records the PCM rate
+54:- **2026-11-08 (WP3a, AC-TTS-07 live run by the Lead):** OpenRouter `/api/v1/audio/speech` returns **24 kHz mono PCM** for both `google/gemini-3.8-flash-lite-tts` (Achird, 177 wpm, −19.3 LUFS) and 
+
+NOTE: 'speech is audible' is a human judgement — confirmed by the user listening, not by this log.

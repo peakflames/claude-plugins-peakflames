@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "beatgrid",
+  "targetMs": 25000,
+  "totalMs": 25000,
+  "bpm": 96,
+  "command": [],
+  "narrate": false,
+  "beats": [
+    {
+      "id": "s1",
+      "startMs": 0,
+      "durationMs": 5000,
+      "onScreenText": "Unit of work",
+      "clipNs": []
+    },
+    {
+      "id": "s2",
+      "startMs": 5000,
+      "durationMs": 5000,
+      "onScreenText": "Requirement IDs",
+      "clipNs": []
+    },
+    {
+      "id": "s3",
+      "startMs": 10000,
+      "durationMs": 5000,
+      "onScreenText": "Verification",
+      "clipNs": []
+    },
+    {
+      "id": "s4",
+      "startMs": 15000,
+      "durationMs": 5000,
+      "onScreenText": "Pick OpenSpec when…",
+      "clipNs": []
+    },
+    {
+      "id": "s5",
+      "startMs": 20000,
+      "durationMs": 5000,
+      "onScreenText": "Pick peak-workflow when…",
+      "clipNs": []
+    }
+  ],
+  "clips": []
+}

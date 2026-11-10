@@ -1,0 +1,85 @@
+plugin.json version: 0.1.0  (all runs preload evals/helpers/no-network.mjs; any attempt prints NETWORK-ATTEMPT)
+$ lib/verify/check-cuts.mjs --help
+check-cuts — check that every cut lands inside a silent gap
+
+Usage: check-cuts [options] <file>
+
+Cuts come from --cuts (ms) or from scene detection. A cut passes when it sits inside a silence (audio at or below --noise-db) lasting at least --min-silence-ms. Exit 0 if all pass, 1 if any fails (failing timecodes are listed).
+
+Options:
+      --min-silence-ms    Minimum silent gap a cut must sit in (default: 300)
+      --cuts <ms,ms,...>  Cut times in ms (skips scene detection)
+      --scene-threshold   Scene-change threshold for detected cuts (default: 0.02)
+      --noise-db          Silence threshold (default: -40)
+      --json              Print the result as JSON
+  -h, --help              Show this help and exit
+      --version           Print the plugin version and exit
+
+Examples:
+  check-cuts review.mp4 --min-silence-ms 300
+  check-cuts spine/narration.wav --cuts 6500,14000 --min-silence-ms 400
+exit=0
+$ lib/verify/check-cuts.mjs --version
+0.1.0
+exit=0
+$ lib/verify/check-cuts.mjs 
+check-cuts: expected at least 1 argument(s), got 0
+Run 'check-cuts --help' for usage.
+exit=2
+$ lib/verify/check-cuts.mjs nope.mp4
+check-cuts: cannot read nope.mp4: no such file
+exit=1
+$ lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4 --cuts a,b
+check-cuts: --cuts expects comma-separated ms values, got 'a,b'
+Run 'check-cuts --help' for usage.
+exit=2
+$ lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4 --cuts=-5
+check-cuts: --cuts expects comma-separated ms values, got '-5'
+Run 'check-cuts --help' for usage.
+exit=2
+$ lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4 --min-silence-ms x
+check-cuts: --min-silence-ms expects a number, got 'x'
+Run 'check-cuts --help' for usage.
+exit=2
+$ lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4 --min-silence-ms -100
+check-cuts: Option '--min-silence-ms' argument is ambiguous.
+Run 'check-cuts --help' for usage.
+exit=2
+$ lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4 --scene-threshold 7
+PASS  0 cut(s), 0 failing — /tmp/vwp2/v-cuts.mp4
+exit=0
+$ lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4 --noise-db x
+check-cuts: --noise-db expects a number, got 'x'
+Run 'check-cuts --help' for usage.
+exit=2
+$ lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4 --bogus
+check-cuts: Unknown option '--bogus'
+Run 'check-cuts --help' for usage.
+exit=2
+$ lib/verify/check-cuts.mjs /tmp/vwp2
+check-cuts: cannot read /tmp/vwp2 as media: /tmp/vwp2: Is a directory
+exit=1
+$ lib/verify/check-cuts.mjs /tmp/vwp2/garbage.mp4
+check-cuts: cannot read /tmp/vwp2/garbage.mp4 as media: /tmp/vwp2/garbage.mp4: Invalid data found when processing input
+exit=1
+$ lib/verify/check-cuts.mjs /tmp/vwp2/empty.mp4
+check-cuts: cannot read /tmp/vwp2/empty.mp4 as media: /tmp/vwp2/empty.mp4: Invalid data found when processing input
+exit=1
+$ PEAK_MEDIA_FFMPEG=/nonexistent lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4
+check-cuts: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3
+$ PEAK_MEDIA_FFPROBE=/nonexistent lib/verify/check-cuts.mjs /tmp/vwp2/v-cuts.mp4
+check-cuts: ffprobe not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3
+## adversarial: natural negative dB value
+$ check-cuts v-cuts.mp4 --noise-db -50
+check-cuts: Option '--noise-db' argument is ambiguous.
+Run 'check-cuts --help' for usage.
+exit=2
+$ check-cuts v-cuts.mp4 --noise-db=-50
+ok    cut at 0:01.520 — silence 1200 ms
+FAIL  cut at 0:03.520 — not in silence (need ≥ 300 ms)
+FAIL  2 cut(s), 1 failing — /tmp/vwp2/v-cuts.mp4
+exit=1
+## node --test AC-BASE-05
+✔ AC-BASE-05: check-cuts baseline (197.554041ms)

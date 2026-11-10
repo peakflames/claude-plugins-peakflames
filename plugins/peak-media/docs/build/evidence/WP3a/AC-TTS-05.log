@@ -1,0 +1,47 @@
+verifier reproduction of AC-TTS-05 — F1 clips, fake/tone, each clip in turn slowed 2x (PEAK_MEDIA_FAKE_SLOW)
+--- slowed clip: 1
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        19  13.82   83      no
+2        25   9.09  165      no
+3        21   7.64  165      no
+median 165 wpm · 0/3 cached
+WARN slow clip 1: 83 wpm vs median 165 — a mood tag may have been read aloud; check its text
+--- slowed clip: 2
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        19   6.91  165      no
+2        25  18.18   82      no
+3        21   7.64  165      no
+median 165 wpm · 0/3 cached
+WARN slow clip 2: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+--- slowed clip: 3
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        19   6.91  165      no
+2        25   9.09  165      no
+3        21  15.27   82      no
+median 165 wpm · 0/3 cached
+WARN slow clip 3: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+--- slowed clip: none
+clip  words   sec  wpm  cached
+----  -----  ----  ---  ------
+1        19  6.91  165      no
+2        25  9.09  165      no
+3        21  7.64  165      no
+median 165 wpm · 0/3 cached
+(no warnings)
+exit=0
+
+== node --test
+✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (73.599541ms)
+ℹ 
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        19   6.91  165      no
+2        25  18.18   82      no
+3        21   7.64  165      no
+median 165 wpm · 0/3 cached
+WARN slow clip 2: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (498.435625ms)
+ℹ 

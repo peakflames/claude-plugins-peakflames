@@ -1,0 +1,27 @@
+# AC-REC-06 r2 — from the full-suite run (node --test plugins/peak-media/evals, 81/81, exit 0; see evals-all.r2.log)
+# PEAK_MEDIA_EVIDENCE_DIR pointed at a temp dir OUTSIDE the repo for that run (so no AC-ASM files land here); only this summary was copied in.
+ranAlone: {"alone":true,"waitedMs":167847,"siblingsAtStart":6}
+voiceOnly median 17.45 worst 18.3 firstSay 16.6/16.6 offsets 16.6,16.6,17,17,17.3,17.3,17.6,17.6,18,18,18.3,18.3
+captioned median 17.45 worst 18.3 firstSay 16.6/16.6 offsets 16.6,16.6,17,17,17.3,17.3,17.6,17.6,18,18,18.3,18.3
+ run captions=false offsets 16.6,17,17.3,17.6,18,18.3 lateMs 0,0,1,0,0,0
+ run captions=true offsets 16.6,17,17.3,17.6,18,18.3 lateMs 0,0,0,0,0,0
+ run captions=false offsets 16.6,17,17.3,17.6,18,18.3 lateMs 0,0,0,1,0,0
+ run captions=true offsets 16.6,17,17.3,17.6,18,18.3 lateMs 0,0,0,0,0,0
+retry lines in suite log: 0
+
+# ac-run --wp WP7b
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-REC-05 | script | pass | not-started | — |
+| AC-REC-06 | script | pass | not-started | — |
+| AC-REC-07 | script | pass | not-started | — |
+| AC-REC-08 | still | — | not-started | — |
+| AC-REC-09 | script | pass | not-started | — |
+| AC-REC-10 | script | pass | not-started | — |
+| AC-BASE-10 | script | pass | not-started | — |
+node docs/build/tools/ac-run.mjs --wp WP7b  100.35s user 17.10s system 63% cpu 3:05.46 total
+exit=0
+
+# ac-run --trace
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+exit=0

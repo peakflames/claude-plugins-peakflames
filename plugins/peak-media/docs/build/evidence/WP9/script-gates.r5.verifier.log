@@ -1,0 +1,87 @@
+# F2/F4 script gate lines — copy of the cold-start r3 project (brief, script, plates, renders, spine) — 46f6005
+## assemble
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-assemble/scripts/assemble.mjs . 2>&1 | tail -1
+  stdout: GATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)
+  exit 0
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-assemble/scripts/assemble.mjs . --json 2>&1 >/dev/null | tail -2
+  stdout: }
+  stdout: GATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)
+  exit 0
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-assemble/scripts/assemble.mjs . 2>&1 | tail -3
+  stdout: GATE 7 composite: FAIL — plate 'p3-tip': no render at /private/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.yBT2SRd4l2/renders/plates/p3-tip.mp4 — render it with video-plates render-plate
+  stdout: assemble: plate 'p3-tip': no render at /private/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.yBT2SRd4l2/renders/plates/p3-tip.mp4 — render it with video-plates render-plate
+  exit 0
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-assemble/scripts/assemble.mjs . --min-silence-ms -5
+  stderr: assemble: --min-silence-ms must be >= 0
+  stderr: Run 'assemble --help' for usage.
+  exit 2
+$ PATH=/usr/bin:/bin node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-assemble/scripts/assemble.mjs .
+  stderr: (eval):1: command not found: node
+  exit 127
+## spine
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-spine/scripts/spine.mjs --brief nope.md
+  stdout: GATE 2 spine: FAIL — cannot read brief /private/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.yBT2SRd4l2/nope.md: no such file
+  stderr: spine: cannot read brief /private/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.yBT2SRd4l2/nope.md: no such file
+  exit 1
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-spine/scripts/spine.mjs --brief brief.md --lead-ms 100
+  stdout: GATE 2 spine: FAIL — --lead-ms must be ≥ 200 (DEC-13/29: beats need ≥ 400 ms of silence between them), got 100
+  stderr: spine: --lead-ms must be ≥ 200 (DEC-13/29: beats need ≥ 400 ms of silence between them), got 100
+  stderr: Run 'spine --help' for usage.
+  exit 2
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-spine/scripts/spine.mjs --budget --brief nope.md
+  stderr: spine: cannot read brief /private/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.yBT2SRd4l2/nope.md: no such file
+  exit 1
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-spine/scripts/spine.mjs --bogus
+  stderr: spine: Unknown option '--bogus'
+  stderr: Run 'spine --help' for usage.
+  exit 2
+## render-plate --pipeline-test
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-plates/scripts/render-plate.mjs plates.json --all --pipeline-test
+  stdout: GATE 5 pipeline: FAIL — --pipeline-test renders one plate: pass plates.json and the first plate id (no --all, --storyboard or --scaffold-only)
+  stderr: render-plate: --pipeline-test renders one plate: pass plates.json and the first plate id (no --all, --storyboard or --scaffold-only)
+  stderr: Run 'render-plate --help' for usage.
+  exit 2
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-plates/scripts/render-plate.mjs plates.json p1-habit p2-reason --pipeline-test
+  stdout: GATE 5 pipeline: FAIL — --pipeline-test renders one plate: pass plates.json and the first plate id (no --all, --storyboard or --scaffold-only)
+  stderr: render-plate: --pipeline-test renders one plate: pass plates.json and the first plate id (no --all, --storyboard or --scaffold-only)
+  stderr: Run 'render-plate --help' for usage.
+  exit 2
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-plates/scripts/render-plate.mjs plates.json p2-reason --pipeline-test
+  stdout: GATE 5 pipeline: FAIL — --pipeline-test renders the first plate (p1-habit), not p2-reason
+  stderr: render-plate: --pipeline-test renders the first plate (p1-habit), not p2-reason
+  stderr: Run 'render-plate --help' for usage.
+  exit 2
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-plates/scripts/render-plate.mjs plates.json p1-habit --pipeline-test 2>&1 | tail -1
+  stdout: GATE 5 pipeline: PASS — renders/plates/p1-habit.mp4 (5500 ms, lint clean)
+  exit 0
+## gate build
+$ PATH=/usr/bin:/bin node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/plate-factory/scripts/gate.mjs build .
+  stderr: (eval):1: command not found: node
+  exit 127
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/plate-factory/scripts/gate.mjs build nope/
+  stdout: GATE 6 build: FAIL — no plates.json at nope/
+  stderr: gate: no plates.json at nope/
+  exit 1
+$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/plate-factory/scripts/gate.mjs check .
+  stderr: gate: unknown gate 'check' — the only scripted gate here is 'build' (stage 6)
+  stderr: Run 'gate --help' for usage.
+  exit 2
+## no ffmpeg on PATH (PATH=/tmp/v5probe/nodebin:/usr/bin:/bin; node only)
+$ PATH=/tmp/v5probe/nodebin:/usr/bin:/bin node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-assemble/scripts/assemble.mjs .
+  stderr: assemble: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  exit 3
+$ PATH=/tmp/v5probe/nodebin:/usr/bin:/bin node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/plate-factory/scripts/gate.mjs build .
+  stderr: gate: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  exit 3
+$ PATH=/tmp/v5probe/nodebin:/usr/bin:/bin node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-plates/scripts/render-plate.mjs plates.json p1-habit --pipeline-test
+  stdout: GATE 5 pipeline: FAIL — ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  stderr: render-plate: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+  exit 3
+$ PATH=/tmp/v5probe/nodebin:/usr/bin:/bin node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/skills/video-spine/scripts/spine.mjs --brief brief.md --no-narrate
+  stdout: beat  habit              0.00 s  +5.50 s
+  stdout: beat  reason             5.50 s  +9.00 s
+  stdout: beat  tip               14.50 s  +5.50 s
+  stdout: wrote /private/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.yBT2SRd4l2/spine/beatgrid.json and /private/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.yBT2SRd4l2/spine/narration.wav
+  stdout: PASS  runtime 20.00 s against a 20.0 s target (+0.0%)
+  stdout: GATE 2 spine: PASS — spine/beatgrid.json 20000 ms (target 20000 ±10%)
+  exit 0

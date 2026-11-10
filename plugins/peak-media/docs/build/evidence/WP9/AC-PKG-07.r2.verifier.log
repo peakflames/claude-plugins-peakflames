@@ -1,0 +1,19 @@
+# AC-PKG-07 r2 verifier probe
+VENDORED.md changed a79e511..c50972c: 0 files
+vendor folders: hyperframes
+SKILL.md under vendor: 0; SKILL.reference.md: 6
+'hyperframes events' hits: 0
+frame-presets present: no
+LICENSE:  Apache License
+VENDORED row 'Source': 1
+VENDORED row 'Commit': 1
+VENDORED row 'Date': 1
+VENDORED row 'Licence': 1
+VENDORED row 'Local changes': 1
+GSAP row: | GSAP | Fetched | data dir, then copied into each video project | GSAP Standard "no charge" License |
+| GSAP | Fetched | npm `gsap` | `lib/pins.json` | GSAP Standard "no charge" License (https://gsap.com/standard-license), not OSI | Data dir. `render-plate` and `assemble` copy `gsap.min.js` into each plate's (and the outro's) `vendor/` folder inside the user's video project. Not redistributed by the plugin (DEC-09) |
+font folders on disk:
+  brand-packs/default/fonts/inter OFL=y
+  brand-packs/default/fonts/jetbrains-mono OFL=y
+  evals/fixtures/brand-alt/fonts/playfair-display OFL=y
+  evals/fixtures/brand-alt/fonts/space-mono OFL=y

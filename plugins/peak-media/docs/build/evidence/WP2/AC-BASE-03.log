@@ -1,0 +1,87 @@
+plugin.json version: 0.1.0  (all runs preload evals/helpers/no-network.mjs; any attempt prints NETWORK-ATTEMPT)
+$ lib/verify/contact-sheet.mjs --help
+contact-sheet — sample frames from a video into a labelled JPEG grid
+
+Usage: contact-sheet [options] <video>
+
+Each frame is stamped with its time (seconds, or m:ss.ss) in the top-left corner. Default: one frame every 0.5 s.
+
+Options:
+  -o, --out <file.jpg>  Output JPEG (default: <video>.contact.jpg)
+      --every <time>    Sample interval, e.g. 0.5s or 250ms (default: 0.5s)
+      --count           Sample n evenly spaced frames instead
+      --at <t,t,...>    Sample exactly these times (e.g. 0.5s,1.2s or ms values)
+      --cols            Frames per row (default: 4)
+      --width           Width of each frame (default: 480)
+      --json            Print the sampled times as JSON
+  -h, --help            Show this help and exit
+      --version         Print the plugin version and exit
+
+Examples:
+  contact-sheet out/final.mp4 --every 0.5s -o review/contact-final.jpg
+  contact-sheet renders/plates/p1.mp4 --count 8
+exit=0
+$ lib/verify/contact-sheet.mjs --version
+0.1.0
+exit=0
+$ lib/verify/contact-sheet.mjs 
+contact-sheet: expected at least 1 argument(s), got 0
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs nope.mp4
+contact-sheet: cannot read nope.mp4: no such file
+exit=1
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --every soon
+contact-sheet: --every expects a time like 0.5s or 500ms, got 'soon'
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --every 0
+contact-sheet: --every must be greater than 0
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --every -1s
+contact-sheet: Option '--every' argument is ambiguous.
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --cols 0
+contact-sheet: --cols must be at least 1
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --count 0
+contact-sheet: --count must be at least 1
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --width abc
+contact-sheet: --width expects a number, got 'abc'
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --width 0 -o /tmp/vwp2/w0.jpg
+/tmp/vwp2/w0.jpg (11 frames, 4×3): 00.00 00.50 01.00 01.50 02.00 02.50 03.00 03.50 04.00 04.50 05.00
+exit=0
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4 --at 99s -o /tmp/vwp2/at.jpg
+contact-sheet: no frames to sample — check --at/--every against the video length
+exit=1
+$ lib/verify/contact-sheet.mjs --x
+contact-sheet: Unknown option '--x'
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/garbage.mp4 -o /tmp/vwp2/g.jpg
+contact-sheet: cannot read /tmp/vwp2/garbage.mp4 as media: /tmp/vwp2/garbage.mp4: Invalid data found when processing input
+exit=1
+$ lib/verify/contact-sheet.mjs /tmp/vwp2/empty.mp4 -o /tmp/vwp2/e.jpg
+contact-sheet: cannot read /tmp/vwp2/empty.mp4 as media: /tmp/vwp2/empty.mp4: Invalid data found when processing input
+exit=1
+$ lib/verify/contact-sheet.mjs /tmp/vwp2 a b
+contact-sheet: unexpected argument 'a'
+Run 'contact-sheet --help' for usage.
+exit=2
+$ lib/verify/contact-sheet.mjs /tmp/vwp2 -o /tmp/vwp2/d.jpg
+contact-sheet: cannot read /tmp/vwp2 as media: /tmp/vwp2: Is a directory
+exit=1
+$ PEAK_MEDIA_FFMPEG=/nonexistent lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4
+contact-sheet: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3
+$ PEAK_MEDIA_FFPROBE=/nonexistent lib/verify/contact-sheet.mjs /tmp/vwp2/v-cuts.mp4
+contact-sheet: ffprobe not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+## node --test AC-BASE-03
+✔ AC-BASE-03: contact-sheet baseline (265.968125ms)

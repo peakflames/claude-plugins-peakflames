@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "kind": "narration",
+  "targetMs": 20000,
+  "totalMs": 20000,
+  "model": "fake/tone",
+  "voice": "Achird",
+  "style": "Clear, friendly, unhurried explainer tone.",
+  "audioOffsetMs": 0,
+  "command": [
+    "node",
+    "spine.mjs",
+    "--brief",
+    "brief.md",
+    "--tts-model",
+    "fake/tone"
+  ],
+  "narrate": true,
+  "audio": "narration.wav",
+  "beats": [
+    {
+      "id": "feature",
+      "startMs": 0,
+      "durationMs": 7000,
+      "clipNs": [
+        1
+      ]
+    },
+    {
+      "id": "anchor",
+      "startMs": 7000,
+      "durationMs": 6500,
+      "clipNs": [
+        2
+      ]
+    },
+    {
+      "id": "openspec",
+      "startMs": 13500,
+      "durationMs": 6500,
+      "clipNs": [
+        3
+      ]
+    }
+  ],
+  "clips": [
+    {
+      "n": 1,
+      "beat": "feature",
+      "text": "In peak-workflow, every requirement is a Gherkin scenario with a stable ID.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 200,
+      "durationMs": 6300,
+      "words": 12,
+      "wpm": 114,
+      "file": "48f9b009a905bb00952a480316a5e71dbc74af817ee275582b8781911ca0dba0.wav"
+    },
+    {
+      "n": 2,
+      "beat": "anchor",
+      "text": "That ID is what the epic plans against, and what the verifier checks.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 7200,
+      "durationMs": 5800,
+      "words": 13,
+      "wpm": 134,
+      "file": "512166dd0877ca9a14967beedca59b8be5d01c59f60b05541d0c221885c6e3aa.wav"
+    },
+    {
+      "n": 3,
+      "beat": "openspec",
+      "text": "OpenSpec takes the lighter road: propose, apply, archive.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 13700,
+      "durationMs": 5800,
+      "words": 8,
+      "wpm": 83,
+      "file": "ea53af5ee0422eb2994d96f169fa1e51d462bb424a25a4ee0651bce2dcc870f4.wav"
+    }
+  ]
+}

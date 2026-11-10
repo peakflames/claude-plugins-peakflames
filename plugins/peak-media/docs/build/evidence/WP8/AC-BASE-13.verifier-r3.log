@@ -1,0 +1,66 @@
+## --version (plugin.json 0.1.0)
+0.1.0
+exit=0
+## --help
+retime-plates — set each plate's startMs/durationMs from its spine beat (one plate per beat)
+
+Usage: retime-plates [options] <plates.json|project-folder>
+
+Reads plates.json (or <folder>/plates.json when given a project folder) and its spine (the "spine" path in plates.json, or --spine): spine/manifest.json
+for narration or spine/beatgrid.json for a beat grid. Every plate takes its beat's startMs and
+durationMs, so plate cuts fall in the silent gaps between beats. Each spine beat must have exactly
+one plate: a plate naming an unknown beat, a beat with no plate, or two plates on one beat is
+refused with the plate or beat named. The result is validated against plates.v1.json and written
+in place (or to --out; relative spine/brand paths are rebased). Run it after every spine run.
+Exit 0 ok, 1 refused or invalid (nothing written), 2 usage. --check writes nothing and exits 1
+if any plate's times would change. Plates listed out of beat order are kept in their order, with a
+warning on stderr (exit 0): the plate list reads best in beat order.
+
+Options:
+  -o, --out <file>    Write the retimed plates.json here (default: in place)
+      --spine <file>  Spine manifest.json or beatgrid.json (default: plates.json "spine"); also sets "spine"
+      --check         Write nothing; exit 1 if any plate is not on its beat's times
+      --json          Print the per-plate changes as JSON
+  -h, --help          Show this help and exit
+      --version       Print the plugin version and exit
+
+Examples:
+  retime-plates plates.json
+  retime-plates plates.json --spine spine/beatgrid.json
+  retime-plates plates.json --check
+  retime-plates my-video/
+exit=0
+## bad: []
+retime-plates: expected at least 1 argument(s), got 0
+Run 'retime-plates --help' for usage.
+exit=2
+## bad: [/nope.json]
+retime-plates: cannot read plates file /nope.json: no such file
+exit=1
+## bad: [--bogus x]
+retime-plates: Unknown option '--bogus x'
+Run 'retime-plates --help' for usage.
+exit=2
+## bad: [<T>]
+retime-plates: <T> is a folder with no plates.json — pass the plates.json path
+exit=1
+## run-2 plates.json --check (copy in scratch)
+p1-hook          hook               0 ms +7010 ms  (unchanged)
+p2-compare       compare         7010 ms +9930 ms  (unchanged)
+p3-close         close          16940 ms +11530 ms  (unchanged)
+p4-result        result         28470 ms +5530 ms  (unchanged)
+PASS  4 plate(s) on their beat times (manifest.json)
+exit=0
+## -o into missing folder
+retime-plates: cannot write /nope/dir/x.json: folder /nope/dir does not exist — create it first
+exit=1
+## --spine /nope.json
+retime-plates: spine not found: /nope.json — run the spine first (video-spine)
+exit=1
+## folder mode
+p1-hook          hook               0 ms +7010 ms  (unchanged)
+p2-compare       compare         7010 ms +9930 ms  (unchanged)
+p3-close         close          16940 ms +11530 ms  (unchanged)
+p4-result        result         28470 ms +5530 ms  (unchanged)
+PASS  retimed 4 plate(s) from <T>/spine/manifest.json (0 changed) → <T>/plates.json
+exit=0

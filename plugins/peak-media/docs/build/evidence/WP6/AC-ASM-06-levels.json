@@ -1,0 +1,100 @@
+{
+  "ac": "AC-ASM-06",
+  "status": "blocked: needs user listen (the Lead produces the real listening sample after merge, real TTS + real plates)",
+  "fixture": "F1 eval fixture: tone narration in the manifest clip windows, synthetic pad music, synthetic whoosh+thud SFX at 6.5 s and 14.0 s",
+  "defaults": {
+    "narrationLufs": -16,
+    "musicLufsUnderVoice": -22,
+    "duckDb": 8,
+    "sfxLufsPerHit": -20,
+    "sfxDb": 0,
+    "truePeakCeilingDbfs": -1.5
+  },
+  "pass1Music": {
+    "video": "<project>/review/review.mp4",
+    "out": "<project>/review/pass1-music.mp4",
+    "durationMs": 20000,
+    "videoMd5": "cd6084c7bf900612fd527b3e125abb40",
+    "narration": {
+      "source": "<project>/review/review.mp4",
+      "targetLufs": -16,
+      "gainDb": 0,
+      "lufs": -16,
+      "truePeakDb": -11.4
+    },
+    "music": {
+      "source": "<project>/music.wav",
+      "underVoiceTargetLufs": -22,
+      "duckDb": 8,
+      "bedLufs": -14.1,
+      "gainDb": 1.7,
+      "duckWindows": [
+        {
+          "startMs": 200,
+          "endMs": 6000
+        },
+        {
+          "startMs": 6700,
+          "endMs": 13500
+        },
+        {
+          "startMs": 14200,
+          "endMs": 19500
+        }
+      ],
+      "underVoiceLufs": -22,
+      "belowVoiceDb": 6.2
+    },
+    "mix": {
+      "lufs": -14.3,
+      "truePeakDb": -6.4
+    }
+  },
+  "pass2MusicSfx": {
+    "video": "<project>/review/review.mp4",
+    "out": "<project>/review/pass2-music-sfx.mp4",
+    "durationMs": 20000,
+    "videoMd5": "cd6084c7bf900612fd527b3e125abb40",
+    "narration": {
+      "source": "<project>/review/review.mp4",
+      "targetLufs": -16,
+      "gainDb": 0,
+      "lufs": -16,
+      "truePeakDb": -11.4
+    },
+    "music": {
+      "source": "<project>/music.wav",
+      "underVoiceTargetLufs": -22,
+      "duckDb": 8,
+      "bedLufs": -14.1,
+      "gainDb": 1.7,
+      "duckWindows": [
+        {
+          "startMs": 200,
+          "endMs": 6000
+        },
+        {
+          "startMs": 6700,
+          "endMs": 13500
+        },
+        {
+          "startMs": 14200,
+          "endMs": 19500
+        }
+      ],
+      "underVoiceLufs": -22,
+      "belowVoiceDb": 6.2
+    },
+    "sfx": {
+      "source": "<project>/sfx.wav",
+      "targetLufs": -20,
+      "gainDb": -4.7,
+      "lufs": -20,
+      "truePeakDb": -9.6
+    },
+    "mix": {
+      "lufs": -14.2,
+      "truePeakDb": -5.1
+    }
+  }
+}

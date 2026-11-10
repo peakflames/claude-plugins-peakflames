@@ -1,0 +1,11 @@
+# AC-CON-03 — verifier-wp1-r2-c4e19a07 @ 42652e9, node v26.8.1, 2026-11-08T22:16:26Z; every validate run uses the evals/helpers/no-network.mjs preload
+$ validate --from-legacy docs/reference/narration.json --out /tmp/pm-v2-con03-ejrm/manifest.json
+ok    docs/reference/narration.json (spine v1)
+exit=0
+$ cmp docs/reference/narration.json evals/fixtures/legacy-narration.json
+identical
+$ validate /tmp/pm-v2-con03-ejrm/manifest.json
+ok    /tmp/pm-v2-con03-ejrm/manifest.json (spine v1)
+exit=0
+# field-by-field deep-equal (verifier script)
+legacy top-level fields: 7 clips: 9 checks: 79 mismatches: 0

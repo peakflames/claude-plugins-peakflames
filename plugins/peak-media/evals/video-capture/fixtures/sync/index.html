@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sync test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+</style>
+</head>
+<body>
+<script>
+  // flip(c): paint the whole frame one colour. The sync storyboard calls it right after each say().
+  window.flip = (c) => { document.body.style.background = c; };
+</script>
+</body>
+</html>

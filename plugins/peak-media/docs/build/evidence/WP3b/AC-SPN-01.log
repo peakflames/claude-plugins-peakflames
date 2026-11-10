@@ -1,0 +1,31 @@
+# AC-SPN-01 verifier run 2026-11-09T00:24:04Z HEAD 0dce4ae; keys unset, HOME=$T/home, network spy preloaded
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/s1 --tts-model fake/tone --cache-dir $T/cache
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165      no
+2        28  10.18  165      no
+3        11   4.00  165      no
+median 165 wpm · 0/3 cached
+clips  0/3 cached · exported to $T/s1/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/s1/manifest.json and $T/s1/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0
+kind narration targetMs 20000 totalMs 20773 dev% 3.87 within±10%: true
+beats [{"id":"hook","startMs":0,"durationMs":5591,"clipNs":[1],"onScreenText":"OpenSpec vs. Peak Workflow: who checks the work?"},{"id":"compare","startMs":5591,"durationMs":10682,"clipNs":[2],"onScreenText":"OpenSpec: same AI reviews. Peak Workflow: every requirement traced to its test + status; human checks recorded."},{"id":"close","startMs":16273,"durationMs":4500,"clipNs":[3],"onScreenText":"OpenSpec: speed. Peak Workflow: an auditable record."}]
+clips [{"n":1,"beat":"hook","startMs":250,"durationMs":5091,"words":14,"file":"1097c4e4074d"},{"n":2,"beat":"compare","startMs":5841,"durationMs":10182,"words":28,"file":"ff0e08ce8550"},{"n":3,"beat":"close","startMs":16523,"durationMs":4000,"words":11,"file":"d7e230aeb29f"}]
+$ node $P/scripts/validate.mjs $T/s1/manifest.json
+ok    $T/s1/manifest.json (spine v1)
+exit=0
+$ ls s1 s1/clips
+$T/s1:
+clips
+manifest.json
+narration.wav
+
+$T/s1/clips:
+1097c4e4074d81fc087b48db628728f4708f919698e3ab95659189e83428b72e.wav
+d7e230aeb29f14ec39baa4abd4c117abe1ec40faa1fff161767d3ca6bf0b7003.wav
+ff0e08ce85509daa2f6079ad714ad5b305edf77368fd3653cb5867d5b29acd03.wav

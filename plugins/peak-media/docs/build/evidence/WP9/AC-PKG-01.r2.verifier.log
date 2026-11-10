@@ -1,0 +1,7 @@
+# AC-PKG-01 r2 verifier probe (HEAD c50972c)
+plugin.json version: 0.1.0
+top CHANGELOG entry: ## [0.1.0] — UNDER DEVELOPMENT
+marketplace peak-media entries: 1 [{"name":"peak-media","description":"Faceless motion-graphics video from web content. A narration or beat-grid spine sets the clock, each visual beat is a plate (HyperFrames motion or slide, or a live recorded page), and assembly composites the plates, audio stems and brand outro into a finished MP4.","source":"./plugins/peak-media"}]
+metadata.version 1.3.1
+source resolves: true
+desc == plugin.json desc: true

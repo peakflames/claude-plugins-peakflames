@@ -1,0 +1,109 @@
+plugin.json version: 0.1.0
+
+$ check-take --help
+exit=0 stdout_lines=24 stderr_lines=0 stack=0 network=0
+check-take — check that every scene change in a captured take lands in a silence of its narration
+
+Usage: check-take [options] <take.mp4>
+
+Detects scene changes in the picture (ffmpeg scene score above --scene-threshold) and checks each
+lies inside a silence of the audio (at or below --noise-db, lasting at least --min-silence-ms, with
+--edge-ms clear on both sides). Defaults are the recorder's (web2video D9, DEC-13): 0.02, -40 dB,
+900 ms, 100 ms. Pass the --mp4 deliverable from capture: the picture-only --out has no audio.
+A silent or captions-only take has a silent track, so every change passes; the report says so.
+Exit 0 if every scene change passes, 1 if any fails (its timecode is listed).
+
+Options:
+      --min-silence-ms <ms>     Shortest silence a scene change may sit in (default: 900)
+      --scene-threshold <0..1>  Scene-change threshold (ffmpeg scene score) (default: 0.02)
+      --noise-db <dB>           Silence threshold (negative, e.g. --noise-db -40) (default: -40)
+      --edge-ms <ms>            Distance a scene change must keep from either edge of its silence (default: 100)
+      --json                    Print the result as JSON
+  -h, --help                    Show this help and exit
+      --version                 Print the plugin version and exit
+
+Examples:
+  check-take take.mp4
+  check-take take.mp4 --json
+  check-take take.mp4 --min-silence-ms 600 --scene-threshold 0.05
+
+$ check-take --version
+exit=0 stdout_lines=1 stderr_lines=0 stack=0 network=0
+0.1.0
+
+$ check-take 
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: expected at least 1 argument(s), got 0
+Run 'check-take --help' for usage.
+
+$ check-take --bogus /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: Unknown option '--bogus'
+Run 'check-take --help' for usage.
+
+$ check-take /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/missing.mp4
+exit=1 stdout_lines=0 stderr_lines=1 stack=0 network=0
+check-take: cannot read $W/missing.mp4: no such file — pass the take's --mp4 output
+
+$ check-take /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq
+exit=1 stdout_lines=0 stderr_lines=1 stack=0 network=0
+check-take: $W is a folder — pass the take's --mp4 output
+
+$ check-take /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/notes.txt
+exit=1 stdout_lines=0 stderr_lines=1 stack=0 network=0
+check-take: cannot read $W/notes.txt as media: $W/notes.txt: Invalid data found when processing input
+
+$ check-take /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=1 stdout_lines=0 stderr_lines=1 stack=0 network=0
+check-take: pic.mp4 has no audio track, so there is nothing to check cuts against — run check-take on the --mp4 deliverable, not the picture-only --out
+
+$ check-take /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/audio-only.m4a
+exit=1 stdout_lines=0 stderr_lines=1 stack=0 network=0
+check-take: $W/audio-only.m4a has no video stream — pass the take's --mp4 output
+
+$ check-take --scene-threshold 2 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: --scene-threshold must be between 0 and 1, got 2
+Run 'check-take --help' for usage.
+
+$ check-take --scene-threshold 0 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: --scene-threshold must be between 0 and 1, got 0
+Run 'check-take --help' for usage.
+
+$ check-take --min-silence-ms -5 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: --min-silence-ms must be >= 0, got -5
+Run 'check-take --help' for usage.
+
+$ check-take --noise-db 6 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: --noise-db must be negative (dBFS), got 6
+Run 'check-take --help' for usage.
+
+$ check-take --min-silence-ms long /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: --min-silence-ms expects a number, got 'long'
+Run 'check-take --help' for usage.
+
+$ check-take --edge-ms -1 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: --edge-ms must be >= 0, got -1
+Run 'check-take --help' for usage.
+
+$ check-take /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: unexpected argument '$W/pic.mp4'
+Run 'check-take --help' for usage.
+
+$ check-take --json=1 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.8xwVh3wlSq/pic.mp4
+exit=2 stdout_lines=0 stderr_lines=2 stack=0 network=0
+check-take: Option '--json' does not take an argument
+Run 'check-take --help' for usage.
+
+flags in --help vs spec.options:
+--min-silence-ms --scene-threshold --noise-db --edge-ms --json
+
+missing ffmpeg:
+check-take: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3

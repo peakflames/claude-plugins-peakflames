@@ -1,0 +1,9 @@
+# WP2 F-9 re-check (AC-SKL-06 with --brand brand-packs/default), verifier run 2026-11-09T00:06:01Z
+isolation probe (expect 7): 7
+online exit=0
+offline exit=0
+p1.mp4 online=f539d93ac1d5ca50ba1f71b357f5fbf0 offline=f539d93ac1d5ca50ba1f71b357f5fbf0 MATCH
+--- remote refs in scaffolded composition dirs (index.html, brand/*.css|html|svg|json):
+(end; exit=1)
+--- any http(s) string at all in index.html / tokens.css:
+(end; exit=1)

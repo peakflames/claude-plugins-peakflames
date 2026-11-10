@@ -1,0 +1,9 @@
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-ORC-01 | manual | — | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log, evidence/WP8/AC-ORC-01-output.verifier-r3.log, evidence/WP8/AC-ORC-01-final.verifier-r3.jpg |
+| AC-ORC-02 | script (transcript grep) | pass | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
+| AC-ORC-03 | script | pass | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
+| AC-ORC-04 | script | pass | PASS | evidence/WP8/AC-ORC-0x.verifier-r3.log |
+| AC-ORC-05 | script | pass | PASS | evidence/WP8/plate-factory-evals.verifier-r3.log |
+| AC-BASE-13 | script | pass | PASS | evidence/WP8/AC-BASE-13.verifier-r3.log |
+exit 0

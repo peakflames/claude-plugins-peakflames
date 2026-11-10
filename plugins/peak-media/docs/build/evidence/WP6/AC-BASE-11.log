@@ -1,0 +1,77 @@
+# AC-BASE-11 — verifier-wp6-r1-90efea8d, worktree a2ed450, 2026-11-09T00:23:53Z; cwd /tmp/vwp6 (verifier-built F1 project)
+  "version": "0.1.0"
+## assemble --help
+assemble — composite rendered plates onto the spine, check cuts, add stems and the brand outro, export out/final.mp4
+
+Usage: assemble <project-folder|plates.json> [options]
+
+Reads plates.json, its spine (manifest.json or beatgrid.json) and its brand pack, and the
+renders in renders/plates/<id>.mp4. Writes review/review.mp4 (plates on the spine with the
+narration at -16 LUFS, or a silent track for a beat grid), fails with the timecode if a plate
+cut is not inside a silent gap, remuxes --music/--sfx stems with remux-audio (picture
+copied) into review/review-mix.mp4, renders the brand outro once (cached in renders/), and
+writes out/final.mp4 = spine + outro, checked with probe-spec. Report: review/assemble.json.
+
+Options:
+      --brand <dir>          Brand pack folder (overrides plates.json brand)
+      --renders <dir>        Folder of plate renders <id>.mp4 (default: <project>/renders/plates)
+      --out <dir>            Where review/, out/ and the outro cache go (default: the project folder)
+      --music <file>         Music bed stem, ducked under the narration
+      --sfx <file>           SFX stem, already placed on the timeline
+      --music-lufs <LUFS>    Music bed loudness before ducking (default: -28)
+      --sfx-db <dB>          Gain applied to the SFX stem (default: 0)
+      --export <preset>      Final export: source | 1080p60 (source = plates.json size and fps) (default: source)
+      --min-silence-ms <ms>  Silent gap every plate cut must sit in (DEC-13) (default: 300)
+      --outro <file.mp4>     Use this pre-rendered outro instead of rendering the brand outro
+      --rerender-outro       Render the brand outro even if a cached render exists
+      --json                 Print the assembly report as JSON
+  -h, --help                 Show this help and exit
+      --version              Print the plugin version and exit
+
+Examples:
+  assemble my-video/
+  assemble my-video/ --music my-video/audio/music.wav --sfx my-video/audio/sfx.wav --export 1080p60
+exit 0
+## assemble --version
+0.1.0
+exit 0
+## assemble 
+assemble: expected at least 1 argument(s), got 0
+Run 'assemble --help' for usage.
+exit 2
+## assemble --bogus
+assemble: Unknown option '--bogus'
+Run 'assemble --help' for usage.
+exit 2
+## assemble /nope/x
+assemble: cannot read /nope/x: no such file or folder
+exit 1
+## assemble proj --export 4k
+assemble: --export must be one of source, 1080p60, got '4k'
+Run 'assemble --help' for usage.
+exit 2
+## assemble stems/music.wav
+assemble: stems/music.wav is not a plates.json — pass the video project folder or its plates.json
+exit 1
+## assemble proj
+assemble: brand pack not found: /brand-packs/default — pass --brand <pack folder>
+exit 1
+## assemble badp
+assemble: badp/plates.json: spine: is required; brand: is required; fps: is required; width: is required; height: is required; plates: is required
+exit 1
+## assemble miss --brand /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a249fce8413cca960/plugins/peak-media/evals/video-assemble/fixtures/brand-outro
+assemble: plate 'p2-table': render lasts 6000 ms, planned 7500 ms (±1 frame) — re-render it
+exit 1
+## assemble proj --min-silence-ms -5
+assemble: --min-silence-ms must be >= 0
+Run 'assemble --help' for usage.
+exit 2
+## assemble proj --music-lufs 3
+assemble: --music-lufs must be negative (e.g. -28)
+Run 'assemble --help' for usage.
+exit 2
+## assemble proj --brand /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a249fce8413cca960/plugins/peak-media/evals/video-assemble/fixtures/brand-outro --music /nope.wav
+assemble: --music /nope.wav: no such file
+exit 1
+## network grep (fetch/http/net) in scripts
+grep exit 1 (1 = no matches)

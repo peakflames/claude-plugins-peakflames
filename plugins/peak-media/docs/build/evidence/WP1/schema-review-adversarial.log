@@ -1,0 +1,81 @@
+# Verifier adversarial schema review — docs generated from neutral-brief / brand-min with one mutation each (generator: /tmp/pm-verify-wp1-Y6Ql/adv/mk.mjs, outside repo)
+== a01-beats-reversed.manifest.json
+      beats[1].startMs: overlaps beats[0] (must be >= 20000)
+      beats[2].startMs: overlaps beats[1] (must be >= 14000)
+exit=1
+== a02-clip-unknown-beat.manifest.json
+      clips[0].beat: references unknown beat 'zzz'
+      beats[0].clipNs[0]: clip 1 belongs to a different beat
+exit=1
+== a03-recorded-no-record.plates.json
+      plates[0].record: is required
+exit=1
+== a04-odd-width.plates.json
+      width: must be multiple of 2
+exit=1
+== a05-clip-outside-beat.manifest.json
+exit=0
+== a06-plate-timing-mismatch.plates.json
+exit=0
+== a07-plates-overlap.plates.json
+exit=0
+== a08-totalMs-way-over.manifest.json
+exit=0
+== a09-clip-not-in-beat-clipNs.manifest.json
+exit=0
+== a10-empty-text.plates.json
+exit=0
+== a11-record-on-motion.plates.json
+exit=0
+== a12-recorded-no-url.plates.json
+exit=0
+== a13-narration-empty-voice.manifest.json
+      voice: must NOT have fewer than 1 characters
+exit=1
+== a14-beatgrid-with-onScreenText-missing.beatgrid.json
+exit=0
+== a15-beatgrid-with-model.beatgrid.json
+exit=0
+== a16-xext.manifest.json
+exit=0
+== a17-xext-in-caption.manifest.json
+      captions[0].x-a: is not allowed (unknown field; use an x- prefix for extensions)
+exit=1
+== a18-plates-dup-beat.plates.json
+exit=0
+== a19-fps-float.plates.json
+      fps: must be integer
+exit=1
+== a20-spine-missing-file.plates.json
+exit=0
+== a21-audio-abs.manifest.json
+exit=0
+== a22-targetMs-zero-beats-gap.manifest.json
+      beats[2].startMs: overlaps beats[1] (must be >= 64000)
+exit=1
+# brand: b1 no --color-accent; b2 no --ease-*; b3 all tokens only inside a /* comment */; b4 legit (var() use + spaced decl); b5 missing font files; b6 outro.durationMs 0; b7 tokens path escapes pack; b8 outro composition deleted; b9 all props empty values
+== b1
+      tokens: tokens.css does not define --color-accent
+exit=1
+== b2
+      tokens: tokens.css defines no --ease-* property
+exit=1
+== b3
+exit=0
+== b4
+exit=0
+== b5
+      fonts[0].files[0]: file not found: fonts/x.woff2
+      fonts[0].license: file not found: OFL.txt
+exit=1
+== b6
+      outro.durationMs: must be >= 1
+exit=1
+== b7
+      tokens: file not found: ../../../../etc/x.css
+exit=1
+== b8
+      outro.composition: file not found: outro/index.html
+exit=1
+== b9
+exit=0

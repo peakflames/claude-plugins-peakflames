@@ -8,12 +8,21 @@ for the history of each component.
 |-----------|-----------|
 | [peak-workflow](plugins/peak-workflow/CHANGELOG.md) | Requirements-driven epic workflow |
 | [epic-workflow](plugins/epic-workflow/CHANGELOG.md) | Prose-acceptance-criteria epic workflow |
+| [peak-media](plugins/peak-media/CHANGELOG.md) | Faceless motion-graphics video from web content |
 | [scripts/claude-code-setup](scripts/CHANGELOG.md) | Claude Code status line installer |
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
+
+## [1.4.0] — 2026-11-10
+
+### Added
+
+- **Bundles `peak-media` v0.1.0** — a new plugin for faceless motion-graphics video from web
+  content: narration spine, HyperFrames and live-capture plates, assembly with audio and a brand
+  outro. macOS only.
 
 ## [1.3.1] — 2026-11-05
 

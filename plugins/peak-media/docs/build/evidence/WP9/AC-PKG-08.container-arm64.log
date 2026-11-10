@@ -1,0 +1,48 @@
+## container: aarch64 · Debian GNU/Linux 12 (bookworm) · node v22.23.4 · npm 10.9.9
+## step 1 — the documented prerequisites (README): ffmpeg, and on Linux the headless browser's shared libraries
+apt-get install -y --no-install-recommends ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libxcomposite1 libxdamage1
+ffmpeg: ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026 the FFmpeg developers
+## step 2 — setup.sh --check before setup (expect one line, exit 3)
+setup.sh: runtime deps not installed in /root/.cache/peak-media/deps/88b6dff0a77c — run /repo/plugins/peak-media/scripts/setup.sh
+exit 3
+## step 3 — AC-PKG-04 and AC-PKG-08 (each test runs setup.sh itself, then F1 / F0)
+# setup could not finish here; its one-line message: setup.sh: no headless browser build exists for Linux arm64 — use macOS or an x86_64 Linux host, or set HYPERFRAMES_BROWSER_PATH
+✖ AC-PKG-04: setup.sh, then the F1 brief end to end with no key (fake/tone spine, default pack) — passes with no manual steps (5688.086464ms)
+✔ AC-PKG-08: setup + F0 in a headless environment — passes, or prints one line naming what is missing (1398.710392ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7148.380421
+
+✖ failing tests:
+
+test at evals/packaging/packaging.test.mjs:122:1
+✖ AC-PKG-04: setup.sh, then the F1 brief end to end with no key (fake/tone spine, default pack) — passes with no manual steps (5688.086464ms)
+  AssertionError [ERR_ASSERTION]: setup.sh: deps: installing pinned versions into /root/.cache/peak-media/deps/88b6dff0a77c
+  setup.sh: no headless browser build exists for Linux arm64 — use macOS or an x86_64 Linux host, or set HYPERFRAMES_BROWSER_PATH
+  
+  
+  3 !== 0
+  
+      at TestContext.<anonymous> (file:///repo/plugins/peak-media/evals/packaging/packaging.test.mjs:124:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at Test.start (node:internal/test_runner/test:944:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+## step 4 — setup.sh --check after
+setup.sh: render browser missing — run /repo/plugins/peak-media/scripts/setup.sh (or set HYPERFRAMES_BROWSER_PATH)
+exit 3
+## browser libraries missing after setup (ldd):
+## TMPDIR left after the run: 669 entries
+      1 node-compile

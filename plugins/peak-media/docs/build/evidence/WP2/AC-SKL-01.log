@@ -1,0 +1,35 @@
+$ TTS_OPENROUTER_API_KEY= node docs/build/tools/skeleton.mjs --fixture docs/build/fixtures/F0 --brand evals/fixtures/brand-min --out /tmp/vwp2/skel1
+/tmp/vwp2/skel1/out/final.mp4
+real 6.65
+user 4.65
+sys 1.26
+exit=0
+/tmp/vwp2/skel1/out/final.mp4
+/tmp/vwp2/skel1/plates/p1/.hyperframes/history-id
+/tmp/vwp2/skel1/plates/p1/.hyperframes/video-state.json
+/tmp/vwp2/skel1/plates/p1/brand/brand.json
+/tmp/vwp2/skel1/plates/p1/brand/logo.svg
+/tmp/vwp2/skel1/plates/p1/brand/music-rules.md
+/tmp/vwp2/skel1/plates/p1/brand/outro/index.html
+/tmp/vwp2/skel1/plates/p1/brand/tokens.css
+/tmp/vwp2/skel1/plates/p1/index.html
+/tmp/vwp2/skel1/plates/p1/vendor/gsap.min.js
+/tmp/vwp2/skel1/renders/plates/p1.mp4
+
+$ probe-spec /tmp/vwp2/skel1/out/final.mp4 --duration-ms 3000 --fps 30
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    fps: 30.000
+ok    duration (±1 frame): 3000 ms
+PASS  /tmp/vwp2/skel1/out/final.mp4
+exit=0
+$ ffprobe duration/frames
+duration=3.000000
+nb_read_frames=90
+duration=3.000000
+## node --test
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (120.039625ms)

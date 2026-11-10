@@ -1,0 +1,12 @@
+# Full suite: TMPDIR=/tmp/wp9scratch/tmpS (fresh and empty before)
+#   node --test "plugins/peak-media/evals/**/*.test.mjs"   — node v26.8.1, Darwin arm64
+# result: tests 100, pass 100, fail 0 (evidence/WP9/AC-PKG-06-suite.log, 398 s)
+# top-level entries left in TMPDIR afterwards:
+node-compile-cache
+# node-compile-cache is Node's own module compile cache (written by node itself, not by any eval
+# or plugin script). No pm-* folders remain.
+#
+# Container runs (evidence/WP9/AC-PKG-04-08.container-amd64.log): the TMPDIR top level afterwards
+# held node-compile-cache (Node) and pulse-* (the PulseAudio client folder made by the browser /
+# ffmpeg system libraries) — third-party, not our code. setup.sh's npm install and browser
+# download leave nothing in TMPDIR (npm uses ~/.npm; the browser goes to HyperFrames' cache).

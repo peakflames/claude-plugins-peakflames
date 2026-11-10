@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "kind": "narration",
+  "targetMs": 20000,
+  "totalMs": 20000,
+  "model": "fake/tone",
+  "voice": "Achird",
+  "style": "Clear, friendly, unhurried explainer tone.",
+  "audioOffsetMs": 0,
+  "command": [
+    "node",
+    "spine.mjs",
+    "--brief",
+    "brief.md",
+    "--tts-model",
+    "fake/tone"
+  ],
+  "narrate": true,
+  "audio": "narration.wav",
+  "beats": [
+    {
+      "id": "hook",
+      "startMs": 0,
+      "durationMs": 6500,
+      "clipNs": [
+        1
+      ]
+    },
+    {
+      "id": "compare",
+      "startMs": 6500,
+      "durationMs": 7500,
+      "clipNs": [
+        2
+      ]
+    },
+    {
+      "id": "close",
+      "startMs": 14000,
+      "durationMs": 6000,
+      "clipNs": [
+        3
+      ]
+    }
+  ],
+  "clips": [
+    {
+      "n": 1,
+      "beat": "hook",
+      "text": "Two tools, same promise: no code until we agree on the spec. They disagree about who checks the work.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 200,
+      "durationMs": 5800,
+      "words": 19,
+      "wpm": 197,
+      "file": "7218052786e5eeba58c5bf6c85dae30c80af9163da62ad55fb01922b67225357.wav"
+    },
+    {
+      "n": 2,
+      "beat": "compare",
+      "text": "OpenSpec tracks small changes and merges them into a living spec. peak-workflow ties every requirement to an ID and has a fresh session verify it.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 6700,
+      "durationMs": 6800,
+      "words": 25,
+      "wpm": 221,
+      "file": "eb955e8a61800d9fb74b194374db63904bbb682a9a3f5bb583beb25452432f23.wav"
+    },
+    {
+      "n": 3,
+      "beat": "close",
+      "text": "OpenSpec wins on speed. peak-workflow wins on proof. Pick the one that matches how much you need to show your work.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 14200,
+      "durationMs": 5300,
+      "words": 21,
+      "wpm": 238,
+      "file": "2bbac191627b5d2176e43f419617e03fa51ba61c283b1b4f8d112bbbdb476555.wav"
+    }
+  ]
+}

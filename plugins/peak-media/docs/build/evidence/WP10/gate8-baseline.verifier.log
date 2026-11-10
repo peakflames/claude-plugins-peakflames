@@ -1,0 +1,46 @@
+$ node scripts/validate.mjs <pack>
+ok    /Users/schaveyt/github/peakflames/peakflames-brand-guidelines/peak-media-pack/brand.json (brand v1)
+exit 0
+$ audio-options <pack>
+pack   Peakflames (/Users/schaveyt/github/peakflames/peakflames-brand-guidelines/peak-media-pack/brand.json)
+music  Groove Sauce  /Users/schaveyt/github/peakflames/peakflames-brand-guidelines/peak-media-pack/music/groove-sauce.mp3  levels: --music-lufs -28 --duck-db 6  credit: "Groove Sauce" by Stan Town, from the YouTube Audio Library (attribution required)
+exit 0
+$ audio-options --help
+audio-options — list the music and SFX stage 8 may offer: the brand pack's, or one folder the user named
+
+Usage: audio-options [options] <brand-pack|brand.json|plates.json|project-folder>
+
+Stage 8 (DEC-39) offers, in this order: the active brand pack's tracks (brand.json "x-tracks":
+title, file, credit, levels) and SFX (the manifest named by "x-sfx"); else the audio files in one
+folder the user names (--folder, not recursive); else narration only. It never searches the disk.
+Exit 0 with the list (possibly empty), 1 when a listed file is missing, 2 usage.
+
+Options:
+      --folder <dir>  List the audio files directly in this folder the user named, instead of the pack
+      --json          Print the list as JSON
+  -h, --help          Show this help and exit
+      --version       Print the plugin version and exit
+
+Examples:
+  audio-options plates.json
+  audio-options ~/brand/my-pack
+  audio-options --folder ~/Music/approved
+exit 0
+$ audio-options --version
+0.1.0
+exit 0
+$ audio-options (no args)
+audio-options: give a brand pack, brand.json, plates.json or project folder (or --folder <dir>)
+Run 'audio-options --help' for usage.
+exit 2
+$ audio-options /nonexistent
+audio-options: /nonexistent: no such file or folder
+exit 1
+$ audio-options --bogus
+audio-options: Unknown option '--bogus'
+Run 'audio-options --help' for usage.
+exit 2
+$ audio-options --folder /nonexistent
+audio-options: /nonexistent: no such folder
+exit 1
+plugin.json version: 0.1.0

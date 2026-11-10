@@ -1,0 +1,18 @@
+# AC-ASM-02 r2 — real F1 review.mp4; synthetic music bed (110/165/220 Hz, 22 s) and SFX (1.5 kHz 150 ms hits at 5400, 16100, 20000 ms) in $TMPDIR
+review.mp4            MD5=84a8257abfe5ce33a95f51df07f280ac
+music pass exit=0  MD5=84a8257abfe5ce33a95f51df07f280ac
+sfx pass   exit=0  MD5=84a8257abfe5ce33a95f51df07f280ac
+narration -16 LUFS (gain 0 dB)
+music     -28.1 LUFS under the voice (12.3 dB below it), +6 dB between lines
+sfx       -20 LUFS (gain 5 dB)
+mix       -15.6 LUFS, true peak -8.4 dBFS
+video     copied (md5 84a8257abfe5ce33a95f51df07f280ac)
+$TMPDIR/rm-mix.mp4
+music+sfx  exit=0  MD5=84a8257abfe5ce33a95f51df07f280ac
+$ remux-audio rm-mix.mp4 --music … (already-mixed source)
+remux-audio: $TMPDIR/rm-mix.mp4 already carries a music/SFX mix — remux from the narration-only review MP4, or pass --narration <file>
+exit=1
+
+## inside assemble (--music --sfx --export 1080p60, see AC-ASM-03.r2.log)
+review.mp4      MD5=84a8257abfe5ce33a95f51df07f280ac
+review-mix.mp4  MD5=84a8257abfe5ce33a95f51df07f280ac

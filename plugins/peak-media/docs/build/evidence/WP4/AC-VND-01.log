@@ -1,0 +1,4 @@
+listed paths: 44; missing: 0
+vendor folders: 13; orphan folders: 0
+vendor files: 44; files not named individually in the map: 0
+(script: /tmp/vwp4/scripts/vnd01.py — every backticked vendor/hyperframes/ path in vendored-map.md exists; every vendor folder is a prefix of a listed path)

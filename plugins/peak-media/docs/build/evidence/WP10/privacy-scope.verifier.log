@@ -1,0 +1,19 @@
+$ git diff 39ef962..df0aec9 --name-only | grep -Ei "\.(mp3|wav|mp4|woff2?|ttf|otf|svg|png|m4a)$"
+hits: 1(1=none)
+$ git ls-files plugins/peak-media | grep -Ei "groove|stan town|archivo|plex|jetbrains|peak-media-pack"
+plugins/peak-media/brand-packs/default/fonts/jetbrains-mono/OFL.txt
+plugins/peak-media/brand-packs/default/fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2
+plugins/peak-media/brand-packs/default/fonts/jetbrains-mono/jetbrains-mono-latin-700-normal.woff2
+exit 0
+$ git ls-files | grep -Ei "\.(mp3|wav|mp4)$"
+exit 1
+$ files under evidence/WP10 (tracked)
+plugins/peak-media/docs/build/evidence/WP10/AC-REAL-03-hstack.jpg
+plugins/peak-media/docs/build/evidence/WP10/AC-REAL-03-outro-vs-s6.jpg
+plugins/peak-media/docs/build/evidence/WP10/AC-REAL-03-outro-vs-s6.json
+plugins/peak-media/docs/build/evidence/WP10/AC-REAL-03-render.log
+plugins/peak-media/docs/build/evidence/WP10/AC-REAL-03.json
+plugins/peak-media/docs/build/evidence/WP10/AC-REAL-03.log
+plugins/peak-media/docs/build/evidence/WP10/ac-run-WP10.log
+$ diff scope (files outside skills/plate-factory, evals/plate-factory, evals/real, docs/build/wp/WP10, docs/build/evidence/WP10)
+exit 1

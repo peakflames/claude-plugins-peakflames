@@ -1,0 +1,94 @@
+# gate.mjs parseReview edge cases (46f6005), ids p1-habit p2-reason p3-tip p1 p10
+PASS  r3 shape (1 major + 3 minor, 1 minor open)
+      defects=4 fixed=3 statuses=[minor:fixed, major:fixed, minor:fixed, minor:open]
+PASS  summary line disagrees (Defects: 1) but lines + VERDICT agree
+      defects=2 fixed=1 statuses=[major:fixed, minor:open]
+FAIL  missing VERDICT
+      defects=1 fixed=1 statuses=[major:fixed]
+      problem: review/plate-review.md has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered
+FAIL  VERDICT omits blocker field
+      defects=1 fixed=1 statuses=[major:fixed]
+      problem: review/plate-review.md has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered
+FAIL  VERDICT says 1 major, lines list 2
+      defects=2 fixed=2 statuses=[major:fixed, major:fixed]
+      problem: review/plate-review.md: the VERDICT says 1 major but 2 major defect line(s) are listed — list every defect the reviewer reported, one per line
+FAIL  VERDICT says 2 major, 1 listed (dropped line)
+      defects=1 fixed=1 statuses=[major:fixed]
+      problem: review/plate-review.md: the VERDICT says 2 major but 1 major defect line(s) are listed — list every defect the reviewer reported, one per line
+PASS  dropped line + edited VERDICT (model rewrites both)
+      defects=1 fixed=1 statuses=[major:fixed]
+FAIL  open major
+      defects=1 fixed=0 statuses=[major:open]
+      problem: review/plate-review.md: major defect not fixed: p2-reason @5s [major] 2: c → d — open
+FAIL  open blocker
+      defects=1 fixed=0 statuses=[blocker:open]
+      problem: review/plate-review.md: blocker defect not fixed: p2-reason @5s [blocker] 2: c → d — open
+FAIL  "not fixed" major
+      defects=1 fixed=0 statuses=[major:not fixed]
+      problem: review/plate-review.md: major defect not fixed: p2-reason @5s [major] 2: c → d — not fixed
+FAIL  no status on major
+      defects=1 fixed=0 statuses=[major:null]
+      problem: review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5s [major] 2: c → d
+FAIL  no status on minor
+      defects=1 fixed=0 statuses=[minor:null]
+      problem: review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5s [minor] 2: c → d
+PASS  bullet + bold id + bold severity
+      defects=1 fixed=1 statuses=[major:fixed]
+PASS  * bullet, severity without brackets
+      defects=1 fixed=1 statuses=[major:fixed]
+PASS  bold VERDICT "**VERDICT:** 0 blocker, 1 major, 0 minor"
+      defects=1 fixed=1 statuses=[major:fixed]
+PASS  bold VERDICT "**VERDICT**: …"
+      defects=1 fixed=1 statuses=[major:fixed]
+FAIL  status in bold "— **fixed**"
+      defects=1 fixed=0 statuses=[major:null]
+      problem: review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5s [major] 2: c → d — **fixed**
+FAIL  status with trailing note "— fixed (re-rendered)"
+      defects=1 fixed=0 statuses=[major:null]
+      problem: review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5s [major] 2: c → d — fixed (re-rendered)
+FAIL  status with emoji "— fixed ✅"
+      defects=1 fixed=0 statuses=[major:null]
+      problem: review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5s [major] 2: c → d — fixed ✅
+PASS  ASCII " - fixed"
+      defects=1 fixed=1 statuses=[major:fixed]
+FAIL  UNMARKED major whose fix text ends "-fixed"
+      defects=1 fixed=0 statuses=[major:null]
+      problem: review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5s [major] 2: header floats → use the pre-fixed header
+FAIL  UNMARKED major whose fix text ends "half-open" (marked fixed? no)
+      defects=1 fixed=0 statuses=[major:open]
+      problem: review/plate-review.md: major defect not fixed: p2-reason @5s [major] 2: door shut → draw it half-open
+PASS  marked fixed but fix text ends "half-open — fixed"
+      defects=1 fixed=1 statuses=[major:fixed]
+FAIL  time range "@2.0–3.5s"
+      defects=0 fixed=0 statuses=[]
+      problem: review/plate-review.md: the VERDICT says 1 major but 0 major defect line(s) are listed — list every defect the reviewer reported, one per line
+FAIL  time "@ 00:05"
+      defects=0 fixed=0 statuses=[]
+      problem: review/plate-review.md: the VERDICT says 1 major but 0 major defect line(s) are listed — list every defect the reviewer reported, one per line
+FAIL  plate id case "P2-reason"
+      defects=1 fixed=1 statuses=[major:fixed]
+      problem: review/plate-review.md: defect for unknown plate 'P2-reason': P2-reason @5s [major] 2: c → d — fixed
+FAIL  unknown plate
+      defects=1 fixed=1 statuses=[major:fixed]
+      problem: review/plate-review.md: defect for unknown plate 'p9': p9 @5s [major] 2: c → d — fixed
+PASS  prefix ids p1 / p10
+      defects=2 fixed=1 statuses=[major:fixed, minor:open]
+PASS  VERDICT 0/0/0, no lines
+      defects=0 fixed=0 statuses=[]
+FAIL  two VERDICT lines (first 0/0/0, second real); 1 major open listed
+      defects=1 fixed=0 statuses=[major:open]
+      problem: review/plate-review.md: the VERDICT says 0 major but 1 major defect line(s) are listed — list every defect the reviewer reported, one per line (+1)
+FAIL  empty file
+      defects=0 fixed=0 statuses=[]
+      problem: review/plate-review.md has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered
+PASS  defect in a code fence
+      defects=1 fixed=1 statuses=[major:fixed]
+FAIL  heading "## p2-reason @5s [major] …" (heading marker)
+      defects=0 fixed=0 statuses=[]
+      problem: review/plate-review.md: the VERDICT says 1 major but 0 major defect line(s) are listed — list every defect the reviewer reported, one per line
+FAIL  numbered list "1. p2-reason …"
+      defects=0 fixed=0 statuses=[]
+      problem: review/plate-review.md: the VERDICT says 1 major but 0 major defect line(s) are listed — list every defect the reviewer reported, one per line
+FAIL  table row
+      defects=0 fixed=0 statuses=[]
+      problem: review/plate-review.md: the VERDICT says 1 major but 0 major defect line(s) are listed — list every defect the reviewer reported, one per line

@@ -1,0 +1,12 @@
+# AC-VND-02 r2 — verifier-wp4-r2-a91e50a1
+$ grep -rniE 'hyperframes\s+events' vendor/ | wc -l
+       0
+$ grep -rniE 'hyperframes[^a-z]{1,3}events' vendor/ | wc -l
+       0
+LICENSE:
+-rw-r--r--@ 1 schaveyt  staff  10763 Nov  8 18:54 vendor/hyperframes/LICENSE
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+2
+4259155fb06f127687ee7b0a8a3682d45132db0f2da26cbc0b7a2d1e796436b8  vendor/hyperframes/LICENSE

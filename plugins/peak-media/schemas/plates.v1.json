@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:peak-media:schema:plates:v1",
+  "title": "peak-media plate list v1",
+  "description": "plates.json: one entry per visual beat. motion and slide plates are rendered frame by frame by HyperFrames; live plates are played in real time and screen-captured (video-capture). Every kind produces renders/plates/<id>.mp4 of exactly durationMs.",
+  "type": "object",
+  "required": ["schemaVersion", "spine", "brand", "fps", "width", "height", "plates"],
+  "additionalProperties": false,
+  "patternProperties": { "^x-": true },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "spine": { "type": "string", "minLength": 1, "description": "Path (relative to plates.json) of spine/manifest.json or spine/beatgrid.json." },
+    "brand": { "type": "string", "minLength": 1, "description": "Path of the brand pack folder or its brand.json." },
+    "fps": { "type": "integer", "minimum": 1, "maximum": 120 },
+    "width": { "type": "integer", "minimum": 16, "multipleOf": 2 },
+    "height": { "type": "integer", "minimum": 16, "multipleOf": 2 },
+    "plates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/plate" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "plate": {
+      "type": "object",
+      "required": ["id", "beat", "kind", "startMs", "durationMs", "intent", "assets"],
+      "additionalProperties": false,
+      "patternProperties": { "^x-": true },
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "beat": { "$ref": "#/$defs/id", "description": "Spine beat this plate covers." },
+        "kind": { "enum": ["motion", "slide", "live"] },
+        "startMs": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 1 },
+        "intent": { "type": "string", "minLength": 1, "description": "The one idea this plate shows." },
+        "assets": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Paths or URLs of real source material (screenshots, logos, data)." },
+        "text": {
+          "description": "On-screen copy: one string, or lines in order.",
+          "anyOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "live": {
+          "type": "object",
+          "required": ["storyboard", "viewport"],
+          "additionalProperties": false, "patternProperties": { "^x-": true },
+          "properties": {
+            "url": { "type": "string", "minLength": 1 },
+            "storyboard": { "type": "string", "minLength": 1 },
+            "viewport": { "type": "string", "pattern": "^[1-9][0-9]*x[1-9][0-9]*$" }
+          }
+        }
+      },
+      "if": { "properties": { "kind": { "const": "live" } }, "required": ["kind"] },
+      "then": { "required": ["live"] },
+      "else": { "not": { "required": ["live"] } }
+    }
+  }
+}

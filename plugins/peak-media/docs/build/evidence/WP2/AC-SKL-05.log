@@ -1,0 +1,16 @@
+$ skeleton (2nd render) --out /tmp/vwp2/skel2
+/tmp/vwp2/skel2/out/final.mp4
+exit=0
+/tmp/vwp2/skel1:       90 frames, sha256 of framemd5 list f4267253dc09cfe4
+/tmp/vwp2/skel2:       90 frames, sha256 of framemd5 list f4267253dc09cfe4
+$ diff framemd5 (empty = identical)
+IDENTICAL
+unique frame hashes:       40 (proves frames differ over time, not a constant image)
+$ file-level md5 of p1.mp4 (informational)
+0e6e1cae0dda25315d777963ebff4c2a
+0e6e1cae0dda25315d777963ebff4c2a
+$ node --test AC-SKL-05
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (6652.884166ms)
+ℹ pass 1
+ℹ fail 0
+ℹ skipped 0

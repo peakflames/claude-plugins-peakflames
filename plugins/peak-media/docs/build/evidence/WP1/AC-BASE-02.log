@@ -1,0 +1,105 @@
+# AC-BASE-02 — verifier-wp1-r2-c4e19a07 @ 42652e9, node v26.8.1, 2026-11-08T22:16:26Z; every validate run uses the evals/helpers/no-network.mjs preload
+$ validate --help
+validate — check peak-media contract files against their v1 schemas
+
+Usage: validate [options] <file|brand-pack-dir>...
+
+The contract is inferred from the file name (*manifest*.json / *beatgrid*.json -> spine,
+*plates*.json -> plates, brand*.json or a folder -> brand) unless --schema is given.
+Beyond the schema it checks cross-references: beat/clip links, plate beats against the
+spine, and that every brand-pack file exists and tokens.css defines the required properties.
+Exit 0 when every file is valid, 1 when any is invalid, 2 on usage errors.
+
+Options:
+      --schema <spine|plates|brand>  Contract to validate against (skips name inference)
+      --from-legacy                  Treat inputs as legacy narration.json and validate the mapped v1 spine manifest
+      --out <file>                   With --from-legacy and one input: write the mapped manifest here
+      --json                         Print results as JSON
+  -q, --quiet                        Print only failures
+  -h, --help                         Show this help and exit
+      --version                      Print the plugin version and exit
+
+Examples:
+  validate spine/manifest.json plates.json
+  validate --schema brand ./my-brand-pack
+  validate --from-legacy narration.json --out spine/manifest.json
+exit=0
+help lists --schema
+help lists --from-legacy
+help lists --out
+help lists --json
+help lists --quiet
+help lists --help
+help lists --version
+$ validate --version
+0.1.0
+exit=0
+plugin.json version: 0.1.0
+$ validate 
+--- stdout
+--- stderr
+validate: expected at least 1 argument(s), got 0
+Run 'validate --help' for usage.
+exit=2 stderr-lines=2 stack=0 net=0
+$ validate --nope
+--- stdout
+--- stderr
+validate: Unknown option '--nope'
+Run 'validate --help' for usage.
+exit=2 stderr-lines=2 stack=0 net=0
+$ validate does-not-exist.json
+--- stdout
+--- stderr
+validate: cannot read does-not-exist.json: no such file
+exit=1 stderr-lines=1 stack=0 net=0
+$ validate --schema bogus x.json
+--- stdout
+--- stderr
+validate: --schema must be one of spine, plates, brand, got 'bogus'
+Run 'validate --help' for usage.
+exit=2 stderr-lines=2 stack=0 net=0
+$ validate --out x.json y.json
+--- stdout
+--- stderr
+validate: --out needs --from-legacy and exactly one input
+Run 'validate --help' for usage.
+exit=2 stderr-lines=2 stack=0 net=0
+$ validate /tmp/pm-v2-con03-ejrm/broken.manifest.json
+--- stdout
+FAIL  /tmp/pm-v2-con03-ejrm/broken.manifest.json (spine v1)
+      (file): is not valid JSON: Unexpected token 'b', "bad.json
+" is not valid JSON
+--- stderr
+exit=1 stderr-lines=0 stack=0 net=0
+$ validate /tmp/pm-v2-con03-ejrm/noname.json
+--- stdout
+--- stderr
+validate: can't tell which contract /tmp/pm-v2-con03-ejrm/noname.json is — pass --schema spine|plates|brand
+Run 'validate --help' for usage.
+exit=2 stderr-lines=2 stack=0 net=0
+$ validate --from-legacy /tmp/pm-v2-con03-ejrm/notlegacy.json
+--- stdout
+--- stderr
+validate: /tmp/pm-v2-con03-ejrm/notlegacy.json has no clips[] — not a legacy narration.json
+exit=1 stderr-lines=1 stack=0 net=0
+$ validate /tmp/pm-v2-con03-ejrm/arr.manifest.json
+--- stdout
+FAIL  /tmp/pm-v2-con03-ejrm/arr.manifest.json (spine v1)
+      (root): must be a JSON object
+--- stderr
+exit=1 stderr-lines=0 stack=0 net=0
+$ grep network imports in validate path
+none
+$ node --test evals
+✔ AC-CON-02: six bad fixtures each fail and name the field (390.936792ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (161.405041ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (239.151625ms)
+✔ validate: cross-reference checks (not AC-bound) (972.116292ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2469.362292

@@ -1,0 +1,9 @@
+# TMPDIR after suite: /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.evQYraFvKT
+total 0
+drwx------@    4 schaveyt  staff     128 Nov  9 15:50 .
+drwx------@ 5066 schaveyt  staff  162112 Nov  9 15:47 ..
+drwxr-xr-x@    3 schaveyt  staff      96 Nov  9 15:43 node-compile-cache
+drwx------@    3 schaveyt  staff      96 Nov  9 15:47 puppeteer_dev_chrome_profile-bAc9ew
+5.8M	/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.evQYraFvKT/node-compile-cache
+1.8M	/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.evQYraFvKT/puppeteer_dev_chrome_profile-bAc9ew
+pm-* entries: 0

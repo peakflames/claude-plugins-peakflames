@@ -1,0 +1,50 @@
+== v6-g8-changes-no-relisten
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== v6-g8-changes-relisten
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== v6-g3-edits-approved
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== v6-g0-edits-approved
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== v6-g4-edit-no-rescaffold
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== v6-g4-reask-rejected-then-approved
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== good-g4-changes-reasked
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== bad-g4-changes-no-reask
+  PASS AC-ORC-01 
+  FAIL AC-ORC-02 plate written before the storyboard was approved — the APPROVED line at line 54 had no AskUserQuestion since the storyboard opened, so it doesn't count: Bash render-plate.mjs" plates.json p1-hook --lint --sheet (line 55)
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== good-approved-with-edits
+  PASS AC-ORC-01 
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 
+== bad-approved-with-edits
+  FAIL AC-ORC-01 no passing gate line for gate(s) 1
+  PASS AC-ORC-02 
+  PASS AC-ORC-03 
+  PASS AC-ORC-04 

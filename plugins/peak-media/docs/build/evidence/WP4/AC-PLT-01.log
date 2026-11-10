@@ -1,0 +1,34 @@
+# AC-PLT-01 (verifier) — render-plate F1 --all and F2 --all with --brand evals/fixtures/brand-min, out in /tmp; ffprobe by verifier
+p1-hook: /tmp/vwp4/f1/renders/plates/p1-hook.mp4 (6500 ms, planned 6500) sheet /tmp/vwp4/f1/review/contact-p1-hook.jpg
+p2-table: /tmp/vwp4/f1/renders/plates/p2-table.mp4 (7500 ms, planned 7500) sheet /tmp/vwp4/f1/review/contact-p2-table.jpg
+p3-close: /tmp/vwp4/f1/renders/plates/p3-close.mp4 (6000 ms, planned 6000) sheet /tmp/vwp4/f1/review/contact-p3-close.jpg
+s1-unit: /tmp/vwp4/f2/renders/plates/s1-unit.mp4 (5000 ms, planned 5000)
+s2-ids: /tmp/vwp4/f2/renders/plates/s2-ids.mp4 (5000 ms, planned 5000)
+s3-verify: /tmp/vwp4/f2/renders/plates/s3-verify.mp4 (5000 ms, planned 5000)
+s4-openspec: /tmp/vwp4/f2/renders/plates/s4-openspec.mp4 (5000 ms, planned 5000)
+s5-peak: /tmp/vwp4/f2/renders/plates/s5-peak.mp4 (5000 ms, planned 5000)
+
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=6.500000|nb_read_frames=195
+format|duration=6.500000
+p1-hook planned=6500ms
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=7.500000|nb_read_frames=225
+format|duration=7.500000
+p2-table planned=7500ms
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=6.000000|nb_read_frames=180
+format|duration=6.000000
+p3-close planned=6000ms
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=5.000000|nb_read_frames=150
+format|duration=5.000000
+s1-unit planned=5000ms
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=5.000000|nb_read_frames=150
+format|duration=5.000000
+s2-ids planned=5000ms
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=5.000000|nb_read_frames=150
+format|duration=5.000000
+s3-verify planned=5000ms
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=5.000000|nb_read_frames=150
+format|duration=5.000000
+s4-openspec planned=5000ms
+stream|codec_type=video|width=1280|height=720|r_frame_rate=30/1|duration=5.000000|nb_read_frames=150
+format|duration=5.000000
+s5-peak planned=5000ms

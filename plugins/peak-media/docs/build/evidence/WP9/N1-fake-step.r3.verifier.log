@@ -1,0 +1,64 @@
+# N1 r3 verifier probe (a): node blocked in runWatched() on a fake step (sh that backgrounds 'sleep 300' and waits); node started in its own process group (terminal job); signal sent once the sleeper is up. Script: /tmp/pm-v3probe/probeA.sh + step.mjs (scratch, outside repo)
+# INT-group = kill -INT -<node pgid> (terminal Ctrl-C); INT/TERM/KILL = to the node pid only
+sig=INT-group node=92925 step-sh=92930 sleeper=92932 step-pgid=92928 node-pgid=92925
+before: pm-run dirs: pm-run-t3CFNm
+  PID  PPID  PGID COMMAND
+92928 92925 92928 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+92929 92928 92928 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+92930 92928 92928 /bin/sh -c echo $$ > /tmp/pm-v3probe/a-4ZjN/shpid; sleep 300 & echo $! > /tmp/pm-v3probe/a-4ZjN/sleeper; wait
+92931 92929 92928 sleep 1
+92932 92930 92928 sleep 300
+node exit=130
+group gone after 1.05 s; remaining in group:
+  PID  PPID COMMAND
+(none)
+sleeper gone
+pm-run dirs after: []
+----
+sig=INT node=92975 step-sh=92980 sleeper=92982 step-pgid=92978 node-pgid=92975
+before: pm-run dirs: pm-run-w56lya
+  PID  PPID  PGID COMMAND
+92978 92975 92978 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+92979 92978 92978 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+92980 92978 92978 /bin/sh -c echo $$ > /tmp/pm-v3probe/a-k5HF/shpid; sleep 300 & echo $! > /tmp/pm-v3probe/a-k5HF/sleeper; wait
+92981 92979 92978 sleep 1
+92982 92980 92978 sleep 300
+node exit=130
+group gone after .93 s; remaining in group:
+  PID  PPID COMMAND
+(none)
+sleeper gone
+pm-run dirs after: []
+----
+sig=TERM node=93023 step-sh=93028 sleeper=93030 step-pgid=93026 node-pgid=93023
+before: pm-run dirs: pm-run-I0WIhL
+  PID  PPID  PGID COMMAND
+93026 93023 93026 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+93027 93026 93026 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+93028 93026 93026 /bin/sh -c echo $$ > /tmp/pm-v3probe/a-zq5v/shpid; sleep 300 & echo $! > /tmp/pm-v3probe/a-zq5v/sleeper; wait
+93029 93027 93026 sleep 1
+93030 93028 93026 sleep 300
+./probeA.sh: line 11: 93023 Terminated: 15          TMPDIR=$D/tmp perl -e 'setpgrp(0,0); exec @ARGV' node /tmp/pm-v3probe/step.mjs $D
+node exit=143
+group gone after 1.03 s; remaining in group:
+  PID  PPID COMMAND
+(none)
+sleeper gone
+pm-run dirs after: []
+----
+sig=KILL node=93072 step-sh=93077 sleeper=93079 step-pgid=93075 node-pgid=93072
+before: pm-run dirs: pm-run-er70DH
+  PID  PPID  PGID COMMAND
+93075 93072 93075 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+93076 93075 93075 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!\012"
+93077 93075 93075 /bin/sh -c echo $$ > /tmp/pm-v3probe/a-QICy/shpid; sleep 300 & echo $! > /tmp/pm-v3probe/a-QICy/sleeper; wait
+93078 93076 93075 sleep 1
+93079 93077 93075 sleep 300
+./probeA.sh: line 11: 93072 Killed: 9               TMPDIR=$D/tmp perl -e 'setpgrp(0,0); exec @ARGV' node /tmp/pm-v3probe/step.mjs $D
+node exit=137
+group gone after 1.05 s; remaining in group:
+  PID  PPID COMMAND
+(none)
+sleeper gone
+pm-run dirs after: []
+----

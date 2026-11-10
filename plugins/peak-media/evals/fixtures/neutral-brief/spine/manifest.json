@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "kind": "narration",
+  "targetMs": 20000,
+  "totalMs": 20000,
+  "model": "fake/tone",
+  "voice": "Achird",
+  "style": "Clear, friendly, unhurried explainer tone.",
+  "audioOffsetMs": 0,
+  "command": [
+    "node",
+    "spine.mjs",
+    "--brief",
+    "brief.md",
+    "--tts-model",
+    "fake/tone"
+  ],
+  "narrate": true,
+  "audio": "narration.wav",
+  "beats": [
+    {
+      "id": "intro",
+      "startMs": 0,
+      "durationMs": 6000,
+      "clipNs": [
+        1
+      ]
+    },
+    {
+      "id": "why",
+      "startMs": 6000,
+      "durationMs": 8000,
+      "clipNs": [
+        2
+      ]
+    },
+    {
+      "id": "tip",
+      "startMs": 14000,
+      "durationMs": 6000,
+      "clipNs": [
+        3
+      ]
+    }
+  ],
+  "clips": [
+    {
+      "n": 1,
+      "beat": "intro",
+      "text": "Plants drink best in the morning, before the sun gets strong.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 200,
+      "durationMs": 5300,
+      "words": 11,
+      "wpm": 125,
+      "file": "8a4713e0d76a5f7e59d16fe1cbc676866dca98ce7e5c5d55c5bd009762b6b8d0.wav"
+    },
+    {
+      "n": 2,
+      "beat": "why",
+      "text": "Cool air means less water lost to evaporation, and leaves have all day to dry, which keeps mildew away.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 6200,
+      "durationMs": 7300,
+      "words": 19,
+      "wpm": 156,
+      "file": "db69cc60a95c4f5fb99c784245ba42fdadaabffa9d5a9836f0ab11fac45cd107.wav"
+    },
+    {
+      "n": 3,
+      "beat": "tip",
+      "text": "So water at the roots, early, and let the day do the rest.",
+      "style": "Clear, friendly, unhurried explainer tone.",
+      "startMs": 14200,
+      "durationMs": 5300,
+      "words": 13,
+      "wpm": 147,
+      "file": "222d4642c12a3a0c4cc669d9b61d760314739d0cd713666128d204cb040ae917.wav"
+    }
+  ]
+}

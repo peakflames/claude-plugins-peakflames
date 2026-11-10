@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "spine": "spine/manifest.json",
+  "brand": "../../../brand-packs/default",
+  "fps": 30,
+  "width": 1280,
+  "height": 720,
+  "plates": [
+    {
+      "id": "p1-intro",
+      "beat": "intro",
+      "kind": "motion",
+      "startMs": 0,
+      "durationMs": 6000,
+      "intent": "Morning is the best time to water",
+      "assets": [],
+      "text": "Water in the morning"
+    },
+    {
+      "id": "p2-why",
+      "beat": "why",
+      "kind": "slide",
+      "startMs": 6000,
+      "durationMs": 8000,
+      "intent": "Two reasons",
+      "assets": [],
+      "text": [
+        "Why mornings?",
+        "Less evaporation",
+        "Leaves dry by evening — less mildew"
+      ]
+    },
+    {
+      "id": "p3-tip",
+      "beat": "tip",
+      "kind": "motion",
+      "startMs": 14000,
+      "durationMs": 6000,
+      "intent": "The one-line tip",
+      "assets": [],
+      "text": "Roots. Early. Done."
+    }
+  ]
+}

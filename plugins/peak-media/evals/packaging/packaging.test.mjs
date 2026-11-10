@@ -1,0 +1,261 @@
+// WP9 packaging: AC-PKG-01, -03, -04, -06, -07, -08.
+// AC-PKG-04 and -08 run setup.sh for real (a no-op when the runtime is already installed). v0.1.0 is
+// macOS-only (DEC-41): -04 is setup then the no-key F1 video; -08 is setup + F0 with a prerequisite
+// missing (ffmpeg, the render browser, the narration key), each reported in one line.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync, statSync, existsSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
+import path from 'node:path';
+import { run, ROOT, pluginVersion, tmpDir } from '../helpers/run.mjs';
+import { depsDir as depsRoot } from '../../lib/deps.mjs';
+
+const REPO = path.resolve(ROOT, '..', '..');
+const SKILLS = ['plate-factory', 'video-spine', 'video-plates', 'video-capture', 'video-assemble']; // DEC-21
+const NO_KEY = { PEAK_MEDIA_OPENROUTER_API_KEY: '', TTS_OPENROUTER_API_KEY: '' };
+const F0 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F0');
+const F1 = path.join(ROOT, 'docs', 'build', 'fixtures', 'F1');
+const DEFAULT_PACK = path.join(ROOT, 'brand-packs', 'default');
+const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
+const lines = (s) => s.trim().split('\n').filter(Boolean);
+
+/** Every file under dir (skipping node_modules), as paths relative to ROOT. */
+function files(dir) {
+  const out = [];
+  const walk = (d) => {
+    for (const e of readdirSync(d)) {
+      const p = path.join(d, e);
+      if (statSync(p).isDirectory()) { if (e !== 'node_modules') walk(p); } else out.push(path.relative(ROOT, p));
+    }
+  };
+  if (existsSync(dir)) walk(dir);
+  return out;
+}
+
+test('AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media', () => {
+  const plugin = readJson(path.join(ROOT, '.claude-plugin', 'plugin.json'));
+  const top = /^## \[(\d+\.\d+\.\d+)\]/m.exec(readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8'));
+  assert.ok(top, 'CHANGELOG.md has a "## [x.y.z]" entry');
+  assert.equal(plugin.version, top[1], 'plugin.json version matches the top CHANGELOG entry');
+  const mp = readJson(path.join(REPO, '.claude-plugin', 'marketplace.json'));
+  const entries = mp.plugins.filter((p) => p.name === plugin.name);
+  assert.equal(entries.length, 1, `marketplace.json lists ${plugin.name} once`);
+  assert.equal(entries[0].source, './plugins/peak-media');
+  assert.equal(path.resolve(REPO, entries[0].source), ROOT, 'the entry points at this plugin folder');
+  assert.ok(entries[0].description?.length > 20, 'the entry has a description');
+});
+
+test('AC-PKG-03: the runtime tree carries no house-brand name (D17), and the examples carry no brand assets', () => {
+  const BRAND_NAME = new RegExp(['peak', 'flames'].join(''), 'i'); // spelled in parts so this file doesn't match itself
+  const runtime = ['skills', 'lib', 'schemas', 'brand-packs', 'vendor', 'scripts', 'evals'];
+  const all = runtime.flatMap((d) => files(path.join(ROOT, d)));
+  assert.ok(all.length > 100, `walked the runtime tree (${all.length} files)`);
+  const hits = all.filter((f) => BRAND_NAME.test(f) || BRAND_NAME.test(readFileSync(path.join(ROOT, f), 'latin1')));
+  assert.deepEqual(hits, [], 'case-insensitive brand-name hits (D17)');
+  const examples = all.filter((f) => /^skills\/[^/]+\/examples\//.test(f));
+  assert.ok(examples.length > 0, 'the skills have examples');
+  const assets = examples.filter((f) => /\.(svg|png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|wav|m4a|ogg|mp4|mov|webm)$/i.test(f) || /logo|brand|outro/i.test(path.basename(f)));
+  assert.deepEqual(assets, [], 'examples carry no logos, fonts, images or audio');
+});
+
+test('AC-PKG-06: every skill has at least one eval (node --test "plugins/peak-media/evals/**/*.test.mjs")', () => {
+  const skills = readdirSync(path.join(ROOT, 'skills')).filter((d) => existsSync(path.join(ROOT, 'skills', d, 'SKILL.md'))).sort();
+  assert.deepEqual(skills, [...SKILLS].sort(), 'the five skills of DEC-21, and no others (no web2video)');
+  for (const s of skills) {
+    const name = /^name:\s*(\S+)/m.exec(readFileSync(path.join(ROOT, 'skills', s, 'SKILL.md'), 'utf8'));
+    assert.equal(name?.[1], s, `skills/${s}/SKILL.md names itself ${s}`);
+    const evals = files(path.join(ROOT, 'evals', s)).filter((f) => f.endsWith('.test.mjs'));
+    const tests = evals.reduce((n, f) => n + (readFileSync(path.join(ROOT, f), 'utf8').match(/^test\(/gm) ?? []).length, 0);
+    assert.ok(tests >= 1, `evals/${s}/ has at least one test (found ${tests} in ${evals.length} file(s))`);
+  }
+});
+
+test('AC-PKG-07: VENDORED.md gives source, commit, date, licence and local changes for every vendor folder; GSAP and fonts are listed', () => {
+  const doc = readFileSync(path.join(ROOT, 'VENDORED.md'), 'utf8');
+  const sections = doc.split(/^## /m).slice(1).map((s) => ({ head: s.split('\n')[0], body: s }));
+  const field = (body, name) => new RegExp(`^\\|\\s*${name}\\s*\\|\\s*(.+?)\\s*\\|\\s*$`, 'm').exec(body)?.[1];
+  const vendors = readdirSync(path.join(ROOT, 'vendor')).filter((d) => statSync(path.join(ROOT, 'vendor', d)).isDirectory());
+  assert.ok(vendors.length > 0);
+  for (const v of vendors) {
+    const sec = sections.find((s) => field(s.body, 'Destination')?.includes(`\`vendor/${v}/\``));
+    assert.ok(sec, `a VENDORED.md section has Destination vendor/${v}/`);
+    assert.match(field(sec.body, 'Source') ?? '', /^https:\/\//, `vendor/${v}: Source is a URL`);
+    assert.match(field(sec.body, 'Commit') ?? '', /`[0-9a-f]{40}`/, `vendor/${v}: Commit is a full sha`);
+    assert.match(field(sec.body, 'Date') ?? '', /\d{4}-\d{2}-\d{2}/, `vendor/${v}: Date`);
+    const lic = field(sec.body, 'Licence') ?? '';
+    assert.match(lic, /\S/, `vendor/${v}: Licence`);
+    assert.ok(existsSync(path.join(ROOT, 'vendor', v, 'LICENSE')), `vendor/${v}/LICENSE is present`);
+    const changes = /^### Local changes\n([\s\S]*?)(?=^### |(?![\s\S]))/m.exec(sec.body);
+    assert.ok(changes && (changes[1].match(/^- /gm) ?? []).length >= 3, `vendor/${v}: a list of local changes`);
+  }
+  // fetched / bundled rows: | Name | Kind | ... |
+  const rows = doc.split('\n').filter((l) => l.startsWith('|')).map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
+  const gsap = rows.find((r) => r[0] === 'GSAP' && r[1] === 'Fetched' && /npm/.test(r[2]));
+  assert.ok(gsap, 'GSAP is listed as Fetched');
+  assert.match(gsap.join(' '), /npm `gsap`/);
+  assert.match(gsap.join(' '), /[Ll]icen[cs]e/);
+  const fontDirs = [...files(path.join(ROOT, 'brand-packs')), ...files(path.join(ROOT, 'evals', 'fixtures'))]
+    .filter((f) => /\/fonts\/[^/]+\/[^/]+$/.test(f)).map((f) => path.dirname(f) + '/');
+  const uniq = [...new Set(fontDirs)];
+  assert.ok(uniq.length >= 2, `found font folders: ${uniq}`);
+  for (const d of uniq) {
+    const r = rows.find((x) => x[1] === 'Bundled' && x[2] === `\`${d}\``);
+    assert.ok(r, `${d} is listed as Bundled`);
+    assert.equal(r.length, 9, `${d}: family, kind, destination, source, version, date, sha256, licence, local changes`);
+    const [, , , source, version, date, sha, licence, local] = r;
+    assert.match(source, /npm `@fontsource\//, `${d}: source`);
+    assert.match(version, /^\d+\.\d+\.\d+$/, `${d}: version`);
+    assert.match(date, /^\d{4}-\d{2}-\d{2}$/, `${d}: date`);
+    assert.match(sha, /^`[0-9a-f]{64}`$/, `${d}: package sha256`);
+    assert.match(licence, /OFL/, `${d}: licence`);
+    assert.match(local, /\S/, `${d}: local changes`);
+    assert.ok(existsSync(path.join(ROOT, d, 'OFL.txt')), `${d}OFL.txt is present`);
+  }
+});
+
+test('packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs and JPEG — no audio or video anywhere (not AC-bound)', () => {
+  const docs = files(path.join(ROOT, 'docs')).filter((f) => !f.split('/').includes('run')); // fixtures/**/run/ is gitignored scratch
+  const odd = docs.filter((f) => !/\.(md|mjs|json|log|jpe?g)$/i.test(f));
+  assert.deepEqual(odd, [], 'docs/ holds only .md .mjs .json .log .jpg');
+  const media = files(ROOT).filter((f) => !f.split('/').includes('run') && /\.(mp4|mov|webm|mkv|wav|mp3|m4a|aac|ogg|flac)$/i.test(f));
+  assert.deepEqual(media, [], 'no audio or video files in the plugin');
+});
+
+test('watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound)', async () => {
+  const dir = tmpDir('pm-watchdog-');
+  const pidFile = path.join(dir, 'sleeper.pid');
+  // fake ffmpeg/ffprobe: answers -version, otherwise starts a sleeper child and waits on it forever-ish
+  const fake = path.join(dir, 'fake-ff');
+  writeFileSync(fake, `#!/bin/sh\ncase "$1" in -version) echo "ffmpeg version fake"; exit 0;; esac\nsleep 120 & echo $! > '${pidFile}'\nwait\n`);
+  chmodSync(fake, 0o755);
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  const r = run('lib/verify/probe-spec.mjs', [path.join(F0, 'plates.json')], { env: { PEAK_MEDIA_FFMPEG: fake, PEAK_MEDIA_FFPROBE: fake, PEAK_MEDIA_STEP_TIMEOUT_S: '2' } });
+  assert.equal(r.code, 1, r.stdout + r.stderr);
+  assert.ok(r.ms < 15_000, `stopped promptly (${r.ms} ms)`);
+  assert.equal(lines(r.stderr).length, 1, r.stderr);
+  assert.match(r.stderr, /ffprobe of .* timed out after 2 s with no exit — stopped it/);
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  assert.ok(!alive(pid), `the step's own child (sleep, pid ${pid}) was killed with its group`);
+
+  // hyperframes: hf() under the same watchdog (the wrap runs a sleeper in place of the CLI)
+  const { hf } = await import('../../lib/hf.mjs');
+  process.env.PEAK_MEDIA_STEP_TIMEOUT_S = '2';
+  try {
+    const t0 = Date.now();
+    assert.throws(() => hf(['render', dir], { wrap: ['/bin/sh', '-c', 'sleep 120', '--'] }), /hyperframes render timed out after 2 s with no exit — stopped it; .*setup\.sh --check/);
+    assert.ok(Date.now() - t0 < 15_000);
+  } finally { delete process.env.PEAK_MEDIA_STEP_TIMEOUT_S; }
+
+  // the eval helper's own per-step watchdog: a script that never exits fails its step in one line
+  const hang = path.join(dir, 'hang.mjs');
+  writeFileSync(hang, 'setInterval(() => {}, 1000);\n');
+  const h = run(path.relative(ROOT, hang), [], { timeoutMs: 1500 });
+  assert.equal(h.timedOut, true);
+  assert.equal(h.code, null);
+  assert.match(h.stderr, /eval step timed out after 1\.5 s: /);
+});
+
+test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s whole process group and leaves no temp folder (WP9 verify-2 N1; not AC-bound)', async () => {
+  const { spawn } = await import('node:child_process');
+  const { mkdirSync } = await import('node:fs');
+  for (const [sig, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+    const dir = tmpDir('pm-interrupt-');
+    const tmp = path.join(dir, 'tmp');
+    mkdirSync(tmp);
+    // a node process blocked in a watched step whose own child sleeps
+    const script = path.join(dir, 'step.mjs');
+    writeFileSync(script, `import { runWatched } from ${JSON.stringify(path.join(ROOT, 'lib', 'watchdog.mjs'))};\n`
+      + `runWatched('/bin/sh', ['-c', 'echo $PPID > ${dir}/pg; sleep 120 & echo $! > ${dir}/pid; wait'], { timeoutMs: 600000 });\n`);
+    const child = spawn(process.execPath, [script], { env: { ...process.env, TMPDIR: tmp }, stdio: 'ignore' });
+    const exited = new Promise((res) => child.on('exit', (c, s) => res({ c, s })));
+    const until = async (cond, ms, what) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) assert.fail(`${sig}: ${what}`); await new Promise((r) => setTimeout(r, 100)); } };
+    await until(() => existsSync(path.join(dir, 'pid')) && readFileSync(path.join(dir, 'pid'), 'utf8').trim(), 15_000, 'the step started');
+    const pg = Number(readFileSync(path.join(dir, 'pg'), 'utf8')), sleeper = Number(readFileSync(path.join(dir, 'pid'), 'utf8'));
+    assert.equal(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')).length, 1, 'the step has its temp folder while it runs');
+    child.kill(sig);
+    const { s } = await exited;
+    assert.equal(s, sig, `node ended by ${sig} (shell exit code ${code})`);
+    const groupAlive = () => { try { process.kill(-pg, 0); return true; } catch { return false; } };
+    await until(() => !groupAlive(), 5000, `the step's process group ${pg} is gone`);
+    assert.throws(() => process.kill(sleeper, 0), /ESRCH/, 'the step\'s child is gone');
+    assert.deepEqual(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')), [], 'no pm-run-* temp folder left');
+  }
+});
+
+test('watchdog: "not found" only when the binary does not exist, not from a real binary\'s exit 127 (WP9 verify-2 N2; not AC-bound)', async () => {
+  const { runWatched } = await import('../../lib/watchdog.mjs');
+  const dir = tmpDir('pm-enoent-');
+  const bin = path.join(dir, 'exits127');
+  writeFileSync(bin, '#!/bin/sh\necho "No such file or directory: input.mp4" >&2\nexit 127\n');
+  chmodSync(bin, 0o755);
+  const real = runWatched(bin, [], { timeoutMs: 10_000 });
+  assert.equal(real.status, 127);
+  assert.equal(real.error, undefined, 'a real binary exiting 127 is not "not found"');
+  assert.equal(runWatched(path.join(dir, 'nope'), [], { timeoutMs: 10_000 }).error?.code, 'ENOENT');
+  assert.equal(runWatched('pm-no-such-binary-xyz', [], { timeoutMs: 10_000 }).error?.code, 'ENOENT');
+});
+
+test('AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps', () => {
+  assert.equal(process.platform, 'darwin', 'v0.1.0 supports macOS only (DEC-41)');
+  const setup = run('scripts/setup.sh', [], { network: true });
+  assert.equal(setup.code, 0, `setup.sh: ${setup.stdout}${setup.stderr}`);
+  assert.match(lines(setup.stdout).at(-1), /^peak-media ready: /);
+
+  const dir = tmpDir('pm-pkg04-');
+  for (const f of ['brief.md', 'script.md']) copyFileSync(path.join(F1, f), path.join(dir, f));
+  const plates = readJson(path.join(F1, 'plates.json'));
+  plates.brand = DEFAULT_PACK;
+  writeFileSync(path.join(dir, 'plates.json'), JSON.stringify(plates, null, 2));
+  const step = (name, script, args) => {
+    const r = run(script, args, { env: NO_KEY, cwd: dir });
+    assert.equal(r.code, 0, `${name}: ${r.stdout}${r.stderr}`);
+    return r;
+  };
+  step('spine', 'skills/video-spine/scripts/spine.mjs', ['--brief', path.join(dir, 'brief.md'), '--tts-model', 'fake/tone', '--target-ms', '20000', '--cache-dir', path.join(dir, 'tts-cache')]);
+  const manifest = readJson(path.join(dir, 'spine', 'manifest.json'));
+  step('retime-plates', 'skills/plate-factory/scripts/retime-plates.mjs', [path.join(dir, 'plates.json')]);
+  step('render-plate', 'skills/video-plates/scripts/render-plate.mjs', [path.join(dir, 'plates.json'), '--all']);
+  const asm = JSON.parse(step('assemble', 'skills/video-assemble/scripts/assemble.mjs', [dir, '--json']).stdout);
+  assert.ok(asm.cuts.length === manifest.beats.length - 1 && asm.cuts.every((c) => c.ok), `every plate cut in silence: ${JSON.stringify(asm.cuts)}`);
+  const final = path.join(dir, 'out', 'final.mp4');
+  const spec = run('lib/verify/probe-spec.mjs', [final, '--size', '1280x720', '--fps', '30', '--duration-ms', String(manifest.totalMs + 3000)]);
+  assert.equal(spec.code, 0, spec.stdout + spec.stderr);
+  process.stdout.write(`# F1: spine ${manifest.totalMs} ms (${manifest.beats.length} beats) + outro 3000 ms → ${path.relative(dir, final)}; ${lines(spec.stdout).at(-1)}\n`);
+});
+
+test('AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing', () => {
+  const setup = run('scripts/setup.sh', ['-q'], { network: true });
+  assert.equal(setup.code, 0, setup.stdout + setup.stderr);
+  const one = (r, re, what) => {
+    assert.notEqual(r.code, 0, `${what}: non-zero exit`);
+    // one line naming what's missing; a plate-factory gate script may also print its GATE … FAIL line
+    assert.equal(lines(r.stderr).length, 1, `${what}: one line — ${r.stderr}`);
+    assert.ok(lines(r.stdout).every((l) => /^GATE \d+ [a-z]+: FAIL — /.test(l)), `${what}: nothing else on stdout — ${r.stdout}`);
+    assert.match(r.stderr, re, what);
+    assert.doesNotMatch(r.stderr, /\n\s+at /, `${what}: no stack trace`);
+  };
+  const empty = tmpDir('pm-pkg08-data-');
+  const f0 = (env) => run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', tmpDir('pm-pkg08-')], { env: { ...NO_KEY, ...env } });
+
+  // ffmpeg
+  const noFf = { PEAK_MEDIA_FFMPEG: path.join(empty, 'no-ffmpeg') };
+  one(run('scripts/setup.sh', ['--check'], { env: noFf }), /^setup\.sh: ffmpeg not found — install it \(macOS: brew install ffmpeg/, 'setup --check without ffmpeg');
+  one(f0(noFf), /ffmpeg not found — install it \(macOS: brew install ffmpeg/, 'F0 without ffmpeg');
+  // the runtime deps (before setup has run)
+  one(run('scripts/setup.sh', ['--check'], { env: { CLAUDE_PLUGIN_DATA: empty } }), /runtime deps not installed .* run .*scripts\/setup\.sh/, 'setup --check without deps');
+  if (!existsSync(path.join(ROOT, 'node_modules'))) one(f0({ CLAUDE_PLUGIN_DATA: empty }), /dependency '.+'.* — run .*scripts\/setup\.sh/, 'F0 without deps');
+  // the render browser (present but can't start)
+  const badBrowser = { HYPERFRAMES_BROWSER_PATH: '/usr/bin/false' };
+  one(run('scripts/setup.sh', ['--check'], { env: badBrowser }), /^setup\.sh: render browser can't start .* — run .*setup\.sh to fetch the render browser/, 'setup --check with a broken browser');
+  one(f0(badBrowser), /render failed for .*: render browser can't start .* — run .*setup\.sh to fetch the render browser/, 'F0 with a broken browser');
+  // the narration key (F0 itself needs none: a beat grid; asking for narration without a key fails up front)
+  const dir = tmpDir('pm-pkg08-key-');
+  for (const f of ['brief.md', 'script.md']) copyFileSync(path.join(F1, f), path.join(dir, f));
+  const t0 = Date.now();
+  one(run('skills/video-spine/scripts/spine.mjs', ['--brief', path.join(dir, 'brief.md'), '--narrate'], { env: NO_KEY }), /PEAK_MEDIA_OPENROUTER_API_KEY/, 'narration without a key');
+  assert.ok(Date.now() - t0 < 5000, 'the key check fails fast, before any synthesis');
+
+  // and with nothing missing, F0 passes
+  const ok = run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', tmpDir('pm-pkg08-ok-')], { env: NO_KEY });
+  assert.equal(ok.code, 0, ok.stdout + ok.stderr);
+  assert.equal(run('scripts/setup.sh', ['--version']).stdout.trim(), pluginVersion());
+});

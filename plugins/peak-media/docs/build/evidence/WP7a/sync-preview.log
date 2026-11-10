@@ -1,0 +1,66 @@
+# Timing preview (WP7b D8 dry run) — verifier 2026-11-09T03:22:21Z, run alone
+Page: full-frame black; storyboard flips to R/G/B right after each say() returns (evaluate + one rAF). Spine: deck spine (fake/tone), clips at 250 / 6432 / 14432 ms, audioOffsetMs 0. Offset = time of first frame showing the new colour (frame k -> k*1000/fps) minus the clip's planned start (where the spine audio sits).
+
+## run captions=0 rep=1: capture --storyboard sync-storyboard.mjs --spine deckspine/manifest.json --out sync.mp4 --json
+exit=0
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running sync-storyboard.mjs
+capture: warning: say() #1 text differs from spine clip 1 ("Water your garden in the morning. It is …") — the spine's audio plays regardless
+SYNC flip 1 #ff0000 evaluate start 251.3 ms, rAF done 280.1 ms
+capture: warning: say() #2 text differs from spine clip 2 ("Cool morning air means less water is los…") — the spine's audio plays regardless
+SYNC flip 2 #00ff00 evaluate start 6432.9 ms, rAF done 6437.1 ms
+capture: warning: say() #3 text differs from spine clip 3 ("Aim at the roots, not the leaves. Water …") — the spine's audio plays regardless
+SYNC flip 3 #0000ff evaluate start 14433.3 ms, rAF done 14436.7 ms
+say #1: planned 250 ms, say() fired 251 ms (late 1), first R frame #9 = 300.0 ms -> offset vs planned +50.0 ms (+1.50 frames), vs fired +49.0 ms; frame before: K
+say #2: planned 6432 ms, say() fired 6433 ms (late 1), first G frame #193 = 6433.3 ms -> offset vs planned +1.3 ms (+0.04 frames), vs fired +0.3 ms; frame before: R
+say #3: planned 14432 ms, say() fired 14433 ms (late 1), first B frame #433 = 14433.3 ms -> offset vs planned +1.3 ms (+0.04 frames), vs fired +0.3 ms; frame before: G
+frames 600 unknown frames 0
+median offset 1.3 ms, worst 50.0 ms
+
+## run captions=0 rep=2: capture --storyboard sync-storyboard.mjs --spine deckspine/manifest.json --out sync.mp4 --json
+exit=0
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running sync-storyboard.mjs
+capture: warning: say() #1 text differs from spine clip 1 ("Water your garden in the morning. It is …") — the spine's audio plays regardless
+SYNC flip 1 #ff0000 evaluate start 251.9 ms, rAF done 267.1 ms
+capture: warning: say() #2 text differs from spine clip 2 ("Cool morning air means less water is los…") — the spine's audio plays regardless
+SYNC flip 2 #00ff00 evaluate start 6434.2 ms, rAF done 6439.4 ms
+capture: warning: say() #3 text differs from spine clip 3 ("Aim at the roots, not the leaves. Water …") — the spine's audio plays regardless
+SYNC flip 3 #0000ff evaluate start 14433.8 ms, rAF done 14438.1 ms
+say #1: planned 250 ms, say() fired 251 ms (late 1), first R frame #8 = 266.7 ms -> offset vs planned +16.7 ms (+0.50 frames), vs fired +15.7 ms; frame before: K
+say #2: planned 6432 ms, say() fired 6434 ms (late 2), first G frame #193 = 6433.3 ms -> offset vs planned +1.3 ms (+0.04 frames), vs fired -0.7 ms; frame before: R
+say #3: planned 14432 ms, say() fired 14434 ms (late 2), first B frame #433 = 14433.3 ms -> offset vs planned +1.3 ms (+0.04 frames), vs fired -0.7 ms; frame before: G
+frames 600 unknown frames 0
+median offset 1.3 ms, worst 16.7 ms
+
+## run captions=1 rep=1: capture --storyboard sync-storyboard.mjs --spine deckspine/manifest.json --out sync.mp4 --json
+exit=0
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running sync-storyboard.mjs
+capture: warning: say() #1 text differs from spine clip 1 ("Water your garden in the morning. It is …") — the spine's audio plays regardless
+SYNC flip 1 #ff0000 evaluate start 302.2 ms, rAF done 315.9 ms
+capture: warning: say() #2 text differs from spine clip 2 ("Cool morning air means less water is los…") — the spine's audio plays regardless
+SYNC flip 2 #00ff00 evaluate start 6437.9 ms, rAF done 6443.0 ms
+capture: warning: say() #3 text differs from spine clip 3 ("Aim at the roots, not the leaves. Water …") — the spine's audio plays regardless
+SYNC flip 3 #0000ff evaluate start 14436.8 ms, rAF done 14443.7 ms
+say #1: planned 250 ms, say() fired 252 ms (late 2), first R frame #10 = 333.3 ms -> offset vs planned +83.3 ms (+2.50 frames), vs fired +81.3 ms; frame before: K
+say #2: planned 6432 ms, say() fired 6433 ms (late 1), first G frame #193 = 6433.3 ms -> offset vs planned +1.3 ms (+0.04 frames), vs fired +0.3 ms; frame before: R
+say #3: planned 14432 ms, say() fired 14434 ms (late 2), first B frame #433 = 14433.3 ms -> offset vs planned +1.3 ms (+0.04 frames), vs fired -0.7 ms; frame before: G
+frames 600 unknown frames 0
+median offset 1.3 ms, worst 83.3 ms
+
+## run captions=1 rep=2: capture --storyboard sync-storyboard.mjs --spine deckspine/manifest.json --out sync.mp4 --json
+exit=0
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running sync-storyboard.mjs
+capture: warning: say() #1 text differs from spine clip 1 ("Water your garden in the morning. It is …") — the spine's audio plays regardless
+SYNC flip 1 #ff0000 evaluate start 286.3 ms, rAF done 290.5 ms
+capture: warning: say() #2 text differs from spine clip 2 ("Cool morning air means less water is los…") — the spine's audio plays regardless
+SYNC flip 2 #00ff00 evaluate start 6439.2 ms, rAF done 6455.0 ms
+capture: warning: say() #3 text differs from spine clip 3 ("Aim at the roots, not the leaves. Water …") — the spine's audio plays regardless
+SYNC flip 3 #0000ff evaluate start 14438.6 ms, rAF done 14457.7 ms
+say #1: planned 250 ms, say() fired 251 ms (late 1), first R frame #9 = 300.0 ms -> offset vs planned +50.0 ms (+1.50 frames), vs fired +49.0 ms; frame before: K
+say #2: planned 6432 ms, say() fired 6433 ms (late 1), first G frame #194 = 6466.7 ms -> offset vs planned +34.7 ms (+1.04 frames), vs fired +33.7 ms; frame before: R
+say #3: planned 14432 ms, say() fired 14433 ms (late 1), first B frame #434 = 14466.7 ms -> offset vs planned +34.7 ms (+1.04 frames), vs fired +33.7 ms; frame before: G
+frames 600 unknown frames 0
+median offset 34.7 ms, worst 50.0 ms

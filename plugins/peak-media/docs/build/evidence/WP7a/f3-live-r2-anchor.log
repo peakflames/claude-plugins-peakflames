@@ -1,0 +1,6 @@
+$ node capture.mjs --plates plates.json --plate r2-anchor --json --debug-requests
+exit 0 in 13080 ms; 140 page requests; 1 failed/4xx/5xx
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard-anchor.mjs
+capture: 1 say() call(s) started after their clip: #1 +295 ms
+capture: response 404 https://github.com/_global-navigation/payloads.json?can_toggle_site_admin_and_employee_status=0&is_admin_mode_on=0&is_ui_opted_out=0&show_ui_opt_out=0&v=8

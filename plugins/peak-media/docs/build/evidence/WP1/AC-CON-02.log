@@ -1,0 +1,25 @@
+# AC-CON-02 — verifier-wp1-r2-c4e19a07 @ 42652e9, node v26.8.1, 2026-11-08T22:16:25Z; every validate run uses the evals/helpers/no-network.mjs preload
+$ validate evals/fixtures/bad/missing-schemaVersion.manifest.json
+FAIL  evals/fixtures/bad/missing-schemaVersion.manifest.json (spine v1)
+      schemaVersion: is required (this plugin reads schemaVersion 1)
+exit=1
+$ validate evals/fixtures/bad/schemaVersion-2.plates.json
+FAIL  evals/fixtures/bad/schemaVersion-2.plates.json (plates v1)
+      schemaVersion: is 2; this plugin reads 1 — update peak-media or migrate the file
+exit=1
+$ validate evals/fixtures/bad/negative-duration.manifest.json
+FAIL  evals/fixtures/bad/negative-duration.manifest.json (spine v1)
+      beats[1].durationMs: must be >= 1
+exit=1
+$ validate evals/fixtures/bad/unknown-kind.plates.json
+FAIL  evals/fixtures/bad/unknown-kind.plates.json (plates v1)
+      plates[0].kind: must be one of motion, slide, live
+exit=1
+$ validate evals/fixtures/bad/plate-without-beat.plates.json
+FAIL  evals/fixtures/bad/plate-without-beat.plates.json (plates v1)
+      plates[1].beat: is required
+exit=1
+$ validate evals/fixtures/bad/brand-missing-tokens
+FAIL  evals/fixtures/bad/brand-missing-tokens/brand.json (brand v1)
+      tokens: is required
+exit=1

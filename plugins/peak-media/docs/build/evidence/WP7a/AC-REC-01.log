@@ -1,0 +1,93 @@
+# AC-REC-01 verifier run 2026-11-09T03:17:00Z
+$ capture --help
+capture — play a live page in real time, drive it with a storyboard, and screen-capture it
+
+Usage: capture --storyboard <file.mjs> --out <take.webm|.mp4> [options]   |   capture --plates plates.json --plate <id>
+
+Three modes, one storyboard: silent (--no-captions), captions (default) and spine-timed (--spine,
+or --plates/--plate). In spine-timed mode say() plays to the spine manifest's clip timing (no TTS
+here), waitForVoice() waits for the clip's end, and the take lasts exactly the plate's (or the
+spine's) planned duration. Otherwise say() holds for reading time (about 3 words/s, at least 1.5 s)
+and the take ends when the storyboard returns and the last say() has finished.
+The page is --url, else the plate's live.url, else the storyboard's exported `url`, else an
+index.html next to the storyboard; local files are served on 127.0.0.1. Pre-flight (Chromium,
+ffmpeg, the pinned Playwright, a valid --spine) runs before any browser opens.
+Storyboard API: references/storyboard-api.md.
+
+Options:
+      --storyboard <file.mjs>   Storyboard module: export default async ({ page, say, waitForVoice, wait }) => { … }
+      --out <file>              The take: .webm, .mkv or .mp4 (picture only) (default with --plate: <project>/renders/plates/<id>.mp4)
+      --mp4 <file.mp4>          Also write an H.264/AAC MP4 with faststart (silent audio track)
+      --viewport <WxH>          Browser viewport (default: the plate's live.viewport, else 1280x720)
+      --no-captions             Draw no captions (silent mode without --spine)
+      --caption-css <file.css>  Caption style sheet (classes .pm-caption-wrap, .pm-caption) replacing the neutral default
+      --url <url|file>          Page to load: http(s) URL or local .html file/folder (overrides the plate and storyboard)
+      --debug-requests          Log every page request, failure and HTTP error to stderr
+      --audio-offset-ms <ms>    Audio placement offset. Spine-timed: say() fires at clip start minus this (default: the spine's audioOffsetMs); otherwise recorded for the mux (default: -100)
+      --spine <manifest.json>   Spine manifest: say() plays to its clip timing (spine-timed mode)
+      --plates <plates.json>    Project plate list; with --plate, supplies storyboard, url, viewport, fps, size, spine and the planned window
+      --plate <id>              The live plate to capture (needs --plates)
+      --fps <n>                 Capture frame rate (default: plates.json fps, else 30)
+      --json                    Print the take summary as JSON
+  -h, --help                    Show this help and exit
+      --version                 Print the plugin version and exit
+
+Examples:
+  capture --storyboard examples/deck/storyboard.mjs --out /tmp/deck.webm
+  capture --storyboard examples/deck/storyboard.mjs --out /tmp/deck.mp4 --no-captions
+  capture --storyboard examples/deck/storyboard.mjs --out /tmp/deck.mp4 --spine spine/manifest.json
+  capture --plates plates.json --plate r1-feature
+exit=0
+
+# narration flags absent from help:
+0
+
+# each flag parsed: a flag-specific bad value must yield a flag-specific error (proves it was parsed and consumed)
+capture: storyboard not found: /nope.mjs
+exit=1 [--storyboard]
+capture: --out must end in .mp4, .webm, .mkv, got 'a.gif'
+Run 'capture --help' for usage.
+exit=2 [--out]
+capture: --mp4 must end in .mp4, got 'a.mov'
+Run 'capture --help' for usage.
+exit=2 [--mp4]
+capture: --viewport expects WxH like 1280x720, got '12x'
+Run 'capture --help' for usage.
+exit=2 [--viewport]
+capture: --caption-css /nope.css: no such file
+exit=1 [--caption-css]
+capture: page not found: /nope.html — pass --url <http(s) URL or local .html file>
+exit=1 [--url]
+capture: --audio-offset-ms expects a number, got 'abc'
+Run 'capture --help' for usage.
+exit=2 [--audio-offset-ms]
+capture: --spine /nope.json: no such file — point it at spine/manifest.json (or beatgrid.json)
+exit=1 [--spine]
+capture: Option '--no-captions' does not take an argument
+Run 'capture --help' for usage.
+exit=2 [--no-captions boolean takes no value]
+capture: Option '--debug-requests' does not take an argument
+Run 'capture --help' for usage.
+exit=2 [--debug-requests boolean takes no value]
+# booleans accepted (stops at simulated missing ffmpeg = got past parsing):
+capture: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3
+# narration flags rejected:
+capture: Unknown option '--narrate'
+Run 'capture --help' for usage.
+exit=2 [--narrate]
+capture: Unknown option '--tts-model'
+Run 'capture --help' for usage.
+exit=2 [--tts-model x]
+capture: Unknown option '--voice'
+Run 'capture --help' for usage.
+exit=2 [--voice x]
+capture: Unknown option '--style'
+Run 'capture --help' for usage.
+exit=2 [--style x]
+capture: Unknown option '--export-clips'
+Run 'capture --help' for usage.
+exit=2 [--export-clips x]
+capture: Unknown option '--manifest'
+Run 'capture --help' for usage.
+exit=2 [--manifest x]
