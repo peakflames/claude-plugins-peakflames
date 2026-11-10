@@ -1,0 +1,124 @@
+{
+  "model": "google/gemini-3.8-flash-lite-tts",
+  "voice": "Rasalgethi",
+  "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+  "audioOffsetMs": -100,
+  "command": [
+    "node",
+    "record.mjs",
+    "--storyboard",
+    "./storyboard.mjs",
+    "--out",
+    "../final/peak-workflow-3-upgrade.webm",
+    "--mp4",
+    "../final/peak-workflow-3-upgrade.mp4",
+    "--viewport",
+    "1280x720",
+    "--narrate",
+    "--no-captions",
+    "--manifest",
+    "../final/narration.json",
+    "--export-clips",
+    "../final/narration-clips",
+    "--tts-model",
+    "google/gemini-3.8-flash-lite-tts",
+    "--voice",
+    "Rasalgethi",
+    "--style",
+    "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators."
+  ],
+  "videoMs": 194920,
+  "wallMs": 195033,
+  "clips": [
+    {
+      "n": 1,
+      "text": "<Warm and curious> So, your project is due for the Peak Workflow three point oh upgrade. And the first thing every owner asks is fair. What will it actually do to my stuff? Let's walk through a real project. Seven hundred sixteen requirements, one hundred forty-five notes, eighteen questions, and not one word of a requirement changed.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 3159,
+      "durationMs": 18800,
+      "words": 54,
+      "wpm": 172,
+      "file": "d7dc4939e8318fe263bfd752e3c31bb71cacd4b6e73da78e4ff180293a931fe6.wav"
+    },
+    {
+      "n": 2,
+      "text": "<Tone becomes informative> Here's where you start. A requirement is one sentence your app must pass. Over months of work, people left notes right inside them. Why it reads this way. What it used to say. Who approved the change. Useful stuff, but piled up in the wrong place.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 23368,
+      "durationMs": 15320,
+      "words": 46,
+      "wpm": 180,
+      "file": "78d589f38c489d1f41046c0b813a1c207c91b4325ec84439645acac1e53af3dc.wav"
+    },
+    {
+      "n": 3,
+      "text": "<Confident> The upgrade runs in two steps. Step one is easy. It reads your project's history and stamps each epic, which is just a chunk of planned work, with who planned it, when, and on which branch. You just click Apply.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 40090,
+      "durationMs": 12160,
+      "words": 40,
+      "wpm": 197,
+      "file": "5ea4c5309629d55920cb9914dcd456139b92ace0c39a4b3744457a82dbf29b7d.wav"
+    },
+    {
+      "n": 4,
+      "text": "<Engaged> Step two is the big one. Every note gets a home. The reason a requirement reads the way it does is saved right beside it. A past change goes into a small history file. If a note says a requirement was replaced, is no longer needed, or is still an open question, that gets recorded too. And notes that only repeat what's already tracked can be deleted.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 53654,
+      "durationMs": 20560,
+      "words": 67,
+      "wpm": 196,
+      "file": "5825a2b0ceaf96fff06d22b8f383f46a85a9bac225e9da572c821748eb019889.wav"
+    },
+    {
+      "n": 5,
+      "text": "<Thoughtful> And you decide, one card at a time. Every card has three parts. What it's asking, what changes for you, and Claude's own read. Card one asked to delete eighteen background notes that only said where requirements came from. Now look at this line. Requirements, no wording changes. Then you pick. Save as shown, change some, or stop here. Nothing is written until the very end.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 75622,
+      "durationMs": 23160,
+      "words": 66,
+      "wpm": 171,
+      "file": "4350d66e8a75cb3d0cdba4f70a497c045c502aaded1339edf2fe42d4f059bc50.wav"
+    },
+    {
+      "n": 6,
+      "text": "<Tone becomes informative> Most cards look like card two. Ten past edits, each logged under a short, plain title. And some notes hold two things at once. Card nine splits those. The part that's still true becomes the reason. The part about an old edit becomes a history entry. Now on the left, after on the right.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 100199,
+      "durationMs": 17280,
+      "words": 54,
+      "wpm": 188,
+      "file": "6f25cd34af67e4384575a66bdad0d4206521f05cd09edd40e7ac2fc3f9d81b2e.wav"
+    },
+    {
+      "n": 7,
+      "text": "<Confident> Then comes Apply. In this project, the notes were saved as forty-four reasons and one hundred nine history entries. Thirty notes were deleted, and zero requirements. Then the proof. Every requirement gets a fingerprint before and after, and they're compared. Seven hundred sixteen out of seven hundred sixteen, a perfect match.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 118873,
+      "durationMs": 19760,
+      "words": 51,
+      "wpm": 155,
+      "file": "29606a19c59216e90e11a2366584e950e679fb3952f12396fa708f5599baacd1.wav"
+    },
+    {
+      "n": 8,
+      "text": "<Engaged> So, what do you get in three point oh? Clean requirements that say only what's true today, plus a small, write-once history of how they got there. And every requirement now shows a state. Verified, changed since verified, or disputed. Here, six hundred fifteen of seven hundred sixteen were already verified. Changed since verified is your to-do list. For each one, ask one question. Did the meaning change? If yes, run capture requirements. If not, just re-verify it.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 140040,
+      "durationMs": 28000,
+      "words": 78,
+      "wpm": 167,
+      "file": "e825e2e594fc242deecf2ce6a283f7fa934188994a4acba3b420da024caf3c0f.wav"
+    },
+    {
+      "n": 9,
+      "text": "<Warm> So here's your part. One, run slash peak workflow, upgrade. Two, answer the cards. Three, merge the branch, because merging is your approval. Until it's merged, start no new work. Then run slash peak workflow, status, to see where you stand. <Relaxed and warm, slowing down to wrap up> Your words stay yours. Three point oh just gives every note a home.",
+      "style": "Dynamic, conversational, and energetic tone, characteristic of modern tech-focused creators.",
+      "startMs": 169446,
+      "durationMs": 22680,
+      "words": 54,
+      "wpm": 143,
+      "file": "b246280e8cc430e1906db5e3e664b3d47fcd294e71a334a3cf276b223bdbfe82.wav"
+    }
+  ]
+}

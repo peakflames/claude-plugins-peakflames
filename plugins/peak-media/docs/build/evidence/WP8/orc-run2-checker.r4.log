@@ -1,0 +1,10 @@
+User's AC-ORC-01 run 2 (session d5e1f46c-cbdb-4cfa-9556-594f0ee817d8, project ~/tmp/peak-media-orc-01), checked with the round-3 checker, unchanged in round 4 (2026-11-09T15:35Z).
+AC-ORC-01 FAILs only on the missing GATE 6 line: after the reviewer's fixes (lines 856-948) the session went straight to stage 7 and wrote GATE 7.
+The user accepted run 2 for AC-ORC-01 with that deviation (the Lead records it). Round 4 changes the skill text only.
+
+$ check-transcript <session>.jsonl
+FAIL  AC-ORC-01  no passing gate line for gate(s) 6
+PASS  AC-ORC-02  storyboard produced (line 501) and approved (line 567) before the first plate write (line 568: Bash render-plate.mjs" plates.json p1-hook --lint --sheet 2>&1); no write while reopened
+PASS  AC-ORC-03  self-review rounds p1-hook×2, p2-compare×2, p3-close×1, p4-result×1 (1–3 each, every rendered plate), then reviewer Agent at line 844
+PASS  AC-ORC-04  runtimes.md Read (line 464) before the first plate write (line 568: Bash render-plate.mjs" plates.json p1-hook --lint --sheet 2>&1)
+exit=1

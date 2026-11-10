@@ -1,0 +1,438 @@
+{
+  "note": "offsetMs = first frame of the colour - tone onset (picture lags sound when > 0); each frame time carries up to ±16.7 ms (½ frame) of grid rounding. Both modes asserted; no retry.",
+  "ranAlone": {
+    "alone": true,
+    "waitedMs": 187302,
+    "siblingsAtStart": 6
+  },
+  "voiceOnly": {
+    "median": 17.450000000000003,
+    "worst": 18.3,
+    "firstSay": [
+      16.6,
+      16.6
+    ],
+    "offsets": [
+      16.6,
+      16.6,
+      17,
+      17,
+      17.3,
+      17.3,
+      17.6,
+      17.6,
+      18,
+      18,
+      18.3,
+      18.3
+    ]
+  },
+  "captioned": {
+    "median": 17.6,
+    "worst": 50,
+    "firstSay": [
+      16.6,
+      50
+    ],
+    "offsets": [
+      16.6,
+      17,
+      17,
+      17.3,
+      17.3,
+      17.6,
+      17.6,
+      18,
+      18,
+      18.3,
+      18.3,
+      50
+    ]
+  },
+  "runs": [
+    {
+      "captions": false,
+      "says": [
+        {
+          "n": 1,
+          "plannedMs": 250,
+          "startMs": 250,
+          "lateMs": 0
+        },
+        {
+          "n": 2,
+          "plannedMs": 2583,
+          "startMs": 2583,
+          "lateMs": 0
+        },
+        {
+          "n": 3,
+          "plannedMs": 4916,
+          "startMs": 4916,
+          "lateMs": 0
+        },
+        {
+          "n": 4,
+          "plannedMs": 7249,
+          "startMs": 7249,
+          "lateMs": 0
+        },
+        {
+          "n": 5,
+          "plannedMs": 9582,
+          "startMs": 9582,
+          "lateMs": 0
+        },
+        {
+          "n": 6,
+          "plannedMs": 11915,
+          "startMs": 11915,
+          "lateMs": 0
+        }
+      ],
+      "fps": 30,
+      "onsets": [
+        250,
+        2583,
+        4916,
+        7249,
+        9582,
+        11915
+      ],
+      "rows": [
+        {
+          "name": "red",
+          "flipFrame": 8,
+          "flipMs": 266.7,
+          "onsetMs": 250,
+          "offsetMs": 16.6
+        },
+        {
+          "name": "green",
+          "flipFrame": 78,
+          "flipMs": 2600,
+          "onsetMs": 2583,
+          "offsetMs": 17
+        },
+        {
+          "name": "blue",
+          "flipFrame": 148,
+          "flipMs": 4933.3,
+          "onsetMs": 4916,
+          "offsetMs": 17.3
+        },
+        {
+          "name": "yellow",
+          "flipFrame": 218,
+          "flipMs": 7266.7,
+          "onsetMs": 7249,
+          "offsetMs": 17.6
+        },
+        {
+          "name": "magenta",
+          "flipFrame": 288,
+          "flipMs": 9600,
+          "onsetMs": 9582,
+          "offsetMs": 18
+        },
+        {
+          "name": "cyan",
+          "flipFrame": 358,
+          "flipMs": 11933.3,
+          "onsetMs": 11915,
+          "offsetMs": 18.3
+        }
+      ],
+      "medianMs": 17.450000000000003,
+      "worstMs": 18.3
+    },
+    {
+      "captions": true,
+      "says": [
+        {
+          "n": 1,
+          "plannedMs": 250,
+          "startMs": 250,
+          "lateMs": 0
+        },
+        {
+          "n": 2,
+          "plannedMs": 2583,
+          "startMs": 2583,
+          "lateMs": 0
+        },
+        {
+          "n": 3,
+          "plannedMs": 4916,
+          "startMs": 4916,
+          "lateMs": 0
+        },
+        {
+          "n": 4,
+          "plannedMs": 7249,
+          "startMs": 7249,
+          "lateMs": 0
+        },
+        {
+          "n": 5,
+          "plannedMs": 9582,
+          "startMs": 9582,
+          "lateMs": 0
+        },
+        {
+          "n": 6,
+          "plannedMs": 11915,
+          "startMs": 11915,
+          "lateMs": 0
+        }
+      ],
+      "fps": 30,
+      "onsets": [
+        250,
+        2583,
+        4916,
+        7249,
+        9582,
+        11915
+      ],
+      "rows": [
+        {
+          "name": "red",
+          "flipFrame": 8,
+          "flipMs": 266.7,
+          "onsetMs": 250,
+          "offsetMs": 16.6
+        },
+        {
+          "name": "green",
+          "flipFrame": 78,
+          "flipMs": 2600,
+          "onsetMs": 2583,
+          "offsetMs": 17
+        },
+        {
+          "name": "blue",
+          "flipFrame": 148,
+          "flipMs": 4933.3,
+          "onsetMs": 4916,
+          "offsetMs": 17.3
+        },
+        {
+          "name": "yellow",
+          "flipFrame": 218,
+          "flipMs": 7266.7,
+          "onsetMs": 7249,
+          "offsetMs": 17.6
+        },
+        {
+          "name": "magenta",
+          "flipFrame": 288,
+          "flipMs": 9600,
+          "onsetMs": 9582,
+          "offsetMs": 18
+        },
+        {
+          "name": "cyan",
+          "flipFrame": 358,
+          "flipMs": 11933.3,
+          "onsetMs": 11915,
+          "offsetMs": 18.3
+        }
+      ],
+      "medianMs": 17.450000000000003,
+      "worstMs": 18.3
+    },
+    {
+      "captions": false,
+      "says": [
+        {
+          "n": 1,
+          "plannedMs": 250,
+          "startMs": 250,
+          "lateMs": 0
+        },
+        {
+          "n": 2,
+          "plannedMs": 2583,
+          "startMs": 2583,
+          "lateMs": 0
+        },
+        {
+          "n": 3,
+          "plannedMs": 4916,
+          "startMs": 4916,
+          "lateMs": 0
+        },
+        {
+          "n": 4,
+          "plannedMs": 7249,
+          "startMs": 7249,
+          "lateMs": 0
+        },
+        {
+          "n": 5,
+          "plannedMs": 9582,
+          "startMs": 9582,
+          "lateMs": 0
+        },
+        {
+          "n": 6,
+          "plannedMs": 11915,
+          "startMs": 11915,
+          "lateMs": 0
+        }
+      ],
+      "fps": 30,
+      "onsets": [
+        250,
+        2583,
+        4916,
+        7249,
+        9582,
+        11915
+      ],
+      "rows": [
+        {
+          "name": "red",
+          "flipFrame": 8,
+          "flipMs": 266.7,
+          "onsetMs": 250,
+          "offsetMs": 16.6
+        },
+        {
+          "name": "green",
+          "flipFrame": 78,
+          "flipMs": 2600,
+          "onsetMs": 2583,
+          "offsetMs": 17
+        },
+        {
+          "name": "blue",
+          "flipFrame": 148,
+          "flipMs": 4933.3,
+          "onsetMs": 4916,
+          "offsetMs": 17.3
+        },
+        {
+          "name": "yellow",
+          "flipFrame": 218,
+          "flipMs": 7266.7,
+          "onsetMs": 7249,
+          "offsetMs": 17.6
+        },
+        {
+          "name": "magenta",
+          "flipFrame": 288,
+          "flipMs": 9600,
+          "onsetMs": 9582,
+          "offsetMs": 18
+        },
+        {
+          "name": "cyan",
+          "flipFrame": 358,
+          "flipMs": 11933.3,
+          "onsetMs": 11915,
+          "offsetMs": 18.3
+        }
+      ],
+      "medianMs": 17.450000000000003,
+      "worstMs": 18.3
+    },
+    {
+      "captions": true,
+      "says": [
+        {
+          "n": 1,
+          "plannedMs": 250,
+          "startMs": 250,
+          "lateMs": 0
+        },
+        {
+          "n": 2,
+          "plannedMs": 2583,
+          "startMs": 2583,
+          "lateMs": 0
+        },
+        {
+          "n": 3,
+          "plannedMs": 4916,
+          "startMs": 4916,
+          "lateMs": 0
+        },
+        {
+          "n": 4,
+          "plannedMs": 7249,
+          "startMs": 7249,
+          "lateMs": 0
+        },
+        {
+          "n": 5,
+          "plannedMs": 9582,
+          "startMs": 9582,
+          "lateMs": 0
+        },
+        {
+          "n": 6,
+          "plannedMs": 11915,
+          "startMs": 11915,
+          "lateMs": 0
+        }
+      ],
+      "fps": 30,
+      "onsets": [
+        250,
+        2583,
+        4916,
+        7249,
+        9582,
+        11915
+      ],
+      "rows": [
+        {
+          "name": "red",
+          "flipFrame": 9,
+          "flipMs": 300,
+          "onsetMs": 250,
+          "offsetMs": 50
+        },
+        {
+          "name": "green",
+          "flipFrame": 78,
+          "flipMs": 2600,
+          "onsetMs": 2583,
+          "offsetMs": 17
+        },
+        {
+          "name": "blue",
+          "flipFrame": 148,
+          "flipMs": 4933.3,
+          "onsetMs": 4916,
+          "offsetMs": 17.3
+        },
+        {
+          "name": "yellow",
+          "flipFrame": 218,
+          "flipMs": 7266.7,
+          "onsetMs": 7249,
+          "offsetMs": 17.6
+        },
+        {
+          "name": "magenta",
+          "flipFrame": 288,
+          "flipMs": 9600,
+          "onsetMs": 9582,
+          "offsetMs": 18
+        },
+        {
+          "name": "cyan",
+          "flipFrame": 358,
+          "flipMs": 11933.3,
+          "onsetMs": 11915,
+          "offsetMs": 18.3
+        }
+      ],
+      "medianMs": 17.8,
+      "worstMs": 50
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+=================== AC-REC-05 / AC-REC-07: deck spine --lead-ms 950, spine-timed capture --mp4
+beat  how               15.13 s  +6.29 s
+wrote /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/deck950/manifest.json and /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/deck950/narration.wav
+PASS  runtime 21.42 s against a 20.0 s target (+7.1%)
+totalMs 21419 clips [ [ 950, 5455 ], [ 7605, 7273 ], [ 16078, 5091 ] ]
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard.mjs
+capture: narration: 3 clip(s) laid at their say() times +0 ms, -16 LUFS
+capture: 1 say() call(s) started after their clip: #1 +224 ms
+capture exit=0
+videoMs=21433
+says [{"n":1,"planned":950,"start":1174,"late":224},{"n":2,"planned":7605,"start":7605,"late":0},{"n":3,"planned":16078,"start":16078,"late":0}] audio {"clips":3,"lufs":-16}
+
+=================== AC-REC-05 probe-spec on the narrated --mp4
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    duration (±1 frame): 21433 ms
+PASS  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/deck.mp4
+probe-spec exit=0
+stream|codec_name=h264|profile=High|pix_fmt=yuv420p
+stream|codec_name=aac|profile=LC|sample_rate=48000|channels=2
+    I:         -16.0 LUFS
+
+=================== AC-REC-07 check-take on the narrated deck (defaults 0.02 / -40 dB / 900 ms)

@@ -1,0 +1,19 @@
+# AC-PLT-01 r2 — verifier-wp4-r2-a91e50a1 — HEAD 047a6f2 — brand-packs/default
+p1-hook: /tmp/vwp4r2/f1/renders/plates/p1-hook.mp4 (6500 ms, planned 6500) lint+check ok sheet /tmp/vwp4r2/f1/review/contact-p1-hook.jpg
+p2-table: /tmp/vwp4r2/f1/renders/plates/p2-table.mp4 (7500 ms, planned 7500) lint+check ok sheet /tmp/vwp4r2/f1/review/contact-p2-table.jpg
+p3-close: /tmp/vwp4r2/f1/renders/plates/p3-close.mp4 (6000 ms, planned 6000) lint+check ok sheet /tmp/vwp4r2/f1/review/contact-p3-close.jpg
+s1-unit: /tmp/vwp4r2/f2/renders/plates/s1-unit.mp4 (5000 ms, planned 5000) lint+check ok sheet /tmp/vwp4r2/f2/review/contact-s1-unit.jpg
+s2-ids: /tmp/vwp4r2/f2/renders/plates/s2-ids.mp4 (5000 ms, planned 5000) lint+check ok sheet /tmp/vwp4r2/f2/review/contact-s2-ids.jpg
+s3-verify: /tmp/vwp4r2/f2/renders/plates/s3-verify.mp4 (5000 ms, planned 5000) lint+check ok sheet /tmp/vwp4r2/f2/review/contact-s3-verify.jpg
+s4-openspec: /tmp/vwp4r2/f2/renders/plates/s4-openspec.mp4 (5000 ms, planned 5000) lint+check ok sheet /tmp/vwp4r2/f2/review/contact-s4-openspec.jpg
+s5-peak: /tmp/vwp4r2/f2/renders/plates/s5-peak.mp4 (5000 ms, planned 5000) lint+check ok sheet /tmp/vwp4r2/f2/review/contact-s5-peak.jpg
+
+## ffprobe (verifier)
+p1-hook plan=6500ms planFrames=195 probe=[1280,720,30/1,195 6.500000 ] readFrames=195 diffFrames=0
+p2-table plan=7500ms planFrames=225 probe=[1280,720,30/1,225 7.500000 ] readFrames=225 diffFrames=0
+p3-close plan=6000ms planFrames=180 probe=[1280,720,30/1,180 6.000000 ] readFrames=180 diffFrames=0
+s1-unit plan=5000ms planFrames=150 probe=[1280,720,30/1,150 5.000000 ] readFrames=150 diffFrames=0
+s2-ids plan=5000ms planFrames=150 probe=[1280,720,30/1,150 5.000000 ] readFrames=150 diffFrames=0
+s3-verify plan=5000ms planFrames=150 probe=[1280,720,30/1,150 5.000000 ] readFrames=150 diffFrames=0
+s4-openspec plan=5000ms planFrames=150 probe=[1280,720,30/1,150 5.000000 ] readFrames=150 diffFrames=0
+s5-peak plan=5000ms planFrames=150 probe=[1280,720,30/1,150 5.000000 ] readFrames=150 diffFrames=0

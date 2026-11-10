@@ -1,0 +1,130 @@
+{
+  "results": {
+    "deck (spine-timed, narrated)": [
+      {
+        "name": "video codec",
+        "ok": true,
+        "expected": "h264",
+        "actual": "h264"
+      },
+      {
+        "name": "video profile",
+        "ok": true,
+        "expected": "High",
+        "actual": "High"
+      },
+      {
+        "name": "pixel format",
+        "ok": true,
+        "expected": "yuv420p",
+        "actual": "yuv420p"
+      },
+      {
+        "name": "audio codec",
+        "ok": true,
+        "expected": "aac",
+        "actual": "aac"
+      },
+      {
+        "name": "audio sample rate",
+        "ok": true,
+        "expected": "48000",
+        "actual": "48000"
+      },
+      {
+        "name": "faststart (moov before mdat)",
+        "ok": true,
+        "expected": "moov<mdat",
+        "actual": "ftyp,moov,free,mdat"
+      },
+      {
+        "name": "width",
+        "ok": true,
+        "expected": "1280",
+        "actual": "1280"
+      },
+      {
+        "name": "height",
+        "ok": true,
+        "expected": "720",
+        "actual": "720"
+      },
+      {
+        "name": "fps",
+        "ok": true,
+        "expected": "30",
+        "actual": "30.000"
+      },
+      {
+        "name": "duration (±1 frame)",
+        "ok": true,
+        "expected": "21433 ms",
+        "actual": "21433 ms"
+      }
+    ],
+    "ui-demo (captions only)": [
+      {
+        "name": "video codec",
+        "ok": true,
+        "expected": "h264",
+        "actual": "h264"
+      },
+      {
+        "name": "video profile",
+        "ok": true,
+        "expected": "High",
+        "actual": "High"
+      },
+      {
+        "name": "pixel format",
+        "ok": true,
+        "expected": "yuv420p",
+        "actual": "yuv420p"
+      },
+      {
+        "name": "audio codec",
+        "ok": true,
+        "expected": "aac",
+        "actual": "aac"
+      },
+      {
+        "name": "audio sample rate",
+        "ok": true,
+        "expected": "48000",
+        "actual": "48000"
+      },
+      {
+        "name": "faststart (moov before mdat)",
+        "ok": true,
+        "expected": "moov<mdat",
+        "actual": "ftyp,moov,free,mdat"
+      },
+      {
+        "name": "width",
+        "ok": true,
+        "expected": "1280",
+        "actual": "1280"
+      },
+      {
+        "name": "height",
+        "ok": true,
+        "expected": "720",
+        "actual": "720"
+      },
+      {
+        "name": "fps",
+        "ok": true,
+        "expected": "30",
+        "actual": "30.000"
+      },
+      {
+        "name": "duration (±1 frame)",
+        "ok": true,
+        "expected": "14500 ms",
+        "actual": "14500 ms"
+      }
+    ]
+  },
+  "narratedLufs": -16,
+  "captionsOnlyLufs": null
+}

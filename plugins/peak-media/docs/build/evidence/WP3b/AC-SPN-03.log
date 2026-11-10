@@ -1,0 +1,95 @@
+# AC-SPN-03 verifier run 2026-11-09T00:24:28Z HEAD 0dce4ae (manifest from AC-SPN-01 run, $T/s1)
+gap clip 1 -> 2 = 500 ms OK
+gap clip 2 -> 3 = 500 ms OK
+lead before clip1 250 ms; tail after last clip 250 ms
+beat hook [0,5591) clip [250,5341) inside: true
+beat compare [5591,16273) clip [5841,16023) inside: true
+beat close [16273,20773) clip [16523,20523) inside: true
+CUTS=5591,16273
+## ffprobe narration.wav
+stream|codec_name=pcm_s16le|sample_rate=48000|channels=1
+format|duration=20.773000
+$ node $P/lib/verify/check-cuts.mjs $T/s1/narration.wav --cuts 5591,16273 --min-silence-ms 400 --expect-cuts 2
+ok    cut at 0:05.591 — silence 500 ms
+ok    cut at 0:16.273 — silence 500 ms
+PASS  2 cut(s), 0 failing — $T/s1/narration.wav
+exit=0
+$ node $P/lib/verify/check-cuts.mjs $T/s1/narration.wav --cuts 5591,16273 --min-silence-ms 400 --json
+{
+  "ok": true,
+  "file": "$T/s1/narration.wav",
+  "hasAudio": true,
+  "edgeMs": 100,
+  "durMs": 20773,
+  "minSilenceMs": 400,
+  "source": "given",
+  "cuts": [
+    {
+      "cutMs": 5591,
+      "timecode": "0:05.591",
+      "ok": true,
+      "edge": false,
+      "silenceMs": 500,
+      "gap": {
+        "startMs": 5341,
+        "endMs": 5841
+      }
+    },
+    {
+      "cutMs": 16273,
+      "timecode": "0:16.273",
+      "ok": true,
+      "edge": false,
+      "silenceMs": 500,
+      "gap": {
+        "startMs": 16023,
+        "endMs": 16523
+      }
+    }
+  ]
+}
+exit=0
+## negative control: cuts placed mid-clip must fail
+$ node $P/lib/verify/check-cuts.mjs $T/s1/narration.wav --cuts 3000,10000 --min-silence-ms 400
+FAIL  cut at 0:03.000 — not in silence (need ≥ 400 ms)
+FAIL  cut at 0:10.000 — not in silence (need ≥ 400 ms)
+FAIL  2 cut(s), 2 failing — $T/s1/narration.wav
+exit=1
+## negative control: 600 ms demand exceeds the 500 ms gaps -> must fail
+$ node $P/lib/verify/check-cuts.mjs $T/s1/narration.wav --cuts 5591,16273 --min-silence-ms 600
+FAIL  cut at 0:05.591 — silence 500 ms (need ≥ 600 ms)
+FAIL  cut at 0:16.273 — silence 500 ms (need ≥ 600 ms)
+FAIL  2 cut(s), 2 failing — $T/s1/narration.wav
+exit=1
+## hold case: --target-ms 24000 (beats held longer)
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/s3h --tts-model fake/tone --cache-dir $T/cache --target-ms 24000
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165     yes
+2        28  10.18  165     yes
+3        11   4.00  165     yes
+median 165 wpm · 3/3 cached
+clips  3/3 cached · exported to $T/s3h/clips
+beat  hook               0.00 s  +6.59 s
+beat  compare            6.59 s  +11.68 s
+beat  close             18.27 s  +5.50 s
+wrote $T/s3h/manifest.json and $T/s3h/narration.wav
+PASS  runtime 23.77 s against a 24.0 s target (-0.9%)
+exit=0
+gap clip 1 -> 2 = 1500 ms OK
+gap clip 2 -> 3 = 1500 ms OK
+lead before clip1 250 ms; tail after last clip 1250 ms
+beat hook [0,6591) clip [250,5341) inside: true
+beat compare [6591,18273) clip [6841,17023) inside: true
+beat close [18273,23773) clip [18523,22523) inside: true
+CUTS=6591,18273
+$ node $P/lib/verify/check-cuts.mjs $T/s3h/narration.wav --cuts 6591,18273 --min-silence-ms 400 --expect-cuts 2
+ok    cut at 0:06.591 — silence 1500 ms
+ok    cut at 0:18.273 — silence 1500 ms
+PASS  2 cut(s), 0 failing — $T/s3h/narration.wav
+exit=0
+## guard: --lead-ms 150 rejected
+$ nokey node $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/s3x --tts-model fake/tone --cache-dir $T/cache --lead-ms 150
+spine: --lead-ms must be ≥ 200 (DEC-13/29: beats need ≥ 400 ms of silence between them), got 150
+Run 'spine --help' for usage.
+exit=2

@@ -1,0 +1,869 @@
+== /tmp/vwp4/f1/plates/p1-hook
+◆  Linting p1-hook/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking p1-hook
+[hyperframes] check: the report is saved to /tmp/vwp4/f1/plates/p1-hook/.hyperframes/artifacts/checks/27a1c05c-a81f-46cd-908e-3eb5e0754da4.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor="Google Inc. (Apple)" renderer="ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)")
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/52
+[hyperframes] check: craft 2/52
+[hyperframes] check: craft 3/52
+[hyperframes] check: craft 4/52
+[hyperframes] check: craft 5/52
+[hyperframes] check: craft 6/52
+[hyperframes] check: craft 7/52
+[hyperframes] check: craft 8/52
+[hyperframes] check: craft 9/52
+[hyperframes] check: craft 10/52
+[hyperframes] check: craft 11/52
+[hyperframes] check: craft 12/52
+[hyperframes] check: craft 13/52
+[hyperframes] check: craft 14/52
+[hyperframes] check: craft 15/52
+[hyperframes] check: craft 16/52
+[hyperframes] check: craft 17/52
+[hyperframes] check: craft 18/52
+[hyperframes] check: craft 19/52
+[hyperframes] check: craft 20/52
+[hyperframes] check: craft 21/52
+[hyperframes] check: craft 22/52
+[hyperframes] check: craft 23/52
+[hyperframes] check: craft 24/52
+[hyperframes] check: craft 25/52
+[hyperframes] check: craft 26/52
+[hyperframes] check: craft 27/52
+[hyperframes] check: craft 28/52
+[hyperframes] check: craft 29/52
+[hyperframes] check: craft 30/52
+[hyperframes] check: craft 31/52
+[hyperframes] check: craft 32/52
+[hyperframes] check: craft 33/52
+[hyperframes] check: craft 34/52
+[hyperframes] check: craft 35/52
+[hyperframes] check: craft 36/52
+[hyperframes] check: craft 37/52
+[hyperframes] check: craft 38/52
+[hyperframes] check: craft 39/52
+[hyperframes] check: craft 40/52
+[hyperframes] check: craft 41/52
+[hyperframes] check: craft 42/52
+[hyperframes] check: craft 43/52
+[hyperframes] check: craft 44/52
+[hyperframes] check: craft 45/52
+[hyperframes] check: craft 46/52
+[hyperframes] check: craft 47/52
+[hyperframes] check: craft 48/52
+[hyperframes] check: craft 49/52
+[hyperframes] check: craft 50/52
+[hyperframes] check: craft 51/52
+[hyperframes] check: craft 52/52
+[hyperframes] check: overlap 1/7
+[hyperframes] check: overlap 2/7
+[hyperframes] check: overlap 3/7
+[hyperframes] check: overlap 4/7
+[hyperframes] check: overlap 5/7
+[hyperframes] check: overlap 6/7
+[hyperframes] check: overlap 7/7
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 13/13 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f1/plates/p1-hook/.hyperframes/artifacts/checks/27a1c05c-a81f-46cd-908e-3eb5e0754da4.json
+Revision: none (unversioned)
+check exit=0
+== /tmp/vwp4/f1/plates/p2-table
+◆  Linting p2-table/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking p2-table
+[hyperframes] check: the report is saved to /tmp/vwp4/f1/plates/p2-table/.hyperframes/artifacts/checks/519d0610-0350-4c6e-88af-d80fdbd4c3b6.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor="Google Inc. (Apple)" renderer="ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)")
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/60
+[hyperframes] check: craft 2/60
+[hyperframes] check: craft 3/60
+[hyperframes] check: craft 4/60
+[hyperframes] check: craft 5/60
+[hyperframes] check: craft 6/60
+[hyperframes] check: craft 7/60
+[hyperframes] check: craft 8/60
+[hyperframes] check: craft 9/60
+[hyperframes] check: craft 10/60
+[hyperframes] check: craft 11/60
+[hyperframes] check: craft 12/60
+[hyperframes] check: craft 13/60
+[hyperframes] check: craft 14/60
+[hyperframes] check: craft 15/60
+[hyperframes] check: craft 16/60
+[hyperframes] check: craft 17/60
+[hyperframes] check: craft 18/60
+[hyperframes] check: craft 19/60
+[hyperframes] check: craft 20/60
+[hyperframes] check: craft 21/60
+[hyperframes] check: craft 22/60
+[hyperframes] check: craft 23/60
+[hyperframes] check: craft 24/60
+[hyperframes] check: craft 25/60
+[hyperframes] check: craft 26/60
+[hyperframes] check: craft 27/60
+[hyperframes] check: craft 28/60
+[hyperframes] check: craft 29/60
+[hyperframes] check: craft 30/60
+[hyperframes] check: craft 31/60
+[hyperframes] check: craft 32/60
+[hyperframes] check: craft 33/60
+[hyperframes] check: craft 34/60
+[hyperframes] check: craft 35/60
+[hyperframes] check: craft 36/60
+[hyperframes] check: craft 37/60
+[hyperframes] check: craft 38/60
+[hyperframes] check: craft 39/60
+[hyperframes] check: craft 40/60
+[hyperframes] check: craft 41/60
+[hyperframes] check: craft 42/60
+[hyperframes] check: craft 43/60
+[hyperframes] check: craft 44/60
+[hyperframes] check: craft 45/60
+[hyperframes] check: craft 46/60
+[hyperframes] check: craft 47/60
+[hyperframes] check: craft 48/60
+[hyperframes] check: craft 49/60
+[hyperframes] check: craft 50/60
+[hyperframes] check: craft 51/60
+[hyperframes] check: craft 52/60
+[hyperframes] check: craft 53/60
+[hyperframes] check: craft 54/60
+[hyperframes] check: craft 55/60
+[hyperframes] check: craft 56/60
+[hyperframes] check: craft 57/60
+[hyperframes] check: craft 58/60
+[hyperframes] check: craft 59/60
+[hyperframes] check: craft 60/60
+[hyperframes] check: overlap 1/8
+[hyperframes] check: overlap 2/8
+[hyperframes] check: overlap 3/8
+[hyperframes] check: overlap 4/8
+[hyperframes] check: overlap 5/8
+[hyperframes] check: overlap 6/8
+[hyperframes] check: overlap 7/8
+[hyperframes] check: overlap 8/8
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 53/53 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f1/plates/p2-table/.hyperframes/artifacts/checks/519d0610-0350-4c6e-88af-d80fdbd4c3b6.json
+Revision: none (unversioned)
+check exit=0
+== /tmp/vwp4/f1/plates/p3-close
+◆  Linting p3-close/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking p3-close
+[hyperframes] check: the report is saved to /tmp/vwp4/f1/plates/p3-close/.hyperframes/artifacts/checks/0ff02e36-244c-4441-b488-02e18d5d60aa.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor="Google Inc. (Apple)" renderer="ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)")
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/48
+[hyperframes] check: craft 2/48
+[hyperframes] check: craft 3/48
+[hyperframes] check: craft 4/48
+[hyperframes] check: craft 5/48
+[hyperframes] check: craft 6/48
+[hyperframes] check: craft 7/48
+[hyperframes] check: craft 8/48
+[hyperframes] check: craft 9/48
+[hyperframes] check: craft 10/48
+[hyperframes] check: craft 11/48
+[hyperframes] check: craft 12/48
+[hyperframes] check: craft 13/48
+[hyperframes] check: craft 14/48
+[hyperframes] check: craft 15/48
+[hyperframes] check: craft 16/48
+[hyperframes] check: craft 17/48
+[hyperframes] check: craft 18/48
+[hyperframes] check: craft 19/48
+[hyperframes] check: craft 20/48
+[hyperframes] check: craft 21/48
+[hyperframes] check: craft 22/48
+[hyperframes] check: craft 23/48
+[hyperframes] check: craft 24/48
+[hyperframes] check: craft 25/48
+[hyperframes] check: craft 26/48
+[hyperframes] check: craft 27/48
+[hyperframes] check: craft 28/48
+[hyperframes] check: craft 29/48
+[hyperframes] check: craft 30/48
+[hyperframes] check: craft 31/48
+[hyperframes] check: craft 32/48
+[hyperframes] check: craft 33/48
+[hyperframes] check: craft 34/48
+[hyperframes] check: craft 35/48
+[hyperframes] check: craft 36/48
+[hyperframes] check: craft 37/48
+[hyperframes] check: craft 38/48
+[hyperframes] check: craft 39/48
+[hyperframes] check: craft 40/48
+[hyperframes] check: craft 41/48
+[hyperframes] check: craft 42/48
+[hyperframes] check: craft 43/48
+[hyperframes] check: craft 44/48
+[hyperframes] check: craft 45/48
+[hyperframes] check: craft 46/48
+[hyperframes] check: craft 47/48
+[hyperframes] check: craft 48/48
+[hyperframes] check: overlap 1/6
+[hyperframes] check: overlap 2/6
+[hyperframes] check: overlap 3/6
+[hyperframes] check: overlap 4/6
+[hyperframes] check: overlap 5/6
+[hyperframes] check: overlap 6/6
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 9/9 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f1/plates/p3-close/.hyperframes/artifacts/checks/0ff02e36-244c-4441-b488-02e18d5d60aa.json
+Revision: none (unversioned)
+check exit=0
+== /tmp/vwp4/f2/plates/s1-unit
+◆  Linting s1-unit/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking s1-unit
+[hyperframes] check: the report is saved to /tmp/vwp4/f2/plates/s1-unit/.hyperframes/artifacts/checks/6b1e4339-274f-4dd9-a346-6dcdf5824a5a.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/40
+[hyperframes] check: craft 2/40
+[hyperframes] check: craft 3/40
+[hyperframes] check: craft 4/40
+[hyperframes] check: craft 5/40
+[hyperframes] check: craft 6/40
+[hyperframes] check: craft 7/40
+[hyperframes] check: craft 8/40
+[hyperframes] check: craft 9/40
+[hyperframes] check: craft 10/40
+[hyperframes] check: craft 11/40
+[hyperframes] check: craft 12/40
+[hyperframes] check: craft 13/40
+[hyperframes] check: craft 14/40
+[hyperframes] check: craft 15/40
+[hyperframes] check: craft 16/40
+[hyperframes] check: craft 17/40
+[hyperframes] check: craft 18/40
+[hyperframes] check: craft 19/40
+[hyperframes] check: craft 20/40
+[hyperframes] check: craft 21/40
+[hyperframes] check: craft 22/40
+[hyperframes] check: craft 23/40
+[hyperframes] check: craft 24/40
+[hyperframes] check: craft 25/40
+[hyperframes] check: craft 26/40
+[hyperframes] check: craft 27/40
+[hyperframes] check: craft 28/40
+[hyperframes] check: craft 29/40
+[hyperframes] check: craft 30/40
+[hyperframes] check: craft 31/40
+[hyperframes] check: craft 32/40
+[hyperframes] check: craft 33/40
+[hyperframes] check: craft 34/40
+[hyperframes] check: craft 35/40
+[hyperframes] check: craft 36/40
+[hyperframes] check: craft 37/40
+[hyperframes] check: craft 38/40
+[hyperframes] check: craft 39/40
+[hyperframes] check: craft 40/40
+[hyperframes] check: overlap 1/5
+[hyperframes] check: overlap 2/5
+[hyperframes] check: overlap 3/5
+[hyperframes] check: overlap 4/5
+[hyperframes] check: overlap 5/5
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 26/26 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f2/plates/s1-unit/.hyperframes/artifacts/checks/6b1e4339-274f-4dd9-a346-6dcdf5824a5a.json
+Revision: none (unversioned)
+check exit=0
+== /tmp/vwp4/f2/plates/s2-ids
+◆  Linting s2-ids/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking s2-ids
+[hyperframes] check: the report is saved to /tmp/vwp4/f2/plates/s2-ids/.hyperframes/artifacts/checks/ad769d06-23b1-4461-8b36-898d1b2c4bb6.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor="Google Inc. (Apple)" renderer="ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)")
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/40
+[hyperframes] check: craft 2/40
+[hyperframes] check: craft 3/40
+[hyperframes] check: craft 4/40
+[hyperframes] check: craft 5/40
+[hyperframes] check: craft 6/40
+[hyperframes] check: craft 7/40
+[hyperframes] check: craft 8/40
+[hyperframes] check: craft 9/40
+[hyperframes] check: craft 10/40
+[hyperframes] check: craft 11/40
+[hyperframes] check: craft 12/40
+[hyperframes] check: craft 13/40
+[hyperframes] check: craft 14/40
+[hyperframes] check: craft 15/40
+[hyperframes] check: craft 16/40
+[hyperframes] check: craft 17/40
+[hyperframes] check: craft 18/40
+[hyperframes] check: craft 19/40
+[hyperframes] check: craft 20/40
+[hyperframes] check: craft 21/40
+[hyperframes] check: craft 22/40
+[hyperframes] check: craft 23/40
+[hyperframes] check: craft 24/40
+[hyperframes] check: craft 25/40
+[hyperframes] check: craft 26/40
+[hyperframes] check: craft 27/40
+[hyperframes] check: craft 28/40
+[hyperframes] check: craft 29/40
+[hyperframes] check: craft 30/40
+[hyperframes] check: craft 31/40
+[hyperframes] check: craft 32/40
+[hyperframes] check: craft 33/40
+[hyperframes] check: craft 34/40
+[hyperframes] check: craft 35/40
+[hyperframes] check: craft 36/40
+[hyperframes] check: craft 37/40
+[hyperframes] check: craft 38/40
+[hyperframes] check: craft 39/40
+[hyperframes] check: craft 40/40
+[hyperframes] check: overlap 1/5
+[hyperframes] check: overlap 2/5
+[hyperframes] check: overlap 3/5
+[hyperframes] check: overlap 4/5
+[hyperframes] check: overlap 5/5
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 26/26 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f2/plates/s2-ids/.hyperframes/artifacts/checks/ad769d06-23b1-4461-8b36-898d1b2c4bb6.json
+Revision: none (unversioned)
+check exit=0
+== /tmp/vwp4/f2/plates/s3-verify
+◆  Linting s3-verify/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking s3-verify
+[hyperframes] check: the report is saved to /tmp/vwp4/f2/plates/s3-verify/.hyperframes/artifacts/checks/f7f086da-3f7f-47b4-b35a-2acd4fa6aa0d.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor="Google Inc. (Apple)" renderer="ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)")
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/40
+[hyperframes] check: craft 2/40
+[hyperframes] check: craft 3/40
+[hyperframes] check: craft 4/40
+[hyperframes] check: craft 5/40
+[hyperframes] check: craft 6/40
+[hyperframes] check: craft 7/40
+[hyperframes] check: craft 8/40
+[hyperframes] check: craft 9/40
+[hyperframes] check: craft 10/40
+[hyperframes] check: craft 11/40
+[hyperframes] check: craft 12/40
+[hyperframes] check: craft 13/40
+[hyperframes] check: craft 14/40
+[hyperframes] check: craft 15/40
+[hyperframes] check: craft 16/40
+[hyperframes] check: craft 17/40
+[hyperframes] check: craft 18/40
+[hyperframes] check: craft 19/40
+[hyperframes] check: craft 20/40
+[hyperframes] check: craft 21/40
+[hyperframes] check: craft 22/40
+[hyperframes] check: craft 23/40
+[hyperframes] check: craft 24/40
+[hyperframes] check: craft 25/40
+[hyperframes] check: craft 26/40
+[hyperframes] check: craft 27/40
+[hyperframes] check: craft 28/40
+[hyperframes] check: craft 29/40
+[hyperframes] check: craft 30/40
+[hyperframes] check: craft 31/40
+[hyperframes] check: craft 32/40
+[hyperframes] check: craft 33/40
+[hyperframes] check: craft 34/40
+[hyperframes] check: craft 35/40
+[hyperframes] check: craft 36/40
+[hyperframes] check: craft 37/40
+[hyperframes] check: craft 38/40
+[hyperframes] check: craft 39/40
+[hyperframes] check: craft 40/40
+[hyperframes] check: overlap 1/5
+[hyperframes] check: overlap 2/5
+[hyperframes] check: overlap 3/5
+[hyperframes] check: overlap 4/5
+[hyperframes] check: overlap 5/5
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 26/26 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f2/plates/s3-verify/.hyperframes/artifacts/checks/f7f086da-3f7f-47b4-b35a-2acd4fa6aa0d.json
+Revision: none (unversioned)
+check exit=0
+== /tmp/vwp4/f2/plates/s4-openspec
+◆  Linting s4-openspec/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking s4-openspec
+[hyperframes] check: the report is saved to /tmp/vwp4/f2/plates/s4-openspec/.hyperframes/artifacts/checks/dd1aaf80-8cd5-42aa-ab5c-40f95e576974.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor="Google Inc. (Apple)" renderer="ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)")
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/40
+[hyperframes] check: craft 2/40
+[hyperframes] check: craft 3/40
+[hyperframes] check: craft 4/40
+[hyperframes] check: craft 5/40
+[hyperframes] check: craft 6/40
+[hyperframes] check: craft 7/40
+[hyperframes] check: craft 8/40
+[hyperframes] check: craft 9/40
+[hyperframes] check: craft 10/40
+[hyperframes] check: craft 11/40
+[hyperframes] check: craft 12/40
+[hyperframes] check: craft 13/40
+[hyperframes] check: craft 14/40
+[hyperframes] check: craft 15/40
+[hyperframes] check: craft 16/40
+[hyperframes] check: craft 17/40
+[hyperframes] check: craft 18/40
+[hyperframes] check: craft 19/40
+[hyperframes] check: craft 20/40
+[hyperframes] check: craft 21/40
+[hyperframes] check: craft 22/40
+[hyperframes] check: craft 23/40
+[hyperframes] check: craft 24/40
+[hyperframes] check: craft 25/40
+[hyperframes] check: craft 26/40
+[hyperframes] check: craft 27/40
+[hyperframes] check: craft 28/40
+[hyperframes] check: craft 29/40
+[hyperframes] check: craft 30/40
+[hyperframes] check: craft 31/40
+[hyperframes] check: craft 32/40
+[hyperframes] check: craft 33/40
+[hyperframes] check: craft 34/40
+[hyperframes] check: craft 35/40
+[hyperframes] check: craft 36/40
+[hyperframes] check: craft 37/40
+[hyperframes] check: craft 38/40
+[hyperframes] check: craft 39/40
+[hyperframes] check: craft 40/40
+[hyperframes] check: overlap 1/5
+[hyperframes] check: overlap 2/5
+[hyperframes] check: overlap 3/5
+[hyperframes] check: overlap 4/5
+[hyperframes] check: overlap 5/5
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 21/21 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f2/plates/s4-openspec/.hyperframes/artifacts/checks/dd1aaf80-8cd5-42aa-ab5c-40f95e576974.json
+Revision: none (unversioned)
+check exit=0
+== /tmp/vwp4/f2/plates/s5-peak
+◆  Linting s5-peak/index.html
+
+◇  0 errors, 0 warnings
+lint exit=0
+◆  Checking s5-peak
+[hyperframes] check: the report is saved to /tmp/vwp4/f2/plates/s5-peak/.hyperframes/artifacts/checks/31612226-c248-4333-a43b-e98f2881c85f.json when the check ends, unless a warning says it could not be saved
+[hyperframes] check: starting Chrome
+[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor="Google Inc. (Apple)" renderer="ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)")
+[hyperframes] check: loading the page
+[hyperframes] check: waiting for the page to be ready
+[hyperframes] check: checking samples
+[hyperframes] check: samples 1/9
+[hyperframes] check: samples 2/9
+[hyperframes] check: samples 3/9
+[hyperframes] check: samples 4/9
+[hyperframes] check: samples 5/9
+[hyperframes] check: samples 6/9
+[hyperframes] check: samples 7/9
+[hyperframes] check: samples 8/9
+[hyperframes] check: samples 9/9
+[hyperframes] check: running the overlap pass
+[hyperframes] check: craft 1/40
+[hyperframes] check: craft 2/40
+[hyperframes] check: craft 3/40
+[hyperframes] check: craft 4/40
+[hyperframes] check: craft 5/40
+[hyperframes] check: craft 6/40
+[hyperframes] check: craft 7/40
+[hyperframes] check: craft 8/40
+[hyperframes] check: craft 9/40
+[hyperframes] check: craft 10/40
+[hyperframes] check: craft 11/40
+[hyperframes] check: craft 12/40
+[hyperframes] check: craft 13/40
+[hyperframes] check: craft 14/40
+[hyperframes] check: craft 15/40
+[hyperframes] check: craft 16/40
+[hyperframes] check: craft 17/40
+[hyperframes] check: craft 18/40
+[hyperframes] check: craft 19/40
+[hyperframes] check: craft 20/40
+[hyperframes] check: craft 21/40
+[hyperframes] check: craft 22/40
+[hyperframes] check: craft 23/40
+[hyperframes] check: craft 24/40
+[hyperframes] check: craft 25/40
+[hyperframes] check: craft 26/40
+[hyperframes] check: craft 27/40
+[hyperframes] check: craft 28/40
+[hyperframes] check: craft 29/40
+[hyperframes] check: craft 30/40
+[hyperframes] check: craft 31/40
+[hyperframes] check: craft 32/40
+[hyperframes] check: craft 33/40
+[hyperframes] check: craft 34/40
+[hyperframes] check: craft 35/40
+[hyperframes] check: craft 36/40
+[hyperframes] check: craft 37/40
+[hyperframes] check: craft 38/40
+[hyperframes] check: craft 39/40
+[hyperframes] check: craft 40/40
+[hyperframes] check: overlap 1/5
+[hyperframes] check: overlap 2/5
+[hyperframes] check: overlap 3/5
+[hyperframes] check: overlap 4/5
+[hyperframes] check: overlap 5/5
+[hyperframes] check: checking samples
+[hyperframes] check: analyze 0/3
+[hyperframes] check: analyzing the samples
+[hyperframes] check: analyze 1/3
+[hyperframes] check: analyze 2/3
+
+Lint
+  ◇ 0 errors, 0 warnings
+
+Runtime
+  ◇ 0 errors, 0 warnings
+
+Layout
+  ◇ 0 issues across 9 sample(s)
+
+Motion
+  ◇ 0 errors, 0 warnings
+
+Contrast
+  ◇ 21/21 text checks pass WCAG AA
+
+Craft
+  ◇ 0 errors, 0 warnings
+
+Audio
+  ℹ audio_none: The film has no sound: no clip in it plays audio.
+    index.html [data-composition-id] t=0s
+  0 error(s), 0 warning(s), 1 info(s)
+
+Snapshots
+  ◇ disabled
+
+◇  Check passed
+Report: /tmp/vwp4/f2/plates/s5-peak/.hyperframes/artifacts/checks/31612226-c248-4333-a43b-e98f2881c85f.json
+Revision: none (unversioned)
+check exit=0

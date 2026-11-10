@@ -1,0 +1,32 @@
+ok   unmarked, fix ends position-fixed: got=null expected=null
+ok   unmarked, half-open: got=null expected=null
+DIFF unmarked, ends "-fixed" w/ space dash missing: "x→y -fixed": got="fixed" expected=null
+ok   unmarked fix text ends " - open" (ambiguous prose): got="open" expected="open"
+ok   em dash fixed: got="fixed" expected="fixed"
+ok   en dash open: got="open" expected="open"
+ok   hyphen fixed: got="fixed" expected="fixed"
+ok   double hyphen open: got="open" expected="open"
+ok   bold fixed: got="fixed" expected="fixed"
+ok   bold incl dash: got=null expected=null
+ok   fixed with check emoji: got="fixed" expected="fixed"
+ok   fixed with ✓: got="fixed" expected="fixed"
+ok   fixed with period: got="fixed" expected="fixed"
+ok   FIXED caps: got="fixed" expected="fixed"
+ok   not fixed: got="not fixed" expected="not fixed"
+ok   not fixed bold: got="not fixed" expected="not fixed"
+ok   fixed (re-rendered): got=null expected=null
+ok   fixed in r2: got=null expected=null
+ok   no space after dash: got="fixed" expected="fixed"
+ok   no space before em dash: got=null expected=null
+ok   "unfixed": got=null expected=null
+ok   "still open": got=null expected=null
+ok   "reopen" no dash: got=null expected=null
+ok   fix text "a - b fixed" (fixed is last word after spaced dash text?): got=null expected=null
+ok   trailing spaces + tab: got="fixed" expected="fixed"
+ok   italic _fixed_: got=null expected=null
+ok   backtick `fixed`: got=null expected=null
+ok   fixed ✔️ (VS16): got="fixed" expected="fixed"
+ok   fixed 🎉🎉: got="fixed" expected="fixed"
+ok   "open" then emoji ❌: got="open" expected="open"
+ok   open but ❌ makes "fixed ❌": got="fixed" expected="fixed"
+30/31 as expected

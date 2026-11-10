@@ -1,0 +1,10 @@
+PASS  trace: 79 ACs, 12 briefs, 0 problem(s)
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-ORC-01 | manual | — | not-started | — |
+| AC-ORC-02 | script (transcript grep) | pass | not-started | — |
+| AC-ORC-03 | script | pass | not-started | — |
+| AC-ORC-04 | script | pass | not-started | — |
+| AC-ORC-05 | script | pass | not-started | — |
+| AC-BASE-13 | script | pass | not-started | — |
+exit=0

@@ -1,0 +1,79 @@
+# AC-BASE-13 verifier round 2 2026-11-09T14:12:07Z HEAD 8fcf8a4
+$ retime-plates --help
+retime-plates — set each plate's startMs/durationMs from its spine beat (one plate per beat)
+
+Usage: retime-plates [options] <plates.json|project-folder>
+
+Reads plates.json (or <folder>/plates.json when given a project folder) and its spine (the "spine" path in plates.json, or --spine): spine/manifest.json
+for narration or spine/beatgrid.json for a beat grid. Every plate takes its beat's startMs and
+durationMs, so plate cuts fall in the silent gaps between beats. Each spine beat must have exactly
+one plate: a plate naming an unknown beat, a beat with no plate, or two plates on one beat is
+refused with the plate or beat named. The result is validated against plates.v1.json and written
+in place (or to --out; relative spine/brand paths are rebased). Run it after every spine run.
+Exit 0 ok, 1 refused or invalid (nothing written), 2 usage. --check writes nothing and exits 1
+if any plate's times would change. Plates listed out of beat order are kept in their order, with a
+warning on stderr (exit 0): the plate list reads best in beat order.
+
+Options:
+  -o, --out <file>    Write the retimed plates.json here (default: in place)
+      --spine <file>  Spine manifest.json or beatgrid.json (default: plates.json "spine"); also sets "spine"
+      --check         Write nothing; exit 1 if any plate is not on its beat's times
+      --json          Print the per-plate changes as JSON
+  -h, --help          Show this help and exit
+      --version       Print the plugin version and exit
+
+Examples:
+  retime-plates plates.json
+  retime-plates plates.json --spine spine/beatgrid.json
+  retime-plates plates.json --check
+  retime-plates my-video/
+exit 0
+$ retime-plates --version
+0.1.0
+exit 0  | plugin.json: 0.1.0
+## bad inputs (want: non-zero, one line, no stack trace)
+-- [] exit 2 lines 2 stack 0
+   retime-plates: expected at least 1 argument(s), got 0
+   Run 'retime-plates --help' for usage.
+-- [a b] exit 2 lines 2 stack 0
+   retime-plates: unexpected argument 'b'
+   Run 'retime-plates --help' for usage.
+-- [--bogus x] exit 2 lines 2 stack 0
+   retime-plates: Unknown option '--bogus'
+   Run 'retime-plates --help' for usage.
+-- [--check --out x /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/p/plates.json] exit 2 lines 2 stack 0
+   retime-plates: pass --check or --out, not both
+   Run 'retime-plates --help' for usage.
+-- [/nope/plates.json] exit 1 lines 1 stack 0
+   retime-plates: cannot read plates file /nope/plates.json: no such file
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/emptydir] exit 1 lines 1 stack 0
+   retime-plates: /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/emptydir is a folder with no plates.json — pass the plates.json path
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/emptydir/] exit 1 lines 1 stack 0
+   retime-plates: /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/emptydir/ is a folder with no plates.json — pass the plates.json path
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/broken.json] exit 1 lines 1 stack 0
+   retime-plates: plates file /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/broken.json is not valid JSON: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/noplates.json] exit 1 lines 1 stack 0
+   retime-plates: /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/noplates.json has no plates[] — not a plates.json
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/unread.json] exit 1 lines 1 stack 0
+   retime-plates: cannot read plates file /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/unread.json: no such file
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/p/plates.json --spine /nope.json] exit 1 lines 1 stack 0
+   retime-plates: spine not found: ../../../../../../../../../../nope.json — run the spine first (video-spine)
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/p/plates.json --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/broken.json] exit 1 lines 1 stack 0
+   retime-plates: spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/broken.json is not valid JSON: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/p/plates.json -o /nope/dir/x.json] exit 70 lines 4 stack 0
+   p1-hook          hook               0 ms +7500 ms  (was 0 +6500)
+   p2-table         compare         7500 ms +12500 ms  (was 6500 +7500)
+   p3-close         close          20000 ms +6000 ms  (was 14000 +6000)
+   retime-plates: unexpected error: ENOENT: no such file or directory, open '/nope/dir/x.json' (set PEAK_MEDIA_DEBUG=1 for a stack trace)
+-- [/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/p --out] exit 2 lines 2 stack 0
+   retime-plates: Option '-o, --out <value>' argument missing
+   Run 'retime-plates --help' for usage.
+## folder arg happy path
+PASS  retimed 3 plate(s) from beatgrid.json (3 changed) → /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dUNA2vzzYR/p
+exit 0
+## imports (network check)
+5:import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
+6:import path from 'node:path';
+7:import { fileURLToPath } from 'node:url';
+8:import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
+9:import { validateDoc } from '../../../lib/schemas.mjs';

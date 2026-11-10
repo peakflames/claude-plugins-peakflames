@@ -1,0 +1,37 @@
+
+=================== AC-REC-09: manifests validate against schemas/spine-manifest.v1.json
+deck.take.json VALID
+  kind narration narrate true clips 3 captions 0 videoMs 21433 wallMs 21489 spine deck950/manifest.json
+ui-default.take.json VALID
+  kind beatgrid narrate false clips 0 captions 5 videoMs 14267 wallMs 14283 spine -
+ui-nocap.take.json VALID
+  kind beatgrid narrate false clips 0 captions 0 videoMs 14200 wallMs 14214 spine -
+ui-css.take.json VALID
+  kind beatgrid narrate false clips 0 captions 5 videoMs 14233 wallMs 14239 spine -
+deck clips laid vs spine:
+[[1,950],[2,7605],[3,16078]] spine [[1,950],[2,7605],[3,16078]]
+
+=================== AC-REC-09: command[] of ui-css.take.json re-run from another directory
+2ed19452693f
+["node","/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/scripts/capture.mjs","--storyboard","/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/ui-demo/storyboard.mjs","--mp4","/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/ui-css.mp4","--caption-css","/Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/ui-demo/captions-alt.css","--json"]
+capture: launching browser (1280x720, 30 fps, mode captions)
+capture: t0 anchored on the first frame; running storyboard.mjs
+capture: audio: silent AAC track (no narration in this take)
+rerun exit=0
+same command true mode captions captions videoMs 14233 14233 frames 427 427
+ caption 1 46 51 d= 5 dur 3333 3333 true
+ caption 2 3379 3383 d= 4 dur 2999 3000 true
+ caption 3 6379 6383 d= 4 dur 2333 2333 true
+ caption 4 8713 8717 d= 4 dur 3000 3000 true
+ caption 5 11713 11717 d= 4 dur 2000 2000 true
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+PASS  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/ui-css.mp4
+rerun probe-spec exit=0

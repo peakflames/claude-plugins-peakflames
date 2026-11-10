@@ -1,0 +1,96 @@
+# verifier-wp4l-a9349ae4 — WP4 layout follow-up — HEAD 5151294 (layout commit 5cf766c). $VT = verifier temp dir (deleted after the run).
+## node --test plugins/peak-media/evals
+✔ AC-BRD-01: brand-packs/default validates and every font has a licence file (340.605417ms)
+✔ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (16148.317334ms)
+✔ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (56975.796875ms)
+✔ AC-BRD-03: the plugin tree ships no music or other audio files (97.441083ms)
+✔ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (61736.229667ms)
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (1949.241791ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (1725.658459ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (733.962792ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (477.888666ms)
+✔ validate: cross-reference checks (not AC-bound) (1642.3245ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (146.189667ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (131.485083ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (12868.651666ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (18015.083875ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (36.760709ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (712.699084ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (231.471417ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (153.409791ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (904.579833ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (1062.695916ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (147.756541ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (149.6555ms)
+✔ AC-BASE-03: contact-sheet baseline (701.790875ms)
+✔ AC-BASE-04: probe-spec baseline (1251.028917ms)
+✔ AC-BASE-05: check-cuts baseline (391.50825ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (1077.314375ms)
+✔ AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a ≥300 ms silent gap (6565.622916ms)
+✔ AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream md5 unchanged (17678.671667ms)
+✔ default levels: music sits 9–15 dB under the voice, rises between lines, SFX hits are audible (4499.407375ms)
+✔ AC-ASM-03: out/final.mp4 passes probe-spec and lasts spine + outro ±1 frame (45785.86125ms)
+✔ AC-ASM-04: no music supplied — assembly succeeds with narration only (and a beat grid gets a silent track) (12345.710417ms)
+✔ AC-ASM-05: the final contact sheet ends on the brand outro (4401.612125ms)
+✔ AC-BASE-11: assemble --help lists every flag, --version = plugin.json, bad input is one line with no stack (933.699708ms)
+✔ AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, bad input is one line with no stack (1198.825875ms)
+✔ AC-BASE-08: render-plate --help/--version/bad input follow the baseline (1758.048916ms)
+✔ AC-BASE-08: a live plate named explicitly is refused with a pointer to video-capture (214.277334ms)
+✔ AC-BASE-08: --all skips live plates (they belong to video-capture) (315.401041ms)
+✔ AC-PLT-01: every F1 plate renders alone to durationMs ±1 frame (99803.789833ms)
+✔ AC-PLT-01: a hand-authored index.html is kept; brand/ and vendor/ are refreshed (583.670167ms)
+✔ AC-PLT-01: an over-long motion line wraps inside the frame (no edge overflow) (21144.229875ms)
+✔ AC-PLT-01: text that cannot fit at the 27 px floor fails fast with one line naming the plate (93.121ms)
+✔ AC-PLT-04: every F1 and F2 plate passes hyperframes lint and check --strict (32385.24375ms)
+✔ AC-VND-01: every path listed in vendored-map.md exists (4.870917ms)
+✔ AC-VND-01: every vendor folder is referenced by vendored-map.md (no orphans) (4.390375ms)
+✔ AC-VND-01: the map tells the agent to Read runtimes.md before the first plate (0.784625ms)
+✔ AC-VND-02: no `hyperframes events` telemetry line anywhere in the vendor tree; LICENSE is present (14.636958ms)
+✔ AC-VND-02: vendored skills are references, not registered skills (no SKILL.md under vendor/) (2.642041ms)
+✔ AC-SPN-01: F1 brief → script → spine with fake/tone; manifest.totalMs within 20 s ±10% and validates (117.817834ms)
+✔ AC-SPN-02: F1 with the key unset → beatgrid.json validates, 0 OpenRouter calls, runtime within ±10% (387.542709ms)
+✔ AC-SPN-03: F1 manifest gaps between beats are ≥ 400 ms and check-cuts passes at every beat boundary (113.449459ms)
+✔ AC-BASE-06: spine baseline (help lists every flag, version, one-line errors, no stack, no network) (2538.081458ms)
+✔ spine: script.md parsing, layout rules and a second (neutral) brief (not AC-bound) (163.309459ms)
+✔ openrouter: sample rate read from the response content-type, table as fallback (not AC-bound) (22.011958ms)
+✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (203.821834ms)
+ℹ --voice Nope: exit 2 in 79 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+ℹ key unset: exit 3 in 58 ms — sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)
+ℹ ffmpeg missing: exit 3 in 63 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (0.620958ms)
+ℹ 9/9 legacy clip keys match (model google/gemini-3.8-flash-lite-tts, voice Rasalgethi)
+✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (159.562292ms)
+ℹ lib: clip reused from pm-tts-legacy-Y105b5/…/tts, calls=0, 1234 ms
+ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  $VT/pm-tts-legacy-out-brdgr7/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached
+✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (83.401875ms)
+ℹ run1 calls=3, run2 calls=0 (3/3 cached), from export calls=0 (3/3 cached)
+ℹ 
+✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (64.822083ms)
+ℹ 
+✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (374.106791ms)
+ℹ 
+✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (147.494083ms)
+ℹ ffprobe: pcm_s16le 24000 Hz 1 ch, 3529 ms, 169456 bytes
+✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (638.268833ms)
+ℹ tests 61
+ℹ suites 0
+ℹ pass 61
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 156391.3195
+## ac-run --wp WP4
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-PLT-01 | script | pass | PASS | evidence/WP4/AC-PLT-01.r2.log |
+| AC-PLT-02 | still | — | PASS | evidence/WP4/AC-PLT-02-verifier-r2-p1-hook.jpg, evidence/WP4/AC-PLT-02-verifier-r2-p2-table.jpg, evidence/WP4/AC-PLT-02-verifier-r2-p3-close.jpg |
+| AC-PLT-03 | still | — | PASS | evidence/WP4/AC-PLT-03-verifier-r2-s1-unit.jpg, evidence/WP4/AC-PLT-03-verifier-r2-s5-peak.jpg, evidence/WP4/AC-PLT-03.r2.log |
+| AC-PLT-04 | script | pass | PASS | evidence/WP4/AC-PLT-04.r2.log |
+| AC-VND-01 | script | pass | PASS | evidence/WP4/AC-VND-01.r2.log |
+| AC-VND-02 | script | pass | PASS | evidence/WP4/AC-VND-02.r2.log |
+| AC-BASE-08 | script | pass | PASS | evidence/WP4/AC-BASE-08.r2.log |
+wp4 exit=0
+## ac-run --trace
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+trace exit=0

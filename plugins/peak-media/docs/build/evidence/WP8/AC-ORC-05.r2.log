@@ -1,0 +1,14 @@
+plugin.json version: 0.1.0
+node v26.8.1, 2026-11-09T14:18Z, round 2
+
+$ node --test --test-name-pattern=^AC-ORC-05: plugins/peak-media/evals/plate-factory
+✔ AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and refuses anything but one plate per beat (866.097375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1156.041167
+exit=0

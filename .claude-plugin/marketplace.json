@@ -18,6 +18,11 @@
       "name": "peak-workflow",
       "description": "Requirements-driven development workflow in the spirit of DO-330 TQL-5. Formal Gherkin-style TOR requirements (TOR-NN-XXXXXXX) serve as the single source of truth — epics implement requirements, tests are derived from Given/When/Then, and wrapup verifies against the requirements baseline. Covers the full lifecycle: discovery, requirements capture, planning, implementation, requirements-based verification, and documentation refresh.",
       "source": "./plugins/peak-workflow"
+    },
+    {
+      "name": "peak-media",
+      "description": "Faceless motion-graphics video from web content. A narration or beat-grid spine sets the clock, each visual beat is a plate (HyperFrames motion or slide, or a live recorded page), and assembly composites the plates, audio stems and brand outro into a finished MP4.",
+      "source": "./plugins/peak-media"
     }
   ]
 }

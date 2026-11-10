@@ -1,0 +1,7 @@
+# F1 r2 verifier probe: fake ffmpeg on PATH (sleeps 300 s and spawns a background child), PEAK_MEDIA_STEP_TIMEOUT_S=3
+exit 1 after 4 s; 1 line(s):
+   contact-sheet: frame at 00.00 timed out after 3 s with no exit — stopped it; if this repeats, check the machine (emulated Linux?) or raise PEAK_MEDIA_STEP_TIMEOUT_S
+fake-ffmpeg.pid 66309 gone
+fake-ffmpeg-child.pid 66310 gone
+(eval):9: no matches found: /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T//pm-run-*
+pm-run-* left in TMPDIR: 0

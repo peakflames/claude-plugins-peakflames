@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "spine": "spine/beatgrid.json",
+  "brand": "../../../../brand-packs/default",
+  "fps": 30,
+  "width": 1280,
+  "height": 720,
+  "plates": [
+    {
+      "id": "p1",
+      "beat": "b1",
+      "kind": "motion",
+      "startMs": 0,
+      "durationMs": 3000,
+      "intent": "Kinetic type: the two words that separate the tools",
+      "assets": [],
+      "text": [
+        "spec-aware",
+        "vs.",
+        "spec-accountable"
+      ]
+    }
+  ]
+}

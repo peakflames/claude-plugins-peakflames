@@ -1,0 +1,144 @@
+{
+  "project": "<tmp>/f1",
+  "plates": [
+    {
+      "id": "p1-hook",
+      "startMs": 0,
+      "durationMs": 6500,
+      "render": "<tmp>/f1/renders/plates/p1-hook.mp4",
+      "renderMs": 6500
+    },
+    {
+      "id": "p2-table",
+      "startMs": 6500,
+      "durationMs": 7500,
+      "render": "<tmp>/f1/renders/plates/p2-table.mp4",
+      "renderMs": 7500
+    },
+    {
+      "id": "p3-close",
+      "startMs": 14000,
+      "durationMs": 6000,
+      "render": "<tmp>/f1/renders/plates/p3-close.mp4",
+      "renderMs": 6000
+    }
+  ],
+  "narration": {
+    "source": "<tmp>/f1/spine/narration.wav",
+    "targetLufs": -16,
+    "gainDb": 2.1,
+    "lufs": -16,
+    "truePeakDb": -11.4
+  },
+  "cuts": [
+    {
+      "cutMs": 6500,
+      "timecode": "0:06.500",
+      "ok": true,
+      "edge": false,
+      "silenceMs": 700,
+      "gap": {
+        "startMs": 6000,
+        "endMs": 6700
+      },
+      "plates": [
+        "p1-hook",
+        "p2-table"
+      ]
+    },
+    {
+      "cutMs": 14000,
+      "timecode": "0:14.000",
+      "ok": true,
+      "edge": false,
+      "silenceMs": 700,
+      "gap": {
+        "startMs": 13500,
+        "endMs": 14200
+      },
+      "plates": [
+        "p2-table",
+        "p3-close"
+      ]
+    }
+  ],
+  "cutsOk": true,
+  "outro": {
+    "mp4": "<tmp>/f1/renders/outro-c27a5bcdb7fe6660.mp4",
+    "source": "cache",
+    "key": "c27a5bcdb7fe6660",
+    "durationMs": 3000,
+    "renderMs": 3000
+  },
+  "final": {
+    "file": "<tmp>/f1/out/final.mp4",
+    "export": "source",
+    "expectedMs": 23000,
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "spec": [
+      {
+        "name": "video codec",
+        "ok": true,
+        "expected": "h264",
+        "actual": "h264"
+      },
+      {
+        "name": "video profile",
+        "ok": true,
+        "expected": "High",
+        "actual": "High"
+      },
+      {
+        "name": "pixel format",
+        "ok": true,
+        "expected": "yuv420p",
+        "actual": "yuv420p"
+      },
+      {
+        "name": "audio codec",
+        "ok": true,
+        "expected": "aac",
+        "actual": "aac"
+      },
+      {
+        "name": "audio sample rate",
+        "ok": true,
+        "expected": "48000",
+        "actual": "48000"
+      },
+      {
+        "name": "faststart (moov before mdat)",
+        "ok": true,
+        "expected": "moov<mdat",
+        "actual": "ftyp,moov,free,mdat"
+      },
+      {
+        "name": "width",
+        "ok": true,
+        "expected": "1280",
+        "actual": "1280"
+      },
+      {
+        "name": "height",
+        "ok": true,
+        "expected": "720",
+        "actual": "720"
+      },
+      {
+        "name": "fps",
+        "ok": true,
+        "expected": "30",
+        "actual": "30.000"
+      },
+      {
+        "name": "duration (±1 frame)",
+        "ok": true,
+        "expected": "23000 ms",
+        "actual": "23000 ms"
+      }
+    ],
+    "ok": true
+  }
+}

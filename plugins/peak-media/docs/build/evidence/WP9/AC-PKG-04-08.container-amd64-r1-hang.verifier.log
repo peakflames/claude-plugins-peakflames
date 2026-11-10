@@ -1,0 +1,27 @@
+# verifier run r1: colima (vz + Rosetta), --platform linux/amd64 node:22-slim, script ~/tmp/v9-verifier/amd64.sh (same as r2). Output ends at V3: AC-PKG-04 never finished.
+# Lead observation (not mine): assemble.mjs inside AC-PKG-04 sat ~1h45m in ep_poll with no child processes and an open socket; Lead removed the container (docker rm -f v9-amd64).
+## container: x86_64 · Debian GNU/Linux 12 (bookworm) · node v22.23.4
+## V0 — nothing installed: setup.sh (install mode) and --check
+setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)
+exit 3
+setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)
+exit 3
+## V1 — apt-get install ffmpeg ca-certificates only (no browser libs), then setup.sh
+apt exit 0
+setup.sh: render browser can't start — missing system libraries: libXcomposite.so.1 libXdamage.so.1 libatk-1.0.so.0 libatk-bridge-2.0.so.0 libatspi.so.0 libnspr4.so libnss3.so libnssutil3.so — install them (Debian/Ubuntu: sudo apt-get install libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libnspr4 libnss3 libxcomposite1 libxdamage1)
+exit 3
+## V1b — setup.sh --check with libs missing
+setup.sh: render browser can't start — missing system libraries: libXcomposite.so.1 libXdamage.so.1 libatk-1.0.so.0 libatk-bridge-2.0.so.0 libatspi.so.0 libnspr4.so libnss3.so libnssutil3.so — install them (Debian/Ubuntu: sudo apt-get install libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libnspr4 libnss3 libxcomposite1 libxdamage1)
+exit 3
+## V2 — README's Linux package line
+apt-get install -y --no-install-recommends ffmpeg ca-certificates libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libxcomposite1 libxdamage1
+apt exit 0
+deps: up to date (/root/.cache/peak-media/deps/88b6dff0a77c)
+browser: present
+peak-media ready: deps /root/.cache/peak-media/deps/88b6dff0a77c · ffmpeg version 5.1.9-0+deb12u1
+exit 0
+peak-media ready: deps /root/.cache/peak-media/deps/88b6dff0a77c
+exit 0
+browser: /root/.cache/hyperframes/chrome/chrome-headless-shell/linux-152.0.7977.30/chrome-headless-shell-linux64/chrome-headless-shell
+ldd: nothing missing
+## V3 — AC-PKG-04 and AC-PKG-08 evals

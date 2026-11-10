@@ -1,0 +1,286 @@
+$ grep -rniE "hyperframes[[:space:]]+events" vendor/
+hits=       0
+$ grep -rniE "events" vendor/ (context)
+vendor/hyperframes/hyperframes/references/motion.md:8:- **Render-time blur**: for fast 2D movers, `data-motion-blur="on"` on the composition root smears them along their real path in preview and render (opt-in; also `data-motion-blur-shutter` for a longer smear, 360 is strong; `-events="on"` when the motion is set from a timeline callback such as a `render(t)` function). Suggest it when the person asks for blur or a filmic look and the piece moves fast. It draws with a per-element filter that works over WebGL and in any Chrome (cost varies by film; on two real films it cost more than capture) (spins and zooms soften rather than streak); `data-motion-blur-tier="capture"` opts into the truer capture, which loses anything in front of a mover and ignores blend modes. It is off only for HDR and distributed renders. Opt a subtree out with `data-motion-blur="off"`, e.g. a seam that already carries its own blur. After adding it run `hyperframes check`. Guide: /guides/motion-blur.
+vendor/hyperframes/hyperframes-cli/SKILL.reference.md:32:`validate`, `inspect` and `layout` are deprecated aliases of `check`; `events` is skills' own telemetry. Don't run them.
+vendor/hyperframes/hyperframes-cli/references/compare-and-batch.md:103:- `--json` emits progress events suitable for agents and CI.
+vendor/hyperframes/slideshow/SKILL.reference.md:53:- Every copied `<video>`/`<audio>` needs `data-start` and `data-duration` (`data-has-audio="true"` when its sound plays), and no `preload="none"`. Custom media chrome reads the native element's events and `currentTime`, never its own timer.
+vendor/hyperframes/slideshow/SKILL.reference.md:54:- Hidden stacked slides need `opacity: 0`, `visibility: hidden` and `pointer-events: none` together, or an invisible layer swallows clicks.
+vendor/hyperframes/hyperframes-cli/references/upgrade-info-misc.md:110:Events include two fingerprint properties used to distinguish managed-sandbox runs from real laptops — no PII, no env-var **values**, only existence checks:
+$ ls -l vendor/hyperframes/LICENSE
+-rw-r--r--@ 1 schaveyt  staff  10763 Nov  8 18:54 vendor/hyperframes/LICENSE
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+$ find plugins/peak-media -name SKILL.md
+./skills/video-plates/SKILL.md
+$ ls vendor/hyperframes
+CREDITS.md
+LICENSE
+cut-the-curve
+hyperframes
+hyperframes-cli
+motion-doctrine
+seam-craft
+slideshow
+$ DEC-08 exclusions
+media-use:        0 path hits
+figma:        0 path hits
+remotion-to-hyperframes:        0 path hits
+reverse-any-video:        0 path hits
+style-sampling:        0 path hits
+changelog-video:        0 path hits
+
+# Upstream diff (codeload tarball @327e2020) — diff -rq
+### hyperframes (upstream skills/hyperframes)
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes: SKILL.md
+Only in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes: SKILL.reference.md
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes: assets
+Files /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/references/look.md and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes/references/look.md differ
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/references: plugin-installation.md
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/references: skill-lifecycle.md
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/scripts: lib
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/scripts: plugin-cli.mjs
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/scripts: plugin-cli.test.mjs
+### hyperframes-cli (upstream skills/hyperframes-cli)
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli: SKILL.md
+Only in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli: SKILL.reference.md
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references: cloud.md
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references: cloudrun.md
+Files /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/conventions.md and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/conventions.md differ
+Files /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/doctor-browser.md and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/doctor-browser.md differ
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references: lambda.md
+Files /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/preview-render.md and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/preview-render.md differ
+Files /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/upgrade-info-misc.md and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/upgrade-info-misc.md differ
+### slideshow (upstream skills/slideshow)
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/slideshow: SKILL.md
+Only in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/slideshow: SKILL.reference.md
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/slideshow: references
+### motion-doctrine (upstream .claude/skills/motion-doctrine)
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/motion-doctrine: SKILL.md
+Only in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/motion-doctrine: SKILL.reference.md
+Files /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/motion-doctrine/scripts/seam-gate.mjs and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/motion-doctrine/scripts/seam-gate.mjs differ
+### cut-the-curve (upstream .claude/skills/cut-the-curve)
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/cut-the-curve: SKILL.md
+Only in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/cut-the-curve: SKILL.reference.md
+### seam-craft (upstream .claude/skills/seam-craft)
+Only in /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/seam-craft: SKILL.md
+Only in /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/seam-craft: SKILL.reference.md
+LICENSE identical
+### CREDITS
+Files /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/CREDITS.md and /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/CREDITS.md differ
+
+# content diffs
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/SKILL.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes/SKILL.reference.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/SKILL.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes/SKILL.reference.md	2026-11-08 18:54:48
+@@ -3,9 +3,8 @@
+ description: Read first to make, edit, animate or render any video with HyperFrames (HTML rendered to video), including launch films, explainers, music videos, charts, maps, vertical clips, title cards, captions and overlays. Holds the render contract, the work loop and what each kind of video needs.
+ ---
+ 
+-**Plugin installs:** Inside a HyperFrames plugin, follow [plugin execution rules](references/plugin-installation.md).
++**peak-media:** this is a vendored reference, not a registered skill. Run the CLI only through peak-media's pinned wrapper (`lib/hf.mjs`, used by `video-plates/scripts/render-plate.mjs`), never `npx`. See `video-plates/references/vendored-map.md`.
+ 
+-**Usage beacon:** run `npx hyperframes events --skill=hyperframes` once as this skill starts. It sends the skill's name with the CLI's usual telemetry (account-linked when signed in) and honours the opt-out.
+ 
+ # HyperFrames
+ 
+@@ -73,4 +72,4 @@
+ | Motion: eases, titles, cuts, punch-ins, speed, holds | `references/motion.md` |
+ | Scenes, attributes, media, lint; GSAP, Lottie, 3D, canvas | `references/format.md`; `references/runtimes.md` |
+ 
+-Decks: `/slideshow`. Remotion source: `/remotion-to-hyperframes`. Copy a video: `/reverse-any-video`. Figma: `/figma`. Skills and the pinned CLI: `references/skill-lifecycle.md`.
++Decks: `/slideshow`. Remotion source: `/remotion-to-hyperframes`. Copy a video: `/reverse-any-video`. Figma: `/figma`. The CLI version is pinned by peak-media (`lib/pins.json`).
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/SKILL.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/SKILL.reference.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/SKILL.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/SKILL.reference.md	2026-11-08 18:54:48
+@@ -1,11 +1,10 @@
+ ---
+ name: hyperframes-cli
+-description: The HyperFrames CLI by job - scaffold, check, look at frames, edit the timeline, preview, render locally or in the cloud, publish, project history - plus reading its JSON and recovering from build or render failures.
++description: The HyperFrames CLI by job - scaffold, check, look at frames, edit the timeline, preview, render locally, publish, project history - plus reading its JSON and recovering from build or render failures.
+ ---
+ 
+-**Plugin installs:** Inside a HyperFrames plugin, follow [plugin execution rules](../hyperframes/references/plugin-installation.md).
++**peak-media:** this is a vendored reference, not a registered skill. Run the CLI only through peak-media's pinned wrapper (`lib/hf.mjs`, used by `video-plates/scripts/render-plate.mjs`), never `npx`. See `video-plates/references/vendored-map.md`.
+ 
+-**Usage beacon:** run `npx hyperframes events --skill=hyperframes-cli` once as this skill starts. It sends the skill's name with the CLI's usual telemetry (account-linked when signed in) and honours the opt-out.
+ 
+ # HyperFrames CLI
+ 
+@@ -24,7 +23,7 @@
+ | Edit the timeline | `timeline` with `move`, `trim`, `split`, `set`, `duplicate`, `delete`, `apply`, `undo`, `ids` |
+ | Reuse | `catalog`, `add` (`/hyperframes-registry`) |
+ | Media and sound | `media-treatment`, `grade-compare`, `remove-background`, `tts`, `transcribe`, `beats`, `normalize-audio` (`/media-use`) |
+-| Show and ship | `preview`, `present` (`/slideshow`), `render`, `publish`, `cloud`, `lambda`, `cloudrun` |
++| Show and ship | `preview`, `present` (`/slideshow`), `render`, `publish` |
+ | Desktop app | `open`, `catch-up` |
+ | Upkeep | `doctor`, `browser`, `upgrade`, `usage`, `clean`, `feedback` |
+ 
+@@ -38,7 +37,7 @@
+ 2. `npx hyperframes check --json` and fix every error. While a lint error remains the layout and contrast audits don't run; "0 samples" means nothing was checked. Contrast failures carry a `suggestedColor`. A finding at a single sample (an entrance in flight) is info; a 3 s+ video with no visible change fails `sweep_static`.
+ 3. `npx hyperframes snapshot` and read the PNGs (under `.hyperframes/artifacts/snapshots/`): that is how you see the video. With sub-compositions, snapshot a midpoint of every scene; tiny unstyled content or a missing hero is a mount defect (`../hyperframes/references/format.md`).
+ 4. `npx hyperframes preview --background`, check the URL answers 200, give the person the project URL and wait, unless they asked for the file or for no stops. Passing checks alone is not a reason to render.
+-5. Time to render (step 4): `npx hyperframes render --quality looks -o out.mp4` (`draft` while iterating, `delivery` for the final; paid plan: `cloud render --fps <data-fps> --quality high -o out.mp4`). Confirm the file is non-empty and its `ffprobe` duration matches the root `data-duration`, then look at decoded frames.
++5. Time to render (step 4): `npx hyperframes render --quality looks -o out.mp4` (`draft` while iterating, `delivery` for the final). Confirm the file is non-empty and its `ffprobe` duration matches the root `data-duration`, then look at decoded frames.
+ 
+ "This element" or the current selection: `npx hyperframes preview --context --json --context-fields selection`; `no-selection` means ask them to click it.
+ 
+@@ -66,8 +65,6 @@
+ | Local | `render --quality looks -o out.mp4` (`draft`, `delivery`) |
+ | Reproducible container | `render --docker --strict -o out.mp4` |
+ | Batch from variables | `render --batch rows.json -o "renders/{name}.mp4"` |
+-| Hosted, no local Chrome or FFmpeg | `cloud render` (`references/cloud.md`) |
+-| Your own AWS or GCP | `lambda render`, `cloudrun render` (`references/lambda.md`, `references/cloudrun.md`) |
+ 
+ A 30 s film renders in a minute or two: run it in the foreground. Detach only a render longer than your tool's timeout (`HYPERFRAMES_RENDER_DETACHED=1`, its own group, output to a log) and wait with `until grep -qE 'Render (complete|failed)' render.log; do sleep 5; done`, never `pgrep -f`, which matches its own loop and waits until the tool times out.
+ 
+@@ -96,8 +93,6 @@
+ | `beats` | `references/beats.md` |
+ | `preview`, `play`, `render`, `publish`, Studio context | `references/preview-render.md` |
+ | `doctor`, `browser` | `references/doctor-browser.md` |
+-| `auth`, `cloud`, template variables | `references/cloud.md` |
+-| `lambda`, `cloudrun` | `references/lambda.md`, `references/cloudrun.md` |
+ | `info`, `upgrade`, `compositions`, `timeline`, `docs`, `usage`, telemetry | `references/upgrade-info-misc.md` |
+ | `--strict` flags, run ids, `clean`, shader lint, JSON paths | `references/conventions.md` |
+ | `keyframes` | `../hyperframes/references/motion.md` (Seeing motion) |
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/slideshow/SKILL.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/slideshow/SKILL.reference.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/slideshow/SKILL.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/slideshow/SKILL.reference.md	2026-11-08 18:54:48
+@@ -3,9 +3,8 @@
+ description: Build a HyperFrames slideshow to present live - slides, fragment reveals, branching hotspots and presenter mode with speaker notes, served by `hyperframes present` - or turn an existing page into one. Use when the person wants a deck or presentation rather than a rendered video.
+ ---
+ 
+-**Plugin installs:** Inside a HyperFrames plugin, follow [plugin execution rules](../hyperframes/references/plugin-installation.md).
++**peak-media:** this is a vendored reference, not a registered skill. Run the CLI only through peak-media's pinned wrapper (`lib/hf.mjs`, used by `video-plates/scripts/render-plate.mjs`), never `npx`. See `video-plates/references/vendored-map.md`.
+ 
+-**Usage beacon:** run `npx hyperframes events --skill=slideshow` once as this skill starts. It sends the skill's name with the CLI's usual telemetry (account-linked when signed in) and honours the opt-out.
+ 
+ # HyperFrames slideshow
+ 
+@@ -54,11 +53,9 @@
+ - Every copied `<video>`/`<audio>` needs `data-start` and `data-duration` (`data-has-audio="true"` when its sound plays), and no `preload="none"`. Custom media chrome reads the native element's events and `currentTime`, never its own timer.
+ - Hidden stacked slides need `opacity: 0`, `visibility: hidden` and `pointer-events: none` together, or an invisible layer swallows clicks.
+ 
+-## Present and hand off
++## Hand off
+ 
+-- **Never render a deck to MP4**: `render` keeps only the first scene and truncates silently. For stills, `snapshot --at` each slide.
++- **Never render a multi-scene deck to MP4**: `render` keeps only the first scene and truncates silently. In peak-media every slide is its own one-scene composition (a `slide` plate), rendered alone, so this does not apply to slide plates.
+ - Run `npx hyperframes check --json` until it is clean. The slideshow rule checks that every `sceneId` resolves, every hotspot `target` exists, fragments sit inside their slide, and main-line slides don't overlap.
+-- Serve it with `npx hyperframes present <project-dir>` and hand over the URL it prints: "Click Present, or press P, to open the audience tab."
+-- The project's root `index.html` should open as a working deck: `<hyperframes-slideshow>` around `<hyperframes-player src="…">`, with the raw composition in a subfolder if needed. The component owns Present (P), Prev/Next, the counter, global mute, fullscreen, swipe, hotspots, presenter notes (editable, kept per deck) and stopping media on slide exit. Don't build your own versions of any of these.
+-- Screen sharing: in Google Meet share the audience **tab**, which keeps rendering in the background. In Zoom drag the audience tab into its own window and share that; a fully covered window freezes.
+-- A deck opened from the bare player bundle without `present` needs workarounds: `references/standalone-harness.md`.
++
++*(peak-media: the live-presentation part of this skill — serving with `present`, the player/slideshow components, screen sharing and the standalone harness — is not vendored.)*
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/motion-doctrine/SKILL.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/motion-doctrine/SKILL.reference.md
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/cut-the-curve/SKILL.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/cut-the-curve/SKILL.reference.md
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/seam-craft/SKILL.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/seam-craft/SKILL.reference.md
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/references/look.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes/references/look.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes/references/look.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes/references/look.md	2026-11-08 18:54:48
+@@ -24,24 +24,8 @@
+ 
+ ## Presets
+ 
+-The presets are slide-deck looks: use one when the person names it, or for a deck (`/slideshow`), never as the fallback for a film without a brand. Each folder in `../assets/frame-presets/` holds a `FRAME.md` spec, a `caption-skin.html` and a `frame-showcase.html` contact sheet. To use one, copy its `FRAME.md` to the project root as `frame.md`, then read it as above; its fonts that aren't bundled need `@font-face` files. The two HTML files are reference code: read them for treatments, never mount them.
++The HyperFrames frame presets are not vendored in peak-media; the look comes from the brand pack's `tokens.css`.
+ 
+-| Preset              | Look                                                                                           |
+-| ------------------- | ---------------------------------------------------------------------------------------------- |
+-| `biennale-yellow`   | Museum catalogue: parchment, deep indigo ink, solar-yellow blooms, Instrument Serif, hairlines |
+-| `blockframe`        | Loud neobrutalist: 4px black borders, hard shadows, candy pastels, Inter 900 caps              |
+-| `blue-professional` | Consulting restraint: cream canvas, one cobalt accent, Space Grotesk + Inter, tinted cards     |
+-| `bold-poster`       | Vintage editorial poster: Shrikhand tilted display, Baskerville, tomato red, double borders    |
+-| `broadside`         | Protest poster: ink-black and fire-orange planes, giant lowercase Barlow 900, mono chrome      |
+-| `capsule`           | Friendly editorial: every container a pill, cream, nine candy accents, Bodoni Moda             |
+-| `cartesian`         | Quiet catalogue: warm-stone palette, Playfair + Inter, taupe hairline grid, compass rings      |
+-| `cobalt-grid`       | Two-colour risograph: cream paper, cobalt ink, graph-paper grid, Newsreader serif              |
+-| `code-editorial`    | Developer brand book: warm paper, scarce terracotta, EB Garamond, navy code surface            |
+-| `coral`             | Bold magazine: coral, ink and cream planes at hard edges, Bebas Neue, giant numerals           |
+-| `creative-mode`     | Sparse neobrutalist: cream, 4px ink borders, Archivo Black caps, rationed accents              |
+-| `daisy-days`        | Picture book: charcoal outlines, sunny pastels, Fredoka One, hand-drawn ornaments              |
+-| `editorial-forest`  | Literary: green, pink and cream, Source Serif display, mono chrome, flat paper                 |
+-
+ ## The LOOK line
+ 
+ With no design spec, the look is the LOOK line of `SPEC.md` (`spec.md`), taken from the brand, the reference or the subject itself: its era, its materials, where it would be shown. Every part is a number (hex, px, %, a named face and weight), the ground and the hero come from a medium rather than from effects, and the BANNED line keeps it off the defaults. Inter, Space Grotesk, Instrument Serif, Geist and JetBrains Mono are where generated design lands; use them when the brand does, not by default. Copy the palette and the faces into the root variables below.
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/conventions.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/conventions.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/conventions.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/conventions.md	2026-11-08 18:54:48
+@@ -13,5 +13,4 @@
+ - Use `--strict`, `--strict-all`, and `--strict-variables` when the corresponding warnings, variables, or CI conditions must gate the render.
+ - For `shader_unbounded_cosine_pow`, clamp the cosine to `[0, 1]` before `pow(1 - cosine, exponent)`; a lower-only `max` is insufficient. Then preview and export on the affected GPU to confirm. Lint only recognizes static shader expressions, and software rendering can miss hardware-specific invalid pixels.
+ - JSON paths redact the home directory as `$HOME`; do not try to reverse the redaction.
+-- When a hosted cloud project approaches or exceeds the 200 MB upload limit, use `cloud render --dry-run --json` and follow the `.hyperframesignore` investigation in `references/cloud.md`. Never ignore an asset merely because it is large.
+ - Never render merely because checks pass. Pause at the final preview and wait for approval.
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/doctor-browser.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/doctor-browser.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/doctor-browser.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/doctor-browser.md	2026-11-08 18:54:48
+@@ -37,10 +37,10 @@
+   headless shell — dies at startup. This is a host-level block, not a HyperFrames or
+   Chrome install problem: compile checks and audio still pass, only rendering is
+   unavailable. State the blocker and deliver the checked composition; render outside the
+-  sandbox or via `render --docker` / cloud rendering where available. **Do not build a
++  sandbox or via `render --docker` where available. **Do not build a
+   substitute rasterizer** (magick/PIL/SVG frame pipelines) — on a blocked-browser host
+   the deliverable IS the checked composition plus this blocker note, and rendering is
+-  handed to `--docker`, cloud, or the user. Write your final summary the moment the
++  handed to `--docker` or the user. Write your final summary the moment the
+   blocker is identified, BEFORE any optional fallback work: a later session failure must
+   not erase the report of work already done.
+ 
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/preview-render.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/preview-render.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/preview-render.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/preview-render.md	2026-11-08 18:54:48
+@@ -197,6 +197,6 @@
+ 
+ ## Where to render, and skill attribution
+ 
+-Use cloud rendering when the user wants hosted rendering without local Chrome, FFmpeg, or AWS, and for the final render on a paid HyperFrames plan (`cloud.md`). Use Lambda only when AWS ownership is a requirement. Use Cloud Run only when GCP ownership is a requirement. Read the matching reference before running any cloud path.
++peak-media renders locally only (hosted, Lambda and Cloud Run rendering are not vendored).
+ 
+ Skill attribution is automatic — the examples above need no `--skill`. A project scaffolded with `hyperframes init --skill=<slug>` records its owning skill in `hyperframes.json`, and every later render inherits it on usage telemetry: re-renders, `npm run render`, and `--batch` alike. Pass `--skill=<slug>` explicitly only to stamp a project that was not scaffolded with one (its first render then persists it).
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/upgrade-info-misc.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/upgrade-info-misc.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/skills/hyperframes-cli/references/upgrade-info-misc.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/hyperframes-cli/references/upgrade-info-misc.md	2026-11-08 18:54:48
+@@ -23,7 +23,7 @@
+ 
+ Compares the installed CLI version against npm latest.
+ 
+-`--project [dir]` bumps a **project's** pinned scripts instead of the global install: it rewrites every `npx …hyperframes@<version>…` in `<dir>/package.json` (default cwd) to npm-latest. Always invoke it unpinned (`npx hyperframes@latest upgrade --project`) — a project scaffolded on an old CLI stays frozen otherwise. `--project . --check` reports the delta without writing; add `--json` for `{ changed, from, to, path }`. Pass the dir explicitly whenever another flag follows `--project` — on older releases a bare `--project` consumes the next flag as its directory value.
++peak-media pins the CLI in `lib/pins.json`; don't run `upgrade --project` on a peak-media video project.
+ 
+ ## timeline
+ 
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/motion-doctrine/scripts/seam-gate.mjs vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/motion-doctrine/scripts/seam-gate.mjs
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/.claude/skills/motion-doctrine/scripts/seam-gate.mjs	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/motion-doctrine/scripts/seam-gate.mjs	2026-11-08 18:54:48
+@@ -75,7 +75,7 @@
+     // launcher would exit 0 before the server is up and detach it out of our process group.
+     // Default to the REPO-LOCAL CLI whenever this skill is running from its repo
+     // checkout. The gate this script backs is defined against that build, and the
+-    // skill forbids `npx hyperframes@latest` for it, so defaulting to the published
++    // skill forbids running the latest published CLI (npx) for it, so defaulting to the published
+     // package here would let the two gates measure different runtimes. npx stays the
+     // fallback for a copy of the skill living outside the repo.
+     const repoCli = join(
+===== /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/CREDITS.md vs /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/CREDITS.md
+--- /tmp/vwp4/up/x/hyperframes-327e20208c3f542841de670cce54754473f58d30/CREDITS.md	2026-11-08 14:59:06
++++ /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a88e60e34cbf427e3/plugins/peak-media/vendor/hyperframes/CREDITS.md	2026-11-08 19:04:43
+@@ -1,3 +1,14 @@
++# Credits — vendored HyperFrames skills
++
++The folders next to this file are trimmed copies of skills from HyperFrames
++(https://github.com/heygen-com/hyperframes), commit 327e20208c3f542841de670cce54754473f58d30,
++licensed under the Apache License 2.0 (see `LICENSE`). peak-media uses them as read-only
++references, not registered skills; every local change is listed in the plugin's `VENDORED.md`.
++
++The upstream `CREDITS.md` follows unchanged.
++
++---
++
+ # Credits
+ 
+ ## Prior art

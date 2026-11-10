@@ -1,0 +1,22 @@
+# verifier-wp4l-a9349ae4 — WP4 layout follow-up — HEAD 5151294 (layout commit 5cf766c). $VT = verifier temp dir (deleted after the run).
+## F1 (tmp/f1-e2e copy, brand = worktree brand-packs/default): render-plate --all --lint --sheet
+p1-hook: $VT/f1/renders/plates/p1-hook.mp4 (7200 ms, planned 7173) lint+check ok sheet $VT/f1/review/contact-p1-hook.jpg
+p2-table: $VT/f1/renders/plates/p2-table.mp4 (12233 ms, planned 12213) lint+check ok sheet $VT/f1/review/contact-p2-table.jpg
+p3-close: $VT/f1/renders/plates/p3-close.mp4 (6633 ms, planned 6613) lint+check ok sheet $VT/f1/review/contact-p3-close.jpg
+## ffprobe -count_frames (±1 frame = ±33.3 ms at 30 fps)
+p1-hook planned 7173 ms (215.19 fr) -> 216 frames, 7200 ms, 1280x720 30/1, off by 27 ms (< 1 frame)
+p2-table planned 12213 ms (366.39 fr) -> 367 frames, 12233 ms, 1280x720 30/1, off by 20 ms (< 1 frame)
+p3-close planned 6613 ms (198.39 fr) -> 199 frames, 6633 ms, 1280x720 30/1, off by 20 ms (< 1 frame)
+## F2: render-plate F2/plates.json --all --brand brand-packs/default --lint --sheet
+s1-unit: $VT/f2/renders/plates/s1-unit.mp4 (5000 ms, planned 5000) lint+check ok sheet $VT/f2/review/contact-s1-unit.jpg
+s2-ids: $VT/f2/renders/plates/s2-ids.mp4 (5000 ms, planned 5000) lint+check ok sheet $VT/f2/review/contact-s2-ids.jpg
+s3-verify: $VT/f2/renders/plates/s3-verify.mp4 (5000 ms, planned 5000) lint+check ok sheet $VT/f2/review/contact-s3-verify.jpg
+s4-openspec: $VT/f2/renders/plates/s4-openspec.mp4 (5000 ms, planned 5000) lint+check ok sheet $VT/f2/review/contact-s4-openspec.jpg
+s5-peak: $VT/f2/renders/plates/s5-peak.mp4 (5000 ms, planned 5000) lint+check ok sheet $VT/f2/review/contact-s5-peak.jpg
+s1-unit planned=5000ms/150fr ffprobe=[1280,720,30/1,150 5.000000 ]
+s2-ids planned=5000ms/150fr ffprobe=[1280,720,30/1,150 5.000000 ]
+s3-verify planned=5000ms/150fr ffprobe=[1280,720,30/1,150 5.000000 ]
+s4-openspec planned=5000ms/150fr ffprobe=[1280,720,30/1,150 5.000000 ]
+s5-peak planned=5000ms/150fr ffprobe=[1280,720,30/1,150 5.000000 ]
+## Determinism: p1-hook rendered twice (2nd with --rescaffold)
+index.html byte-identical; framemd5 identical, 216/216 frames

@@ -1,0 +1,20 @@
+$ capture --help | grep caption-engine
+28:      --caption-engine <overlay|dom>  How captions are drawn: overlay = screencast.showOverlay, in the captured frames only (default); dom = injected into the page (visible to page scripts; no overlay frame delays)
+29-      --url <url|file>                Page to load: http(s) URL or local .html file/folder (overrides the plate and storyboard)
+$ capture --caption-engine bogus
+capture: --caption-engine must be one of overlay, dom, got 'bogus'
+Run 'capture --help' for usage.
+exit=2
+$ grep env var in skills/ evals/
+grep exit=1 (1 = none)
+$ capture ui-demo --caption-engine dom --mp4 --json
+exit=0
+captionEngine: dom
+ caption 61 3333
+ caption 3394 3000
+ caption 6394 2333
+ caption 8728 3000
+ caption 11729 2000
+1
+command: --storyboard /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a749350d1804b495f/plugins/peak-media/skills/video-capture/examples/ui-demo/storyboard.mjs --mp4 /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.XEnaA80cnO/dom.mp4 --caption-engine dom --json
+still: AC-REC-08-verifier-r2-dom.jpg — 5 stills at the middle of each dom caption window; all 5 captions visible as dark pill at bottom centre (Read-checked)

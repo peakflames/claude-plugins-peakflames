@@ -1,0 +1,10 @@
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-REC-05 | script | pass | not-started | — |
+| AC-REC-06 | script | pass | not-started | — |
+| AC-REC-07 | script | pass | not-started | — |
+| AC-REC-08 | still | — | not-started | — |
+| AC-REC-09 | script | pass | not-started | — |
+| AC-REC-10 | script | pass | not-started | — |
+| AC-BASE-10 | script | pass | not-started | — |
+ac-run --wp exit 0

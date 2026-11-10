@@ -1,0 +1,12 @@
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-PLT-01 | script | pass | not-started | — |
+| AC-PLT-02 | still | — | not-started | — |
+| AC-PLT-03 | still | — | not-started | — |
+| AC-PLT-04 | script | pass | not-started | — |
+| AC-VND-01 | script | pass | not-started | — |
+| AC-VND-02 | script | pass | not-started | — |
+| AC-BASE-08 | script | pass | not-started | — |
+exit 0
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+trace exit 0

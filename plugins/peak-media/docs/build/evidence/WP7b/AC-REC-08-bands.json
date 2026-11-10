@@ -1,0 +1,101 @@
+{
+  "note": "pixel classes in the bottom-quarter caption band (128x72 scale) at the middle of each say() window",
+  "stats": {
+    "default": [
+      {
+        "ms": 1985,
+        "dark": 212,
+        "amber": 0,
+        "other": 234
+      },
+      {
+        "ms": 5150,
+        "dark": 186,
+        "amber": 0,
+        "other": 206
+      },
+      {
+        "ms": 7817,
+        "dark": 132,
+        "amber": 0,
+        "other": 146
+      },
+      {
+        "ms": 10483,
+        "dark": 189,
+        "amber": 0,
+        "other": 203
+      },
+      {
+        "ms": 12984,
+        "dark": 129,
+        "amber": 0,
+        "other": 151
+      }
+    ],
+    "no-captions": [
+      {
+        "ms": 1725,
+        "dark": 0,
+        "amber": 0,
+        "other": 0
+      },
+      {
+        "ms": 4891,
+        "dark": 0,
+        "amber": 0,
+        "other": 0
+      },
+      {
+        "ms": 7561,
+        "dark": 0,
+        "amber": 0,
+        "other": 0
+      },
+      {
+        "ms": 10227,
+        "dark": 0,
+        "amber": 0,
+        "other": 0
+      },
+      {
+        "ms": 12727,
+        "dark": 0,
+        "amber": 0,
+        "other": 0
+      }
+    ],
+    "caption-css": [
+      {
+        "ms": 1709,
+        "dark": 0,
+        "amber": 377,
+        "other": 113
+      },
+      {
+        "ms": 4877,
+        "dark": 0,
+        "amber": 327,
+        "other": 93
+      },
+      {
+        "ms": 7600,
+        "dark": 0,
+        "amber": 230,
+        "other": 78
+      },
+      {
+        "ms": 10261,
+        "dark": 0,
+        "amber": 346,
+        "other": 88
+      },
+      {
+        "ms": 12759,
+        "dark": 0,
+        "amber": 225,
+        "other": 83
+      }
+    ]
+  }
+}

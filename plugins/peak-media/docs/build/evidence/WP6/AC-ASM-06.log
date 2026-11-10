@@ -1,0 +1,18 @@
+# AC-ASM-06 — verifier-wp6-r1-90efea8d, worktree a2ed450, 2026-11-09T00:23:32Z
+# inputs: /tmp/vwp6 (testsrc/colour plates 1280x720@30 at 0-6500/6500-14000/14000-20000; 330 Hz narration tones in F1 clip windows 200-6000/6700-13500/14200-19500; music 110/138/165/220 Hz; SFX 1.5 kHz blips at 6.4-6.6 s and 13.9-14.1 s)
+## ebur128 on /Users/schaveyt/github/peakflames/claude-plugins-peakflames/tmp/peak-media-wp6-listen
+pass0-narration-only    I: -16.0 LUFS  LRA: 7.7 LU  Peak: -4.9 dBFS 
+pass1-music             I: -16.5 LUFS  LRA: 6.8 LU  Peak: -3.7 dBFS 
+pass2-music-sfx         I: -16.3 LUFS  LRA: 6.1 LU  Peak: -4.8 dBFS 
+final                   I: -16.5 LUFS  LRA: 8.5 LU  Peak: -4.9 dBFS 
+## narration silences (pass0, silencedetect -40 dB 0.2 s)
+silence_start: 0 silence_end: 0.219083 silence_start: 3.824042 silence_end: 6.717896 silence_start: 11.698208 silence_end: 14.217896 silence_start: 18.088687 silence_end: 20 
+## music 110 Hz partial (3x bandpass q=40), mean_volume dB
+voice 1.0-3.6  pass0 -54.6  pass1 -48.0  final -48.0
+voice 7.5-11.5  pass0 -64.9  pass1 -49.4  final -49.4
+voice 15.0-17.9  pass0 -55.9  pass1 -48.1  final -48.1
+gap 4.5-6.5  pass0 -91.0  pass1 -34.3  final -34.3
+gap 12.4-13.9  pass0 -91.0  pass1 -34.9  final -34.9
+## outro tail 20-23 s
+mean_volume: -91.0 dB
+status: blocked: needs user listen

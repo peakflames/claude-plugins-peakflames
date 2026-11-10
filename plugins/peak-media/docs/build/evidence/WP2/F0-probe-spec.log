@@ -1,0 +1,10 @@
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    duration (±1 frame): 3000 ms
+PASS  /tmp/hfx/f0/out/final.mp4

@@ -1,0 +1,3 @@
+# AC-PKG-04 r2 verifier: setup.sh then F1 neutral eval on macOS, from the full suite run (AC-PKG-06-suite.r2.verifier.log)
+# F1: spine 20773 ms (3 beats) + outro 3000 ms → out/final.mp4; PASS  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.evQYraFvKT/pm-pkg04-itTz1M/out/final.mp4
+✔ AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps (156498.43ms)

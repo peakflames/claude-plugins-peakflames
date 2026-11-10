@@ -1,0 +1,25 @@
+{
+  "ac": "AC-REAL-03",
+  "times": [
+    0,
+    0.4,
+    0.8,
+    1.2,
+    1.6,
+    2,
+    2.5,
+    3,
+    3.4,
+    3.9
+  ],
+  "original": {
+    "source": "peakflames-videos/videos/2026-10-peak-workflow-teaser/index.html #s6",
+    "window": "22-26 s",
+    "fps": 30
+  },
+  "pack": {
+    "source": "peakflames-brand-guidelines/peak-media-pack/outro/index.html",
+    "renderedWith": "skills/video-assemble/scripts/assemble.mjs outroRender",
+    "fps": 30
+  }
+}

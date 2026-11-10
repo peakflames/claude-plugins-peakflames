@@ -1,0 +1,42 @@
+# AC-ASM-02 — verifier-wp6-r1-90efea8d, worktree a2ed450, 2026-11-09T00:23:31Z
+# inputs: /tmp/vwp6 (testsrc/colour plates 1280x720@30 at 0-6500/6500-14000/14000-20000; 330 Hz narration tones in F1 clip windows 200-6000/6700-13500/14200-19500; music 110/138/165/220 Hz; SFX 1.5 kHz blips at 6.4-6.6 s and 13.9-14.1 s)
+MD5=7329fcd8bef87a66089f71419deaccbd  out-nomusic/review/review.mp4
+MD5=7329fcd8bef87a66089f71419deaccbd  remux/review-music.mp4
+MD5=7329fcd8bef87a66089f71419deaccbd  remux/review-sfx.mp4
+MD5=7329fcd8bef87a66089f71419deaccbd  remux/review-mix.mp4
+MD5=7329fcd8bef87a66089f71419deaccbd  out-mix60/review/review.mp4
+MD5=7329fcd8bef87a66089f71419deaccbd  out-mix60/review/review-mix.mp4
+## levels (remux-audio --music --sfx)
+{
+  "video": "/tmp/vwp6/out-nomusic/review/review.mp4",
+  "out": "/tmp/vwp6/remux/review-mix.mp4",
+  "durationMs": 20000,
+  "videoMd5": "7329fcd8bef87a66089f71419deaccbd",
+  "narration": {
+    "source": "/tmp/vwp6/out-nomusic/review/review.mp4",
+    "targetLufs": -16,
+    "gainDb": 0,
+    "lufs": -16,
+    "truePeakDb": -15
+  },
+  "music": {
+    "source": "stems/music.wav",
+    "targetLufs": -28,
+    "gainDb": -15.8,
+    "lufs": -28.1,
+    "ducked": true,
+    "underVoiceRmsDb": -43,
+    "inGapsRmsDb": -31.9,
+    "duckDb": 11.1,
+    "speechWindows": [
+      {
+        "startMs": 200,
+        "endMs": 6000
+      },
+      {
+        "startMs": 6700,
+        "endMs": 13500
+      },
+## refuse already-mixed source
+remux-audio: remux/review-mix.mp4 already carries a music/SFX mix — remux from the narration-only review MP4, or pass --narration <file>
+exit 1

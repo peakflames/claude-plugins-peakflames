@@ -1,0 +1,69 @@
+/* Synthetic second brand pack (eval fixture for AC-BRD-02). Same shape and token names as
+   brand-packs/default; only the colour values and font families differ (light cream canvas,
+   dark ink, burnt-orange accent; Playfair Display + Space Mono, both OFL). */
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('fonts/playfair-display/playfair-display-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('fonts/playfair-display/playfair-display-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('fonts/space-mono/space-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('fonts/space-mono/space-mono-latin-700-normal.woff2') format('woff2');
+}
+
+:root {
+  /* colour */
+  --color-bg: #f6f1e7;
+  --color-fg: #1d1a16;
+  --color-accent: #c2410c;
+  --color-muted: #6b6257;
+  --color-surface: #ebe3d3;
+
+  /* type */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Playfair Display', Georgia, serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --weight-body: 400;
+  --weight-display: 700;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+
+  /* spacing (multiples of 8 px at 720p) */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-6: 48px;
+  --space-8: 64px;
+
+  /* size (720p frame; scale with the frame height) */
+  --size-display: 80px;
+  --size-title: 56px;
+  --size-body: 32px;
+  --size-caption: 28px;
+  --size-mono: 26px;
+  --radius: 12px;
+}

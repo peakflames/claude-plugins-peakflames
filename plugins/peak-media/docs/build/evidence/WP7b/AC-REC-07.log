@@ -1,0 +1,61 @@
+
+=================== AC-REC-05 / AC-REC-07: deck spine --lead-ms 950, spine-timed capture --mp4
+beat  how               15.13 s  +6.29 s
+wrote /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/deck950/manifest.json and /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/deck950/narration.wav
+PASS  runtime 21.42 s against a 20.0 s target (+7.1%)
+totalMs 21419 clips [ [ 950, 5455 ], [ 7605, 7273 ], [ 16078, 5091 ] ]
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard.mjs
+capture: narration: 3 clip(s) laid at their say() times +0 ms, -16 LUFS
+capture: 1 say() call(s) started after their clip: #1 +224 ms
+capture exit=0
+videoMs=21433
+says [{"n":1,"planned":950,"start":1174,"late":224},{"n":2,"planned":7605,"start":7605,"late":0},{"n":3,"planned":16078,"start":16078,"late":0}] audio {"clips":3,"lufs":-16}
+
+=================== AC-REC-05 probe-spec on the narrated --mp4
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    duration (±1 frame): 21433 ms
+PASS  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/deck.mp4
+probe-spec exit=0
+stream|codec_name=h264|profile=High|pix_fmt=yuv420p
+stream|codec_name=aac|profile=LC|sample_rate=48000|channels=2
+    I:         -16.0 LUFS
+
+=================== AC-REC-07 check-take on the narrated deck (defaults 0.02 / -40 dB / 900 ms)
+ok    scene change at 0:06.700 — silence 1200 ms
+ok    scene change at 0:15.200 — silence 1200 ms
+PASS  2 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/deck.mp4
+check-take exit=0
+[{"t":"0:06.700","silenceMs":1200,"ok":true},{"t":"0:15.200","silenceMs":1200,"ok":true}]
+[Parsed_silencedetect_0 @ 0x600002a9c9a0] silence_start: 0
+[Parsed_silencedetect_0 @ 0x600002a9c9a0] silence_end: 0.950021 | silence_duration: 0.950021
+[Parsed_silencedetect_0 @ 0x600002a9c9a0] silence_start: 6.405042
+[Parsed_silencedetect_0 @ 0x600002a9c9a0] silence_end: 7.605042 | silence_duration: 1.2
+[Parsed_silencedetect_0 @ 0x600002a9c9a0] silence_start: 14.878
+[Parsed_silencedetect_0 @ 0x600002a9c9a0] silence_end: 16.078021 | silence_duration: 1.200021
+
+=================== AC-REC-07 control A: default --lead-ms (250), 200 ms fades -> expect FAIL
+PASS  runtime 20.00 s against a 20.0 s target (+0.0%)
+capture exit=0
+FAIL  scene change at 0:06.000 — silence 727 ms (need ≥ 900 ms)
+FAIL  scene change at 0:14.000 — silence 727 ms (need ≥ 900 ms)
+FAIL  2 scene change(s) at threshold 0.02, 2 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/d250.mp4
+check-take exit=1
+
+=================== AC-REC-07 control B: copy of the deck with the original 500 ms fades, --lead-ms 950
+2
+capture exit=0
+note  no scene changes found
+PASS  0 scene change(s) at threshold 0.02, 0 not in a ≥ 900 ms silence — /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.xkyzaKTdeF/d500.mp4
+check-take exit=0
+scene_score=0.011019
+scene_score=0.008412
+scene_score=0.008170

@@ -1,0 +1,49 @@
+# AC-REC-04 verifier run 2026-11-09T03:20:35Z — live sites, run alone
+## spine: spine.mjs --brief f3/brief.md --tts-model fake/tone --max-hold-ms 2000 (PEAK_MEDIA_TTS_CACHE temp; PEAK_MEDIA_OPENROUTER_API_KEY and TTS_OPENROUTER_API_KEY unset)
+clip  words   sec  wpm  cached
+----  -----  ----  ---  ------
+1        12  4.36  165     yes
+2        13  4.73  165     yes
+3         8  2.91  165     yes
+median 165 wpm · 3/3 cached
+clips  3/3 cached · exported to /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/f3/spine/clips
+beat  feature            0.00 s  +6.86 s
+beat  anchor             6.86 s  +7.23 s
+beat  openspec          14.09 s  +5.41 s
+wrote /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/f3/spine/manifest.json and /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/f3/spine/narration.wav
+PASS  runtime 19.50 s against a 20.0 s target (-2.5%)
+spine totalMs 19500 model fake/tone clips [(1, 'feature', 250, 4364), (2, 'anchor', 7114, 4727), (3, 'openspec', 14341, 2909)]
+## plates.json = fixtures/F3/plates.json with startMs/durationMs taken from the spine beats (same ids, urls, storyboards)
+
+## capture --plates f3/plates.json --plate r1-feature --json
+exit=0
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard-feature.mjs
+capture: 1 say() call(s) started after their clip: #1 +70 ms
+planned 6864 ms -> 205.92 frames @30; ffprobe nb_read_frames 206 -> 6866.7 ms; diff +0.08 frames -> PASS (±1 frame)
+ffprobe codec_name=h264|width=1280|height=720|pix_fmt=yuv420p|r_frame_rate=30/1 | duration=6.866667
+take {'mode': 'spine', 'frames': 206, 'uniqueFrames': 81, 'videoMs': 6867, 'ranMs': 4617, 'wallMs': 6919, 'window': {'startMs': 0, 'durationMs': 6864, 'clips': 1}, 'url': 'https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md'}
+  say {'n': 1, 'clip': 1, 'plannedMs': 250, 'startMs': 320, 'lateMs': 70, 'durationMs': 4364, 'caption': True}
+
+## capture --plates f3/plates.json --plate r2-anchor --json
+exit=0
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard-anchor.mjs
+capture: 1 say() call(s) started after their clip: #1 +288 ms
+planned 7227 ms -> 216.81 frames @30; ffprobe nb_read_frames 217 -> 7233.3 ms; diff +0.19 frames -> PASS (±1 frame)
+ffprobe codec_name=h264|width=1280|height=720|pix_fmt=yuv420p|r_frame_rate=30/1 | duration=7.233333
+take {'mode': 'spine', 'frames': 217, 'uniqueFrames': 94, 'videoMs': 7233, 'ranMs': 4981, 'wallMs': 7270, 'window': {'startMs': 6864, 'durationMs': 7227, 'clips': 1}, 'url': 'https://github.com/peakflames/claude-plugins-peakflames/blob/main/plugins/peak-workflow/README.md'}
+  say {'n': 1, 'clip': 2, 'plannedMs': 250, 'startMs': 538, 'lateMs': 288, 'durationMs': 4727, 'caption': True}
+
+## capture --plates f3/plates.json --plate r3-openspec --json
+exit=0
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard-openspec.mjs
+capture: 1 say() call(s) started after their clip: #1 +66 ms
+planned 5409 ms -> 162.27 frames @30; ffprobe nb_read_frames 162 -> 5400.0 ms; diff -0.27 frames -> PASS (±1 frame)
+ffprobe codec_name=h264|width=1280|height=720|pix_fmt=yuv420p|r_frame_rate=30/1 | duration=5.400000
+take {'mode': 'spine', 'frames': 162, 'uniqueFrames': 84, 'videoMs': 5400, 'ranMs': 4491, 'wallMs': 5466, 'window': {'startMs': 14091, 'durationMs': 5409, 'clips': 1}, 'url': 'https://openspec.dev/docs/quickstart'}
+  say {'n': 1, 'clip': 3, 'plannedMs': 250, 'startMs': 316, 'lateMs': 66, 'durationMs': 2909, 'caption': True}
+
+## contact sheet (verifier read) -> evidence/WP7a/AC-REC-04-verifier-f3.jpg
+12 stills over the concatenated plates (0.2-18.8 s). r1-feature (0-6.86 s): GitHub peak-workflow README loads at the top, glides down to "Philosophy" and outlines the "formal requirements baseline lives in Gherkin-style .feature.md files with TOR requirement IDs" paragraph in amber; caption "In peak-workflow, every requirement is a Gherkin scenario with a stable ID." from 1.2 s to 4.0 s, gone at 6.0 s. r2-anchor (6.86-14.09 s): same README mid-page (command tables) gliding to "TOR Requirement IDs", then outlines "TOR IDs are stable once merged to develop and never reused"; caption "That ID is what the epic plans against, and what the verifier checks." at 8.6 and 10.0 s. r3-openspec (14.09-19.5 s): openspec.dev/docs/quickstart (real page, not a 404), "Quickstart" heading at 14.3 s, glides to "The loop at a glance" with the 5-step diagram and caption "OpenSpec takes the lighter road: propose, apply, archive." at 16.5 s, ends on an outlined "Step 5: Archive" at 18.8 s. Pages are fully rendered (no blank/error frames); sites were reachable (curl 200 for both URLs; the old /docs/the-workflow is 404).
