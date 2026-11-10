@@ -101,7 +101,7 @@ Detects scene changes in the picture (ffmpeg scene score above --scene-threshold
 lies inside a silence of the audio (at or below --noise-db, lasting at least --min-silence-ms, with
 --edge-ms clear on both sides). Defaults: 0.02, -40 dB,
 900 ms, 100 ms. Pass the take's --out MP4 from capture: it carries the audio.
-Captions and the cursor are not cuts (DEC-50): the scene score is taken on the picture above the
+Captions and the cursor are not cuts: the scene score is taken on the picture above the
 caption band (the bottom 25 % of the frame by default; --caption-band 0 scores the whole frame),
 and a cursor glide moves too few pixels to reach the threshold. --scene-threshold is set for a
 1280x720 take: a larger frame is scored against threshold × 1280·720 / (width·height), because

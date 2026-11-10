@@ -26,7 +26,7 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | WP12 | verified | wp/WP12/verify-1.md |
 | WP13 | verified | wp/WP13/verify-2.md |
 | WP14 | verified | wp/WP14/verify-1.md |
-| WP15 | in-progress | — |
+| WP15 | verified | wp/WP15/verify-1.md |
 | WP16 | not-started | — |
 | WP17 | not-started | — |
 | WP18 | not-started | — |
@@ -133,5 +133,5 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | AC-W2V-22 | web2video-plan §6 | WP14 | G a local login fixture and a storage-state file the test builds from its cookie · W a take of the protected page · T no sign-in form in any still of the contact sheet (`evidence/WP14/AC-W2V-22-*.jpg`); the manifest has `signedIn: true` and no cookie value | still | PASS | evidence/WP14/AC-W2V-22-verifier.jpg, evidence/WP14/AC-W2V-22.verifier.json |
 | AC-W2V-23 | web2video-plan §6 | WP14 | G a page whose button throws `TypeError` seven times · W a take that clicks it · T the report prints the first 5 errors and `… and 2 more`; the manifest's `x-take.pageErrors` holds all 7 first lines (and a 25-error page records 20) | script | PASS | evidence/WP14/login-reports.verifier.log |
 | AC-W2V-24 | web2video-plan §6 | WP14 | G a captions take of the ui-demo · W its manifest is validated and `command[]` is re-run · T it validates against the v1 spine schema; the re-run produces the same beat ids, preset and fps, and a frame count within ±1 (a `--script` take runs in real time; spine-timed takes are exact) | script | PASS | evidence/WP14/login-reports.verifier.log |
-| AC-W2V-39 | web2video-plan §6 | WP15 | G the F3 project (`evals/video-capture/helpers/projects.mjs` `makeF3Project`, local page) with its `beat()` storyboards · W each live plate is captured with `--plates --plate`, then `assemble` loads the project · T each plate MP4 lasts its `durationMs` ±1 frame, is picture-only, and `checkRenders` accepts it | script | not-started | — |
-| AC-W2V-41 | web2video-plan §6 | WP15 | G the repo · W grep `\bsay\(\|waitForVoice` over Markdown in `skills/` and `docs/reference/` · T 0 hits; and every flag in `capture --help` appears in `skills/video-capture/SKILL.md` or `references/storyboard-api.md` | script | not-started | — |
+| AC-W2V-39 | web2video-plan §6 | WP15 | G the F3 project (`evals/video-capture/helpers/projects.mjs` `makeF3Project`, local page) with its `beat()` storyboards · W each live plate is captured with `--plates --plate`, then `assemble` loads the project · T each plate MP4 lasts its `durationMs` ±1 frame, is picture-only, and `checkRenders` accepts it | script | PASS | evidence/WP15/AC-W2V-39.verifier.log |
+| AC-W2V-41 | web2video-plan §6 | WP15 | G the repo · W grep `\bsay\(\|waitForVoice` over Markdown in `skills/` and `docs/reference/` · T 0 hits; and every flag in `capture --help` appears in `skills/video-capture/SKILL.md` or `references/storyboard-api.md` | script | PASS | evidence/WP15/AC-W2V-41.verifier.log, evidence/WP15/AC-W2V-41.grep.verifier.log |
