@@ -38,7 +38,8 @@ export function parseReview(text, plateIds) {
   for (const line of text.split('\n')) {
     const m = DEFECT_RE.exec(line);
     if (!m) continue;
-    const status = /(?:—|–|-{1,2})\s*(fixed|open|not fixed)\s*\.?\s*\**\s*$/i.exec(m[3])?.[1]?.toLowerCase() ?? null;
+    // the status is its own trailing token after a spaced dash: ` — fixed`, ` — **open**`, ` — fixed ✅`
+    const status = /\s(?:—|–|--?)\s*\**\s*(fixed|open|not fixed)\s*\**\s*\.?[\s\p{Extended_Pictographic}\uFE0F✓✔]*$/iu.exec(m[3])?.[1]?.toLowerCase() ?? null;
     defects.push({ plate: m[1], severity: m[2].toLowerCase(), status, line: line.trim() });
   }
   const v = VERDICT_RE.exec(text);
@@ -103,13 +104,13 @@ Exit 0 PASS, 1 FAIL (one line on stderr), 2 usage.`,
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await runCli(spec, async ({ positionals: [what, target] }) => {
-    if (what !== 'build') throw new CliError(`unknown gate '${what}' — the only scripted gate here is 'build' (stage 6)`, EXIT.USAGE);
-    const fail = (why) => { process.stdout.write(`GATE 6 build: FAIL — ${why}\n`); return new CliError(why); };
+    const fail = (why, code) => { process.stdout.write(`GATE 6 build: FAIL — ${why}\n`); return new CliError(why, code); };
+    if (what !== 'build') throw fail(`unknown gate '${what}' — the only scripted gate here is 'build' (stage 6)`, EXIT.USAGE);
     const platesFile = existsSync(target) && statSync(target).isDirectory() ? path.join(target, 'plates.json') : target;
     if (!existsSync(platesFile)) throw fail(`no plates.json at ${target}`);
     const v = await validateFile(platesFile, 'plates');
     if (!v.ok) throw fail(`${platesFile} is not a valid plates.json: ${v.errors[0].field}: ${v.errors[0].message}`);
-    requireFfmpeg();
+    try { requireFfmpeg(); } catch (e) { throw fail(e.message, e.code); }
     const plan = JSON.parse(readFileSync(platesFile, 'utf8'));
     const { problems, defects, fixed } = checkBuild(plan, path.dirname(path.resolve(platesFile)));
     if (problems.length) throw fail(problems.length > 1 ? `${problems[0]} (+${problems.length - 1} more)` : problems[0]);

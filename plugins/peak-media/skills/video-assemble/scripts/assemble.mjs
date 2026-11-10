@@ -300,16 +300,16 @@ writes out/final.mp4 = spine + outro, checked with probe-spec. Report: review/as
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await runCli(spec, async ({ values, positionals: [input] }) => {
-    if (!existsSync(input)) throw new CliError(`cannot read ${input}: no such file or folder`);
-    if (!(values['min-silence-ms'] >= 0)) throw new CliError('--min-silence-ms must be >= 0', EXIT.USAGE);
-    checkLevels(values);
-    requireFfmpeg();
     // the GATE 7 line is held and printed last, so `… | tail -n 3` keeps it; a run that fails
     // before the cut check prints a FAIL line instead
     let gateLine = null;
     const gateOut = (l) => (values.json ? process.stderr : process.stdout).write(`${l}\n`);
     let r;
     try {
+      if (!existsSync(input)) throw new CliError(`cannot read ${input}: no such file or folder`);
+      if (!(values['min-silence-ms'] >= 0)) throw new CliError('--min-silence-ms must be >= 0', EXIT.USAGE);
+      checkLevels(values);
+      requireFfmpeg();
       r = await assemble({ input, brand: values.brand, renders: values.renders, out: values.out, music: values.music, sfx: values.sfx,
         musicLufs: values['music-lufs'], duckDb: values['duck-db'], sfxLufs: values['sfx-lufs'], sfxDb: values['sfx-db'], exportPreset: values.export, minSilenceMs: values['min-silence-ms'],
         outro: values.outro, rerenderOutro: values['rerender-outro'], log: values.json ? () => {} : (l) => process.stdout.write(`${l}\n`),

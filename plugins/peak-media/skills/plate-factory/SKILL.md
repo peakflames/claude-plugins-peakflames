@@ -26,10 +26,14 @@ and audio never forces a re-render.
   `FAIL`, fix and rerun the command.
 - **Stages 0, 1, 3, 4, 8, 9: you write it**, on its own line in your reply, e.g.
   `GATE 3 plates: APPROVED — plates.json (3 plates, retimed from spine/manifest.json)`. A user
-  gate's `APPROVED` line goes right after the user's answer, before the next command; an
-  approval that comes with changes ("apply 1, approved") means: apply them, then write the
-  `APPROVED` line, then start the next stage. While you
+  gate's `APPROVED` line goes right after the user's answer, before the next command. While you
   wait for an answer, print no gate line (`REJECTED` is only for an answer that turns it down).
+- **Approved, but with changes** ("apply 1, approved"):
+  - gates 0, 1, 3 — apply the text edits, then write the `APPROVED` line, then start the next stage;
+  - gate 4 — a storyboard change reopens it: edit `plates.json`, re-run the storyboard
+    (`--rescaffold`), show it and ask again; no `APPROVED` until the user approves the new one;
+  - gate 8 — a level or music change means re-mix, show the new levels and let the user listen
+    again; no `APPROVED` until they approve what they heard.
 - This holds **whatever output style or brevity setting is active**: a concise style shortens
   your prose, never the gate lines.
 - **A stage may not begin until the previous stage's gate line has been written** (printed by its

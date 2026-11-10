@@ -107,6 +107,17 @@ function approvedWithEdits(s, writeGate) {
   return s;
 }
 
+/** Gate 4 answered "Change p2's heading, then approved": edit, re-run the storyboard, (re-ask), APPROVED. */
+function g4WithChanges(s, reask) {
+  const ask = idx(s, (x) => x[0] === 'ask' && x[1].startsWith('Storyboard'));
+  s[ask] = ['ask', s[ask][1], "Change p2's heading to 'Who checks?', then approved."];
+  s.splice(ask + 1, 0, ['write', `${P}/plates.json`],
+    ['bash', RP('plates.json --all --storyboard --rescaffold'), 'storyboard: review/storyboard.jpg'],
+    ['read', `${P}/review/storyboard.jpg`],
+    ...(reask ? [['ask', "Storyboard re-run with p2's new heading (review/storyboard.jpg). Approve?", 'Approve']] : []));
+  return s;
+}
+
 /** The good run with gates 2, 5, 6, 7 printed by their scripts and not written by the model. */
 function scriptGates(s) {
   const drop = (n) => s.splice(sayIdx(s, n), 1);
@@ -213,6 +224,10 @@ export const VARIANTS = {
   'good-approved-with-edits': (s) => approvedWithEdits(s, true),
   // ... and without the GATE 1 line (the session went from the edit straight to the spine)
   'bad-approved-with-edits': (s) => approvedWithEdits(s, false),
+  // round 7 (verify-5 F2-r5): a storyboard approved "with a change" reopens gate 4 — re-run, ask again
+  'good-g4-changes-reasked': (s) => g4WithChanges(s, true),
+  // ... and writing APPROVED after the re-run without asking again doesn't close the storyboard
+  'bad-g4-changes-no-reask': (s) => g4WithChanges(s, false),
   'bad-unasked-gate': (s) => {
     s.splice(sayIdx(s, 4) - 1, 0,
       ['say', 'GATE 4 storyboard: APPROVED — review/storyboard.jpg'],

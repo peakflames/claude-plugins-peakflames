@@ -209,4 +209,7 @@ test('assemble prints the GATE 7 line itself when every cut is in silence (WP9 r
   const early = run(ASSEMBLE, [proj, '--renders', path.join(tmp, 'no-renders-here')]);
   assert.equal(early.code, 1);
   assert.match(early.stdout.trim().split('\n').at(-1), /^GATE 7 composite: FAIL — plate '.+': no render at /);
+  // usage errors and missing ffmpeg too (verify-5 N4)
+  assert.match(run(ASSEMBLE, [proj, '--min-silence-ms', '-5']).stdout, /^GATE 7 composite: FAIL — --min-silence-ms must be >= 0$/m);
+  assert.match(run(ASSEMBLE, [proj], { env: { PEAK_MEDIA_FFMPEG: '/nonexistent/ffmpeg' } }).stdout, /^GATE 7 composite: FAIL — ffmpeg not found/m);
 });

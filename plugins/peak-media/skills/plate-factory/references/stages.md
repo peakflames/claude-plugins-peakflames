@@ -105,6 +105,8 @@ above, and follow these rules:
   and the plugin's other tools (`contact-sheet`, …) are fine; `echo`, `cat f` or another program
   in the same call isn't. `bash -c '…'` around the run is unwrapped. A copy of the script
   under another `…/skills/<skill>/scripts/` path would still be credited.
+- The check credits script output but can be fooled by deliberate forgery inside the same Bash
+  call; it guards against honest mistakes, not adversarial ones.
 
 ---
 
@@ -161,11 +163,9 @@ End the stage with: `GATE 0 brief: APPROVED — brief.md`
    (`hook: CLEAR — …`), and the numbered proposed changes (`1. compare — original: "…" →
    proposed: "…"`), or "no changes proposed".
 7. `AskUserQuestion`: which proposed changes to apply (each, all, none) and whether to approve the
-   script. Apply only what the user picks; the user's wording wins. If words or the target
-   changed, redo step 4, show the result and ask again.
-8. **Approved with changes** ("apply 1, approved"): apply the picked changes, then write the
-   `GATE 1` line below, then run the spine. The same holds at every user gate: edits first, then
-   the `APPROVED` line, then the next stage's first command.
+   script. Apply only what the user picks; the user's wording wins. If the user approves with
+   changes ("apply 1, approved"), apply them, then write the `GATE 1` line below, then run the
+   spine; ask again only if the changes move the runtime estimate (step 4) outside ±10%.
 
 End the stage with: `GATE 1 script: APPROVED — script.md (<words> words, cold read <k>/<n> CLEAR)`
 
@@ -219,7 +219,8 @@ End the stage with: `GATE 3 plates: APPROVED — plates.json (<n> plates, retime
    per plate: id, time range, on-screen text, planned motion.
 5. `AskUserQuestion`: approve the storyboard before any animation? Changes go into `plates.json`
    (text, intent, kind, assets), then `render-plate plates.json --all --storyboard --rescaffold`;
-   show and ask again.
+   show and ask again. This holds even when the answer was "approved, with this change": the
+   re-run reopens the storyboard, so the `APPROVED` line waits for the user's yes to the new one.
 
 End the stage with: `GATE 4 storyboard: APPROVED — review/storyboard.jpg`
 
@@ -315,8 +316,9 @@ End the stage with: `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in �
    `<abs>/review/review.mp4` with no stems) and its measured levels: integrated LUFS and true
    peak of the mix (from `review/levels.json`, or `review/assemble.json` with no stems), plus
    `belowVoiceDb` when there is music.
-4. `AskUserQuestion`: listen and approve the levels? Adjust `--music-lufs`/`--duck-db` on request,
-   rerun, show and ask again.
+4. `AskUserQuestion`: listen and approve the levels? Adjust `--music-lufs`/`--duck-db` (or the
+   track) on request, rerun, show and ask again — also when the answer was "approved, but a bit
+   quieter": the user approves what they heard, so `APPROVED` waits for the new listen.
 
 End the stage with: `GATE 8 audio: APPROVED — review/review-mix.mp4 (review/levels.json)`
 (no stems: `GATE 8 audio: APPROVED — review/review.mp4 (narration only)`).

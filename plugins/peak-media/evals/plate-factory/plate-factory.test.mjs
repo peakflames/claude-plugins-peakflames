@@ -374,8 +374,9 @@ test('round 6: approval with edits — GATE 1 comes after the edit, and a missin
   assert.match(checkGates(load('bad-approved-with-edits')).message, /no passing gate line for gate\(s\) 1$/);
   const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
   const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
-  assert.match(skill, /approval that comes with changes \("apply 1, approved"\) means: apply them, then write the\s+`APPROVED` line/);
-  assert.match(stages, /\*\*Approved with changes\*\* \("apply 1, approved"\): apply the picked changes, then write the\s+`GATE 1` line below, then run the spine/);
+  assert.match(skill, /gates 0, 1, 3 — apply the text edits, then write the `APPROVED` line/);
+  assert.match(stages, /If the user approves with\s+changes \("apply 1, approved"\), apply them, then write the `GATE 1` line below, then run the\s+spine/);
+  assert.doesNotMatch(stages, /The same holds at every user gate: edits first/, 'no blanket rule across gates (verify-5 F2-r5)');
 });
 
 test('round 6: a script gate line counts only from a real run of the plugin script (verify-4 F1/F3)', async () => {
@@ -427,4 +428,35 @@ test('round 6: gate.mjs counts the reviewer\'s listed defects, checks the VERDIC
   // sheets by exact id
   for (const f of ['contact-p1.jpg', 'p1-r2.jpg', 'p1-fix1.jpg']) assert.ok(isSheetOf(f, 'p1'), f);
   for (const f of ['p10-r1.jpg', 'x-p1-unrelated.jpg', 'contact-p1-hook.jpg', 'p1-hook-r1.jpg']) assert.ok(!isSheetOf(f, 'p1'), f);
+});
+
+test('round 7: a storyboard approved with a change is re-run and asked again; APPROVED without the re-ask fails (verify-5 F2-r5)', () => {
+  const good = byId(checkAll(load('good-g4-changes-reasked')));
+  for (const id of ['AC-ORC-01', 'AC-ORC-02', 'AC-ORC-03', 'AC-ORC-04']) assert.ok(good[id].ok, `${id}: ${good[id].message}`);
+  const bad = byId(checkAll(load('bad-g4-changes-no-reask')));
+  assert.equal(bad['AC-ORC-02'].ok, false);
+  assert.match(bad['AC-ORC-02'].message, /had no AskUserQuestion since the storyboard opened/);
+  const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
+  assert.match(skill, /gate 4 — a storyboard change reopens it: .*\n.*show it and ask again; no `APPROVED` until the user approves the new one/);
+  assert.match(skill, /gate 8 — a level or music change means re-mix, show the new levels and let the user listen\s+again/);
+  const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
+  assert.match(stages, /guards against honest mistakes, not adversarial ones/);
+});
+
+test('round 7: a defect status is an explicit trailing token; gate build prints FAIL on usage errors and missing ffmpeg (verify-5 N1/N2/N4)', async () => {
+  const { parseReview } = await import('../../skills/plate-factory/scripts/gate.mjs');
+  const V = '\nVERDICT: 0 blocker, 1 major, 0 minor';
+  const st = (line) => parseReview(line + V, ['p2']).defects[0].status;
+  assert.equal(st('p2 @5s [major] 2: nav drifts → make the nav position-fixed'), null, 'a word ending in -fixed is not a status');
+  assert.equal(st('p2 @5s major 2: x → draw it half-open'), null);
+  assert.equal(st('p2 @5s major 2: x → y — **fixed**'), 'fixed');
+  assert.equal(st('p2 @5s major 2: x → y — fixed ✅'), 'fixed');
+  assert.equal(st('p2 @5s major 2: x → y - open'), 'open');
+  const GATE = 'skills/plate-factory/scripts/gate.mjs';
+  const usage = run(GATE, ['nope', ROOT]);
+  assert.equal(usage.code, 2);
+  assert.match(usage.stdout, /^GATE 6 build: FAIL — unknown gate 'nope'/m);
+  const noFf = run(GATE, ['build', path.join(ROOT, 'docs', 'build', 'fixtures', 'F1')], { env: { PEAK_MEDIA_FFMPEG: '/nonexistent/ffmpeg' } });
+  assert.equal(noFf.code, 3);
+  assert.match(noFf.stdout, /^GATE 6 build: FAIL — ffmpeg not found/m);
 });
