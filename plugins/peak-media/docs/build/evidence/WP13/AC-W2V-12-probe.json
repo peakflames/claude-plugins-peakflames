@@ -1,0 +1,76 @@
+{
+  "web": {
+    "checks": [
+      "ok video codec: h264",
+      "ok video profile: High",
+      "ok pixel format: yuv420p",
+      "ok audio codec: aac",
+      "ok audio sample rate: 48000",
+      "ok faststart (moov before mdat): ftyp,moov,free,mdat",
+      "ok width: 1280",
+      "ok height: 720",
+      "ok fps: 30.000",
+      "ok duration (±1 frame): 9767 ms",
+      "ok [web] audio profile: LC",
+      "ok [web] audio channels: 2",
+      "ok [web] audio bitrate ≤ 128 kbps +15%: 2 kbps",
+      "ok [web] progressive: progressive",
+      "ok [web] encoder rate control (x264 SEI): rc=crf crf=26.0"
+    ]
+  },
+  "youtube": {
+    "checks": [
+      "ok video codec: h264",
+      "ok video profile: High",
+      "ok pixel format: yuv420p",
+      "ok audio codec: aac",
+      "ok audio sample rate: 48000",
+      "ok faststart (moov before mdat): ftyp,moov,free,mdat",
+      "ok width: 1920",
+      "ok height: 1080",
+      "ok fps: 30.000",
+      "ok duration (±1 frame): 9733 ms",
+      "ok [youtube] audio profile: LC",
+      "ok [youtube] audio channels: 2",
+      "ok [youtube] audio bitrate ≤ 384 kbps +15%: 2 kbps",
+      "ok [youtube] progressive: progressive",
+      "ok [youtube] encoder rate control (x264 SEI): rc=abr bitrate=8000 vbv_maxrate=12000",
+      "ok [youtube] CABAC (x264 SEI): cabac=1",
+      "ok [youtube] video bitrate ≤ 12000 kbps peak: 662 kbps",
+      "ok [youtube] GOP length = 15 frames (half of 30 fps): 15 frames",
+      "ok [youtube] closed GOP: closed",
+      "ok [youtube] 2 consecutive B-frames: max B run 2 (97 runs)",
+      "ok [youtube] no edit lists: 0 elst"
+    ]
+  },
+  "hifi": {
+    "checks": [
+      "ok video codec: h264",
+      "ok video profile: High",
+      "ok pixel format: yuv420p",
+      "ok audio codec: aac",
+      "ok audio sample rate: 48000",
+      "ok faststart (moov before mdat): ftyp,moov,free,mdat",
+      "ok width: 1920",
+      "ok height: 1080",
+      "ok fps: 60.000",
+      "ok duration (±1 frame): 9750 ms",
+      "ok [hifi] audio profile: LC",
+      "ok [hifi] audio channels: 2",
+      "ok [hifi] audio bitrate ≤ 256 kbps +15%: 2 kbps",
+      "ok [hifi] progressive: progressive",
+      "ok [hifi] encoder rate control (x264 SEI): rc=crf crf=16.0"
+    ]
+  },
+  "control": {
+    "file": "ui-web.mp4 checked as youtube",
+    "failed": [
+      "width",
+      "height",
+      "[youtube] encoder rate control (x264 SEI)",
+      "[youtube] GOP length = 15 frames (half of 30 fps)",
+      "[youtube] 2 consecutive B-frames",
+      "[youtube] no edit lists"
+    ]
+  }
+}

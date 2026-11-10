@@ -15,7 +15,7 @@ import { browserPath } from '../../lib/hf.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
 import { loadProject, checkRenders } from '../../skills/video-assemble/scripts/assemble.mjs';
 
-const REC01_FLAGS = ['--storyboard', '--script', '--out', '--mp4', '--viewport', '--no-captions', '--caption-css', '--url', '--debug-requests', '--audio-offset-ms', '--spine', '--no-cursor'];
+const REC01_FLAGS = ['--storyboard', '--script', '--out', '--preset', '--viewport', '--no-captions', '--caption-css', '--url', '--debug-requests', '--audio-offset-ms', '--spine', '--no-cursor'];
 const NARRATION_FLAGS = ['--narrate', '--tts-model', '--voice', '--style', '--export-clips'];
 const STORYBOARD = path.join(DECK, 'storyboard.mjs');
 const DECK_SCRIPT = path.join(DECK, 'script.md');
@@ -69,6 +69,9 @@ test('AC-BASE-09: capture --help lists every flag, --version = plugin.json, bad 
       ['--storyboard', STORYBOARD, '--out', out],                   // no beat source (--script/--spine/--plates)
       ['--storyboard', path.join(tmp, 'missing.mjs'), '--script', DECK_SCRIPT, '--out', out], // missing storyboard
       ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', path.join(tmp, 'x.avi')], // unsupported container
+      ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', path.join(tmp, 'x.webm')], // .webm takes are gone: --out is the MP4
+      ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--mp4', out], // --mp4 is gone
+      ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', out, '--preset', 'vhs'], // unknown preset
       ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', out, '--viewport', 'big'], // bad viewport
       ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--out', out, '--audio-offset-ms', 'soon'], // not a number
       ['--storyboard', STORYBOARD, '--script', path.join(tmp, 'nope.md'), '--out', out], // missing script
@@ -88,12 +91,15 @@ test('AC-REC-01: --help lists the recorder flags and no narration flags; each fl
     assert.notEqual(r.code, 0, `${f} is rejected`);
     assert.match(r.stderr, /Unknown option/, `${f} is unknown to capture`);
   }
+  // --out is the deliverable (WP13): --mp4 is gone
+  assert.doesNotMatch(help.stdout, /--mp4\b/, '--help has no --mp4');
+  assert.match(run(CAPTURE, ['--storyboard', STORYBOARD, '--script', DECK_SCRIPT, '--mp4', path.join(tmp, 'n.mp4')]).stderr, /Unknown option '--mp4'/);
 
   // the declared option table parses every flag (node:util parseArgs, as runCli does)
   const options = Object.fromEntries(Object.entries(spec.options).map(([k, o]) => [k, { type: o.type === 'number' ? 'string' : o.type }]));
   const css = path.join(tmp, 'cap.css');
   writeFileSync(css, '.pm-caption { color: yellow; }');
-  const sample = { storyboard: STORYBOARD, script: DECK_SCRIPT, out: path.join(tmp, 'a.webm'), mp4: path.join(tmp, 'a.mp4'), viewport: '960x540', 'caption-css': css,
+  const sample = { storyboard: STORYBOARD, script: DECK_SCRIPT, out: path.join(tmp, 'a.mp4'), preset: 'youtube', viewport: '960x540', 'caption-css': css,
     url: path.join(DECK, 'index.html'), 'audio-offset-ms': '-50', spine: spineFile };
   const argv = REC01_FLAGS.flatMap((f) => (spec.options[f.slice(2)].type === 'boolean' ? [f] : [`${f}=${sample[f.slice(2)]}`]));
   const { values } = parseArgs({ args: argv, options, strict: true });

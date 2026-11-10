@@ -80,8 +80,8 @@ function arrowPixels(file, ms, { x, y }) {
 // ---- takes shared by the tests ----
 
 const uiTake = {
-  cursor: memo(() => capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', path.join(tmp, 'ui-cursor.mp4')])),
-  'no-cursor': memo(() => capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', path.join(tmp, 'ui-no-cursor.mp4'), '--no-cursor'])),
+  cursor: memo(() => capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--out', path.join(tmp, 'ui-cursor.mp4')])),
+  'no-cursor': memo(() => capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--out', path.join(tmp, 'ui-no-cursor.mp4'), '--no-cursor'])),
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -94,7 +94,7 @@ test('AC-W2V-01: each beat shows its own caption — script.md On screen: lines 
   // narrated deck on a fake/tone spine: the caption of each beat is the spine beat's onScreenText
   const spine = deckSpine(path.join(tmp, 'deck'));
   const deckMp4 = path.join(tmp, 'deck-narrated.mp4');
-  const deck = capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', spine.file, '--mp4', deckMp4]);
+  const deck = capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', spine.file, '--out', deckMp4]);
   assert.equal(deck.take.mode, 'narrated');
   const cases = [
     { name: 'ui-demo', mp4: path.join(tmp, 'ui-cursor.mp4'), run: ui, expected: uiScript.map((b) => [b.id, b.onScreenText]) },
@@ -120,7 +120,7 @@ test('AC-W2V-02: beat(\'nope\') stops the take before any frame is encoded; the 
   const sb = path.join(tmp, 'nope.mjs');
   writeFileSync(sb, "export default async ({ beat }) => { await beat('nope'); };\n");
   const out = path.join(tmp, 'nope.mp4');
-  const r = capture(['--storyboard', sb, '--script', UI_SCRIPT, '--url', path.join(UI, 'index.html'), '--mp4', out], { ok: false });
+  const r = capture(['--storyboard', sb, '--script', UI_SCRIPT, '--url', path.join(UI, 'index.html'), '--out', out], { ok: false });
   assert.notEqual(r.code, 0);
   const lines = errorLines(r.stderr);
   assert.equal(lines.length, 1, r.stderr);
@@ -141,7 +141,7 @@ test('AC-W2V-03: out-of-order, repeated, nested and uncalled beats each stop the
     const sb = path.join(tmp, `rule-${name.replace(/\s+/g, '-')}.mjs`);
     writeFileSync(sb, `export default async ({ beat }) => { ${body} };\n`);
     const out = path.join(tmp, `rule-${name.replace(/\s+/g, '-')}.mp4`);
-    const r = capture(['--storyboard', sb, '--script', UI_SCRIPT, '--url', path.join(UI, 'index.html'), '--mp4', out], { ok: false });
+    const r = capture(['--storyboard', sb, '--script', UI_SCRIPT, '--url', path.join(UI, 'index.html'), '--out', out], { ok: false });
     assert.notEqual(r.code, 0, `${name}: non-zero exit`);
     const lines = errorLines(r.stderr);
     assert.equal(lines.length, 1, `${name}: one line (${r.stderr})`);
@@ -162,7 +162,7 @@ test('AC-W2V-04: a beat lasts max(fn, hold) — a long fn lengthens it, a long h
     "  await beat('long-fn', async () => { await wait(2600); });",
     "  await beat('long-hold', async () => { await wait(300); });",
     '};', ''].join('\n'));
-  const { take } = capture(['--storyboard', sb, '--script', script, '--url', path.join(UI, 'index.html'), '--mp4', path.join(tmp, 'timing.mp4'), '--no-cursor']);
+  const { take } = capture(['--storyboard', sb, '--script', script, '--url', path.join(UI, 'index.html'), '--out', path.join(tmp, 'timing.mp4'), '--no-cursor']);
   const [a, b] = take.beats;
   const holds = { 'long-fn': holdMs('Go.'), 'long-hold': holdMs(longText) };
   assert.equal(holds['long-fn'], 1500);
@@ -205,7 +205,7 @@ test('AC-W2V-06: after a hash-route change and a goto, one cursor and one captio
   const runs = {};
   for (const engine of ['overlay', 'dom']) {
     const mp4 = path.join(tmp, `two-page-${engine}.mp4`);
-    const r = capture(['--storyboard', path.join(TWO_PAGE, 'storyboard.mjs'), '--script', path.join(TWO_PAGE, 'script.md'), '--mp4', mp4, '--caption-engine', engine]);
+    const r = capture(['--storyboard', path.join(TWO_PAGE, 'storyboard.mjs'), '--script', path.join(TWO_PAGE, 'script.md'), '--out', mp4, '--caption-engine', engine]);
     assert.deepEqual(r.take.beats.map((b) => b.id), ['home', 'details', 'page-two']);
     assert.equal(r.take.captionEngine, engine);
     const p = r.take.pointer;
@@ -231,7 +231,7 @@ test('AC-W2V-06: after a hash-route change and a goto, one cursor and one captio
 
 test('AC-W2V-07: scrollBy(container, {y: 1500, ms: 600}) at 30 fps shows at least 10 distinct frames over the scroll', () => {
   const mp4 = path.join(tmp, 'scroll.mp4');
-  const { take } = capture(['--storyboard', path.join(SCROLL, 'storyboard.mjs'), '--script', path.join(SCROLL, 'script.md'), '--mp4', mp4, '--no-captions', '--fps', String(FPS)]);
+  const { take } = capture(['--storyboard', path.join(SCROLL, 'storyboard.mjs'), '--script', path.join(SCROLL, 'script.md'), '--out', mp4, '--no-captions', '--fps', String(FPS)]);
   assert.equal(take.fps, FPS);
   const s = take.pointer.find((p) => p.action === 'scrollBy');
   assert.ok(s, 'scrollBy ran');

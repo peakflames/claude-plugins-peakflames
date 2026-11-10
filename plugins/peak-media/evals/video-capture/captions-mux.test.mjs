@@ -1,4 +1,4 @@
-// video-capture (WP7b): captions, the --mp4 mux, the take manifest, check-take, the ui-demo and
+// video-capture (WP7b): captions, the audio mux of the --out MP4, the take manifest, check-take, the ui-demo and
 // the A/V sync test. Pages are served on 127.0.0.1 — no internet. Spines come from spine.mjs with
 // fake/tone and a temp TTS cache, with both key variables unset.
 // Run alone (AC-REC-06): captures are real time and the sync test is timing-sensitive. Under
@@ -85,12 +85,12 @@ const memo = (fn) => { let v; return () => (v ??= fn()); };
 
 // ---- the takes (each captured once, shared by the tests below) ----
 
-/** The narrated example deck, voice-only (--no-captions: a caption coming up with each clip would be a
- *  picture change over speech): a spine whose 950 ms lead-in fits the 900 ms slide settle. */
+/** The narrated example deck with captions on (as delivered; check-take leaves the caption band out of
+ *  scene detection, DEC-50): a spine whose 950 ms lead-in fits the 900 ms slide settle. */
 const deck = memo(() => {
   const spine = buildSpine(path.join(DECK, 'brief.md'), 'deck-spine', ['--lead-ms', '950']);
   const mp4 = path.join(tmp, 'deck.mp4');
-  const { take } = capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', spine.file, '--mp4', mp4, '--no-captions']);
+  const { take } = capture(['--storyboard', path.join(DECK, 'storyboard.mjs'), '--spine', spine.file, '--out', mp4]);
   return { spine, mp4, take };
 });
 
@@ -98,16 +98,16 @@ const deck = memo(() => {
 const ui = {
   default: memo(() => {
     const mp4 = path.join(tmp, 'ui-default.mp4');
-    const r = capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', mp4], { preload: 'loopback' });
+    const r = capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--out', mp4], { preload: 'loopback' });
     return { mp4, ...r };
   }),
   'no-captions': memo(() => {
     const mp4 = path.join(tmp, 'ui-no-captions.mp4');
-    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', mp4, '--no-captions']) };
+    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--out', mp4, '--no-captions']) };
   }),
   'caption-css': memo(() => {
     const mp4 = path.join(tmp, 'ui-caption-css.mp4');
-    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--mp4', mp4, '--caption-css', UI_ALT_CSS, '--manifest', path.join(tmp, 'ui-css-take.json')]) };
+    return { mp4, ...capture(['--storyboard', UI_STORYBOARD, '--script', UI_SCRIPT, '--out', mp4, '--caption-css', UI_ALT_CSS, '--manifest', path.join(tmp, 'ui-css-take.json')]) };
   }),
 };
 
@@ -115,7 +115,7 @@ const syncSpine = memo(() => buildSpine(path.join(SYNC, 'brief.md'), 'sync-spine
 /** A sync take: voice-only (--no-captions: no overlay at all) or captioned (the default overlay engine). */
 function syncTake(captioned, i = 1) {
   const mp4 = path.join(tmp, `sync-${captioned ? 'captions' : 'voice'}-${i}.mp4`);
-  const { take } = capture(['--storyboard', path.join(SYNC, 'storyboard.mjs'), '--spine', syncSpine().file, '--mp4', mp4, '--audio-offset-ms', '0', ...(captioned ? [] : ['--no-captions'])]);
+  const { take } = capture(['--storyboard', path.join(SYNC, 'storyboard.mjs'), '--spine', syncSpine().file, '--out', mp4, '--audio-offset-ms', '0', ...(captioned ? [] : ['--no-captions'])]);
   return { mp4, take };
 }
 let syncMp4; // kept for AC-REC-07's negative control
@@ -166,7 +166,7 @@ test('AC-BASE-10: check-take --help lists every flag, --version = plugin.json, b
       [path.join(tmp, 'missing.mp4')],                 // no such file
       [tmp],                                           // a folder
       [notMedia],                                      // not media
-      [noAudio],                                       // the picture-only --out (no audio track)
+      [noAudio],                                       // a picture-only plate MP4 (no audio track)
       ['--scene-threshold', '2', noAudio],             // threshold outside 0..1
       ['--min-silence-ms', '-5', noAudio],             // negative silence
       ['--noise-db', '6', noAudio],                    // positive dB
@@ -174,15 +174,17 @@ test('AC-BASE-10: check-take --help lists every flag, --version = plugin.json, b
       [noAudio, noAudio],                              // two takes
       ['--expect-cuts', '-1', noAudio],                // negative count
       ['--expect-cuts', '1.5', noAudio],               // not a whole number
+      ['--caption-band', '0.95', noAudio],             // caption band covering the picture
+      ['--caption-band', '-0.1', noAudio],             // negative caption band
     ],
   });
   const missing = run(CHECK_TAKE, [path.join(tmp, 'missing.mp4')]);
-  assert.match(missing.stderr, /no such file — pass the take's --mp4 output/);
+  assert.match(missing.stderr, /no such file — pass the take's --out MP4/);
   const pic = run(CHECK_TAKE, [noAudio]);
-  assert.match(pic.stderr, /has no audio track.*run check-take on the --mp4 deliverable/);
+  assert.match(pic.stderr, /has no audio track.*run check-take on a take's --out MP4/);
 });
 
-test('AC-REC-05: the --mp4 deliverable passes probe-spec (H.264 High, yuv420p, AAC 48 kHz, faststart), narrated at -16 LUFS, otherwise silent AAC', () => {
+test('AC-REC-05: the --out MP4 deliverable passes probe-spec (H.264 High, yuv420p, AAC 48 kHz, faststart), narrated at -16 LUFS, otherwise silent AAC', () => {
   const results = {};
   const narrated = deck();
   const captionsOnly = ui.default();
@@ -191,7 +193,7 @@ test('AC-REC-05: the --mp4 deliverable passes probe-spec (H.264 High, yuv420p, A
     results[name] = r.checks;
     for (const c of r.checks) assert.ok(c.ok, `${name}: ${c.name} expected ${c.expected}, got ${c.actual}`);
     // D7: duration within 1 s of videoMs (probe-spec checks ±1 frame, which is tighter)
-    assert.equal(take.mp4, mp4);
+    assert.equal(take.out, mp4);
   }
   const lufs = loudness(narrated.mp4).lufs;
   assert.ok(Math.abs(lufs - -16) <= 1, `narration is levelled to -16 LUFS (got ${lufs})`);
@@ -239,12 +241,14 @@ test('AC-REC-06: on a sync page that flips a full-frame colour as each beat star
 
 
 test('AC-REC-07: on the narrated example deck, every scene change (threshold 0.02) lands inside silence (-40 dB, >= 900 ms)', () => {
-  const { mp4, spine } = deck();
+  const { mp4, spine, take } = deck();
+  assert.equal(take.captionTimings.length, spine.doc.beats.length, 'the deck is captured with captions on');
   const r = run(CHECK_TAKE, [mp4, '--json']);
   assert.equal(r.code, 0, `check-take passes: ${r.stdout}${r.stderr}`);
   const res = JSON.parse(r.stdout);
   assert.equal(res.source, 'scene>0.02');
   assert.equal(res.minSilenceMs, 900);
+  assert.equal(res.captionBand, 0.25, 'scene changes are scored above the caption band (DEC-50)');
   assert.equal(res.silentTrack, false, 'the deck take carries narration');
   // each slide change is detected inside the gap between two clips (a fade split by a late frame
   // can score twice; both detections must still sit in the silence)
@@ -350,7 +354,7 @@ test('AC-REC-09: the take manifest validates against the v1 spine schema and com
   const mp4 = ui['caption-css']().mp4;
   // not circular: command[] must carry every flag of the invocation that made the take (as spawned
   // by capture() above), with paths absolute
-  const given = [['--storyboard', UI_STORYBOARD], ['--script', UI_SCRIPT], ['--mp4', mp4], ['--caption-css', UI_ALT_CSS], ['--manifest', manifests['ui-caption-css']], ['--json'], ['--debug-requests']];
+  const given = [['--storyboard', UI_STORYBOARD], ['--script', UI_SCRIPT], ['--out', mp4], ['--caption-css', UI_ALT_CSS], ['--manifest', manifests['ui-caption-css']], ['--json'], ['--debug-requests']];
   for (const [flag, value] of given) {
     const i = args.indexOf(flag);
     assert.ok(i > 0, `command[] has ${flag}`);
@@ -401,14 +405,14 @@ test('watchdog: a hanging storyboard is aborted at --max-ms with one line and th
   const sb = path.join(tmp, 'hang.mjs');
   writeFileSync(sb, "export default async ({ beat }) => { await beat('hang', () => new Promise((r) => setTimeout(r, 600000))); };\n");
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, [path.join(ROOT, CAPTURE), '--storyboard', sb, '--script', oneBeat('hang', 'Waiting forever.'), '--url', path.join(UI, 'index.html'), '--out', path.join(tmp, 'hang.webm'), '--max-ms', '2500'], { encoding: 'utf8', env: { ...process.env, ...env() }, timeout: 60000 });
+  const r = spawnSync(process.execPath, [path.join(ROOT, CAPTURE), '--storyboard', sb, '--script', oneBeat('hang', 'Waiting forever.'), '--url', path.join(UI, 'index.html'), '--out', path.join(tmp, 'hang.mp4'), '--max-ms', '2500'], { encoding: 'utf8', env: { ...process.env, ...env() }, timeout: 60000 });
   const ms = Date.now() - t0;
   assert.equal(r.status, 1, r.stderr);
   const lines = r.stderr.trim().split('\n').filter((l) => !/^capture: (launching|t0 )/.test(l));
   assert.equal(lines.length, 1, r.stderr);
   assert.match(lines[0], /aborted at --max-ms 2500 ms/);
   assert.ok(ms < 20000, `exits promptly (${ms} ms)`);
-  assert.equal(existsSync(path.join(tmp, 'hang.webm')), false, 'nothing is written');
+  assert.equal(existsSync(path.join(tmp, 'hang.mp4')), false, 'nothing is written');
 });
 
 test('watchdog: a spine-timed take that overruns its window by more than 2 s is aborted', () => {
@@ -416,7 +420,7 @@ test('watchdog: a spine-timed take that overruns its window by more than 2 s is 
   writeFileSync(sb, "export default async ({ wait }) => { await wait(120000); };\n");
   const spine = syncSpine();
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, [path.join(ROOT, CAPTURE), '--storyboard', sb, '--url', path.join(SYNC, 'index.html'), '--spine', spine.file, '--out', path.join(tmp, 'overrun.webm')], { encoding: 'utf8', env: { ...process.env, ...env() }, timeout: 90000 });
+  const r = spawnSync(process.execPath, [path.join(ROOT, CAPTURE), '--storyboard', sb, '--url', path.join(SYNC, 'index.html'), '--spine', spine.file, '--out', path.join(tmp, 'overrun.mp4')], { encoding: 'utf8', env: { ...process.env, ...env() }, timeout: 90000 });
   const ms = Date.now() - t0;
   assert.equal(r.status, 1, r.stderr);
   assert.match(r.stderr, /more than 2000 ms past the spine's \d+ ms — aborted/);
@@ -427,7 +431,7 @@ test('captions: --caption-engine dom draws the caption in the page instead of sh
   const sb = path.join(tmp, 'dom-caption.mjs');
   writeFileSync(sb, "export default async ({ beat }) => { await beat('dom'); };\n");
   const mp4 = path.join(tmp, 'dom-caption.mp4');
-  const { take } = capture(['--storyboard', sb, '--script', oneBeat('dom', 'Drawn in the page instead.'), '--url', path.join(UI, 'index.html'), '--mp4', mp4, '--caption-engine', 'dom']);
+  const { take } = capture(['--storyboard', sb, '--script', oneBeat('dom', 'Drawn in the page instead.'), '--url', path.join(UI, 'index.html'), '--out', mp4, '--caption-engine', 'dom']);
   assert.equal(take.captionEngine, 'dom');
   const c = take.captionTimings[0];
   const s = band(mp4, Math.round(c.startMs + c.durationMs / 2));

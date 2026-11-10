@@ -1,6 +1,6 @@
 // AC-REC-06 sync storyboard (web2video D8): one beat per spine clip (beats one..six of script.md),
 // and the whole frame flips to the next colour the moment the beat starts. With fake/tone clips
-// (full level from sample 0) the offset between each colour flip and its tone onset in the --mp4
+// (full level from sample 0) the offset between each colour flip and its tone onset in the --out MP4
 // is the A/V sync error. Captions follow the capture flags: --no-captions for a voice-only take.
 export const COLOURS = [
   { name: 'red', css: '#ff0000', rgb: [255, 0, 0] },

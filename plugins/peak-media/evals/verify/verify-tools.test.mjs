@@ -66,7 +66,23 @@ test('AC-BASE-03: contact-sheet baseline', (t) => {
 });
 
 test('AC-BASE-04: probe-spec baseline', (t) => {
-  baseline(t, assert, 'lib/verify/probe-spec.mjs', { flags: ['--width', '--height', '--size', '--fps', '--duration-ms', '--tolerance-frames', '--no-audio', '--json'], badArgs: [[], ['nope.mp4'], [cuts, '--size', 'big'], [path.join(dir)]] });
+  baseline(t, assert, 'lib/verify/probe-spec.mjs', { flags: ['--preset', '--width', '--height', '--size', '--fps', '--duration-ms', '--tolerance-frames', '--no-audio', '--json'], badArgs: [[], ['nope.mp4'], [cuts, '--size', 'big'], [path.join(dir)], [cuts, '--preset', 'vhs']] });
+});
+
+test('probe-spec --preset youtube: catches an open GOP, a wrong GOP length, 3 B-frames and edit lists (not AC-bound; AC-W2V-12 runs it on real takes)', () => {
+  // 1920x1080 @ 30, AAC 48 kHz stereo: right size, wrong youtube encode
+  const bad = path.join(dir, 'open-gop.mp4');
+  const r = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=1920x1080:r=30:d=3', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '3',
+    '-c:v', 'libx264', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-b:v', '8000k', '-maxrate', '12000k', '-bufsize', '16000k',
+    '-x264-params', 'open-gop=1:keyint=20:min-keyint=20:scenecut=0:bframes=3:b-adapt=0', '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-movflags', '+faststart', bad]);
+  assert.equal(r.status, 0, r.stderr?.toString());
+  const j = JSON.parse(run('lib/verify/probe-spec.mjs', [bad, '--preset', 'youtube', '--json']).stdout);
+  const failed = j.checks.filter((c) => !c.ok).map((c) => c.name);
+  for (const n of ['[youtube] closed GOP', '[youtube] 2 consecutive B-frames', '[youtube] no edit lists']) assert.ok(failed.includes(n), `${n}: ${failed}`);
+  assert.ok(failed.some((n) => /GOP length = 15/.test(n)), `GOP length: ${failed}`);
+  for (const n of ['width', 'height', 'fps', '[youtube] encoder rate control (x264 SEI)', '[youtube] CABAC (x264 SEI)']) assert.ok(!failed.includes(n), `${n} passes`);
+  // --size/--fps override the preset's capture values
+  assert.ok(JSON.parse(run('lib/verify/probe-spec.mjs', [bad, '--preset', 'youtube', '--size', '1280x720', '--json']).stdout).checks.some((c) => c.name === 'width' && !c.ok && c.expected === '1280'));
 });
 
 test('AC-BASE-05: check-cuts baseline', (t) => {

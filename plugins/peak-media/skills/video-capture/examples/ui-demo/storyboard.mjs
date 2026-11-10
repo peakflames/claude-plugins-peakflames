@@ -1,8 +1,8 @@
 // Example UI demo: a captioned tour of the small to-do app in index.html (served on 127.0.0.1).
 // The beats and their captions live in script.md; captions mode is the default and needs no key:
-//   capture --storyboard storyboard.mjs --script script.md --mp4 ui-demo.mp4                    (captions)
-//   capture --storyboard storyboard.mjs --script script.md --mp4 ui-demo.mp4 --no-captions      (silent)
-//   capture --storyboard storyboard.mjs --script script.md --mp4 ui-demo.mp4 --caption-css captions-alt.css
+//   capture --storyboard storyboard.mjs --script script.md --out ui-demo.mp4                    (captions)
+//   capture --storyboard storyboard.mjs --script script.md --out ui-demo.mp4 --no-captions      (silent)
+//   capture --storyboard storyboard.mjs --script script.md --out ui-demo.mp4 --caption-css captions-alt.css
 // Each beat shows its caption, plays the action under it, and holds for the caption's reading
 // time (about 3 words/s, at least 1.5 s) or until the action ends, whichever is later.
 

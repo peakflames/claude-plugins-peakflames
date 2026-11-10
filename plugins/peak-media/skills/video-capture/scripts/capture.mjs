@@ -6,8 +6,10 @@
 // round(ms × fps / 1000) frames. The storyboard runs beat(id, fn?) per beat of --script script.md,
 // --spine, or the plate's beat (DEC-46); with a spine a beat plays to the manifest's clip timing — no
 // TTS here (plate-factory §6, one timing model). Captions and the cursor are drawn with
-// screencast.showOverlay (injected DOM as the fallback). --mp4 lays the spine's clips at their spine
-// times plus --audio-offset-ms at -16 LUFS (D7), and every take writes a take manifest (D11).
+// screencast.showOverlay (injected DOM as the fallback). A standalone take's --out is the MP4
+// deliverable, encoded to its --preset (DEC-47): the spine's clips at their spine times at -16 LUFS
+// (D7), else a silent AAC track. A plate's --out stays picture-only. Every take writes a take
+// manifest (D11).
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, rmSync, mkdtempSync, linkSync, copyFileSync, createReadStream } from 'node:fs';
 import { createServer } from 'node:http';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -25,7 +27,87 @@ import { browserPath } from '../../../lib/hf.mjs';
 import { parseScript } from '../../video-spine/scripts/spine.mjs';
 
 const SETUP = path.join(PLUGIN_ROOT, 'scripts', 'setup.sh');
-const OUT_EXT = ['.mp4', '.webm', '.mkv'];
+/**
+ * Output presets (DEC-47, web2video plan §4.6; U1 confirmed the youtube row, U2 1080p60 capture).
+ * capture: the viewport and fps a take records at (--viewport/--fps override them); video/audio:
+ * the encode, which an override never changes. youtube is bitrate-targeted (VBR about `kbps`,
+ * `highKbps` above 30 fps, peak `maxFactor` × that), with a closed GOP of half the frame rate,
+ * 2 consecutive B-frames and no edit lists. probe-spec --preset checks a file against this same
+ * table (presetExpect).
+ */
+export const PRESETS = {
+  web: {
+    capture: { width: 1280, height: 720, fps: 30 },
+    video: { crf: 26, x264Preset: 'medium' },
+    audio: { kbps: 128 },
+  },
+  youtube: {
+    capture: { width: 1920, height: 1080, fps: 30 },
+    video: { kbps: 8000, highKbps: 12000, maxFactor: 1.5, closedGop: true, bframes: 2, editList: false, x264Preset: 'medium' },
+    audio: { kbps: 384 },
+  },
+  hifi: {
+    capture: { width: 1920, height: 1080, fps: 60 },
+    video: { crf: 16, x264Preset: 'slow' },
+    audio: { kbps: 256 },
+  },
+};
+export const DEFAULT_PRESET = 'web';
+
+/** youtube's target video bitrate at `fps`: 8 Mbps up to 30 fps, 12 Mbps above. */
+const targetKbps = (v, fps) => (fps > 30 ? v.highKbps : v.kbps);
+/** A closed GOP of half the frame rate, in frames. */
+const gopFrames = (fps) => Math.max(1, Math.round(fps / 2));
+
+/**
+ * The ffmpeg arguments of preset `name` at the take's fps: video (H.264 High, yuv420p), audio
+ * (AAC-LC 48 kHz stereo at the preset's bitrate) and mux (faststart; no edit lists for youtube).
+ */
+export function presetArgs(name, fps) {
+  const p = PRESETS[name];
+  const v = p.video;
+  const video = ['-c:v', 'libx264', '-profile:v', 'high', '-preset', v.x264Preset];
+  if (v.kbps) {
+    const k = targetKbps(v, fps);
+    const g = gopFrames(fps);
+    video.push('-b:v', `${k}k`, '-maxrate', `${Math.round(k * v.maxFactor)}k`, '-bufsize', `${k * 2}k`,
+      '-g', String(g), '-keyint_min', String(g), '-sc_threshold', '0', '-bf', String(v.bframes),
+      '-x264-params', `open-gop=0:b-adapt=0:bframes=${v.bframes}:scenecut=0:keyint=${g}:min-keyint=${g}:cabac=1:interlaced=0`);
+  } else {
+    video.push('-crf', String(v.crf));
+  }
+  const audio = ['-c:a', 'aac', '-profile:a', 'aac_low', '-b:a', `${p.audio.kbps}k`, '-ar', '48000', '-ac', '2'];
+  // no edit lists: B-frame reordering then goes in negative composition offsets (ctts v1), so the
+  // picture still starts at 0 with the audio instead of two frames late
+  const mux = v.editList === false ? ['-movflags', '+faststart+negative_cts_offsets', '-use_editlist', '0'] : ['-movflags', '+faststart'];
+  return { video, audio, mux };
+}
+
+/** One line describing a preset, for --help. */
+export function presetSummary(name) {
+  const { capture: c, video: v, audio: a } = PRESETS[name];
+  const enc = v.kbps
+    ? `VBR ~${v.kbps / 1000} Mbps (${v.highKbps / 1000} above 30 fps, peak ×${v.maxFactor}), CABAC, closed GOP of half the fps, ${v.bframes} B-frames, progressive, no edit lists`
+    : `CRF ${v.crf}, x264 ${v.x264Preset}`;
+  return `${c.width}x${c.height} @ ${c.fps} fps; ${enc}; audio ${a.kbps} kbps`;
+}
+
+/**
+ * What a file encoded with preset `name` shows to ffprobe at the take's fps and size (--viewport
+ * and --fps change those, never the encode). probe-spec --preset checks against it.
+ */
+export function presetExpect(name, { fps, width, height } = {}) {
+  const p = PRESETS[name];
+  if (!p) return null;
+  const f = fps ?? p.capture.fps;
+  const e = { preset: name, width: width ?? p.capture.width, height: height ?? p.capture.height, fps: f, audioKbps: p.audio.kbps, channels: 2, sampleRate: 48000 };
+  if (p.video.kbps) {
+    const k = targetKbps(p.video, f);
+    Object.assign(e, { videoKbps: k, videoMaxKbps: Math.round(k * p.video.maxFactor), gop: gopFrames(f), closedGop: p.video.closedGop, bframes: p.video.bframes, editList: p.video.editList });
+  }
+  return e;
+}
+
 /** Watchdog: a spine-timed take aborts once it runs this far past its window. */
 export const OVERRUN_GRACE_MS = 2000;
 /** Watchdog for takes with no window (silent, captions): the default --max-ms. */
@@ -170,13 +252,16 @@ export function resolvePage(u, baseDir) {
   return { kind: 'local', root: path.dirname(html), file: path.basename(html) };
 }
 
+/** What the storyboard's default export receives (DEC-46). */
+export const STORYBOARD_CONTEXT = '{ beat, goto, click, type, point, scrollTo, scrollBy, wait, page, context, mode, fps, viewport, elapsedMs }';
+
 async function loadStoryboard(file) {
   let mod;
   try { mod = await import(pathToFileURL(file).href); } catch (e) {
     throw new CliError(`cannot load storyboard ${file}: ${String(e?.message ?? e).split('\n')[0]}`);
   }
   const fn = mod.default ?? mod.storyboard;
-  if (typeof fn !== 'function') throw new CliError(`storyboard ${file} must export a default async function ({ beat, goto, click, type, point, scrollTo, scrollBy, wait, page }) => { … }`);
+  if (typeof fn !== 'function') throw new CliError(`storyboard ${file} must export a default async function (${STORYBOARD_CONTEXT}) => { … }`);
   return { fn, url: mod.url };
 }
 
@@ -204,6 +289,8 @@ export async function planTake(values) {
   let plates = null;
   if (values.plate && !values.plates) throw usageError('--plate needs --plates <plates.json>');
   if (values.plates && !values.plate) throw usageError('--plates needs --plate <id>');
+  // a plate keeps plates.json's size and fps and writes the picture-only MP4 that video-assemble reads
+  if (values.plates && values.preset !== undefined) throw usageError(`--preset is for standalone takes: plate '${values.plate}' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset`);
   const sourceCount = [values.script, values.spine, values.plates].filter(Boolean).length;
   if (sourceCount !== 1) {
     throw usageError(`pass exactly one of --script <script.md>, --spine <manifest.json>, or --plates <plates.json> --plate <id>${sourceCount ? ' (got more than one)' : ' — the beats come from it'}`);
@@ -222,13 +309,14 @@ export async function planTake(values) {
   if (!existsSync(storyboard) || statSync(storyboard).isDirectory()) throw new CliError(`storyboard not found: ${storyboard}`);
 
   const out = values.out ? path.resolve(values.out) : plates && path.join(platesDir, 'renders', 'plates', `${plates.plate.id}.mp4`);
-  if (!out && !values.mp4) throw usageError('--out <take.webm|.mp4> is required (or --mp4 <file.mp4>)');
-  if (out && !OUT_EXT.includes(path.extname(out).toLowerCase())) throw usageError(`--out must end in ${OUT_EXT.join(', ')}, got '${path.basename(out)}'`);
-  const mp4 = values.mp4 ? path.resolve(values.mp4) : null;
-  if (mp4 && path.extname(mp4).toLowerCase() !== '.mp4') throw usageError(`--mp4 must end in .mp4, got '${path.basename(mp4)}'`);
+  if (!out) throw usageError('--out <take.mp4> is required: the MP4 the take is written to');
+  if (path.extname(out).toLowerCase() !== '.mp4') throw usageError(`--out must end in .mp4, got '${path.basename(out)}'`);
 
-  const viewport = parseViewport(values.viewport ?? plates?.plate.live.viewport ?? '1280x720');
-  const fps = values.fps ?? plates?.doc.fps ?? 30;
+  // standalone takes record at the preset's viewport and fps unless --viewport/--fps say otherwise
+  const preset = plates ? null : values.preset ?? DEFAULT_PRESET;
+  const pc = preset && PRESETS[preset].capture;
+  const viewport = parseViewport(values.viewport ?? plates?.plate.live.viewport ?? `${pc.width}x${pc.height}`);
+  const fps = values.fps ?? plates?.doc.fps ?? pc.fps;
   if (!Number.isInteger(fps) || fps < 1 || fps > 60) throw usageError(`--fps must be a whole number from 1 to 60, got ${fps}`);
   const size = plates ? { width: plates.doc.width, height: plates.doc.height } : viewport;
 
@@ -258,13 +346,12 @@ export async function planTake(values) {
   // watchdog: a spine-timed take may not run more than 2 s past its window; any other take is capped at --max-ms (default 10 min)
   const watchdogMs = maxMs ?? (window ? window.durationMs + OVERRUN_GRACE_MS : DEFAULT_MAX_MS);
 
-  const primary = mp4 ?? out;
-  const manifest = values.manifest ? path.resolve(values.manifest) : manifestPathFor(primary);
+  const manifest = values.manifest ? path.resolve(values.manifest) : manifestPathFor(out);
   if (path.extname(manifest).toLowerCase() !== '.json') throw usageError(`--manifest must end in .json, got '${path.basename(manifest)}'`);
 
-  // --mp4 narration: every clip in the window needs its audio before a browser opens
+  // a narrated standalone take: every clip in the window needs its audio before a browser opens
   let sources = null;
-  if (mp4 && window?.clips.length) {
+  if (preset && window?.clips.length) {
     sources = new Map();
     for (const c of window.clips) {
       const src = clipSource(spineFile, spine, c);
@@ -294,10 +381,10 @@ export async function planTake(values) {
   const mode = spine?.kind === 'narration' ? 'narrated' : captions ? 'captions' : 'silent';
   const captionEngineChoice = values['caption-engine'] ?? 'overlay';
   const cursor = !values['no-cursor'];
-  return { values, plates, storyboard, sb, out, mp4, viewport, size, fps, captions, captionCss, captionEngine: captionEngineChoice, cursor, scriptFile, spineFile, spine, window, beats, beatSource, audioOffsetMs, chrome, pwEntry, page, mode, manifest, sources, watchdogMs };
+  return { values, plates, storyboard, sb, out, preset, viewport, size, fps, captions, captionCss, captionEngine: captionEngineChoice, cursor, scriptFile, spineFile, spine, window, beats, beatSource, audioOffsetMs, chrome, pwEntry, page, mode, manifest, sources, watchdogMs };
 }
 
-/** Narration loudness of the --mp4 deliverable (D7). */
+/** Narration loudness of the deliverable (D7). */
 export const NARRATION_LUFS = -16;
 
 /**
@@ -349,7 +436,7 @@ export function mixNarration(placed, { durationMs, dir }) {
   return { file: out, lufs: Number.isFinite(lv.lufs) ? Number(lv.lufs.toFixed(1)) : -Infinity, truePeakDb: lv.truePeakDb, gainDb: lv.gainDb, clips: placed.length };
 }
 
-const PATH_FLAGS = new Set(['storyboard', 'script', 'out', 'mp4', 'caption-css', 'spine', 'plates', 'manifest']);
+const PATH_FLAGS = new Set(['storyboard', 'script', 'out', 'caption-css', 'spine', 'plates', 'manifest']);
 
 /** argv that reproduces the take: paths made absolute, so it runs from any directory. */
 export function commandFor(values, script = fileURLToPath(import.meta.url)) {
@@ -414,7 +501,7 @@ export function takeManifest(plan, take, { command, manifestFile, placed = [] })
   doc.captions = captions;
   doc['x-take'] = {
     mode: take.mode, storyboard: rel(take.storyboard), script: rel(take.script), url: take.url, plate: take.plate, fps: take.fps, width: take.width, height: take.height,
-    frames: take.frames, out: rel(take.out), mp4: rel(take.mp4), captionEngine: take.captionEngine, cursor: take.cursor,
+    frames: take.frames, out: rel(take.out), preset: take.preset, captionEngine: take.captionEngine, cursor: take.cursor,
     ...(take.audio && { audio: take.audio }),
     beats: take.beats.map((b) => ({ n: b.n, id: b.id, text: b.text, startMs: b.startMs, durationMs: b.durationMs, endMs: b.startMs + b.durationMs, caption: b.caption,
       ...(b.plannedMs !== undefined && { plannedMs: b.plannedMs, lateMs: b.lateMs }), ...(b.clipNs?.length && { clipNs: b.clipNs }) })),
@@ -426,24 +513,26 @@ export function takeManifest(plan, take, { command, manifestFile, placed = [] })
 const log = (msg) => process.stderr.write(`capture: ${msg}\n`);
 
 /**
- * Encode the image sequence to `file`: an .mp4 picture-only plate, a .webm/.mkv take, or the --mp4
- * deliverable (D7: H.264 High, yuv420p, AAC 48 kHz, faststart) with `audio` (a WAV) or a silent AAC track.
+ * Encode the image sequence to `file` (an .mp4). With a preset: the deliverable, encoded to that
+ * preset (PRESETS), with `audio` (a WAV) or a silent AAC track. Without one (a plate): the
+ * picture-only plate MP4 that video-assemble reads (H.264 High, yuv420p, faststart).
  */
-function encode(pattern, n, file, { fps, size, deliverable = false, audio = null }) {
+function encode(pattern, n, file, { fps, size, preset = null, audio = null }) {
   mkdirSync(path.dirname(file), { recursive: true });
-  const ext = path.extname(file).toLowerCase();
   // screencast JPEGs are full range; convert to limited-range yuv420p (the delivery spec)
   const vf = [`scale=${size.width}:${size.height}:flags=lanczos:in_range=pc:out_range=tv`, 'setsar=1', 'format=yuv420p'];
   const args = ['-y', '-v', 'error', '-framerate', String(fps), '-start_number', '0', '-i', pattern];
-  if (deliverable) {
+  if (preset) {
     if (audio) args.push('-i', audio); else args.push('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo');
     args.push('-map', '0:v:0', '-map', '1:a:0');
   }
   args.push('-frames:v', String(n), '-vf', vf.join(','), '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-r', String(fps));
-  if (ext === '.webm') args.push('-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '32', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '4');
-  else args.push('-c:v', 'libx264', '-profile:v', 'high', '-preset', 'veryfast', '-crf', '18');
-  if (deliverable) args.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-t', (n / fps).toFixed(6));
-  if (ext === '.mp4') args.push('-movflags', '+faststart');
+  if (preset) {
+    const p = presetArgs(preset, fps);
+    args.push(...p.video, ...p.audio, '-t', (n / fps).toFixed(6), ...p.mux);
+  } else {
+    args.push('-c:v', 'libx264', '-profile:v', 'high', '-preset', 'veryfast', '-crf', '18', '-movflags', '+faststart');
+  }
   args.push(file);
   ffmpeg(args, { what: `encoding ${path.basename(file)}` });
 }
@@ -764,8 +853,11 @@ export async function capture(plan) {
         } finally {
           const end = now();
           if (rec.startMs !== undefined) {
-            rec.durationMs = Math.max(1, Math.round(end - rec.startMs));
-            rec.startMs = Math.round(rec.startMs);
+            // round both ends, not the length: the next beat starts at or after round(end), so the
+            // manifest's beats never overlap by a rounding millisecond (the v1 schema rejects that)
+            const s = Math.round(rec.startMs);
+            rec.durationMs = Math.max(1, Math.round(end) - s);
+            rec.startMs = s;
             hideCaption(end);
           }
           if (st.active === id) st.active = null;
@@ -917,17 +1009,18 @@ export async function capture(plan) {
     const placed = records.flatMap((r) => beats[r.n - 1].clips?.map((c) => ({
       beat: r, spineClip: plan.spine.clips.find((x) => x.n === c.n), source: plan.sources?.get(c.n), atMs: c.atMs,
     })) ?? []);
-    if (plan.out) encode(pattern, frames, plan.out, { ...opts, deliverable: false });
     let audio = null;
-    if (plan.mp4) {
+    if (plan.preset) {
       audio = mixNarration(placed.filter((p) => p.source), { durationMs: videoMs, dir: tmp });
-      encode(pattern, frames, plan.mp4, { ...opts, deliverable: true, audio: audio.file });
+      encode(pattern, frames, plan.out, { ...opts, preset: plan.preset, audio: audio.file });
       log(audio.clips ? `narration: ${audio.clips} clip(s) laid at their spine times, ${audio.lufs} LUFS` : 'audio: silent AAC track (no narration in this take)');
+    } else {
+      encode(pattern, frames, plan.out, opts); // a plate: picture only
     }
     const late = records.filter((r) => r.lateMs > 1000 / fps); // later than one frame
     if (late.length) log(`${late.length} beat(s) started after their planned time: ${late.map((r) => `'${r.id}' +${r.lateMs} ms`).join(', ')}`);
     const take = {
-      mode, out: plan.out, mp4: plan.mp4, manifest: plan.manifest, storyboard: plan.storyboard, script: plan.scriptFile ?? null, url,
+      mode, out: plan.out, preset: plan.preset, manifest: plan.manifest, storyboard: plan.storyboard, script: plan.scriptFile ?? null, url,
       plate: plan.plates?.plate.id ?? null, spine: plan.spineFile ?? null,
       window: win ? { startMs: win.startMs, durationMs: win.durationMs, clips: win.clips.length } : null,
       fps, width: size.width, height: size.height, frames, uniqueFrames: unique,
@@ -950,7 +1043,7 @@ export async function capture(plan) {
 export const spec = {
   name: 'capture',
   summary: 'play a live page in real time, drive it with a storyboard, and screen-capture it',
-  usage: 'capture --storyboard <file.mjs> (--script script.md | --spine manifest.json) --out <take.webm|.mp4> [options]   |   capture --plates plates.json --plate <id>',
+  usage: 'capture --storyboard <file.mjs> (--script script.md | --spine manifest.json) --out <take.mp4> [--preset web|youtube|hifi] [options]   |   capture --plates plates.json --plate <id>',
   description: `
 The storyboard runs one beat(id, fn?) per beat, in order. The beats come from exactly one of
 --script (script.md: "## <id>" sections), --spine (a spine manifest's beats) or --plates/--plate
@@ -964,19 +1057,24 @@ silent (--no-captions), narrated (a narration spine). The pointer helpers goto, 
 scrollTo and scrollBy glide a visible cursor (--no-cursor hides it) to their target.
 The page is --url, else the plate's live.url, else the storyboard's exported \`url\`, else an
 index.html next to the storyboard; local files are served on 127.0.0.1. Pre-flight (Chromium,
-ffmpeg, the pinned Playwright, a valid --script/--spine, the spine clips' audio for --mp4) runs
-before any browser opens. Captions are a neutral bottom-centre bar; --caption-css restyles them.
---mp4 is the deliverable (H.264 High, yuv420p, AAC 48 kHz, faststart): a narrated take gets the
-spine's clips at their spine times (a late beat moves the picture, not the voice), levelled to
--16 LUFS; other takes get a silent AAC track. Every take writes a take manifest (v1 spine schema).
+ffmpeg, the pinned Playwright, a valid --script/--spine, the spine clips' audio) runs before any
+browser opens. Captions are a neutral bottom-centre bar; --caption-css restyles them.
+--out is the MP4 deliverable with audio, encoded to --preset (default web): a narrated take gets
+the spine's clips at their spine times (a late beat moves the picture, not the voice), levelled
+to -16 LUFS; other takes get a silent AAC track. Every preset is H.264 High, yuv420p, faststart,
+with AAC-LC 48 kHz stereo audio:
+${Object.keys(PRESETS).map((k) => `  ${k.padEnd(8)} ${presetSummary(k)}`).join('\n')}
+--viewport and --fps override the preset's capture size and fps; the encode stays the preset's.
+With --plates/--plate the take is the picture-only plate MP4 video-assemble reads, at plates.json's
+size and fps; --preset is refused there. Every take writes a take manifest (v1 spine schema).
 A watchdog aborts a spine-timed take 2 s past its window, and any take at --max-ms. Check a take
 with check-take.mjs. Storyboard API: references/storyboard-api.md.`,
   options: {
-    storyboard: { type: 'string', arg: 'file.mjs', desc: 'Storyboard module: export default async ({ beat, goto, click, type, point, scrollTo, scrollBy, wait, page }) => { … }' },
+    storyboard: { type: 'string', arg: 'file.mjs', desc: `Storyboard module: export default async (${STORYBOARD_CONTEXT}) => { … }` },
     script: { type: 'string', arg: 'script.md', desc: 'The beats: one "## <id>" section per beat (captions or silent mode; video-spine\'s script format)' },
-    out: { type: 'string', arg: 'file', desc: 'The take: .webm, .mkv or .mp4 (picture only) (default with --plate: <project>/renders/plates/<id>.mp4)' },
-    mp4: { type: 'string', arg: 'file.mp4', desc: 'Also write the deliverable: H.264 High/AAC 48 kHz MP4 with faststart; spine clips laid at their spine times at -16 LUFS, else a silent AAC track' },
-    viewport: { type: 'string', arg: 'WxH', desc: 'Browser viewport (default: the plate\'s live.viewport, else 1280x720)' },
+    out: { type: 'string', arg: 'file.mp4', desc: 'The take: the MP4 deliverable with audio, encoded to --preset; with --plate the picture-only plate MP4 (default there: <project>/renders/plates/<id>.mp4)' },
+    preset: { type: 'string', arg: 'web|youtube|hifi', choices: Object.keys(PRESETS), desc: `Capture size, fps and encode of a standalone take (default: ${DEFAULT_PRESET}; see above). Not with --plates` },
+    viewport: { type: 'string', arg: 'WxH', desc: 'Browser viewport (default: the plate\'s live.viewport, else the preset\'s size)' },
     'no-captions': { type: 'boolean', desc: 'Draw no captions (silent mode with --script; a voice-only video with a narration spine)' },
     'no-cursor': { type: 'boolean', desc: 'Draw no cursor: the pointer helpers act without it' },
     'caption-css': { type: 'string', arg: 'file.css', desc: 'Caption style sheet (classes .pm-caption-wrap, .pm-caption) replacing the neutral default' },
@@ -987,15 +1085,16 @@ with check-take.mjs. Storyboard API: references/storyboard-api.md.`,
     spine: { type: 'string', arg: 'manifest.json', desc: 'The beats from a spine manifest: each beat plays to its clip (narration) or its beat time (beatgrid)' },
     plates: { type: 'string', arg: 'plates.json', desc: 'Project plate list; with --plate, supplies storyboard, url, viewport, fps, size, spine and the planned window' },
     plate: { type: 'string', arg: 'id', desc: 'The live plate to capture (needs --plates)' },
-    fps: { type: 'number', desc: 'Capture frame rate (default: plates.json fps, else 30)' },
-    manifest: { type: 'string', arg: 'file.json', desc: 'Where to write the take manifest (default: <take>.take.json next to --mp4, else --out)' },
+    fps: { type: 'number', desc: 'Capture frame rate, 1-60 (default: plates.json fps, else the preset\'s)' },
+    manifest: { type: 'string', arg: 'file.json', desc: 'Where to write the take manifest (default: <take>.take.json next to --out)' },
     'max-ms': { type: 'number', arg: 'ms', desc: `Abort a take that runs longer than this (default: the spine window + ${OVERRUN_GRACE_MS} ms, else ${DEFAULT_MAX_MS})` },
     json: { type: 'boolean', desc: 'Print the take summary as JSON' },
   },
   examples: [
-    'capture --storyboard examples/ui-demo/storyboard.mjs --script examples/ui-demo/script.md --mp4 /tmp/ui-demo.mp4',
+    'capture --storyboard examples/ui-demo/storyboard.mjs --script examples/ui-demo/script.md --out /tmp/ui-demo.mp4',
+    'capture --storyboard examples/ui-demo/storyboard.mjs --script examples/ui-demo/script.md --out /tmp/ui-demo.mp4 --preset youtube',
     'capture --storyboard examples/deck/storyboard.mjs --script examples/deck/script.md --out /tmp/deck.mp4 --no-captions',
-    'capture --storyboard examples/deck/storyboard.mjs --spine spine/manifest.json --mp4 /tmp/deck.mp4',
+    'capture --storyboard examples/deck/storyboard.mjs --spine spine/manifest.json --out /tmp/deck.mp4',
     'capture --plates plates.json --plate r1-feature',
   ],
 };
@@ -1006,8 +1105,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const take = await capture(plan);
     if (values.json) process.stdout.write(JSON.stringify(take, null, 2) + '\n');
     else {
-      process.stdout.write(`${take.out ?? take.mp4}: ${take.frames} frames at ${take.fps} fps = ${take.videoMs} ms (${take.mode}; ${take.beats.length} beat(s), wall ${take.wallMs} ms)\n`);
-      if (take.out && take.mp4) process.stdout.write(`${take.mp4}: H.264/AAC deliverable\n`);
+      process.stdout.write(`${take.out}: ${take.frames} frames at ${take.fps} fps = ${take.videoMs} ms (${take.mode}; ${take.preset ? `preset ${take.preset}` : 'plate, picture only'}; ${take.beats.length} beat(s), wall ${take.wallMs} ms)\n`);
       process.stdout.write(`${take.manifest}: take manifest\n`);
     }
   });

@@ -1,0 +1,20 @@
+{
+  "note": "ui-demo under helpers/loopback-only.mjs with both TTS key variables empty; requests from --debug-requests",
+  "captions": {
+    "out": "ui-web.mp4",
+    "requests": 1,
+    "distinctHosts": [
+      "127.0.0.1:62145"
+    ],
+    "blocked": []
+  },
+  "silent": {
+    "out": "ui-silent.mp4",
+    "requests": 1,
+    "distinctHosts": [
+      "127.0.0.1:62370"
+    ],
+    "blocked": []
+  },
+  "control": "NETWORK-ATTEMPT https://openrouter.ai/api/v1/audio/speech"
+}

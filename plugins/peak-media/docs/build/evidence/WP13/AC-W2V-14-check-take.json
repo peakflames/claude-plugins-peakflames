@@ -1,0 +1,117 @@
+{
+  "deck": {
+    "captionBand": 0.25,
+    "cuts": [
+      {
+        "timecode": "0:06.700",
+        "silenceMs": 1200,
+        "ok": true
+      },
+      {
+        "timecode": "0:15.167",
+        "silenceMs": 1200,
+        "ok": true
+      }
+    ],
+    "captions": [
+      {
+        "text": "Water your garden in the morning",
+        "startMs": 951,
+        "durationMs": 5454
+      },
+      {
+        "text": "Less water lost, less mildew",
+        "startMs": 7605,
+        "durationMs": 7273
+      },
+      {
+        "text": "Water the roots deeply, then let the soil dry",
+        "startMs": 16078,
+        "durationMs": 5091
+      }
+    ]
+  },
+  "wholeFrameControl": {
+    "cuts": [
+      {
+        "timecode": "0:00.967",
+        "ok": false
+      },
+      {
+        "timecode": "0:06.400",
+        "ok": false
+      },
+      {
+        "timecode": "0:06.700",
+        "ok": true
+      },
+      {
+        "timecode": "0:07.633",
+        "ok": false
+      },
+      {
+        "timecode": "0:14.900",
+        "ok": false
+      },
+      {
+        "timecode": "0:15.167",
+        "ok": true
+      },
+      {
+        "timecode": "0:16.100",
+        "ok": false
+      },
+      {
+        "timecode": "0:21.167",
+        "ok": false
+      }
+    ]
+  },
+  "cursorGlide": {
+    "pointer": [
+      {
+        "action": "point",
+        "beat": "one",
+        "x": 66,
+        "y": 62,
+        "atMs": 467
+      },
+      {
+        "action": "point",
+        "beat": "one",
+        "x": 1214,
+        "y": 62,
+        "atMs": 900
+      },
+      {
+        "action": "point",
+        "beat": "two",
+        "x": 1213,
+        "y": 452,
+        "atMs": 1955
+      },
+      {
+        "action": "point",
+        "beat": "two",
+        "x": 67,
+        "y": 452,
+        "atMs": 2381
+      },
+      {
+        "action": "point",
+        "beat": "three",
+        "x": 1214,
+        "y": 62,
+        "atMs": 3614
+      },
+      {
+        "action": "point",
+        "beat": "three",
+        "x": 66,
+        "y": 62,
+        "atMs": 4049
+      }
+    ],
+    "cuts": 0
+  }
+}
