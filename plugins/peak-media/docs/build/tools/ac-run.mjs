@@ -12,7 +12,8 @@ import { runCli, CliError, EXIT, PLUGIN_ROOT } from '../../../lib/cli.mjs';
 
 const DEFAULT_ROOT = path.join(PLUGIN_ROOT, 'docs', 'build');
 const DEFAULT_EVALS = path.join(PLUGIN_ROOT, 'evals');
-const AC_RE = /AC-[A-Z]+-\d+/g;
+const AC_ID = 'AC-[A-Z0-9]+-\\d+'; // area codes may contain digits (AC-W2V-01)
+const AC_RE = new RegExp(AC_ID, 'g');
 
 function splitRow(line) {
   return line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
@@ -24,7 +25,7 @@ export function parseRegister(root) {
   if (!existsSync(file)) throw new CliError(`no acceptance.md in ${root}`);
   const acs = [], wps = [];
   for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (/^\|\s*AC-[A-Z]+-\d+\s*\|/.test(line)) {
+    if (new RegExp(`^\\|\\s*${AC_ID}\\s*\\|`).test(line)) {
       const c = splitRow(line);
       if (c.length !== 7) throw new CliError(`acceptance.md: malformed row for ${c[0]} (expected 7 columns, got ${c.length} — escape '|' inside cells as '\\|')`);
       const [id, source, wp, gwt, method, status, evidence] = c;
@@ -104,9 +105,12 @@ export function runTests(ids, evals) {
   const pattern = `^(${ids.join('|')}):`;
   // a glob, not the folder: Node 22's --test doesn't expand a directory argument
   const files = existsSync(evals) && statSync(evals).isDirectory() ? path.join(evals, '**', '*.test.mjs') : evals;
-  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${pattern}`, files], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  // drop NODE_TEST_CONTEXT: when ac-run itself runs under node:test, the nested runner would
+  // otherwise report to the parent over its private channel instead of printing TAP
+  const { NODE_TEST_CONTEXT, ...env } = process.env;
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${pattern}`, files], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env });
   for (const line of (r.stdout ?? '').split('\n')) {
-    const m = /^(ok|not ok) \d+ - (AC-[A-Z]+-\d+):/.exec(line.trimStart());
+    const m = new RegExp(`^(ok|not ok) \\d+ - (${AC_ID}):`).exec(line.trimStart());
     if (m) {
       const prev = res.get(m[2]);
       if (prev === undefined) continue;
