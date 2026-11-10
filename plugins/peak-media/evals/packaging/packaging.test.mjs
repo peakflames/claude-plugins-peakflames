@@ -227,7 +227,9 @@ test('AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, brows
   assert.equal(setup.code, 0, setup.stdout + setup.stderr);
   const one = (r, re, what) => {
     assert.notEqual(r.code, 0, `${what}: non-zero exit`);
-    assert.equal(lines(r.stdout + r.stderr).length, 1, `${what}: one line — ${r.stdout}${r.stderr}`);
+    // one line naming what's missing; a plate-factory gate script may also print its GATE … FAIL line
+    assert.equal(lines(r.stderr).length, 1, `${what}: one line — ${r.stderr}`);
+    assert.ok(lines(r.stdout).every((l) => /^GATE \d+ [a-z]+: FAIL — /.test(l)), `${what}: nothing else on stdout — ${r.stdout}`);
     assert.match(r.stderr, re, what);
     assert.doesNotMatch(r.stderr, /\n\s+at /, `${what}: no stack trace`);
   };

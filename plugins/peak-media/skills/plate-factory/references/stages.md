@@ -47,9 +47,11 @@ GATE <n> <name>: <RESULT> — <evidence>
   `GATE 2 spine: PASS — spine/manifest.json 25999 ms (target 26000 ±10%)`. Gate 9's names
   `out/final.mp4`.
 - A **user** gate's `APPROVED` line comes only after an `AskUserQuestion` in that stage that the
-  user answered yes to. A **check** gate reports the check you just ran.
-- Write `FAIL`/`REJECTED` when the gate doesn't hold, fix, and run the stage again until it
-  does. Never write a passing line for a later stage before the earlier one has passed.
+  user answered yes to. A **check** gate reports the check you just ran; for gates 2, 5, 6 and 7
+  the script prints the line itself (see each stage), and you don't write it.
+- `FAIL` (printed by the script for 2, 5, 6, 7) or `REJECTED` (the user turned it down) when the
+  gate doesn't hold: fix, and run the stage again until it does. Don't print a gate line while
+  waiting for the user's answer. Never write a passing line for a later stage before the earlier one has passed.
 - Write the line plainly, starting the line with `GATE`. Bold is fine, around the whole line or
   only its head (`**GATE 4 storyboard: APPROVED** — review/storyboard.jpg`). Never preview
   or quote a gate line: one in a code block, a `>` quote, a bullet or inline code doesn't count,
@@ -74,12 +76,16 @@ above, and follow these rules:
   the user approves again.
 - **A self-review round** is one `contact-sheet` run on `renders/plates/<id>.mp4` before the
   reviewer call, whatever the sheet's name. Every rendered plate needs 1–3 of them. Sheets made
-  after the reviewer (`<id>-fix<N>.jpg`), the stage-5 `render-plate --sheet`, and a sheet run
+  after the reviewer (`<id>-fix<N>.jpg`), the stage-5 `render-plate --pipeline-test` sheet, and a sheet run
   that errored (and was re-run) are not rounds. A simple `for id in a b c; do …$id…; done` loop
   over literal plate ids is counted per plate, but prefer one plate per command.
 - **The reviewer** is the first `Agent` call whose prompt names `review-rubric.md`; it comes after
   every plate's rounds.
 - **`runtimes.md`** is Read (with Read, not cat) before the first plate is written.
+- **Gate lines from scripts.** Gates 2, 5, 6 and 7 count from the output of a Bash call that runs
+  that gate's script (`spine`, `render-plate`, `gate`, `assemble`), as well as from your text.
+  Trimming the output is fine (`2>&1 | tail -5`: every script prints its gate line last); adding
+  `echo`, `cat` or another command to the same call is not (see Known limits).
 
 **Known limits** (accepted; follow the stages and they don't arise):
 
@@ -91,15 +97,26 @@ above, and follow these rules:
   answer was about the storyboard. Ask about the storyboard, then write the gate line.
 - The check only orders each gate's first passing line. It doesn't see a stage that **starts**
   before the previous gate line (e.g. the spine run before `GATE 1`, or `assemble` before
-  `GATE 6`). The rule below still holds: write gate n−1's line before stage n's first command.
+  `GATE 6`). The rule below still holds: write gate n−1's line (or run its gate script) before
+  stage n's first command.
+- A gate line from a script counts only when the Bash call runs the plugin's script
+  (`…/skills/<skill>/scripts/<script>.mjs`, not `--help`/`--version`) with nothing else that could
+  print text: `cd`, `VAR=value`, `| tail`, `| head`, `| grep`, writing a file (`cat > f <<'EOF'`)
+  and the plugin's other tools (`contact-sheet`, …) are fine; `echo`, `cat f` or another program
+  in the same call isn't. `bash -c '…'` around the run is unwrapped. A copy of the script
+  under another `…/skills/<skill>/scripts/` path would still be credited.
+- The check credits script output but can be fooled by deliberate forgery inside the same Bash
+  call; it guards against honest mistakes, not adversarial ones.
 
 ---
 
-Each stage below ends with **"End the stage with:"** and the literal gate line to emit. Fill in the
-`<…>` parts and write it on its own line in your reply before starting the next stage, every
-time, whatever output style or brevity setting is active. **A stage may not begin until the
+Each stage below ends with **"End the stage with:"** and the literal gate line. For stages 2, 5,
+6 and 7 the stage's script prints it: run the command. For the others, fill in the `<…>` parts
+and write it on its own line in your reply before starting the next stage, every time, whatever
+output style or brevity setting is active. **A stage may not begin until the
 previous stage's gate line has been written**: before a stage's first command, confirm the
-previous gate line is in your replies, and if it isn't, write it now (or finish that stage first).
+previous gate line is there, and if it isn't, run that stage's gate command (2, 5, 6, 7) or write
+the line (or finish that stage first).
 "Show" means put it in the chat, as text, before the `AskUserQuestion`; give every file as an
 absolute path (`<abs>/…` below is the video project's absolute path) so the user can open it.
 
@@ -146,8 +163,9 @@ End the stage with: `GATE 0 brief: APPROVED — brief.md`
    (`hook: CLEAR — …`), and the numbered proposed changes (`1. compare — original: "…" →
    proposed: "…"`), or "no changes proposed".
 7. `AskUserQuestion`: which proposed changes to apply (each, all, none) and whether to approve the
-   script. Apply only what the user picks; the user's wording wins. If words or the target
-   changed, redo step 4, show the result and ask again.
+   script. Apply only what the user picks; the user's wording wins. If the user approves with
+   changes ("apply 1, approved"), apply them, then write the `GATE 1` line below, then run the
+   spine; ask again only if the changes move the runtime estimate (step 4) outside ±10%.
 
 End the stage with: `GATE 1 script: APPROVED — script.md (<words> words, cold read <k>/<n> CLEAR)`
 
@@ -155,12 +173,13 @@ End the stage with: `GATE 1 script: APPROVED — script.md (<words> words, cold 
 
 1. `node "PM/skills/video-spine/scripts/spine.mjs" --brief brief.md` (house voice and style are
    the defaults; `--voice/--style` only if the brief says so).
-2. The last line must be `PASS  runtime …`. Read the wpm table: a clip far slower than the rest
-   means a tag was read aloud; fix that line.
+2. It ends with `PASS  runtime …` and its gate line, `GATE 2 spine: PASS — …` (or `FAIL`). Read
+   the wpm table: a clip far slower than the rest means a tag was read aloud; fix that line.
 3. Narration: `node "PM/lib/verify/check-cuts.mjs" spine/narration.wav --cuts <each beat's startMs after the first, comma-separated> --min-silence-ms 400`.
 4. On `FAIL`, change words in `script.md` and go back to stage 1's approval; never stretch the
    spine by hand.
 
+The script prints this line (don't write it yourself):
 End the stage with: `GATE 2 spine: PASS — spine/manifest.json <totalMs> ms (target <targetMs> ±10%)`
 (or `spine/beatgrid.json`).
 
@@ -200,7 +219,8 @@ End the stage with: `GATE 3 plates: APPROVED — plates.json (<n> plates, retime
    per plate: id, time range, on-screen text, planned motion.
 5. `AskUserQuestion`: approve the storyboard before any animation? Changes go into `plates.json`
    (text, intent, kind, assets), then `render-plate plates.json --all --storyboard --rescaffold`;
-   show and ask again.
+   show and ask again. This holds even when the answer was "approved, with this change": the
+   re-run reopens the storyboard, so the `APPROVED` line waits for the user's yes to the new one.
 
 End the stage with: `GATE 4 storyboard: APPROVED — review/storyboard.jpg`
 
@@ -208,11 +228,13 @@ The approved stills are the spec for stage 6.
 
 ## Stage 5 — Pipeline test (check gate)
 
-1. `node "PM/skills/video-plates/scripts/render-plate.mjs" plates.json <first plate id> --lint --sheet`
-   (a `live` first plate: `capture.mjs --plates plates.json --plate <id>`).
+1. `node "PM/skills/video-plates/scripts/render-plate.mjs" plates.json <first plate id> --pipeline-test`
+   — renders it alone with `--lint --sheet` and prints the `GATE 5 pipeline:` line (if the first
+   plate is `live`, use the first motion or slide plate).
 2. Read `review/contact-<id>.jpg`: frames render, fonts and brand colours load, the first frame
    isn't blank. A missing dependency is `FAIL`: run setup, repeat.
 
+The script prints this line (don't write it yourself):
 End the stage with: `GATE 5 pipeline: PASS — renders/plates/<id>.mp4 (<durationMs> ms, lint clean)`
 
 ## Stage 6 — Build plates (check gate: self-review ×3, then one reviewer)
@@ -244,22 +266,32 @@ and Read `review/<id>-fix<N>.jpg` (made the same way; it is not a self-review ro
 holds when every plate has rendered at its `durationMs` with lint clean and no blocker or major
 defect is open.
 
-**Stage 6 ends here, not at the reviewer.** It ends once the reviewer's fixes are re-rendered,
-re-sheeted (`-fix<N>.jpg`) and Read. Write the GATE 6 line at that point, before any assemble
-command.
+**Stage 6 ends here, not at the reviewer.** Once the reviewer's fixes are re-rendered,
+re-sheeted (`-fix<N>.jpg`) and Read:
 
+1. Write the reviewer's report to `review/plate-review.md` **as it answered** (review-rubric.md
+   § C): every defect line, one per line, each with ` — fixed` or ` — open` added at its end, and
+   its `VERDICT:` line. Don't summarise or drop lines: `gate.mjs` counts the defect lines, checks
+   them against the VERDICT, and fails on an open blocker or major.
+2. `node "PM/skills/plate-factory/scripts/gate.mjs" build .` — checks every plate's render
+   (duration, fps, size), a sheet of each final render, and the review record, and prints the
+   `GATE 6 build:` line. On `FAIL`, fix what it names and rerun.
+
+The script prints this line (don't write it yourself):
 End the stage with: `GATE 6 build: PASS — <n> plates; reviewer: <k> defects, <k> fixed`
 
 ## Stage 7 — Composite (check gate: every cut in a silent gap)
 
-0. **First confirm `GATE 6 build: PASS — …` was written.** If it wasn't, write it now (the
-   reviewer's fixes must already be re-rendered and Read), then continue.
+0. **First confirm `GATE 6 build: PASS — …` was written.** If it wasn't, run `gate.mjs build .`
+   now, then continue.
 1. `node "PM/skills/video-assemble/scripts/assemble.mjs" .` (no stems) — writes
-   `review/review.mp4` and checks every plate cut with `check-cuts --min-silence-ms 300`.
+   `review/review.mp4`, checks every plate cut with `check-cuts --min-silence-ms 300`, and prints
+   the `GATE 7 composite:` line.
 2. `node "PM/lib/verify/contact-sheet.mjs" review/review.mp4 --every 1s -o review/contact-review.jpg`; Read it.
 3. A cut not in silence is fixed at the source (the spine beat, then `retime-plates`, then
    re-render that plate).
 
+The script prints this line (don't write it yourself):
 End the stage with: `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in ≥300 ms silence)`
 
 ## Stage 8 — Music, then SFX (user gate: the user listens)
@@ -284,8 +316,9 @@ End the stage with: `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in �
    `<abs>/review/review.mp4` with no stems) and its measured levels: integrated LUFS and true
    peak of the mix (from `review/levels.json`, or `review/assemble.json` with no stems), plus
    `belowVoiceDb` when there is music.
-4. `AskUserQuestion`: listen and approve the levels? Adjust `--music-lufs`/`--duck-db` on request,
-   rerun, show and ask again.
+4. `AskUserQuestion`: listen and approve the levels? Adjust `--music-lufs`/`--duck-db` (or the
+   track) on request, rerun, show and ask again — also when the answer was "approved, but a bit
+   quieter": the user approves what they heard, so `APPROVED` waits for the new listen.
 
 End the stage with: `GATE 8 audio: APPROVED — review/review-mix.mp4 (review/levels.json)`
 (no stems: `GATE 8 audio: APPROVED — review/review.mp4 (narration only)`).

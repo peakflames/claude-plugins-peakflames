@@ -77,16 +77,101 @@ const isTool = (e, ...names) => e.kind === 'tool_use' && names.includes(e.name);
 const isAsk = (e) => isMain(e) && isTool(e, 'AskUserQuestion');
 const askedBetween = (events, lo, hi) => events.some((e) => isAsk(e) && e.seq > lo && e.seq < hi);
 
+/** Mechanical gates whose line the stage's own script prints (WP9 round 5): the plugin path of each. */
+export const GATE_SCRIPTS = {
+  2: 'skills/video-spine/scripts/spine.mjs',
+  5: 'skills/video-plates/scripts/render-plate.mjs',
+  6: 'skills/plate-factory/scripts/gate.mjs',
+  7: 'skills/video-assemble/scripts/assemble.mjs',
+};
+// Segments that may share a command with the gate's script run without being able to print a gate
+// line of their own: cd, bare VAR=value assignments, and output filters (tail, head, grep).
+const PASSIVE = new Set(['cd', 'tail', 'head', 'grep', 'egrep']);
+const unquote = (t) => t.replace(/^["']|["']$/g, '');
+
+/** Split a command into simple commands on &&, ||, ;, | and newlines outside quotes. */
+function quotedSegments(cmd) {
+  const out = []; let cur = ''; let q = null;
+  for (let i = 0; i < cmd.length; i++) {
+    const c = cmd[i];
+    if (q) { cur += c; if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") { q = c; cur += c; continue; }
+    if (c === ';' || c === '\n' || c === '|' || (c === '&' && cmd[i + 1] === '&')) {
+      if (cur.trim()) out.push(cur.trim());
+      cur = '';
+      if ((c === '|' && cmd[i + 1] === '|') || c === '&') i++;
+      continue;
+    }
+    cur += c;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
 /**
- * Gate lines the main thread wrote. A gate line counts only as the assistant's own marker: a line
- * of a text block that starts with `GATE ` or `**GATE ` (bold may cover the whole line or only
- * its head: `**GATE 4 storyboard: APPROVED** — …`), outside ``` / ~~~ fences. A
- * quoted (`> GATE …`), bulleted or inline-code (`` `GATE …` ``) line doesn't count.
+ * Does this Bash command, as a whole, run the plugin's script for gate n and nothing that could
+ * print a gate line itself? The run must be `node <…>/skills/<skill>/scripts/<script>.mjs …` (or the
+ * script path run directly), not --help/--version; every other simple command must be cd, a
+ * VAR=value assignment, or tail/head/grep on its output. `bash -c '…'` / `sh -c '…'` is unwrapped.
+ */
+export function runsGateScript(cmd, n) {
+  const script = GATE_SCRIPTS[n];
+  if (!script) return false;
+  // heredoc bodies are data for the command that reads them, not commands
+  const body = String(cmd).replace(/<<-?\s*(['"]?)([A-Za-z_]\w*)\1([^\n]*)\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g, '<<$2$3');
+  const segs = quotedSegments(body.replace(/\s*\d?>&\d/g, ' ').replace(/\s+\d?>\s*\/dev\/null/g, ' '));
+  let ran = false;
+  for (const seg of segs) {
+    const toks = (seg.match(/"[^"]*"|'[^']*'|\S+/g) ?? []);
+    if (toks.every((t) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(t))) continue; // P="…" assignments
+    const { prog, toks: rest } = program(seg);
+    if (PASSIVE.has(prog)) continue;
+    // stdout sent to a file prints nothing (`cat > review/plate-review.md <<'EOF'`)
+    const out = /(?:^|\s)1?>>?\s*("[^"]*"|'[^']*'|[^\s;&|]+)/.exec(seg);
+    if (out && !/^\/dev\/(std|tty|fd)/.test(unquote(out[1])) && !/GATE\s+\d/.test(seg)) continue;
+    // the plugin's other tools (contact-sheet, probe-spec, …) never print a gate line
+    const other = prog === 'node' ? unquote(rest[1] ?? '') : unquote(rest[0] ?? '');
+    if (/\/(skills\/[a-z-]+\/scripts|lib\/verify)\/[a-z-]+\.mjs$/.test(other.replace(/\\/g, '/'))
+      && !Object.values(GATE_SCRIPTS).some((g) => other.endsWith(`/${g}`)) && !/GATE\s+\d/.test(seg)) continue;
+    if ((prog === 'bash' || prog === 'sh' || prog === 'zsh') && rest[1] === '-c' && rest[2]) {
+      if (rest.length > 4 || !runsGateScript(unquote(rest[2]), n)) return false;
+      ran = true;
+      continue;
+    }
+    const target = prog === 'node' ? unquote(rest[1] ?? '') : unquote(rest[0] ?? '');
+    if (!target.replace(/\\/g, '/').endsWith(`/${script}`)) return false;
+    if (rest.some((t) => /^(--help|-h|--version)$/.test(unquote(t)))) return false;
+    if (/GATE\s+\d/.test(seg)) return false;
+    ran = true;
+  }
+  return ran;
+}
+
+/**
+ * Gate lines of the main thread. A gate line counts as the assistant's own marker: a line of a
+ * text block that starts with `GATE ` or `**GATE ` (bold may cover the whole line or only its head:
+ * `**GATE 4 storyboard: APPROVED** — …`), outside ``` / ~~~ fences. A quoted (`> GATE …`),
+ * bulleted or inline-code (`` `GATE …` ``) line doesn't count. Gates 2, 5, 6 and 7 also count
+ * from the output of a Bash call that runs that gate's plugin script and nothing else that could
+ * print text (runsGateScript): an `echo "GATE …"`, a `cat`, or `--help` alongside doesn't count.
  * Returns {n, name, result, evidence, event, k}.
  */
 export function gateLines(events) {
   const out = [];
+  const uses = new Map(events.filter((e) => e.kind === 'tool_use').map((e) => [e.id, e]));
   for (const e of events) {
+    if (e.kind === 'tool_result' && isMain(e)) {
+      const use = uses.get(e.id);
+      if (!use || use.name !== 'Bash') continue;
+      const cmd = String(use.input?.command ?? '');
+      for (const raw of e.text.split('\n')) {
+        const m = GATE_RE.exec(raw.trim());
+        if (!m || !GATE_SCRIPTS[m[1]]) continue;
+        if (!runsGateScript(cmd, Number(m[1]))) continue;
+        out.push({ n: Number(m[1]), name: m[2], result: m[3], evidence: (m[4] ?? '').trim(), event: e, k: out.length, from: 'script' });
+      }
+      continue;
+    }
     if (e.kind !== 'text' || !isMain(e)) continue;
     let fenced = false;
     for (const raw of e.text.split('\n')) {

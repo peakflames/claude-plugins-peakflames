@@ -209,6 +209,7 @@ Project folders (plates/, renders/plates/, review/) live next to plates.json unl
     'scaffold-only': { type: 'boolean', desc: 'Only prepare plates/<id>/ (template, brand, GSAP); do not render' },
     rescaffold: { type: 'boolean', desc: 'Overwrite an existing plates/<id>/index.html from the template' },
     quality: { type: 'string', arg: 'level', desc: 'HyperFrames render quality: draft, looks, standard, high or delivery', default: 'standard', choices: ['draft', 'looks', 'standard', 'high', 'delivery'] },
+    'pipeline-test': { type: 'boolean', desc: 'Stage 5: render the first plate alone with --lint --sheet and print the GATE 5 line (PASS or FAIL)' },
     json: { type: 'boolean', desc: 'Print the results as JSON' },
   },
   positionals: { min: 1, max: Infinity },
@@ -216,6 +217,7 @@ Project folders (plates/, renders/plates/, review/) live next to plates.json unl
     'render-plate plates.json --all --sheet',
     'render-plate plates.json p2-table --lint',
     'render-plate plates.json --all --storyboard',
+    'render-plate plates.json p1-hook --pipeline-test',
     'render-plate docs/build/fixtures/F1/plates.json --all --brand brand-packs/default --out /tmp/f1',
   ],
 };
@@ -226,7 +228,32 @@ function parseMs(v) {
   return m[2] === 'ms' ? Number(m[1]) : Number(m[1]) * 1000;
 }
 
-export async function main({ values, positionals: [platesArg, ...ids] }) {
+export async function main(args) {
+  if (!args.values['pipeline-test']) return run(args);
+  // Stage 5: the first plate, alone, linted and sheeted; the gate line comes from here, not the model
+  const { values, positionals: [platesArg, ...ids] } = args;
+  const gateFail = (why) => process.stdout.write(`GATE 5 pipeline: FAIL — ${why}\n`);
+  try {
+    if (values.all || ids.length !== 1 || values.storyboard || values['scaffold-only']) {
+      throw new CliError('--pipeline-test renders one plate: pass plates.json and the first plate id (no --all, --storyboard or --scaffold-only)', EXIT.USAGE);
+    }
+    if (existsSync(platesArg)) {
+      const plan = JSON.parse(readFileSync(platesArg, 'utf8'));
+      const first = (plan.plates ?? []).filter((p) => p.kind !== 'live').sort((a, b) => a.startMs - b.startMs)[0];
+      if (first && first.id !== ids[0]) throw new CliError(`--pipeline-test renders the first plate (${first.id}), not ${ids[0]}`, EXIT.USAGE);
+    }
+    const quiet = { ...args, values: { ...values, lint: true, sheet: true, json: false } };
+    const res = await run(quiet, { collect: true });
+    const r = res.plates[0];
+    process.stdout.write(`GATE 5 pipeline: PASS — ${path.relative(res.project, r.mp4)} (${r.durationMs} ms, lint clean)\n`);
+    return EXIT.OK;
+  } catch (e) {
+    gateFail(String(e.message ?? e).split('\n')[0]);
+    throw e;
+  }
+}
+
+async function run({ values, positionals: [platesArg, ...ids] }, { collect = false } = {}) {
   const everyMs = parseMs(values.every);
   if (values.storyboard && values['scaffold-only']) throw new CliError('pass --storyboard or --scaffold-only, not both', EXIT.USAGE);
   const platesFile = path.resolve(platesArg);
@@ -272,6 +299,7 @@ export async function main({ values, positionals: [platesArg, ...ids] }) {
     board = storyboard(prepared, { project });
     if (!values.json) process.stdout.write(`storyboard: ${board}\n`);
   }
+  if (collect) return { project, plates: results };
   if (values.json) process.stdout.write(JSON.stringify({ project, brand: brandDir, plates: results, skipped, storyboard: board }, null, 2) + '\n');
   return EXIT.OK;
 }

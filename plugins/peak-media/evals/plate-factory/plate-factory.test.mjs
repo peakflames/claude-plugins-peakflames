@@ -2,7 +2,7 @@
 // AC-ORC-01, which itself is the user's manual run), and retime-plates (AC-ORC-05, AC-BASE-13).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync, cpSync, utimesSync } from 'node:fs';
 import path from 'node:path';
 import { run, baseline, ROOT, tmpDir } from '../helpers/run.mjs';
 import { validateFile } from '../../lib/schemas.mjs';
@@ -71,6 +71,72 @@ test('skill docs: every stage ends with its literal gate line, and SKILL.md make
   assert.match(stage1, /original line and the proposed\s+line/);
   assert.match(stage1, /words × 60 ÷ 127 \+ 0\.5 s per beat/);
   assert.ok(stage1.indexOf('Runtime check, before any TTS') < stage1.indexOf('AskUserQuestion'), 'runtime is checked before the gate-1 question');
+});
+
+test('skill docs + checker: gates 2, 5, 6, 7 are printed by their scripts; an echoed line does not count (WP9 round 5)', () => {
+  const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
+  const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
+  assert.match(skill, /Stages 2, 5, 6, 7: the script prints it\./);
+  assert.match(skill, /Never type or echo these four lines yourself/);
+  assert.match(skill, /While you\s+wait for an answer, print no gate line/);
+  for (const cmd of ['spine.mjs', '--pipeline-test', 'gate.mjs build', 'assemble.mjs']) assert.ok(skill.includes(cmd), `SKILL.md names ${cmd}`);
+  for (const n of [2, 5, 6, 7]) {
+    assert.match(stages, new RegExp(`The script prints this line \\(don't write it yourself\\):\\nEnd the stage with: \`GATE ${n} `), `stage ${n}: the script prints its line`);
+  }
+  assert.doesNotMatch(stages, /No user stop here, so the line is required/, 'round-4 prose removed');
+  // the fixtures: lines only in script output pass; an echoed GATE 5 doesn't count
+  assert.ok(checkGates(load('good-script-gates')).ok, checkGates(load('good-script-gates')).message);
+  assert.ok(gateLines(load('good-script-gates')).filter((g) => g.from === 'script').map((g) => g.n).join() === '2,5,6,7');
+  assert.match(checkGates(load('bad-echoed-gate')).message, /no passing gate line for gate\(s\) 5$/);
+  // a user gate (or gate 9) never counts from script output
+  const ev = load('good-script-gates').map((e) => (e.kind === 'tool_result' && /GATE 7 /.test(e.text) ? { ...e, text: `${e.text}\nGATE 9 export: PASS — out/final.mp4` } : e));
+  assert.equal(gateLines(ev).filter((g) => g.from === 'script' && g.n === 9).length, 0);
+  // the cold-start failure: nothing printed for 2/5/6/7 -> AC-ORC-01 names them
+  const silent = load('good').map((e) => (e.kind === 'text' ? { ...e, text: e.text.replace(/^GATE [2567] .*$/gm, '') } : e));
+  assert.match(checkGates(silent).message, /no passing gate line for gate\(s\) 2, 5, 6, 7/);
+});
+
+test('scripts print gates 5 and 6: render-plate --pipeline-test and gate build, PASS and FAIL forms (WP9 round 5)', () => {
+  const proj = scratch('pm-gates-');
+  cpSync(path.join(ROOT, 'docs', 'build', 'fixtures', 'F0'), proj, { recursive: true });
+  const plan = JSON.parse(readFileSync(path.join(proj, 'plates.json'), 'utf8'));
+  plan.brand = path.join(ROOT, 'brand-packs', 'default');
+  writeFileSync(path.join(proj, 'plates.json'), JSON.stringify(plan, null, 2));
+  const RENDER = 'skills/video-plates/scripts/render-plate.mjs', GATE = 'skills/plate-factory/scripts/gate.mjs';
+  const gl = (out) => out.split('\n').filter((l) => l.startsWith('GATE '));
+
+  // gate 5 FAIL: a brand pack that doesn't exist -> FAIL line on stdout, one line on stderr
+  const bad = run(RENDER, [path.join(proj, 'plates.json'), 'p1', '--pipeline-test', '--brand', path.join(proj, 'no-pack')]);
+  assert.equal(bad.code, 1, bad.stderr);
+  assert.equal(gl(bad.stdout).length, 1, bad.stdout);
+  assert.match(gl(bad.stdout)[0], /^GATE 5 pipeline: FAIL — brand pack not found: /);
+  assert.equal(bad.stderr.trim().split('\n').length, 1);
+  // gate 5 PASS
+  const ok = run(RENDER, [path.join(proj, 'plates.json'), 'p1', '--pipeline-test']);
+  assert.equal(ok.code, 0, ok.stdout + ok.stderr);
+  assert.match(gl(ok.stdout)[0], /^GATE 5 pipeline: PASS — renders\/plates\/p1\.mp4 \(\d+ ms, lint clean\)$/);
+  assert.ok(existsSync(path.join(proj, 'review', 'contact-p1.jpg')), 'it sheets the plate');
+
+  // gate 6 FAIL: no review record yet
+  const noRec = run(GATE, ['build', proj]);
+  assert.equal(noRec.code, 1);
+  assert.match(gl(noRec.stdout)[0], /^GATE 6 build: FAIL — no review record at review\/plate-review\.md/);
+  assert.equal(noRec.stderr.trim().split('\n').length, 1);
+  // gate 6 FAIL: a defect left open
+  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1 @1.0s major 3: title clipped → shorten — open\nVERDICT: 0 blocker, 1 major, 0 minor\n');
+  assert.match(gl(run(GATE, ['build', proj]).stdout)[0], /^GATE 6 build: FAIL — review\/plate-review\.md: major defect not fixed: p1 @1\.0s major 3/);
+  // gate 6 PASS
+  writeFileSync(path.join(proj, 'review', 'plate-review.md'), '# Review\n\np1 @1.0s major 3: title clipped → shorten — fixed\nVERDICT: 0 blocker, 1 major, 0 minor\n');
+  const pass = run(GATE, ['build', proj]);
+  assert.equal(pass.code, 0, pass.stdout + pass.stderr);
+  assert.deepEqual(gl(pass.stdout), ['GATE 6 build: PASS — 1 plates; reviewer: 1 defects, 1 fixed']);
+  // gate 6 FAIL: a render newer than every sheet of it (re-rendered, not re-sheeted)
+  const mp4 = path.join(proj, 'renders', 'plates', 'p1.mp4');
+  const t = new Date(Date.now() + 60_000);
+  utimesSync(mp4, t, t);
+  assert.match(gl(run(GATE, ['build', proj]).stdout)[0], /^GATE 6 build: FAIL — plate p1: no contact sheet of its final render/);
+  // baseline
+  baseline(null, assert, GATE, { flags: [], badArgs: [[], ['nope', proj], ['build', path.join(proj, 'none')]] });
 });
 
 test('checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else', () => {
@@ -301,4 +367,96 @@ test('AC-BASE-13: retime-plates --help/--version/bad input follow the baseline',
   assert.equal(mo.stderr.trim(), `retime-plates: cannot write ${missingOut}: folder ${path.dirname(missingOut)} does not exist — create it first`);
   const ns = run(RETIME, [noSpine, '--spine', 'nope/manifest.json']);
   assert.equal(ns.stderr.trim(), 'retime-plates: spine not found: nope/manifest.json — run the spine first (video-spine)');
+});
+
+test('round 6: approval with edits — GATE 1 comes after the edit, and a missing one fails (cold start r3)', () => {
+  assert.ok(checkGates(load('good-approved-with-edits')).ok, checkGates(load('good-approved-with-edits')).message);
+  assert.match(checkGates(load('bad-approved-with-edits')).message, /no passing gate line for gate\(s\) 1$/);
+  const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
+  const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
+  assert.match(skill, /gates 0, 1, 3 — apply the text edits, then write the `APPROVED` line/);
+  assert.match(stages, /If the user approves with\s+changes \("apply 1, approved"\), apply them, then write the `GATE 1` line below, then run the\s+spine/);
+  assert.doesNotMatch(stages, /The same holds at every user gate: edits first/, 'no blanket rule across gates (verify-5 F2-r5)');
+});
+
+test('round 6: a script gate line counts only from a real run of the plugin script (verify-4 F1/F3)', async () => {
+  const { runsGateScript } = await import('./transcript.mjs');
+  const R = '/opt/plugins/peak-media', RP = `${R}/skills/video-plates/scripts/render-plate.mjs`;
+  const yes = [
+    [`cd /v && node "${RP}" plates.json p1 --pipeline-test`, 5],
+    [`P="${R}"; cd /v; node "$P/skills/video-plates/scripts/render-plate.mjs" plates.json p1 --pipeline-test 2>&1 | tail -5`, 5],
+    [`node ${RP} plates.json p1 --pipeline-test | grep -E "lint|GATE 5"`, 5],
+    [`bash -c "node ${R}/skills/video-assemble/scripts/assemble.mjs ."`, 7],
+    [`cd /v && node "${R}/skills/plate-factory/scripts/gate.mjs" build . 2>&1 | head -20`, 6],
+    // cold start r3's honest shapes: the record written by a heredoc in the same call; assemble then a contact sheet
+    [`cat > review/plate-review.md <<'EOF'\n# Plate review\np1 @1s major 3: x → y — fixed\nVERDICT: 0 blocker, 1 major, 0 minor\nEOF\nnode "${R}/skills/plate-factory/scripts/gate.mjs" build .`, 6],
+    [`P="${R}"; node "$P/skills/video-assemble/scripts/assemble.mjs" . 2>&1 | tail -10 && node "$P/lib/verify/contact-sheet.mjs" review/review.mp4 --every 1s -o review/contact-review.jpg`, 7],
+  ];
+  const no = [
+    [`node ${RP} --help; cat fake.txt`, 5],
+    ['cat fake.txt | node render-plate.mjs --version', 5],
+    ['node /tmp/render-plate.mjs plates.json p1', 5],
+    ['node -e "console.log(1)" render-plate.mjs', 5],
+    [`node ${RP} plates.json p1 && echo "GATE 5 pipeline: PASS"`, 5],
+    ['X=GATE; cat <<EOF', 5],
+    [`node ${R}/skills/video-spine/scripts/spine.mjs --brief brief.md`, 5],
+    [`cat > f.txt <<'EOF'\nGATE 6 build: PASS — 3 plates\nEOF\nnode "${R}/skills/plate-factory/scripts/gate.mjs" build . ; cat f.txt`, 6],
+    [`node "${R}/skills/plate-factory/scripts/gate.mjs" build . && echo "GATE 6 build: PASS" > /dev/stdout`, 6],
+  ];
+  for (const [c, n] of yes) assert.equal(runsGateScript(c, n), true, c);
+  for (const [c, n] of no) assert.equal(runsGateScript(c, n), false, c);
+});
+
+test('round 6: gate.mjs counts the reviewer\'s listed defects, checks the VERDICT, and matches sheets by exact id (verify-4 G6/F5)', async () => {
+  const { parseReview, isSheetOf } = await import('../../skills/plate-factory/scripts/gate.mjs');
+  const ids = ['p1-habit', 'p2-reason', 'p3-tip'];
+  const report = [
+    '## p1-habit', '- p1-habit @0.00s minor 12: crowds the headline → move the art — fixed',
+    '**p2-reason** @5.00s **[major]** 2: off the storyboard → rebuild stacked — fixed',
+    'p3-tip @0.6s minor 11: drop hangs → let it fall — fixed', 'p3-tip @2.1s minor 9: pause too short → hold 0.5 s — open',
+    '', 'VERDICT: 0 blocker, 1 major, 3 minor',
+  ].join('\n');
+  const ok = parseReview(report, ids);
+  assert.deepEqual(ok.problems, []);
+  assert.equal(ok.defects.length, 4, 'four defects listed — not a summary number');
+  assert.equal(ok.fixed, 3);
+  assert.match(parseReview(report.replace('VERDICT: 0 blocker, 1 major, 3 minor', 'VERDICT: 0 blocker, 1 major, 0 minor'), ids).problems[0], /the VERDICT says 0 minor but 3 minor defect line\(s\) are listed/);
+  assert.match(parseReview(report.replace('rebuild stacked — fixed', 'rebuild stacked — open'), ids).problems.join('\n'), /major defect not fixed/);
+  assert.match(parseReview(report.replace(' — fixed\n**p2', '\n**p2'), ids).problems.join('\n'), /has no " — fixed" or " — open"/);
+  assert.match(parseReview('Defects: 1\nFixed: 1\n', ids).problems[0], /no reviewer VERDICT line/);
+  assert.deepEqual(parseReview('VERDICT: 0 blocker, 0 major, 0 minor', ids).problems, []);
+  // sheets by exact id
+  for (const f of ['contact-p1.jpg', 'p1-r2.jpg', 'p1-fix1.jpg']) assert.ok(isSheetOf(f, 'p1'), f);
+  for (const f of ['p10-r1.jpg', 'x-p1-unrelated.jpg', 'contact-p1-hook.jpg', 'p1-hook-r1.jpg']) assert.ok(!isSheetOf(f, 'p1'), f);
+});
+
+test('round 7: a storyboard approved with a change is re-run and asked again; APPROVED without the re-ask fails (verify-5 F2-r5)', () => {
+  const good = byId(checkAll(load('good-g4-changes-reasked')));
+  for (const id of ['AC-ORC-01', 'AC-ORC-02', 'AC-ORC-03', 'AC-ORC-04']) assert.ok(good[id].ok, `${id}: ${good[id].message}`);
+  const bad = byId(checkAll(load('bad-g4-changes-no-reask')));
+  assert.equal(bad['AC-ORC-02'].ok, false);
+  assert.match(bad['AC-ORC-02'].message, /had no AskUserQuestion since the storyboard opened/);
+  const skill = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'SKILL.md'), 'utf8');
+  assert.match(skill, /gate 4 — a storyboard change reopens it: .*\n.*show it and ask again; no `APPROVED` until the user approves the new one/);
+  assert.match(skill, /gate 8 — a level or music change means re-mix, show the new levels and let the user listen\s+again/);
+  const stages = readFileSync(path.join(ROOT, 'skills', 'plate-factory', 'references', 'stages.md'), 'utf8');
+  assert.match(stages, /guards against honest mistakes, not adversarial ones/);
+});
+
+test('round 7: a defect status is an explicit trailing token; gate build prints FAIL on usage errors and missing ffmpeg (verify-5 N1/N2/N4)', async () => {
+  const { parseReview } = await import('../../skills/plate-factory/scripts/gate.mjs');
+  const V = '\nVERDICT: 0 blocker, 1 major, 0 minor';
+  const st = (line) => parseReview(line + V, ['p2']).defects[0].status;
+  assert.equal(st('p2 @5s [major] 2: nav drifts → make the nav position-fixed'), null, 'a word ending in -fixed is not a status');
+  assert.equal(st('p2 @5s major 2: x → draw it half-open'), null);
+  assert.equal(st('p2 @5s major 2: x → y — **fixed**'), 'fixed');
+  assert.equal(st('p2 @5s major 2: x → y — fixed ✅'), 'fixed');
+  assert.equal(st('p2 @5s major 2: x → y - open'), 'open');
+  const GATE = 'skills/plate-factory/scripts/gate.mjs';
+  const usage = run(GATE, ['nope', ROOT]);
+  assert.equal(usage.code, 2);
+  assert.match(usage.stdout, /^GATE 6 build: FAIL — unknown gate 'nope'/m);
+  const noFf = run(GATE, ['build', path.join(ROOT, 'docs', 'build', 'fixtures', 'F1')], { env: { PEAK_MEDIA_FFMPEG: '/nonexistent/ffmpeg' } });
+  assert.equal(noFf.code, 3);
+  assert.match(noFf.stdout, /^GATE 6 build: FAIL — ffmpeg not found/m);
 });

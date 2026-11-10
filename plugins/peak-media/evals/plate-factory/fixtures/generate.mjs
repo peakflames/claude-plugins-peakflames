@@ -98,6 +98,43 @@ const reviewerSteps = () => [
 const idx = (steps, pred) => steps.findIndex(pred);
 const sayIdx = (steps, n) => idx(steps, (s) => s[0] === 'say' && s[1].includes(`GATE ${n} `));
 
+/** Gate 1 answered "Apply 1, as you suggest. Approved.", the edit made, then (or not) the GATE 1 line. */
+function approvedWithEdits(s, writeGate) {
+  const ask = idx(s, (x) => x[0] === 'ask' && x[1].startsWith('Script'));
+  s[ask] = ['ask', 'Script (50 words, cold read 2/3 CLEAR). Proposed: 1. compare — "…" → "…". Apply which, and approve?', 'Apply 1, as you suggest. Approved.'];
+  const gate = sayIdx(s, 1);
+  s.splice(gate, 1, ['edit', `${P}/script.md`], ...(writeGate ? [['say', 'Applied change 1.\n\nGATE 1 script: APPROVED — script.md (50 words, cold read 2/3 CLEAR)']] : []));
+  return s;
+}
+
+/** Gate 4 answered "Change p2's heading, then approved": edit, re-run the storyboard, (re-ask), APPROVED. */
+function g4WithChanges(s, reask) {
+  const ask = idx(s, (x) => x[0] === 'ask' && x[1].startsWith('Storyboard'));
+  s[ask] = ['ask', s[ask][1], "Change p2's heading to 'Who checks?', then approved."];
+  s.splice(ask + 1, 0, ['write', `${P}/plates.json`],
+    ['bash', RP('plates.json --all --storyboard --rescaffold'), 'storyboard: review/storyboard.jpg'],
+    ['read', `${P}/review/storyboard.jpg`],
+    ...(reask ? [['ask', "Storyboard re-run with p2's new heading (review/storyboard.jpg). Approve?", 'Approve']] : []));
+  return s;
+}
+
+/** The good run with gates 2, 5, 6, 7 printed by their scripts and not written by the model. */
+function scriptGates(s) {
+  const drop = (n) => s.splice(sayIdx(s, n), 1);
+  for (const n of [2, 5, 6, 7]) drop(n);
+  const at = (pred) => idx(s, pred);
+  let i = at((x) => x[0] === 'bash' && x[1].includes('spine.mjs') && x[1].endsWith('--brief brief.md'));
+  s[i] = ['bash', s[i][1], `${s[i][2]}\nGATE 2 spine: PASS — spine/manifest.json 25999 ms (target 26000 ±10%)`];
+  i = at((x) => x[0] === 'bash' && x[1] === RP('plates.json p1-hook --lint --sheet'));
+  s[i] = ['bash', RP('plates.json p1-hook --pipeline-test'), 'p1-hook: renders/plates/p1-hook.mp4 (7173 ms, planned 7173) lint+check ok sheet review/contact-p1-hook.jpg\nGATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)'];
+  i = at((x) => x[0] === 'read' && x[1].endsWith('p2-table-fix1.jpg'));
+  s.splice(i + 1, 0, ['write', `${P}/review/plate-review.md`],
+    ['bash', `cd ${P} && ${node('skills/plate-factory/scripts/gate.mjs', 'build .')} 2>&1 | tail -3`, 'GATE 6 build: PASS — 3 plates; reviewer: 1 defects, 1 fixed']);
+  i = at((x) => x[0] === 'bash' && x[1].endsWith(`${node('skills/video-assemble/scripts/assemble.mjs', '.')}`));
+  s[i] = ['bash', s[i][1], 'cuts      2 plate cut(s) in silence (≥300 ms)\nGATE 7 composite: PASS — review/review.mp4 (2 cuts in ≥300 ms silence)'];
+  return s;
+}
+
 /** Bad variants: each breaks exactly one rule. */
 export const VARIANTS = {
   good: (s) => s,
@@ -174,6 +211,23 @@ export const VARIANTS = {
     s.splice(at, 0, ['bash', `cd ${P} && for id in p2-table p3-close; do node "${ROOT}/skills/video-plates/scripts/render-plate.mjs" plates.json $id --lint; node "${ROOT}/lib/verify/contact-sheet.mjs" renders/plates/\${id}.mp4 --every 0.5s -o review/$id-r1.jpg; done`, 'ok p2-table\nwrote review/p2-table-r1.jpg\nok p3-close\nwrote review/p3-close-r1.jpg']);
     return s;
   },
+  // round 5: the automatic gates' lines come only from their scripts' output
+  'good-script-gates': (s) => scriptGates(s),
+  // ... and an echoed line is not the script's verdict (render-plate ran, but the GATE 5 line was echoed)
+  'bad-echoed-gate': (s) => {
+    s = scriptGates(s);
+    const i = idx(s, (x) => x[0] === 'bash' && x[1].includes('--pipeline-test'));
+    s[i] = ['bash', `${RP('plates.json p1-hook --lint --sheet')} && echo "GATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)"`, 'p1-hook: ok\nGATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)'];
+    return s;
+  },
+  // round 6 (cold start r3): the script is approved with an edit; GATE 1 is written after the edit
+  'good-approved-with-edits': (s) => approvedWithEdits(s, true),
+  // ... and without the GATE 1 line (the session went from the edit straight to the spine)
+  'bad-approved-with-edits': (s) => approvedWithEdits(s, false),
+  // round 7 (verify-5 F2-r5): a storyboard approved "with a change" reopens gate 4 — re-run, ask again
+  'good-g4-changes-reasked': (s) => g4WithChanges(s, true),
+  // ... and writing APPROVED after the re-run without asking again doesn't close the storyboard
+  'bad-g4-changes-no-reask': (s) => g4WithChanges(s, false),
   'bad-unasked-gate': (s) => {
     s.splice(sayIdx(s, 4) - 1, 0,
       ['say', 'GATE 4 storyboard: APPROVED — review/storyboard.jpg'],

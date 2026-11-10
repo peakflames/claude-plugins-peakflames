@@ -17,15 +17,27 @@ voice) sets the clock; each beat gets one **plate** (`motion`, `slide` or `live`
 own; assembly puts the plates on the spine. Stills are approved before any animation is written,
 and audio never forces a re-render.
 
-**Every stage ends with its gate line**, written on its own line in your reply, e.g.
-`GATE 5 pipeline: PASS — renders/plates/p1-hook.mp4 (7173 ms, lint clean)`. This holds for all
-ten stages, including the mechanical ones (2, 5, 6, 7, 9) that need no answer from the user, and
-**whatever output style or brevity setting is active**: a concise style shortens your prose, never
-the gate lines. A stage without its gate line is not finished; the run is checked for all ten.
-**A stage may not begin until the previous stage's gate line has been written.** Before the first
-command of any stage, check that the previous gate line is in your replies; if it isn't, write it
-now (or go back and finish that stage). Stage 6 in particular ends only after the reviewer's fixes
-are re-rendered and re-sheeted; then write `GATE 6 build: …`, then start stage 7.
+**Every stage ends with its gate line**, and the run is checked for all ten.
+
+- **Stages 2, 5, 6, 7: the script prints it.** Run the stage's gate command and its output carries
+  the line: `spine.mjs` → `GATE 2 spine: …`; `render-plate.mjs plates.json <first id>
+  --pipeline-test` → `GATE 5 pipeline: …`; `gate.mjs build .` → `GATE 6 build: …`;
+  `assemble.mjs .` → `GATE 7 composite: …`. Never type or echo these four lines yourself; on
+  `FAIL`, fix and rerun the command.
+- **Stages 0, 1, 3, 4, 8, 9: you write it**, on its own line in your reply, e.g.
+  `GATE 3 plates: APPROVED — plates.json (3 plates, retimed from spine/manifest.json)`. A user
+  gate's `APPROVED` line goes right after the user's answer, before the next command. While you
+  wait for an answer, print no gate line (`REJECTED` is only for an answer that turns it down).
+- **Approved, but with changes** ("apply 1, approved"):
+  - gates 0, 1, 3 — apply the text edits, then write the `APPROVED` line, then start the next stage;
+  - gate 4 — a storyboard change reopens it: edit `plates.json`, re-run the storyboard
+    (`--rescaffold`), show it and ask again; no `APPROVED` until the user approves the new one;
+  - gate 8 — a level or music change means re-mix, show the new levels and let the user listen
+    again; no `APPROVED` until they approve what they heard.
+- This holds **whatever output style or brevity setting is active**: a concise style shortens
+  your prose, never the gate lines.
+- **A stage may not begin until the previous stage's gate line has been written** (printed by its
+  script, or by you).
 
 **The user's wording wins.** Keep the brief's wording in the script. Never rewrite the user's
 lines on your own or apply cold-read findings before the user picks: present them as a batch of
@@ -46,7 +58,7 @@ SKILL.md before its first stage:
 | Stages | Skill | Entry points |
 |---|---|---|
 | 0–2 | `${CLAUDE_PLUGIN_ROOT}/skills/video-spine/SKILL.md` | `spine.mjs`, `sample-voice.mjs` |
-| 3 | this skill | `skills/plate-factory/scripts/retime-plates.mjs`, `scripts/validate.mjs` |
+| 3, 6 | this skill | `skills/plate-factory/scripts/retime-plates.mjs`, `scripts/validate.mjs`, `skills/plate-factory/scripts/gate.mjs` |
 | 4–6 (`motion`, `slide`) | `${CLAUDE_PLUGIN_ROOT}/skills/video-plates/SKILL.md` | `render-plate.mjs` |
 | 6 (`live`) | `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/SKILL.md` | `capture.mjs`, `check-take.mjs` |
 | 7–9 | `${CLAUDE_PLUGIN_ROOT}/skills/video-assemble/SKILL.md` | `assemble.mjs`, `remux-audio.mjs` |
@@ -61,25 +73,25 @@ has each stage's steps, commands and gate-line format. Read
 
 ## The stages
 
-| # | Stage | Output | Gate | Gate line |
+| # | Stage | Output | Gate | Gate line (required; 2, 5, 6, 7 printed by the script) |
 |---|---|---|---|---|
 | 0 | Brief | `brief.md` | user confirms | `GATE 0 brief: APPROVED — brief.md` |
 | 1 | Script | `script.md` | cold-read agent, then user | `GATE 1 script: APPROVED — script.md (…)` |
-| 2 | Spine | `spine/manifest.json` or `beatgrid.json` | runtime within ±10% | `GATE 2 spine: PASS — spine/manifest.json …` |
+| 2 | Spine | `spine/manifest.json` or `beatgrid.json` | runtime within ±10% | `GATE 2 spine: PASS — spine/manifest.json <ms> ms (target <ms> ±10%)` (`spine.mjs`) |
 | 3 | Plate list | `plates.json`, retimed from the spine | user confirms | `GATE 3 plates: APPROVED — plates.json …` |
 | 4 | Storyboard | `review/storyboard.jpg` | **user approves before any animation** | `GATE 4 storyboard: APPROVED — review/storyboard.jpg` |
-| 5 | Pipeline test | plate 1 rendered alone | renders cleanly | `GATE 5 pipeline: PASS — renders/plates/<id>.mp4 …` |
-| 6 | Build plates | `renders/plates/<id>.mp4` each | ≤ 3 self-review rounds per plate, then a reviewer agent | `GATE 6 build: PASS — …` |
-| 7 | Composite | `review/review.mp4` | every cut in a silent gap | `GATE 7 composite: PASS — review/review.mp4 …` |
+| 5 | Pipeline test | plate 1 rendered alone | renders cleanly | `GATE 5 pipeline: PASS — renders/plates/<id>.mp4 (<ms> ms, lint clean)` (`render-plate --pipeline-test`) |
+| 6 | Build plates | `renders/plates/<id>.mp4` each | ≤ 3 self-review rounds per plate, then a reviewer agent | `GATE 6 build: PASS — <n> plates; reviewer: <d> defects, <f> fixed` (`gate.mjs build`) |
+| 7 | Composite | `review/review.mp4` | every cut in a silent gap | `GATE 7 composite: PASS — review/review.mp4 (<k> cuts in ≥300 ms silence)` (`assemble.mjs`) |
 | 8 | Music, then SFX | `review/review-mix.mp4` | user listens | `GATE 8 audio: APPROVED — review/review-mix.mp4 …` |
 | 9 | Export | `out/final.mp4` | spec check + final contact sheet | `GATE 9 export: PASS — out/final.mp4 …` |
 
 ## Rules
 
-- **Stages run in order, and each ends with its gate line.** Write it on its own line in your
-  reply, in exactly the format of `references/stages.md`, only once the gate holds. A failed or
-  refused gate gets a `FAIL`/`REJECTED` line; fix and repeat the stage. Going back to an earlier
-  stage repeats every stage after it.
+- **Stages run in order, and each ends with its gate line**, in exactly the format of
+  `references/stages.md`, only once the gate holds. A failed check prints `FAIL` (from the script
+  for 2, 5, 6, 7); a refusal by the user gets a `REJECTED` line; fix and repeat the stage.
+  Going back to an earlier stage repeats every stage after it.
 - **User gates (0, 1, 3, 4, 8) ask with `AskUserQuestion`** and wait for the answer. Never
   approve on the user's behalf. Mechanical gates (2, 5, 6, 7, 9) report the check's result.
 - **Plate timing comes from the spine.** After every spine run, run `retime-plates plates.json`;

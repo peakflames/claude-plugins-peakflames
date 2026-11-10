@@ -79,7 +79,7 @@ node ${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs --brief brief.md
 - The spine prints a per-clip wpm table and warns when a clip runs far slower than the rest
   (usually a mood tag read aloud): fix that line and rerun. A rerun reuses cached clips
   ("N/N cached").
-- **Gate:** the last line is `PASS  runtime …`. On `runtime … outside ±10%` (exit 1) the files
+- **Gate:** it ends with `PASS  runtime …` and the gate line `GATE 2 spine: PASS — …` (printed by the script; plate-factory relies on it). On `runtime … outside ±10%` (exit 1) the files
   are still written; cut or add words in `script.md` and rerun. Don't stretch the spine by hand.
 - Check cuts land in silence (DEC-13) before handing on:
   `check-cuts spine/narration.wav --cuts <each beat's startMs after the first> --min-silence-ms 400`.
