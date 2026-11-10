@@ -1,0 +1,84 @@
+# AC-ASM-01 — verifier-wp6-r1-90efea8d, worktree a2ed450, 2026-11-09T00:23:28Z
+# inputs: /tmp/vwp6 (testsrc/colour plates 1280x720@30 at 0-6500/6500-14000/14000-20000; 330 Hz narration tones in F1 clip windows 200-6000/6700-13500/14200-19500; music 110/138/165/220 Hz; SFX 1.5 kHz blips at 6.4-6.6 s and 13.9-14.1 s)
+## assemble proj (good narration), brand = evals/video-assemble/fixtures/brand-outro
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 600 frames)
+cuts      2 plate cut(s) in silence (≥300 ms)
+outro     rendered renders/outro-8e989dbcd4d03f5f.mp4
+final     out/final.mp4 1280x720@30, 23000 ms (spine 20000 + outro 3000) — spec PASS
+/tmp/vwp6/out-nomusic/out/final.mp4
+exit 0
+## check-cuts --cuts 6500,14000 --min-silence-ms 300 --expect-cuts 2
+ok    cut at 0:06.500 — silence 700 ms
+ok    cut at 0:14.000 — silence 700 ms
+PASS  2 cut(s), 0 failing — out-nomusic/review/review.mp4
+exit 0
+## check-cuts (scene detected) --min-silence-ms 300
+ok    cut at 0:06.500 — silence 700 ms
+ok    cut at 0:14.000 — silence 700 ms
+ok    cut at 0:14.033 — silence 700 ms
+PASS  3 cut(s), 0 failing — out-nomusic/review/review.mp4
+exit 0
+## bad narration: tone 0.2-6.8 s (over the 6500 cut)
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 600 frames)
+assemble: cut not in a ≥300 ms silence at 0:06.500 (p1-hook|p2-table: over sound) — re-time the spine beat or move the plate boundary; review left at /tmp/vwp6/out-bad/review/review.mp4
+exit 1
+files in out-bad/out:        0
+FAIL  cut at 0:06.500 — not in silence (need ≥ 300 ms)
+ok    cut at 0:14.000 — silence 700 ms
+FAIL  2 cut(s), 1 failing — out-bad/review/review.mp4
+exit 1
+## node --test (whole suite)
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (2587.104166ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (2068.411541ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (1011.711666ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (653.982417ms)
+✔ validate: cross-reference checks (not AC-bound) (5784.575542ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (136.010375ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (146.047833ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (8468.609083ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (48336.862791ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (18.924583ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (610.880958ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (261.001375ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (687.503042ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (1352.485625ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (1122.004083ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (536.534416ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (810.598458ms)
+✔ AC-BASE-03: contact-sheet baseline (606.87675ms)
+✔ AC-BASE-04: probe-spec baseline (1314.91575ms)
+✔ AC-BASE-05: check-cuts baseline (450.775458ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (2560.394541ms)
+✔ AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a ≥300 ms silent gap (8012.649958ms)
+✔ AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream md5 unchanged (19472.6025ms)
+✔ AC-ASM-03: out/final.mp4 passes probe-spec and lasts spine + outro ±1 frame (36246.817833ms)
+✔ AC-ASM-04: no music supplied — assembly succeeds with narration only (and a beat grid gets a silent track) (12929.981292ms)
+✔ AC-ASM-05: the final contact sheet ends on the brand outro (3315.580792ms)
+✔ AC-BASE-11: assemble --help lists every flag, --version = plugin.json, bad input is one line with no stack (915.444042ms)
+✔ AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, bad input is one line with no stack (773.7235ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 123075.868708
+exit 0
+## ac-run --wp WP6
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-ASM-01 | script | pass | not-started | — |
+| AC-ASM-02 | script | pass | not-started | — |
+| AC-ASM-03 | script | pass | not-started | — |
+| AC-ASM-04 | script | pass | not-started | — |
+| AC-ASM-05 | still | — | not-started | — |
+| AC-ASM-06 | manual | — | not-started | — |
+| AC-BASE-11 | script | pass | not-started | — |
+| AC-BASE-12 | script | pass | not-started | — |
+exit 0
+## ac-run --trace
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+exit 0

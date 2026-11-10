@@ -1,0 +1,52 @@
+# gate.mjs build on a copy of the cold-start r3 project (plates.json, spine/, renders/plates, review/ JPEGs) — 46f6005
+$ gate build .   # r3's own plate-review.md (summary Defects: 1, lines without plate ids, 'VERDICT (before fixes):')
+  stdout: GATE 6 build: FAIL — review/plate-review.md has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered
+  stderr: gate: review/plate-review.md has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered
+  exit 1
+$ gate build .   # r3 report saved as stages.md asks (1 major + 3 minor, one minor open)
+  stdout: GATE 6 build: PASS — 3 plates; reviewer: 4 defects, 3 fixed
+  exit 0
+$ gate build .   # major open
+  stdout: GATE 6 build: FAIL — review/plate-review.md: major defect not fixed: p2-reason @5.00s [major] 2: side-by-side cards strayed from the storyboard → rebuild stacked — open
+  stderr: gate: review/plate-review.md: major defect not fixed: p2-reason @5.00s [major] 2: side-by-side cards strayed from the storyboard → rebuild stacked — open
+  exit 1
+$ gate build .   # major with no status
+  stdout: GATE 6 build: FAIL — review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5.00s [major] 2: side-by-side cards strayed from the storyboard → rebuild stacked
+  stderr: gate: review/plate-review.md: defect line has no " — fixed" or " — open" at its end: p2-reason @5.00s [major] 2: side-by-side cards strayed from the storyboard → rebuild stacked
+  exit 1
+$ gate build .   # major with no status, fix text ends 'position-fixed'
+  stdout: GATE 6 build: PASS — 3 plates; reviewer: 4 defects, 3 fixed
+  exit 0
+$ gate build .   # VERDICT says 1 minor, 3 listed (plus a stale 'Defects: 1' summary)
+  stdout: GATE 6 build: FAIL — review/plate-review.md: the VERDICT says 1 minor but 3 minor defect line(s) are listed — list every defect the reviewer reported, one per line
+  stderr: gate: review/plate-review.md: the VERDICT says 1 minor but 3 minor defect line(s) are listed — list every defect the reviewer reported, one per line
+  exit 1
+$ gate build .   # same with VERDICT corrected: summary 'Defects: 1' ignored
+  stdout: GATE 6 build: PASS — 3 plates; reviewer: 4 defects, 3 fixed
+  exit 0
+$ gate build .   # VERDICT line removed
+  stdout: GATE 6 build: FAIL — review/plate-review.md has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered
+  stderr: gate: review/plate-review.md has no reviewer VERDICT line ("VERDICT: <n> blocker, <n> major, <n> minor") — save the reviewer's report as it answered
+  exit 1
+$ gate build .   # numbered-list line (1. p1-habit …)
+  stdout: GATE 6 build: FAIL — review/plate-review.md: the VERDICT says 3 minor but 2 minor defect line(s) are listed — list every defect the reviewer reported, one per line
+  stderr: gate: review/plate-review.md: the VERDICT says 3 minor but 2 minor defect line(s) are listed — list every defect the reviewer reported, one per line
+  exit 1
+$ gate build .   # bullet + bold id
+  stdout: GATE 6 build: PASS — 3 plates; reviewer: 4 defects, 3 fixed
+  exit 0
+$ gate build .   # p2-reason re-rendered after its last sheet
+  stdout: GATE 6 build: FAIL — plate p2-reason: no contact sheet of its final render in review/ (contact-p2-reason.jpg, p2-reason-r<N>.jpg or p2-reason-fix<N>.jpg, made after the last re-render)
+  stderr: gate: plate p2-reason: no contact sheet of its final render in review/ (contact-p2-reason.jpg, p2-reason-r<N>.jpg or p2-reason-fix<N>.jpg, made after the last re-render)
+  exit 1
+$ gate build .   # only newer sheet is 'contact-p2-reason-old.jpg'
+  stdout: GATE 6 build: FAIL — plate p2-reason: no contact sheet of its final render in review/ (contact-p2-reason.jpg, p2-reason-r<N>.jpg or p2-reason-fix<N>.jpg, made after the last re-render)
+  stderr: gate: plate p2-reason: no contact sheet of its final render in review/ (contact-p2-reason.jpg, p2-reason-r<N>.jpg or p2-reason-fix<N>.jpg, made after the last re-render)
+  exit 1
+$ gate build .   # empty p2-reason-fix2.jpg newer than render
+  stdout: GATE 6 build: FAIL — plate p2-reason: no contact sheet of its final render in review/ (contact-p2-reason.jpg, p2-reason-r<N>.jpg or p2-reason-fix<N>.jpg, made after the last re-render)
+  stderr: gate: plate p2-reason: no contact sheet of its final render in review/ (contact-p2-reason.jpg, p2-reason-r<N>.jpg or p2-reason-fix<N>.jpg, made after the last re-render)
+  exit 1
+$ gate build .   # real p2-reason-fix2.jpg
+  stdout: GATE 6 build: PASS — 3 plates; reviewer: 4 defects, 3 fixed
+  exit 0

@@ -1,0 +1,11 @@
+{
+  "note": "Where AC-REAL-03 (evals/real/real.test.mjs) finds the private brand pack and the reference outro. Kept under docs/build so the runtime tree names no house brand (D17, AC-PKG-03). '~' is the home folder. Env overrides: PEAK_MEDIA_REAL_PACK, PEAK_MEDIA_REAL_REF.",
+  "pack": "~/github/peakflames/peakflames-brand-guidelines/peak-media-pack",
+  "reference": {
+    "composition": "~/github/peakflames/peakflames-videos/videos/2026-10-peak-workflow-teaser",
+    "selector": "#s6",
+    "startS": 22,
+    "durationS": 4,
+    "crossfadeS": 0.8
+  }
+}

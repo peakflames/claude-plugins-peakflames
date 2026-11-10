@@ -1,0 +1,71 @@
+## Verifier synthetic: 5 s @25fps; cuts at 1.5 s (silence 1.0–2.2 s) and 3.5 s (660 Hz tone)
+$ check-cuts v-cuts.mp4 --min-silence-ms 300
+ok    cut at 0:01.520 — silence 1200 ms
+FAIL  cut at 0:03.520 — not in silence (need ≥ 300 ms)
+FAIL  2 cut(s), 1 failing — /tmp/vwp2/v-cuts.mp4
+exit=1
+$ check-cuts v-cuts.mp4 --min-silence-ms 300 --json
+{
+  "ok": false,
+  "file": "/tmp/vwp2/v-cuts.mp4",
+  "hasAudio": true,
+  "durMs": 5040,
+  "minSilenceMs": 300,
+  "source": "scene>0.02",
+  "cuts": [
+    {
+      "cutMs": 1520,
+      "timecode": "0:01.520",
+      "ok": true,
+      "silenceMs": 1200,
+      "gap": {
+        "startMs": 1000,
+        "endMs": 2200
+      }
+    },
+    {
+      "cutMs": 3520,
+      "timecode": "0:03.520",
+      "ok": false,
+      "silenceMs": 0
+    }
+  ]
+}
+## Builder's eval synthetic (red|blue@1.0s silent 0–2 s|green@3.0s tone 2–4 s) via node --test
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (553.575334ms)
+ℹ pass 1
+ℹ fail 0
+## adversarial: given cuts at file start, silence edges, last ms, past end
+$ --cuts 0
+FAIL  cut at 0:00.000 — not in silence (need ≥ 300 ms)
+FAIL  1 cut(s), 1 failing — /tmp/vwp2/v-cuts.mp4
+exit=1
+$ --cuts 1000
+ok    cut at 0:01.000 — silence 1200 ms
+PASS  1 cut(s), 0 failing — /tmp/vwp2/v-cuts.mp4
+exit=0
+$ --cuts 2200
+ok    cut at 0:02.200 — silence 1200 ms
+PASS  1 cut(s), 0 failing — /tmp/vwp2/v-cuts.mp4
+exit=0
+$ --cuts 2199
+ok    cut at 0:02.199 — silence 1200 ms
+PASS  1 cut(s), 0 failing — /tmp/vwp2/v-cuts.mp4
+exit=0
+$ --cuts 4999
+FAIL  cut at 0:04.999 — not in silence (need ≥ 300 ms)
+FAIL  1 cut(s), 1 failing — /tmp/vwp2/v-cuts.mp4
+exit=1
+$ --cuts 5000
+FAIL  cut at 0:05.000 — not in silence (need ≥ 300 ms)
+FAIL  1 cut(s), 1 failing — /tmp/vwp2/v-cuts.mp4
+exit=1
+$ --cuts 9000
+FAIL  cut at 0:09.000 — not in silence (need ≥ 300 ms)
+FAIL  1 cut(s), 1 failing — /tmp/vwp2/v-cuts.mp4
+exit=1
+## adversarial: file with no audio
+note  no audio stream: treated as silent
+ok    cut at 0:01.000 — silence 2000 ms
+PASS  1 cut(s), 0 failing — /tmp/vwp2/v-noaudio.mp4
+exit=0

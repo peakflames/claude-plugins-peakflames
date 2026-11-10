@@ -1,0 +1,36 @@
+{
+  "out": "docs/build/evidence/WP2/F0-contact.jpg",
+  "video": "/tmp/hfx/f0/out/final.mp4",
+  "frames": [
+    {
+      "ms": 0,
+      "label": "00.00"
+    },
+    {
+      "ms": 500,
+      "label": "00.50"
+    },
+    {
+      "ms": 1000,
+      "label": "01.00"
+    },
+    {
+      "ms": 1500,
+      "label": "01.50"
+    },
+    {
+      "ms": 2000,
+      "label": "02.00"
+    },
+    {
+      "ms": 2500,
+      "label": "02.50"
+    },
+    {
+      "ms": 2967,
+      "label": "02.97"
+    }
+  ],
+  "cols": 4,
+  "rows": 2
+}

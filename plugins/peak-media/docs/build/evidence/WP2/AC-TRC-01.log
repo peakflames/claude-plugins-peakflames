@@ -1,0 +1,35 @@
+## real register
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+exit=0
+## escaped pipe in gwt + PASS with evidence (expect pass)
+PASS  trace: 1 ACs, 1 briefs, 0 problem(s)
+exit=0
+## orphan AC (owner WP7 has no brief)
+FAIL  AC-Z-02: orphan — owner 'WP7' has no wp/<WP>/brief.md
+FAIL  trace: 2 ACs, 1 briefs, 1 problem(s)
+exit=1
+## brief lists unknown AC
+FAIL  wp/WP1/brief.md lists unknown AC-Z-77
+FAIL  trace: 1 ACs, 1 briefs, 1 problem(s)
+exit=1
+## PASS with no evidence (dash, missing file, empty cell)
+FAIL  AC-Z-01: PASS with no evidence
+FAIL  AC-Z-02: PASS but evidence file missing: evidence/WP1/nope.log
+FAIL  AC-Z-03: PASS with no evidence
+FAIL  trace: 3 ACs, 1 briefs, 3 problem(s)
+exit=1
+## adversarial: PASS whose evidence points at a folder, not a file
+PASS  trace: 1 ACs, 1 briefs, 0 problem(s)
+exit=0
+## adversarial: PASS whose evidence escapes the build folder
+PASS  trace: 1 ACs, 1 briefs, 0 problem(s)
+exit=0
+## adversarial: lower-case 'pass' with no evidence
+FAIL  AC-Z-01: PASS with no evidence
+FAIL  trace: 1 ACs, 1 briefs, 1 problem(s)
+exit=1
+## adversarial: UNescaped pipe in gwt (8 columns)
+PASS  trace: 1 ACs, 1 briefs, 0 problem(s)
+exit=0
+## node --test AC-TRC-01
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (206.3675ms)

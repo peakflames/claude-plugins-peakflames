@@ -1,0 +1,164 @@
+# Verifier round 2 (verifier-wp1-r2-c4e19a07) adversarial review @ 42652e9. Generator /tmp/pm-v2-wp1/adv.mjs (outside repo); docs written under $W=/tmp/pm-v2-adv-jbmt; every run uses the no-network preload.
+== s01 clip runs past its beat end  [expect fail clips[0].startMs]
+      FAIL  $W/c01/x.manifest.json (spine v1)
+      clips[0].startMs: clip 1 (5900–11200 ms) is outside beat 'intro' (0–6000 ms)
+exit=1
+== s02 clip starts before its beat  [expect fail clips[1].startMs]
+      FAIL  $W/c02/x.manifest.json (spine v1)
+      clips[1].startMs: clip 2 (5000–12300 ms) is outside beat 'why' (6000–14000 ms)
+exit=1
+== s03 beat clipNs omits its clip  [expect fail clips[1].beat]
+      FAIL  $W/c03/x.manifest.json (spine v1)
+      clips[1].beat: beat 'why' does not list clip 2 in clipNs
+exit=1
+== s04 beat clipNs lists a clip of another beat  [expect fail beats[0].clipNs[1]]
+      FAIL  $W/c04/x.manifest.json (spine v1)
+      beats[0].clipNs[1]: clip 2 belongs to a different beat
+exit=1
+== s05 beatgrid beat without onScreenText  [expect fail beats[0].onScreenText]
+      FAIL  $W/c05/x.beatgrid.json (spine v1)
+      beats[0].onScreenText: is required
+exit=1
+== s06 beatgrid beat onScreenText empty  [expect fail]
+      FAIL  $W/c06/x.beatgrid.json (spine v1)
+      beats[0].onScreenText: must NOT have fewer than 1 characters
+exit=1
+== s07 beatgrid beat onScreenText whitespace only  [expect observe]
+      ok    $W/c07/x.beatgrid.json (spine v1)
+exit=0
+== s08 narration beat without onScreenText  [expect pass]
+      ok    $W/c08/x.manifest.json (spine v1)
+exit=0
+== s09 x- field in captions[]  [expect pass]
+      ok    $W/c09/x.manifest.json (spine v1)
+exit=0
+== s10 non-x unknown field in captions[]  [expect fail captions[0].note]
+      FAIL  $W/c10/x.manifest.json (spine v1)
+      captions[0].note: is not allowed (unknown field; use an x- prefix for extensions)
+exit=1
+== s11 totalMs 1e9 (F-09 left)  [expect pass (by decision)]
+      ok    $W/c11/x.manifest.json (spine v1)
+exit=0
+== p00 control: neutral plates with spine + brand present  [expect pass, no warning]
+      ok    $W/c12/plates.json (plates v1)
+exit=0
+== p01 two plates overlap inside one beat  [expect fail plates[n].startMs overlaps]
+      FAIL  $W/c13/plates.json (plates v1)
+      plates[2].startMs: overlaps plates[1] 'p2-why' (must be >= 14000)
+exit=1
+== p02 plate runs past its beat (no overlap)  [expect fail plates[2].startMs outside beat]
+      FAIL  $W/c14/plates.json (plates v1)
+      plates[2].startMs: plate 'p3-tip' (14000–21000 ms) is outside beat 'tip' (14000–20000 ms)
+exit=1
+== p03 plate far outside its beat  [expect fail plates[2].startMs]
+      FAIL  $W/c15/plates.json (plates v1)
+      plates[2].startMs: plate 'p3-tip' (999999–1000004 ms) is outside beat 'tip' (14000–20000 ms)
+exit=1
+== p04 plates listed in reverse order, no overlap  [expect pass]
+      ok    $W/c16/plates.json (plates v1)
+exit=0
+== p05 plates.spine points at a missing file  [expect fail spine]
+      FAIL  $W/c17/plates.json (plates v1)
+      spine: file not found: spine/manifest.json
+exit=1
+== p06 spine file is not JSON  [expect fail spine]
+      FAIL  $W/c18/plates.json (plates v1)
+      spine: spine/manifest.json is not valid JSON
+exit=1
+== p07 plates.brand missing  [expect warn brand, exit 0]
+      warn  $W/c19/plates.json: brand: not found: no-such-pack (render steps will fail until it exists)
+      ok    $W/c19/plates.json (plates v1)
+exit=0
+== p08 live block on a motion plate  [expect fail plates[0].live]
+      FAIL  $W/c20/plates.json (plates v1)
+      plates[0].live: is only allowed on plates of kind "live"
+exit=1
+== p09 live block on a slide plate  [expect fail plates[1].live]
+      FAIL  $W/c21/plates.json (plates v1)
+      plates[1].live: is only allowed on plates of kind "live"
+exit=1
+== p10 live plate without live block  [expect fail plates[0].live is required]
+      FAIL  $W/c22/plates.json (plates v1)
+      plates[0].live: is required
+exit=1
+== p11 live plate, live.url omitted (DEC-22 optional)  [expect pass]
+      ok    $W/c23/plates.json (plates v1)
+exit=0
+== p12 x- field in live  [expect pass]
+      ok    $W/c24/plates.json (plates v1)
+exit=0
+== p13 non-x unknown field in live  [expect fail plates[0].live.zoom]
+      FAIL  $W/c25/plates.json (plates v1)
+      plates[0].live.zoom: is not allowed (unknown field; use an x- prefix for extensions)
+exit=1
+== p14 old kind "recorded"  [expect fail plates[0].kind]
+      FAIL  $W/c26/plates.json (plates v1)
+      plates[0].kind: must be one of motion, slide, live
+exit=1
+== p15 old "record" block on live plate  [expect fail record not allowed + live required]
+      FAIL  $W/c27/plates.json (plates v1)
+      plates[0].live: is required
+      plates[0].record: is not allowed (unknown field; use an x- prefix for extensions)
+exit=1
+== p16 live.viewport zero height  [expect fail plates[0].live.viewport]
+      FAIL  $W/c28/plates.json (plates v1)
+      plates[0].live.viewport: must match pattern "^[1-9][0-9]*x[1-9][0-9]*$"
+exit=1
+== p17 kind missing, live block present  [expect fail plates[0].kind (observe live message)]
+      FAIL  $W/c29/plates.json (plates v1)
+      plates[0].live: is only allowed on plates of kind "live"
+      plates[0].kind: is required
+exit=1
+== b01 all tokens only inside a /* comment */  [expect fail tokens]
+      FAIL  $W/c30/pack/brand.json (brand v1)
+      tokens: tokens.css does not define --color-bg
+      tokens: tokens.css does not define --color-fg
+      tokens: tokens.css does not define --color-accent
+      tokens: tokens.css does not define --font-display
+      tokens: tokens.css does not define --font-body
+      tokens: tokens.css does not define --font-mono
+      tokens: tokens.css defines no --ease-* property
+exit=1
+== b02 tokens.css empty file  [expect fail tokens]
+      FAIL  $W/c31/pack/brand.json (brand v1)
+      tokens: tokens.css does not define --color-bg
+      tokens: tokens.css does not define --color-fg
+      tokens: tokens.css does not define --color-accent
+      tokens: tokens.css does not define --font-display
+      tokens: tokens.css does not define --font-body
+      tokens: tokens.css does not define --font-mono
+      tokens: tokens.css defines no --ease-* property
+exit=1
+== b03 all token values empty  [expect fail tokens]
+      FAIL  $W/c32/pack/brand.json (brand v1)
+      tokens: tokens.css does not define --color-bg
+      tokens: tokens.css does not define --color-fg
+      tokens: tokens.css does not define --color-accent
+      tokens: tokens.css does not define --font-display
+      tokens: tokens.css does not define --font-body
+      tokens: tokens.css does not define --font-mono
+      tokens: tokens.css defines no --ease-* property
+exit=1
+== b04 all token values whitespace only  [expect fail tokens]
+      FAIL  $W/c33/pack/brand.json (brand v1)
+      tokens: tokens.css does not define --color-bg
+      tokens: tokens.css does not define --color-fg
+      tokens: tokens.css does not define --color-accent
+      tokens: tokens.css does not define --font-display
+      tokens: tokens.css does not define --font-body
+      tokens: tokens.css does not define --font-mono
+      tokens: tokens.css defines no --ease-* property
+exit=1
+== b05 one value empty (--color-accent)  [expect fail tokens --color-accent]
+      FAIL  $W/c34/pack/brand.json (brand v1)
+      tokens: tokens.css does not define --color-accent
+exit=1
+== b06 legit: comment then decl on one line, no spaces  [expect pass]
+      ok    $W/c35/pack/brand.json (brand v1)
+exit=0
+== b07 tokens defined only inside a string  [expect observe]
+      ok    $W/c36/pack/brand.json (brand v1)
+exit=0
+== b08 tokens after an unclosed /* comment  [expect observe]
+      ok    $W/c37/pack/brand.json (brand v1)
+exit=0

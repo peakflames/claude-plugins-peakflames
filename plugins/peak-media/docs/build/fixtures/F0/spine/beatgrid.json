@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "beatgrid",
+  "targetMs": 3000,
+  "totalMs": 3000,
+  "bpm": 120,
+  "command": [],
+  "narrate": false,
+  "beats": [
+    {
+      "id": "b1",
+      "startMs": 0,
+      "durationMs": 3000,
+      "onScreenText": "spec-aware vs. spec-accountable",
+      "clipNs": []
+    }
+  ],
+  "clips": []
+}

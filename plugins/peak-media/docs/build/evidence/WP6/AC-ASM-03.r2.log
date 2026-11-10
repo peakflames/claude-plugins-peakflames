@@ -1,0 +1,53 @@
+# AC-ASM-03 r2 — real F1 final (spine totalMs 20773 from manifest + outro durationMs 3000 from assemble.json)
+spine totalMs 20773
+$ probe-spec out/final.mp4 --size 1280x720 --fps 30 --duration-ms 23773
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    duration (±1 frame): 23767 ms
+PASS  $TMPDIR/f1/out/final.mp4
+exit=0
+$ ffprobe
+stream|codec_name=h264|profile=High|width=1280|height=720|pix_fmt=yuv420p|r_frame_rate=30/1|duration=23.766667|nb_frames=713
+stream|codec_name=aac|profile=LC|sample_rate=48000|r_frame_rate=0/0|duration=23.766667|nb_frames=1116
+format|duration=23.766667
+
+## 1080p60 export with stems (S-2)
+# S-2 / AC-ASM-02 (inside assemble) / AC-ASM-03 (1080p60) r2 — real F1, --music --sfx --export 1080p60
+$ assemble f1 --brand brand-packs/default --music music.wav --sfx sfx.wav --export 1080p60 --out f1-60
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 623 frames)
+cuts      2 plate cut(s) in silence (≥300 ms)
+mix       review/review-mix.mp4 (-15.6 LUFS, music 12.3 dB under the voice)
+note      plates are 30 fps: --export 1080p60 duplicates frames to 60 fps (motion stays 30 fps); for true 60 fps motion set "fps": 60 in plates.json and re-render the plates
+outro     rendered renders/outro-c0e47bcffabb8dec.mp4 at 60 fps
+final     out/final.mp4 1920x1080@60, 23773 ms (spine 20773 + outro 3000) — spec PASS
+$TMPDIR/f1-60/out/final.mp4
+exit=0
+review.mp4      MD5=84a8257abfe5ce33a95f51df07f280ac
+review-mix.mp4  MD5=84a8257abfe5ce33a95f51df07f280ac
+$ ffprobe outro render
+stream|width=1280|height=720|r_frame_rate=60/1|nb_frames=180
+$ probe-spec out/final.mp4 --size 1920x1080 --fps 60 --duration-ms 23773
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1920
+ok    height: 1080
+ok    fps: 60.000
+ok    duration (±1 frame): 23767 ms
+PASS  f1-60/out/final.mp4
+exit=0
+113:  "note": "plates are 30 fps: --export 1080p60 duplicates frames to 60 fps (motion stays 30 fps); for true 60 fps motion set \"fps\": 60 in plates.json and re-render the plates",
+outro 60fps: distinct frames       79 of      180
+final 60fps plate section 0-5 s: distinct      300 of      300
+13 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 6 

@@ -1,0 +1,48 @@
+# AC-CON-01 — verifier-wp1-r2-c4e19a07 @ 42652e9, node v26.8.1, 2026-11-08T22:16:24Z; every validate run uses the evals/helpers/no-network.mjs preload
+$ validate docs/build/fixtures/F0/spine/beatgrid.json
+ok    docs/build/fixtures/F0/spine/beatgrid.json (spine v1)
+exit=0
+$ validate docs/build/fixtures/F0/plates.json
+warn  docs/build/fixtures/F0/plates.json: brand: not found: ../../../../brand-packs/default (render steps will fail until it exists)
+ok    docs/build/fixtures/F0/plates.json (plates v1)
+exit=0
+$ validate docs/build/fixtures/F1/spine/manifest.json
+ok    docs/build/fixtures/F1/spine/manifest.json (spine v1)
+exit=0
+$ validate docs/build/fixtures/F1/plates.json
+warn  docs/build/fixtures/F1/plates.json: brand: not found: ../../../../brand-packs/default (render steps will fail until it exists)
+ok    docs/build/fixtures/F1/plates.json (plates v1)
+exit=0
+$ validate evals/fixtures/neutral-brief/spine/manifest.json
+ok    evals/fixtures/neutral-brief/spine/manifest.json (spine v1)
+exit=0
+$ validate evals/fixtures/neutral-brief/plates.json
+warn  evals/fixtures/neutral-brief/plates.json: brand: not found: ../../../brand-packs/default (render steps will fail until it exists)
+ok    evals/fixtures/neutral-brief/plates.json (plates v1)
+exit=0
+$ validate evals/fixtures/brand-min
+ok    evals/fixtures/brand-min/brand.json (brand v1)
+exit=0
+$ validate --json (all 7 above) | kind/ok/warnings
+docs/build/fixtures/F0/spine/beatgrid.json spine ok=true warnings=[]
+docs/build/fixtures/F0/plates.json plates ok=true warnings=[{"field":"brand","message":"not found: ../../../../brand-packs/default (render steps will fail until it exists)"}]
+docs/build/fixtures/F1/spine/manifest.json spine ok=true warnings=[]
+docs/build/fixtures/F1/plates.json plates ok=true warnings=[{"field":"brand","message":"not found: ../../../../brand-packs/default (render steps will fail until it exists)"}]
+evals/fixtures/neutral-brief/spine/manifest.json spine ok=true warnings=[]
+evals/fixtures/neutral-brief/plates.json plates ok=true warnings=[{"field":"brand","message":"not found: ../../../brand-packs/default (render steps will fail until it exists)"}]
+evals/fixtures/brand-min/brand.json brand ok=true warnings=[]
+# extra (not AC-bound): F2, F3 after the live rename
+$ validate docs/build/fixtures/F2/spine/beatgrid.json
+ok    docs/build/fixtures/F2/spine/beatgrid.json (spine v1)
+exit=0
+$ validate docs/build/fixtures/F2/plates.json
+warn  docs/build/fixtures/F2/plates.json: brand: not found: ../../../../brand-packs/default (render steps will fail until it exists)
+ok    docs/build/fixtures/F2/plates.json (plates v1)
+exit=0
+$ validate docs/build/fixtures/F3/spine/manifest.json
+ok    docs/build/fixtures/F3/spine/manifest.json (spine v1)
+exit=0
+$ validate docs/build/fixtures/F3/plates.json
+warn  docs/build/fixtures/F3/plates.json: brand: not found: ../../../../brand-packs/default (render steps will fail until it exists)
+ok    docs/build/fixtures/F3/plates.json (plates v1)
+exit=0

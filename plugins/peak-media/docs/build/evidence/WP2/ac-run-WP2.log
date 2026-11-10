@@ -1,0 +1,20 @@
+$ node plugins/peak-media/docs/build/tools/ac-run.mjs --wp WP2
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-SKL-01 | script | pass | not-started | — |
+| AC-SKL-02 | script | pass | not-started | — |
+| AC-SKL-03 | still | — | not-started | — |
+| AC-SKL-04 | script | pass | not-started | — |
+| AC-SKL-05 | script | pass | not-started | — |
+| AC-SKL-06 | script | pass | not-started | — |
+| AC-SKL-07 | script | pass | not-started | — |
+| AC-TRC-01 | script | pass | not-started | — |
+| AC-TRC-02 | script | pass | not-started | — |
+| AC-BASE-01 | script | pass | not-started | — |
+| AC-BASE-03 | script | pass | not-started | — |
+| AC-BASE-04 | script | pass | not-started | — |
+| AC-BASE-05 | script | pass | not-started | — |
+exit=0
+$ node plugins/peak-media/docs/build/tools/ac-run.mjs --trace
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+exit=0

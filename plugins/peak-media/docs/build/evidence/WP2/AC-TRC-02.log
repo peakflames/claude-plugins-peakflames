@@ -1,0 +1,32 @@
+## verifier-id == builder-id
+FAIL  WP1/verify-1.md: verifier-id equals the builder-id (agent-abc) — report rejected
+FAIL  trace: 1 ACs, 1 briefs, 1 problem(s)
+exit=1
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-Z-01 | script | not-run | not-started | — |
+FAIL  WP1/verify-1.md: verifier-id equals the builder-id (agent-abc) — report rejected
+exit=1
+## same id with trailing spaces
+FAIL  WP1/verify-1.md: verifier-id equals the builder-id (agent-abc) — report rejected
+FAIL  trace: 1 ACs, 1 briefs, 1 problem(s)
+exit=1
+## same id in the real handoff's long format
+FAIL  WP1/verify-1.md: verifier-id equals the builder-id (lead-main-session (claude-opus-5-5, interactive Lead session, 2026-11-08)) — report rejected
+FAIL  trace: 1 ACs, 1 briefs, 1 problem(s)
+exit=1
+## adversarial: verifier reuses the builder's bare session id without the parenthetical
+PASS  trace: 1 ACs, 1 briefs, 0 problem(s)
+exit=0
+## adversarial: same id, different case
+PASS  trace: 1 ACs, 1 briefs, 0 problem(s)
+exit=0
+## different ids (expect pass)
+PASS  trace: 1 ACs, 1 briefs, 0 problem(s)
+exit=0
+## verify report with no verifier-id
+FAIL  WP1/verify-1.md: no 'verifier-id:' line — report rejected
+FAIL  trace: 1 ACs, 1 briefs, 1 problem(s)
+exit=1
+## node --test AC-TRC-02
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (103.435375ms)

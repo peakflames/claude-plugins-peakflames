@@ -1,0 +1,108 @@
+# WP3a deferred re-checks through spine.mjs — TTS-03/04 2026-11-09T00:25:19Z HEAD 0dce4ae; keys unset; network spy
+## run 1 / run 2, --cache-dir $T/c4 (fresh)
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t4a --tts-model fake/tone --cache-dir $T/c4
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165      no
+2        28  10.18  165      no
+3        11   4.00  165      no
+median 165 wpm · 0/3 cached
+clips  0/3 cached · exported to $T/t4a/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/t4a/manifest.json and $T/t4a/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t4b --tts-model fake/tone --cache-dir $T/c4
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165     yes
+2        28  10.18  165     yes
+3        11   4.00  165     yes
+median 165 wpm · 3/3 cached
+clips  3/3 cached · exported to $T/t4b/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/t4b/manifest.json and $T/t4b/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0
+## exported clips equal manifest clip files
+manifest files 1097c4e4074d81fc087b48db628728f4708f919698e3ab95659189e83428b72e.wav d7e230aeb29f14ec39baa4abd4c117abe1ec40faa1fff161767d3ca6bf0b7003.wav ff0e08ce85509daa2f6079ad714ad5b305edf77368fd3653cb5867d5b29acd03.wav
+exported      1097c4e4074d81fc087b48db628728f4708f919698e3ab95659189e83428b72e.wav d7e230aeb29f14ec39baa4abd4c117abe1ec40faa1fff161767d3ca6bf0b7003.wav ff0e08ce85509daa2f6079ad714ad5b305edf77368fd3653cb5867d5b29acd03.wav
+equal: true
+## export -> empty cache: clips from $T/t4a/clips copied into a new cache $T/c5
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t4c --tts-model fake/tone --cache-dir $T/c5
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165     yes
+2        28  10.18  165     yes
+3        11   4.00  165     yes
+median 165 wpm · 3/3 cached
+clips  3/3 cached · exported to $T/t4c/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/t4c/manifest.json and $T/t4c/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0
+sha256 run1 export:
+bfb424802dc4f13e 1097c4e4074d81fc087b48db628728f4708f919698e3ab95659189e83428b72e.wav
+3617b90e07dc3fca d7e230aeb29f14ec39baa4abd4c117abe1ec40faa1fff161767d3ca6bf0b7003.wav
+94dbc1fbe61f536d ff0e08ce85509daa2f6079ad714ad5b305edf77368fd3653cb5867d5b29acd03.wav
+sha256 run3 export:
+bfb424802dc4f13e 1097c4e4074d81fc087b48db628728f4708f919698e3ab95659189e83428b72e.wav
+3617b90e07dc3fca d7e230aeb29f14ec39baa4abd4c117abe1ec40faa1fff161767d3ca6bf0b7003.wav
+94dbc1fbe61f536d ff0e08ce85509daa2f6079ad714ad5b305edf77368fd3653cb5867d5b29acd03.wav
+manifest run1 == run3 (ignoring command): true
+## --export-clips <dir> custom
+$ nokey node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t4d --tts-model fake/tone --cache-dir $T/c4 --export-clips $T/t4d-x
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165     yes
+2        28  10.18  165     yes
+3        11   4.00  165     yes
+median 165 wpm · 3/3 cached
+clips  3/3 cached · exported to $T/t4d-x
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/t4d/manifest.json and $T/t4d/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0
+1097c4e4074d81fc087b48db628728f4708f919698e3ab95659189e83428b72e.wav
+d7e230aeb29f14ec39baa4abd4c117abe1ec40faa1fff161767d3ca6bf0b7003.wav
+ff0e08ce85509daa2f6079ad714ad5b305edf77368fd3653cb5867d5b29acd03.wav
+## legacy dirs (PEAK_MEDIA_TTS_LEGACY_DIRS) pass through: seed only the legacy dir, empty cache
+$ env -u PEAK_MEDIA_OPENROUTER_API_KEY -u TTS_OPENROUTER_API_KEY HOME=$T/home2 CLAUDE_PLUGIN_DATA=/Users/schaveyt/.cache/peak-media PEAK_MEDIA_TTS_LEGACY_DIRS=$T/leg node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t4e --tts-model fake/tone --cache-dir $T/c6
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165     yes
+2        28  10.18  165     yes
+3        11   4.00  165     yes
+median 165 wpm · 3/3 cached
+clips  3/3 cached · exported to $T/t4e/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/t4e/manifest.json and $T/t4e/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0
+## PEAK_MEDIA_TTS_CACHE without --cache-dir (HOME isolated to $T/home2)
+$ env -u PEAK_MEDIA_OPENROUTER_API_KEY -u TTS_OPENROUTER_API_KEY HOME=$T/home2 CLAUDE_PLUGIN_DATA=/Users/schaveyt/.cache/peak-media PEAK_MEDIA_TTS_LEGACY_DIRS= PEAK_MEDIA_TTS_CACHE=$T/envcache node --import $P/evals/helpers/no-network.mjs $P/skills/video-spine/scripts/spine.mjs --brief $P/docs/build/fixtures/F1/brief.md --out $T/t4f --tts-model fake/tone
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        14   5.09  165      no
+2        28  10.18  165      no
+3        11   4.00  165      no
+median 165 wpm · 0/3 cached
+clips  0/3 cached · exported to $T/t4f/clips
+beat  hook               0.00 s  +5.59 s
+beat  compare            5.59 s  +10.68 s
+beat  close             16.27 s  +4.50 s
+wrote $T/t4f/manifest.json and $T/t4f/narration.wav
+PASS  runtime 20.77 s against a 20.0 s target (+3.9%)
+exit=0
+files in PEAK_MEDIA_TTS_CACHE ($T/envcache): 0
+files in $HOME/.cache/peak-media/tts ($T/home2/...): 3

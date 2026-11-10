@@ -1,0 +1,15 @@
+# AC-ASM-04 r2 — real F1, assemble with no --music/--sfx (same run as AC-ASM-01.r2.log, exit 0)
+narration -16 LUFS
+final     out/final.mp4 1280x720@30, 23773 ms (spine 20773 + outro 3000) — spec PASS
+$TMPDIR/f1/out/final.mp4
+exit=0
+exit=0
+$ ffprobe audio stream of out/final.mp4
+stream|codec_name=aac|sample_rate=48000|channels=2
+$ ebur128 review/review.mp4
+    I:         -16.0 LUFS
+$ ebur128 out/final.mp4
+    I:         -16.0 LUFS
+$ ls review/ (no review-mix.mp4 expected)
+assemble.json
+review.mp4

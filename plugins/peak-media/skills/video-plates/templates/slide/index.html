@@ -1,0 +1,146 @@
+<!doctype html>
+<!-- peak-media slide plate template: deck layout. Title with an accent rule, then bullets
+     (a "Label: text" bullet gets an accented label) or table rows (lines holding "|" cells),
+     a logo and slide counter in the footer, and a progress line along the bottom edge.
+     The body is set as large as the content area allows; a table's rows share the space below the
+     title. The title is on screen at frame 0; bullets or rows then enter one at a time, evenly
+     spaced, the last one settled by about 60% of the plate.
+     render-plate fills the double-braced placeholders. Brand comes only from brand/tokens.css
+     (colours, fonts, easing) and the pack's logo; GSAP is the local copy in vendor/ (never a CDN). -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width={{WIDTH}}, height={{HEIGHT}}">
+<link rel="stylesheet" href="brand/tokens.css">
+<script src="vendor/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: {{WIDTH}}px; height: {{HEIGHT}}px; overflow: hidden; background: var(--color-bg); }
+  #root { width: 100%; height: 100%; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-body); }
+  #deck { width: 100%; height: 100%; }
+  #content { position: absolute; left: 8%; right: 8%; top: 14%; bottom: 13%; display: flex; flex-direction: column; }
+  .title { font-family: var(--font-display); font-weight: 700; font-size: calc({{HEIGHT}}px * 0.085); line-height: 1.08; letter-spacing: -0.02em; overflow-wrap: anywhere; text-wrap: balance; }
+  .rule { flex: none; width: calc({{HEIGHT}}px * 0.11); height: calc({{HEIGHT}}px * 0.009); margin: calc({{HEIGHT}}px * 0.03) 0 calc({{HEIGHT}}px * 0.04); background: var(--color-accent); border-radius: 2px; transform-origin: 0% 50%; }
+  #body { font-size: calc({{HEIGHT}}px * 0.06); line-height: 1.25; }
+  .bullets { list-style: none; display: flex; flex-direction: column; gap: 0.7em; }
+  .bullet { position: relative; padding-left: 1.1em; overflow-wrap: anywhere; min-width: 0; text-wrap: pretty; }
+  .bullet::before { content: ""; position: absolute; left: 0; top: 0.45em; width: 0.38em; height: 0.38em; background: var(--color-accent); border-radius: 0.06em; }
+  .label { font-weight: 700; color: var(--color-accent); }
+  .table { display: grid; column-gap: 1.1em; }
+  .row { display: contents; }
+  .cell { overflow-wrap: anywhere; min-width: 0; padding: 0.3em 0; border-top: 1px solid color-mix(in srgb, var(--color-fg) 22%, var(--color-bg)); text-wrap: balance; }
+  .cell.head { font-weight: 700; color: var(--color-accent); }
+  #footer { position: absolute; left: 8%; right: 8%; bottom: 5%; height: calc({{HEIGHT}}px * 0.05); display: flex; align-items: center; justify-content: space-between; }
+  #logo { height: 100%; width: auto; }
+  .counter { font-family: var(--font-mono); font-size: calc({{HEIGHT}}px * 0.0375); }
+  #progress { position: absolute; left: 0; bottom: 0; width: 100%; height: calc({{HEIGHT}}px * 0.008); background: var(--color-accent); transform-origin: 0% 50%; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="{{DURATION_S}}" data-width="{{WIDTH}}" data-height="{{HEIGHT}}" data-fps="{{FPS}}">
+  <div id="deck">
+    <div id="content">
+{{BODY}}
+    </div>
+    <div id="footer">
+      <img id="logo" src="{{LOGO}}" alt="">
+{{COUNTER}}
+    </div>
+    <div id="progress"></div>
+  </div>
+</div>
+<script>
+  // Brand easing token (cubic-bezier) as a GSAP ease; falls back to a GSAP name.
+  function tokenEase(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const m = /^cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)$/.exec(v);
+    if (!m) return fallback;
+    const [x1, y1, x2, y2] = m.slice(1).map(Number);
+    const bz = (a, b, t) => 3 * a * t * (1 - t) * (1 - t) + 3 * b * t * t * (1 - t) + t * t * t;
+    return (x) => {
+      let lo = 0, hi = 1, t = x;
+      for (let i = 0; i < 30; i++) { t = (lo + hi) / 2; if (bz(x1, x2, t) < x) lo = t; else hi = t; }
+      return bz(y1, y2, t);
+    };
+  }
+  document.fonts.ready.then(() => {
+    const D = {{DURATION_S}}, H = {{HEIGHT}};
+    const content = document.getElementById("content");
+    const body = document.getElementById("body");
+    const title = document.getElementById("title");
+    const table = document.querySelector(".table");
+    // Fit once, deterministically. The title first: shrink until it sits on at most two rows.
+    // scroll sizes are whole pixels, so the body's own bottom edge is checked too (no sub-pixel overrun)
+    const over = () => content.scrollHeight > content.clientHeight + 1 || content.scrollWidth > content.clientWidth + 1
+      || (body && body.getBoundingClientRect().bottom > content.getBoundingClientRect().bottom + 0.5);
+    let ts = H * 0.085;
+    while ((title.scrollWidth > title.clientWidth + 1 || title.offsetHeight > ts * 1.08 * 2 + 1) && ts > H * 0.05) { ts -= 1; title.style.fontSize = ts + "px"; }
+    // Then the body: the largest size (table cells from 7.5%, bullets from 6.5% of the height) at which
+    // the content box holds everything, down to the reading floor (3.75% = 27 px at 720p).
+    if (body) {
+      const floor = Math.ceil(H * 0.0375);
+      // Table columns: the first sized to its longest head, the others share the rest in proportion
+      // to (their longest one-row width)^k. At each size, k = 1, 0.5, 0 (equal) are tried in turn.
+      // First pass: only layouts where no ordinary word (up to 20 characters) is split across rows,
+      // so a long token such as a URL can't squeeze a neighbour's word apart; if no size down to the
+      // floor manages that, the second pass accepts any layout that fits.
+      let tries = [null];
+      if (table) {
+        const cells = [...table.querySelectorAll(".cell")];
+        const cols = getComputedStyle(table).gridTemplateColumns.split(" ").length;
+        const natural = Array.from({ length: cols }, () => 1);
+        cells.forEach((c, i) => { c.style.whiteSpace = "nowrap"; natural[i % cols] = Math.max(natural[i % cols], c.scrollWidth); });
+        cells.forEach((c) => { c.style.whiteSpace = ""; });
+        tries = [1, 0.5, 0].map((k) => "max-content " + natural.slice(1).map((w) => `minmax(0, ${Math.pow(w, k).toFixed(3)}fr)`).join(" "));
+      }
+      const ctx = document.createElement("canvas").getContext("2d");
+      const splitsWord = () => [...table.querySelectorAll(".cell")].some((c) => {
+        const cs = getComputedStyle(c);
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const room = c.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + 0.5;
+        return c.textContent.split(/\s+/).some((w) => w && w.length <= 20 && ctx.measureText(w).width > room);
+      });
+      const attempt = (s, whole) => {
+        body.style.fontSize = s + "px";
+        for (const cols of tries) {
+          if (cols) table.style.gridTemplateColumns = cols;
+          if (!over() && !(whole && table && splitsWord())) return true;
+        }
+        return false;
+      };
+      const start = Math.round(H * (table ? 0.075 : 0.065));
+      let size = start;
+      while (!attempt(size, true) && size > floor) size -= 1;
+      if (size <= floor && !attempt(size, true)) { size = start; while (!attempt(size, false) && size > floor) size -= 1; }
+      // still too tall at the floor: give the room back from the title
+      while (over() && ts > H * 0.05) { ts -= 1; title.style.fontSize = ts + "px"; }
+      // Rows share the height left under the title: spread it as padding, so the rule lines sit evenly.
+      if (table && !over()) {
+        const rows = table.querySelectorAll(".row").length;
+        const pad = parseFloat(getComputedStyle(table.querySelector(".cell")).paddingTop);
+        const free = content.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom;
+        const extra = Math.min(Math.floor(free / (2 * rows)), size * 0.6);
+        if (extra > 0) table.querySelectorAll(".cell").forEach((c) => { c.style.paddingTop = c.style.paddingBottom = (pad + extra) + "px"; });
+      }
+    }
+
+    const ease = tokenEase("--ease-out", "power3.out");
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#title", { opacity: 1, y: H * 0.015 }, { opacity: 1, y: 0, duration: 0.55, ease }, 0); // on screen at frame 0
+    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease }, 0.1);
+    const groups = table
+      ? gsap.utils.toArray(".row").map((r) => r.querySelectorAll(".cell"))
+      : gsap.utils.toArray(".bullet").map((el) => [el]);
+    // Progressive reveal: first group at 0.5 s, the rest evenly spaced so the last has settled
+    // (0.5 s tween) by about 60% of the plate.
+    const first = Math.min(0.5, D * 0.1), last = Math.max(first, D * 0.6 - 0.5);
+    const step = groups.length > 1 ? (last - first) / (groups.length - 1) : 0;
+    groups.forEach((g, i) => {
+      tl.fromTo(g, { opacity: 0, x: H * -0.03 }, { opacity: 1, x: 0, duration: 0.5, ease }, first + i * step);
+    });
+    tl.fromTo("#progress", { scaleX: 0 }, { scaleX: 1, duration: D - 0.05, ease: "none" }, 0);
+    window.__timelines["main"] = tl;
+  });
+</script>
+</body>
+</html>

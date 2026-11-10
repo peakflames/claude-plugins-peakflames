@@ -1,0 +1,69 @@
+# N1 r3 verifier probe (b): real F0 HyperFrames render (skeleton.mjs --fixture docs/build/fixtures/F0 --brand brand-packs/default), node in its own process group, fresh TMPDIR; signal sent ~1 s after Chrome (chrome-headless-shell) appears among node's descendants; 'step processes' = every descendant of node at signal time (incl. Chrome in its own group and HyperFrames' helper)
+## sig=INT-group node=93173  (Chrome seen after ~1 s)
+  PID  PPID  PGID COMMAND
+93207 93173 93207 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; k
+93208 93207 93207 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; k
+93209 93207 93207 /opt/homebrew/Cellar/node/26.8.1/bin/node /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c/node_modules/hyperframes/bin/hyperframes.mjs render /tmp/p
+93271 93209 93271 /opt/homebrew/Cellar/node/26.8.1/bin/node -e const held = new Map();\012let rest = "";\012const kill = (pid, group) => {\012  try {\012    if (process.p
+93544 93209 93207 /opt/homebrew/bin/ffmpeg -f image2pipe -vcodec mjpeg -framerate 30 -i - -r 30 -c:v libx264 -preset medium -threads 8 -crf 18 -bf 0 -x264-params aq-mode=
+93546 93209 93546 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --allow-pre-
+93547 93546 93546 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=gpu-p
+93548 93546 93546 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=utili
+93549 93546 93546 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=rende
+93550 93546 93546 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=rende
+93551 93208 93207 sleep 1
+pm-run dirs before: pm-run-NJwoQo 
+node exit=130
+all 11 step processes gone after .82 s; still alive: []
+processes mentioning the run dir: []
+pm-run dirs after: []  other TMPDIR entries: [hf-render-u2hNbc node-compile-cache puppeteer_dev_chrome_profile-zTS3Ay ]
+stderr: 
+
+## sig=TERM node=93637  (Chrome seen after ~1 s)
+  PID  PPID  PGID COMMAND
+93671 93637 93671 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; k
+93672 93671 93671 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; k
+93673 93671 93671 /opt/homebrew/Cellar/node/26.8.1/bin/node /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c/node_modules/hyperframes/bin/hyperframes.mjs render /tmp/p
+93735 93673 93735 /opt/homebrew/Cellar/node/26.8.1/bin/node -e const held = new Map();\012let rest = "";\012const kill = (pid, group) => {\012  try {\012    if (process.p
+94016 93673 93671 /opt/homebrew/bin/ffmpeg -f image2pipe -vcodec mjpeg -framerate 30 -i - -r 30 -c:v libx264 -preset medium -threads 8 -crf 18 -bf 0 -x264-params aq-mode=
+94019 93673 94019 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --allow-pre-
+94020 94019 94019 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=gpu-p
+94021 94019 94019 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=utili
+94022 94019 94019 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=rende
+94023 94019 94019 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=rende
+94069 93672 93671 sleep 1
+pm-run dirs before: pm-run-uD4ImL 
+./probeB.sh: line 14: 93637 Terminated: 15          TMPDIR=$D/tmp perl -e 'setpgrp(0,0); exec @ARGV' node $W/docs/build/tools/skeleton.mjs --fixture $W/docs/build/fixtures/F0 --out $D/out --brand $W/brand-packs/default > $D/stdout 2> $D/stderr
+node exit=143
+all 11 step processes gone after .69 s; still alive: []
+processes mentioning the run dir: []
+pm-run dirs after: []  other TMPDIR entries: [hf-render-TcUqDl node-compile-cache puppeteer_dev_chrome_profile-6XGafG ]
+stderr: 
+
+## sig=KILL node=94155  (Chrome seen after ~1 s)
+  PID  PPID  PGID COMMAND
+94191 94155 94191 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; k
+94192 94191 94191 /bin/sh -c st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID\012( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; k
+94193 94191 94191 /opt/homebrew/Cellar/node/26.8.1/bin/node /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c/node_modules/hyperframes/bin/hyperframes.mjs render /tmp/p
+94254 94193 94254 /opt/homebrew/Cellar/node/26.8.1/bin/node -e const held = new Map();\012let rest = "";\012const kill = (pid, group) => {\012  try {\012    if (process.p
+94528 94193 94191 /opt/homebrew/bin/ffmpeg -f image2pipe -vcodec mjpeg -framerate 30 -i - -r 30 -c:v libx264 -preset medium -threads 8 -crf 18 -bf 0 -x264-params aq-mode=
+94536 94193 94536 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --allow-pre-
+94543 94536 94536 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=gpu-p
+94544 94536 94536 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=utili
+94545 94536 94536 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=rende
+94546 94536 94536 /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell --type=rende
+94592 94192 94191 sleep 1
+pm-run dirs before: pm-run-UJfaqL 
+./probeB.sh: line 14: 94155 Killed: 9               TMPDIR=$D/tmp perl -e 'setpgrp(0,0); exec @ARGV' node $W/docs/build/tools/skeleton.mjs --fixture $W/docs/build/fixtures/F0 --out $D/out --brand $W/brand-packs/default > $D/stdout 2> $D/stderr
+node exit=137
+all 11 step processes gone after .75 s; still alive: []
+processes mentioning the run dir: []
+pm-run dirs after: []  other TMPDIR entries: [hf-render-bntUG4 node-compile-cache puppeteer_dev_chrome_profile-y2zjs1 ]
+stderr: 
+
+
+# Reference: same F0 run to completion and with PEAK_MEDIA_STEP_TIMEOUT_S=5 (watchdog timeout path), fresh TMPDIR each
+## F0 normal: exit=0 in 8 s; stdout tail: /tmp/pm-v3probe/c-9heW/out/out/final.mp4; stderr: 
+TMPDIR entries after: [node-compile-cache ]; procs mentioning run: []
+## F0 timeout5: exit=1 in 5 s; stdout tail: ; stderr: skeleton: hyperframes render timed out after 5 s with no exit — stopped it; the render browser may have crashed: run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/scripts/setup.sh --check, or raise PEAK_MEDIA_STEP_TIMEOUT_S
+TMPDIR entries after: [hf-render-53IbEg node-compile-cache puppeteer_dev_chrome_profile-E1oFJr ]; procs mentioning run: []

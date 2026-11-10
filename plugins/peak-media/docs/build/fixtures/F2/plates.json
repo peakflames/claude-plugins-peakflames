@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "spine": "spine/beatgrid.json",
+  "brand": "../../../../brand-packs/default",
+  "fps": 30,
+  "width": 1280,
+  "height": 720,
+  "plates": [
+    {
+      "id": "s1-unit",
+      "beat": "s1",
+      "kind": "slide",
+      "startMs": 0,
+      "durationMs": 5000,
+      "intent": "Unit of work",
+      "assets": [],
+      "text": [
+        "Unit of work",
+        "OpenSpec: a change",
+        "peak-workflow: an epic in a phased plan"
+      ]
+    },
+    {
+      "id": "s2-ids",
+      "beat": "s2",
+      "kind": "slide",
+      "startMs": 5000,
+      "durationMs": 5000,
+      "intent": "Requirement IDs",
+      "assets": [],
+      "text": [
+        "Requirement IDs",
+        "OpenSpec: none",
+        "peak-workflow: TOR-NN-XXXXXXX on every scenario"
+      ]
+    },
+    {
+      "id": "s3-verify",
+      "beat": "s3",
+      "kind": "slide",
+      "startMs": 10000,
+      "durationMs": 5000,
+      "intent": "Verification",
+      "assets": [],
+      "text": [
+        "Verification",
+        "OpenSpec: /opsx:verify — advisory",
+        "peak-workflow: /wrapup-epic — fresh session, PASS/FAIL"
+      ]
+    },
+    {
+      "id": "s4-openspec",
+      "beat": "s4",
+      "kind": "slide",
+      "startMs": 15000,
+      "durationMs": 5000,
+      "intent": "Pick OpenSpec when…",
+      "assets": [],
+      "text": [
+        "Pick OpenSpec when…",
+        "existing codebase, light guardrails",
+        "mixed assistants",
+        "\"agree before you build\" is enough"
+      ]
+    },
+    {
+      "id": "s5-peak",
+      "beat": "s5",
+      "kind": "slide",
+      "startMs": 20000,
+      "durationMs": 5000,
+      "intent": "Pick peak-workflow when…",
+      "assets": [],
+      "text": [
+        "Pick peak-workflow when…",
+        "you must show each requirement was met",
+        "phases, epics, dependencies",
+        "verification the implementer can't talk past"
+      ]
+    }
+  ]
+}

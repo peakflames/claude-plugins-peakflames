@@ -1,0 +1,109 @@
+plugin.json version: 0.1.0  (all runs preload evals/helpers/no-network.mjs; any attempt prints NETWORK-ATTEMPT)
+$ lib/verify/probe-spec.mjs --help
+probe-spec — check an MP4 against the peak-media delivery spec
+
+Usage: probe-spec [options] <file.mp4>
+
+Checks H.264 High, yuv420p, AAC 48 kHz and faststart, plus any size/fps/duration given. Exit 0 if every check passes, 1 if any fails.
+
+Options:
+      --width             Expected video width
+      --height            Expected video height
+      --size <WxH>        Expected size, e.g. 1280x720 (same as --width/--height)
+      --fps               Expected frame rate
+      --duration-ms       Expected duration
+      --tolerance-frames  Duration tolerance in frames (default: 1)
+      --no-audio          Skip the audio checks (picture-only files such as plate renders)
+      --json              Print the result as JSON
+  -h, --help              Show this help and exit
+      --version           Print the plugin version and exit
+
+Examples:
+  probe-spec out/final.mp4 --size 1280x720 --duration-ms 3000
+exit=0
+$ lib/verify/probe-spec.mjs --version
+0.1.0
+exit=0
+$ lib/verify/probe-spec.mjs 
+probe-spec: expected at least 1 argument(s), got 0
+Run 'probe-spec --help' for usage.
+exit=2
+$ lib/verify/probe-spec.mjs nope.mp4
+probe-spec: cannot read nope.mp4: no such file
+exit=1
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-cuts.mp4 --size big
+probe-spec: --size expects WxH, e.g. 1280x720, got 'big'
+Run 'probe-spec --help' for usage.
+exit=2
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-cuts.mp4 --size 1280X720
+probe-spec: --size expects WxH, e.g. 1280x720, got '1280X720'
+Run 'probe-spec --help' for usage.
+exit=2
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-cuts.mp4 --fps x
+probe-spec: --fps expects a number, got 'x'
+Run 'probe-spec --help' for usage.
+exit=2
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-cuts.mp4 --bogus
+probe-spec: Unknown option '--bogus'
+Run 'probe-spec --help' for usage.
+exit=2
+$ lib/verify/probe-spec.mjs /tmp/vwp2
+probe-spec: cannot read /tmp/vwp2 as media: /tmp/vwp2: Is a directory
+exit=1
+$ lib/verify/probe-spec.mjs /tmp/vwp2/garbage.mp4
+probe-spec: cannot read /tmp/vwp2/garbage.mp4 as media: /tmp/vwp2/garbage.mp4: Invalid data found when processing input
+exit=1
+$ lib/verify/probe-spec.mjs /tmp/vwp2/empty.mp4
+probe-spec: cannot read /tmp/vwp2/empty.mp4 as media: /tmp/vwp2/empty.mp4: Invalid data found when processing input
+exit=1
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-nofs.mp4 --size 1280x720 --duration-ms 3000 --fps 30
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+FAIL  faststart (moov before mdat): ftyp,free,mdat,moov (expected moov<mdat)
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    duration (±1 frame): 3000 ms
+FAIL  /tmp/vwp2/v-nofs.mp4
+exit=1
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-44k.mp4 --size 1280x720 --duration-ms 3000 --fps 30
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+FAIL  audio sample rate: 44100 (expected 48000)
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+FAIL  duration (±1 frame): 3100 ms (expected 3000 ms)
+FAIL  /tmp/vwp2/v-44k.mp4
+exit=1
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-noaudio.mp4 --no-audio
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+FAIL  faststart (moov before mdat): ftyp,free,mdat,moov (expected moov<mdat)
+FAIL  /tmp/vwp2/v-noaudio.mp4
+exit=1
+$ lib/verify/probe-spec.mjs /tmp/vwp2/v-cuts.mp4 --duration-ms 5000 --tolerance-frames 0
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+FAIL  faststart (moov before mdat): ftyp,free,mdat,moov (expected moov<mdat)
+FAIL  duration (±0 frame): 5040 ms (expected 5000 ms)
+FAIL  /tmp/vwp2/v-cuts.mp4
+exit=1
+$ PEAK_MEDIA_FFMPEG=/nonexistent lib/verify/probe-spec.mjs /tmp/vwp2/v-cuts.mp4
+probe-spec: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3
+$ PEAK_MEDIA_FFPROBE=/nonexistent lib/verify/probe-spec.mjs /tmp/vwp2/v-cuts.mp4
+probe-spec: ffprobe not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+exit=3
+## node --test AC-BASE-04
+✔ AC-BASE-04: probe-spec baseline (255.656ms)

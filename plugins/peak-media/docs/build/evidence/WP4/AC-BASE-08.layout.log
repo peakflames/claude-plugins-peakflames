@@ -1,0 +1,12 @@
+# verifier-wp4l-a9349ae4 — WP4 layout follow-up — HEAD 5151294 (layout commit 5cf766c). $VT = verifier temp dir (deleted after the run).
+## git diff f503621..5cf766c -- skills/video-plates/scripts: 0 lines (render-plate.mjs unchanged)
+## --help option lines: 13
+## --version: 0.1.0 (plugin.json 0.1.0)
+args=[] exit=2 lines=2 stack=0 :: render-plate: expected at least 1 argument(s), got 0
+args=[nope.json --all] exit=1 lines=1 stack=0 :: render-plate: cannot read $VT/nope.json: no such file
+args=[f1/plates.json] exit=2 lines=2 stack=0 :: render-plate: name plate id(s) after plates.json, or pass --all
+args=[f1/plates.json p9-missing] exit=1 lines=1 stack=0 :: render-plate: no plate 'p9-missing' in $VT/f1/plates.json (plates: p1-hook, p2-table, p3-close)
+args=[f1/plates.json --all p1-hook] exit=2 lines=2 stack=0 :: render-plate: pass plate ids or --all, not both
+args=[f1/plates.json --all --quality ultra] exit=2 lines=2 stack=0 :: render-plate: --quality must be one of draft, looks, standard, high, delivery, got 'ultra'
+args=[--bogus] exit=2 lines=2 stack=0 :: render-plate: Unknown option '--bogus'
+args=[f1/plates.json p1-hook --brand /nonexistent] exit=1 lines=1 stack=0 :: render-plate: brand pack not found: /nonexistent — fix "brand" in $VT/f1/plates.json or pass --brand <pack>

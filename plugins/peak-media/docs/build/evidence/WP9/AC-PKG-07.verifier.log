@@ -1,0 +1,35 @@
+## AC-PKG-07 independent probe
+Mon Nov  9 12:55:24 EST 2026
+vendor/ folders:
+plugins/peak-media/vendor/hyperframes/
+VENDORED Destination rows:
+26:| Destination | `vendor/hyperframes/` |
+vendor/hyperframes subfolders vs Folder mapping:
+CREDITS.md
+LICENSE
+cut-the-curve
+hyperframes
+hyperframes-cli
+motion-doctrine
+seam-craft
+slideshow
+41:| `hyperframes/` | `skills/hyperframes/` |
+42:| `hyperframes-cli/` | `skills/hyperframes-cli/` |
+43:| `slideshow/` | `skills/slideshow/` |
+44:| `motion-doctrine/` | `.claude/skills/motion-doctrine/` (identical copy in `.agents/skills/`) |
+45:| `cut-the-curve/` | `.claude/skills/cut-the-curve/` (identical copy in `.agents/skills/`) |
+46:| `seam-craft/` | `.claude/skills/seam-craft/` (identical copy in `.agents/skills/`) |
+SKILL.md files under vendor (expect none):
+SKILL.reference.md count:        6
+removed paths absent: assets=absent cloud.md=absent skill-lifecycle=absent
+'hyperframes events' hits in vendor: 0
+LICENSE:  Apache License Version 2.0, January 2004 http://www.apache.org/licenses/ 
+GSAP row:
+17:| GSAP | Fetched | data dir, then copied into each video project | GSAP Standard "no charge" License |
+106:| GSAP | Fetched | npm `gsap` | `lib/pins.json` | GSAP Standard "no charge" License (https://gsap.com/standard-license), not OSI | Data dir. `render-plate` and `assemble` copy `gsap.min.js` into each plate's (and the outro's) `vendor/` folder inside the user's video project. Not redistributed by the plugin (DEC-09) |
+font folders on disk / OFL.txt / Bundled row:
+brand-packs/default/fonts/inter/ OFL=y row=1
+brand-packs/default/fonts/jetbrains-mono/ OFL=y row=1
+evals/fixtures/brand-alt/fonts/playfair-display/ OFL=y row=1
+evals/fixtures/brand-alt/fonts/space-mono/ OFL=y row=1
+pins.json gsap: 3.15.1  package.json gsap: 3.15.1

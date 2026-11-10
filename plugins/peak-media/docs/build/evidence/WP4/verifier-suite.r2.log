@@ -1,0 +1,83 @@
+# suite r2 — verifier-wp4-r2-a91e50a1 — host disk 942Mi free, 100% used
+## node --test plugins/peak-media/evals
+✔ AC-BRD-01: brand-packs/default validates and every font has a licence file (379.521416ms)
+✖ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (803.318541ms)
+✖ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (799.69975ms)
+✔ AC-BRD-03: the plugin tree ships no music or other audio files (71.126166ms)
+✖ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (910.250792ms)
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (1280.405291ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (660.438542ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (253.49325ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (396.331834ms)
+✔ validate: cross-reference checks (not AC-bound) (1572.657917ms)
+✖ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (0.301792ms)
+✖ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (0.036875ms)
+✖ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (0.028541ms)
+✖ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (0.026625ms)
+✖ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (0.036792ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (546.575292ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (236.9765ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (154.076791ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (843.73875ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (1096.826917ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (177.416459ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (184.184167ms)
+✔ AC-BASE-03: contact-sheet baseline (383.24375ms)
+✔ AC-BASE-04: probe-spec baseline (321.94875ms)
+✔ AC-BASE-05: check-cuts baseline (331.895083ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (1343.860208ms)
+✔ AC-BASE-08: render-plate --help/--version/bad input follow the baseline (1217.442042ms)
+✔ AC-BASE-08: a live plate named explicitly is refused with a pointer to video-capture (131.141917ms)
+✔ AC-BASE-08: --all skips live plates (they belong to video-capture) (218.306375ms)
+✖ AC-PLT-01: every F1 plate renders alone to durationMs ±1 frame (746.998333ms)
+✔ AC-PLT-01: a hand-authored index.html is kept; brand/ and vendor/ are refreshed (651.787917ms)
+✖ AC-PLT-01: an over-long motion line wraps inside the frame (no edge overflow) (4067.738ms)
+✔ AC-PLT-01: text that cannot fit at the 27 px floor fails fast with one line naming the plate (102.441792ms)
+✔ AC-PLT-04: every F1 and F2 plate passes hyperframes lint and check --strict (25400.263541ms)
+✔ AC-VND-01: every path listed in vendored-map.md exists (3.741667ms)
+✔ AC-VND-01: every vendor folder is referenced by vendored-map.md (no orphans) (3.074375ms)
+✔ AC-VND-01: the map tells the agent to Read runtimes.md before the first plate (0.49575ms)
+✔ AC-VND-02: no `hyperframes events` telemetry line anywhere in the vendor tree; LICENSE is present (2.285791ms)
+✔ AC-VND-02: vendored skills are references, not registered skills (no SKILL.md under vendor/) (3.339542ms)
+✔ AC-SPN-01: F1 brief → script → spine with fake/tone; manifest.totalMs within 20 s ±10% and validates (195.132583ms)
+✔ AC-SPN-02: F1 with the key unset → beatgrid.json validates, 0 OpenRouter calls, runtime within ±10% (415.815416ms)
+✔ AC-SPN-03: F1 manifest gaps between beats are ≥ 400 ms and check-cuts passes at every beat boundary (143.3675ms)
+✔ AC-BASE-06: spine baseline (help lists every flag, version, one-line errors, no stack, no network) (1540.462833ms)
+✔ spine: script.md parsing, layout rules and a second (neutral) brief (not AC-bound) (133.466833ms)
+✔ openrouter: sample rate read from the response content-type, table as fallback (not AC-bound) (22.769125ms)
+✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (187.2335ms)
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (0.857125ms)
+✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (175.861625ms)
+✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (91.331209ms)
+✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (77.901667ms)
+✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (505.480708ms)
+✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (114.66625ms)
+✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (578.803708ms)
+✖ failing tests:
+✖ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (803.318541ms)
+✖ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (799.69975ms)
+✖ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (910.250792ms)
+✖ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (0.301792ms)
+✖ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (0.036875ms)
+✖ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (0.028541ms)
+✖ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (0.026625ms)
+✖ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (0.036792ms)
+✖ AC-PLT-01: every F1 plate renders alone to durationMs ±1 frame (746.998333ms)
+✖ AC-PLT-01: an over-long motion line wraps inside the frame (no edge overflow) (4067.738ms)
+(every ✖ is 'render failed … no output'; direct hyperframes render reports 'Low disk space — 1.0 GB free')
+
+## ac-run --wp WP4
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-PLT-01 | script | fail | not-started | — |
+| AC-PLT-02 | still | — | not-started | — |
+| AC-PLT-03 | still | — | not-started | — |
+| AC-PLT-04 | script | pass | not-started | — |
+| AC-VND-01 | script | pass | not-started | — |
+| AC-VND-02 | script | pass | not-started | — |
+| AC-BASE-08 | script | pass | not-started | — |
+exit=1
+
+## ac-run --trace
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)
+exit=0

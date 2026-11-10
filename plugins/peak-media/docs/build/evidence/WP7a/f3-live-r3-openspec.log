@@ -1,0 +1,9 @@
+$ node capture.mjs --plates plates.json --plate r3-openspec --json --debug-requests
+exit 0 in 11981 ms; 43 page requests; 4 failed/4xx/5xx
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard-openspec.mjs
+capture: 1 say() call(s) started after their clip: #1 +67 ms
+capture: request failed https://openspec.dev/docs/quickstart — net::ERR_ABORTED
+capture: request failed https://openspec.dev/docs/setup — net::ERR_ABORTED
+capture: request failed https://openspec.dev/docs/installation — net::ERR_ABORTED
+capture: request failed https://openspec.dev/docs/installation — net::ERR_ABORTED

@@ -1,0 +1,12 @@
+$ contact-sheet /tmp/vwp2/skel1/out/final.mp4 --every 0.5s -o docs/build/evidence/WP2/AC-SKL-03-verifier.jpg
+docs/build/evidence/WP2/AC-SKL-03-verifier.jpg (7 frames, 4×2): 00.00 00.50 01.00 01.50 02.00 02.50 02.97
+exit=0
+-rw-r--r--@ 1 schaveyt  staff  68343 Nov  8 18:42 docs/build/evidence/WP2/AC-SKL-03-verifier.jpg
+## node --test (contact-sheet labels)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (411.099333ms)
+## verifier visual read (Read tool on AC-SKL-03-verifier.jpg, 1950x558, 4x2 grid, 7 frames)
+- Every tile has a white 7-segment timecode on a dark box, top-left: 00.00 00.50 01.00 01.50 02.00 02.50 02.97 — all legible.
+  The '1' digit uses right-hand segments only, so 01.00/01.50 read as "0 1.00"/"0 1.50" (cosmetic).
+- 00.00: empty dark frame (text not yet in). 00.50: "spec-aware". 01.00: "spec-aware / vs. / spec-accountable", last line mid-fade (grey).
+  01.50 onward: all three lines fully opaque, "vs." in accent blue; held through 02.97. Kinetic text legible.
+- Builder's evidence/WP2/F0-contact.jpg is byte-identical to this sheet (cmp), consistent with deterministic render + sheet.

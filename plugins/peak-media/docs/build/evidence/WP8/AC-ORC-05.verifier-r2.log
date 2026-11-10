@@ -1,0 +1,73 @@
+# AC-ORC-05 verifier round 2 2026-11-09T14:11:53Z HEAD 8fcf8a4
+## setup: F1 brief+script copied to scratch; narration spine via spine --tts-model fake/tone (CACHE in scratch), beat grid via --no-narrate
+PASS  runtime 23.77 s against a 26.0 s target (-8.6%)
+PASS  runtime 26.00 s against a 26.0 s target (+0.0%)
+m/spine/manifest.json hook 0 6591 | compare 6591 11682 | close 18273 5500
+g/spine/beatgrid.json hook 0 7500 | compare 7500 12500 | close 20000 6000
+## fixture plate times (stale):
+p1-hook hook 0 6500 | p2-table compare 6500 7500 | p3-close close 14000 6000
+## 1. stale fixture -> narration manifest via --spine, -o
+p1-hook          hook               0 ms +6591 ms  (was 0 +6500)
+p2-table         compare         6591 ms +11682 ms  (was 6500 +7500)
+p3-close         close          18273 ms +5500 ms  (was 14000 +6000)
+PASS  retimed 3 plate(s) from manifest.json (3 changed) → /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.CyLmAacNOP/m/plates.json
+exit 0
+  p1-hook 0+6591 == beat
+  p2-table 6591+11682 == beat
+  p3-close 18273+5500 == beat
+  all equal: true | spine field: spine/manifest.json
+ok    /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.CyLmAacNOP/m/plates.json (plates v1)
+validate exit 0
+PASS  3 plate(s) on their beat times (manifest.json)
+check exit 0
+## 2. folder argument (new in r1): beat grid, in place, retime-plates <folder>
+p1-hook          hook               0 ms +7500 ms  (was 0 +6500)
+p2-table         compare         7500 ms +12500 ms  (was 6500 +7500)
+p3-close         close          20000 ms +6000 ms  (was 14000 +6000)
+PASS  retimed 3 plate(s) from beatgrid.json (3 changed) → /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.CyLmAacNOP/g
+exit 0
+  p1-hook 0+7500 == beat
+  p2-table 7500+12500 == beat
+  p3-close 20000+6000 == beat
+  all equal: true | spine field: spine/beatgrid.json
+ok    /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.CyLmAacNOP/g/plates.json (plates v1)
+validate exit 0
+PASS  3 plate(s) on their beat times (beatgrid.json)
+check exit 0
+## 3. out-of-order plates (new warning): p3 listed first
+retime-plates: warning: plates are not in beat order ('p1-hook' on beat 'hook' is listed after 'p3-close' on beat 'close') — times are still set; reorder plates.json to match the spine
+p3-close         close          20000 ms +6000 ms  (was 0 +1)
+p1-hook          hook               0 ms +7500 ms  (was 0 +1)
+p2-table         compare         7500 ms +12500 ms  (was 0 +1)
+PASS  retimed 3 plate(s) from beatgrid.json (3 changed) → /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.CyLmAacNOP/g/ooo.json
+exit 0
+  p3-close 20000+6000 == beat
+  p1-hook 0+7500 == beat
+  p2-table 7500+12500 == beat
+  all equal: true | spine field: spine/beatgrid.json
+  order kept: p3-close,p1-hook,p2-table
+-- 3b. --check on the out-of-order (already retimed) file
+retime-plates: warning: plates are not in beat order ('p1-hook' on beat 'hook' is listed after 'p3-close' on beat 'close') — times are still set; reorder plates.json to match the spine
+exit 0
+-- 3c. --json on out-of-order: stdout parses as JSON (warning on stderr only)
+  json ok
+## 4. refusals (nothing written)
+-- j.plates.pop()
+retime-plates: beat 'close' has no plate — add one plate for it to plates.json
+  exit 1 | unchanged: yes
+-- j.plates[1].beat='nope'
+retime-plates: plate 'p2-table' names beat 'nope', which is not in the spine (beats: hook, compare, close) — fix its beat (+1 more)
+  exit 1 | unchanged: yes
+-- j.plates[2].beat='hook'
+retime-plates: beat 'hook' has 2 plates (p1-hook, p3-close) — one plate per beat: merge them, or split the beat in script.md and rerun the spine (+1 more)
+  exit 1 | unchanged: yes
+-- j.plates[1].id=j.plates[0].id
+retime-plates: retimed plates.json would not validate: plates[1].id: duplicate plate id 'p1-hook'
+  exit 1 | unchanged: yes
+-- j.plates=[]
+retime-plates: beat 'hook' has no plate — add one plate for it to plates.json (+2 more)
+  exit 1 | unchanged: yes
+## 5. folder with no plates.json
+retime-plates: /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.CyLmAacNOP/empty is a folder with no plates.json — pass the plates.json path
+exit 1
+## fixture unchanged: yes

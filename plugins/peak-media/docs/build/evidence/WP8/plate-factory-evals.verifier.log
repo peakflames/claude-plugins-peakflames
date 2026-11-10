@@ -1,0 +1,20 @@
+# verifier run 2026-11-09T13:55:05Z HEAD 1aed81f
+$ node --test evals/plate-factory/
+✔ checker fixtures match generate.mjs (no hand edits, no real transcript) (11.27575ms)
+✔ checker: the good run passes every rule; the CLI exits 0 (40.897458ms)
+✔ checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else (1.1355ms)
+✔ checker: gate lines are strict about names, results and the user being asked (1.095958ms)
+✔ AC-ORC-02: storyboard produced and approved before any plates/<id>/index.html is written (transcript check) (37.881959ms)
+✔ AC-ORC-03: at most 3 self-review rounds per plate, then a separate reviewer Agent call (transcript check) (76.32625ms)
+✔ AC-ORC-04: runtimes.md is Read before the first plate is written (transcript check) (36.691375ms)
+✔ AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and refuses anything but one plate per beat (621.476458ms)
+✔ AC-BASE-13: retime-plates --help/--version/bad input follow the baseline (363.081875ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1595.943417
+exit 0

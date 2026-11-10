@@ -1,0 +1,68 @@
+plugin.json version: 0.1.0
+$ setup.sh --help  [outbound network denied]
+setup.sh — install peak-media's pinned runtime dependencies (idempotent)
+
+Usage: setup.sh [options]
+
+Installs the versions in lib/pins.json into ${CLAUDE_PLUGIN_DATA:-~/.cache/peak-media}/deps/<lockhash>/
+and runs 'hyperframes browser ensure'. Needs network only when something is missing.
+Prerequisites it checks: Node 22+, npm, ffmpeg and ffprobe.
+
+Options:
+      --check          Only report what is missing (exit 0 ready, 3 not ready); install nothing
+      --skip-browser   Don't fetch the render browser (e.g. HYPERFRAMES_BROWSER_PATH is set)
+      --data-dir <dir> Use <dir> instead of $CLAUDE_PLUGIN_DATA / ~/.cache/peak-media
+  -q, --quiet          Print only errors and the final line
+  -h, --help           Show this help and exit
+      --version        Print the plugin version and exit
+exit=0
+$ setup.sh --version  [outbound network denied]
+0.1.0
+exit=0
+$ setup.sh -h  [outbound network denied]
+$ setup.sh --bogus  [outbound network denied]
+setup.sh: unknown option '--bogus'. Run 'setup.sh --help' for usage.
+exit=2
+$ setup.sh --data-dir  [outbound network denied]
+setup.sh: --data-dir needs a folder argument. Run 'setup.sh --help' for usage.
+exit=2
+$ setup.sh --data-dir   [outbound network denied]
+setup.sh: --data-dir needs a folder argument. Run 'setup.sh --help' for usage.
+exit=2
+$ setup.sh extra-positional  [outbound network denied]
+setup.sh: unknown option 'extra-positional'. Run 'setup.sh --help' for usage.
+exit=2
+$ setup.sh --check --data-dir /tmp/vwp2/emptydata  [outbound network denied]
+setup.sh: runtime deps not installed in /tmp/vwp2/emptydata/deps/88b6dff0a77c — run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh
+exit=3
+files created in empty data dir by --check: 0
+$ setup.sh --check --skip-browser --data-dir /tmp/vwp2/emptydata  [outbound network denied]
+setup.sh: runtime deps not installed in /tmp/vwp2/emptydata/deps/88b6dff0a77c — run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh
+exit=3
+$ PEAK_MEDIA_FFMPEG=/nonexistent setup.sh --check
+setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)
+exit=3
+$ PEAK_MEDIA_FFPROBE=/nonexistent setup.sh --check
+setup.sh: ffprobe not found — install it (macOS: brew install ffmpeg · Debian/Ubuntu: sudo apt-get install ffmpeg)
+exit=3
+$ setup.sh --check  [outbound network denied]
+peak-media ready: deps /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c
+exit=0
+$ setup.sh -q  [outbound network denied]
+peak-media ready: deps /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c · ffmpeg version 9.0.2
+exit=0
+$ setup.sh --data-dir /dev/null/x  (unwritable, install path, network denied)
+deps: installing pinned versions into /dev/null/x/deps/88b6dff0a77c
+mkdir: /dev/null: Not a directory
+setup.sh: cannot create /dev/null/x/deps/88b6dff0a77c — pass --data-dir <writable folder>
+exit=1
+$ setup.sh --skip-browser --data-dir /tmp/vwp2/emptydata2 (fresh install, network denied: expect actionable failure)
+deps: installing pinned versions into /tmp/vwp2/emptydata2/deps/88b6dff0a77c
+browser: skipped
+peak-media ready: deps /tmp/vwp2/emptydata2/deps/88b6dff0a77c · ffmpeg version 9.0.2
+exit=0
+## node --test AC-BASE-01
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (80.108459ms)
+note: the network-denied fresh install above succeeded because npm served all 82 lockfile tarballs from the local npm cache (78 dirs in node_modules, npm-install.log 'added 82 packages in 1s').
+## node --test AC-BASE-01
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (81.575ms)

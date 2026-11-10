@@ -1,0 +1,38 @@
+# ORC-01 runbook check, verifier r2 2026-11-09T14:13:57Z HEAD 8fcf8a4
+## user's shell: /bin/zsh, zsh 5.9 (x86_64-apple-darwin23.0); interactivecomments in an interactive zsh (pty):
+IC-OFF
+## §1 lines 24-30 + 37 pasted line by line into an interactive zsh (pty; RUN is only listed, nothing created):
+zsh: command not found: #
+zsh: unknown sort specifier
+zsh: missing end of string
+zsh: missing end of string
+tail: #: No such file or directory
+tail: keep: No such file or directory
+tail: ≥: No such file or directory
+tail: 1: No such file or directory
+tail: GB: No such file or directory
+tail: free: No such file or directory
+zsh: unknown sort specifier
+PM=[]
+## §1 brief block (lines 38-44) run with RUN=$TMPDIR/run (not the real RUN):
+exit 0
+brief.md
+source
+
+$TMPDIR/run/source:
+openspec-vs-peak-workflow.md
+forbidden-line hits: 0
+- **Runtime:** 26 s target (±10%), paced for learning, 1280×720, 30 fps
+- **Source:** `source/openspec-vs-peak-workflow.md` §4 and §7
+1. **hook** (motion) — "Two tools, one promise: spec before code. They differ on who checks the work."
+2. **compare** (slide) — head-to-head table, 4 rows: unit of work, requirement IDs, verification (traced to tests + status), human checks (recorded)
+3. **close** (motion) — "OpenSpec wins on speed. Peak Workflow wins on an auditable record."
+## paths
+exists  ~/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media/docs/build/references/openspec-vs-peak-workflow.md
+exists  ~/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media/docs/build/fixtures/F1/brief.md
+exists  ~/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-abeb5dcaa90418466/plugins/peak-media/docs/build/fixtures/F1/script.md
+exists  ~/github/peakflames/peakflames-videos/videos/2026-10-peak-workflow-short/audio/src/groove-sauce.mp3
+RUN: 0 entries in ~/tmp/peak-media-orc-01; CLAUDE.md in ~/tmp or ~: 0
+claude --plugin-dir: 1
+## §5 transcript folder for RUN=/Users/schaveyt/tmp/peak-media-orc-01:
+~/.claude/projects/-Users-schaveyt-tmp-peak-media-orc-01  (expected ~/.claude/projects/-Users-schaveyt-tmp-peak-media-orc-01)

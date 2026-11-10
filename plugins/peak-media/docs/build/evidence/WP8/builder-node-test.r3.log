@@ -1,0 +1,21 @@
+$ node --test plugins/peak-media/evals/plate-factory
+✔ checker fixtures match generate.mjs (no hand edits, no real transcript) (13.234167ms)
+✔ checker: the good run passes every rule; the CLI exits 0 (40.343708ms)
+✔ checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render; a for-loop over plates) (118.024125ms)
+✔ skill docs: every stage ends with its literal gate line, and SKILL.md makes them output-style proof (2.004833ms)
+✔ checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else (1.133042ms)
+✔ checker: gate lines are strict about names, results and the user being asked (1.1305ms)
+✔ AC-ORC-02: storyboard produced and approved before any plates/<id>/index.html is written (transcript check) (45.922375ms)
+✔ AC-ORC-03: at most 3 self-review rounds per plate, then a separate reviewer Agent call (transcript check) (153.931792ms)
+✔ AC-ORC-04: runtimes.md is Read before the first plate is written (transcript check) (38.806958ms)
+✔ AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and refuses anything but one plate per beat (864.818209ms)
+✔ AC-BASE-13: retime-plates --help/--version/bad input follow the baseline (497.835709ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2080.811959
+exit=0

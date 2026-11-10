@@ -1,0 +1,12 @@
+# F1: spine 20773 ms (3 beats) + outro 3000 ms → out/final.mp4; PASS  /tmp/wp9t/pm-pkg04-tr8K0k/out/final.mp4
+✔ watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound) (5945.331625ms)
+✔ AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps (46804.706417ms)
+✔ AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing (9381.822292ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62201.360667

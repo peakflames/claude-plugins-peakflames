@@ -1,0 +1,76 @@
+# AC-BASE-12 r2 — remux-audio
+plugin.json version: 0.1.0
+$ remux-audio --version
+0.1.0
+stderr(0 lines): 
+exit=0
+
+help lists:
+  --out ok
+  --music ok
+  --sfx ok
+  --narration ok
+  --narration-lufs ok
+  --music-lufs ok
+  --duck-db ok
+  --sfx-lufs ok
+  --sfx-db ok
+  --no-duck ok
+  --fade-ms ok
+  --levels ok
+  --json ok
+  --help ok
+  --version ok
+
+$ remux-audio 
+stderr(2 lines): remux-audio: expected at least 1 argument(s), got 0
+Run 'remux-audio --help' for usage.
+exit=2
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 --music $TMPDIR/stems/music.wav
+stderr(2 lines): remux-audio: --out <file.mp4> is required
+Run 'remux-audio --help' for usage.
+exit=2
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 -o $TMPDIR/x.mp4
+stderr(2 lines): remux-audio: nothing to mix — pass --music and/or --sfx
+Run 'remux-audio --help' for usage.
+exit=2
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 --music $TMPDIR/stems/music.wav -o $TMPDIR/f1/review/review.mp4
+stderr(2 lines): remux-audio: --out must differ from the input video (the input keeps the narration-only mix)
+Run 'remux-audio --help' for usage.
+exit=2
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 --music $TMPDIR/silentvid.mp4 -o $TMPDIR/x.mp4
+stderr(1 lines): remux-audio: --music $TMPDIR/silentvid.mp4 has no audio stream
+exit=1
+
+$ remux-audio $TMPDIR/notmedia.mp4 --music $TMPDIR/stems/music.wav -o $TMPDIR/x.mp4
+stderr(1 lines): remux-audio: cannot read $TMPDIR/notmedia.mp4 as media: $TMPDIR/notmedia.mp4: Invalid data found when processing input
+exit=1
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 --music $TMPDIR/stems/music.wav --music-lufs 5 -o $TMPDIR/x.mp4
+stderr(2 lines): remux-audio: --music-lufs must be negative (e.g. -16)
+Run 'remux-audio --help' for usage.
+exit=2
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 --music $TMPDIR/stems/music.wav --fade-ms -1 -o $TMPDIR/x.mp4
+stderr(2 lines): remux-audio: --fade-ms must be >= 0
+Run 'remux-audio --help' for usage.
+exit=2
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 --music /nope.wav -o $TMPDIR/x.mp4
+stderr(1 lines): remux-audio: --music /nope.wav: no such file
+exit=1
+
+$ remux-audio /nope.mp4 --music $TMPDIR/stems/music.wav -o $TMPDIR/x.mp4
+stderr(1 lines): remux-audio: cannot read /nope.mp4: no such file
+exit=1
+
+$ remux-audio $TMPDIR/f1/review/review.mp4 --music $TMPDIR/stems/music.wav --duck-db abc -o $TMPDIR/x.mp4
+stderr(2 lines): remux-audio: --duck-db expects a number, got 'abc'
+Run 'remux-audio --help' for usage.
+exit=2
+
+network: 0 matches

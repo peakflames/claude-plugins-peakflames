@@ -1,0 +1,30 @@
+pins: {"hyperframes":"0.9.25","playwright":"1.65.0","gsap":"3.15.1","ajv":"8.20.0","node":">=22"}
+## verifier grep: literal versions 0.9.25 / 1.65.0 across the whole repo (tracked files), any context
+plugins/peak-media/docs/build/decisions.md:11:| DEC-05 | HyperFrames is pinned to `hyperframes@0.9.25`, set only in `lib/pins.json`, and run with `HYPERFRAMES_NO_UPDATE_CHECK=1 HYPERFRAMES_NO_AUTO_INS
+plugins/peak-media/docs/build/decisions.md:12:| DEC-06 | Playwright is pinned to `1.65.0` in `lib/pins.json`. The recorder uses `page.screencast.start({path,fps,onFrame})` and anchors t0 on the timest
+plugins/peak-media/docs/build/decisions.md:32:| DEC-26 | Every HyperFrames call sets `HYPERFRAMES_NO_UPDATE_CHECK=1 HYPERFRAMES_NO_AUTO_INSTALL=1 HYPERFRAMES_NO_TELEMETRY=1 HYPERFRAMES_SKIP_SKILLS=1 D
+plugins/peak-media/docs/build/decisions.md:52:- **2026-11-08 (WP2):** HyperFrames 0.9.25 renders correctly here, so the DEC-05 fallback to 0.9.23 is not needed. A 3 s 1280×720 plate takes about 7 s; t
+plugins/peak-media/docs/build/wp/WP2/handoff.md:8:- `lib/pins.json` (hyperframes 0.9.25, playwright 1.65.0, gsap 3.15.1, ajv 8.20.0); `package.json`/`package-lock.json` mirror it (DEC-25).
+plugins/peak-media/lib/pins.json:2:  "hyperframes": "0.9.25",
+plugins/peak-media/lib/pins.json:3:  "playwright": "1.65.0",
+plugins/peak-media/package.json:12:    "hyperframes": "0.9.25",
+plugins/peak-media/package.json:13:    "playwright": "1.65.0"
+## verifier grep: hyperframes@ / playwright@ anywhere tracked
+plugins/peak-media/docs/build/decisions.md:11:| DEC-05 | HyperFrames is pinned to `hyperframes@0.9.25`, set only in `lib/pins.json`, and run with `HYPERFRAMES_NO_UPDATE_CHECK=1 HYPERFRAMES_NO_AUTO_INS
+plugins/peak-media/docs/build/decisions.md:13:| DEC-07 | Vendored HF skills go in `vendor/hyperframes/` as **references, not registered skills**: `hyperframes` (presets dropped), `hyperframes-cli` (la
+plugins/peak-media/docs/build/wp/WP4/brief.md:15:Copy the HF skills from `heygen-com/hyperframes@327e20208c3f` and trim per DEC-07 (keep LICENSE + CREDITS.md, strip `npx hyperframes events` lines, log
+## runtime tree only (lib scripts schemas skills evals package.json), excluding pins.json
+(none)
+## package.json / lockfile mirrors
+hyperframes 0.9.25 0.9.25 0.9.25 ok
+playwright 1.65.0 1.65.0 1.65.0 ok
+gsap 3.15.1 3.15.1 3.15.1 ok
+ajv 8.20.0 8.20.0 8.20.0 ok
+## sensitivity check of the eval regex (copy run in /tmp, repo untouched)
+"\"hyperframes\": \"0.9.25\"" caught
+"npx hyperframes@0.9.25" caught
+"hyperframes v0.9.25" caught
+"HF_VERSION = \"0.9.25\" // hyperframes" MISSED
+"const HYPERFRAMES = \"0.9.25\"" caught
+## node --test AC-SKL-07
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (10.344833ms)

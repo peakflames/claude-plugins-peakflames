@@ -1,0 +1,22 @@
+profile: (version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))(allow network-outbound (remote unix-socket))
+## control: outside the sandbox curl reaches example.com
+http=200
+exit=0
+## inside: curl (non-Node) blocked
+curl: (7) Failed to connect to example.com port 443 after 1 ms: Couldn't connect to server
+exit=7
+## inside: grandchild (node -> sh -> curl) blocked, i.e. sandbox inherited by descendants such as the browser
+grandchild curl exit 7 curl: (7) Failed to connect to 1.1.1.1 port 443 after 0 ms: Couldn't connect to server
+## inside: the pinned render browser (headless) cannot load a remote page
+browser: /Users/schaveyt/.cache/hyperframes/chrome/chrome-headless-shell/mac_arm-152.0.7977.30/chrome-headless-shell-mac-arm64/chrome-headless-shell
+
+(control, no sandbox:)
+<title>Example Domain
+## render F0 inside the sandbox
+/tmp/vwp2/skel3/out/final.mp4
+exit=0
+offline framemd5 IDENTICAL to online render
+## remote URL references in the scaffolded plate (html/css)
+none
+## node --test
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (6889.955209ms)

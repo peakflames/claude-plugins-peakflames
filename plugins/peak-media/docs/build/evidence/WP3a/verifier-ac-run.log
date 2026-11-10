@@ -1,0 +1,13 @@
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-TTS-01 | script | pass | not-started | — |
+| AC-TTS-02 | script | pass | not-started | — |
+| AC-TTS-03 | script | pass | not-started | — |
+| AC-TTS-04 | script | pass | not-started | — |
+| AC-TTS-05 | script | pass | not-started | — |
+| AC-TTS-06 | script | pass | not-started | — |
+| AC-TTS-07 | manual | — | not-started | — |
+| AC-TTS-08 | script | pass | not-started | — |
+| AC-BASE-07 | script | pass | not-started | — |
+
+PASS  trace: 77 ACs, 12 briefs, 0 problem(s)

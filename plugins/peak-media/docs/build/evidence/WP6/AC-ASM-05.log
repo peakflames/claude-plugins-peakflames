@@ -1,0 +1,28 @@
+# AC-ASM-05 — verifier-wp6-r1-90efea8d, worktree a2ed450, 2026-11-09T00:23:32Z
+# inputs: /tmp/vwp6 (testsrc/colour plates 1280x720@30 at 0-6500/6500-14000/14000-20000; 330 Hz narration tones in F1 clip windows 200-6000/6700-13500/14200-19500; music 110/138/165/220 Hz; SFX 1.5 kHz blips at 6.4-6.6 s and 13.9-14.1 s)
+## eval brand pack: sheet evidence/WP6/AC-ASM-05-verifier-final.jpg (24 frames every 1 s; 20.00 navy, 21.00-22.97 logo + THANKS FOR WATCHING)
+## default brand pack (main checkout, plugins/peak-media/brand-packs/default)
+narration -16 LUFS
+review    review/review.mp4 (3 plates, 600 frames)
+cuts      2 plate cut(s) in silence (≥300 ms)
+assemble: render failed for /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/pm-outro-npkF8b/brand/outro: - media_load_failed: image media failed to load before capture
+exit 1
+## default outro head:
+<!-- peak-media default outro (3 s, 1280x720, 30 fps): the logo and a name fade in, hold, then fade out.
+     Rendered like a plate: copy this file to <dir>/index.html, the brand pack to <dir>/brand/,
+     and the local GSAP to <dir>/vendor/gsap.min.js (GSAP is installed by setup.sh, never shipped or loaded from a CDN).
+10:<link rel="stylesheet" href="brand/tokens.css">
+11:<script src="vendor/gsap.min.js"></script>
+24:    <img id="logo" src="brand/logo.svg" alt="">
+## assemble staging: skills/video-assemble/scripts/assemble.mjs
+    const stage = path.join(tmp, 'brand');
+    cpSync(brandDir, stage, { recursive: true });
+    const stagedComp = path.join(stage, path.relative(brandDir, compDir));
+    const html = path.join(stagedComp, 'index.html');
+    if (existsSync(html) && /vendor\/gsap(\.min)?\.js/.test(readFileSync(html, 'utf8')) && !existsSync(path.join(stagedComp, 'vendor', 'gsap.min.js'))) {
+      mkdirSync(path.join(stagedComp, 'vendor'), { recursive: true });
+      cpSync(gsapPath(), path.join(stagedComp, 'vendor', 'gsap.min.js'));
+    }
+    mkdirSync(cacheDir, { recursive: true });
+    const part = path.join(tmp, 'outro.mp4');
+    render(stagedComp, part, { fps, wrap: renderWrap });

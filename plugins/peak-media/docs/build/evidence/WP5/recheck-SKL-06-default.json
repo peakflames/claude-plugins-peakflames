@@ -1,0 +1,8 @@
+{
+  "fixture": "docs/build/fixtures/F0",
+  "brand": "brand-packs/default",
+  "isolation": "/usr/bin/sandbox-exec",
+  "offlineEqualsOnline": true,
+  "fontsRemovedDiffers": true,
+  "frames": 90
+}

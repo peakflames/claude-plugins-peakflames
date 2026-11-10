@@ -1,0 +1,47 @@
+# AC-REC-03 verifier run 2026-11-09T03:18:30Z
+storyboard blob before: edd9561893501af06b2daa609df0a2f60cf29de0 (HEAD: edd9561893501af06b2daa609df0a2f60cf29de0)
+## D6 loop check (grep of storyboard.mjs)
+18:    await waitForVoice(); // previous paragraph finishes first
+19:    await wait(250);
+20:    await page.evaluate((n) => window.deckGo(n), slide);
+21:    await wait(900); // let the slide land before speaking
+22:    await say('', { narrate: paragraph });
+24:  await waitForVoice();
+## spine (fake/tone, temp cache, keys unset): /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/deckspine/manifest.json
+totalMs 20000 clips [(1, 250, 5455), (2, 6432, 7273), (3, 14432, 5091)]
+
+## mode silent: capture --storyboard skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/silent.mp4 --no-captions --json
+exit=0 wall=22s
+capture: launching browser (1280x720, 30 fps, mode silent)
+capture: t0 anchored on the first frame; running storyboard.mjs
+mode silent frames 596 videoMs 19867 ranMs 19853 captions False
+  say {'n': 1, 'text': '', 'narrate': 'Water your garden in the morning. It is one small habit with three good reasons.', 'startMs': 1195, 'durationMs': 5000, 'caption': False}
+  say {'n': 2, 'text': '', 'narrate': 'Cool morning air means less water is lost, and the leaves dry out by noon, so mildew has less chance.', 'startMs': 7353, 'durationMs': 6667, 'caption': False}
+  say {'n': 3, 'text': '', 'narrate': 'Aim at the roots, not the leaves. Water deeply, then let the soil dry.', 'startMs': 15184, 'durationMs': 4667, 'caption': False}
+ffprobe: h264,1280,720,30/1,596
+
+## mode captions: capture --storyboard skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/captions.mp4  --json
+exit=0 wall=22s
+capture: launching browser (1280x720, 30 fps, mode captions)
+capture: t0 anchored on the first frame; running storyboard.mjs
+mode captions frames 595 videoMs 19833 ranMs 19842 captions True
+  say {'n': 1, 'text': '', 'narrate': 'Water your garden in the morning. It is one small habit with three good reasons.', 'startMs': 1183, 'durationMs': 5000, 'caption': True}
+  say {'n': 2, 'text': '', 'narrate': 'Cool morning air means less water is lost, and the leaves dry out by noon, so mildew has less chance.', 'startMs': 7346, 'durationMs': 6667, 'caption': True}
+  say {'n': 3, 'text': '', 'narrate': 'Aim at the roots, not the leaves. Water deeply, then let the soil dry.', 'startMs': 15172, 'durationMs': 4667, 'caption': True}
+ffprobe: h264,1280,720,30/1,595
+
+## mode spine: capture --storyboard skills/video-capture/examples/deck/storyboard.mjs --out /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/spine.mp4 --spine /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.QDcdi2G00C/deckspine/manifest.json --json
+exit=0 wall=22s
+capture: launching browser (1280x720, 30 fps, mode spine)
+capture: t0 anchored on the first frame; running storyboard.mjs
+capture: 3 say() call(s) started after their clip: #1 +932 ms, #2 +433 ms, #3 +431 ms
+mode spine frames 600 videoMs 20000 ranMs 19525 captions True
+  say {'n': 1, 'text': '', 'narrate': 'Water your garden in the morning. It is one small habit with three good reasons.', 'clip': 1, 'plannedMs': 250, 'startMs': 1182, 'lateMs': 932, 'durationMs': 5455, 'caption': False}
+  say {'n': 2, 'text': '', 'narrate': 'Cool morning air means less water is lost, and the leaves dry out by noon, so mildew has less chance.', 'clip': 2, 'plannedMs': 6432, 'startMs': 6865, 'lateMs': 433, 'durationMs': 7273, 'caption': False}
+  say {'n': 3, 'text': '', 'narrate': 'Aim at the roots, not the leaves. Water deeply, then let the soil dry.', 'clip': 3, 'plannedMs': 14432, 'startMs': 14863, 'lateMs': 431, 'durationMs': 5091, 'caption': False}
+ffprobe: h264,1280,720,30/1,600
+
+storyboard blob after: edd9561893501af06b2daa609df0a2f60cf29de0  git status: 
+
+## stills (t=3/9/16 s; rows silent / captions / spine) -> evidence/WP7a/AC-REC-03-verifier-modes.jpg
+Read by verifier: all three modes advance slides 1/3 -> 2/3 -> 3/3 at the same points. Silent row: no caption. Captions row: neutral dark caption bar with the narrate paragraph. Spine row: no caption (say("", {narrate}) is voice-only; text is empty).

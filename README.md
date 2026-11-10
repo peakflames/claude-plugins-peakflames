@@ -18,6 +18,7 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 |--------|-------------|
 | [peak-workflow](plugins/peak-workflow/) ⭐ | Requirements-driven development lifecycle — formal Gherkin TOR requirements serve as the single source of truth for acceptance criteria, test derivation, and verification; Change Records amend, retire, and re-verify them, and versioned upgrades bring older projects forward |
 | [epic-workflow](plugins/epic-workflow/) | Structured epic-based project lifecycle — discovery, planning, implementation, and verification using prose acceptance criteria |
+| [peak-media](plugins/peak-media/) | Faceless motion-graphics video from web content — a narration or beat-grid spine sets the clock, each beat is a plate (HyperFrames motion or slide, or a live recorded page), and assembly adds audio and a brand outro. macOS only |
 
 ## Installation
 
@@ -38,6 +39,7 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 For full documentation, see each plugin's README:
 - [peak-workflow/README.md](plugins/peak-workflow/README.md)
 - [epic-workflow/README.md](plugins/epic-workflow/README.md)
+- [peak-media/README.md](plugins/peak-media/README.md)
 
 ## Scripts
 

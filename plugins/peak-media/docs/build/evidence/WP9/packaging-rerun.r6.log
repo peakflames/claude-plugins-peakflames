@@ -1,0 +1,19 @@
+✔ AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media (1.494083ms)
+✔ AC-PKG-03: the runtime tree carries no house-brand name (D17), and the examples carry no brand assets (38.108292ms)
+✔ AC-PKG-06: every skill has at least one eval (node --test "plugins/peak-media/evals/**/*.test.mjs") (2.73325ms)
+✔ AC-PKG-07: VENDORED.md gives source, commit, date, licence and local changes for every vendor folder; GSAP and fonts are listed (2.165917ms)
+✔ packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs and JPEG — no audio or video anywhere (not AC-bound) (18.061208ms)
+✔ watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound) (6006.295875ms)
+# F1: spine 20773 ms (3 beats) + outro 3000 ms → out/final.mp4; PASS  /tmp/wp9p/pm-pkg04-dPMOZX/out/final.mp4
+✔ watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step's whole process group and leaves no temp folder (WP9 verify-2 N1; not AC-bound) (2252.267292ms)
+✔ watchdog: "not found" only when the binary does not exist, not from a real binary's exit 127 (WP9 verify-2 N2; not AC-bound) (202.540334ms)
+✔ AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps (48874.048916ms)
+✔ AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing (9552.061625ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 67024.592875

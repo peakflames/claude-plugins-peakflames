@@ -1,0 +1,7 @@
+# F1 r2 verifier probe: real hyperframes render timed out mid-render (F0 skeleton, PEAK_MEDIA_STEP_TIMEOUT_S=T); chrome-headless-shell count for this run sampled every 0.5 s (filtered to this run's out dir via its hyperframes parent)
+## limit 4 s: exit 1 after 6 s, 1 line(s): skeleton: hyperframes render timed out after 4 s with no exit — stopped it; the render browser may have crashed: run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/scripts/setup.sh --check, or raise PEAK_MEDIA_STEP_TIMEOUT_S
+   chrome children of this run's hyperframes, per 0.5 s: 0 0 1 1 1 1 1 0 0 0 0 
+   leftover processes for /tmp/pm-v2probe/f0wd4: 0
+## limit 5 s: exit 1 after 8 s, 1 line(s): skeleton: hyperframes render timed out after 5 s with no exit — stopped it; the render browser may have crashed: run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/scripts/setup.sh --check, or raise PEAK_MEDIA_STEP_TIMEOUT_S
+   chrome children of this run's hyperframes, per 0.5 s: 0 0 1 1 1 1 1 1 1 0 0 0 0 
+   leftover processes for /tmp/pm-v2probe/f0wd5: 0

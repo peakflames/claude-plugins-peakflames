@@ -1,0 +1,30 @@
+## docs/build heavy-file check (git ls-files)
+Mon Nov  9 12:55:33 EST 2026
+media/archives tracked anywhere in plugin:
+grep exit=1 (1 = none)
+extensions tracked under docs/build:
+  68 jpg
+  27 json
+ 211 log
+  66 md
+   6 mjs
+largest tracked files in plugin (bytes):
+991449 plugins/peak-media/docs/build/evidence/WP4/layout-f1-p2-table.jpg
+991449 plugins/peak-media/docs/build/evidence/WP4/AC-PLT-02-verifier-layout-p2-table.jpg
+720596 plugins/peak-media/docs/build/evidence/WP8/AC-ORC-01-final.verifier-r3.jpg
+624684 plugins/peak-media/docs/build/evidence/WP4/AC-PLT-02-p2-table.jpg
+578967 plugins/peak-media/docs/build/evidence/WP4/layout-f1-p3-close.jpg
+578967 plugins/peak-media/docs/build/evidence/WP4/AC-PLT-02-verifier-layout-p3-close.jpg
+523025 plugins/peak-media/docs/build/evidence/WP4/layout-f1-p1-hook.jpg
+523025 plugins/peak-media/docs/build/evidence/WP4/AC-PLT-02-verifier-layout-p1-hook.jpg
+untracked/ignored media on disk under plugin (not shipped):
+.gitignore:
+node_modules/
+renders/
+out/
+docs/build/**/*.mp4
+docs/build/**/*.webm
+docs/build/**/*.wav
+docs/build/**/*.mov
+docs/build/fixtures/**/run/
+.DS_Store

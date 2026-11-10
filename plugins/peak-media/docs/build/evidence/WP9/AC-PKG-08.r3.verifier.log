@@ -1,0 +1,36 @@
+# AC-PKG-08 r3 verifier probes (macOS 14.6.1 arm64, node v26.8.1); F0 = docs/build/tools/skeleton.mjs --fixture docs/build/fixtures/F0 --brand brand-packs/default; ffmpeg removed from PATH by a PATH holding only node/npm/npx + system dirs
+which ffmpeg in that PATH: none
+## ffmpeg missing
+$ setup.sh (ffmpeg not on PATH)
+   exit=3 stdout-tail: 
+   stderr(1 line): setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg)
+$ setup.sh --check (ffmpeg not on PATH)
+   exit=3 stdout-tail: 
+   stderr(1 line): setup.sh: ffmpeg not found — install it (macOS: brew install ffmpeg)
+$ F0 (ffmpeg not on PATH)
+   exit=3 stderr(1 line): skeleton: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+## browser missing / can't start
+$ setup.sh --check, HYPERFRAMES_BROWSER_PATH=/nonexistent
+   exit=3 stdout-tail: 
+   stderr(1 line): setup.sh: render browser not found at /nonexistent — run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/scripts/setup.sh (or set HYPERFRAMES_BROWSER_PATH)
+$ setup.sh --check, HYPERFRAMES_BROWSER_PATH=/usr/bin/false (present, can't start)
+   exit=3 stdout-tail: 
+   stderr(1 line): setup.sh: render browser can't start (/usr/bin/false): exit 1 — run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/scripts/setup.sh to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium
+$ F0, HYPERFRAMES_BROWSER_PATH=/usr/bin/false
+   exit=1 stderr(1 line): skeleton: render failed for /tmp/pm-v3probe/o-xNjl/plates/p1: render browser can't start (/usr/bin/false): exit 1 — run /Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-ae42bf332f2a3a11c/plugins/peak-media/scripts/setup.sh to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium
+## key unset
+$ spine --narrate without PEAK_MEDIA_OPENROUTER_API_KEY
+   exit=2 stdout-tail: 
+   stderr(2 line): spine: unexpected argument 'evals/fixtures/neutral-brief/script.md'
+Run 'spine --help' for usage.
+## nothing missing
+$ setup.sh --check
+   exit=0 stdout-tail: peak-media ready: deps /Users/schaveyt/.cache/peak-media/deps/88b6dff0a77c
+   stderr(0 line): 
+$ F0 (no key, nothing missing)
+   exit=0 stderr(0 line): 
+## key unset (re-run with correct usage; the call above passed a positional arg — my slip)
+$ spine --brief <copy of neutral-brief/brief.md> --narrate, PEAK_MEDIA_OPENROUTER_API_KEY and TTS_OPENROUTER_API_KEY unset
+   exit=1 stderr(1 line): spine: script.md beats (x) must match the brief's beats in order (intro, why, tip)
+$ same, script.md with the brief's beats (intro, why, tip)
+   exit=3 stderr(1 line): spine: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)
