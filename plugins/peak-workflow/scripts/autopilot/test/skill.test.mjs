@@ -149,7 +149,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   const found = preflight(p, '--allow-test-double').launch;
   assert.deepEqual([found.lastRun.runDir, found.lastRun.status, found.runs.length], [run1, 'DONE', 1]);
   assert.deepEqual(found.openGates.map((g) => [g.file, g.epic, g.kind]), [[`gates/${e2.id}-1.json`, e2.id, 'deferral']]);
-  assert.equal(found.mergedWorkNotInProject, true);
+  assert.deepEqual([found.sync.state, found.sync.waiting.length], ['clone-ahead', 1]); // E1's merge, not fetched yet
   assert.equal(found.workspace, p.state, 'the next run uses the same workspace');
   assert.notEqual(found.runDir, run1);
   assert.equal(driver('report', '--workspace', p.state).status, 0);
@@ -176,6 +176,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   assert.deepEqual([next.launch.openGates.length, next.launch.decidedGates.map((g) => [g.file, g.answer, g.state, g.enters])], [0, [[gate.file, 'Fix now', 'resume', 'BUILD']]]);
   assert.match(next.epics[1].reasons.join(' '), /resumes at BUILD on feature\/epic-Lg2Cat4-categories: you answered "Fix now" on gates\/Lg2Cat4-1\.json/);
   assert.ok(!next.launch.warn.some((w) => /wait for your decision/.test(w)), next.launch.warn.join(' | '));
+  assert.equal(next.launch.sync.state, 'same'); // a fast-forward merge in the project leaves the decision valid
   confirm(next.launch, p.project, [e2.id], { allowTestDouble: true });
   const cloneGit = fs.statSync(path.join(p.clone, '.git')).ino;
   await launchAndWait(next.launch);

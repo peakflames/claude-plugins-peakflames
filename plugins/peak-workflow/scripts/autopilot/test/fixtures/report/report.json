@@ -13,6 +13,7 @@
   "testCommand": "node --test",
   "baseRed": null,
   "driverVersion": "0.2.0",
+  "sync": null,
   "epics": [
     {
       "id": "Lg1Csv7",

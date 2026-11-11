@@ -324,6 +324,12 @@ epic's branch is still there when the owner has decided its gate. This choice ha
   `git fetch <workspace>/clone develop:autopilot/develop`, reviews, and merges it like any branch.
 - **Integration line = `develop` in the clone.** That is the base `start-epic` and `wrapup-epic`
   already detect (`develop` > `main` > `master`).
+- **Sync at run start (P3.5 Part 3).** Before preflight the driver fetches the project's
+  integration line into the clone by URL (still no remote) and compares the tips: equal — nothing;
+  the project ahead — fast-forward the clone; the clone ahead (merged epics the owner has not
+  fetched) — build on top, and the report repeats the fetch command and lists what waits;
+  diverged — refuse the run and print both tips. Readiness (`preflight --json`, `launch.sync`)
+  reports the same case without fetching, and reads sidecars from the clone when it is ahead.
 
 **Merge ownership (refined).** The original design had the driver merge after wrapup passed. In
 solo mode, `wrapup-epic` Step 5a merges `--no-ff` itself, and stopping it mid-skill would make the
@@ -919,7 +925,7 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
 | N1 | No unattended stall | 12 | The driver has no turns; per-step wall clock; `stop.mjs`; `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` |
 | N2 | No runaway verify loops | WP9 | Fix-round counter; run budget |
 | N3 | No model answers human gates | DEC-42/43 | R8 answers only from `policy/gates.json`; every other question parks |
-| N4 | The orchestrator never builds | WP1/WP2 | The driver writes only to `<state>/` and makes only these git operations in the clone: clone, WIP commit, rollback |
+| N4 | The orchestrator never builds | WP1/WP2 | The driver writes only to `<state>/` and makes only these git operations in the clone: clone, WIP commit, rollback, a fast-forward of the integration line from the project at run start, and setting a superseded branch aside under `refs/autopilot/` |
 
 ---
 
@@ -939,6 +945,9 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
 - **Kill switch.** The `STOP` file is checked by the driver between steps and every 30 s, and by
   hook R1 on every tool call. `driver.mjs stop` writes it and waits for a clean report. The
   workspace outlives the run, so the driver removes `STOP` once the run has stopped for it.
+- **Sync with the project.** Each new run starts by bringing the project's integration line
+  into the clone (§6.2); a diverged project refuses the run before anything is written. A
+  fast-forward moves the base, so decisions on branches parked before it are void (§6.8).
 - **Single-instance lock.** `lock` holds pid and start time. A lock whose pid isn't alive is
   stale and is taken over with a log line.
 - **Sleep.** macOS laptops sleep. The launch wraps the driver in `caffeinate -i`. Readiness warns

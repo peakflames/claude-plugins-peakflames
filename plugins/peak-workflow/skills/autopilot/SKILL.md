@@ -67,6 +67,12 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    the running autopilot or stop it; for a run that "did not finish", run the `--resume` command
    the refusal prints (it parks what was in flight and writes the report).
 
+   **Diverged** (`launch.sync.state` is `diverged`): the project and the autopilot clone each
+   have commits the other lacks — the owner committed by day without first bringing in the work
+   autopilot merged. Print both tips and the fetch command from the refusal, and say: fetch,
+   merge `autopilot/<integration>` into `<integration>` in the project, then run this again.
+   Do not run the fetch or the merge yourself.
+
    **A test double.** If a refusal says `claudeBin` is not the real `claude`, `<ws>/settings.json`
    names a stand-in binary. Say so plainly and ask (plain text) whether this run is a rehearsal
    that should use it. On no: stop — the owner removes `claudeBin` from `<ws>/settings.json`. On
@@ -76,7 +82,11 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
 4. **Warnings.** Print every line of `launch.warn`. If it says gates wait for a decision,
    recommend `/peak-workflow:autopilot report` first and ask (plain text) whether to continue
-   anyway; stop unless the user says to continue.
+   anyway; stop unless the user says to continue. `launch.sync.state` says how the project and
+   the clone compare, and the run acts on it by itself: `project-ahead` — the clone is
+   fast-forwarded first (decisions on branches parked before that are void, and the table shows
+   those epics as starting over); `clone-ahead` — merged work is still waiting to be fetched, and
+   the run builds on top of it (epics merged there show as already Complete).
 
 5. **Readiness table.** One row per entry of `epics`, in the order given (phase and index order —
    do not re-sort):
@@ -277,7 +287,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
    and say: review it, then merge `autopilot/<integration>` like any other branch. The private
    clone is the only copy of that work until it is fetched, so the workspace must not be
-   deleted first.
+   deleted first. If gates were decided, add: a fast-forward
+   (`git merge --ff-only autopilot/<integration>`) keeps those decisions usable; a merge commit,
+   or any other new commit on `<integration>`, moves the base — the next run then plans those
+   epics again from scratch instead of resuming them.
 
 7. **Next.** Read `<run>/report.md` again — recording an answer re-rendered it — and print its
    "Do this next" list verbatim (it names epics by ID; that list is the one exception to the

@@ -104,7 +104,7 @@ export function collectReport(runDir) {
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null,
-    driverVersion: s.driverVersion ?? null, epics, gates, referee,
+    driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, epics, gates, referee,
   };
   report.next = nextSteps(report);
   return report;
@@ -130,7 +130,10 @@ function nextSteps(r) {
   const voided = r.epics.filter((e) => e.voided);
   if (voided.length) next.push(`${plural(voided.length, 'decision')} could not be used and the epic was planned again from scratch (${ids(voided)}): the reason is under "Per epic".`);
   if (by('FAILED').length) next.push(`Read why ${plural(by('FAILED').length, 'epic')} failed verification (${ids(by('FAILED'))}); its branch is kept in the clone.`);
-  if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}):\n   git fetch "${r.clone}" ${r.integration}:autopilot/${r.integration} && git log ${r.integration}..autopilot/${r.integration}`);
+  const waiting = r.sync?.state === 'clone-ahead' ? r.sync.waiting : [];
+  const fetch = `git fetch "${r.clone}" ${r.integration}:autopilot/${r.integration} && git log ${r.integration}..autopilot/${r.integration}`;
+  if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}${waiting.length ? `, and ${plural(waiting.length, 'commit')} from earlier runs still waiting in the clone` : ''}):\n   ${fetch}`);
+  else if (waiting.length) next.push(`Bring in the work earlier runs merged, still waiting in the clone (${plural(waiting.length, 'commit')}):\n   ${fetch}`);
   if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds only while that branch and \`${r.integration}\` do not move.`);
   if (r.referee.testChanges.length) next.push(`Read the recorded reason for ${plural(r.referee.testChanges.length, 'changed existing test')} (under "Per epic").`);
   if (by('BLOCKED').length) next.push(`${plural(by('BLOCKED').length, 'epic')} never started because a dependency did not merge (${ids(by('BLOCKED'))}); queue them again once it has.`);
@@ -142,6 +145,9 @@ export function renderReport(r) {
   L.push(`# Autopilot — ${stamp(r.run)} → ${r.ended ? stamp(r.ended) : 'still running'} (stopped: ${r.stoppedBecause ?? 'not yet'})`);
   L.push(`Workspace: ${r.workspace} — run ${r.name}. Paths below are relative to the workspace.`);
   L.push(`Integration line: ${r.integration} in ${r.clone} (not pushed). Spent ${usd(r.spentUsd)}${r.budgetUsd == null ? '' : ` of $${r.budgetUsd}`}.`);
+
+  if (r.sync?.state === 'project-ahead') L.push(`At the start the clone's ${r.integration} was fast-forwarded to the project's (${String(r.sync.cloneTip).slice(0, 9)} → ${String(r.sync.projectTip).slice(0, 9)}).`);
+  if (r.sync?.state === 'clone-ahead') L.push(`At the start the clone was ahead of the project by work not fetched yet; this run built on top of it: ${r.sync.waiting.join('; ')}.`);
 
   L.push('', '## Do this next');
   if (r.next.length) r.next.forEach((n, i) => L.push(`${i + 1}. ${n}`)); else L.push('Nothing to do.');

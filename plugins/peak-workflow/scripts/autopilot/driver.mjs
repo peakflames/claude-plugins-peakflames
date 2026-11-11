@@ -213,8 +213,12 @@ function torLifecycle(pluginDir, root, ...args) {
   return sh('sh', [path.join(pluginDir, 'scripts', 'tor-lifecycle'), '--root', root, ...args], { cwd: root });
 }
 
-/** Reads every phase index, spec and sidecar under `root` (a checked-out working tree). */
-export function readEpics(root) {
+/**
+ * Reads every phase index, spec and sidecar under `root` (a checked-out working tree).
+ * `sidecarText(relPath)` overrides where a sidecar is read from: the clone's integration line,
+ * when autopilot has merged epics the project has not fetched yet.
+ */
+export function readEpics(root, { sidecarText = null } = {}) {
   const planDir = path.join(root, PLAN_DIR);
   if (!exists(planDir)) return [];
   const rows = [];
@@ -231,7 +235,8 @@ export function readEpics(root) {
     const specPath = path.join(planDir, r.phase, r.specFile);
     const spec = exists(specPath) ? read(specPath) : '';
     const sidecarPath = path.join(planDir, 'status', `epic-${r.id}.md`);
-    const sidecar = parseSidecar(exists(sidecarPath) ? read(sidecarPath) : '');
+    const sidecarRel = path.posix.join(PLAN_DIR, 'status', `epic-${r.id}.md`);
+    const sidecar = parseSidecar(sidecarText?.(sidecarRel) ?? (exists(sidecarPath) ? read(sidecarPath) : ''));
     return {
       id: r.id, name: r.name, slug, phase: r.phase,
       label: `${r.id} (${slug}) — ${r.name}`,
@@ -324,7 +329,7 @@ export function gateEntry(g) {
  * branch tip in the clone still equals the gate's `branchTip` and the epic's base has not moved
  * (the strict rule: the merge-base of the branch and the integration line is the integration tip).
  */
-export function gateFacts(workspace, integration) {
+export function gateFacts(workspace, integration, { integrationTip = null } = {}) {
   const clone = path.join(workspace, 'clone');
   const facts = new Map();
   const live = readGates(workspace).filter((g) => gateLive(g) && g.kind !== 'preflight');
@@ -339,24 +344,51 @@ export function gateFacts(workspace, integration) {
     if (!integration || !exists(clone)) why = 'the private clone is gone';
     else {
       const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${g.branch}`).out || null;
-      const dev = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out || null;
+      // `integrationTip`: where the integration line will be once the run has fast-forwarded it (readiness, before the sync).
+      const dev = integrationTip ?? (gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out || null);
       if (!g.branchTip) { // parked before the session made a branch (a question in the planning session)
         if (tip) why = `a branch ${g.branch} has appeared since the gate was written`;
         else if (g.base && dev !== g.base) why = `${integration} moved since the epic was parked`;
       } else if (!tip) why = `the branch ${g.branch} no longer exists in the clone`;
       else if (tip !== g.branchTip) why = `the branch ${g.branch} moved since the gate was written (${String(g.branchTip).slice(0, 9)} → ${tip.slice(0, 9)})`;
-      else if (gitRun(clone, 'merge-base', tip, dev).out !== dev) why = `${integration} moved since the epic was parked, so the branch no longer starts from its tip`;
+      else if (integrationTip || gitRun(clone, 'merge-base', tip, dev).out !== dev) why = `${integration} moved since the epic was parked, so the branch no longer starts from its tip`;
     }
     facts.set(id, why ? { ...f, state: 'void', why } : { ...f, state: 'resume', entry, enters: entry.phase });
   }
   return facts;
 }
 
+// ---- sync with the project (plan P3.5 Part 3) --------------------------------------------------
+
+/**
+ * How the project's integration tip (P) relates to the clone's (C). Read-only: nothing is fetched.
+ * `same` | `project-ahead` (the run fast-forwards the clone) | `clone-ahead` (autopilot merged
+ * epics the owner has not fetched; the run builds on them) | `diverged` (the run is refused).
+ */
+export function syncFacts(project, workspace, integration) {
+  const clone = path.join(workspace, 'clone');
+  if (!integration || !exists(clone)) return { state: 'no-clone', projectTip: null, cloneTip: null, waiting: [] };
+  const P = gitRun(project, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out || null;
+  const C = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out || null;
+  const facts = { projectTip: P, cloneTip: C, waiting: [] };
+  if (!P || !C) return { state: 'diverged', ...facts, why: `${integration} is missing in ${P ? 'the clone' : 'the project'}` };
+  if (P === C) return { state: 'same', ...facts };
+  const has = (repo, sha) => gitOk(repo, 'cat-file', '-e', `${sha}^{commit}`);
+  if (has(project, C) && gitOk(project, 'merge-base', '--is-ancestor', C, P)) return { state: 'project-ahead', ...facts };
+  if (has(clone, P) && gitOk(clone, 'merge-base', '--is-ancestor', P, C)) {
+    const waiting = gitRun(clone, 'log', '--first-parent', '--format=%h %s', `${P}..${C}`).out.split('\n').filter(Boolean);
+    return { state: 'clone-ahead', ...facts, waiting };
+  }
+  return { state: 'diverged', ...facts };
+}
+const fetchCommand = (clone, integration) => `git fetch "${clone}" ${integration}:autopilot/${integration}`;
+const divergedText = (s, project, clone, integration) => `the project and the autopilot clone have diverged on ${integration}: the project is at ${String(s.projectTip).slice(0, 12)} (${project}), the clone at ${String(s.cloneTip).slice(0, 12)} (${clone}). Bring them together first — in the project: \`${fetchCommand(clone, integration)}\`, then merge \`autopilot/${integration}\` into ${integration} (to keep both sides), or decide which side wins — and run autopilot again`;
+
 /**
  * Preflight: which epics may run unattended. Reads only files (and `tor-lifecycle`), so it is
  * safe on the user's repository and in a dry run.
  */
-export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Map() } = {}) {
+export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Map(), sidecarText = null } = {}) {
   const facts = readProjectFacts(root);
   const refuse = [];
   const fmt = torLifecycle(pluginDir, root, 'format');
@@ -374,11 +406,11 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
   try { for (const r of JSON.parse(st.out).requirements ?? []) states[r.tor] = r; } catch { /* reported per anchor below */ }
   const explicit = new Set(config.explicit ?? []);
 
-  const epics = readEpics(root).map((epic) => {
+  const epics = readEpics(root, { sidecarText }).map((epic) => {
     let e = epic;
     const reasons = []; let eligibility = 'eligible'; let humanCheck = false;
     const set = (level, why) => { reasons.push(why); if (eligibility !== 'skip' && eligibility !== 'complete') eligibility = level; };
-    if (e.status === 'Complete') { eligibility = 'complete'; reasons.push('already Complete'); return { ...e, eligibility, humanCheck, reasons }; }
+    if (e.status === 'Complete') { eligibility = 'complete'; reasons.push(sidecarText && !/^status:\s*Complete/m.test(exists(path.join(root, e.sidecar)) ? read(path.join(root, e.sidecar)) : '') ? 'already Complete in the autopilot clone (merged there, not fetched into the project yet)' : 'already Complete'); return { ...e, eligibility, humanCheck, reasons }; }
     // The owner's decision on a parked gate (P3.5 Part 2): a valid one makes the epic eligible whatever its sidecar says.
     const gate = gates.get(e.id) ?? null;
     if (gate) e = { ...e, gate };
@@ -1265,6 +1297,29 @@ class Run {
     return null;
   }
 
+  // ---- sync with the project at run start (P3.5 Part 3) ---------------------------------------
+
+  /**
+   * Brings the project's integration line into the clone before preflight: a one-off URL fetch (the
+   * clone still has no remote), then fast-forward, build on top, or refuse. One of the driver's
+   * few git writes in the clone, and only ever a fast-forward.
+   */
+  syncWithProject(integration) {
+    const project = this.config.project;
+    if (this.dirty()) throw new Error(`the private clone has uncommitted changes on ${this.currentBranch()}; a run does not start on a dirty clone`);
+    const f = gitRun(this.clone, 'fetch', '-q', '--no-tags', project, integration);
+    if (f.code !== 0) throw new Error(`could not fetch ${integration} from ${project}: ${f.err}`);
+    const s = syncFacts(project, this.stateDir, integration);
+    if (s.state === 'diverged') throw new Error(divergedText(s, project, this.clone, integration));
+    if (s.state === 'project-ahead') {
+      if (this.currentBranch() !== integration) this.g('checkout', '-q', integration);
+      this.g('merge', '-q', '--ff-only', s.projectTip);
+      this.log(`sync: ${integration} fast-forwarded ${s.cloneTip.slice(0, 9)} → ${s.projectTip.slice(0, 9)} from the project`);
+    } else if (s.state === 'clone-ahead') this.log(`sync: the clone is ${s.waiting.length} commit(s) ahead of the project on ${integration} (merged work not fetched yet); building on top`);
+    else this.log(`sync: ${integration} is the same in the project and the clone (${String(s.cloneTip).slice(0, 9)})`);
+    return s;
+  }
+
   // ---- entering an epic: from scratch, or from the owner's decision on its gate (P3.5 Part 2) ----
 
   /** Other live gates of this epic stop counting once it is entered again. */
@@ -1412,6 +1467,7 @@ class Run {
         this.log(`private clone made at ${this.clone} (${integration}, no origin)`);
       }
       const integration = detectIntegration(this.clone);
+      const sync = resuming ? null : this.syncWithProject(integration); // refuses a diverged project before anything is written
 
       // From here the run exists on disk: its directory, its config, and the workspace's pointer to it.
       fs.mkdirSync(this.runDir, { recursive: true });
@@ -1426,7 +1482,7 @@ class Run {
         this.state.status = 'running'; this.state.stoppedBecause = null;
         this.log(`resuming run ${this.runName}`);
       } else {
-        this.state = { run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, queue: [] };
+        this.state = { run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, sync, queue: [] };
       }
 
       // Preflight reads the integration line, so the clone must be on it.
@@ -1527,8 +1583,10 @@ export function launchFacts(project, workspace, config) {
   else if (lastRun?.status === 'interrupted') refuse.push(`run ${lastRun.run} did not finish (the driver was killed): continue it with \`driver.mjs run --workspace "${workspace}" --resume\``);
   if (exists(path.join(workspace, 'STOP')) && !running) warn.push(`a STOP file is left in ${workspace}; remove it or the next run stops at once`);
 
+  const clone = path.join(workspace, 'clone');
+  const sync = syncFacts(project, workspace, integration);
   const gates = readGates(workspace).filter(gateLive);
-  const facts = gateFacts(workspace, integration);
+  const facts = gateFacts(workspace, integration, { integrationTip: sync.state === 'project-ahead' ? sync.projectTip : null });
   const brief = (g) => ({ file: g.file, epic: g.epic, kind: g.kind, run: g.run ?? null, question: g.question ?? null, answer: g.decided?.answer ?? null, ...(facts.get(g.epic)?.gate === g.file ? { state: facts.get(g.epic).state, enters: facts.get(g.epic).enters ?? null, why: facts.get(g.epic).why ?? null } : {}) });
   const openGates = gates.filter((g) => !g.decided && (g.options ?? []).length).map(brief);
   const decidedGates = gates.filter((g) => g.decided?.answer).map(brief);
@@ -1536,17 +1594,14 @@ export function launchFacts(project, workspace, config) {
   if (voidGates.length) warn.push(`${voidGates.length} decision(s) can no longer be used (${voidGates.map((g) => `${g.epic}: ${g.why}`).join('; ')}); those epics are planned again from scratch`);
   if (openGates.length) warn.push(`${openGates.length} gate(s) wait for your decision (${[...new Set(openGates.map((g) => g.epic))].join(', ')}); decide them with /peak-workflow:autopilot report`);
 
-  const clone = path.join(workspace, 'clone');
-  let mergedWorkNotInProject = null;
-  if (integration && exists(clone)) {
-    const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out;
-    mergedWorkNotInProject = !!tip && !gitOk(project, 'merge-base', '--is-ancestor', tip, integration);
-  }
+  if (sync.state === 'diverged') refuse.push(divergedText(sync, project, clone, integration));
+  if (sync.state === 'clone-ahead') warn.push(`autopilot has merged work the project has not fetched yet; the run builds on top of it. Waiting in the clone: ${sync.waiting.join('; ')}. Bring it in with: ${fetchCommand(clone, integration)}`);
+  if (sync.state === 'project-ahead') warn.push(`${integration} moved in the project since the last run; the run fast-forwards the clone to it first, which voids decisions on branches parked before that`);
   if (process.platform === 'darwin') warn.push('a laptop with the lid closed on battery may still sleep, even under caffeinate: leave it on power');
   const run = newRunName(workspace);
   return {
     ok: refuse.length === 0, refuse, warn, integration, freeGb, workspace, clone, run, runDir: runDirOf(workspace, run), settingsFileExists: exists(path.join(workspace, 'settings.json')),
-    runs, lastRun, openGates, decidedGates, mergedWorkNotInProject, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
+    runs, lastRun, openGates, decidedGates, sync, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
   };
 }
 
@@ -1622,7 +1677,14 @@ async function main(argv) {
     const root = path.resolve(o.project);
     const ws = path.resolve(wsArg ?? `${root}.autopilot`);
     const config = loadConfig(ws, { project: root, overrides: o.allowTestDouble ? { allowTestDouble: true } : {} });
-    const pre = preflight(root, config, { gates: gateFacts(ws, detectIntegration(root)) });
+    const integration = detectIntegration(root);
+    const sync = syncFacts(root, ws, integration);
+    // What the run will see: the fast-forwarded tip when the project is ahead; the clone's sidecars when the clone is.
+    const clone = path.join(ws, 'clone');
+    const pre = preflight(root, config, {
+      gates: gateFacts(ws, integration, { integrationTip: sync.state === 'project-ahead' ? sync.projectTip : null }),
+      sidecarText: sync.state === 'clone-ahead' ? (rel) => gitShow(clone, integration, rel) : null,
+    });
     pre.launch = launchFacts(root, ws, config);
     if (o.json) console.log(JSON.stringify(pre, null, 2));
     else { pre.refuse.forEach((r) => console.log(`REFUSE: ${r}`)); pre.epics.forEach((e) => console.log(`${e.label}  [${e.eligibility}${e.humanCheck ? ', human check' : ''}]  deps: ${e.deps.join(', ') || '—'}  ${e.reasons.join('; ')}`)); }
