@@ -43,9 +43,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Resume from a decided gate** — the next run re-enters a parked epic at the phase its gate
   names, on the branch the earlier run left, without repeating a finished session; an undecided
   gate keeps its epic out of the run.
-- **Decision validity** — a decision holds only while the branch tip and the integration line are
-  unchanged; a void one is reported and the epic is planned again, with the old branch kept under
-  `refs/autopilot/superseded/`.
+- **Decision validity** — a decision holds while the parked branch is unchanged and still merges
+  cleanly into the integration line (a trial merge); a void one is reported and the epic is
+  planned again, with the old branch kept under `refs/autopilot/superseded/`.
+- **`onPark` setting** — by default the first epic that parks or fails ends the run;
+  `"onPark": "continue"` in the project's `.claude/autopilot.json` keeps building independent
+  epics.
 - **`resume` gate** — budget, infra, STOP and auditor-outage parks get a gate offering "Resume
   from where it stopped" or "Start over"; the auditor still fails closed.
 - **Plan-lint gate options** — "Approve this plan" builds the captured plan, recorded as approved

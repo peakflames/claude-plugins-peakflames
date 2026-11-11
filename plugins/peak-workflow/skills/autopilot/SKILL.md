@@ -89,8 +89,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    recommend `/peak-workflow:autopilot report` first and ask (plain text) whether to continue
    anyway; stop unless the user says to continue. `launch.sync.state` says how the project and
    the clone compare, and the run acts on it by itself: `project-ahead` — the clone is
-   fast-forwarded first (decisions on branches parked before that are void, and the table shows
-   those epics as starting over); `clone-ahead` — merged work is still waiting to be fetched, and
+   fast-forwarded first (a decision on a parked branch still holds if the branch merges cleanly
+   into the new tip; the run checks that when it starts); `clone-ahead` — merged work is still waiting to be fetched, and
    the run builds on top of it (epics merged there show as already Complete); `same` — nothing
    to do; `no-clone` — the first run, which makes the clone at launch.
 
@@ -149,6 +149,12 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    - Run limits: `launch.config.runBudgetUsd` dollars; end time `launch.endByLocal`; the run also
      stops on a red base, low disk (`launch.config.diskFloorGb` GB), or two infrastructure errors
      in a row.
+   - **When an epic parks or fails** (`launch.config.onPark`): `stop` — "the run stops at the
+     first epic that parks or fails; the epics after it are not started tonight"; `continue` —
+     "epics that depend on it are blocked, independent epics still run". Say where it is set:
+     `launch.projectSettingsFile` (`<root>/.claude/autopilot.json`, `{"onPark": "continue"}`),
+     a file the owner edits and commits; this skill never writes it. With `stop`, add that
+     "independent" is the planner's judgement, which is why stopping is the default.
    - **Gates.** Read `${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/policy/gates.json`. List the
      `answer` rows as "answered for you: <skillStep> → <answer>", and the `park` rows as "parks
      for you: <skillStep> — <why>". Add: every other question parks; the plan is approved by a
@@ -297,8 +303,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    d. **Say what the answer does**, from the command's output. Every decided gate resumes its
       epic in the next run: "the next autopilot run continues this epic at `<enters>`, on the
       branch this run left; nothing happens until then." Add the `validWhile` line in plain
-      words — the decision holds only while that branch and the integration line do not move;
-      otherwise it is void and the epic is planned again from scratch. Then, as the fallback
+      words — the decision holds while that branch is unchanged and still merges cleanly into
+      the integration line; otherwise it is void and the epic is planned again from scratch. Then, as the fallback
       only, the gate's `resume` line: the owner may instead continue that epic by hand, in their
       own repository, after fetching the branch (`git fetch "<ws>/clone" <branch>:<branch>`) —
       in which case they should not queue it for autopilot again. An answer that tells the
@@ -319,9 +325,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    owner prefers. A resumed epic's history includes a `wip(autopilot)` commit from its park;
    that is expected. The private clone is the only copy of that work until it is fetched, so the
    workspace must not be deleted first. If any gate is decided and not yet used (`decided` set,
-   no `decided.used`), add: the fast-forward keeps those decisions usable; a merge commit, or any
-   other new commit on `<integration>`, moves the base — the next run then plans those epics
-   again from scratch instead of resuming them.
+   no `decided.used`), add: those decisions stay usable however the work is merged, as long as the
+   parked branch still merges cleanly into `<integration>`; the next run checks that.
 
 7. **Next.** Read `<run>/report.md` again — recording an answer re-rendered it — and print its
    "Do this next" list verbatim (it names epics by ID; that list is the one exception to the
@@ -353,3 +358,4 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `runs/<run>/epics/<id>/…` | Every session's stream, referee log, plan, checks and audit |
 | `runs/<run>/report.md`, `report.json`, `autopilot.log` | The morning report and the driver's log |
 | `lock`, `STOP` | The single-instance lock and the kill switch, one per workspace |
+| `<project>/.claude/autopilot.json` | Not written by autopilot: the owner's project settings, such as `"onPark": "continue"` |

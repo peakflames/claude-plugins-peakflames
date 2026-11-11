@@ -434,6 +434,16 @@ merged work. Building them doesn't break strict order or G1, and it uses the tim
 **base** stops the whole run, because every epic would build on it. The driver runs the test
 command on `develop` before each epic and stops if it fails.
 
+**`onPark` (owner decision 2026-11-11).** Which epics are independent is the planner's
+judgement (the Dependencies column `plan-project` wrote), and nothing deterministic checks it. So
+the default is **`onPark: "stop"`**: the first epic that ends PARKED or FAILED ends the run, and
+the rest stay not started. `onPark: "continue"` gives the stop-the-line rule above (dependents
+BLOCKED, independent epics still run). The setting lives with the project, in
+`<project>/.claude/autopilot.json` — read from the project, never from the clone, so no session
+can change it; that file may also set budgets and the like, but never the run's own keys or
+`claudeBin`. Runs A–C set `continue`, because their expected outcomes need an independent epic
+to run after a park.
+
 **Plan, then implement in a fresh session.** Decided (owner, 2026-11-11): autopilot mirrors
 Claude Code's "clear context on plan accept" (`showClearContextOnPlanAccept: true` in
 `settings.json`), which is how peak-workflow users are meant to work by hand. Planning can use a
@@ -722,12 +732,19 @@ When `autopilot report` records a human answer (through `driver.mjs decide`, the
 epic in the next run** (there is no next-run / by-hand split); `resume`, the by-hand command,
 stays in the gate as the fallback and is always shown.
 
-**Validity (strict rule).** A decision is used only while the branch tip in the clone equals
-`branchTip` and the merge-base of the branch and the integration line is still the integration
-tip. It is judged once, at run start, for every queued epic. A void decision is marked
-`void: {run, date, why}`, reported, and the epic is planned again from scratch on a fresh branch;
-the old branch is kept under `refs/autopilot/superseded/<epic>-<time>`. An epic whose latest gate
-is still undecided is skipped ("waiting for your decision"), never rebuilt.
+**Validity (owner decision 2026-11-11; replaces the strict rule P3.5 first shipped).** A
+decision is used only while the branch tip in the clone equals `branchTip` **and that branch
+still merges cleanly into the integration line** — a trial merge in memory (`git merge-tree`),
+which changes nothing in the clone. The integration line may have moved since the park: another
+epic merged later in the same run, or the owner brought work in with a merge commit or committed
+by day. The strict rule ("the base has not moved") voided the decision in all three cases. The
+backstop for a branch that merges cleanly but no longer works is unchanged: the merge gate runs
+the tests on the integration line after every merge and rolls a bad merge back. Validity is
+judged once, at run start, for every queued epic. A void decision is marked
+`void: {run, date, why}` (naming the conflicting files), reported, and the epic is planned again
+from scratch on a fresh branch; the old branch is kept under
+`refs/autopilot/superseded/<epic>-<time>`. An epic whose latest gate is still undecided is
+skipped ("waiting for your decision"), never rebuilt.
 
 | Gate kind | Written by | Owner's answer | Re-entry |
 |---|---|---|---|
@@ -946,8 +963,8 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
   hook R1 on every tool call. `driver.mjs stop` writes it and waits for a clean report. The
   workspace outlives the run, so the driver removes `STOP` once the run has stopped for it.
 - **Sync with the project.** Each new run starts by bringing the project's integration line
-  into the clone (§6.2); a diverged project refuses the run before anything is written. A
-  fast-forward moves the base, so decisions on branches parked before it are void (§6.8).
+  into the clone (§6.2); a diverged project refuses the run before anything is written. After
+  a fast-forward a decision on a parked branch still holds if that branch merges cleanly (§6.8).
 - **Single-instance lock.** `lock` holds pid and start time. A lock whose pid isn't alive is
   stale and is taken over with a log line.
 - **Sleep.** macOS laptops sleep. The launch wraps the driver in `caffeinate -i`. Readiness warns
@@ -1216,8 +1233,8 @@ above with the owner's go-ahead.
 `/peak-workflow:autopilot report`; the next run finishes every one of them to MERGED or FAILED on
 the branch the first run left, with no session of the first run repeated; the suite is green.
 
-**Status: done 2026-11-11 — exit met against `fake-claude.mjs`.** Suite: 97 tests, 87 pass, 10
-live skipped (`test/resume.test.mjs` has one test per row of the Part 2 table, the void and
+**Status: done 2026-11-11 — exit met against `fake-claude.mjs`.** Suite: 99 tests, 89 pass, 10 live
+skipped (`test/resume.test.mjs` has one test per row of the Part 2 table, the void and
 waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 table). §6.2, §6.3,
 §6.8 and §9 are updated. Deviations and additions:
 
@@ -1230,13 +1247,14 @@ waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 
   on `preflight` and `run`, and the choice is saved in that run's `config.json` only.
 - **Unfinished run.** A new run is refused while the latest one is unfinished (the driver was
   killed); `--resume` continues it. `STOP` is removed once a run has honoured it.
-- **Validity is judged once, at run start** (after the sync), for every queued epic — otherwise
-  the first merge of a run would void every other decision. The strict rule has two consequences
-  worth knowing before Run A: an epic that parks and is followed by a merge **in the same run**
-  has a void decision next time (its branch no longer starts from the integration tip); and
-  bringing merged work into the project with a merge commit (`--no-ff`) instead of a
-  fast-forward moves the base and voids every open decision. The "rebases cleanly" rule the
-  section names as the alternative is not built.
+- **Validity is judged once, at run start** (after the sync), for every queued epic. The strict
+  rule this section names was built first and then **replaced the same day by the owner's
+  decision**: a decision holds while the branch tip is unchanged and the branch still merges
+  cleanly into the integration line (§6.8). Under the strict rule a park followed by a merge in
+  the same run (Run A's shape), or a `--no-ff` bring-in, voided the decision every time.
+- **`onPark`, default `stop`** (owner decision): the first park or failure ends the run unless
+  `<project>/.claude/autopilot.json` says `"onPark": "continue"` (§6.4). Not in the original
+  section.
 - **Undecided and gate-less parks.** An epic whose latest gate is undecided is skipped
   ("waiting for your decision"), never rebuilt. A parked or failed epic with no decidable gate
   (CHECK_BUILD still failing after the fix round, a failed merge gate, a verify FAIL after the
