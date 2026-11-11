@@ -145,14 +145,21 @@ test('packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs 
   assert.deepEqual(media, [], 'no audio or video files in the plugin');
 });
 
-test('watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound)', async () => {
+const POSIX_ONLY = process.platform === 'win32' && 'POSIX shell fake; the full suite is macOS-only (DEC-52)';
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+const until = async (cond, ms, what) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) assert.fail(what); await new Promise((r) => setTimeout(r, 100)); } };
+// a Node step whose own child never exits; the child's pid goes to pidFile (runs the same on every OS)
+const sleeperStep = (pidFile) => `import { spawn } from 'node:child_process';\nimport { writeFileSync } from 'node:fs';\n`
+  + `const c = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });\n`
+  + `writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));\nsetInterval(() => {}, 1000);\n`;
+
+test('watchdog: a hung ffprobe step is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound)', { skip: POSIX_ONLY }, () => {
   const dir = tmpDir('pm-watchdog-');
   const pidFile = path.join(dir, 'sleeper.pid');
   // fake ffmpeg/ffprobe: answers -version, otherwise starts a sleeper child and waits on it forever-ish
   const fake = path.join(dir, 'fake-ff');
   writeFileSync(fake, `#!/bin/sh\ncase "$1" in -version) echo "ffmpeg version fake"; exit 0;; esac\nsleep 120 & echo $! > '${pidFile}'\nwait\n`);
   chmodSync(fake, 0o755);
-  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
   const r = run('lib/verify/probe-spec.mjs', [path.join(F0, 'plates.json')], { env: { PEAK_MEDIA_FFMPEG: fake, PEAK_MEDIA_FFPROBE: fake, PEAK_MEDIA_STEP_TIMEOUT_S: '2' } });
   assert.equal(r.code, 1, r.stdout + r.stderr);
   assert.ok(r.ms < 15_000, `stopped promptly (${r.ms} ms)`);
@@ -160,15 +167,23 @@ test('watchdog: a step that never exits is stopped, its process group killed, an
   assert.match(r.stderr, /ffprobe of .* timed out after 2 s with no exit — stopped it/);
   const pid = Number(readFileSync(pidFile, 'utf8'));
   assert.ok(!alive(pid), `the step's own child (sleep, pid ${pid}) was killed with its group`);
+});
 
-  // hyperframes: hf() under the same watchdog (the wrap runs a sleeper in place of the CLI)
+test('watchdog: a hung HyperFrames step and a hung eval step are stopped with their trees, in one line (WP9 verify-1 F1; not AC-bound)', async () => {
+  const dir = tmpDir('pm-watchdog-');
+  // hyperframes: hf() under the same watchdog (the wrap runs a Node sleeper with a child in place of the CLI)
+  const pidFile = path.join(dir, 'sleeper.pid');
+  const step = path.join(dir, 'hang-hf.mjs');
+  writeFileSync(step, sleeperStep(pidFile));
   const { hf } = await import('../../lib/hf.mjs');
   process.env.PEAK_MEDIA_STEP_TIMEOUT_S = '2';
   try {
     const t0 = Date.now();
-    assert.throws(() => hf(['render', dir], { wrap: ['/bin/sh', '-c', 'sleep 120', '--'] }), /hyperframes render timed out after 2 s with no exit — stopped it; .*setup\.sh --check/);
+    assert.throws(() => hf(['render', dir], { wrap: [process.execPath, step, '--'] }), /hyperframes render timed out after 2 s with no exit — stopped it; .*setup\.mjs --check/);
     assert.ok(Date.now() - t0 < 15_000);
   } finally { delete process.env.PEAK_MEDIA_STEP_TIMEOUT_S; }
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  await until(() => !alive(pid), 10_000, `the step's own child (pid ${pid}) was killed with its tree`);
 
   // the eval helper's own per-step watchdog: a script that never exits fails its step in one line
   const hang = path.join(dir, 'hang.mjs');
@@ -179,7 +194,7 @@ test('watchdog: a step that never exits is stopped, its process group killed, an
   assert.match(h.stderr, /eval step timed out after 1\.5 s: /);
 });
 
-test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s whole process group and leaves no temp folder (WP9 verify-2 N1; not AC-bound)', async () => {
+test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s whole tree and leaves no temp folder (WP9 verify-2 N1; not AC-bound)', async () => {
   const { spawn } = await import('node:child_process');
   const { mkdirSync } = await import('node:fs');
   for (const [sig, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
@@ -187,32 +202,32 @@ test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s who
     const tmp = path.join(dir, 'tmp');
     mkdirSync(tmp);
     // a node process blocked in a watched step whose own child sleeps
+    const pidFile = path.join(dir, 'pid');
+    const step = path.join(dir, 'hang.mjs');
+    writeFileSync(step, sleeperStep(pidFile));
     const script = path.join(dir, 'step.mjs');
     writeFileSync(script, `import { runWatched } from ${JSON.stringify(path.join(ROOT, 'lib', 'watchdog.mjs'))};\n`
-      + `runWatched('/bin/sh', ['-c', 'echo $PPID > ${dir}/pg; sleep 120 & echo $! > ${dir}/pid; wait'], { timeoutMs: 600000 });\n`);
-    const child = spawn(process.execPath, [script], { env: { ...process.env, TMPDIR: tmp }, stdio: 'ignore' });
+      + `runWatched(process.execPath, [${JSON.stringify(step)}], { timeoutMs: 600000 });\n`);
+    const child = spawn(process.execPath, [script], { env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp }, stdio: 'ignore', windowsHide: true });
     const exited = new Promise((res) => child.on('exit', (c, s) => res({ c, s })));
-    const until = async (cond, ms, what) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) assert.fail(`${sig}: ${what}`); await new Promise((r) => setTimeout(r, 100)); } };
-    await until(() => existsSync(path.join(dir, 'pid')) && readFileSync(path.join(dir, 'pid'), 'utf8').trim(), 15_000, 'the step started');
-    const pg = Number(readFileSync(path.join(dir, 'pg'), 'utf8')), sleeper = Number(readFileSync(path.join(dir, 'pid'), 'utf8'));
+    await until(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim(), 15_000, `${sig}: the step started`);
+    const sleeper = Number(readFileSync(pidFile, 'utf8'));
     assert.equal(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')).length, 1, 'the step has its temp folder while it runs');
     child.kill(sig);
     const { s } = await exited;
-    assert.equal(s, sig, `node ended by ${sig} (shell exit code ${code})`);
-    const groupAlive = () => { try { process.kill(-pg, 0); return true; } catch { return false; } };
-    await until(() => !groupAlive(), 5000, `the step's process group ${pg} is gone`);
-    assert.throws(() => process.kill(sleeper, 0), /ESRCH/, 'the step\'s child is gone');
-    assert.deepEqual(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')), [], 'no pm-run-* temp folder left');
+    // the 130/143 shell exit codes are POSIX signals; on win32 kill() ends the process outright
+    if (process.platform !== 'win32') assert.equal(s, sig, `node ended by ${sig} (shell exit code ${code})`);
+    await until(() => !alive(sleeper), 10_000, `${sig}: the step's child ${sleeper} is gone`);
+    await until(() => readdirSync(tmp).filter((x) => x.startsWith('pm-run-')).length === 0, 10_000, `${sig}: no pm-run-* temp folder left`);
   }
 });
 
 test('watchdog: "not found" only when the binary does not exist, not from a real binary\'s exit 127 (WP9 verify-2 N2; not AC-bound)', async () => {
   const { runWatched } = await import('../../lib/watchdog.mjs');
   const dir = tmpDir('pm-enoent-');
-  const bin = path.join(dir, 'exits127');
-  writeFileSync(bin, '#!/bin/sh\necho "No such file or directory: input.mp4" >&2\nexit 127\n');
-  chmodSync(bin, 0o755);
-  const real = runWatched(bin, [], { timeoutMs: 10_000 });
+  const bin = path.join(dir, 'exits127.mjs');
+  writeFileSync(bin, 'process.stderr.write("No such file or directory: input.mp4\\n");\nprocess.exit(127);\n');
+  const real = runWatched(process.execPath, [bin], { timeoutMs: 10_000 });
   assert.equal(real.status, 127);
   assert.equal(real.error, undefined, 'a real binary exiting 127 is not "not found"');
   assert.equal(runWatched(path.join(dir, 'nope'), [], { timeoutMs: 10_000 }).error?.code, 'ENOENT');
