@@ -1,0 +1,88 @@
+# peak-media on every supported OS (DEC-52): macOS, Windows x64, Linux x64. Runs the platform
+# subset of the evals plus one end-to-end smoke test; the full eval suite stays a local macOS run.
+name: peak-media
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'plugins/peak-media/**'
+      - '.github/workflows/peak-media.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'plugins/peak-media/**'
+      - '.github/workflows/peak-media.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: peak-media-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    name: evals (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    env:
+      CLAUDE_PLUGIN_DATA: ${{ runner.temp }}/peak-media-data
+      PM: plugins/peak-media
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Install ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+      - name: Install ffmpeg and Chromium's system libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          npx --yes playwright@1.65.0 install-deps chromium
+
+      - name: Restore the runtime cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CLAUDE_PLUGIN_DATA }}
+            ~/.cache/hyperframes
+          key: pm-runtime-${{ runner.os }}-${{ hashFiles('plugins/peak-media/package-lock.json', 'plugins/peak-media/lib/pins.json') }}
+
+      - name: Setup
+        run: node "$PM/scripts/setup.mjs"
+
+      - name: Evals (platform subset + smoke)
+        run: |
+          node --test \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=tap --test-reporter-destination=test-output.tap \
+            "$PM/evals/platform/*.test.mjs" \
+            "$PM/evals/verify/verify-tools.test.mjs" \
+            "$PM/evals/contracts/*.test.mjs" \
+            "$PM/evals/trace/*.test.mjs" \
+            "$PM/evals/packaging/packaging.test.mjs" \
+            "$PM/evals/smoke/smoke.test.mjs"
+
+      - name: Upload test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ matrix.os }}
+          path: |
+            test-output.tap
+            ${{ env.CLAUDE_PLUGIN_DATA }}/deps/*/*.log
+          if-no-files-found: ignore
