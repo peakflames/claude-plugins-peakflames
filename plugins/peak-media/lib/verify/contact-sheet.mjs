@@ -40,14 +40,28 @@ export function label(ms) {
   return `${m}:${(s - m * 60).toFixed(2).padStart(5, '0')}`;
 }
 
+/**
+ * Sample times in ms. `durMs` is the VIDEO stream's length (not the container's, which can run
+ * longer with the audio); the last sample is its last frame (durMs minus one frame), and an --at
+ * time past it is clamped to it, so `--at 0s,999s` gives the first and last frames.
+ */
 export function sampleTimes(durMs, { everyMs, count, at, fps = 30 }) {
-  const lastMs = Math.max(0, durMs - 1000 / fps);
-  if (at) return at.filter((t) => t <= durMs);
+  const lastMs = Math.max(0, Math.floor(durMs - 1000 / fps));
+  if (at) return [...new Set(at.map((t) => Math.min(Math.max(0, t), lastMs)))];
   if (count) return Array.from({ length: count }, (_, i) => Math.round(count === 1 ? 0 : (i * lastMs) / (count - 1)));
   const out = [];
   for (let t = 0; t <= lastMs + 0.5; t += everyMs) out.push(Math.round(t));
   if (lastMs - out.at(-1) > everyMs / 2) out.push(Math.round(lastMs));
   return out;
+}
+
+/** The video stream's length in ms: its own duration, else frames ÷ fps, else the container's. */
+export function videoDurationMs(v, info, fps) {
+  const own = Number(v.duration);
+  if (Number.isFinite(own) && own > 0) return own * 1000;
+  const n = Number(v.nb_frames);
+  if (Number.isFinite(n) && n > 0) return (n * 1000) / fps;
+  return Number(info.format.duration) * 1000;
 }
 
 /** Build the sheet; returns {out, frames:[{ms,label}], cols, rows}. */
@@ -56,7 +70,7 @@ export function contactSheet(video, { out, everyMs = 500, count, at, cols = 4, w
   const v = info.streams.find((s) => s.codec_type === 'video');
   if (!v) throw new CliError(`${video} has no video stream`);
   const fps = fpsOf(v) || 30;
-  const durMs = Number(info.format.duration) * 1000;
+  const durMs = videoDurationMs(v, info, fps);
   const times = sampleTimes(durMs, { everyMs, count, at, fps });
   if (!times.length) throw new CliError('no frames to sample — check --at/--every against the video length');
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'pm-sheet-'));
@@ -92,12 +106,12 @@ const spec = {
   name: 'contact-sheet',
   summary: 'sample frames from a video into a labelled JPEG grid',
   usage: 'contact-sheet [options] <video>',
-  description: 'Each frame is stamped with its time (seconds, or m:ss.ss) in the top-left corner. Default: one frame every 0.5 s.',
+  description: 'Each frame is stamped with its time (seconds, or m:ss.ss) in the top-left corner. Default: one frame every 0.5 s. Times are on the video stream, which can end before the audio: the last sample is its last frame.',
   options: {
     out: { type: 'string', short: 'o', arg: 'file.jpg', desc: 'Output JPEG (default: <video>.contact.jpg)' },
     every: { type: 'string', arg: 'time', desc: 'Sample interval, e.g. 0.5s or 250ms', default: '0.5s' },
     count: { type: 'number', arg: 'n', desc: 'Sample n evenly spaced frames instead' },
-    at: { type: 'string', arg: 't,t,...', desc: 'Sample exactly these times (e.g. 0.5s,1.2s or ms values)' },
+    at: { type: 'string', arg: 't,t,...', desc: 'Sample exactly these times (e.g. 0.5s,1.2s or ms values); a time past the last frame is clamped to it' },
     cols: { type: 'number', desc: 'Frames per row', default: 4 },
     width: { type: 'number', arg: 'px', desc: 'Width of each frame', default: 480 },
     json: { type: 'boolean', desc: 'Print the sampled times as JSON' },

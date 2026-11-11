@@ -1,0 +1,77 @@
+# node --test --test-reporter=spec evals/video-capture/presets.test.mjs (verifier run, 2026-11-10)
+✔ AC-W2V-13: --preset youtube --viewport 1280x720 --fps 25 records 1280x720@25 with youtube encoding; a plate with --preset is refused before a browser opens (12553.419459ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97731.192459
+
+# measurements (PEAK_MEDIA_EVIDENCE_DIR)
+{
+  "take": {
+    "width": 1280,
+    "height": 720,
+    "fps": 25,
+    "preset": "youtube"
+  },
+  "x264": {
+    "rc": "abr",
+    "bitrate": "8000",
+    "vbv_maxrate": "12000",
+    "keyint": "13",
+    "bframes": "2",
+    "open_gop": "0"
+  },
+  "checks": [
+    "ok video codec: h264",
+    "ok video profile: High",
+    "ok pixel format: yuv420p",
+    "ok audio codec: aac",
+    "ok audio sample rate: 48000",
+    "ok faststart (moov before mdat): ftyp,moov,free,mdat",
+    "ok width: 1280",
+    "ok height: 720",
+    "ok fps: 25.000",
+    "ok duration (\u00b11 frame): 9720 ms",
+    "ok [youtube] audio profile: LC",
+    "ok [youtube] audio channels: 2",
+    "ok [youtube] audio bitrate \u2264 384 kbps +15%: 2 kbps",
+    "ok [youtube] progressive: progressive",
+    "ok [youtube] encoder rate control (x264 SEI): rc=abr bitrate=8000 vbv_maxrate=12000",
+    "ok [youtube] CABAC (x264 SEI): cabac=1",
+    "ok [youtube] video bitrate \u2264 12000 kbps peak: 597 kbps",
+    "ok [youtube] GOP length = 13 frames (half of 25 fps): 13 frames",
+    "ok [youtube] closed GOP: closed",
+    "ok [youtube] 2 consecutive B-frames: max B run 2 (75 runs)",
+    "ok [youtube] no edit lists: 0 elst"
+  ],
+  "plateRefusal": {
+    "code": 2,
+    "ms": 90,
+    "stderr": "capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 \u2014 drop --preset"
+  }
+}
+$ capture --plates … --plate r1-feature --preset web
+capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset
+Run 'capture --help' for usage.
+exit=2 launched=no
+$ capture --plates … --plate r1-feature --preset youtube
+capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset
+Run 'capture --help' for usage.
+exit=2 launched=no
+$ capture --plates … --plate r1-feature --preset hifi
+capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset
+Run 'capture --help' for usage.
+exit=2 launched=no
+$ capture --plates … --plate r1-feature (no preset, real browser via spy)
+capture: launching browser (1280x720, 30 fps, mode narrated)
+capture: t0 anchored on the first frame; running storyboard-feature.mjs
+/tmp/wp13v-plate/plate.mp4: 211 frames at 30 fps = 7033 ms (narrated; plate, picture only; 1 beat(s), wall 7075 ms)
+/tmp/wp13v-plate/plate.take.json: take manifest
+exit=0 launched=yes
+stream|codec_name=h264|profile=High|codec_type=video|width=1280|height=720|r_frame_rate=30/1
+{"preset":null,"fps":30,"width":1280,"height":720,"mode":"narrated"}
+{"fps":30,"width":1280,"height":720}

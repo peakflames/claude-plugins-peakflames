@@ -1,0 +1,11 @@
+$ B="${TMPDIR:-/tmp}/todo-demo-prev-take" && mkdir -p "$B" && cp -p out/todo-demo.mp4 out/todo-demo.take.json "$B"/ && echo "backup: $B" && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard ~/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/storyboard.mjs --script ~/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/script.md --out ~/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/out/todo-demo.mp4 --preset web 2>&1 | tail -40; echo "exit=${pipestatus[1]}"; ls -la out
+backup: /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T//todo-demo-prev-take
+capture: launching browser (1280x720, 30 fps, mode captions)
+capture: t0 anchored on the first frame; running storyboard.mjs
+capture: beat 'nope' is not in script.md — valid: add, done, filter, clear
+exit=1
+total 248
+drwxr-xr-x@ 4 schaveyt  staff     128 Nov 10 19:33 .
+drwxr-xr-x@ 7 schaveyt  staff     224 Nov 10 19:33 ..
+-rw-r--r--@ 1 schaveyt  staff  115553 Nov 10 19:33 todo-demo.mp4
+-rw-r--r--@ 1 schaveyt  staff    4256 Nov 10 19:33 todo-demo.take.json

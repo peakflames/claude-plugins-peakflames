@@ -4,7 +4,7 @@
 
 ## Context
 
-We're building `plugins/peak-media/`, a public Claude Code plugin whose first capability is faceless motion-graphics video made from web content. The design is the "plate factory" (`plugins/peak-media/docs/plate-factory-workflow.md`): a **spine** sets the clock, each visual beat is a **plate** (`motion` | `slide` | `recorded`), and assembly composites the plates onto the spine. The unbuilt `/web2video` plan folds in as the `recorded` renderer, and its TTS layer moves into the spine. The work runs under `plugins/peak-media/docs/build/orchestration-plan.md`: the Lead does WP1–WP2, worktree Builders do the other WPs, a fresh Opus Verifier checks each WP, and every AC result points to evidence on file.
+We're building `plugins/peak-media/`, a public Claude Code plugin whose first capability is faceless motion-graphics video made from web content. The design is the "plate factory" (`plugins/peak-media/docs/plate-factory-workflow.md`): a **spine** sets the clock, each visual beat is a **plate** (`motion` | `slide` | `recorded`), and assembly composites the plates onto the spine. The unbuilt `/web2video` plan (at `0ea0ea6`, DEC-44) folds in as the `recorded` renderer, and its TTS layer moves into the spine. The work runs under `plugins/peak-media/docs/build/orchestration-plan.md`: the Lead does WP1–WP2, worktree Builders do the other WPs, a fresh Opus Verifier checks each WP, and every AC result points to evidence on file.
 
 ## 1. Decisions
 

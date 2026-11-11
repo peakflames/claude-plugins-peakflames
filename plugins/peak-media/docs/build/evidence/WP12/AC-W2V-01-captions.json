@@ -1,0 +1,84 @@
+{
+  "ui-demo": {
+    "captions": [
+      {
+        "beat": "add",
+        "text": "Type a task and press Enter",
+        "startMs": 12,
+        "durationMs": 1999
+      },
+      {
+        "beat": "done",
+        "text": "Tick a task when it is done",
+        "startMs": 2016,
+        "durationMs": 2329
+      },
+      {
+        "beat": "filter",
+        "text": "Filters show what is left, or done",
+        "startMs": 4349,
+        "durationMs": 2863
+      },
+      {
+        "beat": "clear",
+        "text": "Clear done tasks to tidy up",
+        "startMs": 7213,
+        "durationMs": 1999
+      }
+    ],
+    "bands": [
+      {
+        "ms": 1012,
+        "dark": 130
+      },
+      {
+        "ms": 3181,
+        "dark": 118
+      },
+      {
+        "ms": 5781,
+        "dark": 137
+      },
+      {
+        "ms": 8213,
+        "dark": 117
+      }
+    ]
+  },
+  "deck": {
+    "captions": [
+      {
+        "beat": "intro",
+        "text": "Water your garden in the morning",
+        "startMs": 913,
+        "durationMs": 4792
+      },
+      {
+        "beat": "why",
+        "text": "Less water lost, less mildew",
+        "startMs": 6863,
+        "durationMs": 6842
+      },
+      {
+        "beat": "how",
+        "text": "Water the roots deeply, then let the soil dry",
+        "startMs": 14863,
+        "durationMs": 4660
+      }
+    ],
+    "bands": [
+      {
+        "ms": 3309,
+        "dark": 144
+      },
+      {
+        "ms": 10284,
+        "dark": 128
+      },
+      {
+        "ms": 17193,
+        "dark": 182
+      }
+    ]
+  }
+}

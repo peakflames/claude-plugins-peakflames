@@ -1,0 +1,1 @@
+Rows top to bottom: footer crop (x0-640,y640-720) at t=0, 0.033, 0.067, 0.1, 0.2, 0.5 s. The API-key footer is visible in frame 0 only; the storyboard's addStyleTag hide lands from frame 1.

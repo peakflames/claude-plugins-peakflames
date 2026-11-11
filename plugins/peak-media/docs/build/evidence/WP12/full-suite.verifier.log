@@ -1,0 +1,186 @@
+✔ AC-BRD-01: brand-packs/default validates and every font has a licence file (409.160416ms)
+✔ default pack outro renders to 3 s (logo + name fade) with the plate scaffold layout (109893.132916ms)
+✔ AC-BRD-02: F1 plate 1 rendered with the default and a synthetic pack differs in colours and fonts only (contact sheets in evidence/WP5) (85375.481166ms)
+✔ AC-BRD-03: the plugin tree ships no music or other audio files (117.565166ms)
+✔ re-check WP2 F-9: F0 renders offline with brand-packs/default, identical to online, and the web fonts are really used (25250.120583ms)
+✔ AC-CON-01: F0, F1 and neutral fixtures validate against all three v1 schemas (1379.224958ms)
+✔ AC-CON-02: six bad fixtures each fail and name the field (972.348708ms)
+✔ AC-CON-03: legacy narration.json maps to a valid manifest keeping every legacy field (370.219541ms)
+✔ AC-BASE-02: validate baseline (help, version, bad input, no stack, no network) (768.353458ms)
+✔ validate: cross-reference checks (not AC-bound) (2216.665125ms)
+✖ AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media (2.084042ms)
+✔ AC-PKG-03: the runtime tree carries no house-brand name (D17), and the examples carry no brand assets (42.747208ms)
+✔ AC-PKG-06: every skill has at least one eval (node --test "plugins/peak-media/evals/**/*.test.mjs") (4.517042ms)
+✔ AC-PKG-07: VENDORED.md gives source, commit, date, licence and local changes for every vendor folder; GSAP and fonts are listed (2.797125ms)
+✔ packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs and JPEG — no audio or video anywhere (not AC-bound) (32.443875ms)
+✔ watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound) (5881.884792ms)
+# F1: spine 20773 ms (3 beats) + outro 3000 ms → out/final.mp4; PASS  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dc6fbQuEI6/pm-pkg04-riDmax/out/final.mp4
+✔ watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step's whole process group and leaves no temp folder (WP9 verify-2 N1; not AC-bound) (2254.92875ms)
+✔ watchdog: "not found" only when the binary does not exist, not from a real binary's exit 127 (WP9 verify-2 N2; not AC-bound) (137.935208ms)
+✔ AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps (164163.346292ms)
+✔ AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing (25513.812667ms)
+✔ stage 8: audio-options lists the pack's x-tracks and SFX by name, with credit and levels (283.223875ms)
+✔ stage 8: a pack with no tracks says so (ask for a folder, else narration only); a missing listed file fails in one line (222.862458ms)
+✔ stage 8: --folder lists only the audio files directly in the folder the user named (229.54125ms)
+✔ stage 8: stages.md tells the agent to offer pack tracks, then a named folder, then narration only (0.658708ms)
+✔ checker fixtures match generate.mjs (no hand edits, no real transcript) (30.16625ms)
+✔ checker: the good run passes every rule; the CLI exits 0 (147.22925ms)
+✔ checker: legitimate variants pass every rule (head-bold gate lines; an errored sheet run retried; a redirected render; a for-loop over plates) (426.761875ms)
+✔ skill docs: every stage ends with its literal gate line, and SKILL.md makes them output-style proof (0.969584ms)
+✔ skill docs + checker: gates 2, 5, 6, 7 are printed by their scripts; an echoed line does not count (WP9 round 5) (5.939667ms)
+✔ scripts print gates 5 and 6: render-plate --pipeline-test and gate build, PASS and FAIL forms (WP9 round 5) (26307.177792ms)
+✔ checker: gate out of order fails the AC-ORC-01 gate check with its line, and nothing else (2.435667ms)
+✔ checker: gate lines are strict about names, results and the user being asked (2.251042ms)
+✔ AC-ORC-02: storyboard produced and approved before any plates/<id>/index.html is written (transcript check) (95.789208ms)
+✔ AC-ORC-03: at most 3 self-review rounds per plate, then a separate reviewer Agent call (transcript check) (348.404583ms)
+✔ AC-ORC-04: runtimes.md is Read before the first plate is written (transcript check) (93.509666ms)
+✔ AC-ORC-05: retime-plates sets each plate to its spine beat, validates, and refuses anything but one plate per beat (1467.019333ms)
+✔ AC-BASE-13: retime-plates --help/--version/bad input follow the baseline (1742.024917ms)
+✔ round 6: approval with edits — GATE 1 comes after the edit, and a missing one fails (cold start r3) (8.412917ms)
+✔ round 6: a script gate line counts only from a real run of the plugin script (verify-4 F1/F3) (0.513125ms)
+✔ round 6: gate.mjs counts the reviewer's listed defects, checks the VERDICT, and matches sheets by exact id (verify-4 G6/F5) (3.961792ms)
+✔ round 7: a storyboard approved with a change is re-run and asked again; APPROVED without the re-ask fails (verify-5 F2-r5) (9.240833ms)
+✔ round 7: a defect status is an explicit trailing token; gate build prints FAIL on usage errors and missing ffmpeg (verify-5 N1/N2/N4) (498.393167ms)
+✔ AC-REAL-03: the real brand pack validates and its outro reproduces the reference outro (#s6) (93134.324209ms)
+✔ AC-SKL-01: F0 with no TTS key -> out/final.mp4 lasting 3.0 s ±1 frame (249.033375ms)
+✔ AC-SKL-02: final.mp4 meets the delivery spec (H.264 High, yuv420p, AAC 48 kHz, faststart, 1280x720) (252.253958ms)
+✔ AC-SKL-05: rendering the F0 plate twice gives identical per-frame md5 (12356.745333ms)
+✔ AC-SKL-06: with outbound network blocked, the F0 plate still renders (fonts and GSAP are local) (95136.920916ms)
+✔ AC-SKL-07: HyperFrames/Playwright versions appear only in lib/pins.json (+ package.json/lockfile mirrors) (85.048458ms)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (791.300625ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (386.9485ms)
+✔ AC-TRC-03: an area code with digits (AC-W2V-01) is traced and its test result reported (653.173167ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (316.337333ms)
+✔ contact-sheet: one labelled frame every 0.5 s (supports AC-SKL-03) (1076.08825ms)
+✔ AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a tone, with its timecode (1505.036541ms)
+✔ probe-spec: catches a file that misses the spec (not AC-bound) (304.964875ms)
+✔ AC-BASE-01: setup.sh baseline (help, version, bad input) (507.933959ms)
+✔ AC-BASE-03: contact-sheet baseline (1015.946417ms)
+✔ AC-BASE-04: probe-spec baseline (720.724416ms)
+✔ AC-BASE-05: check-cuts baseline (618.474333ms)
+✔ check-cuts: edge margin, negative --noise-db, bad threshold, out-of-range cut (not AC-bound) (2199.56775ms)
+✔ AC-ASM-01: F1 plates assembled on the spine — every plate cut lands in a ≥300 ms silent gap (7212.438833ms)
+✔ AC-ASM-02: music + SFX stems remuxed onto the review MP4 — video stream md5 unchanged (18967.401709ms)
+✔ default levels: music sits 9–15 dB under the voice, rises between lines, SFX hits are audible (5789.130458ms)
+✔ AC-ASM-03: out/final.mp4 passes probe-spec and lasts spine + outro ±1 frame (93014.839833ms)
+✔ AC-ASM-04: no music supplied — assembly succeeds with narration only (and a beat grid gets a silent track) (9731.960916ms)
+✔ AC-ASM-05: the final contact sheet ends on the brand outro (4857.633083ms)
+✔ AC-BASE-11: assemble --help lists every flag, --version = plugin.json, bad input is one line with no stack (1847.751792ms)
+✔ AC-BASE-12: remux-audio --help lists every flag, --version = plugin.json, bad input is one line with no stack (1580.50675ms)
+✔ assemble prints the GATE 7 line itself when every cut is in silence (WP9 round 5) (9232.547167ms)
+✔ AC-W2V-01: each beat shows its own caption — script.md On screen: lines (ui-demo) and spine onScreenText (narrated deck) (36665.985166ms)
+✔ AC-W2V-02: beat('nope') stops the take before any frame is encoded; the one-line error lists the valid ids (1527.516375ms)
+✔ AC-W2V-03: out-of-order, repeated, nested and uncalled beats each stop the take with a one-line message naming the fix (15973.919584ms)
+✔ AC-W2V-04: a beat lasts max(fn, hold) — a long fn lengthens it, a long hold outlasts a short fn — and the next beat starts after it (9568.119667ms)
+✔ AC-W2V-05: the arrow cursor is drawn at each click/type target and between them; --no-cursor draws none (contact sheets) (15270.241ms)
+✔ AC-W2V-06: after a hash-route change and a goto, one cursor and one caption are visible (contact sheets) (16481.900791ms)
+✔ AC-W2V-07: scrollBy(container, {y: 1500, ms: 600}) at 30 fps shows at least 10 distinct frames over the scroll (3327.633959ms)
+✔ AC-W2V-08: none of the pre-beat() storyboard calls is left in code files under skills/, evals/ and docs/build/fixtures/ (20.960542ms)
+✔ AC-W2V-01: the take manifest with per-beat entries validates against the v1 spine schema (61.348709ms)
+✔ AC-BASE-10: check-take --help lists every flag, --version = plugin.json, bad input is one actionable line, no network (192782.859875ms)
+✔ AC-REC-05: the --mp4 deliverable passes probe-spec (H.264 High, yuv420p, AAC 48 kHz, faststart), narrated at -16 LUFS, otherwise silent AAC (36856.71375ms)
+✔ AC-REC-06: on a sync page that flips a full-frame colour as each beat starts, with fake tones, the median offset is <= 120 ms and the worst <= 200 ms (67473.583709ms)
+✔ AC-REC-07: on the narrated example deck, every scene change (threshold 0.02) lands inside silence (-40 dB, >= 900 ms) (3991.014875ms)
+✔ AC-REC-08: ui-demo stills inside each beat show the caption; --no-captions shows none; --caption-css changes the style (23907.65275ms)
+✔ AC-REC-09: the take manifest validates against the v1 spine schema and command[] reproduces the take (11764.322042ms)
+✔ AC-REC-10: with no key, the captions-only example passes with 0 OpenRouter calls (719.797167ms)
+✔ watchdog: a hanging storyboard is aborted at --max-ms with one line and the process exits (4128.737542ms)
+✔ watchdog: a spine-timed take that overruns its window by more than 2 s is aborted (17391.890083ms)
+✔ captions: --caption-engine dom draws the caption in the page instead of showOverlay (3277.983833ms)
+✔ AC-BASE-09: capture --help lists every flag, --version = plugin.json, bad input is one actionable line, no network (1401.047792ms)
+✔ AC-REC-01: --help lists the recorder flags and no narration flags; each flag parses (2328.999583ms)
+✔ AC-REC-02: missing Chromium, missing ffmpeg or a bad --spine exit non-zero in < 2 s with no browser launch (5382.242083ms)
+✔ AC-REC-03: the example deck storyboard runs unmodified in silent, captions and narrated modes (47825.63675ms)
+✔ AC-REC-04: F3 live plates on a 3-clip spine capture to their planned durations ±1 frame (32858.785042ms)
+✔ AC-REC-04: the frame grid places frames by their own timestamps (t0 = first onFrame) and fills to an exact count (32.236791ms)
+✔ layout: motion close plate keeps display text >= 56 px and wraps its long line instead of shrinking (227.79825ms)
+✔ layout: settled motion text block is centred in the frame within 2% both ways (560.264583ms)
+✔ layout: the last table row (and last bullet) has settled by 60% of the slide plate (381.812584ms)
+✔ layout: slide body stays inside the content box and nothing reaches the footer (1113.274959ms)
+✔ layout: a long URL in a table cell does not split a neighbour's word, and the body ends inside the content box (936.49925ms)
+✔ AC-BASE-08: render-plate --help/--version/bad input follow the baseline (1517.06125ms)
+✔ AC-BASE-08: a live plate named explicitly is refused with a pointer to video-capture (136.510417ms)
+✔ AC-BASE-08: --all skips live plates (they belong to video-capture) (255.766667ms)
+✔ AC-PLT-01: every F1 plate renders alone to durationMs ±1 frame (67173.063584ms)
+✔ AC-PLT-01: a hand-authored index.html is kept; brand/ and vendor/ are refreshed (1095.827ms)
+✔ AC-PLT-01: an over-long motion line wraps inside the frame (no edge overflow) (17128.455542ms)
+✔ AC-PLT-01: text that cannot fit at the 27 px floor fails fast with one line naming the plate (135.928292ms)
+✔ AC-PLT-04: every F1 and F2 plate passes hyperframes lint and check --strict (17269.800292ms)
+✔ AC-VND-01: every path listed in vendored-map.md exists (2.145375ms)
+✔ AC-VND-01: every vendor folder is referenced by vendored-map.md (no orphans) (3.123167ms)
+✔ AC-VND-01: the map tells the agent to Read runtimes.md before the first plate (0.299792ms)
+✔ AC-VND-02: no `hyperframes events` telemetry line anywhere in the vendor tree; LICENSE is present (3.173292ms)
+✔ AC-VND-02: vendored skills are references, not registered skills (no SKILL.md under vendor/) (1.691834ms)
+✔ AC-SPN-01: F1 brief → script → spine with fake/tone; manifest.totalMs within 20 s ±10% and validates (148.602708ms)
+✔ AC-SPN-02: F1 with the key unset → beatgrid.json validates, 0 OpenRouter calls, runtime within ±10% (320.201042ms)
+✔ AC-SPN-03: F1 manifest gaps between beats are ≥ 400 ms and check-cuts passes at every beat boundary (177.032917ms)
+✔ AC-BASE-06: spine baseline (help lists every flag, version, one-line errors, no stack, no network) (1509.763833ms)
+✔ spine: script.md parsing, layout rules and a second (neutral) brief (not AC-bound) (193.164708ms)
+✔ spine prints the GATE 2 line itself when the runtime check passes (WP9 round 5) (640.520917ms)
+✔ openrouter: sample rate read from the response content-type, table as fallback (not AC-bound) (15.172542ms)
+✔ AC-TTS-01: bad voice, missing key and missing ffmpeg fail fast, one line, no network (315.54525ms)
+ℹ --voice Nope: exit 2 in 87 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+ℹ key unset: exit 3 in 90 ms — sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)
+ℹ ffmpeg missing: exit 3 in 135 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+✔ AC-TTS-02: cache key equals every legacy narration.json file name byte for byte (0.877292ms)
+ℹ 9/9 legacy clip keys match (model google/gemini-3.8-flash-lite-tts, voice Rasalgethi)
+✔ AC-TTS-03: a WAV seeded only in the legacy cache is reused with 0 synthesis calls (252.628167ms)
+ℹ lib: clip reused from pm-tts-legacy-1AUtQC/…/tts, calls=0, 1234 ms
+ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dc6fbQuEI6/pm-tts-legacy-out-vmrnDu/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached
+✔ AC-TTS-04: F1 run twice → run 2 is N/N cached with 0 calls; exported clips reproduce the run (35.115333ms)
+ℹ run1 calls=3, run2 calls=0 (3/3 cached), from export calls=0 (3/3 cached)
+ℹ 
+clip  words   sec  wpm  cached
+----  -----  ----  ---  ------
+1        19  6.91  165     yes
+2        25  9.09  165     yes
+3        21  7.64  165     yes
+median 165 wpm · 3/3 cached
+✔ AC-TTS-05: one fake clip slowed 2× → wpm table prints and the warning names that clip (42.02675ms)
+ℹ 
+clip  words    sec  wpm  cached
+----  -----  -----  ---  ------
+1        19   6.91  165      no
+2        25  18.18   82      no
+3        21   7.64  165      no
+median 165 wpm · 0/3 cached
+WARN slow clip 2: 82 wpm vs median 165 — a mood tag may have been read aloud; check its text
+✔ AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs and 3 wpm lines (664.265125ms)
+ℹ 
+Achird   32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dc6fbQuEI6/pm-tts-sv-tp1You/samples/Achird.wav
+Kore     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dc6fbQuEI6/pm-tts-sv-tp1You/samples/Kore.wav
+Puck     32 words   11.29 s  170 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.dc6fbQuEI6/pm-tts-sv-tp1You/samples/Puck.wav
+google/gemini-3.8-flash-lite-tts · median 170 wpm · 0/3 cached
+[debug-requests] {"request":{"method":"POST","url":"https://openrouter.ai/api/v1/audio/speech","headers":{"Authorization":"Bearer ***REDACTED***","Content-Type":"application/json"},"body":{"model":"google/gemini-3.8-flash-lite-tts","input":"Here is a short paragraph for comparing narrators. It has a question, a list of three things, and a closing line. Which voice sounds most like the video you have in mind?","voice":"Achird","response_format":"pcm","provider":{"zdr":true},"instructions":"Clear, friendly, unhurried explainer tone."}}}
+✔ AC-TTS-08: a PCM response is cached as a valid WAV that ffprobe reads (182.318917ms)
+ℹ ffprobe: pcm_s16le 24000 Hz 1 ch, 3529 ms, 169456 bytes
+✔ AC-BASE-07: sample-voice baseline (help, version, bad input, no stack, no network) (717.977292ms)
+ℹ tests 127
+ℹ suites 0
+ℹ pass 126
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 394389.926917
+
+✖ failing tests:
+
+test at plugins/peak-media/evals/packaging/packaging.test.mjs:34:1
+✖ AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media (2.084042ms)
+  AssertionError [ERR_ASSERTION]: plugin.json version matches the top CHANGELOG entry
+  
+  '0.1.0' !== '0.2.0'
+  
+      at TestContext.<anonymous> (file://~/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a54c49dbc1e265c3f/plugins/peak-media/evals/packaging/packaging.test.mjs:38:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '0.1.0',
+    expected: '0.2.0',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

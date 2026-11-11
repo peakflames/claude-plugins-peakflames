@@ -1,0 +1,28 @@
+{
+  "holds": {
+    "long-fn": 1500,
+    "long-hold": 5000
+  },
+  "fnMs": {
+    "long-fn": 2600,
+    "long-hold": 300
+  },
+  "beats": [
+    {
+      "n": 1,
+      "id": "long-fn",
+      "text": "Go.",
+      "startMs": 12,
+      "caption": true,
+      "durationMs": 2602
+    },
+    {
+      "n": 2,
+      "id": "long-hold",
+      "text": "This caption has fourteen words so its reading hold runs for well over four seconds.",
+      "startMs": 2614,
+      "caption": true,
+      "durationMs": 5000
+    }
+  ]
+}

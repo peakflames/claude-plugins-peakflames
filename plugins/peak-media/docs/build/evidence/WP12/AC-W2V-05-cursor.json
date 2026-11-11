@@ -1,0 +1,88 @@
+{
+  "note": "near-black px in the 22x28 box below-right of each target (the arrow body); \"between\" = the cursor resting between helpers",
+  "targets": [
+    {
+      "action": "type",
+      "beat": "add",
+      "x": 603,
+      "y": 152,
+      "ms": 612,
+      "cursor": 109,
+      "noCursor": 0
+    },
+    {
+      "action": "type",
+      "beat": "add",
+      "x": 603,
+      "y": 152,
+      "ms": 1061,
+      "cursor": 110,
+      "noCursor": 0
+    },
+    {
+      "action": "click",
+      "beat": "done",
+      "x": 371,
+      "y": 217,
+      "ms": 2612,
+      "cursor": 110,
+      "noCursor": 0
+    },
+    {
+      "action": "click",
+      "beat": "filter",
+      "x": 715,
+      "y": 404,
+      "ms": 4929,
+      "cursor": 110,
+      "noCursor": 0
+    },
+    {
+      "action": "click",
+      "beat": "filter",
+      "x": 789,
+      "y": 404,
+      "ms": 6918,
+      "cursor": 110,
+      "noCursor": 0
+    },
+    {
+      "action": "click",
+      "beat": "clear",
+      "x": 878,
+      "y": 404,
+      "ms": 7795,
+      "cursor": 120,
+      "noCursor": 16
+    },
+    {
+      "action": "click",
+      "beat": "clear",
+      "x": 652,
+      "y": 404,
+      "ms": 8678,
+      "cursor": 111,
+      "noCursor": 0
+    }
+  ],
+  "between": [
+    {
+      "x": 603,
+      "y": 152,
+      "ms": 1952,
+      "px": 110
+    },
+    {
+      "x": 371,
+      "y": 217,
+      "ms": 4269,
+      "px": 111
+    },
+    {
+      "x": 715,
+      "y": 404,
+      "ms": 6258,
+      "px": 110
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orders</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font: 16px/1.4 system-ui, sans-serif; color: #1d232b; background: #f3f5f8; }
+  body { display: flex; flex-direction: column; }
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 24px 32px 8px; gap: 12px; }
+  .bar { display: flex; align-items: center; gap: 16px; }
+  .bar h1 { margin: 0; font-size: 24px; flex: 1; }
+  #break { font: inherit; padding: 8px 16px; border: 0; border-radius: 6px; background: #c2410c; color: #fff; cursor: pointer; }
+  #rows { flex: 1; min-height: 0; overflow-y: auto; background: #fff; border: 1px solid #d5dbe3; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { position: sticky; top: 0; background: #1d4ed8; color: #fff; text-align: left; padding: 10px 16px; }
+  tbody td { padding: 8px 16px; border-top: 1px solid #edf0f4; }
+  tbody tr:nth-child(even) td { background: #f8fafc; }
+  footer { padding: 8px 32px 16px; font-size: 14px; color: #5b6573; }
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <h1>Orders</h1>
+    <button id="break" type="button">Break</button>
+  </div>
+  <div id="rows">
+    <table>
+      <thead><tr><th>#</th><th>Item</th><th>Status</th><th>Total</th></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+</main>
+<footer>Connected · API key: sk-demo-0000-FLAG-ME</footer>
+<script>
+  const items = ['Desk lamp', 'Notebook', 'Cable', 'Chair', 'Monitor arm', 'Mug', 'Headset', 'Plant'];
+  const states = ['Open', 'Packed', 'Shipped', 'Delivered'];
+  const body = document.getElementById('body');
+  for (let i = 1; i <= 200; i++) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i}</td><td>${items[i % items.length]}</td><td>${states[i % states.length]}</td><td>$${(i * 7.25).toFixed(2)}</td>`;
+    body.appendChild(tr);
+  }
+  // A deliberate bug: reading a property of an order that doesn't exist throws a TypeError.
+  document.getElementById('break').addEventListener('click', () => {
+    const order = undefined;
+    return order.id;
+  });
+</script>
+</body>
+</html>

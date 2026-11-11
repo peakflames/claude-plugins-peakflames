@@ -1,6 +1,6 @@
 # peak-media build: multi-agent orchestration scheme
 
-*Draft 2026-11-08. Inputs: `tmp/plate_factory_kickoff_prompt.md`, `plugins/peak-media/docs/plate-factory-workflow.md`, `plugins/peak-media/docs/web2video-plan.md`, `plugins/peak-media/docs/build/references/openspec-vs-peak-workflow.md` (test-video topic).*
+*Draft 2026-11-08. Inputs: `tmp/plate_factory_kickoff_prompt.md`, `plugins/peak-media/docs/plate-factory-workflow.md`, `plugins/peak-media/docs/web2video-plan.md` (at `0ea0ea6`), `plugins/peak-media/docs/build/references/openspec-vs-peak-workflow.md` (test-video topic).*
 
 ---
 
@@ -85,7 +85,7 @@ Sources folded in:
 
 - **Kickoff milestone checks** → one AC each (runtime ±10%, cache-key test, duration match, contact sheet, cuts in silence, orchestrator end to end, packaging items).
 - **Design §7 publishing rules** → schemaVersion on all three contracts, every external dependency optional (no-key run, no-music run, headless/cloud run), evals per skill.
-- **web2video D-items, re-homed:**
+- **web2video D-items (plan at `0ea0ea6`, DEC-44), re-homed:**
 
 | D | Still applies? | New home / change |
 |---|---|---|
@@ -194,7 +194,7 @@ Builders do not use plan mode. They run unattended in worktrees, plan mode would
 
 **Start the Lead session in plan mode** (`claude --permission-mode plan`, or Shift+Tab until "plan mode"), on `feature/new-peak-media-plugin`, and paste:
 
-> Read `tmp/plate_factory_kickoff_prompt.md` (the task), `plugins/peak-media/docs/build/orchestration-plan.md` (how we'll run it), and `plugins/peak-media/docs/plate-factory-workflow.md` + `web2video-plan.md` in full. You are the Lead in the orchestration plan. Test-video topic: `plugins/peak-media/docs/build/references/openspec-vs-peak-workflow.md`; use the fixtures in plan §6 for the kickoff's "first real video".
+> Read `tmp/plate_factory_kickoff_prompt.md` (the task), `plugins/peak-media/docs/build/orchestration-plan.md` (how we'll run it), and `plugins/peak-media/docs/plate-factory-workflow.md` + `web2video-plan.md` (as of commit `0ea0ea6`, see DEC-44) in full. You are the Lead in the orchestration plan. Test-video topic: `plugins/peak-media/docs/build/references/openspec-vs-peak-workflow.md`; use the fixtures in plan §6 for the kickoff's "first real video".
 >
 > This session is WP0. Spawn the four Researchers from plan §2 in parallel (HyperFrames current release + changelog; HyperFrames skills and their licenses; OpenRouter TTS request shape + ZDR field; Playwright screencast API), then ask me your clarifying questions one at a time. Then write the plan: skill names and folder layout, decisions with reasons, the full `acceptance.md` register with given/when/then and baseline ACs, and a brief for each WP. Don't write code until I approve the plan.
 >

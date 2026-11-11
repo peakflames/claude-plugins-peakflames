@@ -1,0 +1,5 @@
+# Footer-key privacy scan (driver)
+Footer text region crop=285:48:30:668 (footer text 'Connected · API key: sk-demo-0000-FLAG-ME', #5b6573 on ~#f3f4f8); signalstats YMIN per frame, text present => YMIN < 150.
+r2 take: frames=598 minYMIN=188 frames_with_text=0
+r1 take (control): frames=592 minYMIN=61 frames_with_text=1
+Frame 0 (t=0.000) and last frame (n=597, t≈19.90 s) of the r2 take extracted at 1280×720 and read by the driver: footer area empty in both, no key text (frames-0-last.jpg).

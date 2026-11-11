@@ -1,0 +1,14 @@
+✔ AC-W2V-41: no removed storyboard API in Markdown under skills/ and docs/reference/ (3.8435ms)
+✔ AC-W2V-41: every flag in capture --help (and capture signin --help) is documented (177.119917ms)
+✔ AC-W2V-36: narrated with no key — the first commands the skill runs give one line naming PEAK_MEDIA_OPENROUTER_API_KEY, exit non-zero, launch no browser; SKILL.md stops there and offers captions (180.242917ms)
+✔ AC-W2V-38: no brand or organization name in the plugin runtime tree, web2video included (author metadata excluded) (19.655833ms)
+✔ web2video docs: every command runs a plugin script as node "${CLAUDE_PLUGIN_ROOT}/…" with flags that script accepts (not AC-bound) (486.169375ms)
+✔ UAT fixtures: cases.md lists AC-UAT-01..12 once each with a fixture; login-demo signs in by cookie; rough-app has its three traps (not AC-bound) (89.302334ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 852.641209

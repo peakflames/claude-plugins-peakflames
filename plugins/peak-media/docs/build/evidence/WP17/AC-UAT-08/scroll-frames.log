@@ -1,0 +1,3 @@
+beat scroll (scrollBy y:2000 over 5000 ms): 5.0s window from 6.08s -> 148 distinct frames (ffmpeg mpdecimate default thresholds)
+beat deeper (scrollBy y:2200 over 4200 ms): 4.2s window from 12.74s -> 125 distinct frames (ffmpeg mpdecimate default thresholds)
+control: beat top hold (no scroll): 4.0s window from 1.0s -> 1 distinct frames (ffmpeg mpdecimate default thresholds)

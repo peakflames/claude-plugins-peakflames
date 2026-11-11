@@ -1,0 +1,62 @@
+# verifier: removed flags/extensions
+$ capture --help | grep -nE "mp4|webm|mkv|preset"
+3:Usage: capture --storyboard <file.mjs> (--script script.md | --spine manifest.json) --out <take.mp4> [--preset web|youtube|hifi] [options]   |   capture --plates plates.json --plate <id>
+19:--out is the MP4 deliverable with audio, encoded to --preset (default web): a narrated take gets
+21:to -16 LUFS; other takes get a silent AAC track. Every preset is H.264 High, yuv420p, faststart,
+26:--viewport and --fps override the preset's capture size and fps; the encode stays the preset's.
+28:size and fps; --preset is refused there. Every take writes a take manifest (v1 spine schema).
+35:      --out <file.mp4>                The take: the MP4 deliverable with audio, encoded to --preset; with --plate the picture-only plate MP4 (default there: <project>/renders/plates/<id>.mp4)
+36:      --preset <web|youtube|hifi>     Capture size, fps and encode of a standalone take (default: web; see above). Not with --plates
+37:      --viewport <WxH>                Browser viewport (default: the plate's live.viewport, else the preset's size)
+48:      --fps <n>                       Capture frame rate, 1-60 (default: plates.json fps, else the preset's)
+57:  capture --storyboard examples/ui-demo/storyboard.mjs --script examples/ui-demo/script.md --out /tmp/ui-demo.mp4 --preset youtube
+--- grep webm/mkv/--mp4/OUT_EXT/vp9 in capture.mjs, check-take.mjs:
+(none above = removed)
+$ capture ... --out /tmp/x.webm
+capture: --out must end in .mp4, got 'wp13v-x.webm'
+Run 'capture --help' for usage.
+exit=2
+$ capture ... --out /tmp/x.mkv
+capture: --out must end in .mp4, got 'wp13v-x.mkv'
+Run 'capture --help' for usage.
+exit=2
+$ capture ... --out /tmp/x.mov
+capture: --out must end in .mp4, got 'wp13v-x.mov'
+Run 'capture --help' for usage.
+exit=2
+$ capture ... --out /tmp/x.mp4 --mp4 /tmp/y.mp4
+capture: Unknown option '--mp4'
+Run 'capture --help' for usage.
+exit=2
+$ capture ... --mp4 /tmp/y.mp4 (no --out)
+capture: Unknown option '--mp4'
+Run 'capture --help' for usage.
+exit=2
+$ capture ... --preset 4k
+capture: --preset must be one of web, youtube, hifi, got '4k'
+Run 'capture --help' for usage.
+exit=2
+(eval):1: no matches found: /tmp/wp13v-x.*
+
+# verifier: plate refusal with a browser spy (HYPERFRAMES_BROWSER_PATH), then a real plate take
+$ capture --plates … --plate r1-feature --preset web
+capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset
+Run 'capture --help' for usage.
+exit=2 launched=no
+$ capture --plates … --plate r1-feature --preset youtube
+capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset
+Run 'capture --help' for usage.
+exit=2 launched=no
+$ capture --plates … --plate r1-feature --preset hifi
+capture: --preset is for standalone takes: plate 'r1-feature' keeps plates.json's size and fps and writes a picture-only MP4 — drop --preset
+Run 'capture --help' for usage.
+exit=2 launched=no
+$ capture --plates … --plate r1-feature (no preset, real browser via spy)
+capture: launching browser (1280x720, 30 fps, mode narrated)
+capture: t0 anchored on the first frame; running storyboard-feature.mjs
+/tmp/wp13v-plate/plate.mp4: 211 frames at 30 fps = 7033 ms (narrated; plate, picture only; 1 beat(s), wall 7075 ms)
+/tmp/wp13v-plate/plate.take.json: take manifest
+exit=0 launched=yes
+stream|codec_name=h264|profile=High|codec_type=video|width=1280|height=720|r_frame_rate=30/1
+{"preset":null,"fps":30,"width":1280,"height":720,"mode":"narrated"}
+{"fps":30,"width":1280,"height":720}

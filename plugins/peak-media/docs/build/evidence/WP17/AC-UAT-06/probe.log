@@ -1,0 +1,17 @@
+$ node $P/lib/verify/probe-spec.mjs ~/tmp/pm-w2v-uat/AC-UAT-06/web2video/ui-demo/out/ui-demo.mp4 --preset hifi
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1920
+ok    height: 1080
+ok    fps: 60.000
+ok    [hifi] audio profile: LC
+ok    [hifi] audio channels: 2
+ok    [hifi] audio bitrate ≤ 256 kbps +15%: 2 kbps
+ok    [hifi] progressive: progressive
+ok    [hifi] encoder rate control (x264 SEI): rc=crf crf=16.0
+PASS  ~/tmp/pm-w2v-uat/AC-UAT-06/web2video/ui-demo/out/ui-demo.mp4
+exit=0

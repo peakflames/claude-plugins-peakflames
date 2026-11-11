@@ -1,0 +1,18 @@
+# AC-W2V-08 verifier (wp12-verifier-1), 2026-11-10T21:32:20Z
+## ac-run --wp WP12
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-W2V-08 | script | pass | not-started | — |
+## node --test evals/video-capture/beat.test.mjs (run alone)
+✔ AC-W2V-08: none of the pre-beat() storyboard calls is left in code files under skills/, evals/ and docs/build/fixtures/ (9.034125ms)
+ℹ tests 9
+ℹ pass 9
+ℹ fail 0
+## full suite (TMPDIR=mktemp)
+✔ AC-W2V-08: none of the pre-beat() storyboard calls is left in code files under skills/, evals/ and docs/build/fixtures/ (20.960542ms)
+ℹ tests 127
+ℹ pass 126
+ℹ fail 1
+
+## independent grep: grep -rnE 'say\(|waitForVoice' --include=*.mjs/*.js/*.html skills evals docs/build/fixtures
+grep exit=1 (1 = 0 hits)

@@ -1,0 +1,26 @@
+# verifier: synthetic check-take cases (ffmpeg lavfi; 440 Hz tone, silent 1.0-2.1 s and 4.0-5.2 s)
+# A: cuts 2.0 (silence) + 2.2 (speech); B: chain 4.5..5.3 every 200 ms, last over speech; C: cuts 1.3+1.5 both in silence; D: bottom-20% box appears at 3.0 over speech
+=== case A
+FAIL  scene change at 0:02.000 (a transition over 2 frames) —over sound (move it into a pause between clips)
+FAIL  1 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 1 not in a ≥ 900 ms silence — A.mp4
+exit=1
+=== case B
+FAIL  scene change at 0:04.500 (a transition over 5 frames) —over sound (move it into a pause between clips)
+FAIL  1 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 1 not in a ≥ 900 ms silence — B.mp4
+exit=1
+=== case C
+ok    scene change at 0:01.300 (a transition over 2 frames) —silence 1109 ms
+PASS  1 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — C.mp4
+exit=0
+=== case D
+FAIL  no scene changes found on a narrated take at threshold 0.02 — gradual fades score below it: lower --scene-threshold, or pass --expect-cuts 0 if the take really has none — D.mp4
+exit=1
+=== case C --expect-cuts 2
+FAIL  expected 2 scene change(s), found 1 at threshold 0.02
+ok    scene change at 0:01.300 (a transition over 2 frames) —silence 1109 ms
+FAIL  expected 2 scene change(s), found 1 at threshold 0.02; 1 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — C.mp4
+exit=1
+=== case D --caption-band 0
+FAIL  scene change at 0:03.000 —over sound (move it into a pause between clips)
+FAIL  1 scene change(s) at threshold 0.02, 1 not in a ≥ 900 ms silence — D.mp4
+exit=1

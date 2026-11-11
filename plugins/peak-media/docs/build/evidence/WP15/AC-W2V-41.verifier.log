@@ -1,0 +1,11 @@
+✔ AC-W2V-41: no removed storyboard API in Markdown under skills/ and docs/reference/ (3.371083ms)
+✔ AC-W2V-41: every flag in capture --help (and capture signin --help) is documented (173.371375ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 245.624958
+exit 0

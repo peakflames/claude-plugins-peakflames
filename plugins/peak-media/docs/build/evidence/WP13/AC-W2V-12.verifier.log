@@ -1,0 +1,163 @@
+# node --test --test-reporter=spec evals/video-capture/presets.test.mjs (verifier run, 2026-11-10)
+✔ AC-W2V-12: the ui-demo captured once per preset passes probe-spec --preset for each (27229.460083ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97731.192459
+
+# measurements (PEAK_MEDIA_EVIDENCE_DIR)
+{
+  "web": {
+    "checks": [
+      "ok video codec: h264",
+      "ok video profile: High",
+      "ok pixel format: yuv420p",
+      "ok audio codec: aac",
+      "ok audio sample rate: 48000",
+      "ok faststart (moov before mdat): ftyp,moov,free,mdat",
+      "ok width: 1280",
+      "ok height: 720",
+      "ok fps: 30.000",
+      "ok duration (\u00b11 frame): 9700 ms",
+      "ok [web] audio profile: LC",
+      "ok [web] audio channels: 2",
+      "ok [web] audio bitrate \u2264 128 kbps +15%: 2 kbps",
+      "ok [web] progressive: progressive",
+      "ok [web] encoder rate control (x264 SEI): rc=crf crf=26.0"
+    ]
+  },
+  "youtube": {
+    "checks": [
+      "ok video codec: h264",
+      "ok video profile: High",
+      "ok pixel format: yuv420p",
+      "ok audio codec: aac",
+      "ok audio sample rate: 48000",
+      "ok faststart (moov before mdat): ftyp,moov,free,mdat",
+      "ok width: 1920",
+      "ok height: 1080",
+      "ok fps: 30.000",
+      "ok duration (\u00b11 frame): 9733 ms",
+      "ok [youtube] audio profile: LC",
+      "ok [youtube] audio channels: 2",
+      "ok [youtube] audio bitrate \u2264 384 kbps +15%: 2 kbps",
+      "ok [youtube] progressive: progressive",
+      "ok [youtube] encoder rate control (x264 SEI): rc=abr bitrate=8000 vbv_maxrate=12000",
+      "ok [youtube] CABAC (x264 SEI): cabac=1",
+      "ok [youtube] video bitrate \u2264 12000 kbps peak: 662 kbps",
+      "ok [youtube] GOP length = 15 frames (half of 30 fps): 15 frames",
+      "ok [youtube] closed GOP: closed",
+      "ok [youtube] 2 consecutive B-frames: max B run 2 (97 runs)",
+      "ok [youtube] no edit lists: 0 elst"
+    ]
+  },
+  "hifi": {
+    "checks": [
+      "ok video codec: h264",
+      "ok video profile: High",
+      "ok pixel format: yuv420p",
+      "ok audio codec: aac",
+      "ok audio sample rate: 48000",
+      "ok faststart (moov before mdat): ftyp,moov,free,mdat",
+      "ok width: 1920",
+      "ok height: 1080",
+      "ok fps: 60.000",
+      "ok duration (\u00b11 frame): 9733 ms",
+      "ok [hifi] audio profile: LC",
+      "ok [hifi] audio channels: 2",
+      "ok [hifi] audio bitrate \u2264 256 kbps +15%: 2 kbps",
+      "ok [hifi] progressive: progressive",
+      "ok [hifi] encoder rate control (x264 SEI): rc=crf crf=16.0"
+    ]
+  },
+  "control": {
+    "file": "ui-web.mp4 checked as youtube",
+    "failed": [
+      "width",
+      "height",
+      "[youtube] encoder rate control (x264 SEI)",
+      "[youtube] GOP length = 15 frames (half of 30 fps)",
+      "[youtube] 2 consecutive B-frames",
+      "[youtube] no edit lists"
+    ]
+  }
+}
+=== web
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    [web] audio profile: LC
+ok    [web] audio channels: 2
+ok    [web] audio bitrate ≤ 128 kbps +15%: 2 kbps
+ok    [web] progressive: progressive
+ok    [web] encoder rate control (x264 SEI): rc=crf crf=26.0
+PASS  /tmp/wp13v-caps/web.mp4
+probe-spec exit=0
+stream|codec_name=h264|profile=High|width=1280|height=720|pix_fmt=yuv420p|field_order=progressive|r_frame_rate=30/1|avg_frame_rate=30/1|bit_rate=51595
+stream|codec_name=aac|profile=LC|sample_rate=48000|channels=2|channel_layout=stereo|r_frame_rate=0/0|avg_frame_rate=0/0|bit_rate=2276
+format|duration=9.700000
+cabac=1 interlaced=0 bluray_compat=0 bframes=3 b_adapt=1 open_gop=0 keyint=250 keyint_min=25 scenecut=40 rc=crf crf=26.0 
+moov@ 36 mdat@ 12121 False elst count 2
+{"preset":"web","fps":30,"width":1280,"height":720,"out":"web.mp4"}
+=== youtube
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1920
+ok    height: 1080
+ok    fps: 30.000
+ok    [youtube] audio profile: LC
+ok    [youtube] audio channels: 2
+ok    [youtube] audio bitrate ≤ 384 kbps +15%: 2 kbps
+ok    [youtube] progressive: progressive
+ok    [youtube] encoder rate control (x264 SEI): rc=abr bitrate=8000 vbv_maxrate=12000
+ok    [youtube] CABAC (x264 SEI): cabac=1
+ok    [youtube] video bitrate ≤ 12000 kbps peak: 666 kbps
+ok    [youtube] GOP length = 15 frames (half of 30 fps): 15 frames
+ok    [youtube] closed GOP: closed
+ok    [youtube] 2 consecutive B-frames: max B run 2 (97 runs)
+ok    [youtube] no edit lists: 0 elst
+PASS  /tmp/wp13v-caps/youtube.mp4
+probe-spec exit=0
+stream|codec_name=h264|profile=High|width=1920|height=1080|pix_fmt=yuv420p|field_order=progressive|r_frame_rate=30/1|avg_frame_rate=30/1|bit_rate=665698
+stream|codec_name=aac|profile=LC|sample_rate=48000|channels=2|channel_layout=stereo|r_frame_rate=0/0|avg_frame_rate=0/0|bit_rate=2278
+format|duration=9.754667
+cabac=1 interlaced=0 bluray_compat=0 bframes=2 b_adapt=0 open_gop=0 keyint=15 keyint_min=8 scenecut=0 rc=abr bitrate=8000 vbv_maxrate=12000 vbv_bufsize=16000 
+moov@ 40 mdat@ 11543 False elst count 0
+{"preset":"youtube","fps":30,"width":1920,"height":1080,"out":"youtube.mp4"}
+=== hifi
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1920
+ok    height: 1080
+ok    fps: 60.000
+ok    [hifi] audio profile: LC
+ok    [hifi] audio channels: 2
+ok    [hifi] audio bitrate ≤ 256 kbps +15%: 2 kbps
+ok    [hifi] progressive: progressive
+ok    [hifi] encoder rate control (x264 SEI): rc=crf crf=16.0
+PASS  /tmp/wp13v-caps/hifi.mp4
+probe-spec exit=0
+stream|codec_name=h264|profile=High|width=1920|height=1080|pix_fmt=yuv420p|field_order=progressive|r_frame_rate=60/1|avg_frame_rate=60/1|bit_rate=135184
+stream|codec_name=aac|profile=LC|sample_rate=48000|channels=2|channel_layout=stereo|r_frame_rate=0/0|avg_frame_rate=0/0|bit_rate=2278
+format|duration=9.733333
+cabac=1 interlaced=0 bluray_compat=0 bframes=3 b_adapt=1 open_gop=0 keyint=250 keyint_min=25 scenecut=40 rc=crf crf=16.0 
+moov@ 36 mdat@ 16964 False elst count 2
+{"preset":"hifi","fps":60,"width":1920,"height":1080,"out":"hifi.mp4"}

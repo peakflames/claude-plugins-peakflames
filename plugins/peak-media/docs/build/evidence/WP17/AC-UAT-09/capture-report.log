@@ -1,0 +1,89 @@
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && python3 - <<'E'
+p='storyboard.mjs'; s=open(p).read()
+s=s.replace("export default async function storyboard({ beat, click, point, wait }) {\n","export default async function storyboard({ beat, click, point, wait, page }) {\n  // Private data: the footer shows an API key. Hide it (layout kept) before the first beat.\n  await page.addStyleTag({ content: 'footer { visibility: hidden !important; }' });\n")
+open(p,'w').write(s)
+E
+node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/rough-app-break.mp4 --preset web 2>&1 | tail -30
+capture: launching browser (1280x720, 30 fps, mode captions)
+capture: t0 anchored on the first frame; running storyboard.mjs
+capture: audio: silent AAC track (no narration in this take)
+wrote out/rough-app-break.mp4 (0.1 MB, 1280x720 @ 30 fps, 19.3 s, preset web)
+beats: orders 0.02–6.13 s · break 6.13–12.3 s · after 12.3–18.8 s
+page errors during take: 1
+  TypeError: Cannot read properties of undefined (reading 'id')
+take manifest: ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/out/rough-app-break.take.json
+
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && ln -s ../../rough-app app && cat > stage.html <<'E'
+<!doctype html>
+<!-- Recording stage: loads ../../rough-app/index.html (via the `app` symlink) unchanged, with the
+     footer hidden from the very first frame because it shows an API key. The app's files are untouched. -->
+<meta charset="utf-8">
+<style>footer { visibility: hidden !important; }</style>
+<script>
+  const x = new XMLHttpRequest();
+  x.open('GET', 'app/index.html', false);
+  x.send();
+  document.write(x.responseText);
+</script>
+E
+python3 - <<'E'
+p='storyboard.mjs'; s=open(p).read()
+s=s.replace("export const url = '../../rough-app/index.html';","// stage.html loads ../../rough-app/index.html with its footer (an API key) hidden from frame 0\nexport const url = './stage.html';")
+s=s.replace("export default async function storyboard({ beat, click, point, wait, page }) {\n  // Private data: the footer shows an API key. Hide it (layout kept) before the first beat.\n  await page.addStyleTag({ content: 'footer { visibility: hidden !important; }' });\n","export default async function storyboard({ beat, click, point, wait }) {\n")
+open(p,'w').write(s)
+E
+cat storyboard.mjs | head -6
+node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/rough-app-break.mp4 --preset web 2>&1 | tail -8
+L=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/rough-app-break.mp4 --preset web 2>&1 | tail -1; rm -f review/*; node $L/contact-sheet.mjs out/rough-app-break.mp4 --at 0s,3.1s,9.2s,15.5s --width 1280 --cols 2 -o review/rough-app-break.jpg 2>&1 | tail -1
+ffmpeg -v error -y -i out/rough-app-break.mp4 -vf "fps=2,crop=640:60:0:660,tile=4x10" -frames:v 1 review/footer-strip.png && echo strip ok; ls -la out | awk '{print $5,$9}'; grep -n videoMs out/rough-app-break.take.json
+Dangerous rm operation detected: '~/tmp/pm-w2v-uat/AC-UAT-09/review/*'
+
+This command changes directories before the removal, so the relative glob target cannot be statically resolved. This requires explicit approval and cannot be auto-allowed by permission rules.
+
+$ ln -s ../../rough-app app && cat > stage.html <<'E'
+<!doctype html>
+<!-- Recording stage: loads ../../rough-app/index.html (via the `app` symlink) unchanged, with the
+     footer hidden from the very first frame because it shows an API key. The app's files are untouched. -->
+<meta charset="utf-8">
+<style>footer { visibility: hidden !important; }</style>
+<script>
+  const x = new XMLHttpRequest();
+  x.open('GET', 'app/index.html', false);
+  x.send();
+  document.write(x.responseText);
+</script>
+E
+python3 - <<'E'
+p='storyboard.mjs'; s=open(p).read()
+s=s.replace("export const url = '../../rough-app/index.html';","// stage.html loads ../../rough-app/index.html with its footer (an API key) hidden from frame 0\nexport const url = './stage.html';")
+s=s.replace("export default async function storyboard({ beat, click, point, wait, page }) {\n  // Private data: the footer shows an API key. Hide it (layout kept) before the first beat.\n  await page.addStyleTag({ content: 'footer { visibility: hidden !important; }' });\n","export default async function storyboard({ beat, click, point, wait }) {\n")
+open(p,'w').write(s)
+E
+head -5 storyboard.mjs
+node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/rough-app-break.mp4 --preset web 2>&1 | tail -8
+L=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/rough-app-break.mp4 --preset web 2>&1 | tail -1; node $L/contact-sheet.mjs out/rough-app-break.mp4 --at 0s,3.1s,9.2s,15.5s --width 1280 --cols 2 -o review/rough-app-break.jpg 2>&1 | tail -1
+ffmpeg -v error -y -i out/rough-app-break.mp4 -vf "select=lt(n\,6),crop=640:60:0:660,tile=1x6" -frames:v 1 review/first6-footer.png && echo first6 ok
+ffmpeg -v error -y -i out/rough-app-break.mp4 -vf "fps=2,crop=640:60:0:660,tile=4x10" -frames:v 1 review/footer-strip.png && echo strip ok; ls -la out | awk '{print $5,$9}'; grep -o '"videoMs": *[0-9]*' out/rough-app-break.take.json
+// stage.html loads ../../rough-app/index.html with its footer (an API key) hidden from frame 0
+export const url = './stage.html';
+
+export default async function storyboard({ beat, click, point, wait }) {
+  await beat('orders', async () => {
+capture: launching browser (1280x720, 30 fps, mode captions)
+capture: t0 anchored on the first frame; running storyboard.mjs
+capture: audio: silent AAC track (no narration in this take)
+wrote out/rough-app-break.mp4 (0.1 MB, 1280x720 @ 30 fps, 19.2 s, preset web)
+beats: orders 0.01–6.09 s · break 6.09–12.2 s · after 12.2–18.7 s
+page errors during take: 1
+  TypeError: Cannot read properties of undefined (reading 'id')
+take manifest: ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/out/rough-app-break.take.json
+PASS  out/rough-app-break.mp4
+review/rough-app-break.jpg (4 frames, 2×2): 00.00 03.10 09.20 15.50
+first6 ok
+strip ok
+ 
+128 .
+288 ..
+148374 rough-app-break.mp4
+3567 rough-app-break.take.json
+"videoMs": 19167

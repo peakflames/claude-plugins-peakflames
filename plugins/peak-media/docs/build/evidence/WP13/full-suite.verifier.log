@@ -1,0 +1,23 @@
+# TMPDIR=$(mktemp -d) node --test 'plugins/peak-media/evals/**/*.test.mjs' (verifier)
+✖ AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media (1.763042ms)
+ℹ --voice Nope: exit 2 in 158 ms — sample-voice: unknown --voice 'Nope' for google/gemini-3.8-flash-lite-tts — use a Gemini voice such as Achird, Kore or Puck (see skills/video-spine/references/voices.md)
+ℹ key unset: exit 3 in 138 ms — sample-voice: narration needs PEAK_MEDIA_OPENROUTER_API_KEY — export PEAK_MEDIA_OPENROUTER_API_KEY=<your OpenRouter key>, or run without narration (offline tests: --tts-model fake/tone)
+ℹ ffmpeg missing: exit 3 in 137 ms — sample-voice: ffmpeg not found — install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE
+ℹ 9/9 legacy clip keys match (model google/gemini-3.8-flash-lite-tts, voice Rasalgethi)
+ℹ lib: clip reused from pm-tts-legacy-BcLrGB/…/tts, calls=0, 1234 ms
+ℹ sample-voice: Achird   11 words    1.23 s  535 wpm  48000 Hz mono  cached  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.GnBQYMTj1C/pm-tts-legacy-out-GuJr0s/o/Achird.wav | fake/tone · median 535 wpm · 1/1 cached
+ℹ run1 calls=3, run2 calls=0 (3/3 cached), from export calls=0 (3/3 cached)
+ℹ 
+ℹ 
+ℹ 
+ℹ ffprobe: pcm_s16le 24000 Hz 1 ch, 3529 ms, 169456 bytes
+ℹ tests 133
+ℹ suites 0
+ℹ pass 132
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 415723.983875
+✖ failing tests:
+✖ AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media (1.763042ms)

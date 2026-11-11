@@ -1,0 +1,1 @@
+$ contact-sheet ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4 --every 1s --width 1280 --cols 2 -> 'contact-sheet: could not extract a frame at 21.79' exit 1 (video 21.800 s / 654 frames, audio 21.821 s); sheet made with --at 0..21,21.7 instead

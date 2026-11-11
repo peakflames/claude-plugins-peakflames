@@ -1,0 +1,9 @@
+✖ check-take merge (m1): a group spans at most 150 ms from its first detection, so a chain splits and two cuts 200 ms apart stay two (1.089417ms)
+✖ check-take merge (m2): a failing merged transition is reported at the frame that fails (0.281583ms)
+✖ check-take (m1, end to end): two hard cuts 200 ms apart in silence count as 2 (861.168708ms)
+ℹ pass 0
+ℹ fail 3
+✖ failing tests:
+✖ check-take merge (m1): a group spans at most 150 ms from its first detection, so a chain splits and two cuts 200 ms apart stay two (1.089417ms)
+✖ check-take merge (m2): a failing merged transition is reported at the frame that fails (0.281583ms)
+✖ check-take (m1, end to end): two hard cuts 200 ms apart in silence count as 2 (861.168708ms)

@@ -1,0 +1,17 @@
+# AC-W2V-21 verifier (wp14-verifier-1), 2026-11-10
+# Launch spy: HYPERFRAMES_BROWSER_PATH and PEAK_MEDIA_HEADED_BROWSER_PATH both point at shell scripts
+# that touch <v>/{render,headed}.launched. cwd = a fresh temp dir <v>.
+$ capture.mjs --storyboard evals/video-capture/fixtures/login/storyboard.mjs --script .../login/script.md --url http://127.0.0.1:9/ --out <v>/w21.mp4 --storage-state /nonexistent.json
+exit 1
+stderr (1 line):
+capture: --storage-state /nonexistent.json: no such file — save a session first with: capture signin <url>
+stdout: (empty)
+launch markers: none; <v>/w21.mp4: absent
+
+# extra cases (same spy): unreadable (chmod 000), JSON without cookies[], a directory
+capture: --storage-state <v>/unread.json: not a readable session file (EACCES) — save a session first with: capture signin <url>   exit 1
+capture: --storage-state <v>/nocookies.json: not a session file (no cookies[]) — save a session first with: capture signin <url>   exit 1
+capture: --storage-state <v>/dir.json: no such file — save a session first with: capture signin <url>   exit 1
+launch markers: none
+
+# eval: login-reports.test.mjs "AC-W2V-21" -> ok (see login-reports.verifier.log)
