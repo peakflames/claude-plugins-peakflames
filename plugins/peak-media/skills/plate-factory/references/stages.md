@@ -122,7 +122,7 @@ absolute path (`<abs>/…` below is the video project's absolute path) so the us
 
 ## Stage 0 — Brief (user gate)
 
-1. `bash "PM/scripts/setup.sh" --check`. If it isn't ready, ask, then run `setup.sh` (network).
+1. `node "PM/scripts/setup.mjs" --check`. If it isn't ready, ask, then run `setup.mjs` (network).
 2. Gather the brief from what the user gave (a URL, repo, document or concept). Facts and real
    assets only: copy screenshots, logos and data into `assets/`. Write or complete `brief.md` in
    the format of `PM/skills/video-spine/SKILL.md` § Stage 0: `- **Runtime:** <n> s target`, a

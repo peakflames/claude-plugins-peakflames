@@ -1,6 +1,6 @@
 // plate-factory: transcript checker on synthetic sessions (AC-ORC-02..04, and the gate-order part of
 // AC-ORC-01, which itself is the user's manual run), and retime-plates (AC-ORC-05, AC-BASE-13).
-import { test, before, after } from 'node:test';
+import { test, before, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { copyFileSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync, cpSync, utimesSync } from 'node:fs';
 import path from 'node:path';

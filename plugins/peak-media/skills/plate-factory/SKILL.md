@@ -65,7 +65,7 @@ SKILL.md before its first stage:
 | review | — | `lib/verify/contact-sheet.mjs`, `lib/verify/check-cuts.mjs`, `lib/verify/probe-spec.mjs` |
 
 Run any script with `--help` for its flags. If one reports a missing dependency, run
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh"` (it needs the network: ask first) and retry.
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"` (it needs the network: ask first) and retry.
 
 **Before stage 0, Read `${CLAUDE_PLUGIN_ROOT}/skills/plate-factory/references/stages.md`.** It
 has each stage's steps, commands and gate-line format. Read

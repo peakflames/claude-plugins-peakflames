@@ -12,10 +12,12 @@ const timedOut = (what, ms) => new CliError(`${what} timed out after ${fmtDurati
 export const ffmpegBin = () => process.env.PEAK_MEDIA_FFMPEG || 'ffmpeg';
 export const ffprobeBin = () => process.env.PEAK_MEDIA_FFPROBE || 'ffprobe';
 
-const INSTALL_HINT = 'install it (macOS: brew install ffmpeg) or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE';
+/** How to install ffmpeg, one line for every supported OS (DEC-53). setup.mjs prints it too. */
+export const FFMPEG_INSTALL = 'install it (macOS: brew install ffmpeg · Windows: winget install Gyan.FFmpeg · Linux: sudo apt-get install ffmpeg)';
+const INSTALL_HINT = `${FFMPEG_INSTALL} or set PEAK_MEDIA_FFMPEG/PEAK_MEDIA_FFPROBE`;
 
 export function hasBinary(bin) {
-  const r = spawnSync(bin, ['-version'], { encoding: 'utf8' });
+  const r = spawnSync(bin, ['-version'], { encoding: 'utf8', windowsHide: true });
   return r.status === 0;
 }
 

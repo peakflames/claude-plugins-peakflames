@@ -1,0 +1,5 @@
+# peak-media's evals and skill files parse text with \n (frontmatter, tables, fixtures compared byte
+# for byte): keep LF on every OS, Windows checkouts included (DEC-53).
+plugins/peak-media/** text=auto eol=lf
+# build evidence is a record: leave its bytes exactly as captured
+plugins/peak-media/docs/build/evidence/** -text

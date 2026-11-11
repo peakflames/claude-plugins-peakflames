@@ -1,7 +1,7 @@
 // WP6 assembly: AC-ASM-01..05, AC-BASE-11/12. F1 plates and narration are generated per run
 // (helpers/fixtures.mjs); the brand outro (brand-packs/default) is rendered through HyperFrames and cached.
 // Set PEAK_MEDIA_EVIDENCE_DIR to also write the AC-ASM-05 contact sheet there.
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';

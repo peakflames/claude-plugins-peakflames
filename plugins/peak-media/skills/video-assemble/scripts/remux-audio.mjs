@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../../../lib/cli.mjs';
 import { ffmpeg, ffmpegBin, probe, fpsOf, requireFfmpeg } from '../../../lib/ffmpeg.mjs';
 import { hasAudio, loudness, levelStem, silentStem, mixStems, duckStem, duckWindows, speechWindows, DUCK } from './audio.mjs';
 
@@ -136,7 +136,7 @@ Run each pass (music, then music + SFX) from the narration-only review MP4.`,
   ],
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, ({ values, positionals: [video] }) => {
     if (!values.out) throw new CliError('--out <file.mp4> is required', EXIT.USAGE);
     if (!values.music && !values.sfx) throw new CliError('nothing to mix — pass --music and/or --sfx', EXIT.USAGE);

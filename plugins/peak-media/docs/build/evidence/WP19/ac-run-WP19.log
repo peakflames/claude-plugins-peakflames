@@ -1,0 +1,20 @@
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-XP-01 | script | pass | PASS | evidence/WP19/ac-run-WP19.log |
+| AC-XP-02 | script | pass | PASS | evidence/WP19/ac-run-WP19.log |
+| AC-XP-03 | script | pass | PASS | evidence/WP19/ac-run-WP19.log |
+| AC-XP-04 | script | pass | PASS | evidence/WP19/ac-run-WP19.log |
+| AC-XP-05 | script | pass | PASS | evidence/WP19/ac-run-WP19.log |
+# smoke setup --check: 1.1 s
+# smoke spine: 0.4 s
+# smoke render-plate: 11.7 s
+# smoke probe-spec plate: 0.3 s
+# smoke capture l-intro: 8.2 s
+# smoke capture l-why: 10.0 s
+# smoke capture l-how: 7.7 s
+# smoke assemble: 8.7 s
+# smoke probe-spec: 0.3 s
+# smoke check-take: 1.0 s
+# smoke: darwin/arm64, 20000 ms spine, plate cuts at 0:06.182, 0:14.182 in silence
+ℹ pass 1
+ℹ fail 0

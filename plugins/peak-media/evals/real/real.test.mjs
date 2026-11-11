@@ -3,7 +3,7 @@
 // docs/build/wp/WP10/real-pack.json (env PEAK_MEDIA_REAL_PACK / PEAK_MEDIA_REAL_REF override), so the
 // runtime tree names no house brand (D17). No pack: skipped; no reference: the comparison is skipped.
 // Nothing from the pack is written to the repo: only logs, JSON and a contact-sheet JPEG in evidence/WP10.
-import { test } from 'node:test';
+import { test } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, cpSync } from 'node:fs';

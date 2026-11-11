@@ -1,11 +1,12 @@
 // WP16 web2video: AC-W2V-36 (script half), AC-W2V-38, plus SKILL.md command and fixture checks.
 // web2video owns no engine: these tests run the commands SKILL.md tells Claude to run, as written.
-import { test } from 'node:test';
+import { test } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, chmodSync, copyFileSync } from 'node:fs';
 import { spawnSync, spawn } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ROOT, tmpDir } from '../helpers/run.mjs';
 
 const SKILL_DIR = path.join(ROOT, 'skills', 'web2video');
@@ -13,7 +14,7 @@ const SKILL = readFileSync(path.join(SKILL_DIR, 'SKILL.md'), 'utf8');
 const REFS = readdirSync(path.join(SKILL_DIR, 'references')).filter((f) => f.endsWith('.md'));
 const DOCS = [['SKILL.md', SKILL], ...REFS.map((f) => [`references/${f}`, readFileSync(path.join(SKILL_DIR, 'references', f), 'utf8')])];
 const NO_KEY = { PEAK_MEDIA_OPENROUTER_API_KEY: '', TTS_OPENROUTER_API_KEY: '' };
-const NO_NET = path.join(ROOT, 'evals', 'helpers', 'no-network.mjs');
+const NO_NET = pathToFileURL(path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')).href;
 const UI_DEMO = path.join(ROOT, 'skills', 'video-capture', 'examples', 'ui-demo');
 const lines = (s) => s.trim().split('\n').filter(Boolean);
 
@@ -116,7 +117,8 @@ test('AC-W2V-38: no brand or organization name in the plugin runtime tree, web2v
 test('web2video docs: every command runs a plugin script as node "${CLAUDE_PLUGIN_ROOT}/…" with flags that script accepts (not AC-bound)', () => {
   let n = 0;
   for (const [name, doc] of DOCS) {
-    for (const m of doc.matchAll(/(?:^|[\s`(])node\s+(\S+)/gm)) {
+    // the one inline exception: stopping `capture serve` by pid, portable to Windows (DEC-53)
+    for (const m of doc.replaceAll('node -e "process.kill(<pid>)"', '').matchAll(/(?:^|[\s`(])node\s+(\S+)/gm)) {
       assert.match(m[1], /^"\$\{CLAUDE_PLUGIN_ROOT\}\//, `${name}: node runs "\${CLAUDE_PLUGIN_ROOT}/…", not ${m[1]}`);
     }
     for (const m of doc.matchAll(/node "\$\{CLAUDE_PLUGIN_ROOT\}\/([^"]+)"([^\n`]*)/g)) {
@@ -176,7 +178,7 @@ test('WP17 UAT fixes in SKILL.md: serve for local folders (D1), silent keeps the
   assert.match(s4, /blocks `file:\/\/`/);
   assert.equal(commandLine('skills/video-capture/scripts/capture.mjs', /\bserve <folder>$/).length > 0, true);
   assert.match(s4, /run_in_background/);
-  assert.match(s4, /kill <pid>/);
+  assert.match(s4, /node -e "process\.kill\(<pid>\)"/);
   assert.match(s4, /don't\s+start any other server/);
   // D2: silent = --no-captions only
   assert.match(step(2), /mean `--no-captions` only: the cursor stays/);

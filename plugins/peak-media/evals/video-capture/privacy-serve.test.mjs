@@ -2,7 +2,7 @@
 // so a hidden element is never in a frame (frame 0 included, and after a goto); D1 — `capture
 // serve` serves a local folder on 127.0.0.1 for exploring and stops on SIGTERM.
 // Captures are real time and short (640x360 @ 10 fps); run this file alone.
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
@@ -117,7 +117,7 @@ test('WP17-D1: capture serve <dir> serves the folder on 127.0.0.1, prints the UR
     assert.match(await home.text(), /Page one/, '/ serves index.html');
     assert.equal((await fetch(url + 'page2.html')).status, 200);
     assert.equal((await fetch(url + '..%2F..%2F..%2Fpackage.json')).status, 404, 'nothing outside the folder');
-    assert.match(s.stderr(), /stop with Ctrl-C or kill \d+/);
+    assert.match(s.stderr(), /stop with Ctrl-C or node -e "process\.kill\(\d+\)"/);
     s.child.kill('SIGTERM');
     const { code } = await s.exited;
     assert.equal(code, 0, s.stderr());

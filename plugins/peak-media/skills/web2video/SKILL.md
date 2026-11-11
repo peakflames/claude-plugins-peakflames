@@ -58,8 +58,8 @@ steps 9–10.
 
 ## Workflow
 
-1. **Setup check.** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh" --check`. If it reports
-   anything missing, ask before running `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh"` (it
+1. **Setup check.** `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --check`. If it reports
+   anything missing, ask before running `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"` (it
    downloads). `capture signin` also needs the headed browser it reports.
 
 2. **Intake.** Infer what you can from the prompt; ask (one `AskUserQuestion`) only for the rest,
@@ -105,7 +105,7 @@ steps 9–10.
    ```
    It prints the URL (`http://127.0.0.1:<port>/`, loopback only) on stdout and its pid on
    stderr; `goto` that URL. When exploring is done, stop it: stop the background task, or
-   `kill <pid>`.
+   `node -e "process.kill(<pid>)"` (works on every OS; Git Bash's `kill` can miss a Windows pid).
 
 5. **Write the project.**
    - `brief.md` and `script.md` in `video-spine`'s format: Read

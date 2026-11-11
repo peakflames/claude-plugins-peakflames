@@ -60,4 +60,4 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/video-plates/scripts/render-plate.mjs" <plate
 `plates/<id>/index.html` (+ `brand/`, `vendor/`), `renders/plates/<id>.mp4` (picture only, H.264,
 plates.json fps and size), `review/contact-<id>.jpg`, `review/storyboard.jpg`. Folders sit next
 to `plates.json` unless `--out <dir>` is given. Exit codes: 0 ok, 1 a plate failed (one line naming
-the plate and the fix), 2 usage, 3 a missing prerequisite (run `scripts/setup.sh`).
+the plate and the fix), 2 usage, 3 a missing prerequisite (run `node scripts/setup.mjs`).

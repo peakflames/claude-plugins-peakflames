@@ -87,7 +87,7 @@ check-take · probe-spec · contact-sheet ──► report and hand-off (no uplo
 
 ### 4.1 Workflow Claude follows
 
-1. **Setup check.** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh" --check`. If anything is
+1. **Setup check.** `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --check`. If anything is
    missing, ask before running setup (it uses the network).
 2. **Intake.** Ask only what cannot be inferred, in this order: the page (URL or local folder),
    whether it needs a login, where the video is going (sets the preset, §4.6), the mode (captions

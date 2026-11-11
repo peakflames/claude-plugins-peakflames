@@ -20,7 +20,7 @@ command; the user does the signing in, in the window.
   `$CLAUDE_PLUGIN_DATA`, else `~/.cache/peak-media`). Keep that path for the take and hand-off.
 - On timeout, or if the browser was quit instead of the tab closed, it saves nothing and exits 1.
   Explain and offer to run it again.
-- Missing headed browser: it stops with one line naming `setup.sh`. Ask before running setup.
+- Missing headed browser: it stops with one line naming `setup.mjs`. Ask before running setup.
 
 Keep the default path. `--save` refuses `./web2video/` and any git work tree, but other folders
 are allowed, and the session belongs outside the project.
@@ -51,6 +51,9 @@ belongs to another host (the file is named for the host you signed in to): sign 
 
 - It lives only in `<data dir>/auth/`. Never copy it into the project, Read it, print it or
   commit it.
+- On macOS and Linux the file is 0600 (owner only). On Windows file modes don't apply: what
+  protects it is that `<data dir>` sits in the user's own profile folder, which other standard
+  users can't read. Don't point `CLAUDE_PLUGIN_DATA` at a shared folder there.
 - At hand-off, offer to delete it: "Delete the saved session at `<path>`? You'd sign in again for
   the next recording." On yes: `rm "<path>"`, and confirm it is gone.
 

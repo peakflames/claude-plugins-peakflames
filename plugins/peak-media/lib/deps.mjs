@@ -1,4 +1,4 @@
-// Resolves runtime npm deps (DEC-10). setup.sh installs them into
+// Resolves runtime npm deps (DEC-10). setup.mjs installs them into
 // ${CLAUDE_PLUGIN_DATA:-~/.cache/peak-media}/deps/<lockhash>/node_modules; a dev
 // checkout with `npm install` in the plugin root also works.
 import { createRequire } from 'node:module';
@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
-import { PLUGIN_ROOT, CliError, EXIT } from './cli.mjs';
+import { PLUGIN_ROOT, CliError, EXIT, setupCommand } from './cli.mjs';
 
 export function dataDir() {
   return process.env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(), '.cache', 'peak-media');
@@ -39,7 +39,7 @@ export function resolveDep(spec) {
 export async function importDep(spec) {
   const p = resolveDep(spec);
   if (!p) {
-    throw new CliError(`missing dependency '${spec.split('/')[0]}' — run ${path.join(PLUGIN_ROOT, 'scripts', 'setup.sh')}`, EXIT.MISSING_PREREQ);
+    throw new CliError(`missing dependency '${spec.split('/')[0]}' — run ${setupCommand()}`, EXIT.MISSING_PREREQ);
   }
   return import(pathToFileURL(p).href);
 }

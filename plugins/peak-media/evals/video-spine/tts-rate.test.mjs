@@ -1,5 +1,5 @@
 // WP3a verify-1 S1: the PCM sample rate comes from the response when it declares one.
-import { test } from 'node:test';
+import { test } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { synthesize } from '../../lib/tts/openrouter.mjs';
 

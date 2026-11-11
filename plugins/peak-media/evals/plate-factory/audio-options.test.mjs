@@ -1,7 +1,7 @@
 // plate-factory stage 8 (DEC-39): audio-options offers the active pack's tracks and SFX by name, else
 // the audio files in one folder the user names, else nothing (narration only). It never searches.
 // The fixture pack is brand-min plus a generated tone: no real audio lives in the repo.
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';

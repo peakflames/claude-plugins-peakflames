@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../../../lib/cli.mjs';
 import { validateDoc } from '../../../lib/schemas.mjs';
 
 function readJson(file, what) {
@@ -167,4 +167,4 @@ async function main({ values, positionals }) {
   return EXIT.OK;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await runCli(spec, main);
+if (isMain(import.meta.url)) await runCli(spec, main);

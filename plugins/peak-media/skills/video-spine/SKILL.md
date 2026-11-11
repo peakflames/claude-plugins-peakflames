@@ -14,7 +14,7 @@ voice, a beat grid carrying on-screen text does. Never generate narration anywhe
 
 Scripts: `${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/` (`spine.mjs`, `sample-voice.mjs`).
 Run `node <script> --help` for every flag. If a script says a dependency is missing, run
-`bash ${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh` and retry.
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"` and retry.
 
 Before writing a script, Read `references/narration-writing.md` (and `references/voices.md` when
 picking a voice).

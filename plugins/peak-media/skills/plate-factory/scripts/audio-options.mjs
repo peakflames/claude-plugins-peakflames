@@ -4,7 +4,7 @@
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../../../lib/cli.mjs';
 
 const AUDIO_RE = /\.(wav|mp3|m4a|aac|flac|ogg|opus|aiff?)$/i;
 
@@ -80,7 +80,7 @@ Exit 0 with the list (possibly empty), 1 when a listed file is missing, 2 usage.
   ],
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, async ({ values, positionals: [target] }) => {
     if (values.folder) {
       const files = folderAudio(values.folder);

@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, CliError, EXIT } from '../cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../cli.mjs';
 import { ffmpeg, probe, fpsOf, requireFfmpeg } from '../ffmpeg.mjs';
 
 const SEG = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
@@ -120,7 +120,7 @@ const spec = {
   examples: ['contact-sheet out/final.mp4 --every 0.5s -o review/contact-final.jpg', 'contact-sheet renders/plates/p1.mp4 --count 8'],
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, ({ values, positionals: [video] }) => {
     if (!existsSync(video)) throw new CliError(`cannot read ${video}: no such file`);
     const everyMs = parseMs(values.every, '--every');

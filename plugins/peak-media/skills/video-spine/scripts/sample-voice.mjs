@@ -5,7 +5,7 @@
 import { readFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../../../lib/cli.mjs';
 import { requireFfmpeg, probe } from '../../../lib/ffmpeg.mjs';
 import { checkTtsOptions, synthesizeClips, cacheSummary, wpmReport, DEFAULT_MODEL, DEFAULT_STYLE } from '../../../lib/tts/index.mjs';
 
@@ -98,6 +98,6 @@ export async function main({ values }, { fetchImpl, env = process.env, stdout = 
   return EXIT.OK;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, main);
 }

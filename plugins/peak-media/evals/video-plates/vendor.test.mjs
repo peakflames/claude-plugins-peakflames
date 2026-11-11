@@ -1,5 +1,5 @@
 // Vendored HyperFrames references (DEC-07): AC-VND-01 (map <-> tree), AC-VND-02 (no telemetry, licence).
-import { test } from 'node:test';
+import { test } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';

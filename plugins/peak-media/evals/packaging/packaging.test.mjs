@@ -1,13 +1,16 @@
 // WP9 packaging: AC-PKG-01, -03, -04, -06, -07, -08. WP16: AC-W2V-40 (six skills, DEC-45).
-// AC-PKG-04 and -08 run setup.sh for real (a no-op when the runtime is already installed). v0.1.0 is
-// macOS-only (DEC-41): -04 is setup then the no-key F1 video; -08 is setup + F0 with a prerequisite
-// missing (ffmpeg, the render browser, the narration key), each reported in one line.
+// AC-PKG-04 and -08 run setup.mjs for real (a no-op when the runtime is already installed). DEC-53
+// (supersedes DEC-41): macOS, Windows x64 and Linux x64. -04 is setup then the no-key F1 video (the
+// full F1 eval stays macOS-only; evals/smoke is the end-to-end run on Windows and Linux); -08 is
+// setup + F0 with a prerequisite missing (ffmpeg, the render browser, the narration key), each
+// reported in one line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
 import path from 'node:path';
 import { run, ROOT, pluginVersion, tmpDir } from '../helpers/run.mjs';
 import { depsDir as depsRoot } from '../../lib/deps.mjs';
+import { pathToFileURL } from 'node:url';
 
 const REPO = path.resolve(ROOT, '..', '..');
 // DEC-45 (supersedes DEC-21's five in part): the five engine skills plus the web2video front door
@@ -19,13 +22,14 @@ const DEFAULT_PACK = path.join(ROOT, 'brand-packs', 'default');
 const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
 const lines = (s) => s.trim().split('\n').filter(Boolean);
 
-/** Every file under dir (skipping node_modules), as paths relative to ROOT. */
+const posix = (p) => p.split(path.sep).join('/');
+/** Every file under dir (skipping node_modules), as /-separated paths relative to ROOT. */
 function files(dir) {
   const out = [];
   const walk = (d) => {
     for (const e of readdirSync(d)) {
       const p = path.join(d, e);
-      if (statSync(p).isDirectory()) { if (e !== 'node_modules') walk(p); } else out.push(path.relative(ROOT, p));
+      if (statSync(p).isDirectory()) { if (e !== 'node_modules') walk(p); } else out.push(posix(path.relative(ROOT, p)));
     }
   };
   if (existsSync(dir)) walk(dir);
@@ -118,8 +122,8 @@ test('AC-PKG-07: VENDORED.md gives source, commit, date, licence and local chang
   assert.ok(gsap, 'GSAP is listed as Fetched');
   assert.match(gsap.join(' '), /npm `gsap`/);
   assert.match(gsap.join(' '), /[Ll]icen[cs]e/);
-  const fontDirs = [...files(path.join(ROOT, 'brand-packs')), ...files(path.join(ROOT, 'evals', 'fixtures'))]
-    .filter((f) => /\/fonts\/[^/]+\/[^/]+$/.test(f)).map((f) => path.dirname(f) + '/');
+  const fontDirs = [...files(path.join(ROOT, 'brand-packs')), ...files(path.join(ROOT, 'evals', 'fixtures'))].map(posix)
+    .filter((f) => /\/fonts\/[^/]+\/[^/]+$/.test(f)).map((f) => path.posix.dirname(f) + '/');
   const uniq = [...new Set(fontDirs)];
   assert.ok(uniq.length >= 2, `found font folders: ${uniq}`);
   for (const d of uniq) {
@@ -145,14 +149,21 @@ test('packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs 
   assert.deepEqual(media, [], 'no audio or video files in the plugin');
 });
 
-test('watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound)', async () => {
+const POSIX_ONLY = process.platform === 'win32' && 'POSIX shell fake; the full suite is macOS-only (DEC-53)';
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+const until = async (cond, ms, what) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) assert.fail(what); await new Promise((r) => setTimeout(r, 100)); } };
+// a Node step whose own child never exits; the child's pid goes to pidFile (runs the same on every OS)
+const sleeperStep = (pidFile) => `import { spawn } from 'node:child_process';\nimport { writeFileSync } from 'node:fs';\n`
+  + `const c = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });\n`
+  + `writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));\nsetInterval(() => {}, 1000);\n`;
+
+test('watchdog: a hung ffprobe step is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound)', { skip: POSIX_ONLY }, () => {
   const dir = tmpDir('pm-watchdog-');
   const pidFile = path.join(dir, 'sleeper.pid');
   // fake ffmpeg/ffprobe: answers -version, otherwise starts a sleeper child and waits on it forever-ish
   const fake = path.join(dir, 'fake-ff');
   writeFileSync(fake, `#!/bin/sh\ncase "$1" in -version) echo "ffmpeg version fake"; exit 0;; esac\nsleep 120 & echo $! > '${pidFile}'\nwait\n`);
   chmodSync(fake, 0o755);
-  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
   const r = run('lib/verify/probe-spec.mjs', [path.join(F0, 'plates.json')], { env: { PEAK_MEDIA_FFMPEG: fake, PEAK_MEDIA_FFPROBE: fake, PEAK_MEDIA_STEP_TIMEOUT_S: '2' } });
   assert.equal(r.code, 1, r.stdout + r.stderr);
   assert.ok(r.ms < 15_000, `stopped promptly (${r.ms} ms)`);
@@ -160,26 +171,34 @@ test('watchdog: a step that never exits is stopped, its process group killed, an
   assert.match(r.stderr, /ffprobe of .* timed out after 2 s with no exit — stopped it/);
   const pid = Number(readFileSync(pidFile, 'utf8'));
   assert.ok(!alive(pid), `the step's own child (sleep, pid ${pid}) was killed with its group`);
+});
 
-  // hyperframes: hf() under the same watchdog (the wrap runs a sleeper in place of the CLI)
+test('watchdog: a hung HyperFrames step and a hung eval step are stopped with their trees, in one line (WP9 verify-1 F1; not AC-bound)', async () => {
+  const dir = tmpDir('pm-watchdog-');
+  // hyperframes: hf() under the same watchdog (the wrap runs a Node sleeper with a child in place of the CLI)
+  const pidFile = path.join(dir, 'sleeper.pid');
+  const step = path.join(dir, 'hang-hf.mjs');
+  writeFileSync(step, sleeperStep(pidFile));
   const { hf } = await import('../../lib/hf.mjs');
   process.env.PEAK_MEDIA_STEP_TIMEOUT_S = '2';
   try {
     const t0 = Date.now();
-    assert.throws(() => hf(['render', dir], { wrap: ['/bin/sh', '-c', 'sleep 120', '--'] }), /hyperframes render timed out after 2 s with no exit — stopped it; .*setup\.sh --check/);
+    assert.throws(() => hf(['render', dir], { wrap: [process.execPath, step, '--'] }), /hyperframes render timed out after 2 s with no exit — stopped it; .*setup\.mjs"? --check/);
     assert.ok(Date.now() - t0 < 15_000);
   } finally { delete process.env.PEAK_MEDIA_STEP_TIMEOUT_S; }
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  await until(() => !alive(pid), 10_000, `the step's own child (pid ${pid}) was killed with its tree`);
 
   // the eval helper's own per-step watchdog: a script that never exits fails its step in one line
   const hang = path.join(dir, 'hang.mjs');
   writeFileSync(hang, 'setInterval(() => {}, 1000);\n');
-  const h = run(path.relative(ROOT, hang), [], { timeoutMs: 1500 });
+  const h = run(hang, [], { timeoutMs: 1500 }); // absolute: tmp may be on another drive than ROOT (win32)
   assert.equal(h.timedOut, true);
   assert.equal(h.code, null);
   assert.match(h.stderr, /eval step timed out after 1\.5 s: /);
 });
 
-test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s whole process group and leaves no temp folder (WP9 verify-2 N1; not AC-bound)', async () => {
+test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s whole tree and leaves no temp folder (WP9 verify-2 N1; not AC-bound)', async () => {
   const { spawn } = await import('node:child_process');
   const { mkdirSync } = await import('node:fs');
   for (const [sig, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
@@ -187,42 +206,45 @@ test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s who
     const tmp = path.join(dir, 'tmp');
     mkdirSync(tmp);
     // a node process blocked in a watched step whose own child sleeps
+    const pidFile = path.join(dir, 'pid');
+    const step = path.join(dir, 'hang.mjs');
+    writeFileSync(step, sleeperStep(pidFile));
     const script = path.join(dir, 'step.mjs');
-    writeFileSync(script, `import { runWatched } from ${JSON.stringify(path.join(ROOT, 'lib', 'watchdog.mjs'))};\n`
-      + `runWatched('/bin/sh', ['-c', 'echo $PPID > ${dir}/pg; sleep 120 & echo $! > ${dir}/pid; wait'], { timeoutMs: 600000 });\n`);
-    const child = spawn(process.execPath, [script], { env: { ...process.env, TMPDIR: tmp }, stdio: 'ignore' });
+    writeFileSync(script, `import { runWatched } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib', 'watchdog.mjs')).href)};\n`
+      + `runWatched(process.execPath, [${JSON.stringify(step)}], { timeoutMs: 600000 });\n`);
+    const child = spawn(process.execPath, [script], { env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp }, stdio: 'ignore', windowsHide: true });
     const exited = new Promise((res) => child.on('exit', (c, s) => res({ c, s })));
-    const until = async (cond, ms, what) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) assert.fail(`${sig}: ${what}`); await new Promise((r) => setTimeout(r, 100)); } };
-    await until(() => existsSync(path.join(dir, 'pid')) && readFileSync(path.join(dir, 'pid'), 'utf8').trim(), 15_000, 'the step started');
-    const pg = Number(readFileSync(path.join(dir, 'pg'), 'utf8')), sleeper = Number(readFileSync(path.join(dir, 'pid'), 'utf8'));
+    await until(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim(), 15_000, `${sig}: the step started`);
+    const sleeper = Number(readFileSync(pidFile, 'utf8'));
     assert.equal(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')).length, 1, 'the step has its temp folder while it runs');
     child.kill(sig);
     const { s } = await exited;
-    assert.equal(s, sig, `node ended by ${sig} (shell exit code ${code})`);
-    const groupAlive = () => { try { process.kill(-pg, 0); return true; } catch { return false; } };
-    await until(() => !groupAlive(), 5000, `the step's process group ${pg} is gone`);
-    assert.throws(() => process.kill(sleeper, 0), /ESRCH/, 'the step\'s child is gone');
-    assert.deepEqual(readdirSync(tmp).filter((x) => x.startsWith('pm-run-')), [], 'no pm-run-* temp folder left');
+    // the 130/143 shell exit codes are POSIX signals; on win32 kill() ends the process outright
+    if (process.platform !== 'win32') assert.equal(s, sig, `node ended by ${sig} (shell exit code ${code})`);
+    await until(() => !alive(sleeper), 10_000, `${sig}: the step's child ${sleeper} is gone`);
+    await until(() => readdirSync(tmp).filter((x) => x.startsWith('pm-run-')).length === 0, 10_000, `${sig}: no pm-run-* temp folder left`);
   }
 });
 
 test('watchdog: "not found" only when the binary does not exist, not from a real binary\'s exit 127 (WP9 verify-2 N2; not AC-bound)', async () => {
   const { runWatched } = await import('../../lib/watchdog.mjs');
   const dir = tmpDir('pm-enoent-');
-  const bin = path.join(dir, 'exits127');
-  writeFileSync(bin, '#!/bin/sh\necho "No such file or directory: input.mp4" >&2\nexit 127\n');
-  chmodSync(bin, 0o755);
-  const real = runWatched(bin, [], { timeoutMs: 10_000 });
+  const bin = path.join(dir, 'exits127.mjs');
+  writeFileSync(bin, 'process.stderr.write("No such file or directory: input.mp4\\n");\nprocess.exit(127);\n');
+  const real = runWatched(process.execPath, [bin], { timeoutMs: 10_000 });
   assert.equal(real.status, 127);
   assert.equal(real.error, undefined, 'a real binary exiting 127 is not "not found"');
   assert.equal(runWatched(path.join(dir, 'nope'), [], { timeoutMs: 10_000 }).error?.code, 'ENOENT');
   assert.equal(runWatched('pm-no-such-binary-xyz', [], { timeoutMs: 10_000 }).error?.code, 'ENOENT');
 });
 
-test('AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps', () => {
-  assert.equal(process.platform, 'darwin', 'v0.1.0 supports macOS only (DEC-41)');
-  const setup = run('scripts/setup.sh', [], { network: true });
-  assert.equal(setup.code, 0, `setup.sh: ${setup.stdout}${setup.stderr}`);
+const SUPPORTED = ['darwin/arm64', 'darwin/x64', 'win32/x64', 'linux/x64'];
+const F1_MACOS_ONLY = process.platform !== 'darwin' && 'the full F1 eval is macOS-only (DEC-53); evals/smoke covers Windows and Linux';
+
+test('AC-PKG-04: on a supported OS with the prerequisites, setup.mjs then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps', { skip: F1_MACOS_ONLY }, () => {
+  assert.ok(SUPPORTED.includes(`${process.platform}/${process.arch}`), `${process.platform}/${process.arch} is supported (DEC-53)`);
+  const setup = run('scripts/setup.mjs', [], { network: true });
+  assert.equal(setup.code, 0, `setup.mjs: ${setup.stdout}${setup.stderr}`);
   assert.match(lines(setup.stdout).at(-1), /^peak-media ready: /);
 
   const dir = tmpDir('pm-pkg04-');
@@ -247,8 +269,8 @@ test('AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral e
   process.stdout.write(`# F1: spine ${manifest.totalMs} ms (${manifest.beats.length} beats) + outro 3000 ms → ${path.relative(dir, final)}; ${lines(spec.stdout).at(-1)}\n`);
 });
 
-test('AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing', () => {
-  const setup = run('scripts/setup.sh', ['-q'], { network: true });
+test('AC-PKG-08: setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing', () => {
+  const setup = run('scripts/setup.mjs', ['-q'], { network: true });
   assert.equal(setup.code, 0, setup.stdout + setup.stderr);
   const one = (r, re, what) => {
     assert.notEqual(r.code, 0, `${what}: non-zero exit`);
@@ -263,15 +285,19 @@ test('AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, brows
 
   // ffmpeg
   const noFf = { PEAK_MEDIA_FFMPEG: path.join(empty, 'no-ffmpeg') };
-  one(run('scripts/setup.sh', ['--check'], { env: noFf }), /^setup\.sh: ffmpeg not found — install it \(macOS: brew install ffmpeg/, 'setup --check without ffmpeg');
-  one(f0(noFf), /ffmpeg not found — install it \(macOS: brew install ffmpeg/, 'F0 without ffmpeg');
+  one(run('scripts/setup.mjs', ['--check'], { env: noFf }), /^setup\.mjs: ffmpeg not found — install it \(macOS: brew install ffmpeg · Windows: winget install Gyan\.FFmpeg · Linux: sudo apt-get install ffmpeg\)/, 'setup --check without ffmpeg');
+  one(f0(noFf), /ffmpeg not found — install it \(macOS: brew install ffmpeg · Windows: winget install Gyan\.FFmpeg/, 'F0 without ffmpeg');
   // the runtime deps (before setup has run)
-  one(run('scripts/setup.sh', ['--check'], { env: { CLAUDE_PLUGIN_DATA: empty } }), /runtime deps not installed .* run .*scripts\/setup\.sh/, 'setup --check without deps');
-  if (!existsSync(path.join(ROOT, 'node_modules'))) one(f0({ CLAUDE_PLUGIN_DATA: empty }), /dependency '.+'.* — run .*scripts\/setup\.sh/, 'F0 without deps');
-  // the render browser (present but can't start)
-  const badBrowser = { HYPERFRAMES_BROWSER_PATH: '/usr/bin/false' };
-  one(run('scripts/setup.sh', ['--check'], { env: badBrowser }), /^setup\.sh: render browser can't start .* — run .*setup\.sh to fetch the render browser/, 'setup --check with a broken browser');
-  one(f0(badBrowser), /render failed for .*: render browser can't start .* — run .*setup\.sh to fetch the render browser/, 'F0 with a broken browser');
+  one(run('scripts/setup.mjs', ['--check'], { env: { CLAUDE_PLUGIN_DATA: empty } }), /runtime deps not installed .* run .*scripts[\\/]setup\.mjs/, 'setup --check without deps');
+  if (!existsSync(path.join(ROOT, 'node_modules'))) one(f0({ CLAUDE_PLUGIN_DATA: empty }), /dependency '.+'.* — run .*scripts[\\/]setup\.mjs/, 'F0 without deps');
+  // the render browser (pointed at a path that isn't there: portable to every OS)
+  const badBrowser = { HYPERFRAMES_BROWSER_PATH: path.join(empty, 'no-chrome') };
+  one(run('scripts/setup.mjs', ['--check'], { env: badBrowser }), /^setup\.mjs: render browser not found at .* — run .*setup\.mjs/, 'setup --check with a missing browser');
+  one(f0(badBrowser), /render failed for .*: render browser not found at .* — run .*setup\.mjs/, 'F0 with a missing browser');
+  // POSIX: a browser that is present but can't start
+  if (process.platform !== 'win32' && existsSync('/usr/bin/false')) {
+    one(run('scripts/setup.mjs', ['--check'], { env: { HYPERFRAMES_BROWSER_PATH: '/usr/bin/false' } }), /^setup\.mjs: render browser can't start .* — run .*setup\.mjs.* to fetch the render browser/, 'setup --check with a broken browser');
+  }
   // the narration key (F0 itself needs none: a beat grid; asking for narration without a key fails up front)
   const dir = tmpDir('pm-pkg08-key-');
   for (const f of ['brief.md', 'script.md']) copyFileSync(path.join(F1, f), path.join(dir, f));
@@ -282,5 +308,5 @@ test('AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, brows
   // and with nothing missing, F0 passes
   const ok = run('docs/build/tools/skeleton.mjs', ['--fixture', F0, '--brand', DEFAULT_PACK, '--out', tmpDir('pm-pkg08-ok-')], { env: NO_KEY });
   assert.equal(ok.code, 0, ok.stdout + ok.stderr);
-  assert.equal(run('scripts/setup.sh', ['--version']).stdout.trim(), pluginVersion());
+  assert.equal(run('scripts/setup.mjs', ['--version']).stdout.trim(), pluginVersion());
 });
