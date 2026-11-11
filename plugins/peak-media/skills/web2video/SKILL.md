@@ -129,7 +129,9 @@ steps 9–10.
      viewer sees the result. A hold between beats (`await wait(…)` after a `beat`) is for a page
      or slide change. Step 9 measures the real length.
    - **Narrated:** size the script to the measured rate before writing it:
-     `node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" --brief brief.md --budget --wpm <wpm>`.
+     `node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" --brief brief.md --budget --wpm <wpm>`,
+     plus the same `--lead-ms`/`--tail-ms` the spine will run with (a deck: `--lead-ms 950`), or
+     the budget assumes the default pauses and the take overruns.
      `<wpm>` is the measured rate × 0.9, rounded down (175 → 157). Short beats read slower
      than the sample paragraph, so budgeting at the full rate overruns. `sample-voice` and `spine`
      both send the default style; if you give `spine` a `--style`, give `sample-voice` the same.
@@ -139,7 +141,9 @@ steps 9–10.
 6. **The gate: one `AskUserQuestion` before anything is recorded.** First show in chat:
    - the whole `script.md`;
    - one line per beat: `id · caption · action`;
-   - mode, preset (and why it fits the destination), output path `web2video/<slug>/out/<slug>.mp4`;
+   - mode and whether captions are drawn (narrated draws them unless the user asked for none:
+     `--no-captions`), preset (and why it fits the destination), output path
+     `web2video/<slug>/out/<slug>.mp4`;
    - the runtime target, and the session file the take will use, if signed in;
    - the cold-read verdict, if narrated, with any suggested edits as original → proposed.
 

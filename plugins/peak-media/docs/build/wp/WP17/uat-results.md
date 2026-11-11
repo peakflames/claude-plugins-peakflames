@@ -95,3 +95,9 @@ Run 2026-11-10 by a Lead-side UAT driver at `1779d1a`, the fix round from `fix-h
 | D10 | skill: `web2video` gate (narrated) | AC-UAT-03's gate said "The voice is the only text track; no captions are drawn over the slides", but the take drew each beat's caption, the narrated default. The hand-off disclosed it. | State at the gate that narrated mode draws captions unless `--no-captions` is chosen. |
 
 Synth calls in round 2: 0 (TTS cache 54 → 54 files across all four cases; AC-UAT-03's `sample-voice` 1/1 and both spine runs 3/3 were cached from round 1).
+
+## Lead fixes after round 2
+
+- **D9** fixed in `skills/web2video/SKILL.md` step 5: `spine --budget` gets the same `--lead-ms`/`--tail-ms` as the spine run (deck: 950).
+- **D10** fixed in step 6: the gate states whether captions are drawn (narrated draws them unless `--no-captions`).
+- **D7** not re-exercised in a session; covered by the skill text test in `evals/web2video/skill.test.mjs`.
