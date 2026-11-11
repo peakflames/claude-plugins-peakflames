@@ -152,7 +152,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    - **When an epic parks or fails** (`launch.config.onPark`): `stop` — "the run stops at the
      first epic that parks or fails; the epics after it are not started tonight"; `continue` —
      "epics that depend on it are blocked, independent epics still run". Say where it is set:
-     `launch.projectSettingsFile` (`<root>/.claude/autopilot.json`, `{"onPark": "continue"}`),
+     `launch.projectSettingsFile` (`<root>/.claude/peak-workflow/autopilot.json`, `{"onPark": "continue"}`),
      a file the owner edits and commits; this skill never writes it. With `stop`, add that
      "independent" is the planner's judgement, which is why stopping is the default.
    - **Gates.** Read `${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/policy/gates.json`. List the
@@ -358,4 +358,4 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `runs/<run>/epics/<id>/…` | Every session's stream, referee log, plan, checks and audit |
 | `runs/<run>/report.md`, `report.json`, `autopilot.log` | The morning report and the driver's log |
 | `lock`, `STOP` | The single-instance lock and the kill switch, one per workspace |
-| `<project>/.claude/autopilot.json` | Not written by autopilot: the owner's project settings, such as `"onPark": "continue"` |
+| `<project>/.claude/peak-workflow/autopilot.json` | Not written by autopilot: the owner's project settings, such as `"onPark": "continue"` |

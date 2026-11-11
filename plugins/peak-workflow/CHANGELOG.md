@@ -47,7 +47,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   cleanly into the integration line (a trial merge); a void one is reported and the epic is
   planned again, with the old branch kept under `refs/autopilot/superseded/`.
 - **`onPark` setting** — by default the first epic that parks or fails ends the run;
-  `"onPark": "continue"` in the project's `.claude/autopilot.json` keeps building independent
+  `"onPark": "continue"` in the project's `.claude/peak-workflow/autopilot.json` keeps building independent
   epics.
 - **`resume` gate** — budget, infra, STOP and auditor-outage parks get a gate offering "Resume
   from where it stopped" or "Start over"; the auditor still fails closed.

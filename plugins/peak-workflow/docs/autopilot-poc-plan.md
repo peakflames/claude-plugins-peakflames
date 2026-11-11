@@ -439,7 +439,7 @@ judgement (the Dependencies column `plan-project` wrote), and nothing determinis
 the default is **`onPark: "stop"`**: the first epic that ends PARKED or FAILED ends the run, and
 the rest stay not started. `onPark: "continue"` gives the stop-the-line rule above (dependents
 BLOCKED, independent epics still run). The setting lives with the project, in
-`<project>/.claude/autopilot.json` — read from the project, never from the clone, so no session
+`<project>/.claude/peak-workflow/autopilot.json` — read from the project, never from the clone, so no session
 can change it; that file may also set budgets and the like, but never the run's own keys or
 `claudeBin`. Runs A–C set `continue`, because their expected outcomes need an independent epic
 to run after a park.
@@ -1253,7 +1253,7 @@ waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 
   cleanly into the integration line (§6.8). Under the strict rule a park followed by a merge in
   the same run (Run A's shape), or a `--no-ff` bring-in, voided the decision every time.
 - **`onPark`, default `stop`** (owner decision): the first park or failure ends the run unless
-  `<project>/.claude/autopilot.json` says `"onPark": "continue"` (§6.4). Not in the original
+  `<project>/.claude/peak-workflow/autopilot.json` says `"onPark": "continue"` (§6.4). Not in the original
   section.
 - **Undecided and gate-less parks.** An epic whose latest gate is undecided is skipped
   ("waiting for your decision"), never rebuilt. A parked or failed epic with no decidable gate

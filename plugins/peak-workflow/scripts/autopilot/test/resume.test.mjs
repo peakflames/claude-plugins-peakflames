@@ -452,14 +452,14 @@ test('onPark defaults to "stop": the first epic that parks ends the run, and the
   assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[E1.id, 'PARKED'], [d.id, 'QUEUED']], 'the independent epic is not started');
   assert.deepEqual([s.status, s.stoppedBecause], ['STOPPED', `${E1.id} parked (onPark: stop)`]);
   assert.ok(p.steps().every((k) => k.startsWith(E1.id)));
-  const file = path.join(p.project, '.claude', 'autopilot.json');
+  const file = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
   const report = readJson(path.join(p.runDir(), 'report.json'));
   assert.deepEqual(report.epics.map((e) => e.outcome), ['PARKED', 'NOT STARTED']);
   assert.ok(report.next.some((n) => n.includes('1 epic did not start (Lg6Cfg3): the run stops at the first epic that parks or fails') && n.includes(`\`{"onPark": "continue"}\` in \`${file}\``)), report.next.join('\n'));
   const pre = JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
   assert.deepEqual([pre.launch.config.onPark, pre.launch.projectSettingsFile, pre.launch.projectSettingsFileExists], ['stop', file, false]);
 
-  // The setting lives with the project: .claude/autopilot.json. With "continue", the independent epic runs after the park.
+  // The setting lives with the project: .claude/peak-workflow/autopilot.json. With "continue", the independent epic runs after the park.
   decide(p, E1.id, ANSWERS.auditNotReal);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ onPark: 'continue', claudeBin: '/somewhere/else', queue: ['nope'] }));

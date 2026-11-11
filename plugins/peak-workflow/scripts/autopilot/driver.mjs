@@ -187,8 +187,8 @@ export function newRunName(workspace, now = new Date()) {
   return name;
 }
 
-/** The project's own autopilot settings, kept with the project (committed or not): `<project>/.claude/autopilot.json`. */
-export const projectSettingsFile = (project) => path.join(project, '.claude', 'autopilot.json');
+/** The project's own autopilot settings, kept with the project (committed or not): `<project>/.claude/peak-workflow/autopilot.json`. */
+export const projectSettingsFile = (project) => path.join(project, '.claude', 'peak-workflow', 'autopilot.json');
 function projectSettings(project) {
   const file = projectSettingsFile(project);
   if (!exists(file)) return {};
@@ -199,7 +199,7 @@ function projectSettings(project) {
 }
 
 /**
- * The effective config of a run: defaults, then the project's `.claude/autopilot.json` (policy that
+ * The effective config of a run: defaults, then the project's `.claude/peak-workflow/autopilot.json` (policy that
  * belongs to the project, such as `onPark`), then the workspace's `settings.json` (budgets, scope,
  * audit, claudeBin, …), then the run's own `config.json` (queue, explicit, end time, run budget,
  * allowTestDouble), then command-line overrides.
