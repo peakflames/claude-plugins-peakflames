@@ -24,7 +24,7 @@ Every script prints its flags with `--help`.
   original → proposed and applied only when they pick it. A change they ask for is applied as asked.
 - **The user signs in themselves**, in the window `capture signin` opens. You never type, ask for,
   or store a password (`references/login.md`).
-- **The deliverable is a file on disk.** Hand-off ends at its path. No upload, post, attachment,
+- **The deliverable is a file on disk.** Hand-off ends at its **absolute** path (the shell may have `cd`'d into the project). No upload, post, attachment,
   message or sharing CLI, even when asked; a request to send it is outside this skill
   (`references/handoff.md`).
 - **Private data on screen blocks hand-off** (step 9) until the user decides.

@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "kind": "beatgrid",
+  "targetMs": 15067,
+  "totalMs": 15067,
+  "audioOffsetMs": -100,
+  "command": [
+    "node",
+    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs",
+    "--storyboard",
+    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-05/web2video/dashboard-tour/storyboard.mjs",
+    "--script",
+    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-05/web2video/dashboard-tour/script.md",
+    "--out",
+    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-05/web2video/dashboard-tour/out/dashboard-tour.mp4",
+    "--preset",
+    "web",
+    "--storage-state",
+    "/Users/schaveyt/.cache/peak-media/auth/127.0.0.1.json"
+  ],
+  "narrate": false,
+  "bpm": 60,
+  "videoMs": 15067,
+  "wallMs": 15091,
+  "beats": [
+    {
+      "id": "overview",
+      "startMs": 11,
+      "durationMs": 5039,
+      "clipNs": [],
+      "onScreenText": "This is the dashboard, where every report starts."
+    },
+    {
+      "id": "run",
+      "startMs": 5051,
+      "durationMs": 4995,
+      "clipNs": [],
+      "onScreenText": "Click Run report to generate a report."
+    },
+    {
+      "id": "result",
+      "startMs": 10047,
+      "durationMs": 5020,
+      "clipNs": [],
+      "onScreenText": "The result appears right below: 42 rows ready."
+    }
+  ],
+  "clips": [],
+  "captions": [
+    {
+      "n": 1,
+      "text": "This is the dashboard, where every report starts.",
+      "startMs": 12,
+      "durationMs": 5038,
+      "x-beat": "overview"
+    },
+    {
+      "n": 2,
+      "text": "Click Run report to generate a report.",
+      "startMs": 5053,
+      "durationMs": 4993,
+      "x-beat": "run"
+    },
+    {
+      "n": 3,
+      "text": "The result appears right below: 42 rows ready.",
+      "startMs": 10049,
+      "durationMs": 5033,
+      "x-beat": "result"
+    }
+  ],
+  "x-take": {
+    "mode": "captions",
+    "storyboard": "../storyboard.mjs",
+    "script": "../script.md",
+    "url": "http://127.0.0.1:4173/",
+    "plate": null,
+    "fps": 30,
+    "width": 1280,
+    "height": 720,
+    "frames": 452,
+    "out": "dashboard-tour.mp4",
+    "preset": "web",
+    "captionEngine": "overlay",
+    "cursor": true,
+    "signedIn": true,
+    "sizeBytes": 66667,
+    "setup": true,
+    "audio": {
+      "clips": 0,
+      "lufs": null
+    },
+    "beats": [
+      {
+        "n": 1,
+        "id": "overview",
+        "text": "This is the dashboard, where every report starts.",
+        "startMs": 11,
+        "durationMs": 5039,
+        "endMs": 5050,
+        "lateMs": 0,
+        "caption": true
+      },
+      {
+        "n": 2,
+        "id": "run",
+        "text": "Click Run report to generate a report.",
+        "startMs": 5051,
+        "durationMs": 4995,
+        "endMs": 10046,
+        "lateMs": 0,
+        "caption": true
+      },
+      {
+        "n": 3,
+        "id": "result",
+        "text": "The result appears right below: 42 rows ready.",
+        "startMs": 10047,
+        "durationMs": 5035,
+        "endMs": 15082,
+        "lateMs": 0,
+        "caption": true
+      }
+    ],
+    "pageErrors": [],
+    "pageErrorCount": 0,
+    "pointer": [
+      {
+        "action": "point",
+        "beat": "overview",
+        "x": 84,
+        "y": 40,
+        "atMs": 449
+      },
+      {
+        "action": "click",
+        "beat": "run",
+        "x": 47,
+        "y": 90,
+        "atMs": 5481
+      },
+      {
+        "action": "point",
+        "beat": "result",
+        "x": 79,
+        "y": 126,
+        "atMs": 10481
+      }
+    ]
+  }
+}
