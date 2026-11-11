@@ -58,3 +58,40 @@ Observations (not defects):
 | AC-UAT-11 | 0 | |
 | AC-UAT-12 | 0 | |
 | **Total** | **4** | counted as new files in `~/.cache/peak-media/tts` plus the spine's `cached` column |
+
+## Round 2 — 02, 03, 08, 11 after the D1–D8 fixes
+
+Run 2026-11-10 by a Lead-side UAT driver at `1779d1a`, the fix round from `fix-handoff.md`. Each case ran alone in a fresh `~/tmp/pm-w2v-uat-r2/<case>/` holding only its fixture, with the same `claude -p` flags, disallowed tools and scripted replies as round 1. The JSONL transcripts were written outside the working dir, in `~/tmp/pm-w2v-uat-r2/_driver/runs/<case>/`. Evidence for each case is in `evidence/WP17/AC-UAT-NN/r2/`. A fresh reviewer subagent read each contact sheet with only the image path and the Then clause. No server or browser was left running after any case.
+
+**Regression first** (`evidence/WP17/regression-serveDir.log`; each run alone, own TMPDIR, deleted after): `capture.test.mjs` 6/6 pass and `beat.test.mjs` 9/9 pass. No tracked WP5/WP10 evidence was rewritten.
+
+| Case | Verdict | Key numbers | MP4 (scratch) |
+|---|---|---|---|
+| AC-UAT-02 | **PASS** (was FAIL) | `--no-captions` only; `cursor: true`, pointer in 9/10 stills; silent AAC −91 dB; 19.0 s; 0 synth | `~/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/out/ui-demo.mp4` |
+| AC-UAT-03 | **PASS** | `sample-voice` + `--budget --wpm 157` + cold read before the gate; `youtube` 1920×1080@30; `check-take --expect-cuts 2` PASS (1363/1443 ms); 21.93 s vs 20 s (+9.7 %); spine miss proposed, not applied; 0 new synth (all cached) | `~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4` |
+| AC-UAT-08 | **PASS** | `scrollBy` ×2; 167 distinct frames in `scroll`; header fixed; key in 0/598 frames (frames 0 and 597 read full size); `hide = ['footer']`; explored via `capture.mjs serve` | `~/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header/out/sticky-header.mp4` |
+| AC-UAT-11 | **PASS** | original → proposed printed before the Edit and capture; applied; no second gate; 19.3 s | `~/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/out/todo-demo.mp4` |
+
+**Driver note (AC-UAT-03):** after "approve", the spine came out at 22.24 s and the session stopped with three original → proposed options. No scripted reply covers this, so the driver answered "3" (shorter pauses), which keeps the 20 s target. The case took three turns, one more than in round 1.
+
+### Defect status after round 2
+
+| ID | Status | Evidence |
+|---|---|---|
+| D1 | **Fixed** | All four sessions explored with `capture.mjs serve <dir>` and stopped it after. No `file://` attempt and no improvised server. |
+| D2 | **Fixed** | AC-UAT-02: `--no-captions` only. The gate keeps the pointer and offers `--no-cursor` as an option. |
+| D3 | **Fixed** | AC-UAT-08: `export const hide = ['footer']`; the key is in no frame, including frame 0. |
+| D4 | **Fixed** | All sessions sampled `0s` and `<videoMs>ms` and read the first and last frames full size. AC-UAT-08's hand-off names the frames it read. |
+| D5 | **Fixed** | `contact-sheet --every 2s` on the AC-UAT-03 take ends at 21.90 s with no error. |
+| D6 | **Fixed** | AC-UAT-03: the budget used 0.9 × wpm; the runtime miss was proposed with original → proposed and applied only after the reply. |
+| D7 | **Not exercised** | Hand-offs now say re-record rebuilds from the project's files. AC-UAT-12 was not re-run. |
+| D8 | **Fixed** | AC-UAT-11: the original → proposed line comes before the Edit and `capture.mjs`. |
+
+### New defects (round 2)
+
+| ID | Where | What happened | Suggested fix |
+|---|---|---|---|
+| D9 | skill: `web2video` step 5 (budget) | `spine --budget --wpm 157` assumes 3 × 500 ms padding, but a deck runs with `--lead-ms 950`. A script reported "on budget" (49 vs 48 words) gave 22.24 s (+11.2 %), the same miss as round 1. | Pass the deck's `--lead-ms` (and any `--tail-ms`) to `spine --budget` in step 5. |
+| D10 | skill: `web2video` gate (narrated) | AC-UAT-03's gate said "The voice is the only text track; no captions are drawn over the slides", but the take drew each beat's caption, the narrated default. The hand-off disclosed it. | State at the gate that narrated mode draws captions unless `--no-captions` is chosen. |
+
+Synth calls in round 2: 0 (TTS cache 54 → 54 files across all four cases; AC-UAT-03's `sample-voice` 1/1 and both spine runs 3/3 were cached from round 1).

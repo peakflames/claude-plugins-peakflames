@@ -1,0 +1,29 @@
+$ node $P/lib/verify/probe-spec.mjs /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/out/ui-demo.mp4 --preset web
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    [web] audio profile: LC
+ok    [web] audio channels: 2
+ok    [web] audio bitrate ≤ 128 kbps +15%: 2 kbps
+ok    [web] progressive: progressive
+ok    [web] encoder rate control (x264 SEI): rc=crf crf=26.0
+PASS  /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/out/ui-demo.mp4
+exit=0
+$ ffprobe audio stream
+codec_name=aac
+profile=LC
+sample_rate=48000
+channels=2
+bit_rate=2277
+$ ffmpeg volumedetect
+[Parsed_volumedetect_0 @ 0x78dac20b40] mean_volume: -91.0 dB
+[Parsed_volumedetect_0 @ 0x78dac20b40] max_volume: -91.0 dB
+$ take command[]
+["node","/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs","--storyboard","/Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/storyboard.mjs","--script","/Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/script.md","--out","/Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/out/ui-demo.mp4","--preset","web","--no-captions"]
+"cursor": true

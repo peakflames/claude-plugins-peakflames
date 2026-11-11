@@ -1,0 +1,57 @@
+# transcript-1.jsonl
+$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice"; echo "exit=$?"
+sample-voice: note: zero data retention is requested; Gemini's only ZDR endpoint needs "Allow Safety Retention" on your OpenRouter account — or use --tts-model microsoft/mai-voice-2.1-flash
+Rasalgethi   32 words   10.96 s  175 wpm  24000 Hz mono  cached  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/web2video-voice/Rasalgethi.wav
+google/gemini-3.8-flash-lite-tts · median 175 wpm · 1/1 cached
+exit=0
+
+# transcript-1.jsonl
+$ …ckGo(i), n); // between beats: lands in silence
+    await wait(900);                                  // let the slide settle before the voice
+    await beat(id);                                   // no fn: the slide is the picture
+  }
+}
+EOF
+node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --budget --wpm 157
+budget  20.0 s at 157 wpm, 3 beat(s) × 500 ms padding → about 48 words
+  intro              15 words  ≈ 6.2 s
+  why                20 words  ≈ 8.1 s
+  how                14 words  ≈ 5.9 s
+script  49 words (on budget)
+
+# transcript-2.jsonl
+$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 950; echo "exit=$?"
+clip  words   sec  wpm  cached
+----  -----  ----  ---  ------
+1        15  5.36  168     yes
+2        20  7.44  161     yes
+3        14  5.84  144     yes
+median 161 wpm · 3/3 cached
+clips  3/3 cached · exported to /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/spine/clips
+beat  intro              0.00 s  +6.56 s
+beat  why                6.56 s  +8.64 s
+beat  how               15.20 s  +7.04 s
+wrote /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/spine/manifest.json and /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/spine/narration.wav
+GATE 2 spine: FAIL — spine/manifest.json 22240 ms is outside ±10% of the 20000 ms target
+spine: runtime 22.24 s against a 20.0 s target (+11.2%) is outside ±10% — resize script.md (words ≈ s × wpm ÷ 60; see --budget) and rerun
+exit=1
+
+# transcript-3.jsonl
+$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning && sed -i '' 's/await wait(900); /await wait(800); /' storyboard.mjs && grep -n 'wait(' storyboard.mjs && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 850; echo "exit=$?"
+9:    if (n) await wait(250);                           // let the last word ring out
+11:    await wait(800);                                  // let the slide settle before the voice
+clip  words   sec  wpm  cached
+----  -----  ----  ---  ------
+1        15  5.36  168     yes
+2        20  7.44  161     yes
+3        14  5.84  144     yes
+median 161 wpm · 3/3 cached
+clips  3/3 cached · exported to /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/spine/clips
+beat  intro              0.00 s  +6.46 s
+beat  why                6.46 s  +8.54 s
+beat  how               15.00 s  +6.94 s
+wrote /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/spine/manifest.json and /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/spine/narration.wav
+PASS  runtime 21.94 s against a 20.0 s target (+9.7%)
+GATE 2 spine: PASS — spine/manifest.json 21940 ms (target 20000 ±10%)
+exit=0
+
