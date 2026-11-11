@@ -29,6 +29,10 @@ work yourself.
 4. **It never picks among ready epics.** The proposed queue is every eligible epic in phase and
    index order. The owner removes or reorders; you do not choose a subset or a "best first" epic.
 
+**Asking the owner.** Every question with a fixed set of answers goes through
+`AskUserQuestion`, never as a question left in the chat. Plain text is only for answers that are
+free text (a changed queue, a budget, an end time) or a list too long for the tool.
+
 **Epic references.** Name an epic as `<id> (<slug>) — <Name>` everywhere (the `label` field in the
 driver's output), never by ID alone.
 
@@ -78,16 +82,19 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    **A test double.** If a refusal says `claudeBin` is not the real `claude`, `<ws>/settings.json`
    names a stand-in binary. If that is the only refusal and no epic is runnable, skip the
    question and go to item 7. In `dry-run` mode, say that sessions would use the stand-in and
-   carry on without asking (a dry run starts nothing). Otherwise say so plainly and ask (plain text) whether this run is a rehearsal
-   that should use it. On no: stop — the owner removes `claudeBin` from `<ws>/settings.json`. On
+   carry on without asking (a dry run starts nothing). Otherwise say so plainly and ask with `AskUserQuestion`: "Sessions would use a
+   stand-in binary (<its file name>), not real Claude Code. Is this run a rehearsal that should
+   use it?" — options `Yes — this run is a rehearsal` and `No — stop here`. On no: stop — the
+   owner removes `claudeBin` from `<ws>/settings.json`. On
    yes: run the preflight again with `--allow-test-double` added, and in Step 2 item 4 add
    `"allowTestDouble": true` to the run's `config.json`. Never add it unasked: it is per run on
    purpose, so a rehearsal's stand-in is never inherited by a real run. After a yes, the
    `claudeBin` warning is expected: state it once, in the Step 2 block.
 
 4. **Warnings.** Print every line of `launch.warn`. If it says gates wait for a decision,
-   recommend `/peak-workflow:autopilot report` first and ask (plain text) whether to continue
-   anyway; stop unless the user says to continue. `launch.sync.state` says how the project and
+   recommend `/peak-workflow:autopilot report` first and ask with `AskUserQuestion` — "<N>
+   gate(s) wait for your decision. Launch a run anyway? Those epics are left alone." with options
+   `Decide the gates first` and `Continue anyway`; stop unless the owner chooses to continue. `launch.sync.state` says how the project and
    the clone compare, and the run acts on it by itself: `project-ahead` — the clone is
    fast-forwarded first (a decision on a parked branch still holds if the branch merges cleanly
    into the new tip; the run checks that when it starts); `clone-ahead` — merged work is still waiting to be fetched, and
@@ -122,8 +129,9 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
 7. **Nothing runnable.** Before stopping, look at the skipped epics. If any is skipped only
    because its status is not `Not Started` or because it belongs to someone else (the two
-   reasons Step 2 item 1 allows), list them and ask (plain text) whether the owner wants to
-   queue any of them explicitly; on yes, continue to Step 2 with those. Otherwise say that no
+   reasons Step 2 item 1 allows), list them and ask with `AskUserQuestion` (`multiSelect: true`, one option per
+   epic, by label, plus `None — stop here`; a numbered plain-text list instead when there are
+   more than three) which the owner wants to queue explicitly; continue to Step 2 with those. Otherwise say that no
    epic is runnable and stop: nothing is launched for an empty queue. If `launch.sync.state` is
    `clone-ahead`, also print the fetch command from the warning — merged work is waiting — and
    point to `/peak-workflow:autopilot report`.
