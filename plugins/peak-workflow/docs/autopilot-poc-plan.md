@@ -15,8 +15,10 @@ unattended agents onto this design.*
 
 - **What.** "Autopilot" is an unattended mode for peak-workflow. A plain Node script (the
   **driver**) builds a queue of a project's epics one at a time, for example overnight. Each epic
-  gets a fresh headless `claude -p "/peak-workflow:start-epic <id>"` session. A second fresh
-  session runs `/peak-workflow:wrapup-epic <id>` as the independent verifier. The epic is merged
+  gets a headless **planning session** (`claude -p "/peak-workflow:start-epic <id>"`, stopped at
+  the plan), then a **fresh implementation session** whose prompt is the approved plan. This is
+  what Claude Code's `showClearContextOnPlanAccept` setting does by hand. Another fresh session
+  runs `/peak-workflow:wrapup-epic <id>` as the independent verifier. The epic is merged
   `--no-ff` into a local integration line only when the driver's own file and command checks
   agree. A **referee** enforces the rules: Claude Code hooks block forbidden actions, driver checks
   run deterministic gates, and an advisory LLM auditor reports findings. A Markdown and JSON
@@ -52,7 +54,7 @@ unattended agents onto this design.*
 | `/peak-workflow:autopilot` | Skill (front door, takeoff) | Yes, interactive with the user | Readiness check, AC scope and cost review, queue confirmation, launching the driver detached. Then it returns. It builds nothing |
 | `/peak-workflow:autopilot report` | Skill (landing) | Yes, interactive with the user | Reads the report, presents merged, parked and failed epics, and records the user's own answers to parked gates |
 | `driver.mjs` | Plain Node script | **No** | All the work between epics: pick the next epic in the confirmed order, spawn fresh headless `claude -p` sessions for `start-epic`, audit and `wrapup-epic`, judge done-ness from files and tests, merge or park, stop the line, enforce budgets, write the report. It can also be run directly (e.g. from cron or `launchd`) with a `config.json` the skill or the user wrote |
-| Epic sessions | Ordinary `claude -p` sessions running the unchanged `start-epic` / `wrapup-epic` skills | Yes | Build, or independently verify, one epic. The referee hooks are loaded through `--settings` |
+| Epic sessions | Ordinary `claude -p` sessions using the user's own installed plugins, settings, `CLAUDE.md` and memory, in `acceptEdits` mode | Yes | Per epic: plan (`start-epic` up to its plan), implement (a fresh session given the approved plan), and independently verify (`wrapup-epic`). The referee hooks are layered on top through `--settings` |
 | Referee hooks | `PreToolUse` / `Stop` / logging hooks (Node scripts) | **No** | Deny forbidden actions, answer pre-approved gates from a fixed table, park everything else |
 | Auditor session | Read-only `claude -p` session with a JSON schema | Yes, advisory | Reports findings. The driver's rules decide what they mean |
 
@@ -334,12 +336,13 @@ decides whether a merge stands.
   clone/                                private clone, no origin; develop = integration line
   epics/<id>/
     preflight.json                      eligibility, flags, anchors, deps
-    build-1/  settings.json  stream.jsonl  result.json  stderr.log  hooks.jsonl  plan.md
+    plan-1/   settings.json  stream.jsonl  result.json  stderr.log  hooks.jsonl  plan.md  plan-lint.json
+    build-1/  settings.json  prompt.md  stream.jsonl  result.json  stderr.log  hooks.jsonl  effective-setup.json
     check-build-1.json                  driver done-ness checks with evidence
     audit-1/  bundle/  result.json      auditor input bundle and output
     verify-1/ …                         same files as build
     check-verify-1.json                 merge-gate checks
-    fix-1/ … verify-2/ …                at most one fix round
+    plan-fix-1/ … fix-1/ … verify-2/ …  at most one fix round (plan + implement again)
   gates/<id>-<n>.json                   queued human gates (§6.8)
   report.md  report.json                morning report (§6.9)
 ```
@@ -365,11 +368,14 @@ for the auditor only). That prevents the WP17 D1 contamination.
          PREFLIGHT ──skip(hw, HIL, sign-in)──► SKIPPED                                            │
              │ ok                                                                                 │
              ▼                                                                                    │
-           BUILD  (fresh session: /peak-workflow:start-epic <id>)                                 │
+           PLAN   (session: /peak-workflow:start-epic <id>, ends at ExitPlanMode; plan captured)  │
              │  park gate / plan lint fail / budget / crash ─────────────────────► PARKED ───────┤
              ▼                                                                                    │
+           BUILD  (fresh session; prompt = approved plan, clear-context handoff format)           │
+             │  park gate / budget / crash ──────────────────────────────────────► PARKED ───────┤
+             ▼                                                                                    │
         CHECK_BUILD (driver: sidecar, commit, tests, trace, scope, test-integrity, tor-lifecycle) │
-             │  fail ──(fix round left?)── yes ─► FIX ─► CHECK_BUILD                              │
+             │  fail ──(fix round left?)── yes ─► FIX (plan + build) ─► CHECK_BUILD               │
              │                             no ──────────────────────────────────► PARKED/FAILED ─┤
              ▼                                                                                    │
            AUDIT  (fresh read-only session; advisory) ── parkOn rule hit ───────────► PARKED ─────┤
@@ -397,10 +403,35 @@ merged work. Building them doesn't break strict order or G1, and it uses the tim
 **base** stops the whole run, because every epic would build on it. The driver runs the test
 command on `develop` before each epic and stops if it fails.
 
+**Plan, then implement in a fresh session.** Decided (owner, 2026-11-11): autopilot mirrors
+Claude Code's "clear context on plan accept" (`showClearContextOnPlanAccept: true` in
+`settings.json`), which is how peak-workflow users are meant to work by hand. Planning can use a
+lot of context, so implementation starts fresh.
+
+- **PLAN.** The session runs `start-epic` Steps 1–4: guards, context, the 2.5 card, the Step 3
+  branch, and plan mode. When it calls ExitPlanMode, hook R9 saves `tool_input.plan` to
+  `plan.md`, lints it, and ends the session (§6.7). The branch exists but has no commits; the
+  sidecar is still Not Started on `develop`.
+- **BUILD.** The driver starts a fresh session whose prompt is the approved plan, in the same
+  shape Claude Code uses for the clear-context handoff (`Implement the following plan:` followed
+  by the plan text; P0 S4 records the exact format). Two things are added:
+  - `${CLAUDE_PLUGIN_ROOT}` in the plan text is replaced with the installed plugin's path. A
+    fresh session that isn't running the skill has no such variable, and the plan's sweep step
+    uses it.
+  - `--append-system-prompt-file build-rules.md` carries `start-epic` Step 5's rule: "execute
+    every item in order; do not add, skip, or reorder items".
+
+  `start-epic` Step 4 requires the plan to be "fully executable in isolation". Its opening steps
+  (verify branch, sidecar to In Progress with `owner:`, announce, tasks) and closing steps
+  (self-assessment, handoff, Mark as Implemented, Commit) are all plan items, and its Deferral and
+  Amendment gate paragraphs are copied verbatim. So the gates still fire in the build session, and
+  hook R8 parks them. R9's lint checks that those items are present before approving.
+
 **Fix round.** There is at most one per epic, shared between CHECK_BUILD and VERIFY failures. The
-fix session runs `/peak-workflow:start-epic <id>` again. The epic is In Progress or Implemented,
+fix round is a planning session that runs `/peak-workflow:start-epic <id>` again, followed by a
+fresh build session given its plan. The epic is In Progress or Implemented,
 so `start-epic` treats it as a resumption: "rework after a wrapup FAIL", per PLAN_TEMPLATE opening
-step 2. The session gets `--append-system-prompt-file <state>/epics/<id>/fix-brief.md`, which
+step 2. Both fix sessions get `--append-system-prompt-file <state>/epics/<id>/fix-brief.md`, which
 lists the driver's failed checks and the verifier's FAIL items, copied from the verify session's
 final result text. This is context for the builder, not enforcement; the checks that follow are
 the enforcement.
@@ -443,34 +474,75 @@ The flags below are confirmed in `cli-reference` and `headless` unless marked. E
 with `cwd = <state>/clone` and with this environment:
 
 ```
-AUTOPILOT_STATE=<state>  AUTOPILOT_ROLE=builder|verifier|auditor  AUTOPILOT_EPIC=<id>
+AUTOPILOT_STATE=<state>  AUTOPILOT_ROLE=planner|builder|verifier|auditor  AUTOPILOT_EPIC=<id>
 CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1      # removes run_in_background (env-vars)
 BASH_MAX_TIMEOUT_MS=900000  BASH_DEFAULT_TIMEOUT_MS=300000
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=60000  # belt and braces (headless "background tasks at exit")
 TMPDIR=<state>/epics/<id>/<step>/tmp        # per-session temp dir, removed after the step
 ```
 
-**Build (and fix):**
+`$PLUGIN_DIR` is the **installed** peak-workflow root, the directory `driver.mjs` runs from.
+Epic sessions load plugins the normal way (no `--plugin-dir`, no `--setting-sources`), so they
+see the user's own plugins, settings, `CLAUDE.md` and memory, as by hand. Decided (owner,
+2026-11-11). Autopilot's `--settings` layer adds the referee on top.
+
+**Plan (and fix plan):**
 
 ```bash
 claude -p "/peak-workflow:start-epic Lg1Csv7" \
-  --plugin-dir "$PLUGIN_DIR" \
-  --settings "$STATE/epics/Lg1Csv7/build-1/settings.json" \
+  --settings "$STATE/epics/Lg1Csv7/plan-1/settings.json" \
   --output-format stream-json --verbose --include-hook-events \
   --permission-mode acceptEdits \
   --allowedTools "Bash" "Read" "Edit" "Write" "Glob" "Grep" "Skill" "Agent" \
   --disallowedTools "WebFetch" "WebSearch" \
+  --max-turns 80 --max-budget-usd 5 \
+  --session-id "$(uuidgen)" --model sonnet \
+  > plan-1/stream.jsonl 2> plan-1/stderr.log
+#  AUTOPILOT_ROLE=planner; the session ends when R9 captures the plan (continue:false)
+#  fix plan adds: --append-system-prompt-file "$STATE/epics/Lg1Csv7/fix-brief.md"
+```
+
+**Build (and fix build):** a fresh session; no slash command, and the prompt is the plan.
+
+```bash
+claude -p "$(cat "$STATE/epics/Lg1Csv7/build-1/prompt.md")" \
+  --append-system-prompt-file "$STATE/epics/Lg1Csv7/build-1/build-rules.md" \
+  --settings "$STATE/epics/Lg1Csv7/build-1/settings.json" \
+  --output-format stream-json --verbose --include-hook-events \
+  --permission-mode acceptEdits \
+  --allowedTools "Bash" "Read" "Edit" "Write" "Glob" "Grep" "Skill" "Agent" "TaskCreate" "TaskUpdate" \
+  --disallowedTools "WebFetch" "WebSearch" \
   --max-turns 200 --max-budget-usd 15 \
   --session-id "$(uuidgen)" --model sonnet \
   > build-1/stream.jsonl 2> build-1/stderr.log
-#  fix round adds: --append-system-prompt-file "$STATE/epics/Lg1Csv7/fix-brief.md"
+#  prompt.md = "Implement the following plan:\n\n" + plan.md with ${CLAUDE_PLUGIN_ROOT} resolved
+#  AUTOPILOT_ROLE=builder; fix build also adds fix-brief.md to build-rules.md
 ```
 
-**Verify:** the same, with `"/peak-workflow:wrapup-epic Lg1Csv7"`, `--model opus` (the skill's
+**Permission mode.** Decided (owner, 2026-11-11): `acceptEdits` plus the referee hooks for the
+plan, build and verify sessions. The honest caveat is that anything neither the hooks, the deny
+rules nor the sandbox covers is allowed. The main risks are covered as follows:
+
+| Risk | Covered by |
+|---|---|
+| Writes outside the clone | R2 path jail (Read, Edit, Write); sandbox filesystem (Bash) |
+| Push, merges to the integration line, history rewrites | R3 and the deny rules |
+| Containers, VMs, global installs | R4 and the deny rules |
+| Disk exhaustion | R5 and the driver's 30 s check |
+| Ending with background work running | R6 and the Stop hook |
+| Weakening existing tests | R7 and the driver's diff check |
+| Answering human gates | R8 |
+| Unvetted plans | R9 |
+| Network | The sandbox with network off, and no WebFetch or WebSearch |
+
+What is not covered: what a script does once it runs (CPU loops, odd file writes inside the
+clone). The wall clock, CHECK_BUILD and the auditor are the backstop.
+
+**Verify:** the same as Plan, with `"/peak-workflow:wrapup-epic Lg1Csv7"`, `--model opus` (the skill's
 frontmatter also says `model: opus`), `AUTOPILOT_ROLE=verifier`, `--max-turns 150`, and
 `--max-budget-usd 10`.
 
-**Audit:**
+**Audit** (stays read-only: the tool set is Read, Grep and Glob only):
 
 ```bash
 claude -p "$(cat "$PLUGIN_DIR/scripts/autopilot/audit/prompt.md")" \
@@ -497,11 +569,26 @@ tree, including subagents such as wrapup's Haiku docs refresh), `stop_reason`, t
 above, and `permission_denials`. `is_error`, `duration_ms` and the presence of every field in the
 CLI's JSON form are **UNCONFIRMED** (P0). The driver also measures wall clock itself.
 
-**Model and settings isolation (P0).** It is **UNCONFIRMED** whether `--plugin-dir` plus a
-user-scope install of peak-workflow loads the plugin twice. It is also unconfirmed whether
-`--setting-sources project,local` is needed to keep the user's own hooks and plugins out. The
-spike decides. `--bare` is **not** usable, because it skips hooks passed with `--settings`
-(`headless` bare mode).
+**Inherited setup and the referee layer.** Sessions inherit the user's setup on purpose. The
+referee must still hold:
+
+- `--settings` values override matching keys from settings files (`cli-reference`);
+- deny rules win in every mode (`permissions`);
+- when hooks disagree, deny beats defer, ask and allow (`hooks`).
+
+So a user allow rule or hook can't undo an autopilot deny. P0 S7 confirms this, along with the
+case where managed settings disable hooks. The driver records the effective setup of every
+session in `effective-setup.json`: the settings files that applied, enabled plugins with path and
+version, the `--settings` layer, and the stream-json init message. The report shows a one-line
+digest and flags any difference between sessions.
+
+**Testing an unreleased copy.** For the PoC, the installed peak-workflow *is* the branch copy. Add
+this repository checkout as a local marketplace and install peak-workflow from it, so the
+working tree on `feature/peak-workflow-autopilot-poc` is what loads. Don't add `--plugin-dir` on
+top of an install, which risks a double load. Reinstall the released version after the PoC. P0
+S7 confirms which copy loaded.
+
+`--bare` is **not** usable, because it skips hooks passed with `--settings` (`headless` bare mode).
 
 ### 6.7 Referee hooks
 
@@ -544,14 +631,14 @@ input (`hooks`). The rules:
 | Rule | Applies to | Logic |
 |---|---|---|
 | R1 kill switch | all | `<state>/STOP` exists: deny, plus `continue: false` with `stopReason` |
-| R2 path jail | Read, Edit, Write, NotebookEdit, Glob, Grep, Bash paths | Resolve `realpath`. Allow under `<state>/clone`, the session `TMPDIR`, and read-only `$PLUGIN_DIR`. Deny `<state>/` outside the clone (except the bundle for the auditor) and anything else. For Bash, it scans absolute paths and `cd` targets in the command (best effort) |
+| R2 path jail | Read, Edit, Write, NotebookEdit, Glob, Grep, Bash paths | Resolve `realpath`. Allow under `<state>/clone` and the session `TMPDIR`. Allow read-only access to `$PLUGIN_DIR` and the user's inherited setup (`~/.claude/` plugins, `CLAUDE.md`, memory). Deny `<state>/` outside the clone (except the bundle for the auditor) and anything else. For Bash, it scans absolute paths and `cd` targets in the command (best effort) |
 | R3 git rules | Bash `git …` | Deny push, remote, `--force`, `reset --hard`, `branch -D`, `checkout main`, `rebase` on develop or main, `tag`. **Builder:** deny `commit` or `merge` when `git branch --show-current` is `develop` or `main`. **Verifier:** allow `git merge --no-ff feature/epic-<AUTOPILOT_EPIC>-*` and `git branch -d` of that branch only |
 | R4 containers and VMs | Bash | Deny docker, podman, colima, lima, multipass, vagrant, qemu, VirtualBox, kind, minikube, nvm/asdf/volta installs, `brew`, global `npm -g` / `pip install --user` |
 | R5 disk and growth | Bash, Write | Deny when free disk < `config.diskFloorGb` (default 15) or `du` of the clone grows by more than `config.growthCapMb` (default 1024) since the step started. The driver checks the same every 30 s and kills the step |
 | R6 background | Bash, Agent | Deny `run_in_background: true`. This duplicates the env var in case it is ignored |
 | R7 test integrity | Edit, Write, MultiEdit, NotebookEdit; Bash `rm`, `git rm`, `mv`, `sed -i`, `>` redirect on a path | If the target is a test file that exists on `develop` (by `git cat-file -e develop:<path>`) and `.autopilot/test-changes.jsonl` has no line for that path, deny with the instruction: "append {path, reason} to .autopilot/test-changes.jsonl first". Writing that file is allowed. The driver's diff check (§6.5) backs this up |
 | R8 gate policy | AskUserQuestion | Match each question against `policy/gates.json` (§7). **Answer:** `permissionDecision: "allow"` with `updatedInput` = the original `questions` plus `answers` {question text → option label}, which is documented for PreToolUse (`hooks`; `agent-sdk/user-input`). **Park:** write `gates/<id>-<n>.json`, deny, and `continue: false` with `stopReason: "autopilot: parked at human gate"` |
-| R9 plan lint | ExitPlanMode | Save `tool_input.plan` to `plan.md`. Approve only if the plan names every anchor TOR ID, contains the PLAN_TEMPLATE closing-step headings ("Implementer self-assessment", "Reconcile spec", "Mark as Implemented", "Commit"), copies the Deferral and Amendment gate paragraphs, and contains no `git push`, container or `sudo` command. Otherwise park with the plan attached. The report always says "plan approved by lint, not by a person". Whether a hook `allow` approves ExitPlanMode headlessly is **UNCONFIRMED** (P0). Fallbacks, in order: a `PermissionRequest` hook with `decision.behavior: "allow"`; the Agent SDK's `canUseTool`; or, as a last resort, a peak-workflow change (§13 Q1) |
+| R9 plan capture and lint | ExitPlanMode | **Planner role:** save `tool_input.plan` to `plan.md`, then lint it. The plan must name every anchor TOR ID; contain the PLAN_TEMPLATE opening steps ("Create (or verify) feature branch", "Update status to \"In Progress\"") and closing-step headings ("Implementer self-assessment", "Reconcile spec", "Mark as Implemented", "Commit"); copy the Deferral and Amendment gate paragraphs; and contain no `git push`, container or `sudo` command. On pass, write `plan-lint.json`, deny the call, and return `continue: false` with `stopReason: "autopilot: plan captured"`. The driver then starts the build session. On fail, write a gate file and park with the plan attached. The report always says "plan approved by lint, not by a person". **Builder and verifier roles:** deny EnterPlanMode and ExitPlanMode, since the build session runs an already-approved plan |
 
 `stop.mjs`: if the `Stop` input's `background_tasks` is non-empty, return `decision: "block"` with
 reason "wait for <task> or stop it; autopilot does not end with work running". If
@@ -559,7 +646,7 @@ reason "wait for <task> or stop it; autopilot does not end with work running". I
 treats the step as failed. Claude Code caps consecutive stop-hook continuations at 8 by default
 (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`).
 
-For the builder role only, `stop.mjs` also blocks **once** when the branch sidecar is not
+For the builder role only (the implementation session), `stop.mjs` also blocks **once** when the branch sidecar is not
 `Implemented` and no gate file was written. The reason is "finish the plan's closing steps
 (self-assessment, handoff, Mark as Implemented, Commit) or stop at a gate". This follows the
 best-practices advice to enforce the finish check with a Stop hook. A second stop is always
@@ -657,10 +744,11 @@ round.
 
 | Scope | Wall clock | Turns | Dollars | Other |
 |---|---|---|---|---|
-| Build session | 90 min | 200 | $15 | Bash call ≤ 15 min |
+| Plan session | 30 min | 80 | $5 | ends at ExitPlanMode |
+| Build (implementation) session | 90 min | 200 | $15 | Bash call ≤ 15 min |
 | Verify session | 45 min | 150 | $10 | |
 | Audit session | 15 min | 40 | $3 | |
-| Fix session | 60 min | 150 | $12 | one per epic |
+| Fix round (plan + build) | 20 + 60 min | 60 + 150 | $4 + $12 | one per epic |
 | Driver test runs | 10 min each | — | — | |
 | Run | until `config.endBy` (default 06:30 local) | — | $80 | max epics = queue length |
 
@@ -692,7 +780,8 @@ start this epic unattended. No row lets a model choose an answer.
 | Step 2.5: "Start Epic <id> …?" (always asked for Not Started) | `AskUserQuestion` | **Answer "Start it"** only if the question names the queued epic ID; otherwise park |
 | Step 2.5: ⚑ lines (teammate's epic or phase, origin branch) | Part of the same question | Preflight skips epics whose `owner:` or `Planned by:` is someone else, unless the user queued them explicitly at confirm |
 | Recovery Check (In Progress without a pause handoff) | Informational | Expected after a park; no action |
-| Step 4: plan mode, plan approval (ExitPlanMode) | Approval | **Plan lint** (R9): approve if it passes, otherwise park with `plan.md` |
+| Step 4: plan mode, plan approval (ExitPlanMode) | Approval | The planning session ends here. R9 captures the plan; **plan lint** approves it, otherwise park with `plan.md`. An approved plan is executed by a **fresh** build session, as with `showClearContextOnPlanAccept` |
+| Step 5: execute the plan | None (the plan is the execution script) | The build session's prompt is the plan; `build-rules.md` carries Step 5's "do not add, skip, or reorder" rule |
 | Plan rejected, branch cleanup | n/a | Doesn't occur (lint never "rejects"; it parks) |
 | Deferral gate (Fix now / Defer / Stop) | `AskUserQuestion` | **Park**. Deferral is an owner decision; "Plan approval does not pre-authorize any deferral" (PLAN_TEMPLATE) |
 | Amendment gate | `AskUserQuestion` | **Park**. Never amend requirements during a run |
@@ -767,6 +856,8 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
 
 - **Crash-safe resume.** Before each action the driver writes the intended step to `state.json`
   (tmp + rename). On restart (`driver.mjs run --resume`), an in-flight step is never re-trusted:
+  - PLAN in flight: kill leftovers and re-run it once. `start-epic` resumes on the existing empty
+    branch (Step 3), and its Leftover check removes the branch if needed.
   - BUILD or FIX in flight: kill leftover processes, then run CHECK_BUILD from files. If it
     passes, continue; if not, count the attempt and park as "interrupted".
   - VERIFY in flight: if `develop` moved, run CHECK_VERIFY (and roll back on failure); if not,
@@ -817,20 +908,20 @@ the answers to `SPIKE.md`.
 
 | # | Check | Pass when |
 |---|---|---|
-| S1 | `claude -p "/peak-workflow:status" --plugin-dir … --output-format json` | The skill runs. Record every top-level result field name (`is_error`, `duration_ms`, `total_cost_usd`, `modelUsage`, `permission_denials`) |
+| S1 | `claude -p "/peak-workflow:status" --output-format json` (installed plugin) | The skill runs. Record every top-level result field name (`is_error`, `duration_ms`, `total_cost_usd`, `modelUsage`, `permission_denials`) |
 | S2 | Hooks from `--settings` fire in non-bare `-p` in an **untrusted** new directory | A PreToolUse deny on `Bash(echo *)` is honoured. If trust blocks hooks, find the documented way to trust the directory |
 | S3 | PreToolUse answers AskUserQuestion via `updatedInput.answers` | Run `start-epic` to Step 2.5; the session proceeds with "Start it" and doesn't re-ask |
-| S4 | Plan approval headlessly | `start-epic` reaches ExitPlanMode; a PreToolUse `allow` (or a PermissionRequest `allow`) exits plan mode and the plan executes. Record which one works |
+| S4 | Plan, then implement in a fresh session (the `showClearContextOnPlanAccept` pattern) | (a) Run `start-epic` interactively once with `showClearContextOnPlanAccept: true` and record exactly how Claude Code formats the handoff prompt for the cleared session; `prompt.md` copies that format. (b) Headless planning session: R9 captures `tool_input.plan` at ExitPlanMode and the session ends cleanly (`continue: false`), with the branch created and nothing committed. (c) A fresh `-p` session given `prompt.md` executes the plan under `start-epic`'s rules: sidecar to In Progress with `owner:`, tasks, middle steps, self-assessment, handoff, Mark as Implemented, Commit, with `${CLAUDE_PLUGIN_ROOT}` resolved and the Deferral and Amendment gates still reaching R8. List any post-approval step the plan doesn't carry and add it to `build-rules.md` |
 | S5 | `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` removes `run_in_background`; the Stop hook sees `background_tasks` | Both observed |
 | S6 | Hooks fire inside wrapup's Haiku subagent with `agent_id` | Observed in `hooks.jsonl` |
-| S7 | `--plugin-dir` vs an installed peak-workflow; `--setting-sources` isolation | No double load; user hooks excluded when intended |
-| S8 | Whether PreToolUse hooks run under `acceptEdits` with a broad `Bash` allow rule (and under `bypassPermissions`, which is not planned) | Deny honoured in `acceptEdits` |
+| S7 | Inherited setup with the referee layered on top | The installed peak-workflow loads once (the branch copy, installed from this checkout as a local marketplace); the stream-json init and `effective-setup.json` show which copy and version. A user allow rule and a user hook that allows `git push` do not override autopilot's deny. Hooks still fire if user or managed settings set hook-related keys |
+| S8 | PreToolUse hooks run and deny under `acceptEdits` with a broad `Bash` allow rule (the decided mode) | Deny honoured; AskUserQuestion answered by R8 |
 | S9 | Baseline cost and time: run E1 build plus verify by hand-launched commands | Numbers recorded; budgets in §6.11 adjusted |
 | S10 | A detached driver survives closing the launching Claude Code session | The process is still alive after exit |
 | S11 | Sandbox settings keys: filesystem writes limited to the clone and `TMPDIR`, network off; `node --test` still runs | A `curl` and a Node `fetch` from a test both fail; the suite passes |
-| S12 | `--permission-mode dontAsk` with an explicit allowlist vs `acceptEdits`: do PreToolUse hooks still answer AskUserQuestion and ExitPlanMode under `dontAsk`? | Pick the strictest mode in which S3 and S4 still pass |
+| S12 | Optional, not a gate: note whether `dontAsk` would also work, for a later hardening pass | Recorded only; `acceptEdits` is decided |
 
-**Exit:** S1–S4 pass, or each failure has a decided fallback (§13 Q1).
+**Exit:** S1–S4, S7 and S8 pass, or each failure has a decided fallback (§13 risks).
 
 ### P1: Driver with a fake `claude`
 
@@ -840,7 +931,7 @@ STOP and dry-run. Build `fake-claude.mjs`: it reads a scenario file and emits st
 writes the git commits or sidecar edits the scenario names, and can hang, crash, exceed a budget
 or "merge".
 
-Tests (`node:test`), one per behaviour: happy path to MERGED; build budget leading to a WIP
+Tests (`node:test`), one per behaviour: happy path to MERGED, where the plan is captured and the build session gets `prompt.md` with `${CLAUDE_PLUGIN_ROOT}` resolved; plan lint fail leading to park; build budget leading to a WIP
 commit and park; check failure followed by one fix round then park; verify FAIL, fix, PASS; a
 bad merge (an extra commit on `develop`) rolled back; dependents BLOCKED after a park while
 independent epics still run; base red stops the run; STOP mid-step; kill -9 of the driver
@@ -976,7 +1067,7 @@ stopwatch):**
 
 **Go** (turn autopilot into a real peak-workflow feature, P6): zero false merges, 100 %
 parked-correctly, 100 % planted violations blocked or flagged, no unexplained stall, Q1 answered
-without editing `start-epic` or `wrapup-epic` (or with one small, owner-approved headless hook in
+without editing `start-epic` or `wrapup-epic` (or, as a last resort, with one small, owner-approved headless hook in
 them), and the owner judges the cost acceptable.
 
 **No-go:** any false merge the referee should have caught; a stall; or a model answering a human
@@ -993,6 +1084,8 @@ inputs to the explainer §10 recommendation.
   (explainer §7 incident 1; DEC-32). One Mac also shares CPU and disk across builders (explainer
   §9). Strict serial order is the default; parallel might later be allowed for epics with no shared
   dependencies and no human gates (explainer §10 open question 4).
+- **A dev container for the run.** Decided for later: it is evaluated only after the go/no-go
+  (§13 open question 11). The PoC runs on the host with the sandbox, network off.
 - **Automated perceptual checks.** Screenshots and visual or audio proxies need a browser or
   media tools, and the explainer shows that numbers stood in badly for looking. Autopilot parks
   instead.
@@ -1006,7 +1099,8 @@ inputs to the explainer §10 recommendation.
 
 | Risk | Mitigation |
 |---|---|
-| Plan mode can't be approved headlessly (S4 fails) | Fallbacks in order: a PermissionRequest hook; the Agent SDK `canUseTool` (a TypeScript driver path); a peak-workflow change that skips EnterPlanMode when `AUTOPILOT_ROLE` is set, with lint applied to the written plan (minor bump; owner approval) |
+| The plan can't be captured cleanly at ExitPlanMode, or a fresh session doesn't follow the plan the way `start-epic` Step 5 would (S4 fails) | Fallbacks in order: capture through a `PermissionRequest` hook; the Agent SDK `canUseTool` (a TypeScript driver path); a stronger `build-rules.md` listing the missing post-approval steps. **Last resort only:** a peak-workflow change that lets `start-epic` write its plan to a file when `AUTOPILOT_ROLE` is set (minor bump; owner approval) |
+| Inherited user setup (plugins, settings, `CLAUDE.md`, memory) makes runs differ per machine, or a user setting weakens a rule | Deny rules and hooks from `--settings` take precedence (S7). The driver records each session's effective setup in `effective-setup.json`, the run log and the report, and flags differences between sessions or runs |
 | The model re-asks after a policy answer, or treats it as "free text" (skills say only a selected option counts) | The answer goes through `updatedInput.answers` as a selected label, not prose. S3 confirms it. Re-asks are counted; after 2, park |
 | The model routes around a denial (writes a script that runs docker, uses `node -e` to edit a test) | The driver's post-checks (diff-based test integrity, scope, disk growth, `docker ps` before and after), the auditor, and hook logging of every denial. The morning report lists denials so a human sees attempts |
 | wrapup merges a bad result | The CHECK_VERIFY merge gate rolls back in the private clone. The user's repo is untouched until they fetch |
@@ -1021,14 +1115,20 @@ inputs to the explainer §10 recommendation.
 
 ### Open questions (decide in P0 or with the owner)
 
-1. **Plan approval path** (S4). Hook, PermissionRequest, SDK, or a small skill change?
+1. **Plan approval path. Decided (owner, 2026-11-11):** a planning session ends at ExitPlanMode
+   with the plan captured and linted (R9), and a fresh session implements it, mirroring
+   `showClearContextOnPlanAccept`. S4 verifies the handoff format and the post-approval steps. A
+   skill change is a last-resort fallback only.
 2. **CLI JSON field names** (S1): `is_error`, `duration_ms`, and whether `permission_denials` and
    `modelUsage` appear in plain `json` (they are documented for stream-json and the SDK).
 3. **Hook trust and `--settings` in non-bare `-p`** (S2): documented only by inference.
-4. **Plugin isolation** (S7): `--plugin-dir` alongside an installed copy; user-level `CLAUDE.md`
-   and hooks leaking into autopilot sessions.
-5. **Do PreToolUse hooks run under `bypassPermissions`?** Not needed if `acceptEdits` plus allow
-   rules works (S8), but undocumented.
+4. **Plugin isolation. Decided (owner, 2026-11-11):** inherit the user's setup (plugins,
+   settings, `CLAUDE.md`, memory), with the referee layered on top via `--settings`. No
+   `--plugin-dir`-only loading and no `--setting-sources` isolation. S7 verifies precedence and
+   which copy loads.
+5. **Permission mode. Decided (owner, 2026-11-11):** `acceptEdits` plus referee hooks; `dontAsk`
+   is not a target (S12 is an optional note). Whether hooks run under `bypassPermissions` is moot,
+   because bypass is not used.
 6. **Agent SDK vs CLI.** The SDK (`query()` with `canUseTool`, `hooks`, `maxBudgetUsd`) may be
    cleaner, but whether slash-command prompts work through `query()` is unconfirmed. The PoC
    starts with the CLI.
@@ -1041,11 +1141,11 @@ inputs to the explainer §10 recommendation.
 10. **Fix-round input.** `wrapup-epic`'s FAIL report is printed, not committed. Is the session's
     final `result` text a reliable source for `fix-brief.md`, or should the PoC propose that
     wrapup write a FAIL handoff file?
-11. **Credentials isolation.** Anthropic advises skipping permissions only inside a disposable
-    container, and warns that even a dev container can expose `~/.claude` credentials (§14). The
-    PoC runs on the host, without bypass, with the sandbox and hooks. Should the go version run the
-    driver inside a dev container with no host secrets mounted? (This is a deliberate, whole-run
-    container, not the per-epic VM that incident 8 warns about.)
+11. **Dev container. Decided (owner, 2026-11-11): later, not in the PoC.** The PoC runs on the
+    host with the Claude Code sandbox (network off), without bypass, under hooks. A whole-run dev
+    container with no host secrets mounted (Anthropic warns that `~/.claude` credentials can leak,
+    §14) is evaluated only after the go/no-go. It is a deliberate, whole-run container, not the
+    per-epic VM that incident 8 warns about.
 
 ---
 
@@ -1059,15 +1159,15 @@ abbreviated `cc:`.
 | Topic | Recommendation (paraphrased) | Source | Effect on this design |
 |---|---|---|---|
 | Unattended runs | Before walking away, settle five things: what done looks like, how Claude checks its work, what it may touch, what stops it (turn and spend caps), and who approves the result | cc:best-practices ("Let Claude run without you") | **Confirms.** Done = §6.5 checks. Check = TOR tests plus the driver's own test run. Touch = R2, the sandbox and one branch. Stop = §6.11 budgets. Approval = the user fetches and merges in the morning |
-| Scripted runs | Use `claude -p` with explicit `--allowedTools`, `dontAsk` for everything else, and `--max-turns`; `--bare` for reproducibility | cc:best-practices ("Run Claude from a script"); cc:headless | **Changes.** P0 S12 tries `dontAsk` in place of `acceptEdits`. **Pushes back** on `--bare`: it skips `--settings` hooks, and the referee needs them (cc:headless). Isolation comes from `--setting-sources` instead (S7) |
+| Scripted runs | Use `claude -p` with explicit `--allowedTools`, `dontAsk` for everything else, and `--max-turns`; `--bare` for reproducibility | cc:best-practices ("Run Claude from a script"); cc:headless | **Partly differs, by owner decision.** It uses `acceptEdits` plus referee hooks rather than `dontAsk`. It inherits the user's setup instead of a reproducible bare setup; the mitigation is recording the effective setup per session (S7, §13). It **pushes back** on `--bare`, which skips `--settings` hooks the referee needs (cc:headless) |
 | Long-running harness | One feature at a time; a structured feature list changed only in its status field; a clean commit at the end of every session; a standard startup routine (read progress, git log, run a basic test) | anthropic.com/engineering/effective-harnesses-for-long-running-agents | **Confirms.** One epic at a time; status sidecars are the feature list; every step ends in a commit or a WIP commit; `start-epic` already reads the handoff and git state, and the driver runs the base tests before each epic |
-| Context | Keep state outside the context window; prefer fresh windows or compaction over one long context | anthropic.com/engineering/effective-context-engineering-for-ai-agents | **Confirms.** A fresh session per step; all state in files. A step that runs out of turns parks rather than being resumed in a bloated context |
+| Context | Keep state outside the context window; prefer fresh windows or compaction over one long context | anthropic.com/engineering/effective-context-engineering-for-ai-agents | **Confirms.** A fresh session per step, including a fresh implementation session after planning (the `showClearContextOnPlanAccept` pattern); all state in files. A step that runs out of turns parks rather than being resumed in a bloated context |
 | Multi-agent cost | Multi-agent systems used about 15× the tokens of chat; use them only for high-value, parallel work, and not where tasks share context or depend on each other | anthropic.com/engineering/built-multi-agent-research-system | **Confirms** serial order and no LLM Lead. Epics depend on each other, which is the poor-fit case |
 | Rules that can't have exceptions | Put them in hooks, deny rules or managed settings, not CLAUDE.md; CLAUDE.md is guidance Claude may decide doesn't apply | cc:best-practices ("Enforce the rules that can't have exceptions") | **Confirms** the referee's split: hooks and deny rules govern, prompts only inform (`fix-brief.md`, auditor) |
 | Finish check | Use a Stop hook to keep Claude working until its check passes | cc:best-practices ("Enforce the check with a Stop hook") | **Adds** the builder-role Stop check in §6.7 (block once, then the driver decides) |
 | Verification | Give Claude a pass/fail check it can run; use a fresh reviewer that doesn't see the author's reasoning | cc:best-practices ("Give Claude a check to run") | **Confirms** TOR-derived tests, `wrapup-epic` in a fresh session, and a separate auditor session |
 | Permissions | Deny rules are the hard limit and hold in every mode | cc:permission-modes; cc:best-practices | **Confirms** the `permissions.deny` list in §6.7 |
-| Skipping permissions | Use `--dangerously-skip-permissions` only in a disposable container; even a dev container can leak `~/.claude` credentials | cc:devcontainer; cc:best-practices ("Change the permission mode") | **Confirms** no bypass mode. Open question 11 asks about a whole-run dev container after the PoC |
+| Skipping permissions | Use `--dangerously-skip-permissions` only in a disposable container; even a dev container can leak `~/.claude` credentials | cc:devcontainer; cc:best-practices ("Change the permission mode") | **Confirms** no bypass mode. A whole-run dev container is decided for later, after the go/no-go (open question 11) |
 | Sandbox | Effective sandboxing needs both filesystem and network isolation; the sandbox confines Bash only and is not a guarantee | anthropic.com/engineering/claude-code-sandboxing; cc:sandboxing | **Changes.** Turn the sandbox on with no network (§6.7, P0 S11). Keep hook R2 for Read, Edit and Write |
 | Network and prompt injection | No system is immune; avoid piping untrusted content to Claude; deny rules match only command text, so network control needs the sandbox | cc:security | **Changes.** No WebFetch or WebSearch, the sandbox with network off, and E4's live fetch is expected to park, not run |
 | Settings tampering | Use `ConfigChange` hooks to block settings changes during a session | cc:security; cc:hooks | **Adds** the ConfigChange block in §6.7 |
