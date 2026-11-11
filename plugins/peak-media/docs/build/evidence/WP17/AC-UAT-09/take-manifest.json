@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "kind": "beatgrid",
+  "targetMs": 19167,
+  "totalMs": 19167,
+  "audioOffsetMs": -100,
+  "command": [
+    "node",
+    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs",
+    "--storyboard",
+    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/storyboard.mjs",
+    "--script",
+    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/script.md",
+    "--out",
+    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/out/rough-app-break.mp4",
+    "--preset",
+    "web"
+  ],
+  "narrate": false,
+  "bpm": 60,
+  "videoMs": 19167,
+  "wallMs": 19177,
+  "beats": [
+    {
+      "id": "orders",
+      "startMs": 8,
+      "durationMs": 6082,
+      "clipNs": [],
+      "onScreenText": "The Orders page, with Break at the top right"
+    },
+    {
+      "id": "break",
+      "startMs": 6090,
+      "durationMs": 6137,
+      "clipNs": [],
+      "onScreenText": "Click the Break button"
+    },
+    {
+      "id": "after",
+      "startMs": 12227,
+      "durationMs": 6439,
+      "clipNs": [],
+      "onScreenText": "Nothing changes on screen; the click throws a TypeError"
+    }
+  ],
+  "clips": [],
+  "captions": [
+    {
+      "n": 1,
+      "text": "The Orders page, with Break at the top right",
+      "startMs": 9,
+      "durationMs": 6081,
+      "x-beat": "orders"
+    },
+    {
+      "n": 2,
+      "text": "Click the Break button",
+      "startMs": 6093,
+      "durationMs": 6134,
+      "x-beat": "break"
+    },
+    {
+      "n": 3,
+      "text": "Nothing changes on screen; the click throws a TypeError",
+      "startMs": 12232,
+      "durationMs": 6434,
+      "x-beat": "after"
+    }
+  ],
+  "x-take": {
+    "mode": "captions",
+    "storyboard": "../storyboard.mjs",
+    "script": "../script.md",
+    "url": "http://127.0.0.1:52105/stage.html",
+    "plate": null,
+    "fps": 30,
+    "width": 1280,
+    "height": 720,
+    "frames": 575,
+    "out": "rough-app-break.mp4",
+    "preset": "web",
+    "captionEngine": "overlay",
+    "cursor": true,
+    "signedIn": false,
+    "sizeBytes": 148374,
+    "audio": {
+      "clips": 0,
+      "lufs": null
+    },
+    "beats": [
+      {
+        "n": 1,
+        "id": "orders",
+        "text": "The Orders page, with Break at the top right",
+        "startMs": 8,
+        "durationMs": 6082,
+        "endMs": 6090,
+        "lateMs": 0,
+        "caption": true
+      },
+      {
+        "n": 2,
+        "id": "break",
+        "text": "Click the Break button",
+        "startMs": 6090,
+        "durationMs": 6137,
+        "endMs": 12227,
+        "lateMs": 0,
+        "caption": true
+      },
+      {
+        "n": 3,
+        "id": "after",
+        "text": "Nothing changes on screen; the click throws a TypeError",
+        "startMs": 12227,
+        "durationMs": 6439,
+        "endMs": 18666,
+        "lateMs": 0,
+        "caption": true
+      }
+    ],
+    "pageErrors": [
+      "TypeError: Cannot read properties of undefined (reading 'id')"
+    ],
+    "pageErrorCount": 1,
+    "pointer": [
+      {
+        "action": "point",
+        "beat": "orders",
+        "x": 595,
+        "y": 43,
+        "atMs": 449
+      },
+      {
+        "action": "point",
+        "beat": "orders",
+        "x": 1211,
+        "y": 43,
+        "atMs": 3088
+      },
+      {
+        "action": "click",
+        "beat": "break",
+        "x": 1211,
+        "y": 43,
+        "atMs": 6132
+      },
+      {
+        "action": "point",
+        "beat": "after",
+        "x": 417,
+        "y": 97,
+        "atMs": 12664
+      }
+    ]
+  }
+}

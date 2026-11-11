@@ -1,0 +1,4 @@
+$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice" 2>&1 | tail -20
+sample-voice: note: zero data retention is requested; Gemini's only ZDR endpoint needs "Allow Safety Retention" on your OpenRouter account — or use --tts-model microsoft/mai-voice-2.1-flash
+Rasalgethi   32 words   10.96 s  175 wpm  24000 Hz mono  synthesized  /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/web2video-voice/Rasalgethi.wav
+google/gemini-3.8-flash-lite-tts · median 175 wpm · 0/1 cached

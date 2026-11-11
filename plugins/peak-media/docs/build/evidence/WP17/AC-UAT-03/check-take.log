@@ -1,0 +1,5 @@
+$ node $P/skills/video-capture/scripts/check-take.mjs /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4 --expect-cuts 2
+ok    scene change at 0:06.467 —silence 1312 ms
+ok    scene change at 0:14.933 —silence 1393 ms
+PASS  2 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4
+exit=0
