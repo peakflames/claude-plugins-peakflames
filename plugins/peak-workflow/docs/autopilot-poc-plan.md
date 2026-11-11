@@ -1026,6 +1026,139 @@ the next run. Deviations and additions:
   every finding from all four is fixed.
 - `README.md` and the other skills are untouched: discoverability is deferred to P6 (§5.2).
 
+### P3.5: One workspace, resume from a decided gate, and sync with the project
+
+**Approved by the owner 2026-11-11. All of it lands before P4.** Where this section differs from
+§6.2, §6.3, §6.8 or §9, this section wins; update those sections as each part lands.
+
+**Why.** P3 left everything per run: each run gets a new state directory (`<project>.autopilot`,
+then `-2`, `-3`, …) and a new clone. A parked epic's branch is stranded in the old clone, so the
+next run rebuilds the epic from scratch and only replays the owner's answer. Gates the driver
+writes itself (`audit`, `human-check`, `plan-lint`, `preflight`) and unmatched questions cannot be
+continued at all except by hand. Runs B and C exist to measure parks and human review time, so
+they must run on the workflow that is meant to ship.
+
+**Starting point (commit `15eacb5`, branch `feature/peak-workflow-autopilot-poc`, not pushed past
+`6f02233` unless the owner has since said so).** Suite: `node --test
+plugins/peak-workflow/scripts/autopilot/test/` → 69 tests, 59 pass, 10 live skipped. Code to know,
+all under `plugins/peak-workflow/scripts/autopilot/`:
+
+| File | What P3.5 touches |
+|---|---|
+| `driver.mjs` | `Run.run()` (clone creation, `resuming`, `carryGates()`), `nextStateDir()`, `carriedSettings()`, `launchFacts()`, `decideGate()`, `runEpic()` phases, `recover()`, `writeGate()`, `doAudit()` |
+| `report.mjs` | `collectReport(stateDir)` reads one run's `state.json`, `gates/`, `epics/`; `replayableKinds()` |
+| `hooks/pretool.mjs` | `ruleR8` reads `<state>/gates/` for a decided, unused gate and marks it `used` (also in `carriedFrom`); `context()` derives `clone` as `<AUTOPILOT_STATE>/clone` |
+| `skills/autopilot/SKILL.md` | Steps 1, 2 item 4, 4 and "What a run leaves behind" name the per-run layout and `carryGatesFrom` / `carriedSettings` |
+| `test/skill.test.mjs` | the two-run test asserts `-2` directories and carried gates; rewrite it for the new layout |
+
+#### Part 1 — one workspace per project (M)
+
+```
+<project>.autopilot/                 the workspace; one per project, long-lived
+  settings.json                      owner settings that outlive a run: budgets, scope, audit, claudeBin, …
+  lock  STOP                         as today, one driver per workspace
+  clone/                             the one private clone; parked and failed branches stay here
+  gates/<epic>-<n>.json              every gate, across runs
+  runs/<YYYYMMDD-HHMMSS>/            one directory per run
+    config.json  state.json  preflight.json  autopilot.log  report.md  report.json
+    epics/<id>/…                     sessions, checks, audits of that run
+  current -> runs/<…>                the latest run (a file holding the name is fine if symlinks are awkward)
+```
+
+- `AUTOPILOT_STATE` stays the workspace (hooks jail on it and find `clone/` and `gates/` there);
+  `AUTOPILOT_STEP` moves under `runs/<run>/epics/…`. Hook R2 must still deny everything in the
+  workspace except `clone/` (and the auditor's bundle). The hooks read `state.json` for
+  `integration` and the epic name: point them at the current run.
+- Delete `nextStateDir`, `carriedSettings`, `config.carryGatesFrom`, `Run.carryGates` and the
+  `carriedFrom` write-back in R8. Settings live in `settings.json`; a run's `config.json` holds
+  only that run's queue, `explicit`, end time and run budget.
+- A `claudeBin` other than `claude` in `settings.json` is refused by `launchFacts` unless the run
+  config says `allowTestDouble: true` (closes "a rehearsal's fake binary is inherited").
+- `driver.mjs` commands take `--workspace <dir>` (keep `--state` as an alias for the tests'
+  sake or migrate the tests; do not support the old layout — nothing has shipped).
+- The report is per run. `launchFacts` reports the workspace, the last run, and open gates.
+
+#### Part 2 — resume from a decided gate (M)
+
+A gate records `branch` and `branchTip`. A decision is **valid only while the branch tip in the
+clone still equals `branchTip` and the epic's base has not moved** (the merge-base of the branch
+and the integration line is still the integration tip, or the branch rebases cleanly — pick the
+strict rule first: equal, else void). A void decision is reported and the epic is re-planned from
+scratch on a fresh branch (the old one kept under `refs/autopilot/superseded/`).
+
+Preflight treats an epic with a valid decided gate as eligible although its sidecar is not
+`Not Started`. The driver enters it at the phase the gate kind names:
+
+| Gate kind | Written by | Owner's answer | Re-entry |
+|---|---|---|---|
+| a question a session asked (`deferral`, `amendment`, any policy `park` row, `unmatched`) | hook R8 | one of its options | the session kind that asked (`session` field): a fresh plan or build session on the existing branch through `start-epic`'s own resume path (the sidecar is In Progress; PLAN_TEMPLATE opening step 2). R8 answers that exact question once. `unmatched` becomes replayable: match on the recorded question text |
+| `audit` | driver | `Not real — verify as built` | VERIFY on the same tip. The audit is not re-run |
+| `audit` | driver | `Real — fix before verify` | the fix round (FIX_PLAN → FIX_BUILD → CHECK_BUILD → AUDIT delta), with the parking findings as `fix-brief.md`. It uses the epic's one fix round |
+| `human-check` | driver | `Looks right` | VERIFY. The look is recorded against `branchTip`; R8 answers wrapup's Step 2.0 manual-verification question with the owner's recorded look instead of the policy "No" |
+| `human-check` | driver | `Not right — describe` | the fix round, with the owner's note as the brief |
+| `plan-lint` | driver or hook | `Approve this plan` / `Re-plan` (add these options; today it has none) | BUILD with the captured plan, recorded as "approved by <owner>", or PLAN again |
+| `preflight` | driver | none: the fix is in the project (requirements, TBD values) | not resumable; clears when preflight passes |
+
+- **Human-check artifact (guardrail G2, open since P1).** Before writing a `human-check` gate the
+  driver produces the thing to look at and lists it in `artifacts`: for an operator-observed TOR,
+  the output of the project's run command from `CLAUDE.md` plus the manual test file the build
+  wrote under `tests/manual/`; for a UI epic, at least the built page or a screenshot command's
+  output. If it cannot produce one, the gate says so plainly.
+- **Budget, infra and STOP parks** have no gate. Add a `resume` gate kind for them
+  (`Resume from where it stopped` / `Start over`), entering at CHECK_BUILD for a parked build
+  (the WIP commit is on the branch) or re-running the interrupted step once.
+- `decideGate` stays the only writer of `decided`. Every gate is now `effect: resume`; the
+  `next-run` / `by-hand` split, and `replayableKinds`, go away. `resume` (the by-hand command) stays in
+  the gate as the fallback and is shown, not hidden.
+- State per epic persists across runs in the workspace (`epics.json` or the gate itself):
+  `fixRounds`, `planStep` path, `audits` (so the delta audit and the one-fix-round cap survive).
+
+#### Part 3 — sync with the project at run start (S–M)
+
+Before preflight, in the clone: `git fetch <project> <integration>` (a one-off URL fetch; the
+clone still has no remote), then compare the fetched tip `P` with the clone's integration tip `C`:
+
+| Case | Action |
+|---|---|
+| `P == C` | nothing |
+| `P` ahead of `C` (the owner merged or committed) | fast-forward the clone's integration line |
+| `C` ahead of `P` (autopilot merged epics the owner has not fetched) | keep building on `C`; the report repeats the fetch command and lists what is waiting |
+| diverged | refuse the run and print both tips; the owner fetches `autopilot/<integration>` and merges, or says which side wins |
+
+After a fast-forward, parked branches whose base is no longer the integration tip fall under
+Part 2's validity rule. This replaces the "would build those epics again" warning.
+
+#### Also in P3.5 (small, from the P3 review)
+
+| Item | Action | Effort |
+|---|---|---|
+| Auditor outage | **Owner decision needed.** Today an audit that cannot run or returns nothing usable parks the epic (fail closed), and two infra errors in a row stop the run. Recommended: keep fail closed, and give that park the new `resume` gate so the next run re-audits instead of rebuilding | S |
+| P2 live smoke | Re-run `AUTOPILOT_LIVE=1 … test/live-smoke.test.mjs` (about $0.40) after the hook changes in P3 and P3.5; needs the owner's go-ahead for real sessions | S |
+| Real skill run | The owner invokes `/peak-workflow:autopilot dry-run` and one fake-backed run from a real Claude Code session (plugin loaded with `--plugin-dir`) to confirm `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion` and the `nohup` launch prompt behave | S |
+| Scope flags | Tighten the keyword list (`account`, `server` are noisy); keep it advisory | S |
+| Linux / Windows launch | Not in the PoC. Note it as a P6 item | — |
+
+#### Tests and exit
+
+Rewrite `test/skill.test.mjs`'s two-run test for the workspace layout, and add, all against
+`fake-claude.mjs`: one test per row of the Part 2 table (decide, next run re-enters at the named
+phase on the same branch tip, no earlier session is re-run); a void decision after the tip or the
+base moves; each row of the Part 3 table; two runs sharing one clone and one `gates/`; the hook
+jail on the new paths; `allowTestDouble`. Keep the golden report test (regenerate with
+`UPDATE_GOLDEN=1`). Then one skill simulation pass per "Validating Changes", and the live items
+above with the owner's go-ahead.
+
+**Exit:** a run parks an epic at each resumable gate kind; the owner decides in
+`/peak-workflow:autopilot report`; the next run finishes every one of them to MERGED or FAILED on
+the branch the first run left, with no session of the first run repeated; the suite is green.
+
+**To pick this up in a new session**, say: "Continue the peak-workflow autopilot PoC on
+`feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
+`docs/autopilot-poc-plan.md` §10 P3 status note and P3.5, then the files in P3.5's table. Build
+P3.5 parts 1, 2, 3 in that order, one commit per part with the suite green, CHANGELOG bullets
+under 3.1.0 in the same commits. Real `claude` sessions only where P3.5 says, and ask first. Do
+not start P4. Ask before any push."
+
 ### P4: Real unattended runs (typically overnight) on the seeded `ledger` project
 
 Run A, B and C from §10.5. Each run: `node scripts/autopilot-lab/lab.mjs reset --run A --dir
