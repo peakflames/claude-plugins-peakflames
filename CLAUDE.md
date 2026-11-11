@@ -102,6 +102,12 @@ its default (see the table).
 - Claude asks before every push to a remote.
 - Never commit: real credentials, `.env`, or anything under `tmp/`.
 
+## Issue Triage
+
+Work arrives as GitHub issues on this repo. Run `/triage <issue>` (`.claude/skills/triage/`) to find the
+root cause, decide with the user whether it is worth fixing, and plan the fix in plan mode before any
+branch is cut.
+
 ## Release Protocol
 
 **Prerequisites:** on `develop` with a clean working tree, and every plugin's `plugin.json`

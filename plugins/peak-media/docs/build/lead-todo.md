@@ -4,6 +4,8 @@ Items the Lead does after WP10, before the release.
 
 **Moved to 0.4.0 (DEC-53, 2026-11-10):** 0.3.0 is the Windows/Linux port only. Every open item below that was planned for 0.3.0 (the `(v0.2)` carry-forward nits still open, the WP16 engine gaps) and the brand-pack captions now target **0.4.0**.
 
+**Tracked as GitHub issues (2026-11-11):** the High and Medium items below are now issues #29–#33 on the `peak-media 0.4.0` milestone, and each is planned with `/triage <n>`. The issue is the source of truth for those items; the Low items stay here.
+
 - [ ] **After 0.3.0 ships:** a coachee runs `/peak-media:web2video` end to end on a real Windows PC; when it passes, drop the README "beta" label for Windows (and Linux, once run there) in a patch release (DEC-53).
 
 - [ ] **Update `orchestration-plan.md` to require strict order** (user request, 2026-11-08; DEC-32). Replace the parallel-wave model in §4/§8 with one WP at a time, each verified and merged before the next starts, plus an end-to-end fixture run before any human listening or viewing gate. Record why: Wave 2 ran five builders in parallel, and builders filled unmerged dependencies with stand-ins (test-pattern plates, a test brand pack, macOS `say` sped up with `atempo`). That hid a blocker (the default pack's outro wouldn't render in `assemble`), produced a meaningless listening test for the user, and cost a fix round on WP6 plus re-verification. Carry the builder rule "build only on merged work; stop and ask instead of using stand-ins" into the plan and `agents/builder.md` (already added there).
