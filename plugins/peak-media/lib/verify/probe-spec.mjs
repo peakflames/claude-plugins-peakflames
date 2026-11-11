@@ -5,7 +5,7 @@
 // is lib/presets.mjs (shared with capture), imported, not copied.
 import { openSync, readSync, closeSync, fstatSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { runCli, CliError, EXIT } from '../cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../cli.mjs';
 import { probe, fpsOf, requireFfmpeg, ffprobeBin } from '../ffmpeg.mjs';
 import { spawnSync } from 'node:child_process';
 import { PRESETS, presetExpect } from '../presets.mjs';
@@ -199,7 +199,7 @@ frame=pict_type); and the file has no edit lists (no elst box in moov/trak/edts)
   examples: ['probe-spec out/final.mp4 --size 1280x720 --duration-ms 3000', 'probe-spec take.mp4 --preset youtube', 'probe-spec take.mp4 --preset youtube --size 1280x720 --fps 25'],
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, ({ values, positionals: [file] }) => {
     if (!existsSync(file)) throw new CliError(`cannot read ${file}: no such file`);
     let { width, height } = values;

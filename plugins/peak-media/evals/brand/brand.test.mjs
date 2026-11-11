@@ -1,7 +1,7 @@
 // WP5 brand pack: the neutral default pack validates and licenses its fonts (AC-BRD-01), a rebrand
 // is a re-render with only --brand changed (AC-BRD-02, still), and no music ships (AC-BRD-03).
 // Also the WP2 F-9 re-check: an offline render with the default pack, so local web fonts are covered.
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, existsSync, cpSync, rmSync, openSync, readSync, closeSync } from 'node:fs';

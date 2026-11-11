@@ -1,5 +1,5 @@
 // WP2 walking skeleton: F0 beat grid -> 1 motion plate -> composite (AC-SKL-01/02/05/06/07).
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';

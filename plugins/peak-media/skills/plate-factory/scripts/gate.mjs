@@ -6,7 +6,7 @@
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../../../lib/cli.mjs';
 import { validateFile } from '../../../lib/schemas.mjs';
 import { requireFfmpeg } from '../../../lib/ffmpeg.mjs';
 import { probeSpec } from '../../../lib/verify/probe-spec.mjs';
@@ -102,7 +102,7 @@ Exit 0 PASS, 1 FAIL (one line on stderr), 2 usage.`,
   examples: ['gate build plates.json', 'gate build .'],
 };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, async ({ positionals: [what, target] }) => {
     const fail = (why, code) => { process.stdout.write(`GATE 6 build: FAIL — ${why}\n`); return new CliError(why, code); };
     if (what !== 'build') throw fail(`unknown gate '${what}' — the only scripted gate here is 'build' (stage 6)`, EXIT.USAGE);

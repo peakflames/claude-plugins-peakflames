@@ -6,7 +6,7 @@
 //
 // Set PEAK_MEDIA_EVIDENCE_DIR to keep the measurements and contact sheet (JPEG/JSON only);
 // otherwise they are written to the temp dir and deleted.
-import { test as nodeTest, before, after } from 'node:test';
+import { test as nodeTest, before, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

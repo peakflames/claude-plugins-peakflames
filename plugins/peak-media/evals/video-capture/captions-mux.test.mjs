@@ -9,7 +9,7 @@
 // that uses the run-alone gate.
 //
 // Set PEAK_MEDIA_EVIDENCE_DIR to keep the stills, measurements and manifests (JPEG/JSON only).
-import { test as nodeTest, before, after } from 'node:test';
+import { test as nodeTest, before, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { rmSync, writeFileSync, readFileSync, existsSync, statSync, mkdirSync, copyFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

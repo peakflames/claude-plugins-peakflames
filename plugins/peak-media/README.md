@@ -146,7 +146,8 @@ at `web2video/<slug>/out/<slug>.mp4`. It never uploads, posts or sends the file.
 **Pages behind a login:** Claude opens a browser window with `capture signin`; you sign in
 yourself and close the tab. The session is saved outside the project (`~/.cache/peak-media/auth/`)
 and every take starts signed in. Claude never types a password and offers to delete the session
-file when it hands over the video.
+file when it hands over the video. On macOS and Linux the file is readable by you only (0600); on
+Windows, your user profile folder is what protects it.
 
 Narrated mode needs the narration key; captions and silent mode don't.
 

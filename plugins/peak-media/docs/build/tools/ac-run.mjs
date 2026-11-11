@@ -8,7 +8,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runCli, CliError, EXIT, PLUGIN_ROOT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, PLUGIN_ROOT, isMain } from '../../../lib/cli.mjs';
 
 const DEFAULT_ROOT = path.join(PLUGIN_ROOT, 'docs', 'build');
 const DEFAULT_EVALS = path.join(PLUGIN_ROOT, 'evals');
@@ -104,7 +104,8 @@ export function runTests(ids, evals) {
   if (!ids.length) return res;
   const pattern = `^(${ids.join('|')}):`;
   // a glob, not the folder: Node 22's --test doesn't expand a directory argument
-  const files = existsSync(evals) && statSync(evals).isDirectory() ? path.join(evals, '**', '*.test.mjs') : evals;
+  // node's glob wants / even on Windows
+  const files = existsSync(evals) && statSync(evals).isDirectory() ? `${evals.split(path.sep).join('/')}/**/*.test.mjs` : evals;
   // drop NODE_TEST_CONTEXT: when ac-run itself runs under node:test, the nested runner would
   // otherwise report to the parent over its private channel instead of printing TAP
   const { NODE_TEST_CONTEXT, ...env } = process.env;
@@ -141,7 +142,7 @@ register status. Exit 1 if any script AC fails or has no test, or the independen
   examples: ['ac-run --wp WP2', 'ac-run --trace'],
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, ({ values }) => {
     if (!values.wp && !values.trace) throw new CliError('pass --wp <WP> or --trace', EXIT.USAGE);
     const root = path.resolve(values.root ?? DEFAULT_ROOT);

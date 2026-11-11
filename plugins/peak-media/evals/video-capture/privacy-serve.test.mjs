@@ -2,7 +2,7 @@
 // so a hidden element is never in a frame (frame 0 included, and after a goto); D1 — `capture
 // serve` serves a local folder on 127.0.0.1 for exploring and stops on SIGTERM.
 // Captures are real time and short (640x360 @ 10 fps); run this file alone.
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';

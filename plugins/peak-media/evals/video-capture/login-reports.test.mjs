@@ -4,7 +4,7 @@
 // adds --headless=new (and, for signin, a DevTools port the test uses to submit the fixture's
 // form and close the tab, as a user would). No real password is ever typed.
 // Set PEAK_MEDIA_EVIDENCE_DIR to keep the contact sheet and measurements (JPEG/JSON only).
-import { test, before, after } from 'node:test';
+import { test, before, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, chmodSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';

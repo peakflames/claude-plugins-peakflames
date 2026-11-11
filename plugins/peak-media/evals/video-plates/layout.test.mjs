@@ -2,7 +2,7 @@
 // Each plate is scaffolded from its template (no render), then measured in the page itself:
 // HyperFrames' pinned headless browser loads a copy of index.html with a probe that waits for the
 // template's fit, seeks the registered GSAP timeline, and dumps rects and computed styles as JSON.
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

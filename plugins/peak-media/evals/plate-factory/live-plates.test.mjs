@@ -1,7 +1,7 @@
 // plate-factory live plates (WP15): F3's three live plates, each storyboard one beat('<plate beat>', fn),
 // captured with `capture --plates --plate <id>` (no --preset) against a local page, then loaded by
 // video-assemble. Real-time captures: run this file alone.
-import { test, after } from 'node:test';
+import { test, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

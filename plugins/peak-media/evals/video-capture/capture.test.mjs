@@ -1,7 +1,7 @@
 // video-capture (WP7a): the capture entry point, pre-flight, the deck example in three modes,
 // and F3's live plates captured to their planned durations. Pages are served locally — no internet.
 // Run alone: captures are real time and timing-sensitive.
-import { test, before, after } from 'node:test';
+import { test, before, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, chmodSync } from 'node:fs';
 import { createHash } from 'node:crypto';

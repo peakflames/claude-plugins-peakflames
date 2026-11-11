@@ -18,7 +18,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, CliError, EXIT, usageError, PLUGIN_ROOT, setupCommand } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, usageError, PLUGIN_ROOT, setupCommand, isMain } from '../../../lib/cli.mjs';
 import { validateFile } from '../../../lib/schemas.mjs';
 import { requireNode } from '../../../lib/preflight.mjs';
 import { requireFfmpeg, ffmpeg } from '../../../lib/ffmpeg.mjs';
@@ -147,6 +147,17 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8' };
 
+/**
+ * True when `file` lies strictly inside `root`. Windows paths compare case-insensitively, and a
+ * drive root (`C:\\`) already ends in its separator. `pathMod` is for tests (path.win32 / path.posix).
+ */
+export function insideRoot(root, file, pathMod = path) {
+  const r = pathMod.resolve(root), f = pathMod.resolve(file);
+  const prefix = r.endsWith(pathMod.sep) ? r : r + pathMod.sep;
+  const win = pathMod.sep === '\\';
+  return win ? f.toLowerCase().startsWith(prefix.toLowerCase()) && f.length > prefix.length : f.startsWith(prefix) && f.length > prefix.length;
+}
+
 /** Serve `root` on 127.0.0.1 (loopback only; port 0 = any free port). Resolves to {url, port, close}. */
 export function serveDir(root, { port = 0 } = {}) {
   const server = createServer((req, res) => {
@@ -154,7 +165,7 @@ export function serveDir(root, { port = 0 } = {}) {
     try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400); res.end('bad request'); return; }
     let file = path.resolve(root, '.' + rel);
     if (existsSync(file) && statSync(file).isDirectory()) file = path.join(file, 'index.html'); // a folder serves its index.html
-    if (!file.startsWith(path.resolve(root) + path.sep) || !existsSync(file) || statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
+    if (!insideRoot(root, file) || !existsSync(file) || statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, { 'content-type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' });
     createReadStream(file).pipe(res);
   });
@@ -1297,7 +1308,7 @@ and the exit is non-zero. Then record signed in with: capture … --storage-stat
  * Serve a local folder (or the folder of an .html file) on 127.0.0.1 until SIGINT/SIGTERM.
  * Prints the page URL on stdout. Resolves once the server is closed.
  */
-export async function serve(target, values, { signals = ['SIGINT', 'SIGTERM'] } = {}) {
+export async function serve(target, values, { signals = ['SIGINT', 'SIGTERM', ...(process.platform === 'win32' ? ['SIGBREAK'] : [])] } = {}) {
   const p = path.resolve(target);
   if (!existsSync(p)) throw new CliError(`serve ${p}: no such folder — pass the folder that holds index.html`);
   const dir = statSync(p).isDirectory() ? p : path.dirname(p);
@@ -1310,7 +1321,7 @@ export async function serve(target, values, { signals = ['SIGINT', 'SIGTERM'] } 
   }
   const url = srv.url + (file ? encodeURIComponent(file) : '');
   process.stdout.write(`${url}\n`);
-  log(`serving ${dir} on 127.0.0.1:${srv.port} (pid ${process.pid})${file === null ? ' — no index.html here; open a file by its name' : ''}; stop with Ctrl-C or kill ${process.pid}`);
+  log(`serving ${dir} on 127.0.0.1:${srv.port} (pid ${process.pid})${file === null ? ' — no index.html here; open a file by its name' : ''}; stop with Ctrl-C or node -e "process.kill(${process.pid})"`);
   await new Promise((resolve) => { const stop = () => { for (const s of signals) process.off(s, stop); resolve(); }; for (const s of signals) process.on(s, stop); });
   await srv.close();
   log('stopped');
@@ -1324,7 +1335,8 @@ export const serveSpec = {
 Serves <dir> (or the folder of <file.html>) on 127.0.0.1 only, the same way a take serves a local
 page, and prints the page's URL on stdout: http://127.0.0.1:<port>/ (or …/<file.html>). Use it to
 explore a local page with playwright-cli, whose browser blocks file:// URLs. It runs until Ctrl-C
-or SIGTERM (kill <pid>; the pid is on stderr), then exits 0. Run it in the background. Nothing is
+or SIGTERM, then exits 0. Run it in the background and stop it with node -e "process.kill(<pid>)"
+(the pid is on stderr; this works on every OS, Git Bash's kill can miss a Windows pid). Nothing is
 recorded and nothing is written.`,
   options: {
     port: { type: 'number', desc: 'Port on 127.0.0.1 (default: a free one, printed in the URL)' },
@@ -1333,7 +1345,7 @@ recorded and nothing is written.`,
   examples: ['capture serve ./site', 'capture serve ./site/index.html --port 8123'],
 };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   // runCli takes no positionals for a take, so the signin subcommand is dispatched before parsing
   if (argv[0] === 'signin') await runCli(signinSpec, ({ values, positionals }) => signin(positionals[0], values), argv.slice(1));

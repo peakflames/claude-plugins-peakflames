@@ -51,6 +51,9 @@ belongs to another host (the file is named for the host you signed in to): sign 
 
 - It lives only in `<data dir>/auth/`. Never copy it into the project, Read it, print it or
   commit it.
+- On macOS and Linux the file is 0600 (owner only). On Windows file modes don't apply: what
+  protects it is that `<data dir>` sits in the user's own profile folder, which other standard
+  users can't read. Don't point `CLAUDE_PLUGIN_DATA` at a shared folder there.
 - At hand-off, offer to delete it: "Delete the saved session at `<path>`? You'd sign in again for
   the next recording." On yes: `rm "<path>"`, and confirm it is gone.
 

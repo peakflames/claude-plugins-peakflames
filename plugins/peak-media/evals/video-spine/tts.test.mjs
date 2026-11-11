@@ -1,7 +1,7 @@
 // WP3a — Spine TTS evals. No test touches the network or the real home cache:
 // OpenRouter is a fake transport, caches live in temp dirs via PEAK_MEDIA_TTS_CACHE /
 // PEAK_MEDIA_TTS_LEGACY_DIRS (or the cacheDir / legacyDirs options).
-import { test } from 'node:test';
+import { test } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, copyFileSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

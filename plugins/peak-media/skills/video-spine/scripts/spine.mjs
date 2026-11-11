@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, CliError, EXIT, usageError } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, usageError, isMain } from '../../../lib/cli.mjs';
 import { ffmpeg, requireFfmpeg } from '../../../lib/ffmpeg.mjs';
 import { validateDoc } from '../../../lib/schemas.mjs';
 import { DEFAULT_MODEL, DEFAULT_VOICE, DEFAULT_STYLE, checkTtsOptions, synthesizeClips, wpmReport } from '../../../lib/tts/index.mjs';
@@ -285,7 +285,7 @@ async function check(doc) {
   if (!r.ok) throw new Error(`internal: spine output fails the v1 schema: ${r.errors.map((e) => `${e.field} ${e.message}`).join('; ')}`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   await runCli(spec, async (a) => {
     try { return await main(a, argv); } catch (e) {

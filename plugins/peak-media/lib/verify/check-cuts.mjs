@@ -3,7 +3,7 @@
 // silent gap of at least --min-silence-ms (DEC-13: spine 400, assembly 300, recorder 900).
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { runCli, CliError, EXIT } from '../cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../cli.mjs';
 import { ffmpeg, probe, tc, requireFfmpeg } from '../ffmpeg.mjs';
 
 /** Silent intervals [{startMs,endMs}] at or below noiseDb. */
@@ -62,7 +62,7 @@ const spec = {
   examples: ['check-cuts review.mp4 --min-silence-ms 300', 'check-cuts spine/narration.wav --cuts 6500,14000 --min-silence-ms 400'],
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, ({ values, positionals: [file] }) => {
     if (!existsSync(file)) throw new CliError(`cannot read ${file}: no such file`);
     let cuts;

@@ -1,6 +1,6 @@
 // WP16 web2video: AC-W2V-36 (script half), AC-W2V-38, plus SKILL.md command and fixture checks.
 // web2video owns no engine: these tests run the commands SKILL.md tells Claude to run, as written.
-import { test } from 'node:test';
+import { test } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, chmodSync, copyFileSync } from 'node:fs';
 import { spawnSync, spawn } from 'node:child_process';
