@@ -8,10 +8,10 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { defaultConfig, sessionCommand, sessionSettings } from '../driver.mjs';
+import { defaultConfig, run, sessionCommand, sessionSettings } from '../driver.mjs';
 import { auditOutput, judgeAudit, validateAudit } from '../audit.mjs';
 import { cannedBuild } from './audit-canned.mjs';
-import { E1 } from './helpers.mjs';
+import { E1, FAKE, happy, makeProject, readJson } from './helpers.mjs';
 
 const LIVE = process.env.AUTOPILOT_LIVE === '1';
 const opts = { skip: LIVE ? false : 'set AUTOPILOT_LIVE=1 to run the real auditor', timeout: 900000 };
@@ -60,4 +60,29 @@ test('live auditor: a widened tolerance in an existing test is a high test-weake
     const used = r.hooks.filter((h) => h.hook === 'PreToolUse' && h.decision === 'pass').map((h) => h.tool_name);
     assert.ok(used.every((n) => ['Read', 'Grep', 'Glob', 'StructuredOutput'].includes(n)), `unexpected tools: ${used.join(' ')}`);
   }
+});
+
+test('live auditor through the driver: the AUDIT step launches real `claude -p`, reads its result and judges it', opts, async (t) => {
+  // Plan, build and verify stay on the fake; only the auditor session is real.
+  const p = makeProject(t);
+  const bin = path.join(p.tmp, 'claude-mixed');
+  const wrapper = ['#!/bin/sh', 'if [ "$AUTOPILOT_ROLE" = "auditor" ]; then exec claude "$@"; fi', `exec "${process.execPath}" "${FAKE}" "$@"`, ''].join('\n');
+  fs.writeFileSync(bin, wrapper, { mode: 0o755 });
+  fs.writeFileSync(path.join(p.state, 'config.json'), JSON.stringify({ ...readJson(path.join(p.state, 'config.json')), claudeBin: bin }));
+  p.scenario(happy(E1));
+
+  await run({ stateDir: p.state });
+
+  const e = p.epic(E1.id);
+  const session = e.sessions.find((s) => s.name === 'audit-1');
+  t.diagnostic(`audit-1: ${session?.outcome} (${session?.why}), $${session?.costUsd}, ${session?.turns} turns; epic ${e.state} — ${e.reason}`);
+  assert.equal(session?.outcome, 'ok', `the driver could not read the real auditor's result: ${session?.why}`);
+  assert.ok(session.costUsd > 0, 'a real session was paid for');
+  const audit = readJson(path.join(p.state, 'epics', E1.id, 'audit-1', 'audit.json'));
+  t.diagnostic(`decision ${audit.decision}, recommend ${audit.recommend}: ${audit.findings.map((f) => `${f.id} ${f.severity} ${f.category}`).join('; ') || 'no findings'}`);
+  assert.ok(Array.isArray(audit.findings) && ['park', 'proceed'].includes(audit.decision));
+  assert.ok(!/no usable result|could not start|infra/.test(e.reason ?? ''), e.reason);
+  assert.equal(e.state, audit.decision === 'park' ? 'PARKED' : 'MERGED');
+  const lines = fs.readFileSync(path.join(p.state, 'epics', E1.id, 'audit-1', 'stream.jsonl'), 'utf8').trim().split('\n').length;
+  t.diagnostic(`real --output-format json printed ${lines} line(s)`);
 });
