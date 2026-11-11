@@ -10,11 +10,11 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-04/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Turn the deck in ./deck into a narrated video for YouTube."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-04/deck; ls /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-04/web2video 2>/dev/null
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ~/tmp/pm-w2v-uat/AC-UAT-04/deck; ls ~/tmp/pm-w2v-uat/AC-UAT-04/web2video 2>/dev/null
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
 $ for f in deck/brief.md deck/script.md deck/storyboard.mjs deck/index.html; do echo "=== $f"; cat "$f"; echo; done; ls -la . ; [ -n "$PEAK_MEDIA_OPENROUTER_API_KEY" ] && echo KEY_SET || echo KEY_MISSING
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice"; echo "exit=$?"
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice"; echo "exit=$?"
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

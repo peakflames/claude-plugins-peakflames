@@ -10,15 +10,15 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-09/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Record clicking the Break button on ./rough-app"}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la; ls -la rough-app web2video 2>&1 | head -50
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/rough-app/index.html
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la; ls -la rough-app web2video 2>&1 | head -50
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-09/rough-app/index.html
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
 $ which playwright-cli && S="${TMPDIR:-/tmp}/w2v-explore" && mkdir -p "$S" && (python3 -m http.server 8765 --bind 127.0.0.1 --directory rough-app >/dev/null 2>&1 &) && sleep 1 && playwright-cli open 2>&1 | tail -5; playwright-cli resize 1280 720 2>&1 | tail -2; playwright-cli goto http://127.0.0.1:8765/index.html 2>&1 | tail -8; playwright-cli screenshot --filename "$S/before.png" 2>&1 | tail -3; playwright-cli click "#break" 2>&1 | tail -8; playwright-cli console 2>&1 | tail -10; playwright-cli screenshot --filename "$S/after.png" 2>&1 | tail -3; echo "$S"
 $ S="${TMPDIR:-/tmp}/w2v-explore"; pkill -f "http.server 8765" ; curl -sS -m 3 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/ ; U="file://$PWD/rough-app/index.html"; playwright-cli goto "$U" 2>&1 | grep -v '[║╔╚]' | tail -6; playwright-cli screenshot --filename "$S/before.png" 2>&1 | grep -i -m2 'error\|png'; playwright-cli click "#break" 2>&1 | grep -v '[║╔╚]' | tail -8; playwright-cli console 2>&1 | grep -v '[║╔╚]' | tail -8; playwright-cli screenshot --filename "$S/after.png" 2>&1 | grep -i -m2 'error\|png'
-$ python3 -m http.server 8765 --bind 127.0.0.1 --directory /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/rough-app
+$ python3 -m http.server 8765 --bind 127.0.0.1 --directory ~/tmp/pm-w2v-uat/AC-UAT-09/rough-app
 $ S="${TMPDIR:-/tmp}/w2v-explore"; for i in 1 2 3 4 5; do c=$(curl -sS -m 2 -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/index.html 2>/dev/null); [ "$c" = 200 ] && break; perl -e 'select(undef,undef,undef,0.5)'; done; echo "http=$c"; f(){ grep -v '[║╔╚]'; }; playwright-cli goto http://127.0.0.1:8765/index.html 2>&1 | f | tail -6; playwright-cli screenshot --filename "$S/before.png" 2>&1 | grep -ci error; playwright-cli click "#break" 2>&1 | f | tail -8; playwright-cli console 2>&1 | f | tail -8; playwright-cli screenshot --filename "$S/after.png" 2>&1 | grep -ci error
 $ cat /private/tmp/claude-501/-Users-schaveyt-tmp-pm-w2v-uat-AC-UAT-09/d2b1a606-3a09-4f52-b7ce-d8a2b6681780/tasks/bb6x30mp2.output; lsof -nP -iTCP:8765 -sTCP:LISTEN; curl -v -m 3 http://127.0.0.1:8765/index.html 2>&1 | head -12; env | grep -i proxy
 $ pgrep -fl "http.server" ; python3 -c "
@@ -42,7 +42,7 @@ E
 $ S="${TMPDIR:-/tmp}/w2v-explore"; curl -sS -m 3 -o /dev/null -w 'http=%{http_code}\n' http://127.0.0.1:8765/index.html; f(){ grep -v '[║╔╚]'; }; playwright-cli goto http://127.0.0.1:8765/index.html 2>&1 | f | tail -6; playwright-cli screenshot --filename "$S/before.png" 2>&1 | grep -ci error; playwright-cli click "#break" 2>&1 | f | tail -8; playwright-cli console 2>&1 | f | tail -8; playwright-cli screenshot --filename "$S/after.png" 2>&1 | grep -ci error
 [Read] /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/w2v-explore/after.png
 $ playwright-cli close 2>&1 | grep -v '[║╔╚]' | tail -2; pkill -f "http.server 8765"; rm -rf .playwright-cli; ls -a
-$ mkdir -p /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/{out,review} && cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && cat > brief.md <<'E'
+$ mkdir -p ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/{out,review} && cd ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && cat > brief.md <<'E'
 # Clicking Break on the Orders page
 
 - **Runtime:** 20 s target
@@ -115,20 +115,20 @@ Reply with a number to record it as planned, or tell me what to change (captions
 ### Tool calls
 
 ```text
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --help 2>&1 | head -80; grep -n -i "hide\|init" /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/SKILL.md | head -20
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && python3 - <<'E'
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --help 2>&1 | head -80; grep -n -i "hide\|init" ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/SKILL.md | head -20
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && python3 - <<'E'
 p='storyboard.mjs'; s=open(p).read()
 s=s.replace("export default async function storyboard({ beat, click, point, wait }) {\n","export default async function storyboard({ beat, click, point, wait, page }) {\n  // Private data: the footer shows an API key. Hide it (layout kept) before the first beat.\n  await page.addStyleTag({ content: 'footer { visibility: hidden !important; }' });\n")
 open(p,'w').write(s)
 E
-node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-c …
-$ L=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/rough-app-break.mp4 --preset web 2>&1 | tail -6; node $L/contact-sheet.mjs out/rough-app-break.mp4 --at 0s,3.1s,9.2s,15.5s --width 1280 --cols 2 -o review/rough-app-break.jpg 2>&1 | tail -2; node $L/contact-sheet.mjs out/rough-app-break.mp4 --at 0s --cols 1 --width 1280 -o review/first-frame.jpg 2>&1 | tail -1; ffmpeg -v error -y -i out/rough-app-break.mp4 -vf "select=lt(n\,6),crop=640:60:0:660,tile=1x6" -frames:v 1 review/first6-footer.png && echo ok; ls -la out | awk '{prin …
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/rough-app-break.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/first6-footer.png
-$ cd /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture && grep -n -i "mod\.\|module\.\|\.setup\|prepare\|addInitScript\|before the first\|hide" scripts/*.mjs SKILL.md references/*.md ../web2video/references/*.md | grep -v "^scripts/.*://" | head -40
-$ cd /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media && grep -n -i "createServer\|serveDir\|realpath\|startsWith(root\|127.0.0.1\|import .* from '\.\./\|import .* from '\./" skills/video-capture/scripts/capture.mjs | head -30
-$ cd /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media && sed -n 120,162p skills/video-capture/scripts/capture.mjs; sed -n 736,775p skills/video-capture/scripts/capture.mjs
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && ln -s ../../rough-app app && cat > stage.html <<'E'
+node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-c …
+$ L=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/rough-app-break.mp4 --preset web 2>&1 | tail -6; node $L/contact-sheet.mjs out/rough-app-break.mp4 --at 0s,3.1s,9.2s,15.5s --width 1280 --cols 2 -o review/rough-app-break.jpg 2>&1 | tail -2; node $L/contact-sheet.mjs out/rough-app-break.mp4 --at 0s --cols 1 --width 1280 -o review/first-frame.jpg 2>&1 | tail -1; ffmpeg -v error -y -i out/rough-app-break.mp4 -vf "select=lt(n\,6),crop=640:60:0:660,tile=1x6" -frames:v 1 review/first6-footer.png && echo ok; ls -la out | awk '{prin …
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/rough-app-break.jpg
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/first6-footer.png
+$ cd ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture && grep -n -i "mod\.\|module\.\|\.setup\|prepare\|addInitScript\|before the first\|hide" scripts/*.mjs SKILL.md references/*.md ../web2video/references/*.md | grep -v "^scripts/.*://" | head -40
+$ cd ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media && grep -n -i "createServer\|serveDir\|realpath\|startsWith(root\|127.0.0.1\|import .* from '\.\./\|import .* from '\./" skills/video-capture/scripts/capture.mjs | head -30
+$ cd ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media && sed -n 120,162p skills/video-capture/scripts/capture.mjs; sed -n 736,775p skills/video-capture/scripts/capture.mjs
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && ln -s ../../rough-app app && cat > stage.html <<'E'
 <!doctype html>
 <!-- Recording stage: loads ../../rough-app/index.html (via the `app` symlink) unchanged, with the
      footer hidden from the very first frame because it shows an API key. The app's files are untouched. -->
@@ -143,7 +143,7 @@ $ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && ln -s
 E
 python3 - <<'E'
 p='storyboar …
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && ls -la && cat storyboard.mjs | head -8
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break && ls -la && cat storyboard.mjs | head -8
 $ ln -s ../../rough-app app && cat > stage.html <<'E'
 <!doctype html>
 <!-- Recording stage: loads ../../rough-app/index.html (via the `app` symlink) unchanged, with the
@@ -160,9 +160,9 @@ E
 python3 - <<'E'
 p='storyboard.mjs'; s=open(p).read()
 s=s.replace("export const url = '../../rough-app …
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/rough-app-break.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/footer-strip.png
-$ rm -f /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/first-frame.jpg; ls /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/rough-app-break.jpg
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/footer-strip.png
+$ rm -f ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review/first-frame.jpg; ls ~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/review
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

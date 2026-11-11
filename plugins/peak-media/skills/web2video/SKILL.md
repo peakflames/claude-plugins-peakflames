@@ -86,7 +86,9 @@ steps 9–10.
    `curl -sS -o /dev/null -w '%{http_code}\n' <url>`. A localhost URL that doesn't answer means
    its dev server isn't running: ask the user to start it. A local folder must hold `index.html`.
    **Sign-in page:** sign in now, following `references/login.md` (it records nothing), so step 4
-   sees what the take will see.
+   sees what the take will see. **Write the user a chat message before running `capture signin`**
+   ("A Chromium window will open on <url>. Sign in there yourself, then close the tab."); a
+   window that opens with no message in chat is a failure of this step.
 
 4. **Explore** with playwright-cli: `playwright-cli open`, then (signed-in page)
    `playwright-cli state-load <session file>`, then `playwright-cli goto <url>`. Take snapshots,

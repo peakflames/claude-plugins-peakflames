@@ -11,9 +11,9 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-12/` with `--plugin-d
 ```text
 $ ls -la && find . -maxdepth 3 -not -path './node_modules/*' | head -100
 [Skill] {"skill": "peak-media:web2video", "args": "Re-record it."}
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo && ls -la out review && cat brief.md script.md storyboard.mjs; for f in out/*.json; do echo "== $f"; cat "$f"; done
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check 2>&1 | tail -20
-$ B="${TMPDIR:-/tmp}/todo-demo-prev-take" && mkdir -p "$B" && cp -p out/todo-demo.mp4 out/todo-demo.take.json "$B"/ && echo "backup: $B" && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/storyboard.mjs --script /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/script.md --out /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/out/todo-demo.mp4 --preset web 2>&1 | tail -40; echo "exit=${pipestatus[1]}"; ls -la out
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo && ls -la out review && cat brief.md script.md storyboard.mjs; for f in out/*.json; do echo "== $f"; cat "$f"; done
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check 2>&1 | tail -20
+$ B="${TMPDIR:-/tmp}/todo-demo-prev-take" && mkdir -p "$B" && cp -p out/todo-demo.mp4 out/todo-demo.take.json "$B"/ && echo "backup: $B" && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard ~/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/storyboard.mjs --script ~/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/script.md --out ~/tmp/pm-w2v-uat/AC-UAT-12/web2video/todo-demo/out/todo-demo.mp4 --preset web 2>&1 | tail -40; echo "exit=${pipestatus[1]}"; ls -la out
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

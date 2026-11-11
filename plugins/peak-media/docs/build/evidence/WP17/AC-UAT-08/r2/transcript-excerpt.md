@@ -10,13 +10,13 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat-r2/AC-UAT-08/` (round 2, com
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Show the sticky header on ./rough-app staying put while the list scrolls."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-08 /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-08/rough-app
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-08/rough-app/index.html
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-08/rough-app
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ~/tmp/pm-w2v-uat-r2/AC-UAT-08 ~/tmp/pm-w2v-uat-r2/AC-UAT-08/rough-app
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-08/rough-app/index.html
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve ~/tmp/pm-w2v-uat-r2/AC-UAT-08/rough-app
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
 $ cat /private/tmp/claude-501/-Users-schaveyt-tmp-pm-w2v-uat-r2-AC-UAT-08/e47548f5-2e06-4ddc-94c6-5121f1f42531/tasks/bss72sr7h.output; which playwright-cli; playwright-cli --help 2>&1 | head -60
 $ mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && playwright-cli open >/dev/null 2>&1; playwright-cli resize 1280 720 >/dev/null; playwright-cli goto http://127.0.0.1:52917/ | tail -5; playwright-cli screenshot --filename=/tmp/w2v-explore/top.png | tail -3; playwright-cli eval "() => { const r=document.querySelector('#rows'); r.scrollTop=1500; const th=document.querySelector('thead th').getBoundingClientRect(); const rr=r.getBoundingClientRect(); return JSON.stringify({thTop:th.top, rowsTop:rr.top, rowsBottom:rr.bottom, scrollH:r.scrollHeight, footerTop:document.querySelector('footer').getBo …
 [Read] /tmp/w2v-explore/top.png
@@ -94,10 +94,10 @@ Reply "record it" to go with this plan, or tell me what to change (footer handli
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/sticky-header.mp4 --preset web 2>&1 | tail -40
-$ L=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; grep -o '"videoMs":[^,]*' out/sticky-header.take.json; grep -o '"pageErrors[^]]*]' out/sticky-header.take.json; node $L/probe-spec.mjs out/sticky-header.mp4 --preset web 2>&1 | tail -5; node $L/contact-sheet.mjs out/sticky-header.mp4 --at 0s,3.25s,8s,9.85s,12s,16.4s,19900ms --width 1280 --cols 2 -o review/sticky-header.jpg 2>&1 | tail -2; node $L/contact-sheet.mjs out/sticky-header.mp4 --at 0s,19900ms --cols 1 --width 1280 -o review/sticky-header-ends.jpg 2>&1 | tail -2
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header/review/sticky-header.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header/review/sticky-header-ends.jpg
+$ cd ~/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/sticky-header.mp4 --preset web 2>&1 | tail -40
+$ L=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; grep -o '"videoMs":[^,]*' out/sticky-header.take.json; grep -o '"pageErrors[^]]*]' out/sticky-header.take.json; node $L/probe-spec.mjs out/sticky-header.mp4 --preset web 2>&1 | tail -5; node $L/contact-sheet.mjs out/sticky-header.mp4 --at 0s,3.25s,8s,9.85s,12s,16.4s,19900ms --width 1280 --cols 2 -o review/sticky-header.jpg 2>&1 | tail -2; node $L/contact-sheet.mjs out/sticky-header.mp4 --at 0s,19900ms --cols 1 --width 1280 -o review/sticky-header-ends.jpg 2>&1 | tail -2
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header/review/sticky-header.jpg
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header/review/sticky-header-ends.jpg
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

@@ -10,22 +10,22 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-03/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Turn the deck in ./deck into a narrated video for YouTube."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/deck /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ~/tmp/pm-w2v-uat/AC-UAT-03/deck ~/tmp/pm-w2v-uat/AC-UAT-03
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
 $ for f in deck/brief.md deck/script.md deck/storyboard.mjs deck/index.html .tts-before; do echo "=== $f"; cat "$f"; echo; done; ls web2video 2>&1; [ -n "$PEAK_MEDIA_OPENROUTER_API_KEY" ] && echo KEY_SET || echo KEY_MISSING
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice" 2>&1 | tail -20
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice" 2>&1 | tail -20
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
 $ mkdir -p web2video/water-in-the-morning/review && cd web2video/water-in-the-morning && which playwright-cli; (cd ../../deck && python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &) ; sleep 1; playwright-cli open 2>&1 | tail -5; playwright-cli resize 1920 1080 2>&1 | tail -2; playwright-cli goto http://127.0.0.1:8765/index.html 2>&1 | tail -5; for i in 0 1 2; do playwright-cli eval "() => window.deckGo($i)" 2>&1 | tail -3; sleep 0.5; playwright-cli screenshot --filename review/explore-$i.png 2>&1 | tail -2; done; playwright-cli close 2>&1 | tail -1; pkill -f "http.server 8765"; ls rev …
-$ rm -f review/explore-*.png; playwright-cli open 2>&1 | tail -1; playwright-cli resize 1920 1080 >/dev/null 2>&1; playwright-cli goto "file:///Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/deck/index.html" 2>&1 | grep -iE "error|URL|Title"; for i in 0 1 2; do playwright-cli eval "() => window.deckGo($i)" 2>&1 | grep -iE "error|result" -A1 | head -3; sleep 0.5; playwright-cli screenshot --filename review/explore-$i.png 2>&1 | grep -i error; done; playwright-cli close 2>&1 | tail -1; ls review
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/deck && exec python3 -m http.server 8765 --bind 127.0.0.1
+$ rm -f review/explore-*.png; playwright-cli open 2>&1 | tail -1; playwright-cli resize 1920 1080 >/dev/null 2>&1; playwright-cli goto "file://~/tmp/pm-w2v-uat/AC-UAT-03/deck/index.html" 2>&1 | grep -iE "error|URL|Title"; for i in 0 1 2; do playwright-cli eval "() => window.deckGo($i)" 2>&1 | grep -iE "error|result" -A1 | head -3; sleep 0.5; playwright-cli screenshot --filename review/explore-$i.png 2>&1 | grep -i error; done; playwright-cli close 2>&1 | tail -1; ls review
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-03/deck && exec python3 -m http.server 8765 --bind 127.0.0.1
 $ rm -f review/explore-*.png; sleep 1; curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/index.html; playwright-cli open 2>&1 | tail -1; playwright-cli resize 1920 1080 >/dev/null 2>&1; playwright-cli goto "http://127.0.0.1:8765/index.html" 2>&1 | grep -iE "error|URL|Title"; for i in 0 1 2; do playwright-cli eval "() => window.deckGo($i)" 2>&1 | grep -iE "error|result" -A1 | head -3; sleep 0.5; playwright-cli screenshot --filename review/explore-$i.png 2>&1 | grep -i error; done; playwright-cli close 2>&1 | tail -1; ls review
 $ cat /private/tmp/claude-501/-Users-schaveyt-tmp-pm-w2v-uat-AC-UAT-03/3ad2fa43-08db-4e5f-ba80-7b146752ce68/tasks/b5v34wm06.output; lsof -iTCP:8765 -sTCP:LISTEN 2>&1 | tail -2; curl -sS -m 3 -o /dev/null -w '%{http_code}\n' http://localhost:8765/index.html
 $ rm -f review/explore-*.png; U=http://localhost:8765/index.html; curl -sS -m 3 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/index.html; playwright-cli open 2>&1 | tail -1; playwright-cli resize 1920 1080 >/dev/null 2>&1; playwright-cli goto "$U" 2>&1 | grep -iE "error|URL|Title"; for i in 0 1 2; do playwright-cli eval "() => window.deckGo($i)" 2>&1 | grep -iE "error|result" -A1 | head -3; sleep 0.5; playwright-cli screenshot --filename review/explore-$i.png 2>&1 | grep -i error; done; playwright-cli close 2>&1 | tail -1; ls review
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/explore-0.png
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/explore-1.png
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/explore-2.png
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/references/narration-writing.md
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/explore-0.png
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/explore-1.png
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/explore-2.png
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/references/narration-writing.md
 $ pkill -f "http.server 8765"; rm -rf review/explore-*.png .playwright-cli; cp ../../deck/script.md script.md
 cat > brief.md <<'EOF'
 # Water in the morning — deck video
@@ -100,12 +100,12 @@ I recommend option 3, since it makes the voice and the slides agree.
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 950 2>&1 | tail -25
-$ sed -i '' -e 's/await wait(250); /await wait(200); /' -e 's/await wait(900); /await wait(800); /' storyboard.mjs && grep -n "wait(" storyboard.mjs && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 850 --tail-ms 200 2>&1 | tail -12
-$ P=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media && node "$P/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --spine spine/manifest.json --out out/water-in-the-morning.mp4 --preset youtube 2>&1 | tail -30 && echo "--- probe" && node "$P/lib/verify/probe-spec.mjs" out/water-in-the-morning.mp4 --preset youtube 2>&1 | tail -15; echo "--- check-take"; node "$P/skills/video-capture/scripts/check-take.mjs" out/water-in-the-morning.mp4 --expect-cuts 2 2>&1 | tail -15; python3 -c "
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 950 2>&1 | tail -25
+$ sed -i '' -e 's/await wait(250); /await wait(200); /' -e 's/await wait(900); /await wait(800); /' storyboard.mjs && grep -n "wait(" storyboard.mjs && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 850 --tail-ms 200 2>&1 | tail -12
+$ P=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media && node "$P/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --spine spine/manifest.json --out out/water-in-the-morning.mp4 --preset youtube 2>&1 | tail -30 && echo "--- probe" && node "$P/lib/verify/probe-spec.mjs" out/water-in-the-morning.mp4 --preset youtube 2>&1 | tail -15; echo "--- check-take"; node "$P/skills/video-capture/scripts/check-take.mjs" out/water-in-the-morning.mp4 --expect-cuts 2 2>&1 | tail -15; python3 -c "
 import json;m=json.load(open('out/water-in-the-morning.take.json')) …
-$ node /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify/contact-sheet.mjs out/water-in-the-morning.mp4 --at 3.53s,10.98s,18.67s --width 1280 --cols 2 -o review/water-in-the-morning.jpg 2>&1 | tail -3; cat /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/water-in-the-morning.jpg
+$ node ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify/contact-sheet.mjs out/water-in-the-morning.mp4 --at 3.53s,10.98s,18.67s --width 1280 --cols 2 -o review/water-in-the-morning.jpg 2>&1 | tail -3; cat ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/review/water-in-the-morning.jpg
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

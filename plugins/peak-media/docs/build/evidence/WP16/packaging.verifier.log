@@ -27,7 +27,7 @@ test at evals/packaging/packaging.test.mjs:35:1
   
   '0.1.0' !== '0.2.0'
   
-      at TestContext.<anonymous> (file:///Users/schaveyt/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a0c7e13b0e5502d9d/plugins/peak-media/evals/packaging/packaging.test.mjs:39:10)
+      at TestContext.<anonymous> (file://~/github/peakflames/claude-plugins-peakflames/.claude/worktrees/agent-a0c7e13b0e5502d9d/plugins/peak-media/evals/packaging/packaging.test.mjs:39:10)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
       at Test.start (node:internal/test_runner/test:1262:17)

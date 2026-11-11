@@ -10,12 +10,12 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat-r2/AC-UAT-02/` (round 2, com
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Record a silent tour of ./ui-demo \u2014 no captions, nothing on screen but the app (no cursor overlay, no captions, no narration)."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ./ui-demo; ls ./web2video 2>/dev/null
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ./ui-demo; ls ./web2video 2>/dev/null
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
 $ cd ./ui-demo && for f in brief.md script.md storyboard.mjs captions-alt.css index.html; do echo "=== $f"; cat "$f"; done
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/ui-demo
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve ~/tmp/pm-w2v-uat-r2/AC-UAT-02/ui-demo
 $ sleep 1; cat /private/tmp/claude-501/-Users-schaveyt-tmp-pm-w2v-uat-r2-AC-UAT-02/64e6ceda-f538-4e2e-9848-ffad9246bdcb/tasks/bifzd4v8s.output; which playwright-cli
 $ mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && playwright-cli open 2>&1 | tail -5 && playwright-cli goto http://127.0.0.1:52731/ 2>&1 | tail -5 && playwright-cli snapshot 2>&1 | tail -30
 $ cd /tmp/w2v-explore && cat .playwright-cli/console-*.log | head -5
@@ -29,7 +29,7 @@ N=22 pc snapshot; playwright-cli screenshot --filename=final.png 2>&1 | grep -i 
 playwright-cli close 2>&1 | head -2
 [Read] /tmp/w2v-explore/done.png
 $ kill 50320; ls /tmp/w2v-explore/*.png
-$ P=/Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo
+$ P=~/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo
 mkdir -p $P/out $P/review && cp ui-demo/script.md $P/script.md
 sed 's/^- \*\*Mode:\*\* captions$/- **Mode:** silent (no captions; cursor shown)/' ui-demo/brief.md > $P/brief.md
 cat > $P/storyboard.mjs <<'EOF'
@@ -106,16 +106,16 @@ Reply with one of:
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/ui-demo.mp4 --preset web --no-captions 2>&1 | tail -40
-$ V=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify
+$ cd ~/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/ui-demo.mp4 --preset web --no-captions 2>&1 | tail -40
+$ V=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify
 grep -o '"videoMs": *[0-9]*' out/ui-demo.take.json; grep -o '"cursor": *[a-z]*' out/ui-demo.take.json
 node $V/probe-spec.mjs out/ui-demo.mp4 --preset web 2>&1 | tail -8
 MS=$(grep -o '"videoMs": *[0-9]*' out/ui-demo.take.json | grep -o '[0-9]*$')
 node $V/contact-sheet.mjs out/ui-demo.mp4 --at 0s,1.97s,6.17s,11.0s,16.05s,${MS}ms --width 1280 --cols 2 -o review/ui-demo.jpg 2>&1 | tail -2
 node $V/contact-sheet.mjs out/ui-demo.mp4 --at 0s,${MS}ms --cols 1 --width 1280 -o review/ui-demo-ends.jpg 2>&1 | tail - …
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/review/ui-demo.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/review/ui-demo-ends.jpg
-$ ls -l /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/out/
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/review/ui-demo.jpg
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/review/ui-demo-ends.jpg
+$ ls -l ~/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/out/
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

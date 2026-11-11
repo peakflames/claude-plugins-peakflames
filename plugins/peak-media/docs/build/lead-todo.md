@@ -32,3 +32,5 @@ Items the Lead does after WP10, before the release.
 - [ ] **WP15 verify-1 carry-forward (v0.2):** nits 8 (beat-error examples show only `script.md`), 10 (DOM cursor fallback undocumented), 11 (narrated beat end shifts with `--audio-offset-ms`). Findings 1–6 fixed in fix round 1 (`b13f8ab`), spot-checked by the Lead (docs test 2/2).
 
 - [ ] **WP16 carry-forward (v0.3 engine gaps):** `contact-sheet --beats <take.json>` (one still per beat from the manifest); `capture --hide <selector>` for private data; `sample-voice --cache-dir`; contact-sheet timecode covers each still's top-left corner (verify-1 #10). WP16 fix round 1 (`92b0aeb`) was spot-checked by the Lead; the runtime sizing (verify-1 #1, blocker) is proven only by WP17's AC-UAT-01/05.
+
+- [ ] **WP17 verify-1 carry-forward (v0.2):** F-02 re-record-from-project (D7) and F-03 D9/D10/D11 are text-tested only — one AC-UAT-03 and AC-UAT-12 re-run would exercise them; F-04 `hide` + page errors in one take unexercised; F-05 the post-recording privacy stop never triggered (every case caught it while exploring). F-01 fixed (chat message before the sign-in window).

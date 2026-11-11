@@ -1,4 +1,4 @@
-$ node $P/lib/verify/probe-spec.mjs /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4 --preset youtube
+$ node $P/lib/verify/probe-spec.mjs ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4 --preset youtube
 ok    video codec: h264
 ok    video profile: High
 ok    pixel format: yuv420p
@@ -19,5 +19,5 @@ ok    [youtube] GOP length = 15 frames (half of 30 fps): 15 frames
 ok    [youtube] closed GOP: closed
 ok    [youtube] 2 consecutive B-frames: max B run 2 (218 runs)
 ok    [youtube] no edit lists: 0 elst
-PASS  /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4
+PASS  ~/tmp/pm-w2v-uat/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4
 exit=0

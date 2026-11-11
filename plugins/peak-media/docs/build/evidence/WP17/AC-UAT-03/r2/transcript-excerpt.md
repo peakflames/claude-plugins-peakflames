@@ -10,13 +10,13 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat-r2/AC-UAT-03/` (round 2, com
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Turn the deck in ./deck into a narrated video for YouTube."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/deck
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
-$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/deck && for f in brief.md script.md storyboard.mjs index.html; do echo "=== $f"; cat "$f"; echo; done; ls /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video 2>&1
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice"; echo "exit=$?"
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/deck
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ~/tmp/pm-w2v-uat-r2/AC-UAT-03/deck
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ cd ~/tmp/pm-w2v-uat-r2/AC-UAT-03/deck && for f in brief.md script.md storyboard.mjs index.html; do echo "=== $f"; cat "$f"; echo; done; ls ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video 2>&1
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/sample-voice.mjs" --voices Rasalgethi --out-dir "${TMPDIR:-/tmp}/web2video-voice"; echo "exit=$?"
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve ~/tmp/pm-w2v-uat-r2/AC-UAT-03/deck
 $ sleep 1; cat /private/tmp/claude-501/-Users-schaveyt-tmp-pm-w2v-uat-r2-AC-UAT-03/fde7a79c-e993-47e1-8e1a-eeb183a34e6e/tasks/b7xiuffx3.output
 $ mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && playwright-cli open 2>&1 | tail -3; playwright-cli resize 1920 1080 2>&1 | tail -1; playwright-cli goto http://127.0.0.1:52818/ 2>&1 | tail -3
 for i in 0 1 2; do playwright-cli eval "() => window.deckGo($i)" 2>&1 | head -3; sleep 0.5; playwright-cli screenshot --filename=/tmp/w2v-explore/s$i.png 2>&1 | tail -1; done; ls /tmp/w2v-explore
@@ -24,8 +24,8 @@ $ cd /tmp/w2v-explore && ls -la s?.png && playwright-cli console 2>&1 | head -8;
 [Read] /tmp/w2v-explore/s0.png
 [Read] /tmp/w2v-explore/s1.png
 [Read] /tmp/w2v-explore/s2.png
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
-$ kill 50943 2>/dev/null; P=/Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning; mkdir -p $P/out $P/review && cd $P && cp ../../deck/script.md script.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ kill 50943 2>/dev/null; P=~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning; mkdir -p $P/out $P/review && cd $P && cp ../../deck/script.md script.md
 cat > brief.md <<'EOF'
 # Water in the morning
 
@@ -119,7 +119,7 @@ I recommend recording as written: your wording matches the slides. If the three-
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 950; echo "exit=$?"
+$ cd ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 950; echo "exit=$?"
 ```
 
 ### Final assistant message (gate question / stop / hand-off)
@@ -149,11 +149,11 @@ Reply with 1, 2 or 3 and I'll rerun the narration and record.
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning && sed -i '' 's/await wait(900); /await wait(800); /' storyboard.mjs && grep -n 'wait(' storyboard.mjs && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 850; echo "exit=$?"
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --spine spine/manifest.json --out out/water-in-the-morning.mp4 --preset youtube; echo "exit=$?"
-$ V=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media && grep -o '"videoMs": *[0-9]*\|"lateMs": *[0-9]*' out/water-in-the-morning.take.json; node $V/lib/verify/probe-spec.mjs out/water-in-the-morning.mp4 --preset youtube; echo "probe=$?"; node $V/skills/video-capture/scripts/check-take.mjs out/water-in-the-morning.mp4 --expect-cuts 2; echo "take=$?"; node $V/lib/verify/contact-sheet.mjs out/water-in-the-morning.mp4 --at 0s,3.5s,11s,18.8s,21940ms --width 1280 --cols 2 -o review/water-in-the-morning.jpg; node $V/lib/verify/contact-sheet.mjs out/water-in-the-morning.mp4 …
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/review/water-in-the-morning.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/review/water-in-the-morning-ends.jpg
+$ cd ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning && sed -i '' 's/await wait(900); /await wait(800); /' storyboard.mjs && grep -n 'wait(' storyboard.mjs && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi --lead-ms 850; echo "exit=$?"
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --spine spine/manifest.json --out out/water-in-the-morning.mp4 --preset youtube; echo "exit=$?"
+$ V=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media && grep -o '"videoMs": *[0-9]*\|"lateMs": *[0-9]*' out/water-in-the-morning.take.json; node $V/lib/verify/probe-spec.mjs out/water-in-the-morning.mp4 --preset youtube; echo "probe=$?"; node $V/skills/video-capture/scripts/check-take.mjs out/water-in-the-morning.mp4 --expect-cuts 2; echo "take=$?"; node $V/lib/verify/contact-sheet.mjs out/water-in-the-morning.mp4 --at 0s,3.5s,11s,18.8s,21940ms --width 1280 --cols 2 -o review/water-in-the-morning.jpg; node $V/lib/verify/contact-sheet.mjs out/water-in-the-morning.mp4 …
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/review/water-in-the-morning.jpg
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/review/water-in-the-morning-ends.jpg
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

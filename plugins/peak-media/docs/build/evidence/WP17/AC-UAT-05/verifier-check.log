@@ -6,7 +6,7 @@
   -> playwright-cli delete-data + close -> write brief/script/storyboard
   -> AskUserQuestion x1 ("Record it") -> capture.mjs ... --storage-state ~/.cache/peak-media/auth/127.0.0.1.json
   -> probe-spec + contact-sheet (--at 0s,...,${MS}ms and -ends sheet) -> Read both -> re-record (setup() tweak) -> Read both
-  -> hand-off ending "Delete the saved session at /Users/schaveyt/.cache/peak-media/auth/127.0.0.1.json?"
+  -> hand-off ending "Delete the saved session at ~/.cache/peak-media/auth/127.0.0.1.json?"
   -> user: "delete the saved session" -> rm, ls confirms gone.
 - No tool call fills or types into the sign-in form; no Bash/playwright-cli 'fill'/'type'/'password' input. No MCP tool calls.
 - AskUserQuestion count before first capture.mjs take: 1. Gate text names beats/captions, captions mode, web preset, output path.

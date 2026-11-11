@@ -10,12 +10,12 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-10/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Make a captioned demo of ./rough-app for the website."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-10 /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-10/rough-app
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-10/rough-app/index.html
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ~/tmp/pm-w2v-uat/AC-UAT-10 ~/tmp/pm-w2v-uat/AC-UAT-10/rough-app
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-10/rough-app/index.html
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
 $ which playwright-cli; playwright-cli open 2>&1 | tail -5; playwright-cli resize 1280 720 2>&1 | tail -2; playwright-cli goto "file://$PWD/rough-app/index.html" 2>&1 | tail -5; mkdir -p "${TMPDIR:-/tmp}/w2v-explore"; playwright-cli screenshot --filename "${TMPDIR:-/tmp}/w2v-explore/s1.png" 2>&1 | tail -3; playwright-cli eval "() => { const r = document.querySelector('#rows'); const f = document.querySelector('footer').getBoundingClientRect(); return JSON.stringify({rowsH: r.clientHeight, scrollH: r.scrollHeight, footerTop: f.top, footerBottom: f.bottom, vh: innerHeight}); }" 2>&1 | tail -5; ech …
 $ (python3 -m http.server 8765 --bind 127.0.0.1 --directory rough-app >/dev/null 2>&1 &) ; sleep 1; D="${TMPDIR:-/tmp}/w2v-explore"; playwright-cli goto "http://127.0.0.1:8765/index.html" 2>&1 | grep -iE "error|title" ; playwright-cli screenshot --filename "$D/s1.png" >/dev/null 2>&1; playwright-cli eval "() => { const r = document.querySelector('#rows'); const f = document.querySelector('footer').getBoundingClientRect(); const rr = r.getBoundingClientRect(); return JSON.stringify({rowsTop: rr.top, rowsBottom: rr.bottom, scrollH: r.scrollHeight, footerTop: f.top, footerBottom: f.bottom, vh: inne …
 $ curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/index.html; lsof -iTCP:8765 -sTCP:LISTEN | tail -2

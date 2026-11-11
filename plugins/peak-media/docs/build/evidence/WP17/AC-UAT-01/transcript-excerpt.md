@@ -10,13 +10,13 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-01/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Make a captioned 20-second demo of the to-do app in ./ui-demo for our product website."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ./ui-demo; ls ./web2video 2>/dev/null
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ./ui-demo; ls ./web2video 2>/dev/null
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
 $ cd ./ui-demo && for f in brief.md script.md storyboard.mjs captions-alt.css index.html; do echo "=== $f"; cat "$f"; done; which playwright-cli
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-01 && S=$(mktemp -d) && cd "$S" && playwright-cli open >/dev/null 2>&1; playwright-cli goto "file:///Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-01/ui-demo/index.html" | tail -5
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-01 && S=$(mktemp -d) && cd "$S" && playwright-cli open >/dev/null 2>&1; playwright-cli goto "file://~/tmp/pm-w2v-uat/AC-UAT-01/ui-demo/index.html" | tail -5
 playwright-cli run-code "async page => {
   await page.setViewportSize({width:1280,height:720});
   await page.locator('#new').fill('Buy milk'); await page.keyboard.press('Enter');
@@ -24,7 +24,7 @@ playwright-cli run-code "async page => {
   await page.getByLabel('Buy milk').click();
   const a = await page.locator('#count').textContent();
   await page.loca …
-$ S=$(mktemp -d); (cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-01/ui-demo && python3 -m http.server 8731 --bind 127.0.0.1 >/dev/null 2>&1 &) ; sleep 1; cd "$S"
+$ S=$(mktemp -d); (cd ~/tmp/pm-w2v-uat/AC-UAT-01/ui-demo && python3 -m http.server 8731 --bind 127.0.0.1 >/dev/null 2>&1 &) ; sleep 1; cd "$S"
 q(){ grep -v -e '╔' -e '║' -e '╚' -e '^$'; }
 playwright-cli open 2>&1 | q | tail -2; playwright-cli goto "http://127.0.0.1:8731/index.html" 2>&1 | q | tail -3
 playwright-cli run-code "async page => {
@@ -34,7 +34,7 @@ playwright-cli run-code "async page => {
   await page.get …
 [Read] /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.fS8UftyGMw/mid.png
 $ cat /var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.fS8UftyGMw/.playwright-cli/console-*.log | head
-$ P=/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-01/web2video/todo-demo; mkdir -p "$P/out" "$P/review" && cp ui-demo/brief.md ui-demo/script.md "$P/" && cat > "$P/storyboard.mjs" <<'EOF'
+$ P=~/tmp/pm-w2v-uat/AC-UAT-01/web2video/todo-demo; mkdir -p "$P/out" "$P/review" && cp ui-demo/brief.md ui-demo/script.md "$P/" && cat > "$P/storyboard.mjs" <<'EOF'
 // Captioned 20 s demo of the to-do app in ../../ui-demo (beats and captions live in script.md).
 // Each beat is held to about 5 s so the viewer sees the result before the next caption.
 export const url = '../../ui-demo/index.html';
@@ -107,12 +107,12 @@ Reply "record it" to capture, or tell me what to change (captions, sample tasks,
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-01/web2video/todo-demo && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web 2>&1 | tail -40
-$ sed -i '' -e 's/await wait(1800);/await wait(2700);/' -e 's/await wait(2000);/await wait(2300);/' -e 's/await wait(500); \/\/ hold/await wait(800); \/\/ hold/' storyboard.mjs && PM=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media && node "$PM/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web 2>&1 | tail -8 && node "$PM/lib/verify/probe-spec.mjs" out/todo-demo.mp4 --preset web; echo "probe exit=$?"; node -e '
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-01/web2video/todo-demo && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web 2>&1 | tail -40
+$ sed -i '' -e 's/await wait(1800);/await wait(2700);/' -e 's/await wait(2000);/await wait(2300);/' -e 's/await wait(500); \/\/ hold/await wait(800); \/\/ hold/' storyboard.mjs && PM=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media && node "$PM/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web 2>&1 | tail -8 && node "$PM/lib/verify/probe-spec.mjs" out/todo-demo.mp4 --preset web; echo "probe exit=$?"; node -e '
 const m=JSON.parse(require("fs").readFileSync("out/todo-demo.take.json","utf8"));
  …
-$ node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify/contact-sheet.mjs" out/todo-demo.mp4 --at 2.46s,4.7s,7.07s,9.0s,11.69s,14.0s,16.66s,19.6s --width 1280 --cols 2 -o review/todo-demo.jpg 2>&1 | tail -3; node -e 'const m=JSON.parse(require("fs").readFileSync("out/todo-demo.take.json","utf8"));console.log(m["x-take"].pageErrorCount, JSON.stringify(m["x-take"].pageErrors))'
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-01/web2video/todo-demo/review/todo-demo.jpg
+$ node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify/contact-sheet.mjs" out/todo-demo.mp4 --at 2.46s,4.7s,7.07s,9.0s,11.69s,14.0s,16.66s,19.6s --width 1280 --cols 2 -o review/todo-demo.jpg 2>&1 | tail -3; node -e 'const m=JSON.parse(require("fs").readFileSync("out/todo-demo.take.json","utf8"));console.log(m["x-take"].pageErrorCount, JSON.stringify(m["x-take"].pageErrors))'
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-01/web2video/todo-demo/review/todo-demo.jpg
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

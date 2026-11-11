@@ -1,4 +1,4 @@
-$ node $P/lib/verify/probe-spec.mjs /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/out/todo-demo.mp4 --preset web
+$ node $P/lib/verify/probe-spec.mjs ~/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/out/todo-demo.mp4 --preset web
 ok    video codec: h264
 ok    video profile: High
 ok    pixel format: yuv420p
@@ -13,5 +13,5 @@ ok    [web] audio channels: 2
 ok    [web] audio bitrate ≤ 128 kbps +15%: 2 kbps
 ok    [web] progressive: progressive
 ok    [web] encoder rate control (x264 SEI): rc=crf crf=26.0
-PASS  /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/out/todo-demo.mp4
+PASS  ~/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/out/todo-demo.mp4
 exit=0

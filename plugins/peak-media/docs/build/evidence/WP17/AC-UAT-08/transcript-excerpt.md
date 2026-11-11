@@ -10,11 +10,11 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-08/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Show the sticky header on ./rough-app staying put while the list scrolls."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la; ls -la rough-app web2video 2>&1 | head -50
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
-$ cat rough-app/index.html; which playwright-cli; sed -n 1,200p "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md"
-$ mkdir -p web2video/sticky-header/review && cd web2video/sticky-header && playwright-cli open 2>&1 | tail -5; playwright-cli goto "file:///Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-08/rough-app/index.html" 2>&1 | tail -5; playwright-cli resize 1280 720 2>&1 | tail -2; playwright-cli screenshot --filename review/explore-top.png 2>&1 | tail -3; playwright-cli eval "() => { const r = document.querySelector('#rows'); r.scrollTop = 1500; const th = document.querySelector('thead th').getBoundingClientRect(); const f = document.querySelector('footer').getBoundingClientRect(); return JSON.stringify({thTop:  …
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la; ls -la rough-app web2video 2>&1 | head -50
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ cat rough-app/index.html; which playwright-cli; sed -n 1,200p "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md"
+$ mkdir -p web2video/sticky-header/review && cd web2video/sticky-header && playwright-cli open 2>&1 | tail -5; playwright-cli goto "file://~/tmp/pm-w2v-uat/AC-UAT-08/rough-app/index.html" 2>&1 | tail -5; playwright-cli resize 1280 720 2>&1 | tail -2; playwright-cli screenshot --filename review/explore-top.png 2>&1 | tail -3; playwright-cli eval "() => { const r = document.querySelector('#rows'); r.scrollTop = 1500; const th = document.querySelector('thead th').getBoundingClientRect(); const f = document.querySelector('footer').getBoundingClientRect(); return JSON.stringify({thTop:  …
 $ (python3 -m http.server 8731 --bind 127.0.0.1 --directory ../../rough-app >/dev/null 2>&1 & echo $! > /tmp/w2v-uat08-srv.pid); sleep 1; playwright-cli goto "http://127.0.0.1:8731/index.html" 2>&1 | grep -iE "error|Page URL|Title" ; playwright-cli screenshot --filename review/explore-top.png 2>&1 | grep -i error; playwright-cli eval "() => { const r = document.querySelector('#rows'); r.scrollTop = 1500; const th = document.querySelector('thead th').getBoundingClientRect(); const f = document.querySelector('footer').getBoundingClientRect(); return JSON.stringify({thTop: th.top, rowsTop: r.getBou …
 $ rm -f review/explore-*.png && (python3 -m http.server 8731 --bind 127.0.0.1 --directory ../../rough-app >/tmp/w2v-uat08-srv.log 2>&1 & echo $! > /tmp/w2v-uat08-srv.pid); sleep 2; curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8731/index.html; cat /tmp/w2v-uat08-srv.log; playwright-cli open "http://localhost:8731/index.html" 2>&1 | grep -iE "error|Page URL|Title"
 $ ps -p $(cat /tmp/w2v-uat08-srv.pid) -o pid,command; lsof -nP -iTCP:8731 2>&1 | head; env | grep -i proxy; playwright-cli close 2>&1 | tail -1
@@ -27,7 +27,7 @@ $ (node -e "
 const http=require('http'),fs=require('fs');
 http.createServer((q,r)=>{r.setHeader('content-type','text/html');r.end(fs.readFileSync('../../rough-app/index.html'))}).listen(8732,'127.0.0.1');" >/dev/null 2>&1 & echo $! > /tmp/w2v-uat08-srv.pid); sleep 1; curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8732/index.html
 playwright-cli open "http://127.0.0.1:8732/index.html" 2>&1 | grep -iE "error|Page URL|Title"; playwright-cli resize 1280 720 >/dev/null 2>&1; playwright-cli screenshot --filename review/explore-top.png 2>&1 | grep -i error; playwright-cli eval "() => {  …
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header/review/explore-scrolled.png
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header/review/explore-scrolled.png
 $ rm -rf .playwright-cli && cat > brief.md <<'EOF'
 # Sticky header on the Orders list
 
@@ -103,11 +103,11 @@ Reply with one of:
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/sticky-header.mp4 --preset web 2>&1 | tail -40
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
-$ P=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $P/probe-spec.mjs out/sticky-header.mp4 --preset web 2>&1 | tail -8; node $P/contact-sheet.mjs out/sticky-header.mp4 --at 3s,9.4s,14.5s,18.5s --width 1280 --cols 2 -o review/sticky-header.jpg 2>&1 | tail -3; node $P/contact-sheet.mjs out/sticky-header.mp4 --at 18.5s --width 1280 --cols 1 -o review/sticky-header-full.jpg 2>&1 | tail -1; grep -o '"videoMs":[^,]*' out/sticky-header.take.json
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header/review/sticky-header.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header/review/sticky-header-full.jpg
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/sticky-header.mp4 --preset web 2>&1 | tail -40
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ P=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $P/probe-spec.mjs out/sticky-header.mp4 --preset web 2>&1 | tail -8; node $P/contact-sheet.mjs out/sticky-header.mp4 --at 3s,9.4s,14.5s,18.5s --width 1280 --cols 2 -o review/sticky-header.jpg 2>&1 | tail -3; node $P/contact-sheet.mjs out/sticky-header.mp4 --at 18.5s --width 1280 --cols 1 -o review/sticky-header-full.jpg 2>&1 | tail -1; grep -o '"videoMs":[^,]*' out/sticky-header.take.json
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header/review/sticky-header.jpg
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-08/web2video/sticky-header/review/sticky-header-full.jpg
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

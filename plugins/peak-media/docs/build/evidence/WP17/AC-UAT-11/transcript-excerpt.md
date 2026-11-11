@@ -10,13 +10,13 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-11/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Make a captioned 20-second demo of the to-do app in ./ui-demo for our product website."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ui-demo; ls web2video 2>/dev/null
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ui-demo; ls web2video 2>/dev/null
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
 $ cd ui-demo && for f in brief.md script.md storyboard.mjs captions-alt.css index.html; do echo "=== $f"; cat "$f"; done; which playwright-cli
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-11 && (python3 -m http.server 8765 --bind 127.0.0.1 --directory ui-demo >/dev/null 2>&1 &) ; sleep 1; mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && playwright-cli open 2>&1 | tail -5; playwright-cli goto http://127.0.0.1:8765/index.html 2>&1 | tail -5; playwright-cli resize 1280 720 2>&1 | tail -2; playwright-cli snapshot 2>&1 | tail -30
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-11 && (python3 -m http.server 8765 --bind 127.0.0.1 --directory ui-demo >/dev/null 2>&1 &) ; sleep 1; mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && playwright-cli open 2>&1 | tail -5; playwright-cli goto http://127.0.0.1:8765/index.html 2>&1 | tail -5; playwright-cli resize 1280 720 2>&1 | tail -2; playwright-cli snapshot 2>&1 | tail -30
 $ cd /tmp/w2v-explore && cat .playwright-cli/console-*.log | head -5; playwright-cli run-code "async page => { await page.fill('#new','Buy milk'); await page.press('#new','Enter'); await page.fill('#new','Call the plumber'); await page.press('#new','Enter'); await page.fill('#new','Book the dentist'); await page.press('#new','Enter'); await page.getByLabel('Buy milk').click(); await page.click('[data-filter=active]'); const a = await page.locator('#list li:not([hidden])').allTextContents(); await page.click('[data-filter=done]'); const d = await page.locator('#list li:not([hidden])').allTextCont …
 $ cd /tmp/w2v-explore && ls -R . | head -30
 [Read] /tmp/w2v-explore/mid.png
@@ -94,9 +94,9 @@ Reply **"Record it"** to proceed, or tell me what to change (for example the cap
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-11/web2video/todo-demo && sed -i '' 's/^On screen: Tick a task when it is done$/On screen: Tick it off when done/' script.md && grep -n "On screen" script.md && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web 2>&1 | tail -40
-$ L=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/todo-demo.mp4 --preset web 2>&1 | tail -8; node $L/contact-sheet.mjs out/todo-demo.mp4 --at 2.2s,4.2s,6.7s,9.0s,11.6s,14.0s,16.5s,19.2s --width 1280 --cols 2 -o review/todo-demo.jpg 2>&1 | tail -3; grep -E '"videoMs"|pageErrors|lateMs' out/todo-demo.take.json; ls -la out
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-11/web2video/todo-demo/review/todo-demo.jpg
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-11/web2video/todo-demo && sed -i '' 's/^On screen: Tick a task when it is done$/On screen: Tick it off when done/' script.md && grep -n "On screen" script.md && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web 2>&1 | tail -40
+$ L=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/todo-demo.mp4 --preset web 2>&1 | tail -8; node $L/contact-sheet.mjs out/todo-demo.mp4 --at 2.2s,4.2s,6.7s,9.0s,11.6s,14.0s,16.5s,19.2s --width 1280 --cols 2 -o review/todo-demo.jpg 2>&1 | tail -3; grep -E '"videoMs"|pageErrors|lateMs' out/todo-demo.take.json; ls -la out
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-11/web2video/todo-demo/review/todo-demo.jpg
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

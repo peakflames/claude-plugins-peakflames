@@ -10,13 +10,13 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat-r2/AC-UAT-11/` (round 2, com
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Make a captioned 20-second demo of the to-do app in ./ui-demo for our product website."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; ls -la ui-demo web2video 2>&1
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; ls -la ui-demo web2video 2>&1
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
 $ cd ui-demo && for f in brief.md script.md storyboard.mjs captions-alt.css index.html; do echo "=== $f"; cat $f; done
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
-$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-11 && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve ui-demo
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-spine/SKILL.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ cd ~/tmp/pm-w2v-uat-r2/AC-UAT-11 && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" serve ui-demo
 $ which playwright-cli; playwright-cli --help 2>&1 | head -60
 $ cat /private/tmp/claude-501/-Users-schaveyt-tmp-pm-w2v-uat-r2-AC-UAT-11/e8f94bd8-53bc-4333-b167-0aa313b9dae8/tasks/be0actd53.output
 $ mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && P="playwright-cli -s=w2v"
@@ -113,16 +113,16 @@ Reply "record it" to go ahead, or tell me what to change (wording, tasks typed, 
 ### Tool calls
 
 ```text
-[Edit] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/script.md
-$ cd /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web
-$ V=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify
+[Edit] ~/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/script.md
+$ cd ~/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/todo-demo.mp4 --preset web
+$ V=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify
 grep -o '"videoMs": *[0-9]*' out/todo-demo.take.json; ls -l out/todo-demo.mp4
 node $V/probe-spec.mjs out/todo-demo.mp4 --preset web
 MS=$(grep -o '"videoMs": *[0-9]*' out/todo-demo.take.json | grep -o '[0-9]*$' | head -1)
 node $V/contact-sheet.mjs out/todo-demo.mp4 --at 0s,2.08s,6.64s,11.67s,16.5s,${MS}ms --width 1280 --cols 2 -o review/todo-demo.jpg
 node $V/contact-sheet.mjs out/todo-demo.mp4 --at 0s,${MS}ms --cols 1 --width 1280 -o review/todo-demo-ends.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/review/todo-demo.jpg
-[Read] /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/review/todo-demo-ends.jpg
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/review/todo-demo.jpg
+[Read] ~/tmp/pm-w2v-uat-r2/AC-UAT-11/web2video/todo-demo/review/todo-demo-ends.jpg
 ```
 
 ### Final assistant message (gate question / stop / hand-off)

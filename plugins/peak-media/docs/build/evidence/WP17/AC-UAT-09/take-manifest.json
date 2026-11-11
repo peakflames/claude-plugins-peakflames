@@ -6,13 +6,13 @@
   "audioOffsetMs": -100,
   "command": [
     "node",
-    "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs",
+    "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs",
     "--storyboard",
-    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/storyboard.mjs",
+    "~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/storyboard.mjs",
     "--script",
-    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/script.md",
+    "~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/script.md",
     "--out",
-    "/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/out/rough-app-break.mp4",
+    "~/tmp/pm-w2v-uat/AC-UAT-09/web2video/rough-app-break/out/rough-app-break.mp4",
     "--preset",
     "web"
   ],

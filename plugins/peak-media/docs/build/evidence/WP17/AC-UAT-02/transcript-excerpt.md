@@ -10,18 +10,18 @@ Driver: headless `claude -p` from `~/tmp/pm-w2v-uat/AC-UAT-02/` with `--plugin-d
 
 ```text
 [Skill] {"skill": "peak-media:web2video", "args": "Record a silent tour of ./ui-demo \u2014 no captions, nothing on screen but the app."}
-$ bash "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02 /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02/ui-demo
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02/ui-demo && for f in brief.md script.md storyboard.mjs captions-alt.css index.html; do echo "=== $f"; cat "$f"; done; which playwright-cli; node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --help
-[Read] /Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
-$ mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && playwright-cli open 2>&1 | tail -5; playwright-cli goto "file:///Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02/ui-demo/index.html" 2>&1 | tail -15
+$ bash "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/scripts/setup.sh" --check; echo "exit=$?"; ls -la ~/tmp/pm-w2v-uat/AC-UAT-02 ~/tmp/pm-w2v-uat/AC-UAT-02/ui-demo
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/references/storyboard-api.md
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/presets.md
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-02/ui-demo && for f in brief.md script.md storyboard.mjs captions-alt.css index.html; do echo "=== $f"; cat "$f"; done; which playwright-cli; node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --help
+[Read] ~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/web2video/references/handoff.md
+$ mkdir -p /tmp/w2v-explore && cd /tmp/w2v-explore && playwright-cli open 2>&1 | tail -5; playwright-cli goto "file://~/tmp/pm-w2v-uat/AC-UAT-02/ui-demo/index.html" 2>&1 | tail -15
 $ (python3 -m http.server 8765 --bind 127.0.0.1 --directory ui-demo >/dev/null 2>&1 & echo $! > /tmp/w2v-explore/srv.pid); sleep 1; cd /tmp/w2v-explore && playwright-cli --help 2>&1 | head -60
 $ cd /tmp/w2v-explore && q(){ playwright-cli "$@" 2>&1 | grep -v -e '^[╔║╚]' | tail -8; }; q goto http://127.0.0.1:8765/index.html; q resize 1280 720; q fill '#new' 'Buy milk'; q press Enter; q fill '#new' 'Call the plumber'; q press Enter; q check 'input[aria-label="Buy milk"]'; q click '[data-filter=active]'; q click '[data-filter=done]'; q screenshot --filename=/tmp/w2v-explore/done.png; q click '#clear'; q click '[data-filter=all]'; q screenshot --filename=/tmp/w2v-explore/end.png; q eval '() => document.getElementById("list").innerText + " | " + document.getElementById("count").innerText';  …
 $ nohup python3 -m http.server 8765 --bind 127.0.0.1 --directory ui-demo >/tmp/w2v-explore/srv.log 2>&1 &
 sleep 1.5; curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/index.html; cat /tmp/w2v-explore/srv.log
-$ lsof -nP -iTCP:8765 -sTCP:LISTEN; pkill -f "http.server 8765"; cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02 && (nohup python3 -m http.server 48231 --bind 127.0.0.1 --directory ui-demo >/tmp/w2v-explore/srv.log 2>&1 &) ; sleep 1.5; lsof -nP -iTCP:48231 -sTCP:LISTEN; curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:48231/index.html; curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://localhost:48231/index.html; cat /tmp/w2v-explore/srv.log; env | grep -i proxy
-$ pgrep -fl "http.server" ; which python3; python3 --version 2>&1 | head -2; pkill -f "http.server 48231"; cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02 && (nohup npx --yes http-server --version >/dev/null 2>&1; true); node -e '
+$ lsof -nP -iTCP:8765 -sTCP:LISTEN; pkill -f "http.server 8765"; cd ~/tmp/pm-w2v-uat/AC-UAT-02 && (nohup python3 -m http.server 48231 --bind 127.0.0.1 --directory ui-demo >/tmp/w2v-explore/srv.log 2>&1 &) ; sleep 1.5; lsof -nP -iTCP:48231 -sTCP:LISTEN; curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:48231/index.html; curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://localhost:48231/index.html; cat /tmp/w2v-explore/srv.log; env | grep -i proxy
+$ pgrep -fl "http.server" ; which python3; python3 --version 2>&1 | head -2; pkill -f "http.server 48231"; cd ~/tmp/pm-w2v-uat/AC-UAT-02 && (nohup npx --yes http-server --version >/dev/null 2>&1; true); node -e '
 const http=require("http"),fs=require("fs"),p=require("path");
 const s=http.createServer((q,r)=>{const f=p.join("ui-demo",q.url==="/"?"index.html":q.url.split("?")[0]);fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);r.end();}else{r.writeHead(200,{"content-type":"text/html"});r.end(d);}})});
 s.listen(48232,"127.0.0.1",()=>{http.get("http://127.0.0.1:48232/index.html",x=>{conso …
@@ -34,7 +34,7 @@ curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:48233/index.html
 cd /tmp/w2v-explore && q(){ playwright- …
 [Read] /tmp/w2v-explore/done.png
 $ cat /tmp/w2v-explore/.playwright-cli/console-*.log | head -5; pkill -f "http.server" ; true
-$ P=/Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02/web2video/ui-demo; mkdir -p $P/out $P/review && cd $P && cp ../../ui-demo/script.md script.md && cat > brief.md <<'EOF'
+$ P=~/tmp/pm-w2v-uat/AC-UAT-02/web2video/ui-demo; mkdir -p $P/out $P/review && cd $P && cp ../../ui-demo/script.md script.md && cat > brief.md <<'EOF'
 # To-do demo
 
 - **Runtime:** 20 s target
@@ -114,9 +114,9 @@ Reply with one of:
 ### Tool calls
 
 ```text
-$ cd /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02/web2video/ui-demo && node "/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/ui-demo.mp4 --preset web --no-captions --no-cursor 2>&1 | tail -30
-$ L=/Users/schaveyt/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/ui-demo.mp4 --preset web 2>&1 | tail -8; node $L/contact-sheet.mjs out/ui-demo.mp4 --at 2.6s,7.7s,12.6s,14.6s,17.5s,20.2s --width 1280 --cols 2 -o review/ui-demo.jpg 2>&1 | tail -3; grep -E '"(videoMs|pageErrors|lateMs)"' -A2 out/ui-demo.take.json | head -20
-[Read] /Users/schaveyt/tmp/pm-w2v-uat/AC-UAT-02/web2video/ui-demo/review/ui-demo.jpg
+$ cd ~/tmp/pm-w2v-uat/AC-UAT-02/web2video/ui-demo && node "~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/skills/video-capture/scripts/capture.mjs" --storyboard storyboard.mjs --script script.md --out out/ui-demo.mp4 --preset web --no-captions --no-cursor 2>&1 | tail -30
+$ L=~/github/peakflames/claude-plugins-peakflames/plugins/peak-media/lib/verify; node $L/probe-spec.mjs out/ui-demo.mp4 --preset web 2>&1 | tail -8; node $L/contact-sheet.mjs out/ui-demo.mp4 --at 2.6s,7.7s,12.6s,14.6s,17.5s,20.2s --width 1280 --cols 2 -o review/ui-demo.jpg 2>&1 | tail -3; grep -E '"(videoMs|pageErrors|lateMs)"' -A2 out/ui-demo.take.json | head -20
+[Read] ~/tmp/pm-w2v-uat/AC-UAT-02/web2video/ui-demo/review/ui-demo.jpg
 $ grep -n -i -A4 'pageErrors\|"errors"' out/ui-demo.take.json | head -12; ls -l out/ui-demo.mp4
 ```
 
