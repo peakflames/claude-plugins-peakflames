@@ -1,0 +1,32 @@
+{
+  "run": "B",
+  "title": "deliberate break: E2's requirement contradicts E1's verbatim rule",
+  "queue": [
+    "Lg1Csv7",
+    "Lg2Cat4",
+    "Lg3Sum9",
+    "Lg4Fx2q",
+    "Lg6Cfg3",
+    "Lg5Chr8"
+  ],
+  "settings": {
+    "onPark": "continue",
+    "humanCheck": {
+      "Lg5Chr8": "cp samples/rules.txt rules.txt && node bin/ledger.js import samples/october.csv && node bin/ledger.js categorize && node bin/ledger.js chart --month 2026-10 --out chart.html; rm -f ledger.json rules.txt"
+    }
+  },
+  "baseGreen": true,
+  "files": {},
+  "edits": [
+    {
+      "file": "docs/requirements/02-categorize.feature.md",
+      "find": "The tool shall match rules without regard to letter case or to extra spaces in a description, and shall leave the stored description unchanged",
+      "replace": "The tool shall store every description upper-cased and trimmed of its surrounding spaces when it is imported, so that rules match without regard to letter case"
+    },
+    {
+      "file": "docs/requirements/02-categorize.feature.md",
+      "find": "And the 'description' of that entry should still equal the string \"  safeway   #88 \" exactly, with its lower case, its two leading spaces, its three inner spaces and its one trailing space kept",
+      "replace": "And the 'description' of that entry should equal the string \"SAFEWAY   #88\" exactly, upper-cased and with its surrounding spaces removed"
+    }
+  ]
+}

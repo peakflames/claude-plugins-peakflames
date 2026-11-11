@@ -1,0 +1,103 @@
+{
+  "feature_id": "04",
+  "feature_file": "04-convert.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-04-Cv1Rt3m",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Showing the ledger in another currency from a rates file the user keeps is the fourth goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 1,
+            "paraphrase": "convert prints every transaction with its amount converted."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-04-Rd2Hf6n",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Amounts are whole cents, never fractions, in every output."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 1,
+            "paraphrase": "Converted amounts are rounded to whole cents."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-04-Uk3Cr9p",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "The rates come from a file the user keeps, so a missing currency is the user's to fix and the tool must say so."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 1,
+            "paraphrase": "A currency without a rate is reported with what to do."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-04-Lv4Ft2q",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "When the user asks for it, rates come from an address they configured."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 2,
+            "paraphrase": "With --live the tool fetches the rates from the configured address instead of reading rates.csv."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-04-Lf5Er7r",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "The network is touched only on --live, and a failure there must leave the user a way forward."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 2,
+            "paraphrase": "If the address cannot be reached the tool says so and suggests running without --live."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

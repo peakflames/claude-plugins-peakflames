@@ -1,0 +1,104 @@
+{
+  "feature_id": "02",
+  "feature_file": "02-categorize.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-02-Rc1Ld5a",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Sorting transactions into categories with rules written once is the second goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 1,
+            "paraphrase": "The user writes rules.txt and runs categorize; every transaction gets a category."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-02-Fm2Wn8b",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Simple rules need a simple tie-break the user can predict: the order they wrote them in."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 1,
+            "paraphrase": "Each transaction gets the category of the first rule that matches."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-02-Un3Ct6c",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Every transaction must land somewhere so totals stay complete."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 1,
+            "paraphrase": "Transactions no rule matches are uncategorized."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-02-Ci4Ws7d",
+      "rationale": "Banks vary case and spacing between exports; matching must tolerate that, but the stored text is the user's evidence and is never tidied.",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Rules interpret the description without changing what is stored: the ledger stays a faithful record."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 1,
+            "paraphrase": "Matching ignores how the bank capitalised or spaced the text; the description is left exactly as stored."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-02-Mr5Er9e",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Rules the user writes once must exist before categories can be assigned; the tool says so plainly."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 1,
+            "paraphrase": "Without rules.txt the user is told what is missing and what to do."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

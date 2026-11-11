@@ -1298,15 +1298,15 @@ waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 
 - **Not done here:** Linux / Windows launch stays a P6 item.
 
 **Before P4 (open):** see the owner's recorded look work in one real verify session — a live
-wrapup on a human-check epic, about $1.50 on Opus, owner's go-ahead needed. Also unseen in a
-real session: the skill's plain-language report presentation, and its going straight into the
-report when a run has already ended at the launch check (both added after the owner's real
-skill run). To pick P4 up
-in a new session, say: "Continue the peak-workflow autopilot PoC on
-`feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
-`docs/autopilot-poc-plan.md` §10 P3.5 status note, P4 and §10.5. Build `scripts/autopilot-lab/lab.mjs`
-(`reset`, `evaluate`), the scenarios, expected outcomes and oracle tests. Real `claude` sessions
-only with my go-ahead. Ask before any push."
+wrapup on a human-check epic, about $1.50 on Opus, owner's go-ahead needed. **Ready to run, not
+yet run:** `AUTOPILOT_LIVE=1 node --test plugins/peak-workflow/scripts/autopilot/test/live-look.test.mjs`
+(plan, build and audit on `fake-claude.mjs` with a real working build; the gate decided "Looks
+right"; then one real `/peak-workflow:wrapup-epic` on Opus). It asserts that R8 answered Step 2.0
+from the look, that no other question parked the session, and that the epic merged; its
+diagnostics print every question asked. Its plumbing up to the real session was checked with a
+no-op `claude`. Also unseen in a real session: the skill's plain-language report presentation, and
+its going straight into the report when a run has already ended at the launch check (both added
+after the owner's real skill run) — the owner sees both on Run A's `report`.
 
 ### P4: Real unattended runs (typically overnight) on the seeded `ledger` project
 
@@ -1316,6 +1316,47 @@ Run A, B and C from §10.5. Each run: `node scripts/autopilot-lab/lab.mjs reset 
 compares `report.json` and the repo to the expected outcomes and runs the hidden oracle tests.
 
 **Exit:** all three runs completed unattended, each with an evaluation file.
+
+**Status 2026-11-11: the lab is built; no run has been made.** `node --test
+scripts/autopilot-lab/test/` → 7 tests pass, no model called. What exists and how it differs from
+§10.5:
+
+- **Seed in two layers.** `fixtures/ledger/` stays E1-only, because the driver's 100 tests build
+  on it. `fixtures/ledger-full/` holds E2–E6 (features 02–06, tracing, specs, sidecars, vision,
+  ConOps, `samples/`) and `fixtures/ledger-full.json` three `CLAUDE.md` edits; `reset` copies one
+  over the other. The seed commit has a fixed date, so two resets give the same commit.
+- **Scenario files** hold `queue`, `edits`, `files` and `settings`. `settings` is written to the
+  project's `.claude/peak-workflow/autopilot.json` and committed: `"onPark": "continue"` (E6 must
+  run after an upstream park) and `humanCheck.Lg5Chr8`, which imports `samples/october.csv` and
+  draws the chart. The queue is not forced: `reset` prints the order (E1, E2, E3, E4, E6, E5)
+  for the owner to give at the skill's confirm step.
+- **Run B's patch** rewrites `TOR-02-Ci4Ws7d` to "store every description upper-cased and
+  trimmed when it is imported". **Run C's patch** adds `test/version-format.test.js`, which fails.
+- **Requirement IDs and commands** are fixed in the seed: `categorize`, `summary --month`,
+  `convert --to [--live]` (rates address in `LEDGER_RATES_URL`), `chart --month --out`,
+  `config` (file named by `LEDGERRC`), `--help`. E3's heavy-run TOR is `TOR-03-Pf5Tn8k`, E4's
+  live TOR `TOR-04-Lv4Ft2q`, E5's operator-observed TOR `TOR-05-Ch3Lk2u`; readiness flags the
+  first two (`big data`, `network`).
+- **`evaluate`** judges the workspace's **first** run by default (the unattended one; later runs
+  follow the owner's decisions; `--run-name` picks another), writes `evaluation.json` beside
+  `report.json`, and exits 1 on any difference. `expected/<run>.json` lists, per epic, the
+  outcomes §10.5 accepts and the checks each needs (`existing-tests-unchanged`,
+  `resource-guard-held`, `parked` with the allowed gate kinds and audit categories, `artifact`,
+  `no-verify-session`, `blocked-by`, `ran-after`). It refuses a run a test double made unless
+  `--rehearsal` is passed.
+- **Oracle.** `oracle/<epic>.<name>.test.mjs` are black-box tests of the CLI, run against an
+  export of the clone's integration line for MERGED epics only. A failing file is a false merge
+  for the epic in its name, except `Lg3Sum9.refunds-net.test.mjs`, the weak-requirement case. A
+  defect merged by an earlier epic can also fail a later epic's file: read the output before
+  blaming the epic. `reference/src/index.js` passes every oracle test and exists only to prove
+  they can be met.
+- **Not built:** the §11 stopwatch and per-rule metrics that need a person or the hook logs
+  (gate re-asks, auditor precision). `evaluate` reports counts; P5 fills the table.
+
+To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
+`feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
+`docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
+go-ahead run `test/live-look.test.mjs`, then walk me through Run A. Ask before any push."
 
 ### P5: Evaluate
 

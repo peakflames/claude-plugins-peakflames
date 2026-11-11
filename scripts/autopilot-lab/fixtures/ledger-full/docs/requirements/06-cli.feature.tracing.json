@@ -1,0 +1,103 @@
+{
+  "feature_id": "06",
+  "feature_file": "06-cli.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-06-Hp1Us5w",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "The tool explains itself with --help."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 1,
+            "paraphrase": "--help lists every command with a one-line description."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-06-Hp2Nc8x",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A user who types nothing should be shown how to use the tool."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 1,
+            "paraphrase": "The usage text is what the user needs when they do not know the commands."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-06-Cf3Vd2y",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "The user is told plainly whether their settings file is right."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 2,
+            "paraphrase": "A correct settings file is confirmed."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-06-Cf4Er6z",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "The user is told plainly when their settings file is wrong."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 2,
+            "paraphrase": "Invalid JSON is reported in one line naming the file, the problem and what to do."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-06-Cf5Uk9A",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "The user is told plainly when their settings file is wrong."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 2,
+            "paraphrase": "An unknown key is reported in one line naming the key."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

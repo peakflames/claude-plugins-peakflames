@@ -1,0 +1,6 @@
+# category: /pattern/ — the first rule that matches wins
+groceries: /SAFEWAY/
+coffee: /COFFEE/
+utilities: /CITY POWER/
+transport: /BUS/
+income: /PAYROLL/

@@ -1,0 +1,20 @@
+{
+  "about": "Edits lab.mjs reset applies after copying fixtures/ledger and then fixtures/ledger-full over it. Each find must be present.",
+  "edits": [
+    {
+      "file": "CLAUDE.md",
+      "find": "It replaces a hand-maintained spreadsheet and needs no\nbank password, no account and no network.",
+      "replace": "It replaces a hand-maintained spreadsheet and needs no\nbank password and no account, and it uses the network only when asked for live currency rates."
+    },
+    {
+      "file": "CLAUDE.md",
+      "find": "- No network access, in the tool or in its tests.",
+      "replace": "- No network access in the tests. The tool itself touches the network only for `convert --live`."
+    },
+    {
+      "file": "CLAUDE.md",
+      "find": "- `docs/product-vision-planning/concept-of-operations.md` §3–§4 — the CSV input format and the\n  `ledger.json` shape.",
+      "replace": "- `docs/product-vision-planning/concept-of-operations.md` §3–§4 — the input formats and the\n  `ledger.json` shape.\n- `samples/` — a sample bank export (`october.csv`) and rules file (`rules.txt`) for trying the\n  tool by hand."
+    }
+  ]
+}

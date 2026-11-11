@@ -15,6 +15,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   for the autopilot proof of concept; passes `tor-lifecycle format` and `check`.
 - **`autopilot-lab/spike/` P0 harness.** The stdio host and hook scripts used to answer the
   spike's questions; reference only, replaced by the driver in P1.
+- **`autopilot-lab/lab.mjs reset`.** Builds the seeded six-epic `ledger` project for run A, B or
+  C in a throwaway directory, byte-for-byte the same each time, and prints how to launch it.
+- **`autopilot-lab/lab.mjs evaluate`.** Compares a finished autopilot run with the scenario's
+  expected outcomes, runs the hidden oracle tests on the merged code, and writes `evaluation.json`.
+- **`autopilot-lab/fixtures/ledger-full/` epics E2–E6.** Requirements, specs and sidecars with the
+  planted traps; copied over the E1 seed by `reset`.
+- **`autopilot-lab/oracle/` and `reference/`.** Hidden black-box tests per epic, and a reference
+  `ledger` that passes them; neither is ever copied into a seeded project.
 
 ## [0.1.1] — 2026-11-04
 

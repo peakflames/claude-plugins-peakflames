@@ -1,0 +1,52 @@
+{
+  "run": "C",
+  "runLevel": {
+    "status": "STOPPED",
+    "baseRed": true
+  },
+  "weakAc": [],
+  "epics": {
+    "Lg1Csv7": {
+      "accept": [
+        {
+          "outcome": "NOT STARTED"
+        }
+      ]
+    },
+    "Lg2Cat4": {
+      "accept": [
+        {
+          "outcome": "NOT STARTED"
+        }
+      ]
+    },
+    "Lg3Sum9": {
+      "accept": [
+        {
+          "outcome": "NOT STARTED"
+        }
+      ]
+    },
+    "Lg4Fx2q": {
+      "accept": [
+        {
+          "outcome": "NOT STARTED"
+        }
+      ]
+    },
+    "Lg6Cfg3": {
+      "accept": [
+        {
+          "outcome": "NOT STARTED"
+        }
+      ]
+    },
+    "Lg5Chr8": {
+      "accept": [
+        {
+          "outcome": "NOT STARTED"
+        }
+      ]
+    }
+  }
+}
