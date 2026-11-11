@@ -1,0 +1,9 @@
+# wp17-verifier-1 — independent footer-key scan (AC-UAT-08)
+# crop=310:24:28:682 (footer text line 'Connected · API key: sk-demo-0000-FLAG-ME'), signalstats YMIN per frame; text present => YMIN < 150
+$ ffmpeg -i ~/tmp/pm-w2v-uat-r2/AC-UAT-08/web2video/sticky-header/out/sticky-header.mp4 -vf "crop=310:24:28:682,signalstats,metadata=print:key=lavfi.signalstats.YMIN:file=-" -f null -
+r2 take: frames 598 text-frames 0 minYMIN 225
+$ (same on ~/tmp/pm-w2v-uat/AC-UAT-08/.../sticky-header.mp4, round-1 control)
+r1 take: frames 592 text-frames 1 minYMIN 61
+# Frame 0 (select=eq(n,0)) and last frame (-sseof -0.2, n=597) of the r2 take extracted at 1280x720 and Read by the verifier:
+# both show the Orders table under the fixed blue header; the area below the table is empty, no 'sk-demo-0000-FLAG-ME' text.
+# Round-1 frame 0, same crop, Read by the verifier: shows 'Connected · API key: sk-demo-0000-FLAG-ME' (the control detects the key).

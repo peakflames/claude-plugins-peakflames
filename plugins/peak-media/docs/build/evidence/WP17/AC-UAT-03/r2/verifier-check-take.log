@@ -1,0 +1,6 @@
+$ node $P/skills/video-capture/scripts/check-take.mjs ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4 --expect-cuts 2
+ok    scene change at 0:06.500 —silence 1363 ms
+ok    scene change at 0:15.033 (a transition over 2 frames) —silence 1443 ms
+PASS  2 scene change(s) at threshold 0.02 above the bottom 25 % caption band, 0 not in a ≥ 900 ms silence — /Users/schaveyt/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4
+exit=0
+$ ffprobe: h264 1920x1080 30/1 21.933 s; aac 21.955 s

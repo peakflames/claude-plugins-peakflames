@@ -1,0 +1,6 @@
+$ ffmpeg -i ~/tmp/pm-w2v-uat-r2/AC-UAT-02/web2video/ui-demo/out/ui-demo.mp4 -af volumedetect -vn -f null -
+mean_volume: -91.0 dB
+max_volume: -91.0 dB
+$ grep cursor/mode out/ui-demo.take.json
+"mode": "silent"  "cursor": true
+$ ffprobe: h264 1280x720 30/1 19.033 s; aac 19.033 s
