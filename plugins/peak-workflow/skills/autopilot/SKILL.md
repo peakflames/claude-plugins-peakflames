@@ -53,8 +53,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 ## Step 1: Readiness
 
 1. Run `DRIVER preflight --project "<root>" --json`. It reads files only and changes nothing. It
-   exits 1 when it refuses the run; the JSON is still printed — read it either way. If Node is
-   missing or older than 22, say so and stop.
+   exits 1 when `ok` is false; a refusal in `launch.refuse` alone still exits 0, and the JSON is
+   printed either way — always read it. If Node is
+   missing or older than 22, say so and stop. Whenever this command is run again in this
+   session, use the newest output: `launch.run` and `launch.runDir` name a new run each time.
 
 2. **A run is already going** (`launch.lastRun.status` is `running`): do not offer a new one. Show
    where it is — for each entry of `queue` in `<launch.lastRun.runDir>/state.json`, its label
@@ -74,11 +76,14 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    Do not run the fetch or the merge yourself.
 
    **A test double.** If a refusal says `claudeBin` is not the real `claude`, `<ws>/settings.json`
-   names a stand-in binary. Say so plainly and ask (plain text) whether this run is a rehearsal
+   names a stand-in binary. If that is the only refusal and no epic is runnable, skip the
+   question and go to item 7. In `dry-run` mode, say that sessions would use the stand-in and
+   carry on without asking (a dry run starts nothing). Otherwise say so plainly and ask (plain text) whether this run is a rehearsal
    that should use it. On no: stop — the owner removes `claudeBin` from `<ws>/settings.json`. On
    yes: run the preflight again with `--allow-test-double` added, and in Step 2 item 4 add
    `"allowTestDouble": true` to the run's `config.json`. Never add it unasked: it is per run on
-   purpose, so a rehearsal's stand-in is never inherited by a real run.
+   purpose, so a rehearsal's stand-in is never inherited by a real run. After a yes, the
+   `claudeBin` warning is expected: state it once, in the Step 2 block.
 
 4. **Warnings.** Print every line of `launch.warn`. If it says gates wait for a decision,
    recommend `/peak-workflow:autopilot report` first and ask (plain text) whether to continue
@@ -86,7 +91,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    the clone compare, and the run acts on it by itself: `project-ahead` — the clone is
    fast-forwarded first (decisions on branches parked before that are void, and the table shows
    those epics as starting over); `clone-ahead` — merged work is still waiting to be fetched, and
-   the run builds on top of it (epics merged there show as already Complete).
+   the run builds on top of it (epics merged there show as already Complete); `same` — nothing
+   to do; `no-clone` — the first run, which makes the clone at launch.
 
 5. **Readiness table.** One row per entry of `epics`, in the order given (phase and index order —
    do not re-sort):
@@ -99,8 +105,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    | Why | `reasons`, joined; empty for a plain "runs" and for "already Complete" |
 
    Then mark as **blocked** any runnable epic with a dependency that is neither `complete` nor
-   itself going to run to a merge tonight (a dependency that is skipped, parks, or builds and then
-   parks). The driver will not start it; say which dependency holds it.
+   itself going to run to a merge tonight (a dependency that is skipped, waits for a decision,
+   parks, or builds and then parks). The driver will not start it; say which dependency holds it.
 
 6. **Scope and cost review.** For each epic that will run, look at `scopeFlags`. For every
    requirement listed there, print its Scenario with
@@ -114,19 +120,29 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    flag is a false alarm. If no epic has a flag, print one line: "No requirement in the queue
    asks for network, keys, containers, big data, a long run or another platform."
 
-7. If no epic is runnable, say so and stop. Nothing is launched for an empty queue.
+7. **Nothing runnable.** Before stopping, look at the skipped epics. If any is skipped only
+   because its status is not `Not Started` or because it belongs to someone else (the two
+   reasons Step 2 item 1 allows), list them and ask (plain text) whether the owner wants to
+   queue any of them explicitly; on yes, continue to Step 2 with those. Otherwise say that no
+   epic is runnable and stop: nothing is launched for an empty queue. If `launch.sync.state` is
+   `clone-ahead`, also print the fetch command from the warning — merged work is waiting — and
+   point to `/peak-workflow:autopilot report`.
 
 ## Step 2: Confirm
 
-1. **Proposed queue.** Every epic whose Tonight column is "runs" or "builds, then parks for you",
-   in the order given. Do not shorten it. An epic the owner asks to add although preflight skips
+1. **Proposed queue.** Every epic whose Tonight column is "runs", "builds, then parks for you",
+   "resumes at …" or "starts over", in the order given. Do not shorten it. An epic that "waits
+   for your decision" is not offered: it is decided in `/peak-workflow:autopilot report` first. An epic the owner asks to add although preflight skips
    it is allowed only for two reasons — its status is not `Not Started` (for example, paused by
    `/peak-workflow:pause`), or it belongs to someone else — and goes into `explicit` as well as
-   `queue`. Safety, hardware and no-anchor epics are never added.
+   `queue`. Safety, hardware and no-anchor epics are never added. An epic that resumes or starts
+   over from a decided gate needs no `explicit` entry.
 
 2. **Show the run**, as one block:
 
-   - The queue, numbered, each with its dependencies.
+   - The queue, numbered, each with its dependencies. For an epic with a `gate`, say what
+     happens: "resumes at `<gate.enters>` on its branch — you answered "<gate.answer>"", or
+     "starts over" with the reason from `reasons`.
    - Per-epic limits from `launch.config.budgets`, as a table with minutes, turns, dollars and
      model per row: `plan`, `build`, `audit`, `verify`, then `planFix` and `fix` marked "only if
      the one fix round happens". Each driver test run is capped at `budgets.testRunMin` minutes.
@@ -181,7 +197,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
 1. **`dry-run` mode:** run
    `DRIVER run --project "<root>" --workspace "<launch.workspace>" --queue <id>,<id> --dry-run` with
-   the confirmed queue, and show its output (the queue, each exact session command, the settings
+   the confirmed queue (add `--explicit <id>,<id>` for epics queued explicitly, and
+   `--allow-test-double` never — a dry run starts nothing), and show its output (the queue, each exact session command, the settings
    and the gate policy). It starts no session and writes nothing; a changed budget or end time is
    not saved either. Say that `/peak-workflow:autopilot` launches the real run, and stop.
 
@@ -195,9 +212,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    the driver appends to `autopilot.log` itself, and `>` would truncate what it writes.
 
 3. **Check it started:** wait three seconds, then `cat "<launch.workspace>/lock"` and
-   `tail -n 5 "<launch.runDir>/autopilot.log"`. A `lock` file with a pid means it is running.
+   `tail -n 5 "<launch.runDir>/autopilot.log"`. A `lock` file (JSON with a `pid`) means it is running.
    If there is no lock but the log tail has a `run ended:` line, the run already finished (a
-   short queue, or a red base): say so and point to `/peak-workflow:autopilot report`. If there
+   short queue, or a red base): say so, point to `/peak-workflow:autopilot report`, and stop —
+   skip item 4. If there
    is no lock and no such line, show the log tail — it holds the reason — and stop; do not retry
    blindly.
 
@@ -223,7 +241,9 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    `<run>/state.json`, the stop command, and stop. Gates are decided after the run ends.
 
 3. **Refresh and read.** Run `DRIVER report --workspace "<ws>"`, then read `<run>/report.json`.
-   If the run ended with no report (the driver was killed), this command writes one.
+   If the run ended with no report (the driver was killed), this command writes one. The
+   report's `sync` is how the project and the clone compared when the run started; for how they
+   compare now, use `launch.sync` from item 1.
 
 4. **Present it.** First the first three lines of `<run>/report.md` (when it ran, why it
    stopped, where, what it spent), verbatim. Then three short lists from `report.json`'s `epics`,
@@ -245,13 +265,18 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    a. Show the gate's `label`, `kind`, `why`, and what there is to look at: the `artifacts`
       (paths under `<ws>`; `clone:` means inside `<ws>/clone`); when `tor` is set, that
       requirement's Scenario (`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" --root "<ws>/clone" text <tor>`);
-      the `branch` the work is on; the session's files in `<run>/epics/<epic>/<session>/`; and —
-      for an `audit` gate — that epic's high findings with their evidence. Offer to open any of
+      the `branch` the work is on; the session's files in
+      `<ws>/runs/<gate's run>/epics/<epic>/<session>/` (a gate may come from an earlier run, and
+      step names repeat across runs); and —
+      for an `audit` gate — that epic's high findings with their evidence. If `artifacts` is
+      empty, say so and point to the session's files and the branch. Offer to open any of
       them; reading is fine, changing anything is not.
 
    b. **Ask the gate's own question.** Use `AskUserQuestion` with `question` verbatim and
       `options` verbatim as the option labels, plus one more option, `Decide later`. No
-      "(Recommended)", no reordering, no added options. If the gate has fewer than two options or
+      "(Recommended)", no reordering, no added options. If the question's own text carries a
+      recommendation (a build session's deferral question does), say before asking that it is
+      that session's recommendation, not autopilot's and not yours. If the gate has fewer than two options or
       more than three, do not use `AskUserQuestion`: print the question and its options as a
       numbered list and take the typed answer. A gate with no options (`preflight`) has no answer
       to record — the fix is in the project, and it clears when preflight passes: say what to
@@ -276,21 +301,27 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       otherwise it is void and the epic is planned again from scratch. Then, as the fallback
       only, the gate's `resume` line: the owner may instead continue that epic by hand, in their
       own repository, after fetching the branch (`git fetch "<ws>/clone" <branch>:<branch>`) —
-      in which case they should not queue it for autopilot again.
+      in which case they should not queue it for autopilot again. An answer that tells the
+      session to stop (a deferral gate's "Stop — I'll take it from here") is replayed like any
+      other: the resumed session receives it and stops, and the epic parks or fails again — say
+      so, and that continuing by hand is then the way forward.
 
-6. **Bring the work in.** If any epic merged, print — do not run — the fetch command from the
-   report's "Do this next" list:
+6. **Bring the work in.** Only when `launch.sync.state` from item 1 is `clone-ahead` (when it is
+   `same`, say the merged work is already in `<integration>` and ignore any fetch line in the
+   report's list). Print — do not run:
 
    ```bash
    git fetch "<ws>/clone" <integration>:autopilot/<integration> && git log <integration>..autopilot/<integration>
+   git merge --ff-only autopilot/<integration>
    ```
 
-   and say: review it, then merge `autopilot/<integration>` like any other branch. The private
-   clone is the only copy of that work until it is fetched, so the workspace must not be
-   deleted first. If gates were decided, add: a fast-forward
-   (`git merge --ff-only autopilot/<integration>`) keeps those decisions usable; a merge commit,
-   or any other new commit on `<integration>`, moves the base — the next run then plans those
-   epics again from scratch instead of resuming them.
+   and say: review what the first line lists, then merge it — the second line, or any merge the
+   owner prefers. A resumed epic's history includes a `wip(autopilot)` commit from its park;
+   that is expected. The private clone is the only copy of that work until it is fetched, so the
+   workspace must not be deleted first. If any gate is decided and not yet used (`decided` set,
+   no `decided.used`), add: the fast-forward keeps those decisions usable; a merge commit, or any
+   other new commit on `<integration>`, moves the base — the next run then plans those epics
+   again from scratch instead of resuming them.
 
 7. **Next.** Read `<run>/report.md` again — recording an answer re-rendered it — and print its
    "Do this next" list verbatim (it names epics by ID; that list is the one exception to the
@@ -302,7 +333,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
 ## Step 5: Stop (`/peak-workflow:autopilot stop`)
 
-`DRIVER preflight --project "<root>" --json`; if `launch.lastRun.status` is not `running`, say
+`DRIVER preflight --project "<root>" --json` (ignore `ok` and the refusals here); if `launch.lastRun.status` is not `running`, say
 nothing is running and stop. Otherwise run `DRIVER stop --workspace "<launch.workspace>"`. It
 writes the `STOP` file, waits for the driver to park the epic in flight and write its report,
 removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:autopilot report`.
@@ -313,7 +344,7 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 |---|---|
 | `<project>.autopilot/` | The workspace: one per project, kept between runs. Never inside the project |
 | `settings.json` | The owner's settings for every run (budgets, scope, audit, `claudeBin`). Edited by hand; the driver only creates it |
-| `clone/` | The one private clone, with no remote. Merged epics are on its integration line; parked and failed epics keep their branch |
+| `clone/` | The one private clone, with no remote. Merged epics are on its integration line; parked and failed epics keep their branch. Work left uncommitted at a park is kept as a `wip(autopilot)` commit on that branch, and stays in its history when the epic later merges |
 | `gates/<epic>-<n>.json` | One file per question that needs the owner, from every run |
 | `epics.json` | What a parked or failed epic carries into the next run (its plan, audits, fix round) |
 | `runs/<YYYYMMDD-HHMMSS>/` | One directory per run; `current` names the latest |

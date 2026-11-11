@@ -1216,12 +1216,63 @@ above with the owner's go-ahead.
 `/peak-workflow:autopilot report`; the next run finishes every one of them to MERGED or FAILED on
 the branch the first run left, with no session of the first run repeated; the suite is green.
 
-**To pick this up in a new session**, say: "Continue the peak-workflow autopilot PoC on
+**Status: done 2026-11-11 — exit met against `fake-claude.mjs`.** Suite: 97 tests, 87 pass, 10
+live skipped (`test/resume.test.mjs` has one test per row of the Part 2 table, the void and
+waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 table). §6.2, §6.3,
+§6.8 and §9 are updated. Deviations and additions:
+
+- **Layout.** `current` is a one-line file, not a symlink. The skill writes the new run's
+  `config.json` at `launch.runDir` and launches with `--run <launch.run>`; the driver creates
+  `settings.json` once (holding only `project`) and never rewrites it. `--state` stays as an
+  alias of `--workspace`. Sessions also get `AUTOPILOT_RUN`. Report and gate paths are relative
+  to the workspace.
+- **Test double.** The driver refuses it as well as `launchFacts`; `--allow-test-double` exists
+  on `preflight` and `run`, and the choice is saved in that run's `config.json` only.
+- **Unfinished run.** A new run is refused while the latest one is unfinished (the driver was
+  killed); `--resume` continues it. `STOP` is removed once a run has honoured it.
+- **Validity is judged once, at run start** (after the sync), for every queued epic — otherwise
+  the first merge of a run would void every other decision. The strict rule has two consequences
+  worth knowing before Run A: an epic that parks and is followed by a merge **in the same run**
+  has a void decision next time (its branch no longer starts from the integration tip); and
+  bringing merged work into the project with a merge commit (`--no-ff`) instead of a
+  fast-forward moves the base and voids every open decision. The "rebases cleanly" rule the
+  section names as the alternative is not built.
+- **Undecided and gate-less parks.** An epic whose latest gate is undecided is skipped
+  ("waiting for your decision"), never rebuilt. A parked or failed epic with no decidable gate
+  (CHECK_BUILD still failing after the fix round, a failed merge gate, a verify FAIL after the
+  fix round) starts over when queued again, its branch set aside under
+  `refs/autopilot/superseded/`.
+- **Re-entry details.** A question asked in a build session re-enters at BUILD with the first
+  run's captured plan (no new planning session). `Real — fix before verify` or
+  `Not right — describe` on an epic whose fix round is used ends it FAILED. The `resume` gate is
+  also written for a run-level stop between steps (end time, run budget). Per-epic state is in
+  `<workspace>/epics.json`.
+- **Human-check artifact.** The command is `settings.json` `humanCheck["<epic>"]` /
+  `humanCheck["*"]`, else the `**Run:**` line of `CLAUDE.md` with `<placeholders>` dropped,
+  capped at two minutes, run by the driver on the branch outside the sandbox (as the test command
+  is). For the ledger's E5 the bare run command shows little: Run A should set
+  `humanCheck.Lg5Chr8` to the chart command.
+- **The owner's look.** R8 answers wrapup's Step 2.0 question "Yes" and passes the look as the
+  `AskUserQuestion` `annotations` note, because the skill's follow-up is free text that no hook
+  can answer. **Not yet seen in a real session.**
+- **Sync.** Readiness classifies the case without fetching and, when the clone is ahead, reads
+  sidecars from the clone's integration line so merged epics show as Complete.
+- **Scope flags** no longer match bare `server`, `account` or `token`.
+- **Skill simulation:** two passes by sub-agents that executed SKILL.md against `fake-claude.mjs`
+  on a `git init` copy of the seed (park, decision, a second run that resumed at BUILD, the
+  owner's fetch). Pass 1 had two Critical findings — readiness dead-ended when the only epic
+  was skipped for ownership, and the dry run ignored `explicit` and the clone — both fixed
+  (`--explicit`, a clone-aware dry run). Pass 2 had no Critical finding; its UX findings are
+  fixed in SKILL.md except one: `report.md` still lists the fetch command after the work is in.
+- **Not done here:** the P2 live smoke re-run and the live auditor test (owner's go-ahead), and
+  the owner's real skill run. Linux / Windows launch stays a P6 item.
+
+**Before P4:** the owner's real skill run and the live re-runs in the table above. To pick P4 up
+in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
-`docs/autopilot-poc-plan.md` §10 P3 status note and P3.5, then the files in P3.5's table. Build
-P3.5 parts 1, 2, 3 in that order, one commit per part with the suite green, CHANGELOG bullets
-under 3.1.0 in the same commits. Real `claude` sessions only where P3.5 says, and ask first. Do
-not start P4. Ask before any push."
+`docs/autopilot-poc-plan.md` §10 P3.5 status note, P4 and §10.5. Build `scripts/autopilot-lab/lab.mjs`
+(`reset`, `evaluate`), the scenarios, expected outcomes and oracle tests. Real `claude` sessions
+only with my go-ahead. Ask before any push."
 
 ### P4: Real unattended runs (typically overnight) on the seeded `ledger` project
 

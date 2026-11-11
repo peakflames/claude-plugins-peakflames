@@ -53,6 +53,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Sync with the project** — each run first fetches the project's integration line into the
   clone: fast-forwards when the project is ahead, builds on top when the clone is, and refuses a
   diverged project with both tips printed.
+- **Scope-flag keywords** — bare `server`, `account` and `token` no longer flag a requirement;
+  the flags stay advisory word matches for the readiness review.
 - **Human-check artifact** — a human-check gate lists the build's manual test files and the output
   of the project's run command, or says plainly that nothing could be produced.
 - **Autopilot workspace** — one long-lived `<project>.autopilot/` per project holds

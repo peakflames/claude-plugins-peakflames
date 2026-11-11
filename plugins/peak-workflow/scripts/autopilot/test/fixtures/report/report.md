@@ -107,7 +107,7 @@ Plan: `runs/20261112-220500/epics/Lg5Chr8/plan-1/plan.md` — approved by lint, 
 Auditor audit-1 (the whole epic diff): recommends proceed — Nothing found. (`runs/20261112-220500/epics/Lg5Chr8/audit-1/audit.json`)
 
 Gates:
-- `gates/Lg5Chr8-1.json` (human-check) — TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify — decided "Looks right" by Todd Schavey on 2026-11-13 — resumes the epic in the next run
+- `gates/Lg5Chr8-1.json` (human-check) — TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify — decided "Looks right" by Todd Schavey on 2026-11-13 — resumes the epic in the next run at VERIFY
   By hand instead: open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8
 
 ### Lg3Sum9 (monthly-summary) — Monthly summary — FAILED

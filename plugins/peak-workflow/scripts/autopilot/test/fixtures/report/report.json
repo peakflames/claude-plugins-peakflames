@@ -856,7 +856,8 @@
       "void": null,
       "superseded": false,
       "cleared": false,
-      "effect": "resume"
+      "effect": "resume",
+      "enters": null
     },
     {
       "file": "gates/Lg5Chr8-1.json",
@@ -888,7 +889,8 @@
       "void": null,
       "superseded": false,
       "cleared": false,
-      "effect": "resume"
+      "effect": "resume",
+      "enters": "VERIFY"
     },
     {
       "file": "gates/Lg6Bud2-1.json",
@@ -916,7 +918,8 @@
       "void": null,
       "superseded": false,
       "cleared": false,
-      "effect": "resume"
+      "effect": "resume",
+      "enters": null
     }
   ],
   "referee": {

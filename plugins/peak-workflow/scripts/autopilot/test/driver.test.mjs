@@ -5,7 +5,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, lintPlan, run, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, lintPlan, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -350,6 +350,18 @@ test('dry run prints the queue, commands, settings and policy, and invokes and w
   assert.match(seed.stdout, /1\. Lg1Csv7 \(csv-import\) — CSV import/);
   assert.ok(seed.stdout.includes('$ claude -p --input-format stream-json'));
   assert.ok(!fs.existsSync(path.join(p.tmp, 'none')));
+});
+
+test('scope flags are advisory word matches: they name the need, and bare "account" or "server" no longer trip them', () => {
+  // Noisy before P3.5: the ledger's own vocabulary.
+  assert.deepEqual(scopeFlags('Given a CSV export of the bank account\nThen the summary lists each account once'), []);
+  assert.deepEqual(scopeFlags('Given the tool runs with no server and no network access needed'), []);
+  assert.deepEqual(scopeFlags('Then each token of the description is matched case-insensitively'), []);
+  // Still flagged.
+  assert.deepEqual(scopeFlags('Given the rates server at https://rates.example.com is online'), ['network']);
+  assert.deepEqual(scopeFlags('When the tool fetches live rates from the remote server'), ['network']);
+  assert.deepEqual(scopeFlags('Given the user has set an API key and signs in with their user account'), ['keys or accounts']);
+  assert.deepEqual(scopeFlags('Given a ledger of 2,000,000 transactions\nWhen the summary runs in a docker container on Windows for 3 hours'), ['containers or other machines', 'big data', 'long run', 'other platforms']);
 });
 
 test('owner decision: git remote writes are denied, the read-only listing is not', () => {

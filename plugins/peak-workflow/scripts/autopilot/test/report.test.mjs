@@ -88,7 +88,7 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   assert.equal(decided.scope, 'next-run');
   const md = fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8');
   assert.match(md, /Decide 1 parked gate: `\/peak-workflow:autopilot report` \(Lg6Bud2\)/);
-  assert.match(md, /decided "Real — fix before verify" by Pat Owner on \d{4}-\d{2}-\d{2} — resumes the epic in the next run\n {2}Look at: .*\n {2}By hand instead: /);
+  assert.match(md, /decided "Real — fix before verify" by Pat Owner on \d{4}-\d{2}-\d{2} — resumes the epic in the next run at FIX_PLAN\n {2}Look at: .*\n {2}By hand instead: /);
   assert.match(md, /2 decided gates \(Lg4Fx2q, Lg5Chr8\) resume their epics on the branch this run left/);
 
   // A gate with no options has no answer to record.

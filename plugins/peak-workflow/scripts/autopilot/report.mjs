@@ -3,6 +3,7 @@
 // Both are pure with respect to the run: they read files and never touch the clone.
 import fs from 'node:fs';
 import path from 'node:path';
+import { gateEntry } from './lib.mjs';
 
 const TERMINAL = new Set(['MERGED', 'PARKED', 'FAILED', 'SKIPPED', 'BLOCKED']);
 const RULES = {
@@ -48,6 +49,8 @@ export function collectReport(runDir) {
       run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, void: g.void ?? null, superseded: !!g.superseded, cleared: !!g.cleared,
       // Every gate with options resumes its epic in the next run once decided; `resume` is the by-hand fallback.
       effect: (g.options ?? []).length ? 'resume' : 'none',
+      // Where a decided gate re-enters its epic in the next run (null until decided, or when it cannot).
+      enters: g.decided && !g.decided.used ? (gateEntry(g)?.fresh ? 'PLAN (from scratch, on a fresh branch)' : gateEntry(g)?.phase ?? null) : null,
     }));
 
   const blocked = []; const setups = []; let gatesAnswered = 0; let ownerAnswers = 0;
@@ -201,7 +204,7 @@ export function renderReport(r) {
       L.push('', 'Gates:');
       for (const g of mine) {
         const fate = g.void ? ` — VOID: ${g.void.why}` : g.decided?.used ? ` (used by run ${g.decided.used.run ?? '?'})` : g.superseded ? ' (superseded: the epic started over)' : g.cleared ? ' (cleared)' : g.decided ? ' — resumes the epic in the next run' : '';
-        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${fate}` : g.effect === 'none' ? `nothing to answer: fix it in the project${fate}` : `NOT DECIDED${fate}`;
+        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${fate}${g.enters && !g.void ? ` at ${g.enters}` : ''}` : g.effect === 'none' ? `nothing to answer: fix it in the project${fate}` : `NOT DECIDED${fate}`;
         L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.question)} — ${d}`);
         if (g.options.length && !g.decided) L.push(`  Options: ${g.options.map((o) => `"${o}"`).join(', ')}`);
         if (g.artifacts.length) L.push(`  Look at: ${g.artifacts.map((a) => `\`${a}\``).join(', ')}`);

@@ -36,3 +36,33 @@ export function lintPlan(plan, anchors) {
   for (const [name, re] of banned) if (re.test(plan)) problems.push(`contains ${name}`);
   return { pass: problems.length === 0, problems, anchors, checkedAt: new Date().toISOString() };
 }
+
+// ---- gates: the owner's answers and where each re-enters an epic (plan P3.5 Part 2) -----------
+
+export const ANSWERS = {
+  auditReal: 'Real — fix before verify', auditNotReal: 'Not real — verify as built',
+  looksRight: 'Looks right', notRight: 'Not right — describe',
+  approvePlan: 'Approve this plan', replan: 'Re-plan',
+  resume: 'Resume from where it stopped', startOver: 'Start over',
+};
+const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_PLAN', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
+const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
+
+/**
+ * Where a decided gate re-enters the epic (the Part 2 table). Returns `{phase}` plus what that
+ * phase needs, `{fresh: true}` for a start from scratch, or null when the gate cannot be resumed.
+ */
+export function gateEntry(g) {
+  const a = g.decided?.answer; const asked = stepKind(g.session);
+  if (!a) return null;
+  if (g.kind === 'preflight') return null; // the fix is in the project; it clears when preflight passes
+  if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
+  if (g.kind === 'audit') return a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_PLAN', fix: 'audit' } : null;
+  if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_PLAN', fix: 'look' } : null;
+  if (g.kind === 'plan-lint') {
+    const fix = asked === 'plan-fix';
+    return a === ANSWERS.approvePlan ? { phase: fix ? 'FIX_BUILD' : 'BUILD', approve: true } : a === ANSWERS.replan ? { phase: fix ? 'FIX_PLAN' : 'PLAN' } : null;
+  }
+  // A question a session asked: the same kind of session again; hook R8 answers that one question once.
+  return STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
+}

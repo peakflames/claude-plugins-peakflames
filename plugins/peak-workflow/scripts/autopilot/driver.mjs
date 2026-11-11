@@ -22,10 +22,10 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { lintPlan, parseSidecar } from './lib.mjs';
+import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
-export { lintPlan, parseSidecar };
+export { ANSWERS, gateEntry, lintPlan, parseSidecar };
 
 export const DRIVER_VERSION = '0.3.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -273,11 +273,12 @@ function readRequirements(root) {
 /**
  * AC scope and cost review, the deterministic half (guardrail G12): words in a requirement's
  * Scenario that suggest it needs something an unattended run does not have or should not spend.
- * The skill writes the judgement; this only points.
+ * The skill writes the judgement; this only points. Advisory, and kept to words that name the
+ * need itself: bare `server` and `account` matched too much (a "bank account", a "local server").
  */
 const SCOPE_FLAGS = [
-  ['network', /\b(https?:\/\/|url|api\b|download|upload|online|internet|server|endpoint|webhook|e-?mail|smtp|live (rate|price|data))/i],
-  ['keys or accounts', /\b(api key|token|credential|password|secret|sign[- ]?in|log[- ]?in|oauth|account)\b/i],
+  ['network', /(https?:\/\/|\b(url|download|upload|online|internet|endpoint|webhook|e-?mail|smtp|remote (server|api|service)|rest api|live (rate|price|data))\b)/i],
+  ['keys or accounts', /\b(api key|access token|credentials?|password|secret key|sign[- ]?in|log[- ]?in|oauth|user account|account (id|key|name))\b/i],
   ['containers or other machines', /\b(docker|container|kubernetes|virtual machine|\bvm\b|ssh|remote host)\b/i],
   ['big data', /\b(\d[\d,.]*\s*(gb|tb|mb|million|billion)|\d{1,3}(,\d{3}){2,}|[1-9]\d{5,}\s+(rows|records|files|lines|entries|transactions))\b/i],
   ['long run', /\b(\d+\s*(hours?|hrs?|days?)|\d{2,}\s*minutes|overnight|soak|endurance)\b/i],
@@ -287,15 +288,6 @@ export const scopeFlags = (text) => SCOPE_FLAGS.filter(([, re]) => re.test(text)
 
 // ---- gates across runs (plan P3.5 Part 2) ------------------------------------------------------
 
-export const ANSWERS = {
-  auditReal: 'Real — fix before verify', auditNotReal: 'Not real — verify as built',
-  looksRight: 'Looks right', notRight: 'Not right — describe',
-  approvePlan: 'Approve this plan', replan: 'Re-plan',
-  resume: 'Resume from where it stopped', startOver: 'Start over',
-};
-const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_PLAN', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
-const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
-
 /** Every gate file of the workspace, oldest first: `{file, …gate}`. */
 export function readGates(workspace) {
   const dir = path.join(workspace, 'gates');
@@ -304,25 +296,6 @@ export function readGates(workspace) {
 }
 /** A gate that still matters: not used, not void, not superseded by a fresh start, not a cleared preflight note. */
 export const gateLive = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
-
-/**
- * Where a decided gate re-enters the epic (the Part 2 table). Returns `{phase}` plus what that
- * phase needs, `{fresh: true}` for a start from scratch, or null when the gate cannot be resumed.
- */
-export function gateEntry(g) {
-  const a = g.decided?.answer; const asked = stepKind(g.session);
-  if (!a) return null;
-  if (g.kind === 'preflight') return null; // the fix is in the project; it clears when preflight passes
-  if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
-  if (g.kind === 'audit') return a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_PLAN', fix: 'audit' } : null;
-  if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_PLAN', fix: 'look' } : null;
-  if (g.kind === 'plan-lint') {
-    const fix = asked === 'plan-fix';
-    return a === ANSWERS.approvePlan ? { phase: fix ? 'FIX_BUILD' : 'BUILD', approve: true } : a === ANSWERS.replan ? { phase: fix ? 'FIX_PLAN' : 'PLAN' } : null;
-  }
-  // A question a session asked: the same kind of session again; hook R8 answers that one question once.
-  return STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
-}
 
 /**
  * Per epic, what its latest live gate means for the next run. A decision is valid only while the
@@ -422,7 +395,7 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
     if (!e.anchors.length) set('skip', 'no Requirements Anchors');
     if (embedded) set('skip', 'hardware project: never unattended');
     for (const who of [e.owner, e.plannedBy]) {
-      if (me && who && who !== '—' && who.toLowerCase() !== me && !explicit.has(e.id)) { set('skip', `belongs to ${who}; queue it explicitly to take it`); break; }
+      if (me && who && who !== '—' && who.toLowerCase() !== me && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) { set('skip', `belongs to ${who}; queue it explicitly to take it`); break; }
     }
     for (const tor of e.anchors) {
       const r = reqs[tor]; const s = states[tor];
@@ -561,7 +534,12 @@ export function buildPrompt(plan, pluginDir = PLUGIN_DIR) {
 export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out = console.log }) {
   const stateDir = workspace; const runDir = runDirOf(workspace, '<run>');
   const integration = detectIntegration(project);
-  const pre = preflight(project, config, { pluginDir, gates: gateFacts(workspace, integration) });
+  // The same view readiness has: the tip the run will fast-forward to, or the clone's sidecars when it is ahead.
+  const sync = syncFacts(project, workspace, integration);
+  const pre = preflight(project, config, {
+    pluginDir, gates: gateFacts(workspace, integration, { integrationTip: sync.state === 'project-ahead' ? sync.projectTip : null }),
+    sidecarText: sync.state === 'clone-ahead' ? (rel) => gitShow(path.join(workspace, 'clone'), integration, rel) : null,
+  });
   const queue = buildQueue(pre, config);
   const version = readJson(path.join(pluginDir, '.claude-plugin', 'plugin.json')).version;
   const p = (s = '') => out(s);
@@ -570,6 +548,8 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   p(`Workspace:        ${stateDir} (this run: ${runDir})`);
   p(`Plugin:           ${pluginDir} (peak-workflow ${version}, driver ${DRIVER_VERSION})`);
   p(`Integration line: ${integration ?? 'develop (assumed: the project is not the root of a git repository with a develop, main or master branch)'} in ${path.join(stateDir, 'clone')} — never pushed`);
+  p(`Sessions:         ${config.claudeBin === 'claude' ? 'claude (real Claude Code sessions)' : `${config.claudeBin} — A TEST DOUBLE, not Claude Code: a rehearsal`}`);
+  if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
@@ -1635,12 +1615,13 @@ export function decideGate(workspace, gateName, answer, { by, note } = {}) {
 }
 
 /** Programmatic entry point (the CLI and the tests both use it). `stateDir` is an alias of `workspace`. */
-export async function run({ project, workspace, stateDir, run: runName, queue, resume = false, claudeBin, allowTestDouble, pluginDir = PLUGIN_DIR, verbose = false, dryRun: dry = false, out }) {
+export async function run({ project, workspace, stateDir, run: runName, queue, explicit, resume = false, claudeBin, allowTestDouble, pluginDir = PLUGIN_DIR, verbose = false, dryRun: dry = false, out }) {
   const root = project ? path.resolve(project) : null;
   if (!root && !(workspace ?? stateDir)) throw new Error('run needs a project or a workspace');
   const ws = path.resolve(workspace ?? stateDir ?? `${root}.autopilot`);
   const overrides = {};
   if (queue) overrides.queue = queue;
+  if (explicit) overrides.explicit = explicit;
   if (claudeBin) overrides.claudeBin = claudeBin;
   if (allowTestDouble) overrides.allowTestDouble = true;
   const name = resume ? runName ?? currentRun(ws) : runName ?? newRunName(ws);
@@ -1669,7 +1650,7 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
   const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
@@ -1692,7 +1673,7 @@ async function main(argv) {
   }
   if (cmd === 'run') {
     if (!o.project && !wsArg) throw new Error('run needs --project or --workspace');
-    const result = await run({ project: o.project, workspace: wsArg, run: o.run, queue: o.queue ? o.queue.split(',').filter(Boolean) : undefined, resume: !!o.resume, claudeBin: o.claudeBin, allowTestDouble: !!o.allowTestDouble, verbose: !!o.verbose || process.stdout.isTTY, dryRun: !!o.dryRun });
+    const result = await run({ project: o.project, workspace: wsArg, run: o.run, queue: o.queue ? o.queue.split(',').filter(Boolean) : undefined, explicit: o.explicit ? o.explicit.split(',').filter(Boolean) : undefined, resume: !!o.resume, claudeBin: o.claudeBin, allowTestDouble: !!o.allowTestDouble, verbose: !!o.verbose || process.stdout.isTTY, dryRun: !!o.dryRun });
     return o.dryRun ? (result.pre.ok ? 0 : 1) : 0;
   }
   if (!wsArg && ['stop', 'report', 'decide'].includes(cmd)) throw new Error(`${cmd} needs --workspace`);
