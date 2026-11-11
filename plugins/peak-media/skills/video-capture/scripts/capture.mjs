@@ -147,18 +147,24 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8' };
 
-/** Serve `root` on 127.0.0.1 (loopback only). Resolves to {url, close}. */
-export function serveDir(root) {
+/** Serve `root` on 127.0.0.1 (loopback only; port 0 = any free port). Resolves to {url, port, close}. */
+export function serveDir(root, { port = 0 } = {}) {
   const server = createServer((req, res) => {
-    const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-    const file = path.resolve(root, '.' + rel);
-    if (!file.startsWith(path.resolve(root)) || !existsSync(file) || statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
+    let rel;
+    try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400); res.end('bad request'); return; }
+    let file = path.resolve(root, '.' + rel);
+    if (existsSync(file) && statSync(file).isDirectory()) file = path.join(file, 'index.html'); // a folder serves its index.html
+    if (!file.startsWith(path.resolve(root) + path.sep) || !existsSync(file) || statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, { 'content-type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' });
     createReadStream(file).pipe(res);
   });
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => resolve({ url: `http://127.0.0.1:${server.address().port}/`, close: () => new Promise((r) => server.close(r)) }));
+    server.listen(port, '127.0.0.1', () => resolve({
+      url: `http://127.0.0.1:${server.address().port}/`, port: server.address().port,
+      // a browser keeps idle connections open; drop them so close() returns at once
+      close: () => new Promise((r) => { server.close(r); server.closeAllConnections?.(); }),
+    }));
   });
 }
 
@@ -185,7 +191,36 @@ async function loadStoryboard(file) {
   }
   const fn = mod.default ?? mod.storyboard;
   if (typeof fn !== 'function') throw new CliError(`storyboard ${file} must export a default async function (${STORYBOARD_CONTEXT}) => { … }`);
-  return { fn, url: mod.url };
+  const hide = mod.hide ?? [];
+  if (!Array.isArray(hide) || hide.some((s) => typeof s !== 'string' || !s.trim())) {
+    throw new CliError(`storyboard ${file}: export const hide must be an array of CSS selectors, e.g. export const hide = ['#api-key', 'footer']`);
+  }
+  if (mod.setup !== undefined && typeof mod.setup !== 'function') {
+    throw new CliError(`storyboard ${file}: export setup must be an async function ({ page, context, viewport, mode, fps }) => { … }`);
+  }
+  return { fn, url: mod.url, hide: hide.map((s) => s.trim()), setup: mod.setup ?? null };
+}
+
+/** How long the storyboard's setup() may take before the take stops. */
+export const SETUP_TIMEOUT_MS = 60_000;
+
+/** CSS that hides each selector (and everything inside it) for the whole take. */
+export const hideCss = (selectors) => selectors.map((s) => `${s}, ${s} * { visibility: hidden !important; }`).join('\n');
+
+/**
+ * Init script (context.addInitScript) for `export const hide`: adds the hiding style sheet to every
+ * document as it is created, before the page's own scripts and before its first paint, so a hidden
+ * element is never in a frame — not frame 0, and not after a goto().
+ */
+function hideInit(css) {
+  const add = () => {
+    if (document.getElementById('pm-hide')) return true;
+    const root = document.head || document.documentElement;
+    if (!root) return false;
+    const st = document.createElement('style'); st.id = 'pm-hide'; st.textContent = css; root.appendChild(st);
+    return true;
+  };
+  if (!add()) new MutationObserver((_, o) => { if (add()) o.disconnect(); }).observe(document, { childList: true, subtree: true });
 }
 
 async function readSpine(file) {
@@ -457,6 +492,7 @@ export function takeManifest(plan, take, { command, manifestFile, placed = [] })
     mode: take.mode, storyboard: rel(take.storyboard), script: rel(take.script), url: take.url, plate: take.plate, fps: take.fps, width: take.width, height: take.height,
     frames: take.frames, out: rel(take.out), preset: take.preset, captionEngine: take.captionEngine, cursor: !!take.cursor,
     signedIn: !!take.signedIn, sizeBytes: take.sizeBytes,
+    ...(take.hide?.length && { hide: take.hide }), ...(take.setup && { setup: true }),
     ...(take.audio && { audio: take.audio }),
     beats: take.beats.map((b) => ({ n: b.n, id: b.id, text: b.text, startMs: b.startMs, durationMs: b.durationMs, endMs: b.startMs + b.durationMs, lateMs: b.lateMs ?? 0, caption: b.caption,
       ...(b.plannedMs !== undefined && { plannedMs: b.plannedMs }), ...(b.clipNs?.length && { clipNs: b.clipNs }) })),
@@ -745,6 +781,9 @@ export async function capture(plan) {
     // --headed (DEC-49, U5): Playwright's own Chromium in a visible window; same screencast, same grid
     browser = await chromium.launch({ executablePath: plan.headed ?? plan.chrome, headless: !plan.headed });
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1, ...(plan.storageState && { storageState: plan.storageState }) });
+    // storyboard `hide` (privacy): in place before the first navigation, so it holds from frame 0
+    // and across every goto()
+    if (plan.sb.hide.length) await context.addInitScript(hideInit, hideCss(plan.sb.hide));
     const page = await context.newPage();
     // uncaught page errors (plan §4.8): from the first load to the end of the take
     const pageErrors = [];
@@ -766,6 +805,28 @@ export async function capture(plan) {
     if (res && res.status() >= 400) throw new CliError(`${url} answered HTTP ${res.status()} — check the URL (live pages move); nothing was captured`);
     // live sites keep laying out after 'load' (lazy diagrams, fonts); let them settle, briefly
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+
+    if (plan.sb.hide.length) {
+      const counts = await page.evaluate((sels) => sels.map((s) => { try { return document.querySelectorAll(s).length; } catch { return -1; } }), plan.sb.hide);
+      const bad = plan.sb.hide.filter((_, i) => counts[i] < 0);
+      if (bad.length) throw new CliError(`hide: ${bad.map((s) => `'${s}'`).join(', ')} ${bad.length > 1 ? 'are not valid CSS selectors' : 'is not a valid CSS selector'} — fix export const hide in ${path.basename(plan.storyboard)}`);
+      const none = plan.sb.hide.filter((_, i) => counts[i] === 0);
+      if (none.length) log(`hide: ${none.map((s) => `'${s}'`).join(', ')} match${none.length > 1 ? '' : 'es'} nothing on the first page (still applied after a navigation) — check the selector`);
+    }
+    // storyboard setup(): runs on the loaded page before t0; nothing it does is captured
+    if (plan.sb.setup) {
+      let setupTimer;
+      try {
+        await Promise.race([
+          plan.sb.setup({ page, context, viewport, mode, fps }),
+          new Promise((_, rej) => { setupTimer = setTimeout(() => rej(new CliError(`storyboard setup() still running after ${SETUP_TIMEOUT_MS / 1000} s — aborted before recording`)), SETUP_TIMEOUT_MS); }),
+        ]);
+      } catch (e) {
+        if (e instanceof CliError) throw e;
+        throw new CliError(`storyboard setup failed: ${String(e?.message ?? e).split('\n')[0]} — nothing was recorded`);
+      } finally { clearTimeout(setupTimer); }
+      await page.waitForLoadState('load').catch(() => {});
+    }
 
     const engine = captionEngine(page, captionCss, plan.captionEngine);
     await warmUp(page, engine, captions, plan.cursor);
@@ -1027,6 +1088,7 @@ export async function capture(plan) {
       captionTimings, beats: records, pointer,
       audio: audio && { clips: audio.clips, lufs: Number.isFinite(audio.lufs) ? audio.lufs : null },
       headed: !!plan.headed, signedIn: !!plan.storageState, sizeBytes, pageErrors: [...pageErrors],
+      hide: [...plan.sb.hide], setup: !!plan.sb.setup,
     };
     const doc = takeManifest(plan, take, { command: commandFor(plan.values), manifestFile: plan.manifest, placed });
     mkdirSync(path.dirname(plan.manifest), { recursive: true });
@@ -1042,7 +1104,7 @@ export async function capture(plan) {
 export const spec = {
   name: 'capture',
   summary: 'play a live page in real time, drive it with a storyboard, and screen-capture it',
-  usage: 'capture --storyboard <file.mjs> (--script script.md | --spine manifest.json) --out <take.mp4> [--preset web|youtube|hifi] [options]   |   capture --plates plates.json --plate <id>   |   capture signin <url> (see capture signin --help)',
+  usage: 'capture --storyboard <file.mjs> (--script script.md | --spine manifest.json) --out <take.mp4> [--preset web|youtube|hifi] [options]   |   capture --plates plates.json --plate <id>   |   capture signin <url> (see capture signin --help)   |   capture serve <dir> [--port n] (see capture serve --help)',
   description: `
 The storyboard runs one beat(id, fn?) per beat, in order. The beats come from exactly one of
 --script (script.md: "## <id>" sections), --spine (a spine manifest's beats) or --plates/--plate
@@ -1056,7 +1118,10 @@ silent (--no-captions), narrated (a narration spine). A visible cursor (--no-cur
 glides to the target of click, type and point, and to the scroll container of scrollTo and
 scrollBy (scrolling the page shows it where it is); goto keeps it in place across the navigation.
 The page is --url, else the plate's live.url, else the storyboard's exported \`url\`, else an
-index.html next to the storyboard; local files are served on 127.0.0.1. Pre-flight (Chromium,
+index.html next to the storyboard; local files are served on 127.0.0.1. Privacy: a storyboard's
+\`export const hide = ['#api-key', …]\` hides those elements from before the first frame and across
+every goto(); \`export async function setup({ page, context })\` runs on the loaded page before t0
+(nothing it does is captured). Pre-flight (Chromium,
 ffmpeg, the pinned Playwright, a valid --script/--spine, the spine clips' audio) runs before any
 browser opens. Captions are a neutral bottom-centre bar; --caption-css restyles them.
 --out is the MP4 deliverable with audio, encoded to --preset (default web): a narrated take gets
@@ -1106,6 +1171,7 @@ with check-take.mjs. Storyboard API: references/storyboard-api.md.`,
     'capture --storyboard examples/deck/storyboard.mjs --spine spine/manifest.json --out /tmp/deck.mp4',
     'capture --plates plates.json --plate r1-feature',
     'capture signin https://app.example.test',
+    'capture serve ./site   (serve a local folder on 127.0.0.1 for exploring; see capture serve --help)',
     'capture --storyboard storyboard.mjs --script script.md --out out/tour.mp4 --storage-state ~/.cache/peak-media/auth/app.example.test.json',
   ],
 };
@@ -1225,10 +1291,53 @@ and the exit is non-zero. Then record signed in with: capture … --storage-stat
   examples: ['capture signin http://127.0.0.1:4173', 'capture signin https://app.example.test --timeout 10m'],
 };
 
+// ---- capture serve <dir> (WP17 D1): the take's own local server, for exploring a local page ----
+
+/**
+ * Serve a local folder (or the folder of an .html file) on 127.0.0.1 until SIGINT/SIGTERM.
+ * Prints the page URL on stdout. Resolves once the server is closed.
+ */
+export async function serve(target, values, { signals = ['SIGINT', 'SIGTERM'] } = {}) {
+  const p = path.resolve(target);
+  if (!existsSync(p)) throw new CliError(`serve ${p}: no such folder — pass the folder that holds index.html`);
+  const dir = statSync(p).isDirectory() ? p : path.dirname(p);
+  const file = statSync(p).isDirectory() ? (existsSync(path.join(p, 'index.html')) ? '' : null) : path.basename(p);
+  const port = values.port ?? 0;
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw usageError(`--port must be a whole number from 0 to 65535, got ${values.port}`);
+  let srv;
+  try { srv = await serveDir(dir, { port }); } catch (e) {
+    throw new CliError(e?.code === 'EADDRINUSE' ? `port ${port} on 127.0.0.1 is in use — pick another --port, or leave it out for a free one` : `cannot serve ${dir}: ${String(e?.message ?? e).split('\n')[0]}`);
+  }
+  const url = srv.url + (file ? encodeURIComponent(file) : '');
+  process.stdout.write(`${url}\n`);
+  log(`serving ${dir} on 127.0.0.1:${srv.port} (pid ${process.pid})${file === null ? ' — no index.html here; open a file by its name' : ''}; stop with Ctrl-C or kill ${process.pid}`);
+  await new Promise((resolve) => { const stop = () => { for (const s of signals) process.off(s, stop); resolve(); }; for (const s of signals) process.on(s, stop); });
+  await srv.close();
+  log('stopped');
+}
+
+export const serveSpec = {
+  name: 'capture serve',
+  summary: 'serve a local folder on 127.0.0.1 so playwright-cli (or any browser) can open it',
+  usage: 'capture serve <dir|file.html> [--port n]',
+  description: `
+Serves <dir> (or the folder of <file.html>) on 127.0.0.1 only, the same way a take serves a local
+page, and prints the page's URL on stdout: http://127.0.0.1:<port>/ (or …/<file.html>). Use it to
+explore a local page with playwright-cli, whose browser blocks file:// URLs. It runs until Ctrl-C
+or SIGTERM (kill <pid>; the pid is on stderr), then exits 0. Run it in the background. Nothing is
+recorded and nothing is written.`,
+  options: {
+    port: { type: 'number', desc: 'Port on 127.0.0.1 (default: a free one, printed in the URL)' },
+  },
+  positionals: { min: 1, max: 1 },
+  examples: ['capture serve ./site', 'capture serve ./site/index.html --port 8123'],
+};
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   // runCli takes no positionals for a take, so the signin subcommand is dispatched before parsing
   if (argv[0] === 'signin') await runCli(signinSpec, ({ values, positionals }) => signin(positionals[0], values), argv.slice(1));
+  else if (argv[0] === 'serve') await runCli(serveSpec, ({ values, positionals }) => serve(positionals[0], values), argv.slice(1));
   else await runCli(spec, async ({ values }) => {
     const plan = await planTake(values);
     const take = await capture(plan);

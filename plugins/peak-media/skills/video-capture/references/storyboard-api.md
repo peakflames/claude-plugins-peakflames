@@ -47,6 +47,28 @@ screencast frame; every time below is on that clock.
 (`scrollTo` with no nested container, `scrollBy(null)`) shows it where it is, with no glide. `goto`
 doesn't move it. `--no-cursor` hides it and skips the glides, so the same storyboard runs shorter.
 
+## Before t0: `hide` and `setup`
+
+Everything in the default function runs after recording starts: a style tag added at its top
+arrives after frame 0. Two more exports act before the first frame:
+
+```js
+export const hide = ['#api-key', 'footer .account'];   // hidden from frame 0, after every goto()
+
+export async function setup({ page, context, viewport, mode, fps }) {
+  await page.getByRole('button', { name: 'Accept cookies' }).click(); // not filmed
+}
+```
+
+| Export | When | Use it for |
+|---|---|---|
+| `hide` | An array of CSS selectors. A style sheet hiding each one (and everything inside it, `visibility: hidden !important`, so the layout doesn't move) is added to every document as it is created (`context.addInitScript`), before the first navigation. | Keys, tokens, names, emails: anything private. It holds from frame 0 and across every `goto()` or link the page follows. |
+| `setup` | Called once with `{ page, context, viewport, mode, fps }` after the page has loaded and settled, before warm-up and the screencast. Nothing it does is captured. 60 s limit. | Dismissing a banner, choosing a tab, seeding local storage. A change that must survive a `goto()` needs `hide` or `context.addInitScript`. |
+
+A `hide` that isn't an array of strings, or a `setup` that isn't a function, stops the take before
+a browser opens. An invalid selector stops it before recording; a selector that matches nothing on
+the first page is logged to stderr. The take manifest records `x-take.hide` and `x-take.setup`.
+
 ## Beat rules
 
 The beats are the take's beat source, in order: the `## <id>` sections of `--script`, the
@@ -116,7 +138,9 @@ The first match wins:
 A relative `url` resolves from the current directory (`--url`), the `plates.json` folder
 (`live.url`) or the storyboard's folder (export).
 
-Local files are served from their folder on `127.0.0.1`, so ES modules and fonts work. Once the
+Local files are served from their folder on `127.0.0.1`, so ES modules and fonts work. To
+explore the same page with playwright-cli first (it blocks `file://`), serve it with
+`capture serve <folder>` and open the URL it prints (SKILL.md § Local pages). Once the
 page has loaded and settled (network idle, at most 5 s), the screencast starts. A main document
 that answers HTTP 4xx or 5xx is an error, and nothing is captured. With `--storage-state` the page
 loads signed in.

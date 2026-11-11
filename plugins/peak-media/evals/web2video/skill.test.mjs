@@ -123,7 +123,7 @@ test('web2video docs: every command runs a plugin script as node "${CLAUDE_PLUGI
       n++;
       const script = path.join(ROOT, m[1]);
       assert.ok(existsSync(script), `${name}: ${m[1]} exists`);
-      const sub = /^\s*signin\b/.test(m[2]) ? ['signin'] : [];
+      const sub = /^\s*(signin|serve)\b/.exec(m[2])?.slice(1, 2) ?? [];
       const help = spawnSync(process.execPath, [script, ...sub, '--help'], { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: `--import ${NO_NET}` } });
       assert.equal(help.status, 0, `${m[1]} ${sub} --help`);
       for (const f of m[2].match(/(?<=\s)--[a-z][a-z-]*/g) ?? []) assert.ok(help.stdout.includes(f), `${name}: ${m[1]} ${sub.join(' ')} accepts ${f}`);
@@ -165,4 +165,38 @@ test('UAT fixtures: cases.md lists AC-UAT-01..12 once each with a fixture; login
     assert.match(dash, /data-testid=dash>Dashboard/);
     assert.match(dash, /id=report/);
   } finally { srv.kill(); }
+});
+
+/** The text of workflow step n of SKILL.md (from "n. **" to the next step). */
+const step = (n) => SKILL.slice(SKILL.indexOf(`\n${n}. **`), n < 10 ? SKILL.indexOf(`\n${n + 1}. **`) : undefined);
+
+test('WP17 UAT fixes in SKILL.md: serve for local folders (D1), silent keeps the cursor (D2), privacy stills (D4), sizing margin and no silent changes (D6), re-record rebuilds the command (D7), edits shown before capture (D8) (not AC-bound)', () => {
+  // D1: one exact command for a local folder, and how to stop it
+  const s4 = step(4);
+  assert.match(s4, /blocks `file:\/\/`/);
+  assert.equal(commandLine('skills/video-capture/scripts/capture.mjs', /\bserve <folder>$/).length > 0, true);
+  assert.match(s4, /run_in_background/);
+  assert.match(s4, /kill <pid>/);
+  assert.match(s4, /don't\s+start any other server/);
+  // D2: silent = --no-captions only
+  assert.match(step(2), /mean `--no-captions` only: the cursor stays/);
+  assert.match(step(2), /`--no-cursor` only when the user\s+explicitly asks/);
+  // D3: hide before t0, pointed at from steps 5 and 9
+  assert.match(step(5), /export const hide = \['<selector>', …\]/);
+  assert.match(step(9), /\*\*hide\*\* it \(`export const hide/);
+  // D4: first and last frames in every sheet, read full size
+  assert.equal(commandLine('lib/verify/contact-sheet.mjs', /-o review\/<slug>\.jpg/).includes('--at 0s,<t1>s,<t2>s,…,<videoMs>ms'), true);
+  assert.match(commandLine('lib/verify/contact-sheet.mjs', /-ends\.jpg/), /--at 0s,<videoMs>ms --cols 1 --width <take width>/);
+  assert.match(step(9), /Always Read the\s+first and last frames at full size, every take/);
+  // D6: budget with a margin; runtime fixes are proposed, never silent
+  assert.match(step(5), /measured rate × 0\.9/);
+  assert.match(step(7), /never applied silently/);
+  assert.match(step(7), /--lead-ms`, `--tail-ms`, storyboard waits/);
+  // D7: re-record rebuilds the step 8 command from the project, not command[]
+  const rr = SKILL.slice(SKILL.indexOf('**Re-recording.**'), SKILL.indexOf('## Workflow'));
+  assert.match(rr, /not the saved `command\[\]`/);
+  for (const k of ['`preset`', '`mode`', '`cursor: false` → `--no-cursor`', '`signedIn: true` → `--storage-state']) assert.ok(rr.includes(k), `re-record carries ${k}`);
+  // D8: original → proposed printed before any spine or capture command
+  assert.match(step(6), /first print it in chat as `original → proposed`/);
+  assert.match(step(6), /\*\*before\*\* any spine or capture command runs/);
 });
