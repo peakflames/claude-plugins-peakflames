@@ -1264,8 +1264,12 @@ waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 
   was skipped for ownership, and the dry run ignored `explicit` and the clone — both fixed
   (`--explicit`, a clone-aware dry run). Pass 2 had no Critical finding; its UX findings are
   fixed in SKILL.md except one: `report.md` still lists the fetch command after the work is in.
-- **Not done here:** the P2 live smoke re-run and the live auditor test (owner's go-ahead), and
-  the owner's real skill run. Linux / Windows launch stays a P6 item.
+- **Live re-run (owner's go-ahead, 2026-11-11):** `AUTOPILOT_LIVE=1` on `live-smoke.test.mjs`
+  and `live-audit.test.mjs` after the P3.5 hook changes — 10 of 10 pass, about $1.05 in real
+  sessions. R1–R4 and R6–R9 denied, answered or parked as designed on the workspace layout; the
+  real auditor returned a high `test-weakened` finding on the widened build and none that parks
+  on the clean one.
+- **Not done here:** the owner's real skill run. Linux / Windows launch stays a P6 item.
 
 **Before P4:** the owner's real skill run and the live re-runs in the table above. To pick P4 up
 in a new session, say: "Continue the peak-workflow autopilot PoC on
