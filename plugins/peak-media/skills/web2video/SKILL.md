@@ -129,9 +129,9 @@ steps 9–10.
      viewer sees the result. A hold between beats (`await wait(…)` after a `beat`) is for a page
      or slide change. Step 9 measures the real length.
    - **Narrated:** size the script to the measured rate before writing it:
-     `node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" --brief brief.md --budget --wpm <wpm>`,
-     plus the same `--lead-ms`/`--tail-ms` the spine will run with (a deck: `--lead-ms 950`), or
-     the budget assumes the default pauses and the take overruns.
+     `node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" --brief brief.md --budget --wpm <wpm>`.
+     Add the same `--lead-ms`/`--tail-ms` the spine will run with (a deck: `--lead-ms 950`);
+     without them the budget assumes the default pauses and the take overruns.
      `<wpm>` is the measured rate × 0.9, rounded down (175 → 157). Short beats read slower
      than the sample paragraph, so budgeting at the full rate overruns. `sample-voice` and `spine`
      both send the default style; if you give `spine` a `--style`, give `sample-voice` the same.
