@@ -22,12 +22,16 @@
 //   {do:"plan", text}                   what hook R9 does: write <step>/plan.md
 //   {do:"gate", gate:{…}}               what hook R8 does on a park: write gates/<epic>-<n>.json
 //   {do:"control_request", tool_name, input?}   ask the host for permission; the answer is logged
+//   {do:"tool", tool_name, tool_input}  run the session's real PreToolUse hook from settings.json, as
+//                                       Claude Code would before a tool call. A deny is recorded in
+//                                       permission_denials; `continue: false` ends the session
+//                                       (terminal_reason hook_stopped). Outputs go to <step>/fake-tools.jsonl
 //   {do:"sleep", ms}   {do:"hang"}   {do:"crash", code?}
 //
 // `result: false` ends without a result line (a CLI crash). A result with
 // `subtype: "error_max_budget_usd"` or `"error_max_turns"` is a budget stop.
 // Every invocation is appended to FAKE_CLAUDE_LOG (JSON lines) when that is set.
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -56,6 +60,8 @@ function fill(v) {
   return v;
 }
 
+const denials = [];
+let hookStopped = false;
 const lines = readline.createInterface({ input: process.stdin })[Symbol.asyncIterator]();
 const stdinClosed = new Promise((r) => process.stdin.on('end', r).on('close', r));
 
@@ -97,6 +103,15 @@ async function act(a) {
       fs.writeFileSync(path.join(stepDir, 'fake-control-response.json'), value ?? 'null');
       break;
     }
+    case 'tool': {
+      const hook = JSON.parse(fs.readFileSync(settings, 'utf8')).hooks.PreToolUse[0].hooks[0].command;
+      const r = spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PreToolUse', permission_mode: flag('--permission-mode'), tool_name: a.tool_name, tool_input: a.tool_input ?? {}, tool_use_id: `toolu_${denials.length}` }) });
+      const out = r.stdout ? JSON.parse(r.stdout) : null;
+      fs.appendFileSync(path.join(stepDir, 'fake-tools.jsonl'), JSON.stringify({ tool_name: a.tool_name, exit: r.status, out }) + '\n');
+      if (out?.hookSpecificOutput?.permissionDecision === 'deny') denials.push({ tool_name: a.tool_name, tool_input: a.tool_input ?? {} });
+      if (out?.continue === false) hookStopped = true;
+      break;
+    }
     case 'sleep': await sleep(a.ms); break;
     case 'hang': await new Promise(() => setInterval(() => {}, 1 << 30)); break;
     case 'crash': process.exit(a.code ?? 1); break;
@@ -123,10 +138,10 @@ async function main() {
   try { version = JSON.parse(fs.readFileSync(path.join(plugin, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { /* no plugin dir */ }
   emit({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), model: flag('--model'), permissionMode: flag('--permission-mode'), claude_code_version: 'fake', tools: ['Bash', 'Read', 'Edit', 'Write'], plugins: [{ name: 'peak-workflow', path: plugin, source: 'peak-workflow@inline', version }] });
 
-  for (const a of script.actions ?? []) await act(a);
+  for (const a of script.actions ?? []) { await act(a); if (hookStopped) break; }
 
   if (script.result === false) process.exit(script.exit ?? 1);
-  emit({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: sessionId, num_turns: 3, total_cost_usd: 0.01, duration_ms: Date.now() - started, stop_reason: 'end_turn', terminal_reason: 'completed', usage: {}, modelUsage: {}, permission_denials: [], ...script.result });
+  emit({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: sessionId, num_turns: 3, total_cost_usd: 0.01, duration_ms: Date.now() - started, stop_reason: 'end_turn', terminal_reason: 'completed', usage: {}, modelUsage: {}, ...script.result, permission_denials: denials, ...(hookStopped ? { terminal_reason: 'hook_stopped' } : {}) });
   if (hostMode) await stdinClosed; // the real CLI exits when the host closes stdin
   process.exit(script.exit ?? 0);
 }

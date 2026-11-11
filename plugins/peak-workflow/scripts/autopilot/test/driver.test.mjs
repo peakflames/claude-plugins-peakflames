@@ -363,3 +363,64 @@ test('plan lint keys on headings and anchors, and refuses push, sudo and contain
   assert.deepEqual(lintPlan(planText(E1) + '\nThen run `git push origin develop` and `sudo make install` and `docker run x`.\n', E1.tors).problems, ['contains git push', 'contains sudo', 'contains a container or VM command']);
   assert.equal(lintPlan(planText(E1, { omit: ['commit'] }), E1.tors).pass, false);
 });
+
+// ---- driver and real hooks together (P2): the fake calls the hooks named in settings.json ------
+
+const ask = (question, options) => ({ do: 'tool', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question, options: options.map((label) => ({ label })) }] } });
+
+test('driver + real hooks: the hook answers Step 2.5, captures and lints the plan, and the epic merges', async (t) => {
+  const p = makeProject(t);
+  p.scenario({
+    ...happy(E1),
+    [`${E1.id}/plan`]: { actions: [
+      ask(`Start Epic ${E1.id} (${E1.slug}) — CSV import? Phase 1 — Core`, ['Start it', 'Show me the ready epics instead', 'Stop']),
+      { do: 'branch', name: E1.branch },
+      { do: 'tool', tool_name: 'ExitPlanMode', tool_input: { plan: planText(E1) } },
+      { do: 'write', path: 'src/never.js', content: 'the session ended at ExitPlanMode\n' },
+    ] },
+    [`${E1.id}/verify`]: { actions: [
+      ask('Verdict PASS. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop']),
+      ask('Did you perform any manual verification beyond the automated gates I ran?', ['Yes — I performed manual verification', 'No — only automated gates were run']),
+      { do: 'tool', tool_name: 'Bash', tool_input: { command: 'git push origin develop' } },
+      ...wrapupActions(E1),
+    ] },
+  });
+
+  await go(p);
+
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  const dir = path.join(p.state, 'epics', E1.id);
+  const tools = (step) => fs.readFileSync(path.join(dir, step, 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).out);
+  const [start, exit] = tools('plan-1');
+  assert.equal(Object.values(start.hookSpecificOutput.updatedInput.answers)[0], 'Start it');
+  assert.equal(exit.stopReason, 'autopilot: plan captured');
+  assert.equal(fs.readFileSync(path.join(dir, 'plan-1', 'plan.md'), 'utf8'), planText(E1));
+  assert.equal(readJson(path.join(dir, 'plan-1', 'result.json')).terminal_reason, 'hook_stopped');
+  assert.ok(!fs.existsSync(path.join(p.clone, 'src', 'never.js')));
+  const [proceed, manual, push] = tools('verify-1');
+  assert.equal(Object.values(proceed.hookSpecificOutput.updatedInput.answers)[0], 'Proceed');
+  assert.equal(Object.values(manual.hookSpecificOutput.updatedInput.answers)[0], 'No — only automated gates were run');
+  assert.match(push.hookSpecificOutput.permissionDecisionReason, /^autopilot R3: git push/);
+  assert.equal(p.epic(E1.id).sessions.find((s) => s.name === 'verify-1').denials, 1);
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'verify-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).decision), ['answer', 'answer', 'deny']);
+});
+
+test('driver + real hooks: a deferral question in the build session parks the epic with the hook\'s gate file', async (t) => {
+  const p = makeProject(t);
+  const question = `${E1.tors[3]} cannot be fully met: amounts with three decimals. Recommendation: Fix now — small. How to proceed?`;
+  p.scenario({
+    [`${E1.id}/plan`]: planScript(E1),
+    [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, ask(question, ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"]), { do: 'write', path: 'src/never.js', content: 'x' }] },
+  });
+
+  await go(p);
+
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'PARKED');
+  assert.match(e.reason, /parked at a human gate \(Lg1Csv7-1\.json\)/);
+  const gate = readJson(path.join(p.state, 'gates', `${E1.id}-1.json`));
+  assert.deepEqual([gate.kind, gate.session, gate.question, gate.tor], ['deferral', 'build-1', question, E1.tors[3]]);
+  assert.equal(git(p.clone, 'log', '-1', '--format=%s', E1.branch), 'wip(autopilot): uncommitted work at park');
+  assert.ok(!git(p.clone, 'ls-tree', '-r', '--name-only', E1.branch).includes('src/never.js'));
+  assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${E1.id}/build-1`]);
+});

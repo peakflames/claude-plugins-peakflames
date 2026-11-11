@@ -17,6 +17,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   command, the settings JSON and the gate policy, and invokes nothing.
 - **`fake-claude.mjs` test double** — scripted stand-in for `claude` that drives the driver's
   `node:test` suite without calling a model.
+- **Autopilot referee hooks** — `scripts/autopilot/hooks/` deny unattended sessions anything
+  outside the private clone, pushes and remote writes, containers, background tasks, and unrecorded
+  edits to existing tests; a stop hook refuses to end with work running.
+- **Autopilot gate policy** — `scripts/autopilot/policy/gates.json` lists the few questions
+  autopilot answers and with what; every other `AskUserQuestion` parks the epic with a gate file
+  for a person.
+- **Autopilot plan capture** — in a planning session `ExitPlanMode` saves the plan, lints it for
+  anchors, closing steps and gate rules, and ends the session; a failed lint parks.
 
 ## [3.0.1] — 2026-11-05
 

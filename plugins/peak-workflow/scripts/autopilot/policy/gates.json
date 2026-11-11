@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "about": "Gate policy for hook R8 (autopilot-poc-plan.md §7). A question is matched by fragments of the skill's own wording, never by a model. `park` rows are checked first. An `answer` row applies only when its role runs the session, its extra requirement holds (`epicId`: the question names the queued epic; `anchorTor`: the TOR it names is one of the epic's anchors), and its answer is among the options actually offered. Anything else parks.",
+  "answer": [
+    { "kind": "start-epic-confirm", "skillStep": "start-epic Step 2.5", "roles": ["planner"], "fragments": ["Start Epic "], "requires": "epicId", "answer": "Start it" },
+    { "kind": "tor-fail", "skillStep": "wrapup-epic Step 1.4b (TOR FAIL or CANNOT VERIFY)", "roles": ["verifier"], "pattern": "^\\W*TOR-\\d{2}-[A-Za-z0-9]{7} is (FAIL|CANNOT VERIFY): ", "requires": "anchorTor", "answer": "Stop — epic FAILs" },
+    { "kind": "quality-gate-fail", "skillStep": "wrapup-epic Step 1.4b (failing quality gate)", "roles": ["verifier"], "fragments": [" failed: ", "How to proceed?"], "answer": "Stop — epic FAILs" },
+    { "kind": "verdict-pass-proceed", "skillStep": "wrapup-epic Step 1.5", "roles": ["verifier"], "fragments": ["Verdict PASS", "Proceed to Phase 2"], "answer": "Proceed" },
+    { "kind": "manual-verification", "skillStep": "wrapup-epic Step 2.0", "roles": ["verifier"], "fragments": ["Did you perform any manual verification"], "answer": "No — only automated gates were run" },
+    { "kind": "ship-mode", "skillStep": "wrapup-epic Step 5", "roles": ["verifier"], "fragments": ["Ship mode", "solo", "team"], "answer": "Solo — local merge only" }
+  ],
+  "park": [
+    { "kind": "deferral", "skillStep": "start-epic Deferral gate", "fragments": ["cannot be fully met"], "why": "deferral is an owner decision; plan approval does not pre-authorize any deferral" },
+    { "kind": "amendment", "skillStep": "start-epic Amendment gate", "fragments": ["looks wrong", "How to proceed?"], "why": "requirements are never amended during a run" },
+    { "kind": "amendment-how", "skillStep": "wrapup-epic Step 1.4b (requirement may be wrong)", "fragments": ["How should TOR-", "change?"], "why": "requirements are never amended during a run" },
+    { "kind": "anchor-superseded", "skillStep": "start-epic Step 1 item 6", "fragments": ["Update this epic's anchors?"], "why": "a requirements decision" },
+    { "kind": "test-directories", "skillStep": "start-epic Step 1 item 4b / wrapup-epic Step 1.2 item 2", "fragments": ["Which directories hold tests?"], "why": "preflight requires the Test directories line; this should not be asked" },
+    { "kind": "meaning-unchanged", "skillStep": "wrapup-epic Step 1.1 (changed requirement)", "fragments": ["Meaning unchanged"], "why": "a requirements decision" }
+  ]
+}

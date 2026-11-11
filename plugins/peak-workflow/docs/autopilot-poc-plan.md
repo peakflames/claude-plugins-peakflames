@@ -980,6 +980,13 @@ family, using `claude -p` in a throwaway repo with a prompt that tries the actio
 
 **Exit:** unit tests green; live smoke shows each denial in `hooks.jsonl` and `permission_denials`.
 
+**Status: done 2026-11-11 — exit met.** 23 hook unit tests green, plus two driver tests in which
+the fake calls the real hooks. Live smoke (`AUTOPILOT_LIVE=1`, skipped otherwise): 8 real sessions,
+R1–R4 and R6–R9, all denied, answered or parked as designed, about $0.40 in total. R5 has unit
+tests only. Additions: `config-change.mjs` blocks settings changes; `lib.mjs` holds the plan lint
+and sidecar parse shared with the driver; the planner may not commit; a person's decided gate is
+answered once; file-tool writes under `.git/` are denied.
+
 ### P3: Auditor, report, and the `autopilot` skill
 
 Build the bundle builder, `audit/prompt.md`, `audit/schema.json`, the report renderer and
