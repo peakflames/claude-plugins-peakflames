@@ -1132,7 +1132,7 @@ Part 2's validity rule. This replaces the "would build those epics again" warnin
 
 | Item | Action | Effort |
 |---|---|---|
-| Auditor outage | **Owner decision needed.** Today an audit that cannot run or returns nothing usable parks the epic (fail closed), and two infra errors in a row stop the run. Recommended: keep fail closed, and give that park the new `resume` gate so the next run re-audits instead of rebuilding | S |
+| Auditor outage | **Decided (owner, 2026-11-11): fail closed.** An audit that cannot run or returns nothing usable parks the epic, and two infra errors in a row stop the run. Give that park the new `resume` gate so the next run re-audits instead of rebuilding | S |
 | P2 live smoke | Re-run `AUTOPILOT_LIVE=1 … test/live-smoke.test.mjs` (about $0.40) after the hook changes in P3 and P3.5; needs the owner's go-ahead for real sessions | S |
 | Real skill run | The owner invokes `/peak-workflow:autopilot dry-run` and one fake-backed run from a real Claude Code session (plugin loaded with `--plugin-dir`) to confirm `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion` and the `nohup` launch prompt behave | S |
 | Scope flags | Tighten the keyword list (`account`, `server` are noisy); keep it advisory | S |
