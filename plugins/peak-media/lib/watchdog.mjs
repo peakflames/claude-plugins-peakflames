@@ -89,7 +89,9 @@ export function runWatched(bin, args = [], { cwd, env, input, timeoutMs = 10 * 6
   try {
     if (input !== undefined) writeFileSync(f('in'), input);
     const child = spawn(process.execPath, [CHILD, f('status'), input !== undefined ? f('in') : '', f('out'), f('err'), dir, String(process.pid), resolved, ...args],
-      { cwd, env, detached: process.platform !== 'win32', stdio: 'ignore', windowsHide: true });
+      // detached on every OS: POSIX, so the wrapper leads the step's process group; win32, so it
+      // leaves libuv's kill-on-close job object and outlives this process to clean up after it
+      { cwd, env, detached: true, stdio: 'ignore', windowsHide: true });
     child.on('error', () => {});
     child.unref();
     const deadline = Date.now() + timeoutMs;
