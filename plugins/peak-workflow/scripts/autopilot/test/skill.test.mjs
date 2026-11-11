@@ -155,7 +155,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   assert.equal(driver('report', '--workspace', p.state).status, 0);
   const report = readJson(path.join(run1, 'report.json'));
   assert.deepEqual(report.epics.map((e) => [e.id, e.outcome]), [[E1.id, 'MERGED'], [e2.id, 'PARKED']]);
-  assert.match(report.next[0], /Decide 1 parked gate: `\/peak-workflow:autopilot report` \(Lg2Cat4\)/);
+  assert.match(report.next[0], /Answer 1 waiting question: `\/peak-workflow:autopilot report` \(Lg2Cat4\)/);
   const [gate] = report.gates;
   assert.deepEqual([gate.file, gate.kind, gate.question, gate.options, gate.decided, gate.run], [`gates/${e2.id}-1.json`, 'deferral', question, ['Fix now', 'Defer', 'Stop'], null, path.basename(run1)]);
 

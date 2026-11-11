@@ -1297,7 +1297,11 @@ waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 
   Not shown by it: a run outliving its session for hours (P0 S10 covers the mechanism).
 - **Not done here:** Linux / Windows launch stays a P6 item.
 
-**Before P4:** the owner's real skill run and the live re-runs in the table above. To pick P4 up
+**Before P4 (open, in this order):** (1) see the owner's recorded look work in one real verify
+session — a live wrapup on a human-check epic, about $1.50 on Opus, owner's go-ahead needed;
+(2) `report.md` still lists the fetch command after the merged work is in the project;
+(3) owner to decide: when a run has already ended at the launch check, should the skill go
+straight into the report instead of saying "run `report`" (recommended: yes). To pick P4 up
 in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 status note, P4 and §10.5. Build `scripts/autopilot-lab/lab.mjs`

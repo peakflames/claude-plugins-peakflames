@@ -44,7 +44,7 @@ test('report data: outcomes, evidence, referee counts and next steps come from f
   // §6.9 fields the evaluation script reads.
   for (const k of ['run', 'stoppedBecause', 'spentUsd', 'epics', 'referee']) assert.ok(k in r, k);
   for (const k of ['id', 'outcome', 'reason', 'checks', 'audit', 'gates', 'costUsd', 'turns', 'wallMs', 'sessions']) assert.ok(k in r.epics[0], k);
-  assert.match(r.next[0], /Decide 2 parked gates: `\/peak-workflow:autopilot report` \(Lg4Fx2q, Lg6Bud2\)/);
+  assert.match(r.next[0], /Answer 2 waiting questions: `\/peak-workflow:autopilot report` \(Lg4Fx2q, Lg6Bud2\)/);
   assert.ok(r.next.some((n) => n.includes(`git fetch "${STATE}/clone" develop:autopilot/develop && git log develop..autopilot/develop`)));
 });
 
@@ -67,7 +67,7 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
 
   let r = cli('report', '--workspace', tmp);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8'), /Decide 2 parked gates/);
+  assert.match(fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8'), /Answer 2 waiting questions/);
 
   // An answer that is not one of the gate's options is refused: the driver never invents one.
   r = cli('decide', '--workspace', tmp, '--gate', 'Lg6Bud2-1.json', '--answer', 'Quarterly', '--by', 'Pat Owner');
@@ -87,7 +87,7 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   assert.match(decided.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(decided.scope, 'next-run');
   const md = fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8');
-  assert.match(md, /Decide 1 parked gate: `\/peak-workflow:autopilot report` \(Lg6Bud2\)/);
+  assert.match(md, /Answer 1 waiting question: `\/peak-workflow:autopilot report` \(Lg6Bud2\)/);
   assert.match(md, /decided "Real — fix before verify" by Pat Owner on \d{4}-\d{2}-\d{2} — resumes the epic in the next run at FIX_PLAN\n {2}Look at: .*\n {2}By hand instead: /);
   assert.match(md, /2 decided gates \(Lg4Fx2q, Lg5Chr8\) resume their epics on the branch this run left/);
 

@@ -970,11 +970,18 @@
     }
   },
   "next": [
-    "Decide 2 parked gates: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)",
+    "Answer 2 waiting questions: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)",
     "Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.",
     "Review and bring in the merged work (Lg1Csv7):\n   git fetch \"<workspace>/clone\" develop:autopilot/develop && git log develop..autopilot/develop",
     "Run `/peak-workflow:autopilot` again: 1 decided gate (Lg5Chr8) resumes its epic on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into `develop`.",
     "Read the recorded reason for 1 changed existing test (under \"Per epic\").",
     "1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has."
+  ],
+  "tldr": [
+    "Autopilot worked through 7 epics (an epic is one planned piece of work): 1 finished and passed every check, 3 stopped part-way and need you, 1 failed its independent check, 2 did not start.",
+    "The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; you bring the work in yourself with one command (under \"Do this next\").",
+    "2 questions only you can answer are waiting. Run `/peak-workflow:autopilot report` and it asks you each one; the work then continues from where it stopped in the next run.",
+    "It ran from 2026-11-13 06:05 to 2026-11-13 12:41 and spent $41.20 of a $80 limit.",
+    "What to do: follow \"Do this next\" below, from the top. It has 6 steps."
   ]
 }

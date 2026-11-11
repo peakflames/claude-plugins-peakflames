@@ -291,7 +291,7 @@ test('resume gate (budget park in build), "Resume from where it stopped": CHECK_
   const g = gate(p, E1.id);
   assert.deepEqual([g.kind, g.phase, g.options, e1.gates], ['resume', 'CHECK_BUILD', [ANSWERS.resume, ANSWERS.startOver], [`${E1.id}-1.json`]]);
   assert.match(g.question, /stopped: budget: build-1 hit error_max_budget_usd\. Continue it in the next run\?/);
-  assert.match(readJson(path.join(p.runDir(), 'report.json')).next[0], /Decide 1 parked gate/);
+  assert.match(readJson(path.join(p.runDir(), 'report.json')).next[0], /Answer 1 waiting question/);
   const tip = git(p.clone, 'rev-parse', E1.branch);
   assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'CHECK_BUILD');
 
@@ -491,7 +491,7 @@ test('an undecided gate keeps its epic out of the next run: nothing is rebuilt w
   assert.equal(git(p.clone, 'rev-parse', E1.branch), tip);
   assert.equal(gate(p, E1.id).superseded, undefined);
   // The second run's report still tells the owner to decide it.
-  assert.match(readJson(path.join(p.runDir(), 'report.json')).next[0], /Decide 1 parked gate: `\/peak-workflow:autopilot report` \(Lg1Csv7\)/);
+  assert.match(readJson(path.join(p.runDir(), 'report.json')).next[0], /Answer 1 waiting question: `\/peak-workflow:autopilot report` \(Lg1Csv7\)/);
   assert.ok(dep.id);
 });
 

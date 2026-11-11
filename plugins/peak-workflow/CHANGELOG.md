@@ -35,6 +35,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   epic before verification. After a fix round it audits only the delta.
 - **Autopilot morning report** — `report.md` and `report.json` list what to do next, each epic's
   outcome with evidence, referee blocks, test changes with reasons, and auditor findings.
+- **Report TL;DR and glossary** — `report.md` opens with a plain-language TL;DR and ends with
+  "Words used in this report"; `autopilot report` presents the TL;DR first and explains each term
+  on first use.
 - **Autopilot readiness facts** — `driver.mjs preflight --json` adds a `launch` block (workspace,
   the new run's directory, earlier runs, open and decided gates, refusals, warnings) and per-epic
   `scopeFlags` for requirements that need network, keys, big data or long runs.

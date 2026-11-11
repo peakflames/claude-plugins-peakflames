@@ -259,19 +259,36 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    report's `sync` is how the project and the clone compared when the run started; for how they
    compare now, use `launch.sync` from item 1.
 
-4. **Present it.** First the first three lines of `<run>/report.md` (when it ran, why it
-   stopped, where, what it spent), verbatim. Then three short lists from `report.json`'s `epics`,
-   each epic by `label`:
-   - **Merged** — `outcome: MERGED`, with cost.
-   - **Parked** — `reason`, the `evidence` path (relative to `<ws>`), and the decision needed:
-     the `question` of each entry of `report.json`'s top-level `gates` whose `epic` is this
-     epic's `id`.
-   - **Failed, blocked, skipped or not started** — `outcome` and `reason`.
+4. **Present it**, for someone who has never seen this report and does not know the jargon.
+   Lead with what happened and what they must do; keep file paths and IDs for the detail.
 
-   Then the Referee lines from `report.md` (blocked calls, test changes, auditor findings,
-   unmatched questions, session setup). For any epic with auditor findings, or with entries in
-   `testChanges`, show them: each one is something only a person judges. Give the path
-   `<run>/report.md` for the per-epic detail.
+   a. **TL;DR first.** Print `report.json`'s `tldr` lines verbatim as a short bullet list under
+      the heading "TL;DR". Add nothing before it.
+
+   b. **One line of orientation**: "Autopilot built these in its own private copy of your
+      project. Your project has not been changed." Then three short lists from `report.json`'s
+      `epics`, each epic by `label`, under plain headings:
+      - **Finished and merged** (`outcome: MERGED`) — with cost.
+      - **Waiting for you** (`outcome: PARKED`) — in one plain sentence each: why it stopped
+        (`reason`, reworded if it is jargon) and the question you will be asked (the `question`
+        of each entry of the top-level `gates` whose `epic` is this epic's `id`). Give the
+        `evidence` path (relative to `<ws>`) last.
+      - **Did not finish or did not start** (`FAILED`, `BLOCKED`, `SKIPPED`, `NOT STARTED`) —
+        `outcome` in plain words and `reason`.
+
+      Omit a list that is empty, except say "Nothing is waiting for you" when that is so.
+
+   c. **Guardrails**, in plain sentences rather than the report's own lines: how many actions
+      the rules refused and what kind, how many routine questions were answered from the
+      pre-agreed list, what the independent reviewer (the auditor) found, and whether any
+      existing test was changed. For any epic with auditor findings, or with entries in
+      `testChanges`, show them: each one is something only a person judges. If a rehearsal's
+      stand-in ran the sessions, say the review results are not real.
+
+   d. The first time a term from the report's "Words used in this report" list appears in what
+      you write (epic, parked, gate, merged, clone, integration line, referee, auditor), add a
+      few words saying what it means. Give the path `<run>/report.md` for the full detail and
+      say that its last section explains every term.
 
 5. **Decide the parked gates.** For each entry of `report.json`'s `gates` whose `decided` is
    null, in order:

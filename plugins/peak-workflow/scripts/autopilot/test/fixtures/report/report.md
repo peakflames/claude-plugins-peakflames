@@ -1,9 +1,20 @@
 # Autopilot — 2026-11-13 06:05 → 2026-11-13 12:41 (stopped: queue done)
+
+## TL;DR
+- Autopilot worked through 7 epics (an epic is one planned piece of work): 1 finished and passed every check, 3 stopped part-way and need you, 1 failed its independent check, 2 did not start.
+- The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; you bring the work in yourself with one command (under "Do this next").
+- 2 questions only you can answer are waiting. Run `/peak-workflow:autopilot report` and it asks you each one; the work then continues from where it stopped in the next run.
+- It ran from 2026-11-13 06:05 to 2026-11-13 12:41 and spent $41.20 of a $80 limit.
+- What to do: follow "Do this next" below, from the top. It has 6 steps.
+
+New to this report? "Words used in this report", at the end, explains every term.
+
+## Where things are
 Workspace: <workspace> — run 20261112-220500. Paths below are relative to the workspace.
 Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80.
 
 ## Do this next
-1. Decide 2 parked gates: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)
+1. Answer 2 waiting questions: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)
 2. Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.
 3. Review and bring in the merged work (Lg1Csv7):
    git fetch "<workspace>/clone" develop:autopilot/develop && git log develop..autopilot/develop
@@ -12,6 +23,8 @@ Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80
 6. 1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has.
 
 ## Results
+One row per epic, in the order they were queued.
+
 | Epic | Outcome | Why | Evidence | Cost | Time |
 |---|---|---|---|---|---|
 | Lg1Csv7 (csv-import) — CSV import | MERGED | verify PASS, merge gate green | runs/20261112-220500/epics/Lg1Csv7/check-verify-1.json | $9.10 | 52 m |
@@ -23,6 +36,7 @@ Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80
 | Lg8Hw01 (receipt-printer) — Receipt printer | SKIPPED | TOR-08-Ab1Cd2E is a Safety requirement (hardware-in-the-loop) | — | $0.00 | 0 m |
 
 ## Referee
+What the guardrails did while nobody was watching: calls they refused, questions answered from the pre-agreed list, and what the reviewer found.
 Blocked: 3 (R7 test edit without reason ×2, R4 container, VM or global install ×1). Gates answered from policy: 4. Test changes with recorded reason: 1 (listed per epic below).
 Auditor findings: 5 (2 high, 2 medium, 1 low) — listed per epic below. The auditor advises; the driver parks only on a high finding in a park category.
 Questions parked because no policy row matched: 1 (gates/Lg6Bud2-1.json) — if a pre-approved row clearly applied, that is a needless park worth reporting.
@@ -30,6 +44,7 @@ Session setup: Claude Code 2.1.322, peak-workflow 3.1.0 (peak-workflow@inline), 
 Every plan was approved by lint, not by a person.
 
 ## Per epic
+The detail behind each row of Results: what ran, what was checked, and anything waiting for you.
 
 ### Lg1Csv7 (csv-import) — CSV import — MERGED
 
@@ -160,3 +175,17 @@ dependency not merged: Lg3Sum9 (FAILED)
 ### Lg8Hw01 (receipt-printer) — Receipt printer — SKIPPED
 
 TOR-08-Ab1Cd2E is a Safety requirement (hardware-in-the-loop)
+
+## Words used in this report
+- **Epic** — one planned piece of work, built from its written requirements.
+- **Merged** — finished, checked, and combined into autopilot's private copy. It is not in your project until you bring it in.
+- **Parked** — stopped part-way because something needs a person. The work so far is kept.
+- **Gate** — a question only you can answer. Each parked epic has one, unless the report says there is nothing to answer.
+- **Failed** — the independent check found the work does not meet a requirement, and the one allowed fix attempt did not cure it.
+- **Blocked / not started** — never begun: it depends on an epic that did not finish, or the run ended first.
+- **Private copy (the "clone")** — autopilot's own copy of your project, where all of this happened. Your project is never written.
+- **Integration line** — the main branch that finished epics are combined into (usually `develop`).
+- **Session** — one unattended Claude Code conversation. Each epic gets separate ones to plan, build, and check.
+- **Referee** — fixed rules that stop a session doing what it must not: touching files outside the private copy, pushing, weakening an existing test, answering your questions for you.
+- **Auditor** — a second, read-only reviewer that looks for shortcuts in the build. It only advises; a serious finding becomes a question for you.
+- **Plan approved by lint** — a script checked that the plan has every required part. No person read it.
