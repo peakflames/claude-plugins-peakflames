@@ -44,6 +44,22 @@ test('AC-SKL-04: check-cuts passes the cut in silence and fails the cut over a t
   assert.equal(run('lib/verify/check-cuts.mjs', [cuts, '--cuts', '1000', '--min-silence-ms', '2500']).code, 1, 'gap shorter than the minimum fails');
 });
 
+test('WP17-D5: contact-sheet samples the video stream, not the longer audio: --every ends on the last frame, --at past it is clamped (not AC-bound)', () => {
+  // 1.0 s of video (30 frames) muxed with 1.5 s of audio: the container runs 1.5 s
+  const long = path.join(dir, 'audio-longer.mp4');
+  const mk = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=s=320x240:r=30:d=1', '-f', 'lavfi', '-i', 'sine=f=440:r=48000:d=1.5',
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', long]);
+  assert.equal(mk.status, 0, mk.stderr?.toString());
+  const every = run('lib/verify/contact-sheet.mjs', [long, '--every', '0.25s', '-o', path.join(dir, 'long-every.jpg'), '--json']);
+  assert.equal(every.code, 0, every.stderr);
+  const ms = JSON.parse(every.stdout).frames.map((f) => f.ms);
+  assert.ok(ms.at(-1) <= 1000 - 1000 / 30, `last sample on the video's last frame, not past it: ${ms}`);
+  assert.ok(ms.at(-1) >= 900, `still reaches the end of the video: ${ms}`);
+  const at = run('lib/verify/contact-sheet.mjs', [long, '--at', '0s,1.2s', '-o', path.join(dir, 'long-at.jpg'), '--json']);
+  assert.equal(at.code, 0, at.stderr);
+  assert.deepEqual(JSON.parse(at.stdout).frames.map((f) => f.label), ['00.00', '00.97'], '1.2 s (past the video) is clamped to its last frame');
+});
+
 test('probe-spec: catches a file that misses the spec (not AC-bound)', () => {
   const r = run('lib/verify/probe-spec.mjs', [plain, '--json']);
   assert.equal(r.code, 1);

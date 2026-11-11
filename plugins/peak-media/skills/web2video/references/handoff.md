@@ -5,7 +5,8 @@ web2video ends at the file. Report it, answer questions about it, and stop.
 ## Before you hand off
 
 - The length is within ±10 % of the runtime target; probe-spec passed (and check-take, if narrated).
-- You Read the contact sheet with one still per beat.
+- You Read the contact sheet (first frame, one still per beat, last frame) and the full-size
+  first and last frames.
 - Every private-data finding has the user's decision, and it was carried out.
 
 ## Report template
@@ -19,9 +20,9 @@ Your video is ready: web2video/<slug>/out/<slug>.mp4
 - Preset: <p> — <one reason tied to the destination the user named>
 - Mode: <captions | silent | narrated (voice <v>)>
 - Beats: <id start–end s · …>
-- Checks: probe-spec <PASS>; check-take <PASS | n/a (no voice)>; stills reviewed (review/<slug>.jpg)
+- Checks: probe-spec <PASS>; check-take <PASS | n/a (no voice)>; stills reviewed (review/<slug>.jpg: <the times read, first and last frames included>)
 - Findings: <page errors (first lines), late beats, private data and what was done — or "none">
-- Re-record: the project folder web2video/<slug>/ re-runs the take (command[] in out/<slug>.take.json)
+- Re-record: ask to re-record web2video/<slug>/ (the take is rebuilt from the project's files, so the folder can be moved)
 ```
 
 Then, if a session file was made: offer to delete it (`login.md`). If a destination size limit

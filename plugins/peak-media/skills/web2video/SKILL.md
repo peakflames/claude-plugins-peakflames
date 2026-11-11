@@ -47,9 +47,14 @@ web2video/<slug>/
 ```
 
 **Re-recording.** When `web2video/<slug>/` already exists and the user asks to re-record it, take
-the project as it is: skip to step 8 and rerun the take's saved `command[]` from
-`out/<slug>.take.json` (or the step 8 command). Leave `storyboard.mjs` and `script.md` untouched;
-a beat error is reported to the user as printed before anything is changed. Then steps 9–10.
+the project as it is: skip to step 8 and run the step 8 command from inside the project folder,
+rebuilt from the project's own files, not the saved `command[]` (its absolute paths point at
+wherever the project was first recorded, so a moved or copied project would record over the
+original). Take the settings from `out/<slug>.take.json`'s `x-take`: `preset`; `mode` (`silent`
+→ `--no-captions`, `narrated` → `--spine spine/manifest.json`); `cursor: false` → `--no-cursor`;
+`signedIn: true` → `--storage-state <session file>`. Leave `storyboard.mjs` and `script.md`
+untouched; a beat error is reported to the user as printed before anything is changed. Then
+steps 9–10.
 
 ## Workflow
 
@@ -63,7 +68,9 @@ a beat error is reported to the user as printed before anything is changed. Then
    - whether it needs a sign-in;
    - where the video is going → the preset (`references/presets.md`; default `web`);
    - the mode: **captions** (default), **silent** (`--no-captions`), or **narrated** (a voice;
-     needs `PEAK_MEDIA_OPENROUTER_API_KEY`);
+     needs `PEAK_MEDIA_OPENROUTER_API_KEY`). Silent, "no text", "nothing on screen but the app"
+     all mean `--no-captions` only: the cursor stays. Add `--no-cursor` only when the user
+     explicitly asks for no cursor or pointer;
    - the runtime: default 20 s for a UI demo; a deck is sized by its slides.
 
    **Narrated: check the key now, before anything else runs.** Measure the voice:
@@ -88,6 +95,16 @@ a beat error is reported to the user as printed before anything is changed. Then
    for private data (step 9) now, so the plan can avoid it. Then `playwright-cli close` (after
    `playwright-cli delete-data` for a signed-in page).
 
+   **A local folder:** playwright-cli blocks `file://` URLs. Serve the folder the way the take
+   will, with this one command, run with Bash in the background (`run_in_background`); don't
+   start any other server:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" serve <folder>
+   ```
+   It prints the URL (`http://127.0.0.1:<port>/`, loopback only) on stdout and its pid on
+   stderr; `goto` that URL. When exploring is done, stop it: stop the background task, or
+   `kill <pid>`.
+
 5. **Write the project.**
    - `brief.md` and `script.md` in `video-spine`'s format: Read
      `${CLAUDE_PLUGIN_ROOT}/skills/video-spine/SKILL.md` (Stage 0 and Stage 1) for the file
@@ -100,6 +117,11 @@ a beat error is reported to the user as printed before anything is changed. Then
      `scrollTo`, `scrollBy`) so the cursor shows. A local page: `export const url =
      '<path to its index.html, relative to storyboard.mjs>'`. Keep the bottom quarter of the frame
      clear of the action (captions sit there).
+   - **Anything private the user chose to hide** goes in `export const hide = ['<selector>', …]`
+     in `storyboard.mjs`: hidden before the first frame and after every `goto`. Never hide it with
+     `page.addStyleTag` or `evaluate` in the default function: that runs after recording starts,
+     so frame 0 shows it. Other setup that must not be filmed (dismiss a banner, pick a tab) goes
+     in `export async function setup({ page, context })`, which runs before recording starts.
    - **Captions and silent: size the beats to the runtime.** A beat lasts as long as its `fn` (at
      least its caption's reading time, ~3 words/s), so the target is met with holds. Give each
      beat ≈ runtime ÷ beats: estimate its action (each pointer helper ~0.4 s glide, a click
@@ -108,6 +130,9 @@ a beat error is reported to the user as printed before anything is changed. Then
      or slide change. Step 9 measures the real length.
    - **Narrated:** size the script to the measured rate before writing it:
      `node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" --brief brief.md --budget --wpm <wpm>`.
+     `<wpm>` is the measured rate × 0.9, rounded down (175 → 157). Short beats read slower
+     than the sample paragraph, so budgeting at the full rate overruns. `sample-voice` and `spine`
+     both send the default style; if you give `spine` a `--style`, give `sample-voice` the same.
      Then run the cold read: a fresh subagent given *only* `script.md`, playing the brief's
      audience, marks each beat CLEAR or UNCLEAR and flags hype. Fix UNCLEAR beats and read again.
 
@@ -119,13 +144,17 @@ a beat error is reported to the user as printed before anything is changed. Then
    - the cold-read verdict, if narrated, with any suggested edits as original → proposed.
 
    Ask with options such as "Record it", one per suggested edit, and "Change something". When the
-   user asks for a change, apply it, show it as original → proposed, and go on to step 7: the gate
-   is passed, with no second approval. Ask again only if they reject the plan outright.
+   user asks for a change: first print it in chat as `original → proposed` (one line per changed
+   line of `script.md` or `storyboard.mjs`), then apply it, then go on to step 7. That line comes
+   **before** any spine or capture command runs, never only at hand-off. The gate is passed, with
+   no second approval. Ask again only if they reject the plan outright.
 
 7. **Spine** (narrated only):
    `node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" --brief brief.md --narrate --voice Rasalgethi`
-   (a deck adds `--lead-ms 950`). It must end `PASS  runtime …`. On a runtime miss, propose word
-   changes as original → proposed, apply the ones the user picks, and rerun.
+   (a deck adds `--lead-ms 950`). It must end `PASS  runtime …`. On a runtime miss, propose
+   changes as original → proposed, apply the ones the user picks, and rerun. This covers words,
+   pauses and padding alike (`--lead-ms`, `--tail-ms`, storyboard waits): any change made to hit
+   the runtime is proposed to the user, never applied silently.
 
 8. **Capture.**
    ```bash
@@ -144,18 +173,24 @@ a beat error is reported to the user as printed before anything is changed. Then
    - `node "${CLAUDE_PLUGIN_ROOT}/lib/verify/probe-spec.mjs" out/<slug>.mp4 --preset <p>` passes.
    - Narrated: `node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/check-take.mjs" out/<slug>.mp4`
      passes, with `--expect-cuts <n>` when you know the number of page or slide changes.
-   - A contact sheet with one still inside each beat (the midpoint of each span in
-     `x-take.beats[]` of `out/<slug>.take.json`), at a width where small text reads:
-     `node "${CLAUDE_PLUGIN_ROOT}/lib/verify/contact-sheet.mjs" out/<slug>.mp4 --at <t1>s,<t2>s,… --width 1280 --cols 2 -o review/<slug>.jpg`.
+   - A contact sheet with the first frame, one still inside each beat (the midpoint of each span
+     in `x-take.beats[]` of `out/<slug>.take.json`) and the last frame, at a width where small
+     text reads:
+     `node "${CLAUDE_PLUGIN_ROOT}/lib/verify/contact-sheet.mjs" out/<slug>.mp4 --at 0s,<t1>s,<t2>s,…,<videoMs>ms --width 1280 --cols 2 -o review/<slug>.jpg`
+     (a time past the last frame is clamped to it, so `<videoMs>ms` is the last frame).
      **Read it.** Check: caption readable and clear of the action; the action finished before
      the next beat; no blank or half-loaded frame; the cursor on its target.
-   - **Private data:** tokens or keys, real names, emails, customer records. Read the frame edges
-     closely (footers, status bars, sidebars, corners); for a doubtful spot, Read a full-size still
-     of that moment (`--at <t>s --cols 1 --width <take width>`). The time stamp covers each still's top-left corner:
-     check that corner in the step 4 screenshots. A finding stops here. Show the still and its
-     timecode, then ask: **crop** it out of frame (scroll position or viewport), **hide** it (the
-     storyboard hides the element before the first beat), or **re-record with clean data**. Hand
-     off only after the user decides; record their choice.
+   - **Private data:** tokens or keys, real names, emails, customer records. Always Read the
+     first and last frames at full size, every take:
+     `node "${CLAUDE_PLUGIN_ROOT}/lib/verify/contact-sheet.mjs" out/<slug>.mp4 --at 0s,<videoMs>ms --cols 1 --width <take width> -o review/<slug>-ends.jpg`.
+     Then read the beat stills; the frame edges closely (footers, status bars, sidebars,
+     corners). For a doubtful spot, Read a full-size still of that moment (`--at <t>s --cols 1
+     --width <take width>`). The time stamp covers each still's top-left corner: check that
+     corner in the step 4 screenshots. Say in the hand-off which frames you read. A finding
+     stops here. Show the still and its timecode, then ask: **crop** it out of frame (scroll
+     position or viewport), **hide** it (`export const hide = ['<selector>']` in the storyboard:
+     hidden from frame 0 on), or **re-record with clean data**. Hand off only after the user
+     decides; record their choice.
 
    A failed check means fix and re-run steps 8–9, not a new gate.
 

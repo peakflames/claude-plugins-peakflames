@@ -38,13 +38,13 @@ test('AC-W2V-41: no removed storyboard API in Markdown under skills/ and docs/re
   assert.deepEqual(hits, [], `0 hits expected:\n${hits.join('\n')}`);
 });
 
-test('AC-W2V-41: every flag in capture --help (and capture signin --help) is documented', () => {
+test('AC-W2V-41: every flag in capture --help (and capture signin --help, capture serve --help) is documented', () => {
   const docs = readFileSync(SKILL, 'utf8') + readFileSync(API, 'utf8');
-  for (const args of [['--help'], ['signin', '--help']]) {
+  for (const args of [['--help'], ['signin', '--help'], ['serve', '--help']]) {
     const r = run(CAPTURE, args);
     assert.equal(r.code, 0, r.stderr);
     const flags = helpFlags(r.stdout);
-    assert.ok(flags.length >= (args.length === 1 ? 20 : 3), `parsed the Options of capture ${args.join(' ')} (${flags.join(' ')})`);
+    assert.ok(flags.length >= (args.length === 1 ? 20 : args[0] === 'serve' ? 2 : 3), `parsed the Options of capture ${args.join(' ')} (${flags.join(' ')})`);
     const missing = flags.filter((f) => !new RegExp(`${f}(?![a-z-])`).test(docs));
     assert.deepEqual(missing, [], `capture ${args.join(' ')}: flags not in SKILL.md or storyboard-api.md`);
   }

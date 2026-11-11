@@ -16,7 +16,7 @@ the frame-by-frame alternative for designed motion.
 
 Scripts: `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/` (`capture.mjs`, `check-take.mjs`).
 `node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --help` and the same with
-`signin --help` list every flag; `--version` prints the plugin version. If a script says a
+`signin --help` or `serve --help` list every flag; `--version` prints the plugin version. If a script says a
 dependency is missing, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh"` and retry. Before
 writing a storyboard, Read `references/storyboard-api.md`.
 
@@ -79,6 +79,9 @@ the spine's lead-in (`spine --lead-ms`, default 250 ms, minimum 200) so no clip 
 3. **Explore it with playwright-cli** (the authoring companion, not the recorder): open the page,
    take snapshots, find stable selectors (prefer roles, labels and text over CSS paths) and
    dry-run each interaction. `playwright-cli install --skills` installs its own skill.
+   playwright-cli blocks `file://`: for a local page, serve its folder on 127.0.0.1 with
+   `node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" serve <folder>` (Bash in
+   the background; see Local pages) and open the URL it prints.
 4. **Choose the mode and preset.** Captions is the default. Ask about narration only if the user
    hasn't said; narration means a spine (`video-spine`, which needs an OpenRouter key for a real
    voice). Ask where the video is going if it decides the preset.
@@ -87,7 +90,9 @@ the spine's lead-in (`spine --lead-ms`, default 250 ms, minimum 200) so no clip 
 6. **Write `storyboard.mjs`** (API: `references/storyboard-api.md`): one `beat(id, fn)` per beat,
    in script order, with the action the beat describes inside `fn`. Change slides or pages
    *between* beats, never inside one. Keep the bottom quarter of the frame clear of content the
-   captions would cover.
+   captions would cover. Hide anything private with `export const hide = ['<selector>', …]`
+   (hidden before the first frame and after every `goto`), never with a style tag added inside
+   the default function, which runs after recording starts.
 7. **Capture.**
    ```bash
    # captions, web (default preset)
@@ -108,8 +113,12 @@ the spine's lead-in (`spine --lead-ms`, default 250 ms, minimum 200) so no clip 
     `node "${CLAUDE_PLUGIN_ROOT}/lib/verify/contact-sheet.mjs" out/demo.mp4 --at 1.7s,4.9s,… -o review/demo.jpg`.
     Look for: the caption readable and not covering the action, the action finished before the
     next beat, the cursor on its target, no blank or half-loaded frames, nothing private on screen.
+    For private data also Read the first and last frames full size (`--at 0s,<videoMs>ms --cols 1
+    --width <take width>`; a time past the last frame is clamped to it).
 11. **Keep the take manifest** (`out/demo.take.json`) with the video: its `command[]` re-runs the
-    take.
+    take in place. Its paths are absolute: after moving or copying the project, rebuild the
+    command from the project's files (the step 7 command, with `x-take`'s preset, mode and
+    cursor) instead.
 
 ## Flags (`capture.mjs`)
 
@@ -137,7 +146,22 @@ the spine's lead-in (`spine --lead-ms`, default 250 ms, minimum 200) so no clip 
 | `--json` | Print the take summary as JSON instead of the report |
 
 `capture signin <url> [--save <file.json>] [--timeout 300s]` is a separate subcommand; see
-Signed-in pages.
+Signed-in pages. `capture serve <dir> [--port n]` is another; see Local pages.
+
+## Local pages
+
+`capture serve <dir|file.html> [--port n]` serves a folder on 127.0.0.1 (loopback only) the way a
+take serves a local page, so playwright-cli (which blocks `file://`) can explore it:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" serve ./site
+```
+
+- It prints the URL on stdout (`http://127.0.0.1:<port>/`, or `…/<file.html>` for a file) and
+  its pid on stderr, then runs until Ctrl-C or SIGTERM and exits 0. Run it in the background.
+- `--port <n>` picks the port (default: a free one). A busy port is a one-line error.
+- `/` serves the folder's `index.html`; nothing outside the folder is served.
+- A take doesn't need it: capture serves a local `--url`/`url` itself.
 
 ## Cursor
 
@@ -210,10 +234,12 @@ take manifest: /abs/path/out/todo-demo.take.json
 
 **The take manifest** (`<take>.take.json`) is a v1 spine manifest: `kind: "narration"` with the
 laid clips for a narrated take, else `kind: "beatgrid"`. It carries `beats[]`, `captions[]`,
-`videoMs`, `wallMs`, `command[]` (absolute paths; re-runs the take) and `x-take`:
+`videoMs`, `wallMs`, `command[]` (absolute paths; re-runs the take in place, not after the
+project moves) and `x-take` (its paths are relative to the manifest's folder):
 
 - `mode`, `preset`, `plate`, `storyboard`, `script`, `url`, `fps`, `width`, `height`, `frames`, `out`
 - `cursor`, `signedIn`, `sizeBytes`, `captionEngine`
+- `hide` (the storyboard's hidden selectors) and `setup: true`, when the storyboard has them
 - `audio` (narrated takes: the clips as laid and the loudness)
 - `beats[]`, one per beat: `n`, `id`, `text`, `startMs`, `durationMs`, `endMs`, `lateMs`,
   `caption`, and for timed beats `plannedMs` and `clipNs`
