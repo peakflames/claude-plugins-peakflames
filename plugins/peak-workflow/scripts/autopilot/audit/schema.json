@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings", "recommend", "summary"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "severity", "evidence", "explanation"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["stand-in", "test-weakened", "cannot-fail", "never-ran-real", "claim-without-evidence", "scope", "weak-requirement"]
+          },
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+          "evidence": { "type": "string" },
+          "explanation": { "type": "string" }
+        }
+      }
+    },
+    "recommend": { "type": "string", "enum": ["proceed", "park"] },
+    "summary": { "type": "string" }
+  }
+}

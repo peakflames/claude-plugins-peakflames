@@ -1,0 +1,491 @@
+{
+  "run": "2026-11-13T06:05:00.000Z",
+  "driverVersion": "0.2.0",
+  "pluginDir": "/plugins/peak-workflow",
+  "integration": "develop",
+  "startSha": "1111111111111111111111111111111111111111",
+  "spentUsd": 41.2,
+  "runBudgetUsd": 80,
+  "testCommand": "node --test",
+  "status": "DONE",
+  "stoppedBecause": "queue done",
+  "consecutiveInfra": 0,
+  "baseSkips": 0,
+  "endedAt": "2026-11-13T12:41:00.000Z",
+  "queue": [
+    {
+      "id": "Lg1Csv7",
+      "name": "CSV import",
+      "label": "Lg1Csv7 (csv-import) — CSV import",
+      "attempts": {},
+      "fixRounds": 0,
+      "costUsd": 9.1,
+      "turns": 141,
+      "wallMs": 2940000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.9,
+          "turns": 27,
+          "wallMs": 240000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 4.2,
+          "turns": 70,
+          "wallMs": 1320000,
+          "terminalReason": "completed",
+          "denials": 2
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.6,
+          "turns": 9,
+          "wallMs": 180000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "verify-1",
+          "sessionId": "00000000-0000-4000-8000-0e00f0010000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 3.4,
+          "turns": 35,
+          "wallMs": 1200000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "gates": [],
+      "checks": [
+        {
+          "file": "check-build-1.json",
+          "pass": true,
+          "failed": []
+        },
+        {
+          "file": "check-verify-1.json",
+          "pass": true,
+          "failed": []
+        }
+      ],
+      "planStep": "plan-1",
+      "preVerify": null,
+      "step": null,
+      "state": "MERGED",
+      "reason": "verify PASS, merge gate green",
+      "startedAt": "2026-11-13T06:06:00.000Z",
+      "endedAt": "2026-11-13T06:58:00.000Z",
+      "audits": [
+        {
+          "step": "audit-1",
+          "file": "audit-1/audit.json",
+          "delta": false,
+          "base": "1111111",
+          "tip": "2222222",
+          "steps": [
+            "build-1"
+          ],
+          "findings": 1,
+          "parks": [],
+          "recommend": "proceed"
+        }
+      ],
+      "testChanges": [
+        {
+          "path": "test/smoke.test.js",
+          "reason": "the version line now ends with the build date"
+        }
+      ]
+    },
+    {
+      "id": "Lg4Fx2q",
+      "name": "Currency conversion",
+      "label": "Lg4Fx2q (currency) — Currency conversion",
+      "attempts": {},
+      "fixRounds": 0,
+      "costUsd": 11.3,
+      "turns": 160,
+      "wallMs": 3480000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1.1,
+          "turns": 30,
+          "wallMs": 300000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 9.4,
+          "turns": 118,
+          "wallMs": 2940000,
+          "terminalReason": "completed",
+          "denials": 1
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.8,
+          "turns": 12,
+          "wallMs": 240000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "gates": [
+        "Lg4Fx2q-1.json"
+      ],
+      "checks": [
+        {
+          "file": "check-build-1.json",
+          "pass": true,
+          "failed": []
+        }
+      ],
+      "planStep": "plan-1",
+      "preVerify": null,
+      "step": null,
+      "state": "PARKED",
+      "reason": "auditor: F1 stand-in, F2 test-weakened (audit-1)",
+      "startedAt": "2026-11-13T06:58:00.000Z",
+      "endedAt": "2026-11-13T07:59:00.000Z",
+      "audits": [
+        {
+          "step": "audit-1",
+          "file": "audit-1/audit.json",
+          "delta": false,
+          "base": "3333333",
+          "tip": "4444444",
+          "steps": [
+            "build-1"
+          ],
+          "findings": 3,
+          "parks": [
+            "F1",
+            "F2"
+          ],
+          "recommend": "park"
+        }
+      ]
+    },
+    {
+      "id": "Lg5Chr8",
+      "name": "Spending chart",
+      "label": "Lg5Chr8 (spending-chart) — Spending chart",
+      "attempts": {},
+      "fixRounds": 0,
+      "costUsd": 7.8,
+      "turns": 122,
+      "wallMs": 2220000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1,
+          "turns": 28,
+          "wallMs": 300000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 6.3,
+          "turns": 86,
+          "wallMs": 1740000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.5,
+          "turns": 8,
+          "wallMs": 180000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "gates": [
+        "Lg5Chr8-1.json"
+      ],
+      "checks": [
+        {
+          "file": "check-build-1.json",
+          "pass": true,
+          "failed": []
+        }
+      ],
+      "planStep": "plan-1",
+      "preVerify": null,
+      "step": null,
+      "state": "PARKED",
+      "reason": "human check needed before verify",
+      "startedAt": "2026-11-13T07:59:00.000Z",
+      "endedAt": "2026-11-13T08:39:00.000Z",
+      "audits": [
+        {
+          "step": "audit-1",
+          "file": "audit-1/audit.json",
+          "delta": false,
+          "base": "5555555",
+          "tip": "6666666",
+          "steps": [
+            "build-1"
+          ],
+          "findings": 0,
+          "parks": [],
+          "recommend": "proceed"
+        }
+      ]
+    },
+    {
+      "id": "Lg3Sum9",
+      "name": "Monthly summary",
+      "label": "Lg3Sum9 (monthly-summary) — Monthly summary",
+      "attempts": {},
+      "fixRounds": 1,
+      "costUsd": 13,
+      "turns": 233,
+      "wallMs": 5040000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1,
+          "turns": 29,
+          "wallMs": 300000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 4,
+          "turns": 70,
+          "wallMs": 1440000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.5,
+          "turns": 8,
+          "wallMs": 180000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "verify-1",
+          "sessionId": "00000000-0000-4000-8000-0e00f0010000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 2.6,
+          "turns": 30,
+          "wallMs": 960000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "plan-fix-1",
+          "sessionId": "00000000-0000-4000-8000-00a00f000100",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.7,
+          "turns": 20,
+          "wallMs": 240000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "fix-1",
+          "sessionId": "00000000-0000-4000-8000-f00010000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1.9,
+          "turns": 40,
+          "wallMs": 840000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "audit-2",
+          "sessionId": "00000000-0000-4000-8000-a0d000200000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.3,
+          "turns": 6,
+          "wallMs": 120000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "verify-2",
+          "sessionId": "00000000-0000-4000-8000-0e00f0020000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 2,
+          "turns": 30,
+          "wallMs": 960000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "gates": [],
+      "checks": [
+        {
+          "file": "check-build-1.json",
+          "pass": true,
+          "failed": []
+        },
+        {
+          "file": "check-build-2.json",
+          "pass": true,
+          "failed": []
+        }
+      ],
+      "planStep": "plan-fix-1",
+      "preVerify": null,
+      "step": null,
+      "state": "FAILED",
+      "reason": "verify-2 FAIL after the fix round: TOR-03-Jm2Wq8z totals test fails (test/summary.test.js:41)",
+      "startedAt": "2026-11-13T08:39:00.000Z",
+      "endedAt": "2026-11-13T10:07:00.000Z",
+      "audits": [
+        {
+          "step": "audit-1",
+          "file": "audit-1/audit.json",
+          "delta": false,
+          "base": "7777777",
+          "tip": "8888888",
+          "steps": [
+            "build-1"
+          ],
+          "findings": 0,
+          "parks": [],
+          "recommend": "proceed"
+        },
+        {
+          "step": "audit-2",
+          "file": "audit-2/audit.json",
+          "delta": true,
+          "base": "8888888",
+          "tip": "9999999",
+          "steps": [
+            "fix-1"
+          ],
+          "findings": 1,
+          "parks": [],
+          "recommend": "proceed"
+        }
+      ]
+    },
+    {
+      "id": "Lg6Bud2",
+      "name": "Category budgets",
+      "label": "Lg6Bud2 (budgets) — Category budgets",
+      "attempts": {},
+      "fixRounds": 0,
+      "costUsd": 0,
+      "turns": 31,
+      "wallMs": 660000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0,
+          "turns": 31,
+          "wallMs": 660000,
+          "terminalReason": "hook_stopped",
+          "denials": 1
+        }
+      ],
+      "gates": [
+        "Lg6Bud2-1.json"
+      ],
+      "checks": [],
+      "planStep": null,
+      "preVerify": null,
+      "step": null,
+      "state": "PARKED",
+      "reason": "parked at a human gate (Lg6Bud2-1.json)",
+      "startedAt": "2026-11-13T10:07:00.000Z",
+      "endedAt": "2026-11-13T10:19:00.000Z"
+    },
+    {
+      "id": "Lg7Exp5",
+      "name": "Export to CSV",
+      "label": "Lg7Exp5 (export) — Export to CSV",
+      "attempts": {},
+      "fixRounds": 0,
+      "costUsd": 0,
+      "turns": 0,
+      "wallMs": 0,
+      "sessions": [],
+      "gates": [],
+      "checks": [],
+      "planStep": null,
+      "preVerify": null,
+      "step": null,
+      "state": "BLOCKED",
+      "reason": "dependency not merged: Lg3Sum9 (FAILED)",
+      "endedAt": "2026-11-13T10:19:00.000Z"
+    },
+    {
+      "id": "Lg8Hw01",
+      "name": "Receipt printer",
+      "label": "Lg8Hw01 (receipt-printer) — Receipt printer",
+      "attempts": {},
+      "fixRounds": 0,
+      "costUsd": 0,
+      "turns": 0,
+      "wallMs": 0,
+      "sessions": [],
+      "gates": [],
+      "checks": [],
+      "planStep": null,
+      "preVerify": null,
+      "step": null,
+      "state": "SKIPPED",
+      "reason": "TOR-08-Ab1Cd2E is a Safety requirement (hardware-in-the-loop)",
+      "endedAt": "2026-11-13T10:19:00.000Z"
+    }
+  ]
+}

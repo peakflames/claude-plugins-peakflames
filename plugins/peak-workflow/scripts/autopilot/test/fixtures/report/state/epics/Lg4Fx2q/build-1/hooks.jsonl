@@ -1,0 +1,1 @@
+{"t":"2026-11-13T06:10:00.000Z","hook":"PreToolUse","tool_name":"Bash","rule":"R4","decision":"deny","reason":"docker is denied (containers, VMs, system package managers, sudo and gh are off limits unattended)"}

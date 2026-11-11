@@ -1,0 +1,2 @@
+{"t":"2026-11-13T06:10:00.000Z","hook":"PreToolUse","tool_name":"AskUserQuestion","rule":"R8","decision":"answer","reason":"answered from policy: Start it"}
+{"hook":"PostToolUse","tool_name":"Read"}

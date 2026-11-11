@@ -1,0 +1,30 @@
+{
+  "pass": true,
+  "checks": [
+    {
+      "name": "verdict",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "sidecar-on-integration",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "no-waivers",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "tests-green-on-integration",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "requirements-health",
+      "pass": true,
+      "evidence": "x"
+    }
+  ]
+}

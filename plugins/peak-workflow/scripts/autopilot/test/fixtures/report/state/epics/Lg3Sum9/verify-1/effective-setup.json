@@ -1,0 +1,22 @@
+{
+  "command": [
+    "claude"
+  ],
+  "env": {},
+  "settings": "settings.json",
+  "init": {
+    "type": "system",
+    "subtype": "init",
+    "claude_code_version": "2.1.322",
+    "permissionMode": "acceptEdits",
+    "model": "sonnet",
+    "plugins": [
+      {
+        "name": "peak-workflow",
+        "path": "/plugins/peak-workflow",
+        "source": "peak-workflow@inline",
+        "version": "3.1.0"
+      }
+    ]
+  }
+}

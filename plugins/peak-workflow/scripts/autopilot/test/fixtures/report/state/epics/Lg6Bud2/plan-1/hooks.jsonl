@@ -1,0 +1,2 @@
+{"t":"2026-11-13T06:10:00.000Z","hook":"PreToolUse","tool_name":"AskUserQuestion","rule":"R8","decision":"answer","reason":"answered from policy: Start it"}
+{"t":"2026-11-13T06:10:00.000Z","hook":"PreToolUse","tool_name":"AskUserQuestion","rule":"R8","decision":"park","reason":"parked at human gate (unmatched): no policy row matches this question"}

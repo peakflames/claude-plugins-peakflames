@@ -1,0 +1,24 @@
+{
+  "step": "audit-2",
+  "epic": "Lg3Sum9",
+  "delta": true,
+  "parkOn": [
+    "stand-in",
+    "test-weakened",
+    "cannot-fail",
+    "never-ran-real"
+  ],
+  "decision": "proceed",
+  "recommend": "proceed",
+  "summary": "The fix changes one function. Its handoff claims a full test run that the digest does not show.",
+  "findings": [
+    {
+      "id": "F1",
+      "category": "claim-without-evidence",
+      "severity": "medium",
+      "evidence": "handoff.md:22; digest.md: no call that runs node --test after D14",
+      "explanation": "The handoff says the suite passed after the fix for TOR-03-Jm2Wq8z, but the last test run in the digest is before the final edit.",
+      "parks": false
+    }
+  ]
+}

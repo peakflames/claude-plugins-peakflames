@@ -6,7 +6,10 @@
 //
 //   { "<epic>/<step>": script,      e.g. "Lg1Csv7/build-1"   (most specific)
 //     "<epic>/<kind>": script,      e.g. "Lg1Csv7/build"
-//     "*/<kind>":      script }     kinds: plan, build, verify, plan-fix, fix
+//     "*/<kind>":      script }     kinds: plan, build, verify, plan-fix, fix, audit
+//
+// An audit step with no script is a clean audit: `structured_output` with no findings. A scripted
+// one sets `result.structured_output` to what the auditor would return.
 //
 //   script = { "actions": [ … ], "result": { …overrides… } | false, "exit": 0 }
 //
@@ -131,12 +134,13 @@ async function main() {
     fs.appendFileSync(process.env.FAKE_CLAUDE_LOG, JSON.stringify({ key: `${epic}/${step}`, epic, step, kind, argv, cwd: process.cwd(), env, prompt, pid: process.pid }) + '\n');
   }
   const scenario = JSON.parse(fs.readFileSync(process.env.FAKE_CLAUDE_SCENARIO, 'utf8'));
-  const script = fill(scenario[`${epic}/${step}`] ?? scenario[`${epic}/${kind}`] ?? scenario[`*/${kind}`]);
+  const script = fill(scenario[`${epic}/${step}`] ?? scenario[`${epic}/${kind}`] ?? scenario[`*/${kind}`]
+    ?? (kind === 'audit' ? { result: { structured_output: { findings: [], recommend: 'proceed', summary: 'fake auditor: nothing found' } } } : undefined));
   if (!script) throw new Error(`fake-claude: the scenario has no script for ${epic}/${step}`);
 
   let version = 'unknown';
   try { version = JSON.parse(fs.readFileSync(path.join(plugin, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { /* no plugin dir */ }
-  emit({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), model: flag('--model'), permissionMode: flag('--permission-mode'), claude_code_version: 'fake', tools: ['Bash', 'Read', 'Edit', 'Write'], plugins: [{ name: 'peak-workflow', path: plugin, source: 'peak-workflow@inline', version }] });
+  if (flag('--output-format') !== 'json') emit({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), model: flag('--model'), permissionMode: flag('--permission-mode'), claude_code_version: 'fake', tools: ['Bash', 'Read', 'Edit', 'Write'], plugins: [{ name: 'peak-workflow', path: plugin, source: 'peak-workflow@inline', version }] });
 
   for (const a of script.actions ?? []) { await act(a); if (hookStopped) break; }
 

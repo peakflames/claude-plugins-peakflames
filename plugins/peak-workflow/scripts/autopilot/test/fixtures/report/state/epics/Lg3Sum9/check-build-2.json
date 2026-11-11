@@ -1,0 +1,50 @@
+{
+  "pass": true,
+  "checks": [
+    {
+      "name": "branch-and-commit",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "clean-tree",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "sidecar",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "handoff",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "traceability",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "tests-green",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "requirements-health",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "scope",
+      "pass": true,
+      "evidence": "x"
+    },
+    {
+      "name": "test-integrity",
+      "pass": true,
+      "evidence": "x"
+    }
+  ]
+}

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// peak-workflow autopilot driver (PoC, P1). Node 22+, no dependencies.
+// peak-workflow autopilot driver (PoC). Node 22+, no dependencies.
 //
 //   node driver.mjs preflight --project <dir> [--json]
 //   node driver.mjs run --project <dir> [--state <dir>] [--queue id,id] [--dry-run] [--resume]
 //                       [--claude-bin <path>]
 //   node driver.mjs stop --state <dir>
+//   node driver.mjs report --state <dir>                      re-render report.md and report.json
+//   node driver.mjs decide --state <dir> --gate <file> --answer <text> [--note <text>]
 //
 // Design: plugins/peak-workflow/docs/autopilot-poc-plan.md §6 and §9; SPIKE.md wins where they
 // differ. The driver is a plain script: it launches one headless Claude Code session per step,
@@ -15,11 +17,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { lintPlan, parseSidecar } from './lib.mjs';
+import { replayableKinds, writeReport } from './report.mjs';
 
 export { lintPlan, parseSidecar };
 
-export const DRIVER_VERSION = '0.1.0';
+export const DRIVER_VERSION = '0.2.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PLUGIN_DIR = path.resolve(HERE, '..', '..');
 
@@ -30,6 +34,7 @@ const KINDS = {
   verify: { prefix: 'verify', role: 'verifier', state: 'VERIFY' },
   planFix: { prefix: 'plan-fix', role: 'planner', state: 'FIX_PLAN' },
   fix: { prefix: 'fix', role: 'builder', state: 'FIX_BUILD' },
+  audit: { prefix: 'audit', role: 'auditor', state: 'AUDIT' },
 };
 const PLAN_DIR = 'docs/implementation-plan';
 
@@ -222,6 +227,21 @@ function readRequirements(root) {
 }
 
 /**
+ * AC scope and cost review, the deterministic half (guardrail G12): words in a requirement's
+ * Scenario that suggest it needs something an unattended run does not have or should not spend.
+ * The skill writes the judgement; this only points.
+ */
+const SCOPE_FLAGS = [
+  ['network', /\b(https?:\/\/|url|api\b|download|upload|online|internet|server|endpoint|webhook|e-?mail|smtp|live (rate|price|data))/i],
+  ['keys or accounts', /\b(api key|token|credential|password|secret|sign[- ]?in|log[- ]?in|oauth|account)\b/i],
+  ['containers or other machines', /\b(docker|container|kubernetes|virtual machine|\bvm\b|ssh|remote host)\b/i],
+  ['big data', /\b(\d[\d,.]*\s*(gb|tb|mb|million|billion)|\d{1,3}(,\d{3}){2,}|[1-9]\d{5,}\s+(rows|records|files|lines|entries|transactions))\b/i],
+  ['long run', /\b(\d+\s*(hours?|hrs?|days?)|\d{2,}\s*minutes|overnight|soak|endurance)\b/i],
+  ['other platforms', /\b(windows|linux|ubuntu|ios|android|safari|firefox|chrome|edge|raspberry)\b/i],
+];
+export const scopeFlags = (text) => SCOPE_FLAGS.filter(([, re]) => re.test(text)).map(([name]) => name);
+
+/**
  * Preflight: which epics may run unattended. Reads only files (and `tor-lifecycle`), so it is
  * safe on the user's repository and in a dry run.
  */
@@ -243,7 +263,8 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR } = {}) {
   try { for (const r of JSON.parse(st.out).requirements ?? []) states[r.tor] = r; } catch { /* reported per anchor below */ }
   const explicit = new Set(config.explicit ?? []);
 
-  const epics = readEpics(root).map((e) => {
+  const epics = readEpics(root).map((epic) => {
+    let e = epic;
     const reasons = []; let eligibility = 'eligible'; let humanCheck = false;
     const set = (level, why) => { reasons.push(why); if (eligibility !== 'skip' && eligibility !== 'complete') eligibility = level; };
     if (e.status === 'Complete') { eligibility = 'complete'; reasons.push('already Complete'); return { ...e, eligibility, humanCheck, reasons }; }
@@ -260,6 +281,7 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR } = {}) {
       else if (/operator-observed/.test(r.text)) { humanCheck = true; reasons.push(`${tor} is operator-observed: parks for a person before verify`); }
     }
     if (ui && e.hasScreens) { humanCheck = true; reasons.push('UI epic: parks for a human look before verify'); }
+    e = { ...e, scopeFlags: e.anchors.map((tor) => ({ tor, flags: scopeFlags(reqs[tor]?.text ?? '') })).filter((x) => x.flags.length) };
     if (tbd) set('park', 'CLAUDE.md still has values to decide (TBD / Not decided yet)');
     return { ...e, eligibility, humanCheck, reasons };
   });
@@ -316,9 +338,38 @@ export function sessionSettings() {
   };
 }
 
-/** The exact host-mode command for one step (SPIKE.md "Host mode"). Pure: used by the dry run too. */
-export function sessionCommand(config, { kind, epicId, stateDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [] }) {
+/**
+ * The exact command for one step: host mode for plan, build and verify (SPIKE.md "Host mode"),
+ * plain `-p` for the auditor (plan §6.6 "Audit"). Pure: used by the dry run too.
+ */
+export function sessionCommand(config, { kind, epicId, stateDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema }) {
   const b = config.budgets[kind];
+  const clone = path.join(stateDir, 'clone');
+  const env = {
+    AUTOPILOT_STATE: stateDir,
+    AUTOPILOT_ROLE: KINDS[kind].role,
+    AUTOPILOT_EPIC: epicId,
+    AUTOPILOT_STEP: stepDir,
+    AUTOPILOT_HOOKS: path.join(pluginDir, 'scripts', 'autopilot', 'hooks'),
+    CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
+    BASH_MAX_TIMEOUT_MS: '900000',
+    BASH_DEFAULT_TIMEOUT_MS: '300000',
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '60000',
+  };
+  if (kind === 'audit') {
+    // The auditor needs no gate tools, so it stays on plain `-p` (SPIKE.md correction 1): read-only
+    // tools, the bundle as its working directory, the clone readable through --add-dir.
+    const args = [
+      '-p', prompt ?? read(path.join(AUDIT_DIR, 'prompt.md')),
+      '--settings', path.join(stepDir, 'settings.json'),
+      '--tools', 'Read,Grep,Glob', '--permission-mode', 'dontAsk',
+      '--add-dir', clone,
+      '--output-format', 'json', '--json-schema', schema ?? JSON.stringify(SCHEMA),
+      '--max-turns', String(b.turns), '--max-budget-usd', String(b.usd),
+      '--session-id', sessionId, '--model', b.model, '--no-session-persistence',
+    ];
+    return { bin: config.claudeBin, args, env, cwd: path.join(stepDir, 'bundle'), wallMin: b.wallMin, host: false };
+  }
   const args = [
     '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
     '--permission-prompt-tool', 'stdio', '--include-hook-events',
@@ -331,18 +382,7 @@ export function sessionCommand(config, { kind, epicId, stateDir, stepDir, plugin
     '--session-id', sessionId, '--model', b.model,
   ];
   for (const f of appendFiles) args.push('--append-system-prompt-file', f);
-  const env = {
-    AUTOPILOT_STATE: stateDir,
-    AUTOPILOT_ROLE: KINDS[kind].role,
-    AUTOPILOT_EPIC: epicId,
-    AUTOPILOT_STEP: stepDir,
-    AUTOPILOT_HOOKS: path.join(pluginDir, 'scripts', 'autopilot', 'hooks'),
-    CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
-    BASH_MAX_TIMEOUT_MS: '900000',
-    BASH_DEFAULT_TIMEOUT_MS: '300000',
-    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '60000',
-  };
-  return { bin: config.claudeBin, args, env, cwd: path.join(stateDir, 'clone'), wallMin: b.wallMin };
+  return { bin: config.claudeBin, args, env, cwd: clone, wallMin: b.wallMin, host: true };
 }
 
 const userLine = (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] } });
@@ -412,13 +452,19 @@ export function dryRun({ project, stateDir, config, pluginDir = PLUGIN_DIR, out 
       p(`    $ ${[c.bin, ...c.args].map(shellQuote).join(' ')} > ${shellQuote(path.join(stepDir, 'stream.jsonl'))} 2> ${shellQuote(path.join(stepDir, 'stderr.log'))}`);
       p(`    stdin: ${userLine(prompt)}`);
       if (kind === 'build') {
-        p(`  audit-1 — ${exists(path.join(pluginDir, 'scripts', 'autopilot', 'audit', 'prompt.md')) ? 'advisory auditor' : 'skipped: the auditor is not built yet (P3)'}`);
+        const auditDir = path.join(stateDir, 'epics', e.id, 'audit-1');
+        const a = sessionCommand(config, { kind: 'audit', epicId: e.id, stateDir, stepDir: auditDir, pluginDir, sessionId: '<uuid>', prompt: '<audit/prompt.md>', schema: '<audit/schema.json>' });
+        p(`  audit-1 — role auditor (advisory, read-only), wall clock ${a.wallMin} min; the driver parks only on a high finding in: ${config.audit.parkOn.join(', ')}`);
+        p(`    cwd:   ${a.cwd}   (the bundle: diff.patch, spec.md, tors.md, handoff.md, digest.md, test-changes.jsonl)`);
+        p(`    env:   ${Object.entries(a.env).map(([k, v]) => `${k}=${shellQuote(v)}`).join(' ')}`);
+        p(`    $ ${[a.bin, ...a.args].map(shellQuote).join(' ')} < /dev/null > ${shellQuote(path.join(auditDir, 'stream.jsonl'))} 2> ${shellQuote(path.join(auditDir, 'stderr.log'))}`);
         if (e.humanCheck) p('  (this epic parks here for a person; no verify session runs)');
       }
     }
     p('  fix round (at most one): plan-fix-1 and fix-1 use the plan and build commands with');
     p(`    --append-system-prompt-file ${shellQuote(path.join(stateDir, 'epics', e.id, 'fix-brief.md'))} and the fix budgets`);
     p(`    (plan-fix: ${config.budgets.planFix.turns} turns, $${config.budgets.planFix.usd}, ${config.budgets.planFix.wallMin} min; fix: ${config.budgets.fix.turns} turns, $${config.budgets.fix.usd}, ${config.budgets.fix.wallMin} min)`);
+    p('    after it the auditor runs again on the changes since its last audit only');
   }
 
   p(); p('Settings JSON (written as each step\'s settings.json):');
@@ -583,7 +629,7 @@ class Run {
     const stepDir = path.join(this.epicDir(e), name);
     fs.mkdirSync(stepDir, { recursive: true });
     const sessionId = randomUUID();
-    const { prompt, appendFiles = [] } = prepare(stepDir);
+    const { prompt, appendFiles = [] } = prepare(stepDir) ?? {};
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings());
     const cmd = sessionCommand(cfg, { kind, epicId: e.id, stateDir: this.stateDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles });
 
@@ -598,7 +644,7 @@ class Run {
     writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb }); // read by hook R5
     const isScript = /\.(mjs|cjs|js)$/.test(cmd.bin);
     const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, {
-      cwd: this.clone, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: cmd.cwd, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'],
     });
     const stream = fs.createWriteStream(path.join(stepDir, 'stream.jsonl'));
     const stderr = fs.createWriteStream(path.join(stepDir, 'stderr.log'));
@@ -622,10 +668,11 @@ class Run {
     });
     if (child.pid) {
       e.step.pid = child.pid; this.save();
-      send(userLine(prompt));
+      if (cmd.host) send(userLine(prompt)); else child.stdin.end(); // plain -p: the prompt is an argument (stdin as `< /dev/null`)
       readline.createInterface({ input: child.stdout }).on('line', (line) => {
         stream.write(line + '\n');
         let d; try { d = JSON.parse(line); } catch { return; }
+        if (Array.isArray(d)) { s.init = d.find((x) => x?.type === 'system' && x.subtype === 'init') ?? s.init; d = d.find((x) => x?.type === 'result') ?? {}; }
         if (d.type === 'system' && d.subtype === 'init') s.init = d;
         if (d.type === 'control_request') {
           // The host approves nothing (SPIKE.md): hooks and acceptEdits decide; anything that reaches us is denied and logged.
@@ -830,11 +877,57 @@ class Run {
     return 'FIX_PLAN';
   }
 
-  doAudit(e) {
+  /**
+   * AUDIT (§6.10): a fresh read-only session reads the bundle and reports findings. The driver
+   * decides from `config.audit.parkOn`; the auditor's `recommend` is recorded and has no effect.
+   * After a fix round only the changes since the last audited tip are audited.
+   */
+  async doAudit(e) {
     e.state = 'AUDIT'; this.save();
-    // The auditor (bundle, prompt, schema) is P3. Until it exists the step is recorded as skipped.
-    e.audit = { skipped: 'the auditor is not built yet (P3)' };
     const m = this.meta(e);
+    e.audits = e.audits ?? [];
+    const last = e.audits.at(-1);
+    const audited = new Set(e.audits.flatMap((a) => a.steps ?? []));
+    const steps = e.sessions.filter((x) => /^(build|fix)-\d+$/.test(x.name) && !audited.has(x.name)).map((x) => x.name);
+    let bundle = null; let s;
+    try {
+      s = await this.step(e, 'audit', (stepDir) => {
+        bundle = buildBundle({
+          clone: this.clone, pluginDir: this.pluginDir, bundleDir: path.join(stepDir, 'bundle'), epic: m, integration: this.state.integration,
+          base: last?.tip ?? null, steps: [...new Set(steps)].map((name) => ({ name, dir: path.join(this.epicDir(e), name) })),
+        });
+      });
+    } catch (err) {
+      return this.park(e, `auditor: the audit could not start (${err.message}); not verified without an audit`);
+    }
+    if (!s) return null;
+
+    const value = auditOutput(s.result);
+    const valid = validateAudit(value);
+    if (!valid.ok) {
+      writeJson(path.join(s.stepDir, 'audit.json'), { unusable: valid.problems, raw: s.result?.structured_output ?? s.result?.result ?? null });
+      return this.park(e, `auditor: ${s.name} returned no usable result (${valid.problems.join('; ')}); not verified without an audit`);
+    }
+    const judged = judgeAudit(value, this.config.audit.parkOn);
+    const file = `${s.name}/audit.json`;
+    writeJson(path.join(this.epicDir(e), file), { step: s.name, epic: e.id, branch: m.branch, delta: bundle.delta, base: bundle.base, tip: bundle.tip, parkOn: this.config.audit.parkOn, decision: judged.parks.length ? 'park' : 'proceed', recommend: judged.recommend, summary: judged.summary, findings: judged.findings });
+    e.audits.push({ step: s.name, file, delta: bundle.delta, base: bundle.base, tip: bundle.tip, steps: bundle.steps, findings: judged.findings.length, parks: judged.parks.map((f) => f.id), recommend: judged.recommend });
+    e.audit = { step: s.name, file, findings: judged.findings.length, parks: judged.parks.length, recommend: judged.recommend };
+    this.save();
+    this.log(`${e.id}: ${s.name} — ${judged.findings.length} finding(s), ${judged.parks.length} that park; the auditor recommends ${judged.recommend} (no effect)`);
+
+    if (judged.parks.length) {
+      const list = judged.parks.map((f) => `${f.id} ${f.category}`).join(', ');
+      this.writeGate(e, {
+        kind: 'audit', skillStep: 'autopilot AUDIT (before wrapup-epic)', session: s.name,
+        question: `The auditor reported ${judged.parks.length} high finding(s) on ${m.label}: ${judged.parks.map((f) => `${f.id} ${f.category} — ${f.explanation}`).join(' | ')}. Are they real?`,
+        options: ['Real — fix before verify', 'Not real — verify as built'],
+        why: `a high finding in a park category (${this.config.audit.parkOn.join(', ')}); the auditor only advises, so a person judges it`,
+        artifacts: [`epics/${e.id}/${file}`, `epics/${e.id}/${s.name}/bundle/diff.patch`],
+        resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${e.id} to fix it, or /peak-workflow:wrapup-epic ${e.id} to verify it as built`,
+      });
+      return this.park(e, `auditor: ${list} (${s.name})`);
+    }
     if (m.humanCheck) {
       this.writeGate(e, { kind: 'human-check', skillStep: 'wrapup-epic Step 1.2 item 7', question: m.reasons.join('; '), options: ['Looks right', 'Not right — describe'], why: 'autopilot never self-approves a look', artifacts: [], resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}` });
       return this.park(e, 'human check needed before verify');
@@ -932,7 +1025,7 @@ class Run {
       else if (phase === 'FIX_BUILD') phase = await this.doBuild(e, true);
       else if (phase === 'CHECK_BUILD') phase = this.doCheckBuild(e);
       else if (phase === 'CHECK_BUILD_INTERRUPTED') phase = this.doCheckBuild(e, { interrupted: true });
-      else if (phase === 'AUDIT') phase = this.doAudit(e);
+      else if (phase === 'AUDIT') phase = await this.doAudit(e);
       else if (phase === 'VERIFY') phase = await this.doVerify(e);
       else if (phase === 'CHECK_VERIFY') phase = this.doCheckVerify(e);
       else throw new Error(`unknown phase ${phase}`);
@@ -1016,7 +1109,7 @@ class Run {
         this.state.status = 'running'; this.state.stoppedBecause = null;
         this.log(`resuming run ${this.state.run}`);
       } else {
-        this.state = { run: new Date().toISOString(), driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, queue: [] };
+        this.state = { run: new Date().toISOString(), driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, queue: [] };
       }
 
       // Preflight reads the integration line, so the clone must be on it.
@@ -1028,6 +1121,8 @@ class Run {
       if (!resuming) {
         this.state.queue = buildQueue(this.pre, cfg).map((m) => ({ id: m.id, name: m.name, label: m.label, state: 'QUEUED', reason: null, attempts: {}, fixRounds: 0, costUsd: 0, turns: 0, wallMs: 0, sessions: [], gates: [], checks: [], planStep: null, preVerify: null, step: null }));
         writeJson(path.join(this.stateDir, 'preflight.json'), this.pre);
+        this.state.testCommand = this.pre.testCommand;
+        this.carryGates();
       } else {
         // Epics already in the run keep the eligibility they started with; their sidecars have moved since.
         for (const q of this.state.queue) { const m = this.metaById.get(q.id); if (m && q.state !== 'QUEUED') { m.eligibility = 'eligible'; m.reasons = []; } }
@@ -1067,7 +1162,7 @@ class Run {
       this.state.status = this.stopReason ? 'STOPPED' : 'DONE';
       this.state.endedAt = new Date().toISOString();
       this.save();
-      this.writeReport();
+      writeReport(this.stateDir);
       this.log(`run ended: ${this.state.stoppedBecause}; report at ${path.join(this.stateDir, 'report.md')}`);
       return this.state;
     } finally {
@@ -1075,30 +1170,105 @@ class Run {
     }
   }
 
-  // ---- report (data and a plain rendering; the full renderer is P3) ------------------------------
-
-  writeReport() {
-    const s = this.state;
-    const epics = s.queue.map((q) => ({ id: q.id, label: q.label, outcome: TERMINAL.has(q.state) ? q.state : 'NOT STARTED', reason: q.reason, checks: q.checks, audit: q.audit ?? null, gates: q.gates, costUsd: q.costUsd, turns: q.turns, wallMs: q.wallMs, sessions: q.sessions, testChanges: q.testChanges ?? [], rejected: q.rejected ?? [], planApprovedBy: q.planStep ? 'lint, not a person' : null }));
-    const report = { run: s.run, ended: s.endedAt, stoppedBecause: s.stoppedBecause, integration: s.integration, clone: this.clone, startSha: s.startSha, spentUsd: s.spentUsd, budgetUsd: this.config.runBudgetUsd, baseRed: s.baseRed ?? null, epics, referee: { blocked: [], testChanges: epics.flatMap((e) => e.testChanges.map((t) => ({ epic: e.id, ...t }))) } };
-    writeJson(path.join(this.stateDir, 'report.json'), report);
-    const parked = epics.filter((e) => e.outcome === 'PARKED');
-    const merged = epics.filter((e) => e.outcome === 'MERGED');
-    const next = [];
-    if (s.baseRed) next.push(`Fix the failing tests on \`${s.integration}\` (\`${this.config.testCommand}\`), then run again.`);
-    if (parked.length) next.push(`Decide ${parked.length} parked epic(s): ${parked.map((e) => e.id).join(', ')} (gate files in \`gates/\`).`);
-    if (merged.length) next.push(`Review and bring in the merged work:\n   \`git fetch ${this.clone} ${s.integration}:autopilot/${s.integration} && git log ${s.integration}..autopilot/${s.integration}\``);
-    const md = [
-      `# Autopilot — ${s.run} → ${s.endedAt} (stopped: ${s.stoppedBecause})`,
-      `Integration line: ${s.integration} in ${this.clone} (not pushed). Spent $${s.spentUsd.toFixed(2)} of $${this.config.runBudgetUsd}.`,
-      '', '## Do this next', ...(next.length ? next.map((n, i) => `${i + 1}. ${n}`) : ['Nothing to do.']),
-      '', '## Results', '| Epic | Outcome | Why | Evidence | Cost | Time |', '|---|---|---|---|---|---|',
-      ...epics.map((e) => `| ${e.label} | ${e.outcome} | ${(e.reason ?? '—').replace(/\|/g, '\\|')} | ${e.checks.at(-1)?.file ?? e.gates.at(-1) ?? '—'} | $${e.costUsd.toFixed(2)} | ${Math.round(e.wallMs / 60000)} m |`),
-      '', '## Notes', '- Every plan was approved by lint, not by a person.', '- Auditor: not built yet (P3); no audit ran.',
-      ...report.referee.testChanges.map((t) => `- Existing test changed in ${t.epic}: ${t.path} — ${t.reason ?? 'NO REASON RECORDED'}`), '',
-    ].join('\n');
-    writeAtomic(path.join(this.stateDir, 'report.md'), md);
+  /**
+   * A person's answers from the last run (`config.carryGatesFrom`, written by the skill): decided,
+   * unused gate files of queued epics are copied in, so hook R8 answers each of them once.
+   */
+  carryGates() {
+    const from = this.config.carryGatesFrom;
+    if (!from) return;
+    const dir = path.join(path.resolve(from), 'gates');
+    const queued = new Set(this.state.queue.map((q) => q.id));
+    for (const f of exists(dir) ? fs.readdirSync(dir).filter((n) => n.endsWith('.json')).sort() : []) {
+      let g; try { g = readJson(path.join(dir, f)); } catch { continue; }
+      if (!g.decided?.answer || g.decided.used || !queued.has(g.epic)) continue;
+      writeJson(path.join(this.stateDir, 'gates', f), { ...g, carriedFrom: path.join(dir, f) });
+      this.log(`${g.epic}: carried in the decided gate ${f} (${g.kind}: "${g.decided.answer}" by ${g.decided.by})`);
+    }
   }
+}
+
+/** A new run never reuses a state directory that already holds a run: `<project>.autopilot`, then `-2`, `-3`, … */
+export function nextStateDir(project) {
+  let next = `${project}.autopilot`;
+  for (let n = 2; exists(path.join(next, 'state.json')); n++) next = `${project}.autopilot-${n}`;
+  return next;
+}
+
+/** The last run's saved settings, minus what belongs to that run alone; null when there is none. */
+export function carriedSettings(project, stateDir) {
+  const base = `${project}.autopilot`;
+  const dirs = [base, ...Array.from({ length: 200 }, (_, i) => `${base}-${i + 2}`)].filter((d) => d !== stateDir && exists(path.join(d, 'state.json')) && exists(path.join(d, 'config.json')));
+  if (!dirs.length) return null;
+  let saved; try { saved = readJson(path.join(dirs.at(-1), 'config.json')); } catch { return null; }
+  for (const k of ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'carryGatesFrom', 'testCommand', 'testDirs']) delete saved[k];
+  return Object.keys(saved).length ? saved : null;
+}
+
+/** What the skill needs to know before it offers a launch: read-only facts about the project and its state directory. */
+export function launchFacts(project, stateDir, config) {
+  const refuse = []; const warn = [];
+  const integration = detectIntegration(project);
+  if (!integration) refuse.push(`${project} is not the root of a git repository with a develop, main or master branch`);
+  const dirty = integration ? gitRun(project, 'status', '--porcelain').out.split('\n').filter(Boolean).length : 0;
+  if (dirty) warn.push(`${dirty} uncommitted change(s) in the project are not part of the run: autopilot clones committed work on ${integration}`);
+  let freeGb = null;
+  try { const f = fs.statfsSync(exists(stateDir) ? stateDir : path.dirname(stateDir)); freeGb = +((f.bavail * f.bsize) / 1024 ** 3).toFixed(1); } catch { /* unknown */ }
+  if (freeGb !== null && freeGb < config.diskFloorGb) refuse.push(`free disk is ${freeGb} GB, under the ${config.diskFloorGb} GB floor`);
+  const bin = sh(/\.(mjs|cjs|js)$/.test(config.claudeBin) ? process.execPath : config.claudeBin, ['--version'], { timeout: 20000 });
+  if (bin.code !== 0 && !/\.(mjs|cjs|js)$/.test(config.claudeBin)) refuse.push(`\`${config.claudeBin} --version\` failed: Claude Code is not on PATH`);
+  if (config.claudeBin !== 'claude') warn.push(`claudeBin is ${config.claudeBin}, not the real \`claude\``);
+  if (config.endBy && Date.parse(config.endBy) <= Date.now()) { warn.push(`the saved end time ${config.endBy} is in the past; using the next 06:30 instead`); config.endBy = nextEndBy(); }
+
+  // Earlier runs: the default state directory and its numbered siblings.
+  const runs = [];
+  const parent = path.dirname(project); const base = `${path.basename(project)}.autopilot`;
+  for (const name of fs.readdirSync(parent).filter((n) => n === base || new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`).test(n)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))) {
+    const dir = path.join(parent, name);
+    let st = null; try { st = readJson(path.join(dir, 'state.json')); } catch { /* no run yet */ }
+    let lock = null; try { lock = readJson(path.join(dir, 'lock')); } catch { /* none */ }
+    const running = !!(lock?.pid && pidAlive(lock.pid));
+    const gateDir = path.join(dir, 'gates');
+    const gates = (exists(gateDir) ? fs.readdirSync(gateDir).filter((f) => f.endsWith('.json')) : []).map((f) => { try { return readJson(path.join(gateDir, f)); } catch { return {}; } });
+    let unfetched = null;
+    if (st && integration && exists(path.join(dir, 'clone'))) {
+      const tip = gitRun(path.join(dir, 'clone'), 'rev-parse', st.integration).out;
+      unfetched = tip && tip !== st.startSha && !gitOk(project, 'merge-base', '--is-ancestor', tip, integration);
+    }
+    runs.push({ stateDir: dir, started: !!st, run: st?.run ?? null, status: running ? 'running' : st ? st.status : 'not started', pid: running ? lock.pid : null, stoppedBecause: st?.stoppedBecause ?? null,
+      undecidedGates: gates.filter((g) => !g.decided).length, decidedUnusedGates: gates.filter((g) => g.decided?.answer && !g.decided.used).length, mergedWorkNotInProject: unfetched });
+  }
+  const live = runs.find((r) => r.status === 'running');
+  if (live) refuse.push(`autopilot is already running for this project (pid ${live.pid}, ${live.stateDir})`);
+  const lastRun = runs.filter((r) => r.started).at(-1) ?? null;
+  if (lastRun?.mergedWorkNotInProject) warn.push(`the last run merged work that is not on ${integration} in the project yet (${lastRun.stateDir}); a new run starts from the project and would build those epics again`);
+  if (lastRun?.undecidedGates) warn.push(`the last run has ${lastRun.undecidedGates} undecided gate(s); decide them first with /peak-workflow:autopilot report`);
+  if (exists(path.join(stateDir, 'state.json'))) refuse.push(`${stateDir} already holds a run; a new run needs a fresh state directory`);
+  if (process.platform === 'darwin') warn.push('a laptop with the lid closed on battery may still sleep, even under caffeinate: leave it on power');
+  return {
+    ok: refuse.length === 0, refuse, warn, integration, freeGb, stateDir, configFileExists: exists(path.join(stateDir, 'config.json')), runs, lastRun,
+    carryGatesFrom: lastRun?.decidedUnusedGates ? lastRun.stateDir : null, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
+  };
+}
+
+/** Records a person's answer in a gate file (§6.8). The driver never chooses the answer; it only writes what it is given. */
+export function decideGate(stateDir, gateName, answer, { by, note } = {}) {
+  const file = path.join(stateDir, 'gates', path.basename(gateName));
+  if (!exists(file)) throw new Error(`no gate file ${file}`);
+  const gate = readJson(file);
+  if (gate.decided?.used) throw new Error(`${path.basename(file)} was already decided and used (${gate.decided.used.date})`);
+  const options = gate.options ?? [];
+  const label = options.find((o) => o.trim().toLowerCase() === String(answer).trim().toLowerCase());
+  if (options.length && !label) throw new Error(`"${answer}" is not one of this gate's options: ${options.map((o) => `"${o}"`).join(', ')}`);
+  if (!String(answer ?? '').trim()) throw new Error('an answer is required');
+  let project = null; try { project = readJson(path.join(stateDir, 'config.json')).project; } catch { /* no config */ }
+  const who = by ?? (project ? sh('git', ['config', 'user.name'], { cwd: project }).out : '') ?? '';
+  if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
+  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(note ? { note } : {}) };
+  writeJson(file, gate);
+  const effect = replayableKinds().has(gate.kind) ? 'next-run' : 'by-hand';
+  if (exists(path.join(stateDir, 'state.json'))) writeReport(stateDir);
+  return { gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect, resume: effect === 'by-hand' ? gate.resume ?? null : null };
 }
 
 /** Programmatic entry point (the CLI and the tests both use it). */
@@ -1132,12 +1302,18 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--json]\n       driver.mjs run [--project <dir>] [--state <dir>] [--queue id,id] [--dry-run] [--resume] [--claude-bin <path>] [--verbose]\n       driver.mjs stop --state <dir>';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--state <dir>] [--json]\n       driver.mjs run [--project <dir>] [--state <dir>] [--queue id,id] [--dry-run] [--resume] [--claude-bin <path>] [--verbose]\n       driver.mjs stop --state <dir>\n       driver.mjs report --state <dir>\n       driver.mjs decide --state <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]';
   if (o.help || !cmd) { console.log(usage); return 0; }
   if (cmd === 'preflight') {
     if (!o.project) throw new Error('preflight needs --project');
     const root = path.resolve(o.project);
-    const pre = preflight(root, loadConfig(path.resolve(o.state ?? `${root}.autopilot`), root));
+    // Without --state, the directory a new run would use: the first one that holds no run yet.
+    const state = o.state ? path.resolve(o.state) : nextStateDir(root);
+    // A fresh state directory inherits the settings (not the queue or end time) the last run was confirmed with.
+    const carried = exists(path.join(state, 'config.json')) ? null : carriedSettings(root, state);
+    const config = loadConfig(state, root, carried ?? {});
+    const pre = preflight(root, config);
+    pre.launch = { ...launchFacts(root, state, config), carriedSettings: carried };
     if (o.json) console.log(JSON.stringify(pre, null, 2));
     else { pre.refuse.forEach((r) => console.log(`REFUSE: ${r}`)); pre.epics.forEach((e) => console.log(`${e.label}  [${e.eligibility}${e.humanCheck ? ', human check' : ''}]  deps: ${e.deps.join(', ') || '—'}  ${e.reasons.join('; ')}`)); }
     return pre.ok ? 0 : 1;
@@ -1156,6 +1332,17 @@ async function main(argv) {
     const holder = () => { try { return readJson(lock).pid; } catch { return null; } };
     for (let pid = holder(); pid && pidAlive(pid); pid = holder()) await sleep(1000);
     console.log(exists(path.join(state, 'report.md')) ? `Stopped. Report: ${path.join(state, 'report.md')}` : 'No driver is running. Remove the STOP file before the next run.');
+    return 0;
+  }
+  if (cmd === 'report') {
+    if (!o.state) throw new Error('report needs --state');
+    const r = writeReport(path.resolve(o.state));
+    console.log(`${path.join(path.resolve(o.state), 'report.md')} (${r.epics.length} epic(s); ${r.stoppedBecause ?? 'still running'})`);
+    return 0;
+  }
+  if (cmd === 'decide') {
+    if (!o.state || !o.gate || o.answer === undefined) throw new Error('decide needs --state, --gate and --answer');
+    console.log(JSON.stringify(decideGate(path.resolve(o.state), o.gate, o.answer, { by: o.by, note: o.note }), null, 2));
     return 0;
   }
   throw new Error(`unknown command ${cmd}\n${usage}`);

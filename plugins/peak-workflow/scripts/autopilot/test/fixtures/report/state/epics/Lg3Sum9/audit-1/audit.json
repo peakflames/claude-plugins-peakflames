@@ -1,0 +1,15 @@
+{
+  "step": "audit-1",
+  "epic": "Lg3Sum9",
+  "delta": false,
+  "parkOn": [
+    "stand-in",
+    "test-weakened",
+    "cannot-fail",
+    "never-ran-real"
+  ],
+  "decision": "proceed",
+  "recommend": "proceed",
+  "summary": "Nothing found.",
+  "findings": []
+}

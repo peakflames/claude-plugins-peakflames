@@ -1,0 +1,21 @@
+{
+  "session": "audit-1",
+  "branch": "feature/epic-Lg4Fx2q-currency",
+  "branchTip": null,
+  "artifacts": [
+    "epics/Lg4Fx2q/audit-1/audit.json",
+    "epics/Lg4Fx2q/audit-1/bundle/diff.patch"
+  ],
+  "decided": null,
+  "epic": "Lg4Fx2q",
+  "epicName": "Currency conversion",
+  "kind": "audit",
+  "skillStep": "autopilot AUDIT (before wrapup-epic)",
+  "question": "The auditor reported 2 high finding(s) on Lg4Fx2q (currency) — Currency conversion: F1 stand-in — every test replaces the fetch with fakeRates() | F2 test-weakened — the rounding assertion was loosened. Are they real?",
+  "options": [
+    "Real — fix before verify",
+    "Not real — verify as built"
+  ],
+  "why": "a high finding in a park category; the auditor only advises, so a person judges it",
+  "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built"
+}

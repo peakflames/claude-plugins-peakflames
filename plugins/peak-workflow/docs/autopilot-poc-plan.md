@@ -997,6 +997,35 @@ dry-run simulation as `plugins/peak-workflow/CLAUDE.md` "Validating Changes" des
 
 **Exit:** the skill launches a dry-run autopilot run end to end and presents its report.
 
+**Status: done 2026-11-11 — exit met.** 17 new tests green (auditor 10, report 4, skill 3), plus
+one live auditor test (`AUTOPILOT_LIVE=1`): on the canned build that widens a tolerance in an
+existing test the real auditor returned a high `test-weakened` finding; on the clean build, none
+that parks (about $0.25 each on Opus). The skill test runs SKILL.md's own launch line against
+`fake-claude.mjs`: readiness, `config.json`, detached run, report, a decided gate replayed once in
+the next run. Deviations and additions:
+
+- The auditor's findings are in `audit-N/audit.json` (with the driver's decision per finding);
+  `audit-N/result.json` is the raw CLI result, as for every other step.
+- `--json-schema` takes the schema text, not a path; the result arrives as `structured_output`
+  through a `StructuredOutput` tool call, which the referee lets the auditor make.
+- The digest is built from `hooks.jsonl` and each session's last message (`result.json`);
+  `stream.jsonl` is not parsed.
+- An audit that cannot start, or returns nothing usable, parks the epic: nothing is verified
+  without an audit.
+- A new run always gets a fresh state directory (`<project>.autopilot`, then `-2`, `-3`, …).
+  `config.carryGatesFrom` copies the last run's decided, unused gates in, so R8 answers each once.
+  Gates the driver writes itself (`audit`, `human-check`, `plan-lint`, `preflight`) and unmatched
+  questions cannot be replayed; the report gives their by-hand `resume` command.
+- Added `driver.mjs decide` (the skill records a gate answer through it; an answer outside the
+  gate's options is refused) and `driver.mjs report` (re-render). `preflight --json` gained a
+  `launch` block and per-epic `scopeFlags` (the deterministic half of the G12 review).
+- A fresh state directory inherits the last run's saved settings (`launch.carriedSettings`:
+  budgets, scope, `claudeBin`, …) but never its queue, end time or run budget.
+- Skill dry-run simulation: four passes by sub-agents that executed SKILL.md against
+  `fake-claude.mjs` on a `git init` copy of the seed; the last two had no Critical finding, and
+  every finding from all four is fixed.
+- `README.md` and the other skills are untouched: discoverability is deferred to P6 (§5.2).
+
 ### P4: Real unattended runs (typically overnight) on the seeded `ledger` project
 
 Run A, B and C from §10.5. Each run: `node scripts/autopilot-lab/lab.mjs reset --run A --dir

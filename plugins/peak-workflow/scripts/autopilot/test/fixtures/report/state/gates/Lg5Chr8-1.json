@@ -1,0 +1,23 @@
+{
+  "session": "audit-1",
+  "branch": "feature/epic-Lg5Chr8-spending-chart",
+  "branchTip": null,
+  "artifacts": [],
+  "decided": {
+    "answer": "Looks right",
+    "by": "Todd Schavey",
+    "date": "2026-11-13",
+    "scope": "next-run"
+  },
+  "epic": "Lg5Chr8",
+  "epicName": "Spending chart",
+  "kind": "human-check",
+  "skillStep": "wrapup-epic Step 1.2 item 7",
+  "question": "TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify",
+  "options": [
+    "Looks right",
+    "Not right — describe"
+  ],
+  "why": "autopilot never self-approves a look",
+  "resume": "open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8"
+}

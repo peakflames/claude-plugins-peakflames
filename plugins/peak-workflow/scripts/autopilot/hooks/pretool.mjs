@@ -332,8 +332,14 @@ function ruleR8(ctx) {
     const gate = writeGate(ctx, { ...park, artifacts: [] });
     return { rule: 'R8', decision: 'park', reason: `parked at human gate (${park.kind}): ${park.why}`, gate, stop: 'autopilot: parked at human gate' };
   }
-  for (const { f, g } of used) fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify({ ...g, decided: { ...g.decided, used: { session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } }, null, 2) + '\n');
-  return { rule: 'R8', decision: 'answer', reason: `answered from policy: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers } };
+  for (const { f, g } of used) {
+    const done = { ...g, decided: { ...g.decided, used: { session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
+    fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
+    // A gate carried in from the last run is marked used there too, so that run's report stops offering it.
+    if (g.carriedFrom) { try { const src = readJson(g.carriedFrom); if (src?.decided) fs.writeFileSync(g.carriedFrom, JSON.stringify({ ...src, decided: { ...src.decided, used: done.decided.used } }, null, 2) + '\n'); } catch { /* the old run is gone */ } }
+  }
+  const source = used.length === 0 ? 'policy' : used.length === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
+  return { rule: 'R8', decision: 'answer', owner: used.length, reason: `answered from ${source}: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers } };
 }
 
 // ---- R9: plan capture and lint -----------------------------------------------------------------
@@ -364,6 +370,8 @@ export function decide(input, env = process.env) {
   if (ti.run_in_background === true) return deny('R6', 'background tasks are denied; autopilot never ends with work running. Run it in the foreground');
   if (tool === 'AskUserQuestion') return ruleR8(ctx);
   if (tool === 'EnterPlanMode' || tool === 'ExitPlanMode') return ruleR9(ctx);
+  // StructuredOutput is how `--json-schema` returns the auditor's findings; it touches no file.
+  if (ctx.role === 'auditor' && tool === 'StructuredOutput') return null;
   if (ctx.role === 'auditor' && !['Read', 'Glob', 'Grep'].includes(tool)) return deny('R2', `${tool} is denied: the auditor only reads`);
 
   let d = ruleR2Files(ctx);

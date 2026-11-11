@@ -22,10 +22,10 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.equal(state.status, 'DONE');
   assert.equal(state.stoppedBecause, 'queue done');
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${E1.id}/build-1`, `${E1.id}/verify-1`]);
+  assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${E1.id}/build-1`, `${E1.id}/audit-1`, `${E1.id}/verify-1`]);
 
   // Launcher: host mode and --plugin-dir on every session, in the private clone.
-  for (const c of p.calls()) {
+  for (const c of p.calls().filter((x) => x.kind !== 'audit')) {
     const has = (...seq) => c.argv.join('\u0001').includes(seq.join('\u0001'));
     assert.ok(has('-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-prompt-tool', 'stdio'), `${c.step}: host mode`);
     assert.ok(has('--plugin-dir', PLUGIN_DIR), `${c.step}: --plugin-dir`);
@@ -34,7 +34,8 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
     assert.equal(c.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, '1');
     assert.equal(c.env.AUTOPILOT_STATE, p.state);
   }
-  const [plan, build, verify] = p.calls();
+  const [plan, build, audit, verify] = p.calls();
+  assert.equal(audit.env.AUTOPILOT_ROLE, 'auditor');
   assert.equal(plan.prompt, `/peak-workflow:start-epic ${E1.id}`);
   assert.equal(plan.env.AUTOPILOT_ROLE, 'planner');
   assert.equal(verify.prompt, `/peak-workflow:wrapup-epic ${E1.id}`);
@@ -71,7 +72,7 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
 
   const report = readJson(path.join(p.state, 'report.json'));
   assert.equal(report.epics[0].outcome, 'MERGED');
-  assert.equal(report.spentUsd, 2);
+  assert.equal(report.spentUsd, 2.01); // plan 0.40 + build 0.30 + audit 0.01 + verify 1.30
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
 });
 
@@ -151,7 +152,7 @@ test('verify FAIL, one fix round, verify PASS: MERGED', async (t) => {
   const e = p.epic(E1.id);
   assert.equal(e.state, 'MERGED');
   assert.equal(e.fixRounds, 1);
-  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'verify-1', 'plan-fix-1', 'fix-1', 'verify-2'].map((s) => `${E1.id}/${s}`));
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1', 'plan-fix-1', 'fix-1', 'audit-2', 'verify-2'].map((s) => `${E1.id}/${s}`));
   assert.match(fs.readFileSync(path.join(p.state, 'epics', E1.id, 'fix-brief.md'), 'utf8'), /TOR-01-Hd3Yc8L: the description is trimmed/);
   assert.ok(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('src/fix.js'));
 });
@@ -216,7 +217,7 @@ test('dependents are BLOCKED after a park while independent epics still run', as
   assert.deepEqual(state.queue.map((q) => [q.id, q.state]), [[E1.id, 'PARKED'], [b.id, 'BLOCKED'], [c.id, 'BLOCKED'], [d.id, 'MERGED']]);
   assert.match(p.epic(b.id).reason, new RegExp(`dependency not merged: ${E1.id} \\(PARKED\\)`));
   assert.match(p.epic(c.id).reason, new RegExp(`dependency not merged: ${b.id} \\(BLOCKED\\)`));
-  assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${d.id}/plan-1`, `${d.id}/build-1`, `${d.id}/verify-1`]);
+  assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${d.id}/plan-1`, `${d.id}/build-1`, `${d.id}/audit-1`, `${d.id}/verify-1`]);
   assert.equal(state.stoppedBecause, 'queue done');
 });
 
@@ -283,7 +284,7 @@ test('kill -9 of the driver mid-VERIFY, then --resume: leftovers killed, verify 
   assert.equal(alive(sessionPid), false);
   assert.equal(state.status, 'DONE');
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  assert.deepEqual(p.steps().slice(2), [`${E1.id}/verify-1`, `${E1.id}/verify-2`]);
+  assert.deepEqual(p.steps().slice(3), [`${E1.id}/verify-1`, `${E1.id}/verify-2`]);
   assert.ok(!git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('half-written.md'));
   assert.match(fs.readFileSync(path.join(p.state, 'autopilot.log'), 'utf8'), /stale lock taken over[\s\S]*killed leftover session verify-1[\s\S]*re-entering at VERIFY/);
 });
@@ -299,7 +300,7 @@ test('kill -9 mid-VERIFY after the merge landed, then --resume: the merge gate d
   await go(p, { resume: true });
 
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
   assert.equal(readJson(path.join(p.state, 'epics', E1.id, 'check-verify-1.json')).pass, true);
 });
 

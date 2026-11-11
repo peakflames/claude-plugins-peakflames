@@ -1,0 +1,20 @@
+{
+  "session": "plan-1",
+  "branch": "feature/epic-Lg6Bud2-budgets",
+  "branchTip": null,
+  "artifacts": [],
+  "decided": null,
+  "epic": "Lg6Bud2",
+  "epicName": "Category budgets",
+  "kind": "unmatched",
+  "skillStep": "unknown",
+  "question": "The spec names both a monthly and a weekly budget period. Which should this epic build?",
+  "options": [
+    "Monthly",
+    "Weekly",
+    "Both"
+  ],
+  "tor": null,
+  "why": "no policy row matches this question; autopilot never chooses an answer",
+  "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg6Bud2"
+}

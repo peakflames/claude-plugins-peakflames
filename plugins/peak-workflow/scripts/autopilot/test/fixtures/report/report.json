@@ -1,0 +1,920 @@
+{
+  "run": "2026-11-13T06:05:00.000Z",
+  "ended": "2026-11-13T12:41:00.000Z",
+  "status": "DONE",
+  "stoppedBecause": "queue done",
+  "integration": "develop",
+  "clone": "<state>/clone",
+  "startSha": "1111111111111111111111111111111111111111",
+  "spentUsd": 41.2,
+  "budgetUsd": 80,
+  "testCommand": "node --test",
+  "baseRed": null,
+  "driverVersion": "0.2.0",
+  "epics": [
+    {
+      "id": "Lg1Csv7",
+      "label": "Lg1Csv7 (csv-import) — CSV import",
+      "outcome": "MERGED",
+      "reason": "verify PASS, merge gate green",
+      "evidence": "epics/Lg1Csv7/check-verify-1.json",
+      "checks": [
+        {
+          "file": "epics/Lg1Csv7/check-build-1.json",
+          "pass": true,
+          "failed": [],
+          "items": [
+            {
+              "name": "branch-and-commit",
+              "pass": true
+            },
+            {
+              "name": "clean-tree",
+              "pass": true
+            },
+            {
+              "name": "sidecar",
+              "pass": true
+            },
+            {
+              "name": "handoff",
+              "pass": true
+            },
+            {
+              "name": "traceability",
+              "pass": true
+            },
+            {
+              "name": "tests-green",
+              "pass": true
+            },
+            {
+              "name": "requirements-health",
+              "pass": true
+            },
+            {
+              "name": "scope",
+              "pass": true
+            },
+            {
+              "name": "test-integrity",
+              "pass": true
+            }
+          ]
+        },
+        {
+          "file": "epics/Lg1Csv7/check-verify-1.json",
+          "pass": true,
+          "failed": [],
+          "items": [
+            {
+              "name": "verdict",
+              "pass": true
+            },
+            {
+              "name": "sidecar-on-integration",
+              "pass": true
+            },
+            {
+              "name": "no-waivers",
+              "pass": true
+            },
+            {
+              "name": "tests-green-on-integration",
+              "pass": true
+            },
+            {
+              "name": "requirements-health",
+              "pass": true
+            }
+          ]
+        }
+      ],
+      "audit": {
+        "findings": [
+          {
+            "id": "F1",
+            "category": "scope",
+            "severity": "low",
+            "evidence": "README.md:14",
+            "explanation": "README.md is not a Key Component of this epic; the edit only documents the new command.",
+            "parks": false,
+            "step": "audit-1"
+          }
+        ],
+        "recommend": "proceed",
+        "summary": "The import is exercised through the real CLI in every test. One note on scope.",
+        "runs": [
+          {
+            "step": "audit-1",
+            "file": "epics/Lg1Csv7/audit-1/audit.json",
+            "delta": false,
+            "base": "1111111",
+            "tip": "2222222",
+            "recommend": "proceed",
+            "summary": "The import is exercised through the real CLI in every test. One note on scope.",
+            "findings": [
+              {
+                "id": "F1",
+                "category": "scope",
+                "severity": "low",
+                "evidence": "README.md:14",
+                "explanation": "README.md is not a Key Component of this epic; the edit only documents the new command.",
+                "parks": false
+              }
+            ]
+          }
+        ]
+      },
+      "gates": [],
+      "costUsd": 9.1,
+      "turns": 141,
+      "wallMs": 2940000,
+      "elapsedMs": 3120000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.9,
+          "turns": 27,
+          "wallMs": 240000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 4.2,
+          "turns": 70,
+          "wallMs": 1320000,
+          "terminalReason": "completed",
+          "denials": 2
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.6,
+          "turns": 9,
+          "wallMs": 180000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "verify-1",
+          "sessionId": "00000000-0000-4000-8000-0e00f0010000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 3.4,
+          "turns": 35,
+          "wallMs": 1200000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "testChanges": [
+        {
+          "path": "test/smoke.test.js",
+          "reason": "the version line now ends with the build date"
+        }
+      ],
+      "rejected": [],
+      "fixRounds": 0,
+      "planApprovedBy": "lint, not a person",
+      "plan": "epics/Lg1Csv7/plan-1/plan.md"
+    },
+    {
+      "id": "Lg4Fx2q",
+      "label": "Lg4Fx2q (currency) — Currency conversion",
+      "outcome": "PARKED",
+      "reason": "auditor: F1 stand-in, F2 test-weakened (audit-1)",
+      "evidence": "epics/Lg4Fx2q/audit-1/audit.json F1, F2",
+      "checks": [
+        {
+          "file": "epics/Lg4Fx2q/check-build-1.json",
+          "pass": true,
+          "failed": [],
+          "items": [
+            {
+              "name": "branch-and-commit",
+              "pass": true
+            },
+            {
+              "name": "clean-tree",
+              "pass": true
+            },
+            {
+              "name": "sidecar",
+              "pass": true
+            },
+            {
+              "name": "handoff",
+              "pass": true
+            },
+            {
+              "name": "traceability",
+              "pass": true
+            },
+            {
+              "name": "tests-green",
+              "pass": true
+            },
+            {
+              "name": "requirements-health",
+              "pass": true
+            },
+            {
+              "name": "scope",
+              "pass": true
+            },
+            {
+              "name": "test-integrity",
+              "pass": true
+            }
+          ]
+        }
+      ],
+      "audit": {
+        "findings": [
+          {
+            "id": "F1",
+            "category": "stand-in",
+            "severity": "high",
+            "evidence": "test/currency.test.js:12; digest.md: no call that reaches the rates service",
+            "explanation": "TOR-04-Rt5Yu7I says the tool fetches the day's rate from the rates service. Every test replaces the fetch with fakeRates(), so the real path never runs.",
+            "parks": true,
+            "step": "audit-1"
+          },
+          {
+            "id": "F2",
+            "category": "test-weakened",
+            "severity": "high",
+            "evidence": "diff.patch:88",
+            "explanation": "The existing rounding assertion for TOR-01-Hd3Yc8L went from exact cents to a tolerance of 1 cent. The recorded reason (\"float noise\") does not hold: amounts are integers.",
+            "parks": true,
+            "step": "audit-1"
+          },
+          {
+            "id": "F3",
+            "category": "weak-requirement",
+            "severity": "medium",
+            "evidence": "tors.md:TOR-04-Rt5Yu7I",
+            "explanation": "The requirement does not say what happens when the rates service is down; any behaviour passes.",
+            "parks": false,
+            "step": "audit-1"
+          }
+        ],
+        "recommend": "park",
+        "summary": "The live-rates path is only ever run against a local double, and an existing rounding test was loosened.",
+        "runs": [
+          {
+            "step": "audit-1",
+            "file": "epics/Lg4Fx2q/audit-1/audit.json",
+            "delta": false,
+            "base": "3333333",
+            "tip": "4444444",
+            "recommend": "park",
+            "summary": "The live-rates path is only ever run against a local double, and an existing rounding test was loosened.",
+            "findings": [
+              {
+                "id": "F1",
+                "category": "stand-in",
+                "severity": "high",
+                "evidence": "test/currency.test.js:12; digest.md: no call that reaches the rates service",
+                "explanation": "TOR-04-Rt5Yu7I says the tool fetches the day's rate from the rates service. Every test replaces the fetch with fakeRates(), so the real path never runs.",
+                "parks": true
+              },
+              {
+                "id": "F2",
+                "category": "test-weakened",
+                "severity": "high",
+                "evidence": "diff.patch:88",
+                "explanation": "The existing rounding assertion for TOR-01-Hd3Yc8L went from exact cents to a tolerance of 1 cent. The recorded reason (\"float noise\") does not hold: amounts are integers.",
+                "parks": true
+              },
+              {
+                "id": "F3",
+                "category": "weak-requirement",
+                "severity": "medium",
+                "evidence": "tors.md:TOR-04-Rt5Yu7I",
+                "explanation": "The requirement does not say what happens when the rates service is down; any behaviour passes.",
+                "parks": false
+              }
+            ]
+          }
+        ]
+      },
+      "gates": [
+        "Lg4Fx2q-1.json"
+      ],
+      "costUsd": 11.3,
+      "turns": 160,
+      "wallMs": 3480000,
+      "elapsedMs": 3660000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1.1,
+          "turns": 30,
+          "wallMs": 300000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 9.4,
+          "turns": 118,
+          "wallMs": 2940000,
+          "terminalReason": "completed",
+          "denials": 1
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.8,
+          "turns": 12,
+          "wallMs": 240000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "testChanges": [],
+      "rejected": [],
+      "fixRounds": 0,
+      "planApprovedBy": "lint, not a person",
+      "plan": "epics/Lg4Fx2q/plan-1/plan.md"
+    },
+    {
+      "id": "Lg5Chr8",
+      "label": "Lg5Chr8 (spending-chart) — Spending chart",
+      "outcome": "PARKED",
+      "reason": "human check needed before verify",
+      "evidence": "gates/Lg5Chr8-1.json",
+      "checks": [
+        {
+          "file": "epics/Lg5Chr8/check-build-1.json",
+          "pass": true,
+          "failed": [],
+          "items": [
+            {
+              "name": "branch-and-commit",
+              "pass": true
+            },
+            {
+              "name": "clean-tree",
+              "pass": true
+            },
+            {
+              "name": "sidecar",
+              "pass": true
+            },
+            {
+              "name": "handoff",
+              "pass": true
+            },
+            {
+              "name": "traceability",
+              "pass": true
+            },
+            {
+              "name": "tests-green",
+              "pass": true
+            },
+            {
+              "name": "requirements-health",
+              "pass": true
+            },
+            {
+              "name": "scope",
+              "pass": true
+            },
+            {
+              "name": "test-integrity",
+              "pass": true
+            }
+          ]
+        }
+      ],
+      "audit": {
+        "findings": [],
+        "recommend": "proceed",
+        "summary": "Nothing found.",
+        "runs": [
+          {
+            "step": "audit-1",
+            "file": "epics/Lg5Chr8/audit-1/audit.json",
+            "delta": false,
+            "base": "5555555",
+            "tip": "6666666",
+            "recommend": "proceed",
+            "summary": "Nothing found.",
+            "findings": []
+          }
+        ]
+      },
+      "gates": [
+        "Lg5Chr8-1.json"
+      ],
+      "costUsd": 7.8,
+      "turns": 122,
+      "wallMs": 2220000,
+      "elapsedMs": 2400000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1,
+          "turns": 28,
+          "wallMs": 300000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 6.3,
+          "turns": 86,
+          "wallMs": 1740000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.5,
+          "turns": 8,
+          "wallMs": 180000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "testChanges": [],
+      "rejected": [],
+      "fixRounds": 0,
+      "planApprovedBy": "lint, not a person",
+      "plan": "epics/Lg5Chr8/plan-1/plan.md"
+    },
+    {
+      "id": "Lg3Sum9",
+      "label": "Lg3Sum9 (monthly-summary) — Monthly summary",
+      "outcome": "FAILED",
+      "reason": "verify-2 FAIL after the fix round: TOR-03-Jm2Wq8z totals test fails (test/summary.test.js:41)",
+      "evidence": "epics/Lg3Sum9/verify-2/result.json",
+      "checks": [
+        {
+          "file": "epics/Lg3Sum9/check-build-1.json",
+          "pass": true,
+          "failed": [],
+          "items": [
+            {
+              "name": "branch-and-commit",
+              "pass": true
+            },
+            {
+              "name": "clean-tree",
+              "pass": true
+            },
+            {
+              "name": "sidecar",
+              "pass": true
+            },
+            {
+              "name": "handoff",
+              "pass": true
+            },
+            {
+              "name": "traceability",
+              "pass": true
+            },
+            {
+              "name": "tests-green",
+              "pass": true
+            },
+            {
+              "name": "requirements-health",
+              "pass": true
+            },
+            {
+              "name": "scope",
+              "pass": true
+            },
+            {
+              "name": "test-integrity",
+              "pass": true
+            }
+          ]
+        },
+        {
+          "file": "epics/Lg3Sum9/check-build-2.json",
+          "pass": true,
+          "failed": [],
+          "items": [
+            {
+              "name": "branch-and-commit",
+              "pass": true
+            },
+            {
+              "name": "clean-tree",
+              "pass": true
+            },
+            {
+              "name": "sidecar",
+              "pass": true
+            },
+            {
+              "name": "handoff",
+              "pass": true
+            },
+            {
+              "name": "traceability",
+              "pass": true
+            },
+            {
+              "name": "tests-green",
+              "pass": true
+            },
+            {
+              "name": "requirements-health",
+              "pass": true
+            },
+            {
+              "name": "scope",
+              "pass": true
+            },
+            {
+              "name": "test-integrity",
+              "pass": true
+            }
+          ]
+        }
+      ],
+      "audit": {
+        "findings": [
+          {
+            "id": "F1",
+            "category": "claim-without-evidence",
+            "severity": "medium",
+            "evidence": "handoff.md:22; digest.md: no call that runs node --test after D14",
+            "explanation": "The handoff says the suite passed after the fix for TOR-03-Jm2Wq8z, but the last test run in the digest is before the final edit.",
+            "parks": false,
+            "step": "audit-2"
+          }
+        ],
+        "recommend": "proceed",
+        "summary": "The fix changes one function. Its handoff claims a full test run that the digest does not show.",
+        "runs": [
+          {
+            "step": "audit-1",
+            "file": "epics/Lg3Sum9/audit-1/audit.json",
+            "delta": false,
+            "base": "7777777",
+            "tip": "8888888",
+            "recommend": "proceed",
+            "summary": "Nothing found.",
+            "findings": []
+          },
+          {
+            "step": "audit-2",
+            "file": "epics/Lg3Sum9/audit-2/audit.json",
+            "delta": true,
+            "base": "8888888",
+            "tip": "9999999",
+            "recommend": "proceed",
+            "summary": "The fix changes one function. Its handoff claims a full test run that the digest does not show.",
+            "findings": [
+              {
+                "id": "F1",
+                "category": "claim-without-evidence",
+                "severity": "medium",
+                "evidence": "handoff.md:22; digest.md: no call that runs node --test after D14",
+                "explanation": "The handoff says the suite passed after the fix for TOR-03-Jm2Wq8z, but the last test run in the digest is before the final edit.",
+                "parks": false
+              }
+            ]
+          }
+        ]
+      },
+      "gates": [],
+      "costUsd": 13,
+      "turns": 233,
+      "wallMs": 5040000,
+      "elapsedMs": 5280000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1,
+          "turns": 29,
+          "wallMs": 300000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "build-1",
+          "sessionId": "00000000-0000-4000-8000-b000d0100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 4,
+          "turns": 70,
+          "wallMs": 1440000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "audit-1",
+          "sessionId": "00000000-0000-4000-8000-a0d000100000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.5,
+          "turns": 8,
+          "wallMs": 180000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "verify-1",
+          "sessionId": "00000000-0000-4000-8000-0e00f0010000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 2.6,
+          "turns": 30,
+          "wallMs": 960000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "plan-fix-1",
+          "sessionId": "00000000-0000-4000-8000-00a00f000100",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.7,
+          "turns": 20,
+          "wallMs": 240000,
+          "terminalReason": "hook_stopped",
+          "denials": 0
+        },
+        {
+          "name": "fix-1",
+          "sessionId": "00000000-0000-4000-8000-f00010000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 1.9,
+          "turns": 40,
+          "wallMs": 840000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "audit-2",
+          "sessionId": "00000000-0000-4000-8000-a0d000200000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0.3,
+          "turns": 6,
+          "wallMs": 120000,
+          "terminalReason": "completed",
+          "denials": 0
+        },
+        {
+          "name": "verify-2",
+          "sessionId": "00000000-0000-4000-8000-0e00f0020000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 2,
+          "turns": 30,
+          "wallMs": 960000,
+          "terminalReason": "completed",
+          "denials": 0
+        }
+      ],
+      "testChanges": [],
+      "rejected": [],
+      "fixRounds": 1,
+      "planApprovedBy": "lint, not a person",
+      "plan": "epics/Lg3Sum9/plan-fix-1/plan.md"
+    },
+    {
+      "id": "Lg6Bud2",
+      "label": "Lg6Bud2 (budgets) — Category budgets",
+      "outcome": "PARKED",
+      "reason": "parked at a human gate (Lg6Bud2-1.json)",
+      "evidence": "gates/Lg6Bud2-1.json",
+      "checks": [],
+      "audit": null,
+      "gates": [
+        "Lg6Bud2-1.json"
+      ],
+      "costUsd": 0,
+      "turns": 31,
+      "wallMs": 660000,
+      "elapsedMs": 720000,
+      "sessions": [
+        {
+          "name": "plan-1",
+          "sessionId": "00000000-0000-4000-8000-00a001000000",
+          "outcome": "ok",
+          "why": "success",
+          "costUsd": 0,
+          "turns": 31,
+          "wallMs": 660000,
+          "terminalReason": "hook_stopped",
+          "denials": 1
+        }
+      ],
+      "testChanges": [],
+      "rejected": [],
+      "fixRounds": 0,
+      "planApprovedBy": null,
+      "plan": null
+    },
+    {
+      "id": "Lg7Exp5",
+      "label": "Lg7Exp5 (export) — Export to CSV",
+      "outcome": "BLOCKED",
+      "reason": "dependency not merged: Lg3Sum9 (FAILED)",
+      "evidence": null,
+      "checks": [],
+      "audit": null,
+      "gates": [],
+      "costUsd": 0,
+      "turns": 0,
+      "wallMs": 0,
+      "elapsedMs": 0,
+      "sessions": [],
+      "testChanges": [],
+      "rejected": [],
+      "fixRounds": 0,
+      "planApprovedBy": null,
+      "plan": null
+    },
+    {
+      "id": "Lg8Hw01",
+      "label": "Lg8Hw01 (receipt-printer) — Receipt printer",
+      "outcome": "SKIPPED",
+      "reason": "TOR-08-Ab1Cd2E is a Safety requirement (hardware-in-the-loop)",
+      "evidence": null,
+      "checks": [],
+      "audit": null,
+      "gates": [],
+      "costUsd": 0,
+      "turns": 0,
+      "wallMs": 0,
+      "elapsedMs": 0,
+      "sessions": [],
+      "testChanges": [],
+      "rejected": [],
+      "fixRounds": 0,
+      "planApprovedBy": null,
+      "plan": null
+    }
+  ],
+  "gates": [
+    {
+      "file": "gates/Lg4Fx2q-1.json",
+      "epic": "Lg4Fx2q",
+      "label": "Lg4Fx2q (currency) — Currency conversion",
+      "kind": "audit",
+      "session": "audit-1",
+      "skillStep": "autopilot AUDIT (before wrapup-epic)",
+      "question": "The auditor reported 2 high finding(s) on Lg4Fx2q (currency) — Currency conversion: F1 stand-in — every test replaces the fetch with fakeRates() | F2 test-weakened — the rounding assertion was loosened. Are they real?",
+      "options": [
+        "Real — fix before verify",
+        "Not real — verify as built"
+      ],
+      "tor": null,
+      "why": "a high finding in a park category; the auditor only advises, so a person judges it",
+      "artifacts": [
+        "epics/Lg4Fx2q/audit-1/audit.json",
+        "epics/Lg4Fx2q/audit-1/bundle/diff.patch"
+      ],
+      "branch": "feature/epic-Lg4Fx2q-currency",
+      "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built",
+      "decided": null,
+      "carried": null,
+      "effect": "by-hand"
+    },
+    {
+      "file": "gates/Lg5Chr8-1.json",
+      "epic": "Lg5Chr8",
+      "label": "Lg5Chr8 (spending-chart) — Spending chart",
+      "kind": "human-check",
+      "session": "audit-1",
+      "skillStep": "wrapup-epic Step 1.2 item 7",
+      "question": "TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify",
+      "options": [
+        "Looks right",
+        "Not right — describe"
+      ],
+      "tor": null,
+      "why": "autopilot never self-approves a look",
+      "artifacts": [],
+      "branch": "feature/epic-Lg5Chr8-spending-chart",
+      "resume": "open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8",
+      "decided": {
+        "answer": "Looks right",
+        "by": "Todd Schavey",
+        "date": "2026-11-13",
+        "scope": "next-run"
+      },
+      "carried": null,
+      "effect": "by-hand"
+    },
+    {
+      "file": "gates/Lg6Bud2-1.json",
+      "epic": "Lg6Bud2",
+      "label": "Lg6Bud2 (budgets) — Category budgets",
+      "kind": "unmatched",
+      "session": "plan-1",
+      "skillStep": "unknown",
+      "question": "The spec names both a monthly and a weekly budget period. Which should this epic build?",
+      "options": [
+        "Monthly",
+        "Weekly",
+        "Both"
+      ],
+      "tor": null,
+      "why": "no policy row matches this question; autopilot never chooses an answer",
+      "artifacts": [],
+      "branch": "feature/epic-Lg6Bud2-budgets",
+      "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg6Bud2",
+      "decided": null,
+      "carried": null,
+      "effect": "by-hand"
+    }
+  ],
+  "referee": {
+    "blocked": [
+      {
+        "epic": "Lg1Csv7",
+        "step": "build-1",
+        "rule": "R7",
+        "tool": "Edit",
+        "reason": "test integrity — test/smoke.test.js is an existing test on develop"
+      },
+      {
+        "epic": "Lg1Csv7",
+        "step": "build-1",
+        "rule": "R7",
+        "tool": "Write",
+        "reason": "test integrity — test/smoke.test.js is an existing test on develop"
+      },
+      {
+        "epic": "Lg4Fx2q",
+        "step": "build-1",
+        "rule": "R4",
+        "tool": "Bash",
+        "reason": "docker is denied (containers, VMs, system package managers, sudo and gh are off limits unattended)"
+      }
+    ],
+    "gatesAnswered": 4,
+    "ownerAnswers": 0,
+    "testChanges": [
+      {
+        "epic": "Lg1Csv7",
+        "path": "test/smoke.test.js",
+        "reason": "the version line now ends with the build date"
+      }
+    ],
+    "unmatchedParks": [
+      "gates/Lg6Bud2-1.json"
+    ],
+    "setup": {
+      "digest": "Claude Code 2.1.322, peak-workflow 3.1.0 (peak-workflow@inline), acceptEdits",
+      "differs": []
+    },
+    "auditFindings": {
+      "high": 2,
+      "medium": 2,
+      "low": 1
+    }
+  },
+  "next": [
+    "Decide 2 parked gates: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)",
+    "Carry on by hand where you decided a gate (Lg5Chr8): the command is under \"Per epic\".",
+    "Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.",
+    "Review and bring in the merged work (Lg1Csv7):\n   git fetch \"<state>/clone\" develop:autopilot/develop && git log develop..autopilot/develop",
+    "Read the recorded reason for 1 changed existing test (under \"Per epic\").",
+    "1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has."
+  ]
+}

@@ -27,6 +27,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
+| `autopilot` | Proof of concept — front door to the unattended driver: readiness (preflight, scope and cost review), confirm, detached launch; `report` mode presents the morning report and records the owner's answers to parked gates. Never edits project code, runs `start-epic` or `wrapup-epic`, answers a gate, or picks among ready epics |
 
 ## Key Design Invariants
 
@@ -190,6 +191,11 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
   2 usage/data error, 3 interpreter. Decisions (what to ask, what to block) stay in `SKILL.md`.
   `tor-lifecycle mark` is the only writer of a sidecar's `verified:`, `unverified:`, and
   `reverified:` lines and of an append to a Complete epic's `requirements:`
+- `scripts/autopilot/` is the autopilot proof of concept: `driver.mjs` (state machine, done-ness
+  checks, merge gate), `hooks/` (the referee), `policy/gates.json`, `audit/` (the auditor's prompt
+  and schema), `audit.mjs` and `report.mjs`. Node 22+, no dependencies. The `autopilot` skill only
+  talks to the user and calls `driver.mjs`; what may run unattended and what parks is decided by
+  the driver and the hooks, never by a prompt. Tests: `node --test scripts/autopilot/test/`
 - `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
   templates. They are **forward-only and append-only**: a shipped step is never edited; a
   correction is a new step. Each step starts with a detect check (so re-running is harmless) and

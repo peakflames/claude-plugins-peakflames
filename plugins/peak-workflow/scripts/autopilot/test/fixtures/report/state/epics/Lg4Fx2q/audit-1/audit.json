@@ -1,0 +1,40 @@
+{
+  "step": "audit-1",
+  "epic": "Lg4Fx2q",
+  "delta": false,
+  "parkOn": [
+    "stand-in",
+    "test-weakened",
+    "cannot-fail",
+    "never-ran-real"
+  ],
+  "decision": "park",
+  "recommend": "park",
+  "summary": "The live-rates path is only ever run against a local double, and an existing rounding test was loosened.",
+  "findings": [
+    {
+      "id": "F1",
+      "category": "stand-in",
+      "severity": "high",
+      "evidence": "test/currency.test.js:12; digest.md: no call that reaches the rates service",
+      "explanation": "TOR-04-Rt5Yu7I says the tool fetches the day's rate from the rates service. Every test replaces the fetch with fakeRates(), so the real path never runs.",
+      "parks": true
+    },
+    {
+      "id": "F2",
+      "category": "test-weakened",
+      "severity": "high",
+      "evidence": "diff.patch:88",
+      "explanation": "The existing rounding assertion for TOR-01-Hd3Yc8L went from exact cents to a tolerance of 1 cent. The recorded reason (\"float noise\") does not hold: amounts are integers.",
+      "parks": true
+    },
+    {
+      "id": "F3",
+      "category": "weak-requirement",
+      "severity": "medium",
+      "evidence": "tors.md:TOR-04-Rt5Yu7I",
+      "explanation": "The requirement does not say what happens when the rates service is down; any behaviour passes.",
+      "parks": false
+    }
+  ]
+}

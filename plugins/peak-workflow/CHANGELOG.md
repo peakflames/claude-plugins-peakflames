@@ -12,7 +12,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Autopilot driver (proof of concept)** — `scripts/autopilot/driver.mjs` runs queued epics
   unattended in a private clone: plan, build, driver checks, verify, and a merge gate that rolls
-  back a bad merge. Not yet reachable from a skill.
+  back a bad merge.
 - **Autopilot dry run** — `driver.mjs run --dry-run` prints the queue, each exact session
   command, the settings JSON and the gate policy, and invokes nothing.
 - **`fake-claude.mjs` test double** — scripted stand-in for `claude` that drives the driver's
@@ -25,6 +25,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   for a person.
 - **Autopilot plan capture** — in a planning session `ExitPlanMode` saves the plan, lints it for
   anchors, closing steps and gate rules, and ends the session; a failed lint parks.
+- **`autopilot` skill (proof of concept)** — `/peak-workflow:autopilot` checks readiness, confirms
+  the queue and limits, and launches the driver detached; it never builds, never answers a gate,
+  and never picks among ready epics.
+- **`autopilot report`** — presents the morning report, asks the owner each parked gate's own
+  question, records the answer in the gate file, and prints the fetch command for merged work.
+- **Autopilot auditor** — after the driver's build checks, a read-only session audits the epic
+  diff for stand-ins, weakened tests and unrun paths; a high finding in a park category parks the
+  epic before verification. After a fix round it audits only the delta.
+- **Autopilot morning report** — `report.md` and `report.json` list what to do next, each epic's
+  outcome with evidence, referee blocks, test changes with reasons, and auditor findings.
+- **Autopilot readiness facts** — `driver.mjs preflight --json` adds a `launch` block (state
+  directory, earlier runs, refusals, warnings) and per-epic `scopeFlags` for requirements that
+  need network, keys, big data or long runs.
+- **`driver.mjs decide` and `report`** — record a person's gate answer (only one of the gate's own
+  options) and re-render the report; a decided answer is carried into the next run and used once.
 
 ## [3.0.1] — 2026-11-05
 
