@@ -8,6 +8,9 @@ import path from 'node:path';
 
 export const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/** The command that runs setup, as printed in "run …" hints (a .mjs path alone won't run on Windows). */
+export const setupCommand = (extra = '') => `node "${path.join(PLUGIN_ROOT, 'scripts', 'setup.mjs')}"${extra ? ` ${extra}` : ''}`;
+
 export const EXIT = { OK: 0, FAIL: 1, USAGE: 2, MISSING_PREREQ: 3, UNEXPECTED: 70 };
 
 /** An expected failure: printed as one line, no stack. */
@@ -100,4 +103,11 @@ export async function runCli(spec, main, argv = process.argv.slice(2)) {
   }
   process.exitCode = code;
   return code;
+}
+
+/** True when the module at metaUrl is the script node was started with (case-insensitive on win32). */
+export function isMain(metaUrl) {
+  if (!process.argv[1]) return false;
+  const a = path.resolve(process.argv[1]), b = fileURLToPath(metaUrl);
+  return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 }

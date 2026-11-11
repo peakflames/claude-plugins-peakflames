@@ -4,7 +4,7 @@
 // adds --headless=new (and, for signin, a DevTools port the test uses to submit the fixture's
 // form and close the tab, as a user would). No real password is ever typed.
 // Set PEAK_MEDIA_EVIDENCE_DIR to keep the contact sheet and measurements (JPEG/JSON only).
-import { test, before, after } from 'node:test';
+import { test, before, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, chmodSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
@@ -164,7 +164,7 @@ test('WP14 signin: --help/--version, bad input and a missing headed browser are 
   one(['http://127.0.0.1:1', '--timeout', 'later'], /--timeout expects a duration/);
   one(['http://127.0.0.1:1', '--save', path.join(ROOT, 'leak.json')], /git work tree/);
   assert.equal(spy.launched(), false, 'no browser for bad input');
-  const r = one(['http://127.0.0.1:1'], /capture signin needs Playwright's Chromium .* — run .*setup\.sh/, { PEAK_MEDIA_HEADED_BROWSER_PATH: path.join(tmp, 'no-chromium') });
+  const r = one(['http://127.0.0.1:1'], /capture signin needs Playwright's Chromium .* — run .*setup\.mjs/, { PEAK_MEDIA_HEADED_BROWSER_PATH: path.join(tmp, 'no-chromium') });
   assert.equal(r.code, 3);
 });
 
@@ -215,15 +215,15 @@ test('WP14 signin: --timeout exits non-zero with nothing saved', async () => {
   } finally { await server.close(); }
 });
 
-test('WP14 setup.sh --check reports the headed browser like the render browser; --skip-browser skips both', () => {
+test('WP14 setup.mjs --check reports the headed browser like the render browser; --skip-browser skips both', () => {
   const missing = { PEAK_MEDIA_HEADED_BROWSER_PATH: path.join(tmp, 'no-chromium') };
-  const r = run('scripts/setup.sh', ['--check'], { env: missing });
+  const r = run('scripts/setup.mjs', ['--check'], { env: missing });
   assert.equal(r.code, 3);
   assert.equal(lines(r.stderr).length, 1, r.stderr);
-  assert.match(r.stderr, /^setup\.sh: headed browser missing \(Playwright's Chromium, for capture signin\/--headed\) — run .*setup\.sh/);
-  assert.equal(run('scripts/setup.sh', ['--check', '--skip-browser'], { env: missing }).code, 0);
-  assert.match(run('scripts/setup.sh', ['--help']).stdout, /--skip-browser +Don't fetch the render or the headed browser/);
-  assert.equal(run('scripts/setup.sh', ['--check']).code, 0, 'installed here by setup.sh (DEC-49)');
+  assert.match(r.stderr, /^setup\.mjs: headed browser missing \(Playwright's Chromium, for capture signin\/--headed\) — run .*setup\.mjs/);
+  assert.equal(run('scripts/setup.mjs', ['--check', '--skip-browser'], { env: missing }).code, 0);
+  assert.match(run('scripts/setup.mjs', ['--help']).stdout, /--skip-browser +Don't fetch the render or the headed browser/);
+  assert.equal(run('scripts/setup.mjs', ['--check']).code, 0, 'installed here by setup.mjs (DEC-49)');
 });
 
 // ---- --storage-state ----
@@ -299,7 +299,7 @@ test('WP14 --headed: the take runs in Playwright\'s Chromium and records the sam
     { env: { HYPERFRAMES_BROWSER_PATH: render.file, PEAK_MEDIA_HEADED_BROWSER_PATH: path.join(tmp, 'none') } });
   assert.equal(miss.code, 3);
   assert.equal(lines(miss.stderr).length, 1, miss.stderr);
-  assert.match(miss.stderr, /--headed needs Playwright's Chromium .* — run .*setup\.sh/);
+  assert.match(miss.stderr, /--headed needs Playwright's Chromium .* — run .*setup\.mjs/);
 });
 
 // ---- reports ----

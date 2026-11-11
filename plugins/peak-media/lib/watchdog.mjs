@@ -1,13 +1,17 @@
 // Run a child process synchronously under a watchdog that does not depend on the child-exit
-// signal reaching node. The child runs detached (its own process group) inside `sh`, with stdout
-// and stderr going to files; sh writes the exit status to a file when the child ends. This process
-// polls for that file and, past the deadline, kills the whole process group (SIGKILL).
+// signal reaching node. A small Node wrapper (lib/watchdog-child.mjs) runs the step with stdout and
+// stderr going to files and writes the exit status to a file when the step ends. This process
+// polls for that file and, past the deadline, kills the step's whole process tree.
 // Why: under emulation (linux/amd64 on Apple silicon via Rosetta) spawnSync was seen to sleep in
 // epoll forever after its children had exited, ignoring its own `timeout` (WP9 verify-1 F1).
-import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+// One implementation on every OS (DEC-53): no /bin/sh, so it runs the same on Windows.
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
+
+const CHILD = path.join(path.dirname(fileURLToPath(import.meta.url)), 'watchdog-child.mjs');
 
 const sleeper = new Int32Array(new SharedArrayBuffer(4));
 const nap = (ms) => Atomics.wait(sleeper, 0, 0, ms);
@@ -20,24 +24,54 @@ export function stepTimeoutMs(defaultMs) {
 
 export const fmtDuration = (ms) => (ms >= 60_000 && ms % 60_000 === 0 ? `${ms / 60_000} min` : `${Math.round(ms / 100) / 10} s`);
 
-// sh: $1 = status file, $2 = stdin file ('' = /dev/null), $3 = stdout file, $4 = stderr file,
-// $5 = this call's temp folder, $6.. = command. A background watcher checks every second that the
-// node process ($PPID) is still alive; if it is gone (Ctrl-C, SIGTERM, a crash: node is blocked in
-// a synchronous wait, so JS signal handlers can't run), it deletes the temp folder and kills the
-// step's whole process group, so nothing is left running or on disk.
-const SH = [
-  'st="$1"; in="${2:-/dev/null}"; o="$3"; e="$4"; d="$5"; shift 5; p=$PPID',
-  '( while kill -0 "$p" 2>/dev/null; do sleep 1; done; rm -rf "$d"; kill -KILL -- -$$ ) & w=$!',
-  '"$@" <"$in" >"$o" 2>"$e"; s=$?',
-  'kill "$w" 2>/dev/null',
-  'echo "$s" >"$st.tmp"; mv "$st.tmp" "$st"',
-].join('\n');
+/**
+ * Kill pid and everything it started. win32: `taskkill /T /F` (the tree by parent pid).
+ * POSIX: SIGKILL to the process group pid leads (the watchdog wrapper is spawned detached).
+ */
+export function killTree(pid, platform = process.platform) {
+  if (platform === 'win32') {
+    const taskkill = process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'taskkill.exe') : 'taskkill';
+    spawnSync(taskkill, ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 30_000 });
+  } else {
+    try { process.kill(-pid, 'SIGKILL'); } catch { /* already gone */ }
+  }
+}
 
-/** Absolute path of bin (as given, or found on PATH), or null when it doesn't exist. */
-function resolveBin(bin, env) {
-  if (bin.includes('/')) return existsSync(bin) ? bin : null;
-  for (const dir of String((env ?? process.env).PATH ?? '').split(':')) {
-    if (dir && existsSync(path.join(dir, bin))) return path.join(dir, bin);
+/**
+ * Delete dir, retrying for up to ms: on win32 a just-killed process releases its open files a moment
+ * after it ends, and until then the folder can't be removed. Returns true when it is gone.
+ */
+export function removeDir(dir, ms = 0) {
+  const end = Date.now() + ms;
+  for (;;) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* still held */ }
+    if (!existsSync(dir)) return true;
+    if (Date.now() >= end) return false;
+    nap(100);
+  }
+}
+
+/** Read an env var case-insensitively (Windows keeps `Path`, not `PATH`, in a copied env). */
+function envVar(env, name) {
+  const key = Object.keys(env).find((k) => k.toUpperCase() === name);
+  return key === undefined ? undefined : env[key];
+}
+
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
+
+/**
+ * Absolute path of bin (as given, or found on PATH), or null when it doesn't exist. On win32 each
+ * PATHEXT extension is tried (`ffmpeg` finds `ffmpeg.exe`). `platform`/`pathMod` are for tests.
+ */
+export function resolveBin(bin, env = process.env, { platform = process.platform, pathMod = platform === 'win32' ? path.win32 : path.posix, exists = isFile } = {}) {
+  const win = platform === 'win32';
+  const exts = win ? String(envVar(env, 'PATHEXT') || '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean) : [];
+  const candidates = (p) => (win ? [...(pathMod.extname(p) ? [p] : []), ...exts.map((e) => p + e)] : [p]);
+  const first = (p) => candidates(p).find(exists) ?? null;
+  if (pathMod.isAbsolute(bin) || bin.includes('/') || bin.includes(pathMod.sep)) return first(bin);
+  for (const dir of String(envVar(env, 'PATH') ?? '').split(pathMod.delimiter)) {
+    const hit = dir && first(pathMod.join(dir, bin));
+    if (hit) return hit;
   }
   return null;
 }
@@ -48,13 +82,16 @@ function resolveBin(bin, env) {
  */
 export function runWatched(bin, args = [], { cwd, env, input, timeoutMs = 10 * 60_000, encoding = 'utf8' } = {}) {
   // "not found" only when the binary itself doesn't exist, never from the step's own output
-  if (!resolveBin(bin, env)) return { status: null, stdout: '', stderr: '', timedOut: false, error: Object.assign(new Error(`${bin}: not found`), { code: 'ENOENT' }) };
+  const resolved = resolveBin(bin, env ?? process.env);
+  if (!resolved) return { status: null, stdout: '', stderr: '', timedOut: false, error: Object.assign(new Error(`${bin}: not found`), { code: 'ENOENT' }) };
   const dir = mkdtempSync(path.join(os.tmpdir(), 'pm-run-'));
   const f = (n) => path.join(dir, n);
   try {
     if (input !== undefined) writeFileSync(f('in'), input);
-    const child = spawn('/bin/sh', ['-c', SH, 'pm-watchdog', f('status'), input !== undefined ? f('in') : '', f('out'), f('err'), dir, bin, ...args],
-      { cwd, env, detached: true, stdio: 'ignore' });
+    const child = spawn(process.execPath, [CHILD, f('status'), input !== undefined ? f('in') : '', f('out'), f('err'), dir, String(process.pid), resolved, ...args],
+      // detached on every OS: POSIX, so the wrapper leads the step's process group; win32, so it
+      // leaves libuv's kill-on-close job object and outlives this process to clean up after it
+      { cwd, env, detached: true, stdio: 'ignore', windowsHide: true });
     child.on('error', () => {});
     child.unref();
     const deadline = Date.now() + timeoutMs;
@@ -62,7 +99,7 @@ export function runWatched(bin, args = [], { cwd, env, input, timeoutMs = 10 * 6
     while (!existsSync(f('status'))) {
       if (Date.now() > deadline) {
         timedOut = true;
-        try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
+        if (child.pid) killTree(child.pid);
         break;
       }
       nap(wait);
@@ -74,6 +111,6 @@ export function runWatched(bin, args = [], { cwd, env, input, timeoutMs = 10 * 6
     const status = Number(readFileSync(f('status'), 'utf8').trim());
     return { status, stdout, stderr, timedOut: false };
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeDir(dir, process.platform === 'win32' ? 5000 : 0); // win32: a killed step may still hold a file
   }
 }

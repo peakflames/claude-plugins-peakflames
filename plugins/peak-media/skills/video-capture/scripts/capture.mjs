@@ -18,7 +18,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, CliError, EXIT, usageError, PLUGIN_ROOT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, usageError, PLUGIN_ROOT, setupCommand, isMain } from '../../../lib/cli.mjs';
 import { validateFile } from '../../../lib/schemas.mjs';
 import { requireNode } from '../../../lib/preflight.mjs';
 import { requireFfmpeg, ffmpeg } from '../../../lib/ffmpeg.mjs';
@@ -30,7 +30,7 @@ import { headedBrowserPath, headedBrowserOk } from '../../../lib/browser.mjs';
 import { parseScript } from '../../video-spine/scripts/spine.mjs';
 import { PRESETS, DEFAULT_PRESET, presetArgs, presetSummary } from '../../../lib/presets.mjs';
 
-const SETUP = path.join(PLUGIN_ROOT, 'scripts', 'setup.sh');
+const SETUP = setupCommand();
 /** Watchdog: a spine-timed take aborts once it runs this far past its window. */
 export const OVERRUN_GRACE_MS = 2000;
 /** Watchdog for takes with no window (silent, captions): the default --max-ms. */
@@ -147,6 +147,17 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8' };
 
+/**
+ * True when `file` lies strictly inside `root`. Windows paths compare case-insensitively, and a
+ * drive root (`C:\\`) already ends in its separator. `pathMod` is for tests (path.win32 / path.posix).
+ */
+export function insideRoot(root, file, pathMod = path) {
+  const r = pathMod.resolve(root), f = pathMod.resolve(file);
+  const prefix = r.endsWith(pathMod.sep) ? r : r + pathMod.sep;
+  const win = pathMod.sep === '\\';
+  return win ? f.toLowerCase().startsWith(prefix.toLowerCase()) && f.length > prefix.length : f.startsWith(prefix) && f.length > prefix.length;
+}
+
 /** Serve `root` on 127.0.0.1 (loopback only; port 0 = any free port). Resolves to {url, port, close}. */
 export function serveDir(root, { port = 0 } = {}) {
   const server = createServer((req, res) => {
@@ -154,7 +165,7 @@ export function serveDir(root, { port = 0 } = {}) {
     try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400); res.end('bad request'); return; }
     let file = path.resolve(root, '.' + rel);
     if (existsSync(file) && statSync(file).isDirectory()) file = path.join(file, 'index.html'); // a folder serves its index.html
-    if (!file.startsWith(path.resolve(root) + path.sep) || !existsSync(file) || statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
+    if (!insideRoot(root, file) || !existsSync(file) || statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, { 'content-type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' });
     createReadStream(file).pipe(res);
   });
@@ -340,7 +351,7 @@ export async function planTake(values) {
   return { values, plates, storyboard, sb, out, preset, viewport, size, fps, captions, captionCss, captionEngine: captionEngineChoice, cursor, scriptFile, spineFile, spine, window, beats, beatSource, audioOffsetMs, chrome, headed, storageState, pwEntry, page, mode, manifest, sources, watchdogMs };
 }
 
-/** The pinned Playwright's entry point, or a one-line MISSING_PREREQ error naming setup.sh. */
+/** The pinned Playwright's entry point, or a one-line MISSING_PREREQ error naming setup.mjs. */
 function requirePlaywright() {
   const pwRoot = depRoot('playwright');
   const pwEntry = resolveDep('playwright');
@@ -1136,7 +1147,7 @@ Signed-in takes: run \`capture signin <url>\` once (you sign in by hand in a vis
 session is saved to <data dir>/auth/<host>.json, mode 0600, when you close the tab), then pass
 --storage-state <that file>. A missing session file stops the take before a browser opens; the
 take manifest records signedIn: true, never the file's contents. --headed records in a visible
-window of Playwright's Chromium (installed by setup.sh); the frames are the same.
+window of Playwright's Chromium (installed by setup.mjs); the frames are the same.
 After every take capture prints the file (bytes, size in px, fps, length, preset or plate), each
 beat's span, and the page's uncaught errors (the first ${MAX_REPORTED_PAGE_ERRORS}; the manifest keeps ${MAX_MANIFEST_PAGE_ERRORS}).
 A watchdog aborts a spine-timed take 2 s past its window, and any take at --max-ms. Check a take
@@ -1161,7 +1172,7 @@ with check-take.mjs. Storyboard API: references/storyboard-api.md.`,
     manifest: { type: 'string', arg: 'file.json', desc: 'Where to write the take manifest (default: <take>.take.json next to --out)' },
     'max-ms': { type: 'number', arg: 'ms', desc: `Abort a take that runs longer than this (default: the spine window + ${OVERRUN_GRACE_MS} ms, else ${DEFAULT_MAX_MS})` },
     'storage-state': { type: 'string', arg: 'file.json', desc: 'Start the take signed in: a session saved by `capture signin` (default place: <data dir>/auth/<host>.json)' },
-    headed: { type: 'boolean', desc: 'Record in a visible window of Playwright\'s Chromium (setup.sh installs it); same frames as headless' },
+    headed: { type: 'boolean', desc: 'Record in a visible window of Playwright\'s Chromium (setup.mjs installs it); same frames as headless' },
     json: { type: 'boolean', desc: 'Print the take summary as JSON' },
   },
   examples: [
@@ -1276,7 +1287,7 @@ export const signinSpec = {
   summary: 'sign in by hand in a visible browser and save the session for capture --storage-state',
   usage: 'capture signin <url> [--save <file.json>] [--timeout 300s]',
   description: `
-Opens <url> in a visible window of Playwright's Chromium (setup.sh installs it). Sign in by hand,
+Opens <url> in a visible window of Playwright's Chromium (setup.mjs installs it). Sign in by hand,
 then close the tab: the session (cookies and local storage) is saved when the last tab closes, and
 the command exits. Nothing is recorded. The default file is <data dir>/auth/<host>.json
 (<data dir> = $CLAUDE_PLUGIN_DATA, else ~/.cache/peak-media); its folder is 0700, the file 0600.
@@ -1297,7 +1308,7 @@ and the exit is non-zero. Then record signed in with: capture … --storage-stat
  * Serve a local folder (or the folder of an .html file) on 127.0.0.1 until SIGINT/SIGTERM.
  * Prints the page URL on stdout. Resolves once the server is closed.
  */
-export async function serve(target, values, { signals = ['SIGINT', 'SIGTERM'] } = {}) {
+export async function serve(target, values, { signals = ['SIGINT', 'SIGTERM', ...(process.platform === 'win32' ? ['SIGBREAK'] : [])] } = {}) {
   const p = path.resolve(target);
   if (!existsSync(p)) throw new CliError(`serve ${p}: no such folder — pass the folder that holds index.html`);
   const dir = statSync(p).isDirectory() ? p : path.dirname(p);
@@ -1310,7 +1321,7 @@ export async function serve(target, values, { signals = ['SIGINT', 'SIGTERM'] } 
   }
   const url = srv.url + (file ? encodeURIComponent(file) : '');
   process.stdout.write(`${url}\n`);
-  log(`serving ${dir} on 127.0.0.1:${srv.port} (pid ${process.pid})${file === null ? ' — no index.html here; open a file by its name' : ''}; stop with Ctrl-C or kill ${process.pid}`);
+  log(`serving ${dir} on 127.0.0.1:${srv.port} (pid ${process.pid})${file === null ? ' — no index.html here; open a file by its name' : ''}; stop with Ctrl-C or node -e "process.kill(${process.pid})"`);
   await new Promise((resolve) => { const stop = () => { for (const s of signals) process.off(s, stop); resolve(); }; for (const s of signals) process.on(s, stop); });
   await srv.close();
   log('stopped');
@@ -1324,7 +1335,8 @@ export const serveSpec = {
 Serves <dir> (or the folder of <file.html>) on 127.0.0.1 only, the same way a take serves a local
 page, and prints the page's URL on stdout: http://127.0.0.1:<port>/ (or …/<file.html>). Use it to
 explore a local page with playwright-cli, whose browser blocks file:// URLs. It runs until Ctrl-C
-or SIGTERM (kill <pid>; the pid is on stderr), then exits 0. Run it in the background. Nothing is
+or SIGTERM, then exits 0. Run it in the background and stop it with node -e "process.kill(<pid>)"
+(the pid is on stderr; this works on every OS, Git Bash's kill can miss a Windows pid). Nothing is
 recorded and nothing is written.`,
   options: {
     port: { type: 'number', desc: 'Port on 127.0.0.1 (default: a free one, printed in the URL)' },
@@ -1333,7 +1345,7 @@ recorded and nothing is written.`,
   examples: ['capture serve ./site', 'capture serve ./site/index.html --port 8123'],
 };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   // runCli takes no positionals for a take, so the signin subcommand is dispatched before parsing
   if (argv[0] === 'signin') await runCli(signinSpec, ({ values, positionals }) => signin(positionals[0], values), argv.slice(1));

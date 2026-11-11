@@ -6,8 +6,8 @@
     "from": 0.8,
     "to": 4,
     "frames": 96,
-    "mean": 0.99758040625,
-    "min": 0.997157
+    "mean": 0.997575,
+    "min": 0.997099
   },
   "sheet": "AC-REAL-03-hstack.jpg (each tile: left = #s6 original, right = pack outro)"
 }

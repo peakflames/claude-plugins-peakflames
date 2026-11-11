@@ -1,4 +1,4 @@
-// WP2 shared verify tools: contact-sheet, probe-spec, check-cuts, setup.sh (AC-SKL-03/04, AC-BASE-01/03/04/05).
+// WP2 shared verify tools: contact-sheet, probe-spec, check-cuts, setup.mjs (AC-SKL-03/04, AC-BASE-01/03/04/05).
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -67,11 +67,11 @@ test('probe-spec: catches a file that misses the spec (not AC-bound)', () => {
   for (const n of ['video profile', 'audio codec', 'faststart (moov before mdat)']) assert.ok(failed.includes(n), n);
 });
 
-test('AC-BASE-01: setup.sh baseline (help, version, bad input)', (t) => {
-  baseline(t, assert, 'scripts/setup.sh', { flags: ['--check', '--skip-browser', '--data-dir', '--quiet'], badArgs: [['--bogus'], ['--data-dir']] });
-  const r = run('scripts/setup.sh', ['--check'], { env: { PEAK_MEDIA_FFMPEG: '/nonexistent/ffmpeg' } });
+test('AC-BASE-01: setup.mjs baseline (help, version, bad input)', (t) => {
+  baseline(t, assert, 'scripts/setup.mjs', { flags: ['--check', '--skip-browser', '--data-dir', '--quiet'], badArgs: [['--bogus'], ['--data-dir']] });
+  const r = run('scripts/setup.mjs', ['--check'], { env: { PEAK_MEDIA_FFMPEG: '/nonexistent/ffmpeg' } });
   assert.equal(r.code, 3);
-  assert.match(r.stderr.trim(), /^setup\.sh: ffmpeg not found — install it/);
+  assert.match(r.stderr.trim(), /^setup\.mjs: ffmpeg not found — install it \(macOS: brew install ffmpeg · Windows: winget install Gyan\.FFmpeg · Linux: sudo apt-get install ffmpeg\)$/);
 });
 
 test('AC-BASE-03: contact-sheet baseline', (t) => {

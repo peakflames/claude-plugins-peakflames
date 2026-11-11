@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, CliError, EXIT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, isMain } from '../../../lib/cli.mjs';
 import { validateFile } from '../../../lib/schemas.mjs';
 import { ffmpeg, probe, fpsOf, requireFfmpeg } from '../../../lib/ffmpeg.mjs';
 import { preflight } from '../../../lib/preflight.mjs';
@@ -298,7 +298,7 @@ writes out/final.mp4 = spine + outro, checked with probe-spec. Report: review/as
   ],
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, async ({ values, positionals: [input] }) => {
     // the GATE 7 line is held and printed last, so `… | tail -n 3` keeps it; a run that fails
     // before the cut check prints a FAIL line instead

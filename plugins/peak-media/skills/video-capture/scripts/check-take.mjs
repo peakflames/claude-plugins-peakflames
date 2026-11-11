@@ -7,7 +7,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { runCli, CliError, EXIT, usageError } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, usageError, isMain } from '../../../lib/cli.mjs';
 import { requireFfmpeg, probe, ffmpeg, fpsOf } from '../../../lib/ffmpeg.mjs';
 import { checkCuts, silences } from '../../../lib/verify/check-cuts.mjs';
 
@@ -132,7 +132,7 @@ Exit 0 if every scene change passes, 1 if any fails (its timecode is listed).`,
   ],
 };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, ({ values, positionals: [file] }) => {
     const th = values['scene-threshold'];
     if (!(th > 0 && th < 1)) throw usageError(`--scene-threshold must be between 0 and 1, got ${th}`);

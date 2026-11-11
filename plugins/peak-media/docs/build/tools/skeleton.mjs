@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runCli, CliError, EXIT, PLUGIN_ROOT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, PLUGIN_ROOT, isMain } from '../../../lib/cli.mjs';
 import { validateFile } from '../../../lib/schemas.mjs';
 import { preflight } from '../../../lib/preflight.mjs';
 import { render, gsapPath } from '../../../lib/hf.mjs';
@@ -83,7 +83,7 @@ const spec = {
   positionals: { max: 0 },
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   await runCli(spec, async ({ values }) => {
     if (!values.fixture || !values.out) throw new CliError('--fixture and --out are required', EXIT.USAGE);
     if (!existsSync(path.join(values.fixture, 'plates.json'))) throw new CliError(`no plates.json in ${values.fixture}`);

@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, sta
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, CliError, EXIT, PLUGIN_ROOT } from '../../../lib/cli.mjs';
+import { runCli, CliError, EXIT, PLUGIN_ROOT, isMain } from '../../../lib/cli.mjs';
 import { validateFile } from '../../../lib/schemas.mjs';
 import { preflight } from '../../../lib/preflight.mjs';
 import { render, hf, gsapPath } from '../../../lib/hf.mjs';
@@ -304,5 +304,5 @@ async function run({ values, positionals: [platesArg, ...ids] }, { collect = fal
   return EXIT.OK;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await runCli(spec, main);
+if (isMain(import.meta.url)) await runCli(spec, main);
 export { spec };

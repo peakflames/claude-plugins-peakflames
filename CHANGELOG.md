@@ -16,6 +16,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] — 2026-11-11
+
+### Added
+
+- **Bundles `peak-media` v0.3.0** — Windows x64 and Linux x64 support (beta) alongside macOS, verified by a 3-OS CI matrix. Breaking: `scripts/setup.mjs` replaces `setup.sh`. See the [peak-media changelog](plugins/peak-media/CHANGELOG.md).
+
 ## [1.5.0] — 2026-11-10
 
 ### Added

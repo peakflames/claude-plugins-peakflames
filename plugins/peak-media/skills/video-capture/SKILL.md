@@ -17,7 +17,7 @@ the frame-by-frame alternative for designed motion.
 Scripts: `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/` (`capture.mjs`, `check-take.mjs`).
 `node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --help` and the same with
 `signin --help` or `serve --help` list every flag; `--version` prints the plugin version. If a script says a
-dependency is missing, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh"` and retry. Before
+dependency is missing, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"` and retry. Before
 writing a storyboard, Read `references/storyboard-api.md`.
 
 ## When to use it
@@ -158,7 +158,9 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" serve ./si
 ```
 
 - It prints the URL on stdout (`http://127.0.0.1:<port>/`, or `…/<file.html>` for a file) and
-  its pid on stderr, then runs until Ctrl-C or SIGTERM and exits 0. Run it in the background.
+  its pid on stderr, then runs until Ctrl-C or SIGTERM and exits 0. Run it in the background;
+  stop it with `node -e "process.kill(<pid>)"` (works on every OS; Git Bash's `kill` can miss a
+  Windows pid).
 - `--port <n>` picks the port (default: a free one). A busy port is a one-line error.
 - `/` serves the folder's `index.html`; nothing outside the folder is served.
 - A take doesn't need it: capture serves a local `--url`/`url` itself.
@@ -195,7 +197,8 @@ Playwright calls never move the cursor.
    A visible Chromium window opens; the user signs in themselves and closes the tab (not the whole
    browser: quitting the browser saves nothing). The session (cookies
    and local storage) is saved to `<data dir>/auth/<host>.json` (`<data dir>` =
-   `$CLAUDE_PLUGIN_DATA`, else `~/.cache/peak-media`), folder 0700, file 0600, and the command
+   `$CLAUDE_PLUGIN_DATA`, else `~/.cache/peak-media`), folder 0700, file 0600 (on Windows those
+   modes don't apply: the per-user profile folder is what protects the file), and the command
    prints only that path. It gives up after `--timeout` (default `300s`; `5m`, `1500ms` also work)
    and saves nothing.
 2. Capture with `--storage-state <that file>`. A missing or unreadable session file stops the take
@@ -209,8 +212,8 @@ The session file is a credential:
 - At hand-off, offer to delete it.
 - No session available: record only the public part, or use a demo account with seeded data.
 
-`signin` and `--headed` need Playwright's Chromium, which `setup.sh` installs; if it is missing
-they stop with one line naming `setup.sh`. Recording otherwise uses the headless shell.
+`signin` and `--headed` need Playwright's Chromium, which `setup.mjs` installs; if it is missing
+they stop with one line naming `setup.mjs`. Recording otherwise uses the headless shell.
 
 ## Report
 

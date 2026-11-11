@@ -1,6 +1,6 @@
 // video-plates: render-plate entry point (AC-BASE-08), F1 renders (AC-PLT-01), lint/check (AC-PLT-04).
 // Renders use the default brand pack (brand-packs/default, WP5) via --brand.
-import { test } from 'node:test';
+import { test } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { writeFileSync, cpSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

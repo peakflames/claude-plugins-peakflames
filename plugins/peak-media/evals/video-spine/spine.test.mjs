@@ -1,6 +1,6 @@
 // WP3b spine: brief + script.md -> spine/manifest.json | beatgrid.json (AC-SPN-01..03, AC-BASE-06).
 // Only the documented lib/tts API is assumed (fake/tone provider), never the stub's internals.
-import { test, before } from 'node:test';
+import { test, before } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { copyFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';

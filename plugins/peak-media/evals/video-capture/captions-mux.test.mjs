@@ -9,12 +9,13 @@
 // that uses the run-alone gate.
 //
 // Set PEAK_MEDIA_EVIDENCE_DIR to keep the stills, measurements and manifests (JPEG/JSON only).
-import { test as nodeTest, before, after } from 'node:test';
+import { test as nodeTest, before, after } from '../helpers/suite.mjs';
 import assert from 'node:assert/strict';
 import { rmSync, writeFileSync, readFileSync, existsSync, statSync, mkdirSync, copyFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ROOT, run, baseline, tmpDir } from '../helpers/run.mjs';
 import { CAPTURE, SPINE, DECK, NO_KEY } from './helpers/projects.mjs';
 import { measureSync } from './helpers/sync.mjs';
@@ -35,7 +36,7 @@ const UI_SCRIPT = path.join(UI, 'script.md');
 /** The ui-demo's captions: each beat's On screen: line in script.md. */
 const CAPTIONS = parseScript(readFileSync(UI_SCRIPT, 'utf8')).map((b) => b.onScreenText);
 const SYNC = path.join(ROOT, 'evals', 'video-capture', 'fixtures', 'sync');
-const LOOPBACK_ONLY = path.join(ROOT, 'evals', 'video-capture', 'helpers', 'loopback-only.mjs');
+const LOOPBACK_ONLY = pathToFileURL(path.join(ROOT, 'evals', 'video-capture', 'helpers', 'loopback-only.mjs')).href;
 const EVIDENCE = process.env.PEAK_MEDIA_EVIDENCE_DIR;
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;

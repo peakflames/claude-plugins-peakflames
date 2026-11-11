@@ -1,11 +1,10 @@
 // Pre-flight checks: each failure is one actionable line (exit 3) before any work starts.
-import path from 'node:path';
-import { CliError, EXIT, PLUGIN_ROOT } from './cli.mjs';
+import { CliError, EXIT, setupCommand } from './cli.mjs';
 import { requireFfmpeg } from './ffmpeg.mjs';
 import { depRoot } from './deps.mjs';
 import { hfBin, browserPath } from './hf.mjs';
 
-const SETUP = path.join(PLUGIN_ROOT, 'scripts', 'setup.sh');
+const SETUP = setupCommand();
 
 export function requireNode(min = 22) {
   const major = Number(process.versions.node.split('.')[0]);
