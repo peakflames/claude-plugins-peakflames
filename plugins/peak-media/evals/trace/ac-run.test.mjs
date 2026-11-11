@@ -1,4 +1,4 @@
-// WP2 traceability tool (AC-TRC-01/02).
+// WP2 traceability tool (AC-TRC-01/02); WP11 area codes with digits (AC-TRC-03).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -57,6 +57,28 @@ test('AC-TRC-02: a verify report whose verifier-id equals the builder-id is reje
   assert.equal(run(AC, ['--trace', '--root', loose]).code, 1, 'case and a trailing (note) do not make ids differ');
   const diff = fixture({ rows: [row('AC-X-01', 'WP1')], briefs: { WP1: ['AC-X-01'] }, files: { 'wp/WP1/handoff.md': 'builder-id: agent-123\n', 'wp/WP1/verify-1.md': 'verifier-id: agent-456\n' } });
   assert.equal(run(AC, ['--trace', '--root', diff]).code, 0);
+});
+
+test('AC-TRC-03: an area code with digits (AC-W2V-01) is traced and its test result reported', () => {
+  // --trace: listed in a brief -> clean; unlisted -> orphan; a brief naming an unknown W2V ID -> flagged
+  const listed = fixture({ rows: [row('AC-W2V-01', 'WP1')], briefs: { WP1: ['AC-W2V-01'] } });
+  let r = run(AC, ['--trace', '--root', listed]);
+  assert.equal(r.code, 0, r.stdout); assert.match(r.stdout, /trace: 1 ACs/);
+  const orphan = fixture({ rows: [row('AC-W2V-01', 'WP1'), row('AC-W2V-02', 'WP1')], briefs: { WP1: ['AC-W2V-01'] } });
+  r = run(AC, ['--trace', '--root', orphan]);
+  assert.equal(r.code, 1); assert.match(r.stdout, /AC-W2V-02: orphan — not listed in wp\/WP1\/brief\.md/);
+  const unknown = fixture({ rows: [row('AC-W2V-01', 'WP1')], briefs: { WP1: ['AC-W2V-01', 'AC-W2V-99'] } });
+  r = run(AC, ['--trace', '--root', unknown]);
+  assert.equal(r.code, 1); assert.match(r.stdout, /lists unknown AC-W2V-99/);
+
+  // --wp: tests named "AC-W2V-0n: …" are found and their pass/fail reported
+  const wp = fixture({ rows: [row('AC-W2V-01', 'WP1'), row('AC-W2V-02', 'WP1')], briefs: { WP1: ['AC-W2V-01', 'AC-W2V-02'] } });
+  const evals = tmpDir('pm-trace-evals-');
+  writeFileSync(path.join(evals, 'w2v.test.mjs'), "import { test } from 'node:test';\ntest('AC-W2V-01: passes', () => {});\ntest('AC-W2V-02: fails', () => { throw new Error('x'); });\n");
+  r = run(AC, ['--wp', 'WP1', '--root', wp, '--evals', evals]);
+  assert.equal(r.code, 1, 'AC-W2V-02 fails, so the run fails');
+  assert.match(r.stdout, /\| AC-W2V-01 \| script \| pass \|/);
+  assert.match(r.stdout, /\| AC-W2V-02 \| script \| fail \|/);
 });
 
 test('ac-run: baseline-style usage errors (not AC-bound)', () => {

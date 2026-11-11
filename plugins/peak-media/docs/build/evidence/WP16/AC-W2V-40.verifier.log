@@ -1,0 +1,34 @@
+# AC-W2V-40 verifier run, node --test evals/packaging/packaging.test.mjs
+✖ AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media (2.303583ms)
+✔ AC-PKG-03: the runtime tree carries no house-brand name (D17), and the examples carry no brand assets (19.633584ms)
+✔ AC-PKG-06: every skill has at least one eval (node --test "plugins/peak-media/evals/**/*.test.mjs") (3.890833ms)
+✔ AC-W2V-40: exactly six skills (web2video included), each named for its folder, with a Triggers line and an eval (4.07325ms)
+✔ AC-PKG-07: VENDORED.md gives source, commit, date, licence and local changes for every vendor folder; GSAP and fonts are listed (2.178042ms)
+✔ packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs and JPEG — no audio or video anywhere (not AC-bound) (19.619042ms)
+✔ watchdog: a step that never exits is stopped, its process group killed, and the run fails in one line (WP9 verify-1 F1; not AC-bound) (5898.880208ms)
+✔ watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step's whole process group and leaves no temp folder (WP9 verify-2 N1; not AC-bound) (2255.465875ms)
+✔ watchdog: "not found" only when the binary does not exist, not from a real binary's exit 127 (WP9 verify-2 N2; not AC-bound) (153.908833ms)
+✔ AC-PKG-04: on macOS with the prerequisites, setup.sh then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps (42549.821875ms)
+✔ AC-PKG-08: on macOS, setup + F0 with a prerequisite missing (ffmpeg, browser, key) prints the one-line message for what is missing (9220.04575ms)
+ℹ pass 10
+ℹ fail 1
+✖ failing tests:
+✖ AC-PKG-01: plugin.json version = the top CHANGELOG entry, and marketplace.json lists peak-media (2.303583ms)
+# AC-PKG-01 fails as expected until WP18 (version bump)
+skills/plate-factory/SKILL.md
+skills/video-assemble/SKILL.md
+skills/video-capture/SKILL.md
+skills/video-plates/SKILL.md
+skills/video-spine/SKILL.md
+skills/web2video/SKILL.md
+---
+name: web2video
+description: |
+  Makes a short MP4 of a web page or app from one sentence: asks only what it can't infer, writes
+  the script and storyboard, gets one approval, records with a visible cursor and captions (or
+  narration, or silent), checks the take, and hands over a file encoded for where it is going
+  (website, YouTube, archive). Handles pages behind a sign-in. A front door over video-capture
+  and video-spine; it never uploads or sends the video.
+  Triggers on: "make a video of this page", "record a demo of", "turn this deck into a video",
+  "screen recording of the app", "video tour of the dashboard", "/web2video".
+---

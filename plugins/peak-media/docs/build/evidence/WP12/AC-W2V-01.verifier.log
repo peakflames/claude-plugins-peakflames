@@ -1,0 +1,18 @@
+# AC-W2V-01 verifier (wp12-verifier-1), 2026-11-10T21:32:20Z
+## ac-run --wp WP12
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-W2V-01 | script | pass | not-started | — |
+## node --test evals/video-capture/beat.test.mjs (run alone)
+✔ AC-W2V-01: each beat shows its own caption — script.md On screen: lines (ui-demo) and spine onScreenText (narrated deck) (35290.234875ms)
+✔ AC-W2V-01: the take manifest with per-beat entries validates against the v1 spine schema (46.837083ms)
+ℹ tests 9
+ℹ pass 9
+ℹ fail 0
+## full suite (TMPDIR=mktemp)
+✔ AC-TRC-03: an area code with digits (AC-W2V-01) is traced and its test result reported (653.173167ms)
+✔ AC-W2V-01: each beat shows its own caption — script.md On screen: lines (ui-demo) and spine onScreenText (narrated deck) (36665.985166ms)
+✔ AC-W2V-01: the take manifest with per-beat entries validates against the v1 spine schema (61.348709ms)
+ℹ tests 127
+ℹ pass 126
+ℹ fail 1

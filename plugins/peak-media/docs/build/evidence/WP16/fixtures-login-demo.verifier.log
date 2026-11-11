@@ -1,0 +1,34 @@
+# login-demo smoke (wp16-verifier-1)
+## signed out
+HTTP/1.1 200 OK
+content-type: text/html
+Date: Tue, 10 Nov 2026 23:52:37 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+<!doctype html><meta charset=utf-8><title>Demo</title><body><h1>Sign in</h1><form method=post action=/login>
+      <input name=user placeholder=User><input name=pass type=password placeholder=Password>
+      <button>Sign in</button></form></body>
+## Cookie: session=demo
+HTTP/1.1 200 OK
+content-type: text/html
+Date: Tue, 10 Nov 2026 23:52:37 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+<!doctype html><meta charset=utf-8><title>Demo</title><body><h1 data-testid=dash>Dashboard</h1><button id=report>Run report</button>
+    <p id=out></p><script>report.onclick=()=>{out.textContent='Report ready: 42 rows'}</script></body>
+## POST /login
+HTTP/1.1 303 See Other
+Set-Cookie: session=demo; Path=/; HttpOnly
+Location: /
+Date: Tue, 10 Nov 2026 23:52:37 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+## bind
+COMMAND   PID     USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+node    36182 schaveyt   12u  IPv4 0x1ec9ecc95b9937a2      0t0  TCP 127.0.0.1:4173 (LISTEN)

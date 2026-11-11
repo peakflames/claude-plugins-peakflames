@@ -1,0 +1,23 @@
+$ node $P/lib/verify/probe-spec.mjs ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4 --preset youtube
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1920
+ok    height: 1080
+ok    fps: 30.000
+ok    [youtube] audio profile: LC
+ok    [youtube] audio channels: 2
+ok    [youtube] audio bitrate ≤ 384 kbps +15%: 203 kbps
+ok    [youtube] progressive: progressive
+ok    [youtube] encoder rate control (x264 SEI): rc=abr bitrate=8000 vbv_maxrate=12000
+ok    [youtube] CABAC (x264 SEI): cabac=1
+ok    [youtube] video bitrate ≤ 12000 kbps peak: 1014 kbps
+ok    [youtube] GOP length = 15 frames (half of 30 fps): 15 frames
+ok    [youtube] closed GOP: closed
+ok    [youtube] 2 consecutive B-frames: max B run 2 (219 runs)
+ok    [youtube] no edit lists: 0 elst
+PASS  ~/tmp/pm-w2v-uat-r2/AC-UAT-03/web2video/water-in-the-morning/out/water-in-the-morning.mp4
+exit=0

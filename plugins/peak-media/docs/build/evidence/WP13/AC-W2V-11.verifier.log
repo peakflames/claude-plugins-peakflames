@@ -1,0 +1,49 @@
+# node --test --test-reporter=spec evals/video-capture/presets.test.mjs (verifier run, 2026-11-10)
+✔ AC-W2V-11: the deck narrated on a fake/tone spine — each clip starts in --out at its spine time (± one frame), and capture made no TTS request (24909.066375ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97731.192459
+
+# measurements (PEAK_MEDIA_EVIDENCE_DIR)
+{
+  "note": "tone onsets (end of each \u2265200 ms silence at -40 dB) in the --out MP4 vs the spine clip start; beat planned = clip start \u2212 audioOffsetMs",
+  "fps": 30,
+  "audioOffsetMs": 0,
+  "rows": [
+    {
+      "n": 1,
+      "beat": "intro",
+      "spineStartMs": 950,
+      "onsetMs": 950,
+      "errMs": 0,
+      "beatPlannedMs": 950,
+      "beatStartMs": 950,
+      "lateMs": 0
+    },
+    {
+      "n": 2,
+      "beat": "why",
+      "spineStartMs": 7605,
+      "onsetMs": 7605,
+      "errMs": 0,
+      "beatPlannedMs": 7605,
+      "beatStartMs": 7605,
+      "lateMs": 0
+    },
+    {
+      "n": 3,
+      "beat": "how",
+      "spineStartMs": 16078,
+      "onsetMs": 16078,
+      "errMs": 0,
+      "beatPlannedMs": 16078,
+      "beatStartMs": 16078,
+      "lateMs": 0
+    }
+  ]
+}

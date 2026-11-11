@@ -1,0 +1,11 @@
+✔ AC-BASE-10: check-take --help lists every flag, --version = plugin.json, bad input is one actionable line, no network (3314.904458ms)
+✔ AC-REC-07: on the narrated example deck, every scene change (threshold 0.02) lands inside silence (-40 dB, >= 900 ms) (45876.924ms)
+✔ AC-REC-10: with no key, the captions-only example passes with 0 OpenRouter calls (12377.03475ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 61687.894916

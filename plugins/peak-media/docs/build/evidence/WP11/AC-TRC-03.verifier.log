@@ -1,0 +1,34 @@
+# WP11 verify-1 — AC-TRC-03 — 2026-11-10T20:09:39Z — HEAD 8eedf36
+## node --test --test-name-pattern='^AC-TRC-03:' evals/trace/ac-run.test.mjs
+✔ AC-TRC-03: an area code with digits (AC-W2V-01) is traced and its test result reported (481.782125ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 555.719
+exit=0
+## ac-run --wp WP11
+| AC | method | run | register | evidence |
+|---|---|---|---|---|
+| AC-TRC-03 | script | pass | not-started | — |
+exit=0
+## ac-run --trace
+PASS  trace: 80 ACs, 13 briefs, 0 problem(s)
+exit=0
+## node --test evals/trace/ac-run.test.mjs (full file)
+✔ AC-TRC-01: --trace fails on orphan AC, unknown AC in a brief, PASS without evidence; passes on the real register (715.964375ms)
+✔ AC-TRC-02: a verify report whose verifier-id equals the builder-id is rejected (352.601958ms)
+✔ AC-TRC-03: an area code with digits (AC-W2V-01) is traced and its test result reported (482.178333ms)
+✔ ac-run: baseline-style usage errors (not AC-bound) (269.767542ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1889.980916
+exit=0

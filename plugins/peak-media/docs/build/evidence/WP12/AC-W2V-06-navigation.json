@@ -1,0 +1,66 @@
+{
+  "overlay": [
+    {
+      "label": "home",
+      "ms": 679,
+      "at": {
+        "x": 366,
+        "y": 310
+      },
+      "arrow": 111,
+      "caption": 62
+    },
+    {
+      "label": "after hash route",
+      "ms": 2661,
+      "at": {
+        "x": 376,
+        "y": 310
+      },
+      "arrow": 109,
+      "caption": 92
+    },
+    {
+      "label": "after goto",
+      "ms": 5191,
+      "at": {
+        "x": 360,
+        "y": 310
+      },
+      "arrow": 111,
+      "caption": 100
+    }
+  ],
+  "dom": [
+    {
+      "label": "home",
+      "ms": 681,
+      "at": {
+        "x": 366,
+        "y": 310
+      },
+      "arrow": 111,
+      "caption": 62
+    },
+    {
+      "label": "after hash route",
+      "ms": 2645,
+      "at": {
+        "x": 376,
+        "y": 310
+      },
+      "arrow": 110,
+      "caption": 92
+    },
+    {
+      "label": "after goto",
+      "ms": 5190,
+      "at": {
+        "x": 360,
+        "y": 310
+      },
+      "arrow": 108,
+      "caption": 100
+    }
+  ]
+}

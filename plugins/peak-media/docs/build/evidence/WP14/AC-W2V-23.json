@@ -1,0 +1,18 @@
+{
+  "seven": {
+    "stdout": "wrote <tmp>/w23-seven.mp4 (17 kB, 1280x720 @ 30 fps, 1.7 s, preset web)\nbeats: boom 0.01–1.72 s\npage errors during take: 7\n  TypeError: Cannot read properties of undefined (reading 'item1')\n  TypeError: Cannot read properties of undefined (reading 'item2')\n  TypeError: Cannot read properties of undefined (reading 'item3')\n  TypeError: Cannot read properties of undefined (reading 'item4')\n  TypeError: Cannot read properties of undefined (reading 'item5')\n  … and 2 more\ntake manifest: <tmp>/w23-seven.take.json\n",
+    "pageErrors": [
+      "TypeError: Cannot read properties of undefined (reading 'item1')",
+      "TypeError: Cannot read properties of undefined (reading 'item2')",
+      "TypeError: Cannot read properties of undefined (reading 'item3')",
+      "TypeError: Cannot read properties of undefined (reading 'item4')",
+      "TypeError: Cannot read properties of undefined (reading 'item5')",
+      "TypeError: Cannot read properties of undefined (reading 'item6')",
+      "TypeError: Cannot read properties of undefined (reading 'item7')"
+    ]
+  },
+  "many": {
+    "manifestPageErrors": 20,
+    "pageErrorCount": 25
+  }
+}

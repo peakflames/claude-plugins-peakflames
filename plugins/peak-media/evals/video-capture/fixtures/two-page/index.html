@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Two-page fixture — home</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #eef0f2; color: #1d2329; font: 22px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { width: 640px; margin: 60px auto 0; background: #fff; border-radius: 12px; padding: 28px 32px; }
+  a, button { display: inline-block; margin-top: 18px; font: inherit; font-size: 18px; padding: 10px 18px; border-radius: 8px; border: 1px solid #3a6ea5; color: #3a6ea5; background: #fff; text-decoration: none; }
+</style>
+</head>
+<body>
+<!-- AC-W2V-06: a hash-route link (#/details swaps the view without a page load) and a link to
+     page2.html that the storyboard follows with goto(). -->
+<main id="view"></main>
+<script>
+  const views = {
+    '': '<h1>Home</h1><p>A hash-route link, then a real page load.</p><a id="go" href="#/details">Details</a>',
+    '#/details': '<h1>Details</h1><p>Same document, new route.</p><a id="next" href="page2.html">Page two</a>',
+  };
+  const render = () => { document.getElementById('view').innerHTML = views[location.hash] ?? views['']; };
+  addEventListener('hashchange', render);
+  render();
+</script>
+</body>
+</html>

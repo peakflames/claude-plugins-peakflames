@@ -1,0 +1,69 @@
+{
+ "note": "Headed takes (headless:false), 5 s each, continuous-motion page, FrameGrid-style slot count. pw = Playwright Chrome for Testing 1254 (not installed by setup.sh); chrome = channel chrome (user-installed). The headless shell from browserPath() cannot run headed (see U6).",
+ "u5-chrome-30": {
+  "unknown": "U2",
+  "date": "2026-11-10T19:59:16.065Z",
+  "fps": 30,
+  "seconds": 5,
+  "viewport": {
+   "width": 1920,
+   "height": 1080
+  },
+  "headed": true,
+  "exe": "chrome",
+  "version": "157.0.8103.39",
+  "wallMs": 5002,
+  "slots": 150,
+  "unique": 145,
+  "ratio": 0.9667,
+  "uniqueFps": 29,
+  "framesDelivered": 287,
+  "pass": true,
+  "maxGapMs": 200,
+  "framesDir": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.72MQhc0t8s/u-grid-Omd1Ce"
+ },
+ "u5-pw-30": {
+  "unknown": "U2",
+  "date": "2026-11-10T19:59:09.344Z",
+  "fps": 30,
+  "seconds": 5,
+  "viewport": {
+   "width": 1920,
+   "height": 1080
+  },
+  "headed": true,
+  "exe": "pw",
+  "version": "158.0.8127.18",
+  "wallMs": 5004,
+  "slots": 150,
+  "unique": 144,
+  "ratio": 0.96,
+  "uniqueFps": 28.8,
+  "framesDelivered": 288,
+  "pass": true,
+  "maxGapMs": 216.7,
+  "framesDir": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.72MQhc0t8s/u-grid-oNREBh"
+ },
+ "u5-pw-60": {
+  "unknown": "U2",
+  "date": "2026-11-10T19:59:22.425Z",
+  "fps": 60,
+  "seconds": 5,
+  "viewport": {
+   "width": 1920,
+   "height": 1080
+  },
+  "headed": true,
+  "exe": "pw",
+  "version": "158.0.8127.18",
+  "wallMs": 5004,
+  "slots": 300,
+  "unique": 299,
+  "ratio": 0.9967,
+  "uniqueFps": 59.8,
+  "framesDelivered": 299,
+  "pass": true,
+  "maxGapMs": 18.7,
+  "framesDir": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.72MQhc0t8s/u-grid-xo5Kao"
+ }
+}

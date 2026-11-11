@@ -1,0 +1,29 @@
+# distinct frames (ffmpeg mpdecimate) — beats from x-take: top 0.02–6.48, scroll 6.48–13.2, still-there 13.2–19.6
+scroll beat: 6.72s window from 6.48s -> 167 distinct frames (ffmpeg mpdecimate default thresholds)
+scrollBy #1 (1400 px / 2600 ms): 2.6s window from 6.6s -> 78 distinct frames (ffmpeg mpdecimate default thresholds)
+scrollBy #2 (1800 px / 2600 ms): 2.6s window from 9.7s -> 66 distinct frames (ffmpeg mpdecimate default thresholds)
+control hold in top beat: 3s window from 2s -> 1 distinct frames (ffmpeg mpdecimate default thresholds)
+
+# storyboard.mjs
+export const url = '../../rough-app/index.html';
+
+// The footer prints an API key; hidden from frame 0.
+export const hide = ['footer'];
+
+export default async function storyboard({ beat, point, scrollBy, wait }) {
+  await beat('top', async () => {
+    await point('thead th:nth-child(2)');
+    await wait(6000);
+  });
+  await beat('scroll', async () => {
+    await scrollBy('#rows', { y: 1400, ms: 2600 });
+    await wait(500);
+    await scrollBy('#rows', { y: 1800, ms: 2600 });
+    await wait(500);
+  });
+  await beat('still-there', async () => {
+    await point('thead th:nth-child(3)');
+    await wait(6000);
+  });
+  await wait(300);
+}

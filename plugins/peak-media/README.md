@@ -20,7 +20,7 @@ In Claude Code:
 /plugin install peak-media@peakflames-plugins
 ```
 
-Restart Claude Code, then check that `/plugin` lists the five skills below.
+Restart Claude Code, then check that `/plugin` lists the six skills below.
 
 The marketplace tracks the repository's `main` branch, which holds released versions only. To try
 unreleased work, add a branch instead, e.g. `peakflames/claude-plugins-peakflames#develop`; expect
@@ -30,10 +30,10 @@ it to change without a release.
 
 | Need | Why | Check |
 |---|---|---|
-| **macOS** | The only supported platform in 0.1.0 | |
+| **macOS** | The only supported platform | |
 | **Node.js 22 or newer** (with npm) | Every script is Node; HyperFrames needs 22 | `node -v` |
 | **ffmpeg and ffprobe** | Encoding, loudness, cut checks | `ffmpeg -version` |
-| **About 600 MB of disk** for the runtime, plus room for renders | Runtime deps ≈ 140 MB, render browser ≈ 400 MB; a 1–2 minute video needs a few hundred MB more while it is built | |
+| **About 1 GB of disk** for the runtime, plus room for renders | Runtime deps ≈ 140 MB, render browser ≈ 400 MB, sign-in browser ≈ 380 MB; a 1–2 minute video needs a few hundred MB more while it is built | |
 | **Network** for setup, and for narration | Setup downloads the pinned packages and a headless browser once; rendering is offline | |
 
 Install ffmpeg with `brew install ffmpeg`.
@@ -80,7 +80,7 @@ no retention: `--tts-model microsoft/mai-voice-2.1-flash`.
 **No key, no problem.** Without a key nothing is sent anywhere: the spine becomes a silent beat
 grid (below).
 
-## Three ways to make a video
+## Four ways to make a video
 
 ### 1. Narrated explainer
 
@@ -122,6 +122,34 @@ It works on its own (a captioned demo, a silent screen recording, or a narrated 
 spine) or as the `live` plates inside a plate-factory video. It never synthesizes speech itself.
 No key is needed for captions.
 
+### 4. A video of a web page, for a destination: `web2video`
+
+Point it at a page or a local folder and say where the video is going:
+
+> Make a 20-second captioned demo of the sign-up flow at http://localhost:5173 for our website.
+>
+> Turn the deck in `./deck` into a narrated video I can put on YouTube.
+>
+> Record a silent tour of our dashboard. It needs a login.
+
+Claude explores the page, writes `script.md` and a storyboard, and asks **once** before recording,
+showing the script, the beats, the mode, the preset and the output path. It then records, checks
+the result (format, length, one still per beat, anything private on screen) and hands you the file
+at `web2video/<slug>/out/<slug>.mp4`. It never uploads, posts or sends the file.
+
+| Preset | Size | Pick it for |
+|---|---|---|
+| `web` (default) | 1280×720 @ 30 fps, small | websites, docs, chat, email |
+| `youtube` | 1920×1080 @ 30 fps | YouTube and other video platforms |
+| `hifi` | 1920×1080 @ 60 fps, high quality | archive and editing |
+
+**Pages behind a login:** Claude opens a browser window with `capture signin`; you sign in
+yourself and close the tab. The session is saved outside the project (`~/.cache/peak-media/auth/`)
+and every take starts signed in. Claude never types a password and offers to delete the session
+file when it hands over the video.
+
+Narrated mode needs the narration key; captions and silent mode don't.
+
 ## The skills
 
 | Skill | What it does |
@@ -129,8 +157,9 @@ No key is needed for captions.
 | `plate-factory` | The orchestrator: brief → `out/final.mp4` through gates 0–9 |
 | `video-spine` | Brief → `script.md` → narration (`spine/manifest.json`) or a beat grid (`spine/beatgrid.json`); voice samples |
 | `video-plates` | Motion and slide plates: storyboard stills, render each plate alone, lint and contact sheets, rebrand |
-| `video-capture` | Live page capture from a storyboard, with captions; take checks |
+| `video-capture` | Live page capture from a `beat()` storyboard: cursor, captions, presets, sign-in; take checks |
 | `video-assemble` | Composite, cut check, music and SFX remux, brand outro, final export |
+| `web2video` | A page or folder → an MP4 for a named destination: one approval, sign-in, presets, checks, no upload |
 
 Each skill also works on its own, e.g. *"re-render plate p2 with the new copy"* or *"add this
 track under review.mp4"*.

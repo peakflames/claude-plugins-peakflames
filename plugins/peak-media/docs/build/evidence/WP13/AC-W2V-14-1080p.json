@@ -1,0 +1,66 @@
+{
+  "note": "narrated deck, captions on, check-take --expect-cuts 2 per 1080p preset; threshold 0.02 at 1280x720, scaled by area, scored at <= 30 fps",
+  "youtube": {
+    "size": "1920x1080",
+    "fps": 30,
+    "effectiveThreshold": 0.008889,
+    "scoredFps": 30,
+    "cuts": [
+      {
+        "timecode": "0:06.700",
+        "silenceMs": 1200,
+        "ok": true,
+        "frames": 1
+      },
+      {
+        "timecode": "0:15.167",
+        "silenceMs": 1200,
+        "ok": true,
+        "frames": 2
+      }
+    ],
+    "wholeFrameCuts": 8
+  },
+  "hifi": {
+    "size": "1920x1080",
+    "fps": 60,
+    "effectiveThreshold": 0.008889,
+    "scoredFps": 30,
+    "cuts": [
+      {
+        "timecode": "0:06.700",
+        "silenceMs": 1200,
+        "ok": true,
+        "frames": 1
+      },
+      {
+        "timecode": "0:15.167",
+        "silenceMs": 1200,
+        "ok": true,
+        "frames": 2
+      }
+    ],
+    "wholeFrameCuts": 8
+  },
+  "youtube@60": {
+    "size": "1920x1080",
+    "fps": 60,
+    "effectiveThreshold": 0.008889,
+    "scoredFps": 30,
+    "cuts": [
+      {
+        "timecode": "0:06.700",
+        "silenceMs": 1200,
+        "ok": true,
+        "frames": 1
+      },
+      {
+        "timecode": "0:15.167",
+        "silenceMs": 1200,
+        "ok": true,
+        "frames": 1
+      }
+    ],
+    "wholeFrameCuts": 8
+  }
+}

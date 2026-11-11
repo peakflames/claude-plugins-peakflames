@@ -1,0 +1,17 @@
+$ node $P/lib/verify/probe-spec.mjs ~/tmp/pm-w2v-uat/AC-UAT-11/web2video/todo-demo/out/todo-demo.mp4 --preset web
+ok    video codec: h264
+ok    video profile: High
+ok    pixel format: yuv420p
+ok    audio codec: aac
+ok    audio sample rate: 48000
+ok    faststart (moov before mdat): ftyp,moov,free,mdat
+ok    width: 1280
+ok    height: 720
+ok    fps: 30.000
+ok    [web] audio profile: LC
+ok    [web] audio channels: 2
+ok    [web] audio bitrate ≤ 128 kbps +15%: 2 kbps
+ok    [web] progressive: progressive
+ok    [web] encoder rate control (x264 SEI): rc=crf crf=26.0
+PASS  ~/tmp/pm-w2v-uat/AC-UAT-11/web2video/todo-demo/out/todo-demo.mp4
+exit=0

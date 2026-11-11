@@ -1,0 +1,32 @@
+# M2 (verifier-2): tone onsets measured sample-by-sample (first |x| > -50 dBFS from 300 ms before each clip) in each --out MP4, vs the spine clip start
+web fps 30/1 [{"clip":1,"spineMs":950,"onsetMs":950.02,"errMs":0.02},{"clip":2,"spineMs":7605,"onsetMs":7605.02,"errMs":0.02},{"clip":3,"spineMs":16078,"onsetMs":16078.02,"errMs":0.02}] within ±2 ms within 1 frame (33.3 ms)
+youtube fps 30/1 [{"clip":1,"spineMs":950,"onsetMs":950.02,"errMs":0.02},{"clip":2,"spineMs":7605,"onsetMs":7605.02,"errMs":0.02},{"clip":3,"spineMs":16078,"onsetMs":16078.02,"errMs":0.02}] within ±2 ms within 1 frame (33.3 ms)
+youtube60 fps 60/1 [{"clip":1,"spineMs":950,"onsetMs":950.02,"errMs":0.02},{"clip":2,"spineMs":7605,"onsetMs":7605.02,"errMs":0.02},{"clip":3,"spineMs":16078,"onsetMs":16078.02,"errMs":0.02}] within ±2 ms within 1 frame (16.7 ms)
+hifi fps 60/1 [{"clip":1,"spineMs":950,"onsetMs":950.02,"errMs":0.02},{"clip":2,"spineMs":7605,"onsetMs":7605.02,"errMs":0.02},{"clip":3,"spineMs":16078,"onsetMs":16078.02,"errMs":0.02}] within ±2 ms within 1 frame (16.7 ms)
+
+# probe-spec on the same takes
+ok    [youtube] 2 consecutive B-frames: max B run 2 (214 runs)
+ok    [youtube] no edit lists: 0 elst
+PASS  /tmp/wp13v2/deck-youtube.mp4
+probe youtube exit=0
+ok    [youtube] 2 consecutive B-frames: max B run 2 (428 runs)
+ok    [youtube] no edit lists: 0 elst
+PASS  /tmp/wp13v2/deck-youtube60.mp4
+probe youtube60 exit=0
+ok    [hifi] progressive: progressive
+ok    [hifi] encoder rate control (x264 SEI): rc=crf crf=16.0
+PASS  /tmp/wp13v2/deck-hifi.mp4
+probe hifi exit=0
+
+# priming trim with a clip at 0 ms: 1 kHz sine from sample 0 encoded with presetArgs(web|youtube)
+web audioFilter - first sample > -40dBFS at 1 (0.02 ms) decoded samples 96000
+youtube audioFilter atrim=start_sample=1024,asetpts=PTS-STARTPTS,apad first sample > -40dBFS at 1018 (21.21 ms) decoded samples 97024
+AAC_PRIMING_SAMPLES 1024
+peak 0.125 best phase shift (samples mod 48) 0 err 0.0001
+(phase shift 0 = decoded sample n equals input sample n: alignment is exact, input samples 0..1023 are dropped)
+
+# n1: x264 SEI
+youtube: bframes=2 open_gop=0 keyint=15 keyint_min=1 scenecut=0 rc=abr bitrate=8000 
+youtube60: bframes=2 open_gop=0 keyint=30 keyint_min=3 scenecut=0 rc=abr bitrate=12000 
+ok    [youtube] GOP length = 30 frames (half of 60 fps): 30 frames
+ok    [youtube] closed GOP: closed

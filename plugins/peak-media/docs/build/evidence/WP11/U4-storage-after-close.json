@@ -1,0 +1,197 @@
+{
+ "note": "Headed. Cookie set by server (HttpOnly) and by JS, plus localStorage token, on a loopback page; then the only tab is closed and context.storageState() is read 1 s later. window.close() is ignored by Chromium for a tab the script did not open (no close event) - expected. A real mouse click on the tab x / Cmd+W was NOT performed (would drive the users screen); CDP Target.closeTarget is the browser-side close path the tab x uses. No real credentials used.",
+ "u4-pw": {
+  "unknown": "U4",
+  "date": "2026-11-10T20:00:07.941Z",
+  "exe": "pw",
+  "results": [
+   {
+    "scenario": "page.close()",
+    "persistent": false,
+    "pageCloseEventMs": 5,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "window.close() (page-initiated)",
+    "persistent": false,
+    "pageCloseEventMs": null,
+    "pagesLeft": 1,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "CDP Target.closeTarget (browser-side close, like the tab x)",
+    "persistent": false,
+    "pageCloseEventMs": 5,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "persistent: page.close()",
+    "persistent": true,
+    "pageCloseEventMs": 4,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "persistent: CDP Target.closeTarget",
+    "persistent": true,
+    "pageCloseEventMs": 4,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   }
+  ]
+ },
+ "u4-chrome": {
+  "unknown": "U4",
+  "date": "2026-11-10T20:00:42.204Z",
+  "exe": "chrome",
+  "results": [
+   {
+    "scenario": "page.close()",
+    "persistent": false,
+    "pageCloseEventMs": 6,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "window.close() (page-initiated)",
+    "persistent": false,
+    "pageCloseEventMs": null,
+    "pagesLeft": 1,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "CDP Target.closeTarget (browser-side close, like the tab x)",
+    "persistent": false,
+    "pageCloseEventMs": 7,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "persistent: page.close()",
+    "persistent": true,
+    "pageCloseEventMs": 4,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   },
+   {
+    "scenario": "persistent: CDP Target.closeTarget",
+    "persistent": true,
+    "pageCloseEventMs": 5,
+    "pagesLeft": 0,
+    "contextClosed": false,
+    "browserDisconnected": false,
+    "storage": {
+     "cookies": [
+      "js",
+      "srv"
+     ],
+     "localStorage": [
+      "token"
+     ]
+    },
+    "storageStateOk": true
+   }
+  ]
+ }
+}

@@ -1,93 +1,129 @@
 # Storyboard API
 
-A storyboard is an ES module that drives a live page while `capture` screen-captures it. The
-same storyboard runs unchanged in all three modes. Only the meaning of `say()` changes.
+A storyboard is an ES module that drives a live page while `capture` screen-captures it. It names
+beats by id; the text of each beat lives once, in `script.md` or the spine manifest. The same
+storyboard runs in captions, silent and narrated mode.
 
 ```js
 // storyboard.mjs
 export const url = './index.html'; // optional; see "Which page loads"
 
-export default async function storyboard({ page, say, waitForVoice, wait }) {
-  await page.click('text=New task');
-  await say('Add a task');
-  await waitForVoice();
+export default async function storyboard({ beat, click, type }) {
+  await beat('add', async () => {
+    await type('#new', 'Buy milk', { enter: true });
+  });
+  await beat('done', async () => {
+    await click('#buy-milk');
+  });
 }
 ```
 
 ## The function
 
-`export default async ({ page, say, waitForVoice, wait, ... }) => { … }`. A named export
-`storyboard` is also accepted. The take starts at t0, the timestamp of the first screencast
-frame. Every time below is measured from t0 on that same clock.
+`export default async ({ beat, goto, click, type, point, scrollTo, scrollBy, wait, page, context, mode, fps, viewport, elapsedMs }) => { … }`.
+A named export `storyboard` is also accepted. The take starts at t0, the timestamp of the first
+screencast frame; every time below is on that clock.
 
 | Name | What it does |
 |---|---|
-| `page` | The Playwright `Page`, already loaded. Use any Playwright call: `click`, `fill`, `evaluate`, `mouse.wheel`, … |
-| `say(text)` | One beat of narration or caption, spoken and shown as written. See the modes table below. |
-| `say("", { narrate })` | Voice only: `narrate` is the spoken text and no caption is drawn. The exception is captions mode, where there is no voice, so `narrate` is shown as the caption. |
-| `say(text, { narrate })` | The caption shows `text` and the voice speaks `narrate`. |
-| `waitForVoice()` | Resolves when the current `say()` has finished: the clip's end in spine-timed mode, or the end of the caption's reading time otherwise. |
-| `wait(ms)` | Sleeps for `ms` ms of real time. |
-| `elapsedMs()` | ms since t0, useful for debugging timing. |
-| `mode` | `'silent'`, `'captions'` or `'spine'`. A storyboard should rarely need it. |
+| `beat(id, fn?)` | Runs one beat: shows its caption, starts its clip (narrated) or its reading hold (captions, silent), runs `fn` under it, and resolves when **both** `fn` and the clip or hold have finished. Without `fn` the beat only holds (a deck slide). |
+| `goto(url, { settle = 900 })` | Navigate (relative to the current page), wait for load and network idle (at most 5 s), then pause `settle` ms. The cursor and captions survive navigation. A 4xx/5xx answer stops the take. |
+| `click(target, { settle = 420, ...opts })` | Glide the cursor to the element's centre, pulse, click, pause `settle` ms. `opts` pass through to Playwright's `click` (`modifiers`, `button`, …). |
+| `type(target, text, { delay = 45, enter = false })` | Glide to the field, pulse, click into it, type one character every `delay` ms so it reads on screen, then press Enter if `enter`. |
+| `point(target)` | Glide the cursor to the element without clicking, to show something. |
+| `scrollTo(target, { ms = 600 })` | Scroll the nearest scroll container (or the page) over `ms` until `target` is centred in it. No scroll if it is already fully in view. |
+| `scrollBy(container, { x = 0, y = 0, ms = 600 })` | Scroll `container` by `x`/`y` px over `ms` (`null` = the window). Sticky headers and pinned columns read as motion, not a cut. |
+| `wait(ms)` | Real-time pause. |
+| `page`, `context` | The Playwright `Page` (already loaded) and `BrowserContext`, for anything else: `evaluate`, `fill`, `keyboard`, … Raw calls don't move the cursor. |
+| `mode` | `'captions'`, `'silent'` or `'narrated'`. A storyboard rarely needs it. |
 | `fps`, `viewport` | The capture frame rate and `{width, height}`. |
+| `elapsedMs()` | ms since t0, for debugging timing. |
 
-`say()` resolves once the beat has started. Use `waitForVoice()` before anything that must not
-overlap the beat, such as a slide change.
+`target` is a selector string (first match) or a Playwright locator such as
+`page.getByLabel('Buy milk')`. The target is scrolled into view and must be visible.
 
-## Modes
+`click`, `type` and `point` glide a visible cursor (~400 ms) to their target before they act.
+`scrollTo` and `scrollBy` glide it to the scroll container's centre; scrolling the page itself
+(`scrollTo` with no nested container, `scrollBy(null)`) shows it where it is, with no glide. `goto`
+doesn't move it. `--no-cursor` hides it and skips the glides, so the same storyboard runs shorter.
 
-| Mode | Flags | What `say()` does | How long the take lasts |
-|---|---|---|---|
-| Silent | `--no-captions` | Timing only. The beat is held for reading time (about 3 words/s, at least 1.5 s). | Until the storyboard returns and the last beat ends |
-| Captions (default) | none | Draws a caption and holds it for reading time | Same as silent |
-| Spine-timed | `--spine manifest.json`, or `--plates plates.json --plate <id>` | Plays to the spine. The n-th `say()` is the n-th narration clip in the window. If called early, it waits for the clip's planned start; if called late, it starts at once and the delay is reported. `waitForVoice()` waits for the clip's planned end. No TTS runs here: the spine owns the voice. | Exactly the window: the plate's `durationMs`, or the spine's `totalMs` |
+## Before t0: `hide` and `setup`
 
-### Spine-timed details
+Everything in the default function runs after recording starts: a style tag added at its top
+arrives after frame 0. Two more exports act before the first frame:
 
-- **The window.** With `--plate`, it is the plate's `[startMs, startMs + durationMs)` on the
-  spine clock, and its clips are those that start inside it. With `--spine` alone, it is the whole
-  spine.
-- **Text check.** If a `say()` text differs from its clip's text, you get a warning. The spine's
-  audio plays regardless.
-- **Too many `say()` calls.** A `say()` with no clip left in the window is an error.
-- **Overrunning.** A storyboard that runs past the window by more than one frame is an error:
-  shorten its waits, or lengthen the beat in the spine. A watchdog aborts a take that is still
-  running 2 s past its window, so a hung step (a selector wait with no timeout) can't stall it.
-  Takes with no window stop at `--max-ms` (default 10 minutes).
-- **Short storyboards.** If it finishes early, the last picture keeps recording live until the
-  window ends.
-- **`--audio-offset-ms`** shifts every clip: `say()` fires at the clip start minus the offset. The
-  default is the spine's `audioOffsetMs`.
-- **Late starts in decks.** The deck loop below changes the slide 250 ms after the previous clip
-  ends, then waits 900 ms. On a spine with short lead-ins, each `say()` therefore starts after its
-  clip. That is expected: the slide change lands in the silence between clips, which is the point
-  of the loop.
-- **Late `say()` moves the picture, not the voice.** `--mp4` lays each clip where the spine puts
-  it (the `say()` time on the spine clock plus `--audio-offset-ms`), so the take sounds exactly like
-  the assembled video. A late `say()` is reported, and recorded in the take manifest.
-- **Gaps for `check-take`.** `check-take` wants every scene change inside a silence of at least
-  900 ms. The deck loop changes the slide 250 ms into the gap and speaks 1150 ms in, so give its
-  spine long lead-ins: `spine --brief examples/deck/brief.md --tts-model fake/tone --lead-ms 950`.
-  The default 250 ms lead-in leaves gaps of about 730 ms, which `check-take` rejects.
+```js
+export const hide = ['#api-key', 'footer .account'];   // hidden from frame 0, after every goto()
+
+export async function setup({ page, context, viewport, mode, fps }) {
+  await page.getByRole('button', { name: 'Accept cookies' }).click(); // not filmed
+}
+```
+
+| Export | When | Use it for |
+|---|---|---|
+| `hide` | An array of CSS selectors. A style sheet hiding each one (and everything inside it, `visibility: hidden !important`, so the layout doesn't move) is added to every document as it is created (`context.addInitScript`), before the first navigation. | Keys, tokens, names, emails: anything private. It holds from frame 0 and across every `goto()` or link the page follows. |
+| `setup` | Called once with `{ page, context, viewport, mode, fps }` after the page has loaded and settled, before warm-up and the screencast. Nothing it does is captured. 60 s limit. | Dismissing a banner, choosing a tab, seeding local storage. A change that must survive a `goto()` needs `hide` or `context.addInitScript`. |
+
+A `hide` that isn't an array of strings, or a `setup` that isn't a function, stops the take before
+a browser opens. An invalid selector stops it before recording; a selector that matches nothing on
+the first page is logged to stderr. The take manifest records `x-take.hide` and `x-take.setup`.
+
+## Beat rules
+
+The beats are the take's beat source, in order: the `## <id>` sections of `--script`, the
+`beats[]` of `--spine`, or the single beat of the `--plate`. Each rule below stops the take with a
+one-line error that names the fix:
+
+| Mistake | Error |
+|---|---|
+| Unknown id | `beat 'x' is not in script.md — valid: add, done, filter, clear` |
+| No id | `beat() needs a beat id as its first argument — valid: …` |
+| Out of order | `beat 'filter' was called before 'done' — call the beats in script.md order: …` |
+| Called twice | `beat 'add' was called twice — each beat runs once: give the second part its own beat in script.md, or move it into beat('add', fn)` |
+| Nested | `beat 'done' was called inside beat 'add' — beats can't nest: await beat('add', …) to the end, then call beat('done')` |
+| `fn` not a function | `beat('add', fn): fn must be a function, or left out` |
+| Never called | `beat 'clear' never called — the storyboard returned without it; add await beat('clear', …) in script.md order, or remove the beat from script.md` |
+
+Always `await` each `beat()`.
+
+## Timing
+
+- **Captions and silent (`--script`).** A beat holds for its caption's reading time: about
+  3 words/s, at least 1.5 s. A longer `fn` lengthens the beat. The take ends when the storyboard
+  returns.
+- **Narrated (`--spine`).** `beat(id)` waits for its clip's planned start (clip start minus
+  `--audio-offset-ms`, default the spine's `audioOffsetMs`) and ends at its clip's end. Called
+  late, it starts at once: the delay is logged and kept as `lateMs`, and the voice stays at its
+  spine time. A beatgrid spine times each beat to its `startMs`/`durationMs` instead. The take
+  lasts exactly the spine's `totalMs`.
+- **Live plate (`--plates --plate`).** The storyboard runs the plate's one beat, timed like a
+  narrated beat inside the plate's window. The take lasts exactly the plate's `durationMs`; if
+  the storyboard finishes early, the last picture keeps recording to the end.
+- **Between beats is silence.** In a narrated take, anything the storyboard does between two
+  `beat()` calls lands in the gap between clips. Put slide and page changes there; put the action
+  the beat describes inside its `fn`. `check-take` fails a scene change made over speech.
+- **Overruns.** A spine-timed storyboard that runs more than one frame past its window stops the
+  take: shorten its waits or lengthen the beat in the spine. A watchdog aborts a take still
+  running 2 s past its window, so a hung step can't stall it; other takes stop at `--max-ms`
+  (default 10 minutes).
 
 ## Captions
 
-Captions are drawn with Playwright's `page.screencast.showOverlay`, which renders into the
-captured frames only (the page's DOM is untouched); `--caption-engine dom` injects them into the
-page instead (see SKILL.md for when). If the Playwright build has no `showOverlay`,
-or it fails, the caption is injected into the page DOM instead, with the same classes and style.
+Captions are drawn with Playwright's `page.screencast.showOverlay`, into the captured frames only
+(the page DOM is untouched); `--caption-engine dom` injects them into the page instead (see
+SKILL.md for when). If the overlay is unavailable or fails, the caption goes into the page DOM
+with the same classes and style.
 
-- **Default style:** neutral: a bottom-centre, semi-opaque dark bar with white system sans text.
+- **Text:** the beat's `On screen:` line in `script.md`, else its paragraph's first sentence; a
+  spine beat's `onScreenText`.
+- **Default style:** a bottom-centre, semi-opaque dark bar with white system sans text.
 - **`--caption-css <file>`** replaces it. Style `.pm-caption-wrap` (positioning, full width) and
   `.pm-caption` (the text box). `examples/ui-demo/captions-alt.css` is a worked example.
-- **`--no-captions`** draws none.
-- **Timing:** one caption at a time. In captions and silent modes a caption holds for reading
-  time, about 3 words/s and at least 1.5 s; in spine-timed mode it holds until its clip ends. A new
-  `say()` replaces a caption still showing. A voice-only `say("", { narrate })` shows no caption,
-  except in captions mode, where `narrate` is shown so the viewer can read it.
+- **`--no-captions`** draws none; the reading time still paces `--script` beats.
+- **One caption at a time,** shown for its whole beat and removed at the beat's end.
 - Before t0 the capture warms up (page round trips, one caption shown and removed) so the first
-  `say()` is not late; none of it is captured.
+  beat is not late; none of it is captured.
 
 ## Which page loads
 
@@ -102,45 +138,90 @@ The first match wins:
 A relative `url` resolves from the current directory (`--url`), the `plates.json` folder
 (`live.url`) or the storyboard's folder (export).
 
-Local files are served from their folder on `127.0.0.1`, so ES modules and fonts work. Once the
+Local files are served from their folder on `127.0.0.1`, so ES modules and fonts work. To
+explore the same page with playwright-cli first (it blocks `file://`), serve it with
+`capture serve <folder>` and open the URL it prints (SKILL.md § Local pages). Once the
 page has loaded and settled (network idle, at most 5 s), the screencast starts. A main document
-that answers HTTP 4xx or 5xx is an error, and nothing is captured.
+that answers HTTP 4xx or 5xx is an error, and nothing is captured. With `--storage-state` the page
+loads signed in.
 
-## The deck loop
+## Examples
 
-Each slide waits for the previous voice, changes in the silence, lets the slide land, then
-speaks:
+**UI demo** (`examples/ui-demo/storyboard.mjs`; beats `add`, `done`, `filter`, `clear` from its
+`script.md`):
 
 ```js
-for (const { slide, paragraph } of SCRIPT) {
-  await waitForVoice();                        // previous paragraph finishes first
-  await wait(250);
-  await page.evaluate((n) => window.deckGo(n), slide);
-  await wait(900);                             // let the slide land before speaking
-  await say('', { narrate: paragraph });
+export const url = './index.html';
+
+export default async function storyboard({ beat, click, type, wait, page }) {
+  await beat('add', async () => {
+    await type('#new', 'Buy milk', { enter: true });
+    await type('#new', 'Call the plumber', { enter: true });
+  });
+  await beat('done', async () => {
+    await click(page.getByLabel('Buy milk'));
+  });
+  await beat('filter', async () => {
+    await click('[data-filter=active]');
+    await wait(1100);
+    await click('[data-filter=done]');
+  });
+  await beat('clear', async () => {
+    await click('#clear');
+    await click('[data-filter=all]');
+  });
+  await wait(500); // hold the final state
 }
-await waitForVoice();
 ```
 
-`examples/deck/` is a runnable copy. Its `brief.md` and `script.md` build the matching spine:
-`spine --brief examples/deck/brief.md --tts-model fake/tone --out /tmp/deck-spine`.
+**Deck** (`examples/deck/storyboard.mjs`; beats `intro`, `why`, `how` from its `script.md`):
+
+```js
+const SLIDES = ['intro', 'why', 'how'];
+
+export default async function storyboard({ beat, page, wait }) {
+  for (const [n, id] of SLIDES.entries()) {
+    if (n) await wait(250);                           // let the last word ring out
+    await page.evaluate((i) => window.deckGo(i), n); // between beats: lands in silence
+    await wait(900);                                  // let the slide settle before the voice
+    await beat(id);                                   // no fn: the slide is the picture
+  }
+}
+```
+
+The deck changes each slide about 250 ms after the previous beat ends and calls the next `beat()`
+about 1150 ms after it (900 ms after the change; 900 ms into the take for the first beat). A
+narrated deck therefore needs a spine with long lead-ins:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/skills/video-spine/scripts/spine.mjs" \
+  --brief "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/examples/deck/brief.md" --tts-model fake/tone --lead-ms 950
+```
+
+The default 250 ms lead-in leaves gaps of about 500 ms: every beat starts late and `check-take`
+rejects the slide changes.
+
+**Live plate** (one beat, the plate's `beat` in `plates.json`):
+
+```js
+export default async function storyboard({ beat, scrollTo, point }) {
+  await beat('feature', async () => {
+    await scrollTo('text=Gherkin-style');
+    await point('text=Gherkin-style');
+  });
+}
+```
 
 ## Output
 
-- **`--out`** is the picture-only take: `.mp4` (H.264), `.webm` (VP9) or `.mkv`. It has exactly
-  `round(ms × fps / 1000)` frames.
-- **`--mp4`** writes the deliverable: H.264 High, yuv420p, AAC 48 kHz, faststart. A spine-timed
-  take carries the spine's clips, each at its `say()` time on the spine clock plus
-  `--audio-offset-ms`, levelled to −16 LUFS. Clip audio comes from the spine's `clips/` folder,
-  the TTS cache or the spine's `narration.wav`, checked before the browser opens. Silent and
-  captions-only takes get a silent AAC track.
-- **The take manifest** (`<take>.take.json` next to `--mp4`, else `--out`; `--manifest` moves it)
-  is a v1 spine manifest. `command[]` reproduces the take (absolute paths). A narrated take is
-  `kind: "narration"` with the clips as laid; any other take is `kind: "beatgrid"`,
-  `"narrate": false`, a nominal `bpm` of 60, and one beat whose `onScreenText` joins the captions.
-  Both carry `captions[]` (`n`, `text`, `startMs`, `durationMs` as shown), `videoMs`, `wallMs`,
-  `spine` (relative path) and `x-take` (mode, every `say()` with its lateness, caption engine).
-- **`--json`** prints the take summary: mode, frames, `videoMs`, `wallMs`, each `say()` with
-  its start, clip and lateness, the caption timings and the audio.
-- **`--debug-requests`** logs every page request and failure to stderr. Turn it on when a live site
-  misbehaves.
+- **`--out`** is an MP4 with exactly `round(ms × fps / 1000)` frames. A standalone take is the
+  deliverable, encoded to `--preset`, with the spine's clips (narrated) or a silent AAC track. A
+  live plate's take is picture-only (H.264, `plates.json` size and fps), for `video-assemble`.
+- **Narrated audio** is each clip at its beat's spine time plus `--audio-offset-ms`, levelled to
+  −16 LUFS. Clip audio comes from the spine's `clips/` folder, the TTS cache or the spine's
+  `narration.wav`, checked before the browser opens.
+- **The take manifest** (`<take>.take.json` next to `--out`; `--manifest` moves it) is a v1 spine
+  manifest, described in SKILL.md § Report.
+- **`--json`** prints the take summary instead of the report.
+- **`--debug-requests`** logs every page request and failure to stderr. Turn it on when a live
+  site misbehaves.

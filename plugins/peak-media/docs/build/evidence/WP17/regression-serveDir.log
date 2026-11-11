@@ -1,0 +1,36 @@
+## capture.test.mjs (TMPDIR=/tmp/r2cap.SGrM) Tue Nov 10 19:51:23 EST 2026
+✔ AC-BASE-09: capture --help lists every flag, --version = plugin.json, bad input is one actionable line, no network (1586.175667ms)
+✔ AC-REC-01: --help lists the recorder flags and no narration flags; each flag parses (1881.005666ms)
+✔ AC-REC-02: missing Chromium, missing ffmpeg or a bad --spine exit non-zero in < 2 s with no browser launch (5607.052125ms)
+✔ AC-REC-03: the example deck storyboard runs unmodified in silent, captions and narrated modes (48192.83475ms)
+✔ AC-REC-04: F3 live plates on a 3-clip spine capture to their planned durations ±1 frame (26793.042041ms)
+✔ AC-REC-04: the frame grid places frames by their own timestamps (t0 = first onFrame) and fills to an exact count (20.147792ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 84649.534417
+exit=0
+
+## beat.test.mjs (TMPDIR=/tmp/r2beat.wR3a) Tue Nov 10 19:52:48 EST 2026
+✔ AC-W2V-01: each beat shows its own caption — script.md On screen: lines (ui-demo) and spine onScreenText (narrated deck) (35954.754208ms)
+✔ AC-W2V-02: beat('nope') stops the take before any frame is encoded; the one-line error lists the valid ids (1467.303709ms)
+✔ AC-W2V-03: out-of-order, repeated, nested and uncalled beats each stop the take with a one-line message naming the fix (15028.656666ms)
+✔ AC-W2V-04: a beat lasts max(fn, hold) — a long fn lengthens it, a long hold outlasts a short fn — and the next beat starts after it (9584.113875ms)
+✔ AC-W2V-05: the arrow cursor is drawn at each click/type target and between them; --no-cursor draws none (contact sheets) (14274.283833ms)
+✔ AC-W2V-06: after a hash-route change and a goto, one cursor and one caption are visible (contact sheets) (16280.460417ms)
+✔ AC-W2V-07: scrollBy(container, {y: 1500, ms: 600}) at 30 fps shows at least 10 distinct frames over the scroll (3314.5425ms)
+✔ AC-W2V-08: none of the pre-beat() storyboard calls is left in code files under skills/, evals/ and docs/build/fixtures/ (25.248625ms)
+✔ AC-W2V-01: the take manifest with per-beat entries validates against the v1 spine schema (66.892625ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 96087.018125
+exit=0

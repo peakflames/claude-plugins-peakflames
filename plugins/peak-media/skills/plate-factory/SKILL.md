@@ -60,7 +60,7 @@ SKILL.md before its first stage:
 | 0–2 | `${CLAUDE_PLUGIN_ROOT}/skills/video-spine/SKILL.md` | `spine.mjs`, `sample-voice.mjs` |
 | 3, 6, 8 | this skill | `skills/plate-factory/scripts/retime-plates.mjs`, `scripts/validate.mjs`, `skills/plate-factory/scripts/gate.mjs`, `skills/plate-factory/scripts/audio-options.mjs` |
 | 4–6 (`motion`, `slide`) | `${CLAUDE_PLUGIN_ROOT}/skills/video-plates/SKILL.md` | `render-plate.mjs` |
-| 6 (`live`) | `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/SKILL.md` | `capture.mjs`, `check-take.mjs` |
+| 6 (`live`) | `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/SKILL.md` | `capture.mjs --plates plates.json --plate <id>` (no `--preset`); the storyboard calls `beat('<plate beat>', fn)` once |
 | 7–9 | `${CLAUDE_PLUGIN_ROOT}/skills/video-assemble/SKILL.md` | `assemble.mjs`, `remux-audio.mjs` |
 | review | — | `lib/verify/contact-sheet.mjs`, `lib/verify/check-cuts.mjs`, `lib/verify/probe-spec.mjs` |
 

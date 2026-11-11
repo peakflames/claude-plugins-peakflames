@@ -1,0 +1,6 @@
+{
+  "out of order": "capture: beat 'done' was called before 'add' — call the beats in script.md order: add, done, filter, clear",
+  "repeated": "capture: beat 'add' was called twice — each beat runs once: give the second part its own beat in script.md, or move it into beat('add', fn)",
+  "nested": "capture: beat 'done' was called inside beat 'add' — beats can't nest: await beat('add', …) to the end, then call beat('done')",
+  "never called": "capture: beat 'clear' never called — the storyboard returned without it; add await beat('clear', …) in script.md order, or remove the beat from script.md"
+}

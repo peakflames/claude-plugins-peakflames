@@ -191,7 +191,10 @@ End the stage with: `GATE 2 spine: PASS — spine/manifest.json <totalMs> ms (ta
    `{id: "p<N>-<beat>", beat, kind, startMs: 0, durationMs: 1, intent, assets, text}`.
    - `intent` is the plate's one idea. `text` is its on-screen copy (the script's `On screen:`
      line, table rows as `a | b | c`). `assets` are files under `assets/`.
-   - A `live` plate also gets `live: {url?, storyboard, viewport}` (video-capture).
+   - A `live` plate also gets `live: {url?, storyboard, viewport}` (video-capture). Its
+     storyboard runs exactly one beat, the plate's `beat`, with the action inside it:
+     `await beat('<plate beat>', async () => { … })`. The caption and voice come from the
+     spine; the storyboard holds no text. API: `PM/skills/video-capture/references/storyboard-api.md`.
    - The times are placeholders: the next step sets them.
 2. `node "PM/skills/plate-factory/scripts/retime-plates.mjs" plates.json` — every plate takes its
    beat's `startMs`/`durationMs`. It refuses a missing, unknown or doubled beat; fix the list.
@@ -247,7 +250,9 @@ not a loop over plates.
 
 1. Author or adjust `plates/<id>/index.html` (`PM/skills/video-plates/references/plate-authoring.md`),
    or keep the template if it already shows the approved still.
-2. Render it alone: `render-plate plates.json <id> --lint` (`live`: `capture.mjs --plates plates.json --plate <id>`).
+2. Render it alone: `render-plate plates.json <id> --lint` (`live`: `capture.mjs --plates plates.json --plate <id>`,
+   with no `--preset`; it writes the picture-only `renders/plates/<id>.mp4` at the plate's exact
+   `durationMs`, at `plates.json`'s size and fps).
 3. `node "PM/lib/verify/contact-sheet.mjs" renders/plates/<id>.mp4 --every 0.5s -o review/<id>-r<N>.jpg`
 4. Read `review/<id>-r<N>.jpg` and list what fails `review-rubric.md` § A. Nothing → the plate is
    done. Otherwise fix and start round N+1. After round 3, stop: what's left goes to the reviewer.

@@ -1,0 +1,22 @@
+{
+ "unknown": "U2",
+ "date": "2026-11-10T19:55:44.471Z",
+ "fps": 60,
+ "seconds": 30,
+ "viewport": {
+  "width": 1920,
+  "height": 1080
+ },
+ "headed": false,
+ "exe": "shell",
+ "version": "152.0.7977.30",
+ "wallMs": 30004,
+ "slots": 1800,
+ "unique": 1775,
+ "ratio": 0.9861,
+ "uniqueFps": 59.17,
+ "framesDelivered": 1800,
+ "pass": true,
+ "maxGapMs": 18,
+ "framesDir": "/var/folders/2n/ccyy63_91bz46s53b7rdtshh0000gn/T/tmp.72MQhc0t8s/u-grid-NJ3mbf"
+}
