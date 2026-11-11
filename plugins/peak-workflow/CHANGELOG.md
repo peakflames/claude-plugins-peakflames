@@ -39,7 +39,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   the new run's directory, earlier runs, open and decided gates, refusals, warnings) and per-epic
   `scopeFlags` for requirements that need network, keys, big data or long runs.
 - **`driver.mjs decide` and `report`** — record a person's gate answer (only one of the gate's own
-  options) and re-render the report; the next run in the same workspace uses a decided answer once.
+  options) and re-render the report; a gate with no options is refused.
+- **Resume from a decided gate** — the next run re-enters a parked epic at the phase its gate
+  names, on the branch the earlier run left, without repeating a finished session; an undecided
+  gate keeps its epic out of the run.
+- **Decision validity** — a decision holds only while the branch tip and the integration line are
+  unchanged; a void one is reported and the epic is planned again, with the old branch kept under
+  `refs/autopilot/superseded/`.
+- **`resume` gate** — budget, infra, STOP and auditor-outage parks get a gate offering "Resume
+  from where it stopped" or "Start over"; the auditor still fails closed.
+- **Plan-lint gate options** — "Approve this plan" builds the captured plan, recorded as approved
+  by the owner; "Re-plan" plans again.
+- **Human-check artifact** — a human-check gate lists the build's manual test files and the output
+  of the project's run command, or says plainly that nothing could be produced.
 - **Autopilot workspace** — one long-lived `<project>.autopilot/` per project holds
   `settings.json`, the single private clone and every gate; each run gets `runs/<timestamp>/` with
   its own config, state, log and report.

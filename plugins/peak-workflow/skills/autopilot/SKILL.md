@@ -85,7 +85,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    |---|---|
    | Epic | `label` |
    | Depends on | `deps` (each as its own label), or `—` |
-   | Tonight | From `eligibility` (not `status`): `eligible` → "runs"; `eligible` with `humanCheck: true` → "builds, then parks for you"; `park` → "parks before starting"; `skip` → "skipped"; `complete` → "already Complete" |
+   | Tonight | From `eligibility` (not `status`): `eligible` → "runs"; `eligible` with `humanCheck: true` → "builds, then parks for you"; `park` → "parks before starting"; `skip` → "skipped"; `complete` → "already Complete". When the epic has a `gate` field, its `state` wins: `resume` → "resumes at `<gate.enters>`"; `waiting` → "waits for your decision"; `void` or `fresh` → "starts over" |
    | Why | `reasons`, joined; empty for a plain "runs" and for "already Complete" |
 
    Then mark as **blocked** any runnable epic with a dependency that is neither `complete` nor
@@ -243,8 +243,9 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       `options` verbatim as the option labels, plus one more option, `Decide later`. No
       "(Recommended)", no reordering, no added options. If the gate has fewer than two options or
       more than three, do not use `AskUserQuestion`: print the question and its options as a
-      numbered list and take the typed answer. A gate with no options (`plan-lint`, `preflight`)
-      has no answer to record: show its `resume` line as the way forward and move on.
+      numbered list and take the typed answer. A gate with no options (`preflight`) has no answer
+      to record — the fix is in the project, and it clears when preflight passes: say what to
+      fix (its `question`) and move on.
 
    c. **Record what the owner chose**, exactly, unless it was `Decide later`:
 
@@ -258,13 +259,14 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       `git config user.name`, and re-renders the report. It refuses an answer that is not one of
       the gate's options; if it refuses, ask again — never substitute a different option.
 
-   d. **Say what the answer does**, from the command's `effect`:
-      - `next-run` — the next autopilot run asks this epic's session the same question, and the
-        referee answers it once with the owner's answer. Nothing happens until then. Do not
-        print a by-hand command for it.
-      - `by-hand` — autopilot cannot replay this one. Print the gate's `resume` line: the owner
-        continues that epic by hand, in their own repository, after fetching the branch
-        (`git fetch "<ws>/clone" <branch>:<branch>`).
+   d. **Say what the answer does**, from the command's output. Every decided gate resumes its
+      epic in the next run: "the next autopilot run continues this epic at `<enters>`, on the
+      branch this run left; nothing happens until then." Add the `validWhile` line in plain
+      words — the decision holds only while that branch and the integration line do not move;
+      otherwise it is void and the epic is planned again from scratch. Then, as the fallback
+      only, the gate's `resume` line: the owner may instead continue that epic by hand, in their
+      own repository, after fetching the branch (`git fetch "<ws>/clone" <branch>:<branch>`) —
+      in which case they should not queue it for autopilot again.
 
 6. **Bring the work in.** If any epic merged, print — do not run — the fetch command from the
    report's "Do this next" list:
@@ -280,9 +282,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 7. **Next.** Read `<run>/report.md` again — recording an answer re-rendered it — and print its
    "Do this next" list verbatim (it names epics by ID; that list is the one exception to the
    label rule). If gates are still undecided, say how many and that this command can be run
-   again when the owner is ready. If any gate was decided with effect `next-run`, or epics are
-   still unbuilt, add that `/peak-workflow:autopilot` starts the next run in the same workspace
-   and clone, where each decided answer is used once. Then stop.
+   again when the owner is ready. If any gate was decided, or epics are still unbuilt, add that
+   `/peak-workflow:autopilot` starts the next run in the same workspace and clone, where each
+   decided gate resumes its epic and an epic whose gate is still undecided is left alone. Then
+   stop.
 
 ## Step 5: Stop (`/peak-workflow:autopilot stop`)
 
@@ -299,6 +302,7 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `settings.json` | The owner's settings for every run (budgets, scope, audit, `claudeBin`). Edited by hand; the driver only creates it |
 | `clone/` | The one private clone, with no remote. Merged epics are on its integration line; parked and failed epics keep their branch |
 | `gates/<epic>-<n>.json` | One file per question that needs the owner, from every run |
+| `epics.json` | What a parked or failed epic carries into the next run (its plan, audits, fix round) |
 | `runs/<YYYYMMDD-HHMMSS>/` | One directory per run; `current` names the latest |
 | `runs/<run>/config.json` | That run's queue, end time and run budget, confirmed in Step 2 |
 | `runs/<run>/state.json`, `preflight.json` | The driver's state machine (each epic's `state`) and the preflight it ran from |

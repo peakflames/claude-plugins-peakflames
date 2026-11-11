@@ -304,7 +304,7 @@ const rowMatches = (row, question) => (row.fragments ?? []).every((f) => norm(qu
 function ruleR8(ctx) {
   const policy = readJson(path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'policy', 'gates.json'), { answer: [], park: [] });
   const questions = ctx.input.tool_input?.questions ?? [];
-  const answers = {}; const used = [];
+  const answers = {}; const used = []; const notes = {}; let looked = null;
   let park = questions.length ? null : { kind: 'unmatched', question: '(AskUserQuestion with no questions)', options: [], why: 'nothing to match' };
   for (const q of questions) {
     const labels = (q.options ?? []).map((o) => (typeof o === 'string' ? o : o.label));
@@ -316,12 +316,22 @@ function ruleR8(ctx) {
     const base = { kind, skillStep: (parkRow ?? row)?.skillStep ?? 'unknown', question: q.question, options: labels, tor };
 
     // A person's recorded answer from `autopilot report` applies to that one gate kind (and TOR), once.
+    // A question no policy row knows is matched on its recorded text. A void or superseded gate never answers.
     const dir = path.join(ctx.state, 'gates');
+    const same = (g) => (kind === 'unmatched' ? norm(g.question ?? '') === norm(q.question) : (g.tor ?? null) === tor);
     const decided = (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => f.startsWith(`${ctx.epic}-`) && f.endsWith('.json')).map((f) => ({ f, g: readJson(path.join(dir, f), {}) }))
-      .find(({ g }) => g.decided?.answer && !g.decided.used && g.kind === kind && kind !== 'unmatched' && (g.tor ?? null) === tor && offered(g.decided.answer));
+      .find(({ g }) => g.decided?.answer && !g.decided.used && !g.void && !g.superseded && g.kind === kind && same(g) && offered(g.decided.answer));
     if (decided) {
       answers[q.question] = offered(decided.g.decided.answer);
       used.push(decided); continue;
+    }
+    // The owner's recorded look at a human-check gate (the driver puts it in step.json for the verify
+    // session it resumes): wrapup's manual-verification question is answered with it, not the policy "No".
+    const look = kind === 'manual-verification' && ctx.role === 'verifier' && ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).look : null;
+    if (look && offered('Yes — I performed manual verification')) {
+      answers[q.question] = offered('Yes — I performed manual verification');
+      notes[q.question] = `Recorded by autopilot from the owner's decision, not typed in this session: ${look.by} looked at ${(look.artifacts ?? []).join(', ') || 'the build'} on ${look.date} (branch tip ${String(look.branchTip).slice(0, 9)}) and answered "Looks right"${look.note ? ` — "${look.note}"` : ''}. This is the description of the manual check; do not ask for another.`;
+      looked = look; continue;
     }
     if (parkRow) { park = { ...base, why: parkRow.why }; break; }
     if (!row) { park = { ...base, why: 'no policy row matches this question; autopilot never chooses an answer' }; break; }
@@ -340,8 +350,10 @@ function ruleR8(ctx) {
     const done = { ...g, decided: { ...g.decided, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
     fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
   }
-  const source = used.length === 0 ? 'policy' : used.length === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
-  return { rule: 'R8', decision: 'answer', owner: used.length, reason: `answered from ${source}: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers } };
+  const owner = used.length + (looked ? 1 : 0);
+  const source = owner === 0 ? 'policy' : owner === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
+  const annotations = Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { notes: v }]));
+  return { rule: 'R8', decision: 'answer', owner, reason: `answered from ${source}: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers, ...(looked ? { annotations: { ...(ctx.input.tool_input.annotations ?? {}), ...annotations } } : {}) } };
 }
 
 // ---- R9: plan capture and lint -----------------------------------------------------------------
@@ -355,7 +367,7 @@ function ruleR9(ctx) {
   const lint = plan.trim() ? lintPlan(plan, anchors(ctx)) : { pass: false, problems: ['ExitPlanMode carried no plan text'], anchors: anchors(ctx), checkedAt: new Date().toISOString() };
   if (ctx.step) fs.writeFileSync(path.join(ctx.step, 'plan-lint.json'), JSON.stringify(lint, null, 2) + '\n');
   if (lint.pass) return { rule: 'R9', decision: 'capture', reason: 'plan captured and approved by lint, not by a person', stop: 'autopilot: plan captured' };
-  const gate = writeGate(ctx, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: 'The captured plan failed plan lint. Approve it by hand, or fix what it lacks.', options: [], why: lint.problems.join('; '), artifacts: ctx.step ? [path.relative(ctx.state, path.join(ctx.step, 'plan.md'))] : [] });
+  const gate = writeGate(ctx, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: `The captured plan failed plan lint (${lint.problems.join('; ')}). Approve it as it is, or have it planned again?`, options: ['Approve this plan', 'Re-plan'], why: lint.problems.join('; '), artifacts: ctx.step ? [path.relative(ctx.state, path.join(ctx.step, 'plan.md'))] : [] });
   return { rule: 'R9', decision: 'park', reason: `plan lint failed: ${lint.problems.join('; ')}`, gate, stop: 'autopilot: parked at human gate' };
 }
 

@@ -140,7 +140,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   const log = fs.readFileSync(path.join(run1, 'autopilot.log'), 'utf8');
   assert.match(log, /run \d{8}-\d{6}: queue Lg1Csv7, Lg2Cat4/); // the driver's own first lines survive the redirect
   assert.match(log, /run ended: queue done/);
-  assert.deepEqual(fs.readdirSync(p.state).sort(), ['clone', 'current', 'gates', 'runs', 'settings.json']);
+  assert.deepEqual(fs.readdirSync(p.state).sort(), ['clone', 'current', 'epics.json', 'gates', 'runs', 'settings.json']);
   assert.deepEqual(fs.readdirSync(run1).sort(), ['autopilot.log', 'config.json', 'epics', 'preflight.json', 'report.json', 'report.md', 'state.json']);
   assert.equal(fs.readFileSync(path.join(p.state, 'settings.json'), 'utf8'), settingsBefore, 'the driver never rewrites the owner\'s settings');
   const tip1 = git(p.clone, 'rev-parse', e2.branch);
@@ -162,6 +162,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   // Step 4.5 — the owner answers; the skill records exactly that.
   const decided = driver('decide', '--workspace', p.state, '--gate', gate.file, '--answer', 'Fix now', '--by', 'Pat Owner');
   assert.equal(decided.status, 0, decided.stderr);
+  assert.deepEqual([decided.json().effect, decided.json().enters], ['resume', 'BUILD']);
   assert.deepEqual(readJson(path.join(p.state, gate.file)).decided, { answer: 'Fix now', by: 'Pat Owner', date: new Date().toISOString().slice(0, 10), scope: 'next-run' });
 
   // Step 4.6 — the fetch command from the report brings the merged work into the owner's repository.
@@ -172,7 +173,8 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   // The next run: the same workspace, clone and gates/; a new run directory.
   const next = preflight(p, '--allow-test-double');
   assert.deepEqual(next.epics.map((e) => [e.id, e.eligibility]), [[E1.id, 'complete'], [e2.id, 'eligible']]);
-  assert.deepEqual([next.launch.openGates.length, next.launch.decidedGates.map((g) => [g.file, g.answer])], [0, [[gate.file, 'Fix now']]]);
+  assert.deepEqual([next.launch.openGates.length, next.launch.decidedGates.map((g) => [g.file, g.answer, g.state, g.enters])], [0, [[gate.file, 'Fix now', 'resume', 'BUILD']]]);
+  assert.match(next.epics[1].reasons.join(' '), /resumes at BUILD on feature\/epic-Lg2Cat4-categories: you answered "Fix now" on gates\/Lg2Cat4-1\.json/);
   assert.ok(!next.launch.warn.some((w) => /wait for your decision/.test(w)), next.launch.warn.join(' | '));
   confirm(next.launch, p.project, [e2.id], { allowTestDouble: true });
   const cloneGit = fs.statSync(path.join(p.clone, '.git')).ino;
@@ -182,6 +184,8 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   assert.equal(p.runDir(), run2);
   assert.equal(fs.statSync(path.join(p.clone, '.git')).ino, cloneGit, 'the same clone, not a new one');
   assert.deepEqual(readJson(path.join(run2, 'state.json')).queue.map((q) => [q.id, q.state]), [[e2.id, 'MERGED']]);
+  // The second run resumed the epic: its first session is the build that asked, not a new plan.
+  assert.deepEqual(fs.readdirSync(path.join(run2, 'epics', e2.id)).filter((n) => /-\d+$/.test(n)).sort(), ['audit-1', 'build-1', 'verify-1']);
   assert.ok(git(p.clone, 'merge-base', '--is-ancestor', tip1, 'develop') === '', 'the work the first run left on the branch is what merged');
   // One gates/ for both runs: the first run's gate file is the one the second run used.
   assert.deepEqual(fs.readdirSync(path.join(p.state, 'gates')), [`${e2.id}-1.json`]);

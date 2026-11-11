@@ -4,10 +4,10 @@ Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80
 
 ## Do this next
 1. Decide 2 parked gates: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)
-2. Carry on by hand where you decided a gate (Lg5Chr8): the command is under "Per epic".
-3. Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.
-4. Review and bring in the merged work (Lg1Csv7):
+2. Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.
+3. Review and bring in the merged work (Lg1Csv7):
    git fetch "<workspace>/clone" develop:autopilot/develop && git log develop..autopilot/develop
+4. Run `/peak-workflow:autopilot` again: 1 decided gate (Lg5Chr8) resumes its epic on the branch this run left. A decision holds only while that branch and `develop` do not move.
 5. Read the recorded reason for 1 changed existing test (under "Per epic").
 6. 1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has.
 
@@ -84,8 +84,9 @@ Auditor audit-1 (the whole epic diff): recommends park — The live-rates path i
 
 Gates:
 - `gates/Lg4Fx2q-1.json` (audit) — The auditor reported 2 high finding(s) on Lg4Fx2q (currency) — Currency conversion: F1 stand-in — every test replaces the fetch with fakeRates() \| F2 test-weakened — the rounding assertion was loosened. Are they real? — NOT DECIDED
+  Options: "Real — fix before verify", "Not real — verify as built"
   Look at: `runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json`, `runs/20261112-220500/epics/Lg4Fx2q/audit-1/bundle/diff.patch`
-  By hand: open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built
+  By hand instead: open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built
 
 ### Lg5Chr8 (spending-chart) — Spending chart — PARKED
 
@@ -106,8 +107,8 @@ Plan: `runs/20261112-220500/epics/Lg5Chr8/plan-1/plan.md` — approved by lint, 
 Auditor audit-1 (the whole epic diff): recommends proceed — Nothing found. (`runs/20261112-220500/epics/Lg5Chr8/audit-1/audit.json`)
 
 Gates:
-- `gates/Lg5Chr8-1.json` (human-check) — TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify — decided "Looks right" by Todd Schavey on 2026-11-13 — continue by hand
-  By hand: open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8
+- `gates/Lg5Chr8-1.json` (human-check) — TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify — decided "Looks right" by Todd Schavey on 2026-11-13 — resumes the epic in the next run
+  By hand instead: open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8
 
 ### Lg3Sum9 (monthly-summary) — Monthly summary — FAILED
 
@@ -149,7 +150,8 @@ parked at a human gate (Lg6Bud2-1.json)
 
 Gates:
 - `gates/Lg6Bud2-1.json` (unmatched) — The spec names both a monthly and a weekly budget period. Which should this epic build? — NOT DECIDED
-  By hand: open a new session in the fetched repo: /peak-workflow:start-epic Lg6Bud2
+  Options: "Monthly", "Weekly", "Both"
+  By hand instead: open a new session in the fetched repo: /peak-workflow:start-epic Lg6Bud2
 
 ### Lg7Exp5 (export) — Export to CSV — BLOCKED
 

@@ -295,6 +295,41 @@ test('R8 a gate a person decided is answered with their answer, once, for that k
   parked(h.ask(q, opts)); // and only once
 });
 
+test('R8 decided gates: an unmatched question is matched on its recorded text; a void or superseded gate never answers', (t) => {
+  const h = referee(t);
+  const q = 'The spec names both a monthly and a weekly budget period. Which should this epic build?';
+  parked(h.ask(q, ['Monthly', 'Weekly']));
+  const file = path.join(h.state, 'gates', `${E1.id}-1.json`);
+  const decided = { ...readJson(file), decided: { answer: 'Weekly', by: 'Pat', date: '2026-11-12', scope: 'next-run' } };
+  assert.equal(decided.kind, 'unmatched');
+
+  fs.writeFileSync(file, JSON.stringify({ ...decided, void: { why: 'the branch moved' } }));
+  parked(h.ask(q, ['Monthly', 'Weekly']));
+  fs.rmSync(path.join(h.state, 'gates', `${E1.id}-2.json`));
+  fs.writeFileSync(file, JSON.stringify({ ...decided, superseded: { run: 'x' } }));
+  parked(h.ask(q, ['Monthly', 'Weekly']));
+  fs.rmSync(path.join(h.state, 'gates', `${E1.id}-2.json`));
+
+  fs.writeFileSync(file, JSON.stringify(decided));
+  parked(h.ask('Which colour should the bars be?', ['Monthly', 'Weekly'])); // another unmatched question: not covered
+  answered(h.ask(`  ${q.toUpperCase()}`, ['Monthly', 'Weekly']), `  ${q.toUpperCase()}`, 'Weekly'); // same text, spacing and case aside
+  assert.equal(readJson(file).decided.used.session, 'build-1');
+  parked(h.ask(q, ['Monthly', 'Weekly'])); // once
+});
+
+test('R8 human-check: the verify session the driver resumes answers the manual-verification question with the owner\'s recorded look', (t) => {
+  const v = referee(t, { role: 'verifier' });
+  const q = 'Did you perform any manual verification beyond the automated gates I ran?';
+  const opts = ['Yes — I performed manual verification', 'No — only automated gates were run'];
+  answered(v.ask(q, opts), q, 'No — only automated gates were run'); // no look recorded: the policy answer, which is true
+  fs.writeFileSync(path.join(v.step, 'step.json'), JSON.stringify({ look: { gate: 'gates/x-1.json', by: 'Pat Owner', date: '2026-11-12', note: 'labels readable', branchTip: 'abcdef0123456789', artifacts: ['clone:tests/manual/TOR-05-Vw8Kp2d.md'] } }));
+  const r = v.ask(q, opts);
+  assert.deepEqual(r.out.hookSpecificOutput.updatedInput.answers, { [q]: 'Yes — I performed manual verification' });
+  assert.match(r.out.hookSpecificOutput.updatedInput.annotations[q].notes, /^Recorded by autopilot from the owner's decision, not typed in this session: Pat Owner looked at clone:tests\/manual\/TOR-05-Vw8Kp2d\.md on 2026-11-12 \(branch tip abcdef012\) and answered "Looks right" — "labels readable"\./);
+  assert.match(r.out.hookSpecificOutput.permissionDecisionReason, /the owner's recorded decision/);
+  parked(v.ask(q, ['Maybe', 'Skip'])); // neither the look's "Yes" nor the policy's "No" is offered
+});
+
 test('workspace layout: the jail covers everything but clone/, in this run and every other; hooks read the current run', (t) => {
   const h = referee(t, { config: { diskFloorGb: 0 } });
   const older = path.join(h.state, 'runs', '20261110-220500');
@@ -334,6 +369,7 @@ test('R9 planner: a plan missing a TOR ID or a closing step parks with the plan 
   denied(r, 'R9', new RegExp(`plan lint failed: does not name anchor ${E1.tors[0]}; missing "Reconcile spec"`));
   assert.equal(r.out.stopReason, 'autopilot: parked at human gate');
   assert.equal(h.gate(1).kind, 'plan-lint');
+  assert.deepEqual(h.gate(1).options, ['Approve this plan', 'Re-plan']); // decidable: the next run builds it or plans again
   assert.deepEqual(h.gate(1).artifacts, [`runs/${path.basename(h.runDir)}/epics/${E1.id}/plan-1/plan.md`]);
   assert.equal(readJson(path.join(h.step, 'plan-lint.json')).pass, false);
   denied(h.pre('ExitPlanMode', {}), 'R9', /no plan text/);

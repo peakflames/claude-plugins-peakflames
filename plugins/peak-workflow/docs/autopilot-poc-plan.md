@@ -692,24 +692,57 @@ allowed, and the driver's CHECK_BUILD decides.
 
 ### 6.8 Gate queue format
 
-`gates/<epicId>-<n>.json`:
+`<workspace>/gates/<epicId>-<n>.json` (one directory for every run; P3.5 Parts 1 and 2):
 
 ```json
-{ "epic": "Lg5Chr8", "epicName": "Spending chart", "kind": "human-check",
-  "session": "verify-1", "skillStep": "wrapup-epic Step 1.2 item 7 (operator-observed)",
-  "question": "TOR-05-Vw8Kp2d: a person opening chart.html sees one bar per category with readable labels",
+{ "epic": "Lg5Chr8", "epicName": "Spending chart", "run": "20261112-220500", "kind": "human-check",
+  "session": "audit-1", "skillStep": "wrapup-epic Step 1.2 item 7",
+  "question": "TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify. Does what was built look right?",
   "options": ["Looks right", "Not right — describe"],
-  "why": "operator-observed TOR; autopilot never self-approves a look",
-  "artifacts": ["epics/Lg5Chr8/artifacts/chart.html", "clone:tests/manual/TOR-05-Vw8Kp2d.md"],
-  "branch": "feature/epic-Lg5Chr8-spending-chart", "branchTip": "…",
+  "why": "autopilot never self-approves a look",
+  "artifacts": ["clone:tests/manual/TOR-05-Vw8Kp2d.md", "runs/20261112-220500/epics/Lg5Chr8/artifacts/run-output.txt",
+                "runs/20261112-220500/epics/Lg5Chr8/artifacts/files/chart.html"],
+  "branch": "feature/epic-Lg5Chr8-spending-chart", "branchTip": "…", "base": "<integration tip at park>",
   "resume": "open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8",
   "decided": null }
 ```
 
-When `autopilot report` records a human answer, `decided` becomes
-`{"answer": "...", "by": "<git user.name>", "date": "...", "scope": "next-run"}`. The next run,
-R8 answers that one gate kind for that epic with the human's answer, and only that one. Gate kinds
-whose question text is dynamic (deferral, amendment) match on kind plus TOR ID, not on full text.
+Artifact paths are relative to the workspace; `clone:` means inside the clone. `branch`,
+`branchTip` and `base` are written when the epic parks, after the WIP commit.
+
+When `autopilot report` records a human answer (through `driver.mjs decide`, the only writer of
+`decided`), `decided` becomes `{"answer": "...", "by": "<git user.name>", "date": "...",
+"scope": "next-run"}`, with `note` when the owner explained. **Every decided gate resumes its
+epic in the next run** (there is no next-run / by-hand split); `resume`, the by-hand command,
+stays in the gate as the fallback and is always shown.
+
+**Validity (strict rule).** A decision is used only while the branch tip in the clone equals
+`branchTip` and the merge-base of the branch and the integration line is still the integration
+tip. It is judged once, at run start, for every queued epic. A void decision is marked
+`void: {run, date, why}`, reported, and the epic is planned again from scratch on a fresh branch;
+the old branch is kept under `refs/autopilot/superseded/<epic>-<time>`. An epic whose latest gate
+is still undecided is skipped ("waiting for your decision"), never rebuilt.
+
+| Gate kind | Written by | Owner's answer | Re-entry |
+|---|---|---|---|
+| a question a session asked (`deferral`, `amendment`, any policy `park` row, `unmatched`) | hook R8 | one of its options | the session kind that asked: PLAN, BUILD, FIX_PLAN, FIX_BUILD or VERIFY, as a fresh session on the existing branch (a build session gets the first run's captured plan). R8 answers that question once: by kind and TOR, or for `unmatched` by the recorded question text |
+| `audit` | driver | `Not real — verify as built` | VERIFY on the same tip; the audit is not re-run |
+| `audit` | driver | `Real — fix before verify` | FIX_PLAN → FIX_BUILD → CHECK_BUILD → AUDIT (delta), with the parking findings as `fix-brief.md`. Uses the one fix round; if it is already used, the epic is FAILED |
+| `human-check` | driver | `Looks right` | VERIFY. The look is recorded against `branchTip`; R8 answers wrapup's Step 2.0 question "Yes" with the owner's look as its note |
+| `human-check` | driver | `Not right — describe` | the fix round with the owner's note as the brief; the changed build parks for a new look |
+| `plan-lint` | driver or hook | `Approve this plan` / `Re-plan` | BUILD with the captured plan, recorded as approved by the owner, or PLAN again |
+| `resume` | driver, for a budget, infra, STOP or auditor-outage park | `Resume from where it stopped` / `Start over` | the gate's `phase`: CHECK_BUILD for a parked build (its WIP commit is on the branch), otherwise the interrupted step once. `Start over` plans from scratch on a fresh branch |
+| `preflight` | driver | none (no options) | not resumable: the fix is in the project, and the gate clears when preflight passes |
+
+What an epic carries from one run to the next is in `<workspace>/epics.json`: `fixRounds`, the
+captured plan's path and who approved it, the build sessions not yet audited, the audits (so the
+delta audit and the one-fix-round cap survive), and the fix brief. A merged epic's entry is removed.
+
+**Human-check artifact (guardrail G2).** Before writing a `human-check` gate the driver lists the
+build's `tests/manual/<TOR>.md` files and runs one command on the branch — `settings.json`
+`humanCheck["<epic>"]` or `humanCheck["*"]`, else the `**Run:**` command of `CLAUDE.md` with its
+`<placeholders>` dropped — keeping its output and any file it leaves as artifacts. When there is
+nothing to look at, the gate's `why` says so.
 
 ### 6.9 Morning report
 
@@ -920,6 +953,9 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
   because an epic may add a dependency; the report lists any lockfile change.
 - **Infra errors.** Auth failure, rate limit or CLI crash: retry the step once after 5 min. Two
   consecutive infra errors stop the run with `stoppedBecause: "infra"`.
+- **Parks that are nobody's question** (budget, infra, STOP, a run-level stop between steps, an
+  auditor that could not run) get a `resume` gate (§6.8), so the next run continues the epic
+  instead of rebuilding it. The auditor stays fail closed: nothing is verified without an audit.
 
 ---
 

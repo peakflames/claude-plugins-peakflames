@@ -188,7 +188,12 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
-      "plan": "runs/20261112-220500/epics/Lg1Csv7/plan-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg1Csv7/plan-1/plan.md",
+      "resumed": null,
+      "voided": null,
+      "superseded": [],
+      "auditOverruled": null,
+      "look": null
     },
     {
       "id": "Lg4Fx2q",
@@ -357,7 +362,12 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
-      "plan": "runs/20261112-220500/epics/Lg4Fx2q/plan-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg4Fx2q/plan-1/plan.md",
+      "resumed": null,
+      "voided": null,
+      "superseded": [],
+      "auditOverruled": null,
+      "look": null
     },
     {
       "id": "Lg5Chr8",
@@ -473,7 +483,12 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
-      "plan": "runs/20261112-220500/epics/Lg5Chr8/plan-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg5Chr8/plan-1/plan.md",
+      "resumed": null,
+      "voided": null,
+      "superseded": [],
+      "auditOverruled": null,
+      "look": null
     },
     {
       "id": "Lg3Sum9",
@@ -714,7 +729,12 @@
       "rejected": [],
       "fixRounds": 1,
       "planApprovedBy": "lint, not a person",
-      "plan": "runs/20261112-220500/epics/Lg3Sum9/plan-fix-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg3Sum9/plan-fix-1/plan.md",
+      "resumed": null,
+      "voided": null,
+      "superseded": [],
+      "auditOverruled": null,
+      "look": null
     },
     {
       "id": "Lg6Bud2",
@@ -748,7 +768,12 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": null,
-      "plan": null
+      "plan": null,
+      "resumed": null,
+      "voided": null,
+      "superseded": [],
+      "auditOverruled": null,
+      "look": null
     },
     {
       "id": "Lg7Exp5",
@@ -768,7 +793,12 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": null,
-      "plan": null
+      "plan": null,
+      "resumed": null,
+      "voided": null,
+      "superseded": [],
+      "auditOverruled": null,
+      "look": null
     },
     {
       "id": "Lg8Hw01",
@@ -788,7 +818,12 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": null,
-      "plan": null
+      "plan": null,
+      "resumed": null,
+      "voided": null,
+      "superseded": [],
+      "auditOverruled": null,
+      "look": null
     }
   ],
   "gates": [
@@ -811,11 +846,16 @@
         "runs/20261112-220500/epics/Lg4Fx2q/audit-1/bundle/diff.patch"
       ],
       "branch": "feature/epic-Lg4Fx2q-currency",
+      "branchTip": null,
+      "phase": null,
       "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built",
       "decided": null,
       "run": "20261112-220500",
       "fromEarlierRun": false,
-      "effect": "by-hand"
+      "void": null,
+      "superseded": false,
+      "cleared": false,
+      "effect": "resume"
     },
     {
       "file": "gates/Lg5Chr8-1.json",
@@ -833,6 +873,8 @@
       "why": "autopilot never self-approves a look",
       "artifacts": [],
       "branch": "feature/epic-Lg5Chr8-spending-chart",
+      "branchTip": null,
+      "phase": null,
       "resume": "open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8",
       "decided": {
         "answer": "Looks right",
@@ -842,7 +884,10 @@
       },
       "run": "20261112-220500",
       "fromEarlierRun": false,
-      "effect": "by-hand"
+      "void": null,
+      "superseded": false,
+      "cleared": false,
+      "effect": "resume"
     },
     {
       "file": "gates/Lg6Bud2-1.json",
@@ -861,11 +906,16 @@
       "why": "no policy row matches this question; autopilot never chooses an answer",
       "artifacts": [],
       "branch": "feature/epic-Lg6Bud2-budgets",
+      "branchTip": null,
+      "phase": null,
       "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg6Bud2",
       "decided": null,
       "run": "20261112-220500",
       "fromEarlierRun": false,
-      "effect": "by-hand"
+      "void": null,
+      "superseded": false,
+      "cleared": false,
+      "effect": "resume"
     }
   ],
   "referee": {
@@ -916,9 +966,9 @@
   },
   "next": [
     "Decide 2 parked gates: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)",
-    "Carry on by hand where you decided a gate (Lg5Chr8): the command is under \"Per epic\".",
     "Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.",
     "Review and bring in the merged work (Lg1Csv7):\n   git fetch \"<workspace>/clone\" develop:autopilot/develop && git log develop..autopilot/develop",
+    "Run `/peak-workflow:autopilot` again: 1 decided gate (Lg5Chr8) resumes its epic on the branch this run left. A decision holds only while that branch and `develop` do not move.",
     "Read the recorded reason for 1 changed existing test (under \"Per epic\").",
     "1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has."
   ]

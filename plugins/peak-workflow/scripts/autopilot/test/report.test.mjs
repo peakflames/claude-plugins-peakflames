@@ -78,8 +78,8 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   r = cli('decide', '--state', tmp, '--gate', 'gates/Lg4Fx2q-1.json', '--answer', 'real — fix before verify', '--by', 'Pat Owner', '--note', 'F2 is right');
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
-  assert.equal(out.effect, 'by-hand');
-  assert.match(out.resume, /start-epic Lg4Fx2q/);
+  assert.deepEqual([out.effect, out.enters], ['resume', 'FIX_PLAN']); // every decided gate resumes in the next run
+  assert.match(out.resume, /start-epic Lg4Fx2q/); // the by-hand command stays as the fallback
   const decided = readJson(path.join(tmp, 'gates', 'Lg4Fx2q-1.json')).decided;
   assert.deepEqual(Object.keys(decided), ['answer', 'by', 'date', 'scope', 'note']);
   assert.equal(decided.answer, 'Real — fix before verify'); // the offered label, exactly
@@ -88,5 +88,12 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   assert.equal(decided.scope, 'next-run');
   const md = fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8');
   assert.match(md, /Decide 1 parked gate: `\/peak-workflow:autopilot report` \(Lg6Bud2\)/);
-  assert.match(md, /decided "Real — fix before verify" by Pat Owner/);
+  assert.match(md, /decided "Real — fix before verify" by Pat Owner on \d{4}-\d{2}-\d{2} — resumes the epic in the next run\n {2}Look at: .*\n {2}By hand instead: /);
+  assert.match(md, /2 decided gates \(Lg4Fx2q, Lg5Chr8\) resume their epics on the branch this run left/);
+
+  // A gate with no options has no answer to record.
+  fs.writeFileSync(path.join(tmp, 'gates', 'Lg8Hw01-1.json'), JSON.stringify({ epic: 'Lg8Hw01', run: RUN, kind: 'preflight', question: 'CLAUDE.md still has values to decide', options: [], decided: null }));
+  r = cli('decide', '--workspace', tmp, '--gate', 'Lg8Hw01-1.json', '--answer', 'ok', '--by', 'Pat Owner');
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /has no answer to record: the fix is in the project, and the gate clears when preflight passes/);
 });

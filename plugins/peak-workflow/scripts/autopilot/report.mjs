@@ -3,9 +3,7 @@
 // Both are pure with respect to the run: they read files and never touch the clone.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL = new Set(['MERGED', 'PARKED', 'FAILED', 'SKIPPED', 'BLOCKED']);
 const RULES = {
   R0: 'referee error', R1: 'kill switch', R2: 'path jail', R3: 'git rule', R4: 'container, VM or global install', R5: 'disk floor or growth cap',
@@ -26,12 +24,6 @@ function stamp(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** Gate kinds hook R8 can replay from a person's recorded answer: the ones its policy table knows. */
-export function replayableKinds(pluginAutopilotDir = HERE) {
-  const policy = readJson(path.join(pluginAutopilotDir, 'policy', 'gates.json'), { answer: [], park: [] });
-  return new Set([...policy.answer, ...policy.park].map((r) => r.kind));
-}
-
 /**
  * `runDir` is `<workspace>/runs/<run>`. The report is per run; gates and the clone belong to the
  * workspace, and every path in the report is relative to the workspace.
@@ -42,16 +34,20 @@ export function collectReport(runDir) {
   const workspace = path.resolve(runDir, '..', '..'); const runName = path.basename(runDir);
   const config = { ...readJson(path.join(workspace, 'settings.json'), {}), ...readJson(path.join(runDir, 'config.json'), {}) };
   const clone = path.join(workspace, 'clone');
-  const replay = replayableKinds();
+  const queued = new Set((s.queue ?? []).map((q) => q.id));
+  const live = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
 
-  // This run's gates: the ones it wrote, and the ones (from an earlier run) it used an answer of.
+  // This run's gates: the ones it wrote, the ones from an earlier run it used or voided, and any
+  // still waiting on the owner for an epic in this run's queue.
   const gateDir = path.join(workspace, 'gates');
   const gates = (fs.existsSync(gateDir) ? fs.readdirSync(gateDir).filter((f) => f.endsWith('.json')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [])
-    .map((file) => ({ file, g: readJson(path.join(gateDir, file)) })).filter(({ g }) => g && ((g.run ?? runName) === runName || g.decided?.used?.run === runName))
+    .map((file) => ({ file, g: readJson(path.join(gateDir, file)) })).filter(({ g }) => g && ((g.run ?? runName) === runName || g.decided?.used?.run === runName || g.void?.run === runName || (queued.has(g.epic) && live(g) && g.kind !== 'preflight')))
     .map(({ file, g }) => ({
       file: `gates/${file}`, epic: g.epic, label: (s.queue ?? []).find((q) => q.id === g.epic)?.label ?? g.epic, kind: g.kind, session: g.session ?? null, skillStep: g.skillStep ?? null, question: g.question ?? null, options: g.options ?? [],
-      tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], branch: g.branch ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
-      run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, effect: replay.has(g.kind) ? 'next-run' : 'by-hand',
+      tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], branch: g.branch ?? null, branchTip: g.branchTip ?? null, phase: g.phase ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
+      run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, void: g.void ?? null, superseded: !!g.superseded, cleared: !!g.cleared,
+      // Every gate with options resumes its epic in the next run once decided; `resume` is the by-hand fallback.
+      effect: (g.options ?? []).length ? 'resume' : 'none',
     }));
 
   const blocked = []; const setups = []; let gatesAnswered = 0; let ownerAnswers = 0;
@@ -90,7 +86,8 @@ export function collectReport(runDir) {
       id: q.id, label: q.label ?? q.id, outcome, reason: q.reason ?? null, evidence, checks, audit, gates: q.gates ?? [],
       costUsd: q.costUsd ?? 0, turns: q.turns ?? 0, wallMs: q.wallMs ?? 0, elapsedMs, sessions: q.sessions ?? [],
       testChanges: q.testChanges ?? [], rejected: q.rejected ?? [], fixRounds: q.fixRounds ?? 0,
-      planApprovedBy: q.planStep ? 'lint, not a person' : null, plan: q.planStep ? `${rel}/${q.planStep}/plan.md` : null,
+      planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
+      resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null,
     };
   });
 
@@ -121,18 +118,20 @@ function nextSteps(r) {
   if (r.baseRed) next.push(`Fix the failing tests on \`${r.integration}\` (\`${r.testCommand}\`), then run autopilot again. Nothing was built on a red base.`);
   if (/^preflight:/.test(r.stoppedBecause ?? '')) next.push(`Fix what preflight refused (${r.stoppedBecause.replace(/^preflight:\s*/, '')}), then run autopilot again.`);
   const parked = by('PARKED');
-  const open = r.gates.filter((g) => !g.decided && parked.some((e) => e.id === g.epic));
-  const withGate = parked.filter((e) => open.some((g) => g.epic === e.id));
-  const noGate = parked.filter((e) => !r.gates.some((g) => g.epic === e.id && e.gates.includes(path.basename(g.file))));
-  if (open.length) next.push(`Decide ${plural(open.length, 'parked gate')}: \`/peak-workflow:autopilot report\` (${ids(withGate)})`);
-  if (noGate.length) next.push(`Look at ${plural(noGate.length, 'parked epic')} with no question to answer (${ids(noGate)}): the reason and the branch are under "Per epic".`);
-  const decided = r.gates.filter((g) => g.decided && !g.decided.used);
+  const liveGate = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
   const epicsOf = (list) => [...new Set(list.map((g) => g.epic))].join(', ');
-  const byHand = decided.filter((g) => g.effect === 'by-hand'); const replay = decided.filter((g) => g.effect === 'next-run');
-  if (byHand.length) next.push(`Carry on by hand where you decided a gate (${epicsOf(byHand)}): the command is under "Per epic".`);
+  const open = r.gates.filter((g) => !g.decided && liveGate(g) && g.effect === 'resume');
+  const noGate = parked.filter((e) => !r.gates.some((g) => g.epic === e.id && e.gates.includes(path.basename(g.file))));
+  const projectFix = r.gates.filter((g) => g.kind === 'preflight' && liveGate(g) && parked.some((e) => e.id === g.epic));
+  if (open.length) next.push(`Decide ${plural(open.length, 'parked gate')}: \`/peak-workflow:autopilot report\` (${epicsOf(open)})`);
+  if (projectFix.length) next.push(`Fix in the project what stopped ${plural(projectFix.length, 'epic')} before it started (${epicsOf(projectFix)}); nothing to answer — the reason is under "Per epic".`);
+  if (noGate.length) next.push(`Look at ${plural(noGate.length, 'parked epic')} with no question to answer (${ids(noGate)}): the reason and the branch are under "Per epic". Queued again, such an epic starts over.`);
+  const decided = r.gates.filter((g) => g.decided && liveGate(g));
+  const voided = r.epics.filter((e) => e.voided);
+  if (voided.length) next.push(`${plural(voided.length, 'decision')} could not be used and the epic was planned again from scratch (${ids(voided)}): the reason is under "Per epic".`);
   if (by('FAILED').length) next.push(`Read why ${plural(by('FAILED').length, 'epic')} failed verification (${ids(by('FAILED'))}); its branch is kept in the clone.`);
   if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}):\n   git fetch "${r.clone}" ${r.integration}:autopilot/${r.integration} && git log ${r.integration}..autopilot/${r.integration}`);
-  if (replay.length) next.push(`${by('MERGED').length ? 'Once the merged work is in the project, run' : 'Run'} \`/peak-workflow:autopilot\` again to use ${plural(replay.length, 'decided answer')} (${epicsOf(replay)}): each is pre-approved once.`);
+  if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds only while that branch and \`${r.integration}\` do not move.`);
   if (r.referee.testChanges.length) next.push(`Read the recorded reason for ${plural(r.referee.testChanges.length, 'changed existing test')} (under "Per epic").`);
   if (by('BLOCKED').length) next.push(`${plural(by('BLOCKED').length, 'epic')} never started because a dependency did not merge (${ids(by('BLOCKED'))}); queue them again once it has.`);
   return next;
@@ -163,12 +162,18 @@ export function renderReport(r) {
   else L.push('Auditor: no audit ran.');
   L.push(`Questions parked because no policy row matched: ${ref.unmatchedParks.length}${ref.unmatchedParks.length ? ` (${ref.unmatchedParks.join(', ')}) — if a pre-approved row clearly applied, that is a needless park worth reporting` : ''}.`);
   if (ref.setup.digest) L.push(`Session setup: ${ref.setup.digest}${ref.setup.differs.length ? ` — DIFFERS between sessions: ${ref.setup.differs.map((x) => `${x.epic}/${x.step}: ${x.digest}`).join('; ')}` : ' — the same in every session'}.`);
-  L.push('Every plan was approved by lint, not by a person.');
+  const owned = r.epics.filter((e) => e.planApprovedBy && e.planApprovedBy !== 'lint, not a person');
+  L.push(owned.length ? `Plans were approved by lint, not by a person — except ${owned.map((e) => `${e.id} (approved by ${e.planApprovedBy})`).join(', ')}.` : 'Every plan was approved by lint, not by a person.');
 
   L.push('', '## Per epic');
   for (const e of r.epics) {
     L.push('', `### ${e.label} — ${e.outcome}`, '', e.reason ?? '(no reason recorded)');
-    if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by lint, not by a person.${e.fixRounds ? ' One fix round was used.' : ''}`);
+    if (e.resumed) L.push('', e.resumed.fresh ? `Started over: ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`.` : `Resumed at ${e.resumed.phase} on \`${e.resumed.branch}\` (${String(e.resumed.branchTip).slice(0, 9)}, left by run ${e.resumed.fromRun ?? '?'}): ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`. No earlier session was run again.`);
+    if (e.voided) L.push('', `Your decision "${e.voided.answer}" on \`${e.voided.gate}\` was void — ${e.voided.why}. The epic was planned again from scratch.`);
+    for (const ref of e.superseded) L.push('', `The earlier branch is kept in the clone at \`${ref}\`.`);
+    if (e.auditOverruled) L.push('', `Verified as built: ${e.auditOverruled.by} judged the auditor's findings not real (\`${e.auditOverruled.gate}\`).`);
+    if (e.look) L.push('', `Human check: ${e.look.by} looked on ${e.look.date} and answered "Looks right" (\`${e.look.gate}\`); wrapup's manual-verification question was answered with that.`);
+    if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);
     if (e.sessions.length) {
       L.push('', '| Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |', '|---|---|---|---|---|---|');
       for (const x of e.sessions) L.push(`| ${x.name} | ${cell(x.outcome === 'ok' ? 'ok' : `${x.outcome}: ${x.why}`)} | ${usd(x.costUsd)} | ${x.turns ?? 0} | ${mins(x.wallMs)} | ${x.denials ?? 0} |`);
@@ -189,10 +194,12 @@ export function renderReport(r) {
     if (mine.length) {
       L.push('', 'Gates:');
       for (const g of mine) {
-        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.used ? ' (used)' : g.effect === 'next-run' ? ' — pre-approved once for the next run' : ' — continue by hand'}` : 'NOT DECIDED';
+        const fate = g.void ? ` — VOID: ${g.void.why}` : g.decided?.used ? ` (used by run ${g.decided.used.run ?? '?'})` : g.superseded ? ' (superseded: the epic started over)' : g.cleared ? ' (cleared)' : g.decided ? ' — resumes the epic in the next run' : '';
+        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${fate}` : g.effect === 'none' ? `nothing to answer: fix it in the project${fate}` : `NOT DECIDED${fate}`;
         L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.question)} — ${d}`);
+        if (g.options.length && !g.decided) L.push(`  Options: ${g.options.map((o) => `"${o}"`).join(', ')}`);
         if (g.artifacts.length) L.push(`  Look at: ${g.artifacts.map((a) => `\`${a}\``).join(', ')}`);
-        if (!g.decided?.used && g.resume && g.effect === 'by-hand') L.push(`  By hand: ${g.resume}`);
+        if (!g.decided?.used && !g.superseded && !g.cleared && g.resume) L.push(`  By hand instead: ${g.resume}`);
       }
     }
     if (e.testChanges.length) {

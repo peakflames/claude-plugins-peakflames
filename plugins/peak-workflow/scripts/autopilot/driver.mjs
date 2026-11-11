@@ -23,11 +23,11 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { lintPlan, parseSidecar } from './lib.mjs';
-import { replayableKinds, writeReport } from './report.mjs';
+import { writeReport } from './report.mjs';
 
 export { lintPlan, parseSidecar };
 
-export const DRIVER_VERSION = '0.2.0';
+export const DRIVER_VERSION = '0.3.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PLUGIN_DIR = path.resolve(HERE, '..', '..');
 
@@ -124,8 +124,10 @@ export function readProjectFacts(root) {
   const tests = text.match(/\*\*Tests:\*\*\s*`([^`]+)`/);
   const dirs = text.match(/\*\*Test directories:\*\*\s*(.+)/);
   const type = text.match(/\*\*Project type:\*\*\s*(.+)/);
+  const runCmd = text.match(/\*\*Run:\*\*\s*`([^`]+)`/);
   return {
     claudeMd: text,
+    runCommand: runCmd ? runCmd[1].replace(/\s*<[^>]+>/g, '').trim() || null : null, // `<command>` placeholders dropped
     testCommand: tests ? tests[1].trim() : null,
     testDirs: dirs ? dirs[1].replace(/`/g, '').split(/[,\s]+/).filter(Boolean).map((d) => (d.endsWith('/') ? d : d + '/')) : [],
     projectType: type ? type[1].trim() : null,
@@ -278,11 +280,83 @@ const SCOPE_FLAGS = [
 ];
 export const scopeFlags = (text) => SCOPE_FLAGS.filter(([, re]) => re.test(text)).map(([name]) => name);
 
+// ---- gates across runs (plan P3.5 Part 2) ------------------------------------------------------
+
+export const ANSWERS = {
+  auditReal: 'Real — fix before verify', auditNotReal: 'Not real — verify as built',
+  looksRight: 'Looks right', notRight: 'Not right — describe',
+  approvePlan: 'Approve this plan', replan: 'Re-plan',
+  resume: 'Resume from where it stopped', startOver: 'Start over',
+};
+const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_PLAN', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
+const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
+
+/** Every gate file of the workspace, oldest first: `{file, …gate}`. */
+export function readGates(workspace) {
+  const dir = path.join(workspace, 'gates');
+  return (exists(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [])
+    .map((f) => ({ file: `gates/${f}`, ...tryJson(path.join(dir, f), {}) })).filter((g) => g.epic);
+}
+/** A gate that still matters: not used, not void, not superseded by a fresh start, not a cleared preflight note. */
+export const gateLive = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
+
+/**
+ * Where a decided gate re-enters the epic (the Part 2 table). Returns `{phase}` plus what that
+ * phase needs, `{fresh: true}` for a start from scratch, or null when the gate cannot be resumed.
+ */
+export function gateEntry(g) {
+  const a = g.decided?.answer; const asked = stepKind(g.session);
+  if (!a) return null;
+  if (g.kind === 'preflight') return null; // the fix is in the project; it clears when preflight passes
+  if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
+  if (g.kind === 'audit') return a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_PLAN', fix: 'audit' } : null;
+  if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_PLAN', fix: 'look' } : null;
+  if (g.kind === 'plan-lint') {
+    const fix = asked === 'plan-fix';
+    return a === ANSWERS.approvePlan ? { phase: fix ? 'FIX_BUILD' : 'BUILD', approve: true } : a === ANSWERS.replan ? { phase: fix ? 'FIX_PLAN' : 'PLAN' } : null;
+  }
+  // A question a session asked: the same kind of session again; hook R8 answers that one question once.
+  return STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
+}
+
+/**
+ * Per epic, what its latest live gate means for the next run. A decision is valid only while the
+ * branch tip in the clone still equals the gate's `branchTip` and the epic's base has not moved
+ * (the strict rule: the merge-base of the branch and the integration line is the integration tip).
+ */
+export function gateFacts(workspace, integration) {
+  const clone = path.join(workspace, 'clone');
+  const facts = new Map();
+  const live = readGates(workspace).filter((g) => gateLive(g) && g.kind !== 'preflight');
+  for (const id of new Set(live.map((g) => g.epic))) {
+    const g = live.filter((x) => x.epic === id).at(-1);
+    const f = { gate: g.file, kind: g.kind, branch: g.branch ?? null, answer: g.decided?.answer ?? null, by: g.decided?.by ?? null };
+    if (!g.decided?.answer) { facts.set(id, { ...f, state: (g.options ?? []).length ? 'waiting' : 'none' }); continue; }
+    const entry = gateEntry(g);
+    if (!entry) { facts.set(id, { ...f, state: 'none' }); continue; }
+    if (entry.fresh) { facts.set(id, { ...f, state: 'fresh', entry }); continue; }
+    let why = null;
+    if (!integration || !exists(clone)) why = 'the private clone is gone';
+    else {
+      const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${g.branch}`).out || null;
+      const dev = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out || null;
+      if (!g.branchTip) { // parked before the session made a branch (a question in the planning session)
+        if (tip) why = `a branch ${g.branch} has appeared since the gate was written`;
+        else if (g.base && dev !== g.base) why = `${integration} moved since the epic was parked`;
+      } else if (!tip) why = `the branch ${g.branch} no longer exists in the clone`;
+      else if (tip !== g.branchTip) why = `the branch ${g.branch} moved since the gate was written (${String(g.branchTip).slice(0, 9)} → ${tip.slice(0, 9)})`;
+      else if (gitRun(clone, 'merge-base', tip, dev).out !== dev) why = `${integration} moved since the epic was parked, so the branch no longer starts from its tip`;
+    }
+    facts.set(id, why ? { ...f, state: 'void', why } : { ...f, state: 'resume', entry, enters: entry.phase });
+  }
+  return facts;
+}
+
 /**
  * Preflight: which epics may run unattended. Reads only files (and `tor-lifecycle`), so it is
  * safe on the user's repository and in a dry run.
  */
-export function preflight(root, config, { pluginDir = PLUGIN_DIR } = {}) {
+export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Map() } = {}) {
   const facts = readProjectFacts(root);
   const refuse = [];
   const fmt = torLifecycle(pluginDir, root, 'format');
@@ -305,7 +379,14 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR } = {}) {
     const reasons = []; let eligibility = 'eligible'; let humanCheck = false;
     const set = (level, why) => { reasons.push(why); if (eligibility !== 'skip' && eligibility !== 'complete') eligibility = level; };
     if (e.status === 'Complete') { eligibility = 'complete'; reasons.push('already Complete'); return { ...e, eligibility, humanCheck, reasons }; }
-    if (e.status !== 'Not Started' && !explicit.has(e.id)) set('skip', `status is ${e.status}; resume it by hand or queue it explicitly`);
+    // The owner's decision on a parked gate (P3.5 Part 2): a valid one makes the epic eligible whatever its sidecar says.
+    const gate = gates.get(e.id) ?? null;
+    if (gate) e = { ...e, gate };
+    if (gate?.state === 'waiting') set('skip', `waiting for your decision on ${gate.gate} (${gate.kind}): /peak-workflow:autopilot report`);
+    else if (gate?.state === 'resume') reasons.push(`resumes at ${gate.enters} on ${gate.branch}: you answered "${gate.answer}" on ${gate.gate}`);
+    else if (gate?.state === 'fresh') reasons.push(`starts over: you answered "${gate.answer}" on ${gate.gate}`);
+    else if (gate?.state === 'void') reasons.push(`your decision on ${gate.gate} is void (${gate.why}): the epic is planned again from scratch`);
+    if (e.status !== 'Not Started' && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) set('skip', `status is ${e.status}; resume it by hand or queue it explicitly`);
     if (!e.anchors.length) set('skip', 'no Requirements Anchors');
     if (embedded) set('skip', 'hardware project: never unattended');
     for (const who of [e.owner, e.plannedBy]) {
@@ -447,9 +528,9 @@ export function buildPrompt(plan, pluginDir = PLUGIN_DIR) {
 
 export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out = console.log }) {
   const stateDir = workspace; const runDir = runDirOf(workspace, '<run>');
-  const pre = preflight(project, config, { pluginDir });
-  const queue = buildQueue(pre, config);
   const integration = detectIntegration(project);
+  const pre = preflight(project, config, { pluginDir, gates: gateFacts(workspace, integration) });
+  const queue = buildQueue(pre, config);
   const version = readJson(path.join(pluginDir, '.claude-plugin', 'plugin.json')).version;
   const p = (s = '') => out(s);
   p('Autopilot dry run — nothing is invoked and nothing is written');
@@ -644,22 +725,71 @@ class Run {
     const n = this.gateFiles().filter((f) => f.startsWith(`${e.id}-`)).length + 1;
     const name = `${e.id}-${n}.json`;
     writeJson(path.join(this.stateDir, 'gates', name), {
-      epic: e.id, epicName: m.name, run: this.runName, session: e.lastStep ?? null, branch: m.branch, branchTip: this.branchTip(m.branch),
+      epic: e.id, epicName: m.name, run: this.runName, session: e.lastStep ?? null, branch: m.branch, branchTip: this.branchTip(m.branch), base: this.integrationSha(),
       resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${e.id}`, decided: null, ...gate,
     });
     e.gates.push(name);
     return name;
   }
 
+  gatePath(file) { return path.join(this.stateDir, 'gates', path.basename(file)); }
+  /** Rewrites one gate file. The driver never writes `decided` itself (only `decideGate` does); it records what became of the gate. */
+  markGate(file, patch) {
+    const g = tryJson(this.gatePath(file));
+    if (!g) return;
+    writeJson(this.gatePath(file), typeof patch === 'function' ? patch(g) : { ...g, ...patch });
+  }
+  /** At park, every gate this run wrote for the epic gets the branch as it now is (after the WIP commit) and the base. */
+  sealGates(e) {
+    const m = this.meta(e); const tip = this.branchTip(m.branch);
+    for (const name of e.gates) this.markGate(name, (g) => (g.decided ? g : { ...g, branch: m.branch, branchTip: tip, base: this.integrationSha() }));
+  }
+
+  // ---- what an epic carries from one run to the next (workspace `epics.json`) -----------------
+
+  records() { return tryJson(path.join(this.stateDir, 'epics.json'), {}); }
+  record(e) {
+    const all = this.records();
+    if (e.state === 'MERGED') delete all[e.id];
+    else {
+      const brief = path.join(this.epicDir(e), 'fix-brief.md');
+      all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], fixBrief: exists(brief) ? read(brief) : null };
+    }
+    writeJson(path.join(this.stateDir, 'epics.json'), all);
+  }
+  forget(e) { const all = this.records(); if (all[e.id]) { delete all[e.id]; writeJson(path.join(this.stateDir, 'epics.json'), all); } }
+
   // ---- terminal transitions --------------------------------------------------------------------
 
   finish(e, state, reason) {
     e.state = state; e.reason = reason; e.step = null; e.endedAt = new Date().toISOString();
     this.save();
+    if (['PARKED', 'FAILED', 'MERGED'].includes(state) && this.metaById?.has(e.id)) {
+      try {
+        if (state !== 'MERGED') this.sealGates(e);
+        // A resumed gate is spent once its epic ends again, whether or not the session re-asked the question.
+        if (e.resumed) this.markGate(e.resumed.gate, (g) => (g.decided && !g.decided.used ? { ...g, decided: { ...g.decided, used: { run: this.runName, phase: e.resumed.phase, date: new Date().toISOString(), note: 'the question was not asked again' } } } : g));
+        if (e.sessions.length || e.resumed || state === 'MERGED') this.record(e);
+      } catch (err) { this.log(`${e.id}: could not record the epic for the next run: ${err.message}`); }
+    }
     this.log(`${e.id}: ${state} — ${reason}`);
     return null;
   }
   park(e, reason) { try { this.wipCommit(e); } catch (err) { this.log(`${e.id}: could not commit uncommitted work: ${err.message}`); } return this.finish(e, 'PARKED', reason); }
+  /**
+   * A park that is nobody's question (budget, infra, STOP, an auditor outage) gets a `resume` gate,
+   * so the next run continues at `phase` instead of rebuilding the epic.
+   */
+  parkResumable(e, reason, phase) {
+    this.writeGate(e, {
+      kind: 'resume', skillStep: 'autopilot driver', phase,
+      question: `${this.meta(e).label} stopped: ${reason}. Continue it in the next run?`,
+      options: [ANSWERS.resume, ANSWERS.startOver],
+      why: `nothing was decided for you: the run stopped the epic before ${phase}. "${ANSWERS.resume}" re-enters at ${phase} on the same branch; "${ANSWERS.startOver}" plans it again from scratch`,
+      artifacts: e.lastStep ? [this.rel(path.join(this.epicDir(e), e.lastStep))] : [],
+    });
+    return this.park(e, reason);
+  }
 
   // ---- one session -----------------------------------------------------------------------------
 
@@ -686,7 +816,8 @@ class Run {
 
     const startMb = this.cloneMb();
     const started = Date.now();
-    writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb }); // read by hook R5
+    // Read by hook R5 (startMb) and hook R8 (`look`: the owner's recorded look, for wrapup's manual-verification question).
+    writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb, ...(kind === 'verify' && e.look ? { look: e.look } : {}) });
     const isScript = /\.(mjs|cjs|js)$/.test(cmd.bin);
     const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, {
       cwd: cmd.cwd, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'],
@@ -786,9 +917,11 @@ class Run {
     const moved = this.integrationSha() !== devBefore;
     const undo = () => { if (kind === 'verify') this.rollback(e); else if (moved) this.resetIntegration(e, devBefore); };
 
-    if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return this.park(e, `stopped by the STOP file during ${s.name}`); }
-    if (s.outcome === 'infra') { undo(); return this.park(e, `infra error during ${s.name}: ${s.why}`); }
-    if (s.outcome === 'budget') { undo(); return this.park(e, `budget: ${s.name} hit ${s.why}`); }
+    // Re-entry after a park that is nobody's question: a parked build is judged from its WIP commit; any other step is run again once.
+    const again = { plan: 'PLAN', planFix: 'FIX_PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind];
+    if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return this.parkResumable(e, `stopped by the STOP file during ${s.name}`, again); }
+    if (s.outcome === 'infra') { undo(); return this.parkResumable(e, `infra error during ${s.name}: ${s.why}`, again); }
+    if (s.outcome === 'budget') { undo(); return this.parkResumable(e, `budget: ${s.name} hit ${s.why}`, again); }
     const newGates = this.gateFiles().filter((f) => !gatesBefore.has(f));
     if (newGates.length) { e.gates.push(...newGates.filter((g) => !e.gates.includes(g))); undo(); return this.park(e, `parked at a human gate (${newGates.join(', ')})`); }
     if (kind !== 'verify' && moved) { undo(); return this.park(e, `${s.name} moved ${this.state.integration}; only a verify session may merge`); }
@@ -807,18 +940,19 @@ class Run {
     const lint = lintPlan(read(planFile), m.anchors);
     writeJson(path.join(s.stepDir, 'plan-lint.json'), lint);
     if (!lint.pass) {
-      this.writeGate(e, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: 'The captured plan failed plan lint. Approve it by hand, or fix what it lacks.', options: [], why: lint.problems.join('; '), artifacts: [this.rel(planFile)] });
+      this.writeGate(e, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: `The captured plan failed plan lint (${lint.problems.join('; ')}). Approve it as it is, or have it planned again?`, options: [ANSWERS.approvePlan, ANSWERS.replan], why: lint.problems.join('; '), artifacts: [this.rel(planFile)] });
       return this.park(e, `plan lint failed: ${lint.problems.join('; ')}`);
     }
-    e.planStep = s.name;
+    e.planStep = s.name; e.plan = this.rel(planFile); e.planApprovedBy = 'lint';
     this.log(`${e.id}: plan approved by lint, not by a person (${s.name}/plan.md)`);
     return fix ? 'FIX_BUILD' : 'BUILD';
   }
 
   async doBuild(e, fix) {
     const brief = path.join(this.epicDir(e), 'fix-brief.md');
-    const plan = read(path.join(this.epicDir(e), e.planStep, 'plan.md'));
+    const plan = read(path.join(this.stateDir, e.plan));
     const s = await this.step(e, fix ? 'fix' : 'build', (stepDir) => {
+      (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir) }); // what the next audit reads, in this run or a later one
       fs.writeFileSync(path.join(stepDir, 'prompt.md'), buildPrompt(plan, this.pluginDir));
       fs.writeFileSync(path.join(stepDir, 'build-rules.md'), BUILD_RULES + (fix ? '\n' + read(brief) : ''));
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
@@ -932,18 +1066,18 @@ class Run {
     const m = this.meta(e);
     e.audits = e.audits ?? [];
     const last = e.audits.at(-1);
-    const audited = new Set(e.audits.flatMap((a) => a.steps ?? []));
-    const steps = e.sessions.filter((x) => /^(build|fix)-\d+$/.test(x.name) && !audited.has(x.name)).map((x) => x.name);
+    const audited = new Set(e.audits.flatMap((a) => a.dirs ?? []));
+    const steps = (e.buildSteps ?? []).filter((x) => !audited.has(x.dir)); // may be sessions of an earlier run
     let bundle = null; let s;
     try {
       s = await this.step(e, 'audit', (stepDir) => {
         bundle = buildBundle({
           clone: this.clone, pluginDir: this.pluginDir, bundleDir: path.join(stepDir, 'bundle'), epic: m, integration: this.state.integration,
-          base: last?.tip ?? null, steps: [...new Set(steps)].map((name) => ({ name, dir: path.join(this.epicDir(e), name) })),
+          base: last?.tip ?? null, steps: steps.map((x) => ({ name: x.name, dir: path.join(this.stateDir, x.dir) })),
         });
       });
     } catch (err) {
-      return this.park(e, `auditor: the audit could not start (${err.message}); not verified without an audit`);
+      return this.parkResumable(e, `auditor: the audit could not start (${err.message}); not verified without an audit`, 'AUDIT');
     }
     if (!s) return null;
 
@@ -951,12 +1085,13 @@ class Run {
     const valid = validateAudit(value);
     if (!valid.ok) {
       writeJson(path.join(s.stepDir, 'audit.json'), { unusable: valid.problems, raw: s.result?.structured_output ?? s.result?.result ?? null });
-      return this.park(e, `auditor: ${s.name} returned no usable result (${valid.problems.join('; ')}); not verified without an audit`);
+      // Fail closed (owner decision): nothing is verified without an audit. The `resume` gate lets the next run audit again.
+      return this.parkResumable(e, `auditor: ${s.name} returned no usable result (${valid.problems.join('; ')}); not verified without an audit`, 'AUDIT');
     }
     const judged = judgeAudit(value, this.config.audit.parkOn);
     const file = `${s.name}/audit.json`;
     writeJson(path.join(this.epicDir(e), file), { step: s.name, epic: e.id, branch: m.branch, delta: bundle.delta, base: bundle.base, tip: bundle.tip, parkOn: this.config.audit.parkOn, decision: judged.parks.length ? 'park' : 'proceed', recommend: judged.recommend, summary: judged.summary, findings: judged.findings });
-    e.audits.push({ step: s.name, file, delta: bundle.delta, base: bundle.base, tip: bundle.tip, steps: bundle.steps, findings: judged.findings.length, parks: judged.parks.map((f) => f.id), recommend: judged.recommend });
+    e.audits.push({ step: s.name, file, delta: bundle.delta, base: bundle.base, tip: bundle.tip, steps: bundle.steps, dirs: steps.map((x) => x.dir), findings: judged.findings.length, parks: judged.parks.map((f) => f.id), recommend: judged.recommend });
     e.audit = { step: s.name, file, findings: judged.findings.length, parks: judged.parks.length, recommend: judged.recommend };
     this.save();
     this.log(`${e.id}: ${s.name} — ${judged.findings.length} finding(s), ${judged.parks.length} that park; the auditor recommends ${judged.recommend} (no effect)`);
@@ -966,18 +1101,70 @@ class Run {
       this.writeGate(e, {
         kind: 'audit', skillStep: 'autopilot AUDIT (before wrapup-epic)', session: s.name,
         question: `The auditor reported ${judged.parks.length} high finding(s) on ${m.label}: ${judged.parks.map((f) => `${f.id} ${f.category} — ${f.explanation}`).join(' | ')}. Are they real?`,
-        options: ['Real — fix before verify', 'Not real — verify as built'],
+        options: [ANSWERS.auditReal, ANSWERS.auditNotReal],
         why: `a high finding in a park category (${this.config.audit.parkOn.join(', ')}); the auditor only advises, so a person judges it`,
         artifacts: [this.rel(path.join(this.epicDir(e), file)), this.rel(path.join(s.stepDir, 'bundle', 'diff.patch'))],
         resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${e.id} to fix it, or /peak-workflow:wrapup-epic ${e.id} to verify it as built`,
       });
       return this.park(e, `auditor: ${list} (${s.name})`);
     }
-    if (m.humanCheck) {
-      this.writeGate(e, { kind: 'human-check', skillStep: 'wrapup-epic Step 1.2 item 7', question: m.reasons.join('; '), options: ['Looks right', 'Not right — describe'], why: 'autopilot never self-approves a look', artifacts: [], resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}` });
-      return this.park(e, 'human check needed before verify');
+    return this.humanCheck(e) ? null : 'VERIFY';
+  }
+
+  /**
+   * Human-check epics (operator-observed, UI) park before VERIFY with something to look at
+   * (guardrail G2). The look is the owner's; the driver only produces the artifact. Returns true
+   * when the epic parked.
+   */
+  humanCheck(e) {
+    const m = this.meta(e);
+    if (!m.humanCheck) return false;
+    const tip = this.branchTip(m.branch);
+    if (e.look?.branchTip === tip) return false; // the owner already looked at exactly this tip
+    e.look = null;
+    const made = this.produceArtifacts(e);
+    this.writeGate(e, {
+      kind: 'human-check', skillStep: 'wrapup-epic Step 1.2 item 7',
+      question: `${m.reasons.filter((r) => /operator-observed|UI epic/.test(r)).join('; ') || 'this epic needs a person to look'}. Does what was built look right?`,
+      options: [ANSWERS.looksRight, ANSWERS.notRight],
+      why: `autopilot never self-approves a look${made.artifacts.length ? '' : ` — and it could not produce anything to look at: ${made.notes.join('; ')}`}`,
+      artifacts: made.artifacts, artifactNotes: made.notes,
+      resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
+    });
+    this.park(e, made.artifacts.length ? 'human check needed before verify' : 'human check needed before verify (nothing could be produced to look at)');
+    return true;
+  }
+
+  /**
+   * What a person can look at for a human-check gate: the manual test files the build wrote, and
+   * the output of the project's run command (`settings.json` `humanCheck["<epic>"]` or
+   * `humanCheck["*"]`, else the **Run:** line of CLAUDE.md) with any file it leaves behind.
+   */
+  produceArtifacts(e) {
+    const m = this.meta(e); const b = m.branch; const artifacts = []; const notes = [];
+    const manual = this.g('ls-tree', '-r', '--name-only', b, '--', 'tests/manual').split('\n').filter((f) => m.anchors.some((tor) => f.includes(tor)));
+    for (const f of manual) artifacts.push(`clone:${f}`);
+    if (!manual.length) notes.push('the build wrote no tests/manual/<TOR>.md file for this epic');
+    const cmd = this.config.humanCheck?.[e.id] ?? this.config.humanCheck?.['*'] ?? readProjectFacts(this.clone).runCommand;
+    if (!cmd) { notes.push('CLAUDE.md has no **Run:** command and settings.json names no humanCheck command'); return { artifacts, notes }; }
+    if (this.currentBranch() !== b) { if (this.dirty()) { notes.push('the clone has uncommitted changes, so the run command was not run'); return { artifacts, notes }; } this.g('checkout', '-q', b); }
+    const dir = path.join(this.epicDir(e), 'artifacts');
+    fs.mkdirSync(dir, { recursive: true });
+    const r = sh(cmd, [], { cwd: this.clone, shell: true, timeout: Math.min(this.config.budgets.testRunMin, 2) * 60000, killSignal: 'SIGKILL' });
+    fs.writeFileSync(path.join(dir, 'run-output.txt'), `$ ${cmd}\n(exit ${r.code}${r.timedOut ? ', killed at the time limit' : ''}, on ${b} at ${this.branchTip(b)})\n\n${r.out}\n${r.err ? `\n--- stderr ---\n${r.err}\n` : ''}`);
+    artifacts.push(this.rel(path.join(dir, 'run-output.txt')));
+    // Files the command left in the clone (a built page, a chart) are kept as artifacts; the clone goes back to the commit.
+    for (const line of this.g('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean)) {
+      const f = line.slice(3);
+      const src = path.join(this.clone, f);
+      if (!exists(src) || !fs.statSync(src).isFile() || fs.statSync(src).size > 20 * 1024 * 1024) continue;
+      const dest = path.join(dir, 'files', f);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(src, dest);
+      artifacts.push(this.rel(dest));
     }
-    return 'VERIFY';
+    this.g('checkout', '-q', '-f', b); this.g('clean', '-fdq');
+    return { artifacts, notes };
   }
 
   async doVerify(e) {
@@ -1063,7 +1250,7 @@ class Run {
     let phase = entry;
     while (phase) {
       const stop = this.runStop();
-      if (stop) return this.park(e, `run stopped (${stop}) before ${phase}`);
+      if (stop) return this.parkResumable(e, `run stopped (${stop}) before ${phase}`, phase === 'CHECK_BUILD_INTERRUPTED' ? 'CHECK_BUILD' : phase);
       if (phase === 'PLAN') phase = await this.doPlan(e, false);
       else if (phase === 'BUILD') phase = await this.doBuild(e, false);
       else if (phase === 'FIX_PLAN') phase = await this.doPlan(e, true);
@@ -1076,6 +1263,77 @@ class Run {
       else throw new Error(`unknown phase ${phase}`);
     }
     return null;
+  }
+
+  // ---- entering an epic: from scratch, or from the owner's decision on its gate (P3.5 Part 2) ----
+
+  /** Other live gates of this epic stop counting once it is entered again. */
+  supersedeGates(e, keep) {
+    const now = { run: this.runName, date: new Date().toISOString() };
+    for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && gateLive(x) && x.file !== keep)) this.markGate(g.file, g.kind === 'preflight' ? { cleared: now } : { superseded: now });
+  }
+  /** A branch left by an earlier attempt is set aside, never deleted: the fresh plan gets a fresh branch. */
+  supersedeBranch(e) {
+    const b = this.meta(e).branch; const tip = this.branchTip(b);
+    if (!tip) return;
+    if (this.currentBranch() === b) this.g('checkout', '-q', '-f', this.state.integration);
+    const ref = `refs/autopilot/superseded/${e.id}-${Date.now()}`;
+    this.g('update-ref', ref, tip);
+    this.g('branch', '-q', '-D', b);
+    gitRun(this.clone, 'config', '--remove-section', `branch.${b}`);
+    e.superseded = [...(e.superseded ?? []), ref];
+    this.log(`${e.id}: the earlier branch ${b} (${tip.slice(0, 9)}) is kept at ${ref}; the epic starts on a fresh branch`);
+  }
+
+  /**
+   * The phase an epic starts at in this run: `PLAN` from scratch, or the phase the owner's decided
+   * gate names (the Part 2 table), on the branch the earlier run left. Returns null when the epic
+   * already reached a terminal state here.
+   */
+  enter(e) {
+    const m = this.meta(e); const f = this.gates.get(e.id);
+    const now = () => new Date().toISOString();
+    if (f?.state === 'resume') {
+      const g = readJson(this.gatePath(f.gate)); const rec = this.records()[e.id] ?? {};
+      const entry = f.entry; let phase = entry.phase;
+      Object.assign(e, { fixRounds: rec.fixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [] });
+      if (rec.fixBrief) fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'), rec.fixBrief);
+      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null };
+      this.supersedeGates(e, f.gate);
+      const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
+      if (entry.approve) { e.plan = g.artifacts?.[0] ?? null; e.planApprovedBy = g.decided.by; e.planStep = g.session ?? null; }
+      if (entry.look) e.look = { gate: f.gate, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, branchTip: g.branchTip, artifacts: g.artifacts ?? [] };
+      if (entry.fix) {
+        if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used; ${g.resume ?? 'continue it by hand'}`); }
+        e.fixRounds = 1;
+        if (entry.fix === 'audit') {
+          const audit = tryJson(path.join(this.stateDir, g.artifacts?.[0] ?? '-'), {});
+          const parks = (audit.findings ?? []).filter((x) => x.parks);
+          this.writeFixBrief(e, `The auditor reported these high findings and the owner (${g.decided.by}) confirmed they are real:`, [...parks.map((x) => `- **${x.id} ${x.category}** — ${x.explanation} (evidence: ${x.evidence})`), ...(g.decided.note ? ['', `The owner's note: ${g.decided.note}`] : [])]);
+        } else {
+          this.writeFixBrief(e, `The owner (${g.decided.by}) looked at what was built and answered "${f.answer}":`, [g.decided.note ? `> ${g.decided.note}` : '(no note was recorded: re-read the requirement and what the gate showed)', '', `They looked at: ${(g.artifacts ?? []).join(', ') || '(nothing could be produced)'}`]);
+        }
+      }
+      // Phases that run a captured plan need it; without one the epic is planned again.
+      if ((phase === 'BUILD' || phase === 'FIX_BUILD') && !(e.plan && exists(path.join(this.stateDir, e.plan)))) { phase = phase === 'BUILD' ? 'PLAN' : 'FIX_PLAN'; e.resumed.phase = phase; }
+      if (f.kind === 'audit' && phase === 'VERIFY') e.auditOverruled = { gate: f.gate, by: g.decided.by };
+      if (!entry.question) used(); // a question gate is marked used by hook R8 when it answers
+      this.log(`${e.id}: resuming at ${phase} on ${g.branch} (${String(g.branchTip).slice(0, 9)}): ${g.decided.by} answered "${f.answer}" on ${f.gate}`);
+      return phase;
+    }
+    if (f?.state === 'void') {
+      this.markGate(f.gate, { void: { run: this.runName, date: now(), why: f.why } });
+      e.voided = { gate: f.gate, answer: f.answer, why: f.why };
+      this.log(`${e.id}: the decision on ${f.gate} ("${f.answer}") is void — ${f.why}; planning the epic again from scratch`);
+    } else if (f?.state === 'fresh') {
+      this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase: 'PLAN', date: now() } } }));
+      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase: 'PLAN', fresh: true };
+      this.log(`${e.id}: starting over: ${f.by} answered "${f.answer}" on ${f.gate}`);
+    }
+    this.supersedeGates(e, null);
+    this.supersedeBranch(e);
+    this.forget(e);
+    return 'PLAN';
   }
 
   // ---- crash resume (§9): an in-flight step is never re-trusted ---------------------------------
@@ -1176,7 +1434,10 @@ class Run {
         if (this.currentBranch() !== integration) { if (this.dirty()) throw new Error(`the private clone has uncommitted changes on ${this.currentBranch()}; a run does not start on a dirty clone`); this.g('checkout', '-q', integration); }
         this.state.startSha = this.integrationSha();
       } else if (!this.state.queue.some((q) => !TERMINAL.has(q.state) && q.state !== 'QUEUED') && this.currentBranch() !== integration && !this.dirty()) this.g('checkout', '-q', integration);
-      this.pre = preflight(this.clone, cfg, { pluginDir: this.pluginDir });
+      // Gate decisions are judged once, at run start: valid ones resume, void ones are planned again.
+      if (!resuming) this.state.gateFacts = Object.fromEntries(gateFacts(this.stateDir, integration));
+      this.gates = new Map(Object.entries(this.state.gateFacts ?? {}));
+      this.pre = preflight(this.clone, cfg, { pluginDir: this.pluginDir, gates: this.gates });
       this.pre.epics = this.pre.epics.map((p) => ({ ...p }));
       this.metaById = new Map(this.pre.epics.map((p) => [p.id, p]));
       if (!resuming) {
@@ -1214,7 +1475,9 @@ class Run {
           this.state.baseSkips = t.skips;
           e.startedAt = new Date().toISOString();
         }
-        await this.runEpic(e, entry ?? 'PLAN');
+        const phase = entry ?? this.enter(e);
+        this.save();
+        if (phase) await this.runEpic(e, phase);
       }
 
       const left = this.state.queue.filter((q) => !TERMINAL.has(q.state)).length;
@@ -1233,13 +1496,6 @@ class Run {
       this.releaseLock();
     }
   }
-}
-
-/** Every gate file of the workspace, oldest first: `{file, …gate}`. */
-export function readGates(workspace) {
-  const dir = path.join(workspace, 'gates');
-  return (exists(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [])
-    .map((f) => ({ file: `gates/${f}`, ...tryJson(path.join(dir, f), {}) })).filter((g) => g.epic);
 }
 
 /** What the skill needs to know before it offers a launch: read-only facts about the project and its workspace. */
@@ -1271,10 +1527,13 @@ export function launchFacts(project, workspace, config) {
   else if (lastRun?.status === 'interrupted') refuse.push(`run ${lastRun.run} did not finish (the driver was killed): continue it with \`driver.mjs run --workspace "${workspace}" --resume\``);
   if (exists(path.join(workspace, 'STOP')) && !running) warn.push(`a STOP file is left in ${workspace}; remove it or the next run stops at once`);
 
-  const gates = readGates(workspace);
-  const brief = (g) => ({ file: g.file, epic: g.epic, kind: g.kind, run: g.run ?? null, question: g.question ?? null, answer: g.decided?.answer ?? null });
+  const gates = readGates(workspace).filter(gateLive);
+  const facts = gateFacts(workspace, integration);
+  const brief = (g) => ({ file: g.file, epic: g.epic, kind: g.kind, run: g.run ?? null, question: g.question ?? null, answer: g.decided?.answer ?? null, ...(facts.get(g.epic)?.gate === g.file ? { state: facts.get(g.epic).state, enters: facts.get(g.epic).enters ?? null, why: facts.get(g.epic).why ?? null } : {}) });
   const openGates = gates.filter((g) => !g.decided && (g.options ?? []).length).map(brief);
-  const decidedGates = gates.filter((g) => g.decided?.answer && !g.decided.used).map(brief);
+  const decidedGates = gates.filter((g) => g.decided?.answer).map(brief);
+  const voidGates = decidedGates.filter((g) => g.state === 'void');
+  if (voidGates.length) warn.push(`${voidGates.length} decision(s) can no longer be used (${voidGates.map((g) => `${g.epic}: ${g.why}`).join('; ')}); those epics are planned again from scratch`);
   if (openGates.length) warn.push(`${openGates.length} gate(s) wait for your decision (${[...new Set(openGates.map((g) => g.epic))].join(', ')}); decide them with /peak-workflow:autopilot report`);
 
   const clone = path.join(workspace, 'clone');
@@ -1297,7 +1556,9 @@ export function decideGate(workspace, gateName, answer, { by, note } = {}) {
   if (!exists(file)) throw new Error(`no gate file ${file}`);
   const gate = readJson(file);
   if (gate.decided?.used) throw new Error(`${path.basename(file)} was already decided and used (${gate.decided.used.date})`);
+  if (gate.void || gate.superseded || gate.cleared) throw new Error(`${path.basename(file)} no longer applies: the epic was entered again since (${gate.void ? `void: ${gate.void.why}` : gate.superseded ? 'superseded' : 'cleared'})`);
   const options = gate.options ?? [];
+  if (!options.length) throw new Error(`${path.basename(file)} (${gate.kind}) has no answer to record: ${gate.kind === 'preflight' ? 'the fix is in the project, and the gate clears when preflight passes' : gate.resume ?? 'continue by hand'}`);
   const label = options.find((o) => o.trim().toLowerCase() === String(answer).trim().toLowerCase());
   if (options.length && !label) throw new Error(`"${answer}" is not one of this gate's options: ${options.map((o) => `"${o}"`).join(', ')}`);
   if (!String(answer ?? '').trim()) throw new Error('an answer is required');
@@ -1307,9 +1568,15 @@ export function decideGate(workspace, gateName, answer, { by, note } = {}) {
   if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
   gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(note ? { note } : {}) };
   writeJson(file, gate);
-  const effect = replayableKinds().has(gate.kind) ? 'next-run' : 'by-hand';
   if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
-  return { gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect, resume: effect === 'by-hand' ? gate.resume ?? null : null };
+  // Every decided gate resumes its epic in the next run; the by-hand command stays as the fallback.
+  const entry = gateEntry(gate);
+  return {
+    gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect: 'resume',
+    enters: entry?.fresh ? 'PLAN (from scratch, on a fresh branch)' : entry?.phase ?? null,
+    validWhile: entry?.fresh ? null : `${gate.branch} stays at ${String(gate.branchTip).slice(0, 9)} and the integration line does not move; otherwise the decision is void and the epic is planned again`,
+    resume: gate.resume ?? null,
+  };
 }
 
 /** Programmatic entry point (the CLI and the tests both use it). `stateDir` is an alias of `workspace`. */
@@ -1355,7 +1622,7 @@ async function main(argv) {
     const root = path.resolve(o.project);
     const ws = path.resolve(wsArg ?? `${root}.autopilot`);
     const config = loadConfig(ws, { project: root, overrides: o.allowTestDouble ? { allowTestDouble: true } : {} });
-    const pre = preflight(root, config);
+    const pre = preflight(root, config, { gates: gateFacts(ws, detectIntegration(root)) });
     pre.launch = launchFacts(root, ws, config);
     if (o.json) console.log(JSON.stringify(pre, null, 2));
     else { pre.refuse.forEach((r) => console.log(`REFUSE: ${r}`)); pre.epics.forEach((e) => console.log(`${e.label}  [${e.eligibility}${e.humanCheck ? ', human check' : ''}]  deps: ${e.deps.join(', ') || '—'}  ${e.reasons.join('; ')}`)); }
