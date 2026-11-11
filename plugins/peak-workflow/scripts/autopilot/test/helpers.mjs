@@ -43,7 +43,7 @@ export function makeProject(t, { config = {} } = {}) {
   git(project, 'checkout', '-q', '-b', 'develop');
   fs.mkdirSync(state);
   fs.writeFileSync(path.join(state, 'settings.json'), JSON.stringify({
-    project, claudeBin: FAKE, endBy: null, diskFloorGb: 0,
+    project, claudeBin: FAKE, endBy: null, diskFloorGb: 0, onPark: 'continue', // most tests exercise stop-the-line; `onPark: stop` has its own
     timing: { pollMs: 100, killGraceMs: 300, infraRetryMs: 0 }, ...config,
   }));
   const p = { tmp, project, state, clone: path.join(state, 'clone'), log: path.join(tmp, 'fake.log'), scenarioFile: path.join(tmp, 'scenario.json') };

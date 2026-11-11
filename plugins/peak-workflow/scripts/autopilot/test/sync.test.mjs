@@ -37,32 +37,35 @@ test('sync, P == C: nothing moves; the clone is reused as it is', async (t) => {
   assert.equal(git(p.clone, 'remote'), '', 'the fetch is by URL: the clone still has no remote');
 });
 
-test('sync, P ahead of C: the clone is fast-forwarded, the new work is built on, and a branch parked before it has a void decision', async (t) => {
+test('sync, P ahead of C: the clone is fast-forwarded and the new work is built on; a parked branch that still merges cleanly keeps its decision', async (t) => {
   const p = makeProject(t);
   const e2 = addEpic(p.project, E2);
   p.scenario({ ...happy(E1), ...happy(e2), [`${e2.id}/audit`]: audit('stand-in') });
   await p.go();
   assert.deepEqual([p.epic(E1.id).state, p.epic(e2.id).state], ['MERGED', 'PARKED']);
   assert.equal(cli('decide', '--workspace', p.state, '--gate', `${e2.id}-1.json`, '--answer', ANSWERS.auditNotReal, '--by', 'Pat Owner').status, 0);
-  ownerFetches(p);
-  assert.equal(preflight(p).launch.decidedGates[0].state, 'resume', 'a fast-forward in the project keeps the decision');
 
-  // The owner then commits on develop: a new epic, planned by day.
+  // The owner brings the night's work in with a merge commit (this repository's convention), then plans a new epic by day.
+  const fetch = readJson(path.join(p.runDir(), 'report.json')).next.find((n) => n.includes('git fetch')).split('\n')[1].trim();
+  assert.equal(spawnSync('sh', ['-c', fetch], { cwd: p.project }).status, 0);
+  git(p.project, 'merge', '-q', '--no-ff', '-m', 'Merge autopilot/develop', 'autopilot/develop');
   const e6 = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
   const P = tip(p.project); const C = tip(p.clone);
   assert.deepEqual(syncFacts(p.project, p.state, 'develop'), { state: 'project-ahead', projectTip: P, cloneTip: C, waiting: [] });
   const pre = preflight(p);
-  assert.match(pre.launch.warn.join('\n'), /develop moved in the project since the last run; the run fast-forwards the clone/);
-  assert.deepEqual(pre.launch.decidedGates.map((g) => [g.epic, g.state]), [[e2.id, 'void']], 'readiness already says what the run will find');
-  assert.match(pre.epics.find((e) => e.id === e2.id).reasons.join(' '), /is void \(develop moved since the epic was parked/);
+  assert.match(pre.launch.warn.join('\n'), /develop moved in the project since the last run; the run fast-forwards the clone to it first; a decision on a parked branch still holds if that branch merges cleanly/);
+  assert.deepEqual(pre.launch.decidedGates.map((g) => [g.epic, g.state]), [[e2.id, 'resume']]);
+  assert.match(pre.epics.find((e) => e.id === e2.id).reasons.join(' '), /resumes at VERIFY .*\(whether the branch still merges cleanly is checked when the run starts\)/);
 
-  p.scenario({ ...happy(e2), ...happy(e6) });
+  p.scenario({ [`${e2.id}/verify`]: happy(e2)[`${e2.id}/verify`], ...happy(e6) });
+  const before = p.calls().length;
   const s = await p.go();
 
   assert.deepEqual([s.sync.state, s.startSha], ['project-ahead', P]);
   assert.ok(git(p.clone, 'log', '--format=%s', 'develop').includes(`docs: add epic ${e6.id}`));
   assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[e2.id, 'MERGED'], [e6.id, 'MERGED']]);
-  assert.match(p.epic(e2.id).voided.why, /develop moved since the epic was parked/); // Part 2's validity rule, after the fast-forward
+  assert.deepEqual(p.steps().slice(before, before + 1), [`${e2.id}/verify-1`], 'the parked epic resumed; it was not rebuilt');
+  assert.equal(p.epic(e2.id).voided, undefined);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /At the start the clone's develop was fast-forwarded to the project's/);
   assert.equal(tip(p.project), P, 'the project is only read');
 });

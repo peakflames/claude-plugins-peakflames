@@ -107,7 +107,7 @@ export function collectReport(runDir) {
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null,
-    driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, epics, gates, referee,
+    driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
   report.next = nextSteps(report);
   return report;
@@ -137,8 +137,10 @@ function nextSteps(r) {
   const fetch = `git fetch "${r.clone}" ${r.integration}:autopilot/${r.integration} && git log ${r.integration}..autopilot/${r.integration}`;
   if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}${waiting.length ? `, and ${plural(waiting.length, 'commit')} from earlier runs still waiting in the clone` : ''}):\n   ${fetch}`);
   else if (waiting.length) next.push(`Bring in the work earlier runs merged, still waiting in the clone (${plural(waiting.length, 'commit')}):\n   ${fetch}`);
-  if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds only while that branch and \`${r.integration}\` do not move.`);
+  if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into \`${r.integration}\`.`);
   if (r.referee.testChanges.length) next.push(`Read the recorded reason for ${plural(r.referee.testChanges.length, 'changed existing test')} (under "Per epic").`);
+  const notStarted = by('NOT STARTED');
+  if (r.stoppedOnPark && notStarted.length) next.push(`${plural(notStarted.length, 'epic')} did not start (${ids(notStarted)}): the run stops at the first epic that parks or fails. To keep building independent epics after a park, put \`{"onPark": "continue"}\` in \`${r.stoppedOnPark.settingsFile}\`.`);
   if (by('BLOCKED').length) next.push(`${plural(by('BLOCKED').length, 'epic')} never started because a dependency did not merge (${ids(by('BLOCKED'))}); queue them again once it has.`);
   return next;
 }
@@ -177,7 +179,7 @@ export function renderReport(r) {
   L.push('', '## Per epic');
   for (const e of r.epics) {
     L.push('', `### ${e.label} — ${e.outcome}`, '', e.reason ?? '(no reason recorded)');
-    if (e.resumed) L.push('', e.resumed.fresh ? `Started over: ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`.` : `Resumed at ${e.resumed.phase} on \`${e.resumed.branch}\` (${String(e.resumed.branchTip).slice(0, 9)}, left by run ${e.resumed.fromRun ?? '?'}): ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`. No earlier session was run again.`);
+    if (e.resumed) L.push('', e.resumed.fresh ? `Started over: ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`.` : `Resumed at ${e.resumed.phase} on \`${e.resumed.branch}\` (${String(e.resumed.branchTip).slice(0, 9)}, left by run ${e.resumed.fromRun ?? '?'}): ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`. No earlier session was run again.${e.resumed.behind ? ` The branch was ${plural(e.resumed.behind, 'commit')} behind \`${r.integration}\` and merged cleanly in a trial merge.` : ''}`);
     if (e.voided) L.push('', `Your decision "${e.voided.answer}" on \`${e.voided.gate}\` was void — ${e.voided.why}. The epic was planned again from scratch.`);
     for (const ref of e.superseded) L.push('', `The earlier branch is kept in the clone at \`${ref}\`.`);
     if (e.auditOverruled) L.push('', `Verified as built: ${e.auditOverruled.by} judged the auditor's findings not real (\`${e.auditOverruled.gate}\`).`);

@@ -394,21 +394,86 @@ test('void decision: the branch tip moved after the gate was written — reporte
   assert.equal(cli('decide', '--workspace', p.state, '--gate', `${E1.id}-1.json`, '--answer', ANSWERS.auditReal, '--by', 'Pat').status, 2, 'a void gate cannot be decided again');
 });
 
-test('void decision: the base moved (another epic merged after the park) — strict rule, re-planned from scratch', async (t) => {
+test('another epic merged after the park: the decision still holds, because the parked branch merges cleanly — resumed, not rebuilt', async (t) => {
   const p = makeProject(t);
   const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
   p.scenario({ ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d) });
   const s1 = await p.go();
-  assert.deepEqual(s1.queue.map((q) => q.state), ['PARKED', 'MERGED']);
+  assert.deepEqual(s1.queue.map((q) => q.state), ['PARKED', 'MERGED']); // Run A's shape: a park, then an independent merge
+  const tip = git(p.clone, 'rev-parse', E1.branch);
   decide(p, E1.id, ANSWERS.auditNotReal);
-  assert.match(gateFacts(p.state, 'develop').get(E1.id).why, /develop moved since the epic was parked/);
+  const f = gateFacts(p.state, 'develop').get(E1.id);
+  assert.deepEqual([f.state, f.enters, f.behind > 0], ['resume', 'VERIFY', true]);
+
+  p.scenario({ [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+
+  assert.deepEqual(r.steps, [`${E1.id}/verify-1`]);
+  const e = p.epic(E1.id);
+  assert.deepEqual([e.state, e.voided, e.resumed.behind > 0], ['MERGED', undefined, true]);
+  assert.ok(merged(p, tip));
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /The branch was \d+ commits? behind `develop` and merged cleanly in a trial merge\./);
+});
+
+test('void decision: the parked branch no longer merges cleanly into the integration line — reported with the files, re-planned from scratch', async (t) => {
+  const p = makeProject(t);
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  const clash = (text) => ({ do: 'write', path: 'src/shared.js', content: text });
+  const building = (e, text) => ({ actions: [...buildActions(e, { commit: false }), clash(text), { do: 'commit', message: `feat(epic-${e.id}): implement ${e.slug}` }] });
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: building(E1, 'export const mode = "a";\n'), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d), [`${d.id}/build`]: building(d, 'export const mode = "b";\n') });
+  await p.go();
+  decide(p, E1.id, ANSWERS.auditNotReal);
+  const before = git(p.clone, 'status', '--porcelain') + git(p.clone, 'rev-parse', 'develop');
+  const f = gateFacts(p.state, 'develop').get(E1.id);
+  assert.equal(f.state, 'void');
+  assert.match(f.why, /no longer merges cleanly into develop \(conflicts in src\/shared\.js\)/);
+  assert.equal(git(p.clone, 'status', '--porcelain') + git(p.clone, 'rev-parse', 'develop'), before, 'the trial merge changes nothing in the clone');
 
   p.scenario(happy(E1));
   const r = await again(p);
 
   assert.deepEqual(r.steps, ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  assert.match(p.epic(E1.id).voided.why, /develop moved/);
+  assert.match(p.epic(E1.id).voided.why, /conflicts in src\/shared\.js/);
+});
+
+// ---- onPark ------------------------------------------------------------------------------------
+
+test('onPark defaults to "stop": the first epic that parks ends the run, and the report says how to change that', async (t) => {
+  const p = makeProject(t);
+  const settings = readJson(path.join(p.state, 'settings.json'));
+  delete settings.onPark; // the default, as a real workspace has it
+  fs.writeFileSync(path.join(p.state, 'settings.json'), JSON.stringify(settings));
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d) });
+
+  const s = await p.go();
+
+  assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[E1.id, 'PARKED'], [d.id, 'QUEUED']], 'the independent epic is not started');
+  assert.deepEqual([s.status, s.stoppedBecause], ['STOPPED', `${E1.id} parked (onPark: stop)`]);
+  assert.ok(p.steps().every((k) => k.startsWith(E1.id)));
+  const file = path.join(p.project, '.claude', 'autopilot.json');
+  const report = readJson(path.join(p.runDir(), 'report.json'));
+  assert.deepEqual(report.epics.map((e) => e.outcome), ['PARKED', 'NOT STARTED']);
+  assert.ok(report.next.some((n) => n.includes('1 epic did not start (Lg6Cfg3): the run stops at the first epic that parks or fails') && n.includes(`\`{"onPark": "continue"}\` in \`${file}\``)), report.next.join('\n'));
+  const pre = JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
+  assert.deepEqual([pre.launch.config.onPark, pre.launch.projectSettingsFile, pre.launch.projectSettingsFileExists], ['stop', file, false]);
+
+  // The setting lives with the project: .claude/autopilot.json. With "continue", the independent epic runs after the park.
+  decide(p, E1.id, ANSWERS.auditNotReal);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ onPark: 'continue', claudeBin: '/somewhere/else', queue: ['nope'] }));
+  git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'chore: autopilot keeps building after a park');
+  const pre2 = JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
+  assert.deepEqual([pre2.launch.config.onPark, pre2.launch.projectSettingsFileExists, pre2.launch.config.queue], ['continue', true, null]);
+  assert.match(pre2.launch.config.claudeBin, /fake-claude\.mjs$/, 'a project file never names the session binary');
+  p.scenario({ [`${E1.id}/verify`]: { actions: [], result: { result: 'Verdict: FAIL' } }, [`${E1.id}/plan-fix`]: planScript(E1, { omit: ['mark'] }), ...happy(d) });
+  const r = await again(p);
+  assert.deepEqual(r.state.queue.map((q) => [q.id, q.state]), [[E1.id, 'PARKED'], [d.id, 'MERGED']]);
+  assert.equal(r.state.stoppedBecause, 'queue done');
+
+  fs.writeFileSync(file, JSON.stringify({ onPark: 'sometimes' }));
+  await assert.rejects(p.go(), /onPark must be "stop" or "continue", not "sometimes"/);
 });
 
 test('an undecided gate keeps its epic out of the next run: nothing is rebuilt while the owner has not answered', async (t) => {

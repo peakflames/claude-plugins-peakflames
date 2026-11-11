@@ -7,7 +7,7 @@ Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80
 2. Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.
 3. Review and bring in the merged work (Lg1Csv7):
    git fetch "<workspace>/clone" develop:autopilot/develop && git log develop..autopilot/develop
-4. Run `/peak-workflow:autopilot` again: 1 decided gate (Lg5Chr8) resumes its epic on the branch this run left. A decision holds only while that branch and `develop` do not move.
+4. Run `/peak-workflow:autopilot` again: 1 decided gate (Lg5Chr8) resumes its epic on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into `develop`.
 5. Read the recorded reason for 1 changed existing test (under "Per epic").
 6. 1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has.
 

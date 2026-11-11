@@ -146,6 +146,7 @@ export function defaultConfig(project) {
     runBudgetUsd: 80,
     diskFloorGb: 15,
     growthCapMb: 1024,
+    onPark: 'stop', // 'stop': the first epic that parks or fails ends the run; 'continue': independent epics still run
     claudeBin: 'claude',
     allowTestDouble: false, // run-level: never inherited from settings.json by accident (a rehearsal's fake binary)
     budgets: {
@@ -186,10 +187,22 @@ export function newRunName(workspace, now = new Date()) {
   return name;
 }
 
+/** The project's own autopilot settings, kept with the project (committed or not): `<project>/.claude/autopilot.json`. */
+export const projectSettingsFile = (project) => path.join(project, '.claude', 'autopilot.json');
+function projectSettings(project) {
+  const file = projectSettingsFile(project);
+  if (!exists(file)) return {};
+  let j; try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); }
+  // A project file sets policy and limits; it never names the run, the project path or a session binary.
+  for (const k of [...RUN_KEYS, 'claudeBin']) delete j[k];
+  return j;
+}
+
 /**
- * The effective config of a run: defaults, then the workspace's `settings.json` (what the owner set
- * for every run: budgets, scope, audit, claudeBin, …), then the run's own `config.json` (queue,
- * explicit, end time, run budget, allowTestDouble), then command-line overrides.
+ * The effective config of a run: defaults, then the project's `.claude/autopilot.json` (policy that
+ * belongs to the project, such as `onPark`), then the workspace's `settings.json` (budgets, scope,
+ * audit, claudeBin, …), then the run's own `config.json` (queue, explicit, end time, run budget,
+ * allowTestDouble), then command-line overrides.
  */
 export function loadConfig(workspace, { project, run: runName, overrides = {} } = {}) {
   const settings = tryJson(path.join(workspace, 'settings.json'), {});
@@ -197,8 +210,9 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   const given = project ?? runCfg.project ?? settings.project;
   if (!given) throw new Error('no project: pass --project, or a --workspace whose settings.json names it');
   const root = path.resolve(given);
-  const cfg = merge(merge(merge(defaultConfig(root), settings), runCfg), overrides);
+  const cfg = merge(merge(merge(merge(defaultConfig(root), projectSettings(root)), settings), runCfg), overrides);
   cfg.project = root;
+  if (!['stop', 'continue'].includes(cfg.onPark)) throw new Error(`onPark must be "stop" or "continue", not ${JSON.stringify(cfg.onPark)} (${projectSettingsFile(root)})`);
   return cfg;
 }
 /** The keys that belong to one run; everything else is a workspace setting. */
@@ -299,8 +313,9 @@ export const gateLive = (g) => !g.decided?.used && !g.void && !g.superseded && !
 
 /**
  * Per epic, what its latest live gate means for the next run. A decision is valid only while the
- * branch tip in the clone still equals the gate's `branchTip` and the epic's base has not moved
- * (the strict rule: the merge-base of the branch and the integration line is the integration tip).
+ * branch tip in the clone still equals the gate's `branchTip` and that branch still merges cleanly
+ * into the integration line (owner decision 2026-11-11; it replaced the strict "base has not
+ * moved" rule, which voided a decision whenever another epic merged or the owner committed).
  */
 export function gateFacts(workspace, integration, { integrationTip = null } = {}) {
   const clone = path.join(workspace, 'clone');
@@ -319,12 +334,19 @@ export function gateFacts(workspace, integration, { integrationTip = null } = {}
       const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${g.branch}`).out || null;
       // `integrationTip`: where the integration line will be once the run has fast-forwarded it (readiness, before the sync).
       const dev = integrationTip ?? (gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out || null);
-      if (!g.branchTip) { // parked before the session made a branch (a question in the planning session)
+      if (!g.branchTip) { // parked before the session made a branch (a question in the planning session): nothing to merge
         if (tip) why = `a branch ${g.branch} has appeared since the gate was written`;
-        else if (g.base && dev !== g.base) why = `${integration} moved since the epic was parked`;
       } else if (!tip) why = `the branch ${g.branch} no longer exists in the clone`;
       else if (tip !== g.branchTip) why = `the branch ${g.branch} moved since the gate was written (${String(g.branchTip).slice(0, 9)} → ${tip.slice(0, 9)})`;
-      else if (integrationTip || gitRun(clone, 'merge-base', tip, dev).out !== dev) why = `${integration} moved since the epic was parked, so the branch no longer starts from its tip`;
+      else if (!gitOk(clone, 'cat-file', '-e', `${dev}^{commit}`)) f.checkedAtRunStart = true; // the project's new commits are not in the clone yet
+      else {
+        // A trial merge, in memory: nothing in the clone changes. The integration line may have moved (another
+        // epic merged, the owner committed); the decision stands as long as the parked branch still merges cleanly.
+        const trial = gitRun(clone, 'merge-tree', '--write-tree', '--name-only', '--no-messages', dev, tip);
+        if (trial.code === 1) why = `the branch ${g.branch} no longer merges cleanly into ${integration} (conflicts in ${trial.out.split('\n').slice(1).filter(Boolean).join(', ') || 'its files'})`;
+        else if (trial.code !== 0) why = `the trial merge of ${g.branch} into ${integration} could not run (${trial.err.split('\n')[0] || `git merge-tree exited ${trial.code}`})`;
+        else f.behind = Number(gitRun(clone, 'rev-list', '--count', `${tip}..${dev}`).out || 0); // commits on the integration line the branch has not seen
+      }
     }
     facts.set(id, why ? { ...f, state: 'void', why } : { ...f, state: 'resume', entry, enters: entry.phase });
   }
@@ -388,7 +410,7 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
     const gate = gates.get(e.id) ?? null;
     if (gate) e = { ...e, gate };
     if (gate?.state === 'waiting') set('skip', `waiting for your decision on ${gate.gate} (${gate.kind}): /peak-workflow:autopilot report`);
-    else if (gate?.state === 'resume') reasons.push(`resumes at ${gate.enters} on ${gate.branch}: you answered "${gate.answer}" on ${gate.gate}`);
+    else if (gate?.state === 'resume') reasons.push(`resumes at ${gate.enters} on ${gate.branch}: you answered "${gate.answer}" on ${gate.gate}${gate.checkedAtRunStart ? ' (whether the branch still merges cleanly is checked when the run starts)' : ''}`);
     else if (gate?.state === 'fresh') reasons.push(`starts over: you answered "${gate.answer}" on ${gate.gate}`);
     else if (gate?.state === 'void') reasons.push(`your decision on ${gate.gate} is void (${gate.why}): the epic is planned again from scratch`);
     if (e.status !== 'Not Started' && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) set('skip', `status is ${e.status}; resume it by hand or queue it explicitly`);
@@ -551,6 +573,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   p(`Sessions:         ${config.claudeBin === 'claude' ? 'claude (real Claude Code sessions)' : `${config.claudeBin} — A TEST DOUBLE, not Claude Code: a rehearsal`}`);
   if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
+  p(`When an epic parks: ${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set in ${projectSettingsFile(project)}`);
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
 
@@ -1277,6 +1300,17 @@ class Run {
     return null;
   }
 
+  /**
+   * `onPark: "stop"` (the default): an epic that parked or failed ends the run. Which epics are
+   * independent of it is the planner's judgement, so nothing more is built until the owner has looked.
+   */
+  stopOnPark(e) {
+    if (this.config.onPark !== 'stop' || this.stopReason || !['PARKED', 'FAILED'].includes(e.state)) return;
+    this.stopReason = `${e.id} ${e.state === 'PARKED' ? 'parked' : 'failed'} (onPark: stop)`;
+    this.state.stoppedOnPark = { epic: e.id, state: e.state, settingsFile: projectSettingsFile(this.config.project) };
+    this.log(`${e.id} ${e.state}: stopping the run (onPark is "stop"; set "onPark": "continue" in ${projectSettingsFile(this.config.project)} to keep building independent epics)`);
+  }
+
   // ---- sync with the project at run start (P3.5 Part 3) ---------------------------------------
 
   /**
@@ -1353,7 +1387,8 @@ class Run {
       if ((phase === 'BUILD' || phase === 'FIX_BUILD') && !(e.plan && exists(path.join(this.stateDir, e.plan)))) { phase = phase === 'BUILD' ? 'PLAN' : 'FIX_PLAN'; e.resumed.phase = phase; }
       if (f.kind === 'audit' && phase === 'VERIFY') e.auditOverruled = { gate: f.gate, by: g.decided.by };
       if (!entry.question) used(); // a question gate is marked used by hook R8 when it answers
-      this.log(`${e.id}: resuming at ${phase} on ${g.branch} (${String(g.branchTip).slice(0, 9)}): ${g.decided.by} answered "${f.answer}" on ${f.gate}`);
+      e.resumed.behind = f.behind ?? 0;
+      this.log(`${e.id}: resuming at ${phase} on ${g.branch} (${String(g.branchTip).slice(0, 9)}${f.behind ? `, ${f.behind} commit(s) behind ${this.state.integration}; it merges cleanly` : ''}): ${g.decided.by} answered "${f.answer}" on ${f.gate}`);
       return phase;
     }
     if (f?.state === 'void') {
@@ -1502,7 +1537,7 @@ class Run {
           if (m.eligibility === 'skip' || m.eligibility === 'complete') { this.finish(e, 'SKIPPED', m.reasons.join('; ')); continue; }
           if (m.eligibility === 'park') {
             this.writeGate(e, { kind: 'preflight', skillStep: 'start-epic Steps 1–2', question: m.reasons.join('; '), options: [], why: 'a decision only the owner can make; no session was started', artifacts: [] });
-            this.finish(e, 'PARKED', m.reasons.join('; ')); continue;
+            this.finish(e, 'PARKED', m.reasons.join('; ')); this.stopOnPark(e); continue;
           }
           // Base red stops the whole run: every epic would build on it.
           if (this.currentBranch() !== integration) { if (this.dirty()) { this.stopReason = `clone is dirty on ${this.currentBranch()}`; break; } this.g('checkout', '-q', integration); }
@@ -1514,6 +1549,7 @@ class Run {
         const phase = entry ?? this.enter(e);
         this.save();
         if (phase) await this.runEpic(e, phase);
+        this.stopOnPark(e);
       }
 
       const left = this.state.queue.filter((q) => !TERMINAL.has(q.state)).length;
@@ -1576,11 +1612,12 @@ export function launchFacts(project, workspace, config) {
 
   if (sync.state === 'diverged') refuse.push(divergedText(sync, project, clone, integration));
   if (sync.state === 'clone-ahead') warn.push(`autopilot has merged work the project has not fetched yet; the run builds on top of it. Waiting in the clone: ${sync.waiting.join('; ')}. Bring it in with: ${fetchCommand(clone, integration)}`);
-  if (sync.state === 'project-ahead') warn.push(`${integration} moved in the project since the last run; the run fast-forwards the clone to it first, which voids decisions on branches parked before that`);
+  if (sync.state === 'project-ahead') warn.push(`${integration} moved in the project since the last run; the run fast-forwards the clone to it first; a decision on a parked branch still holds if that branch merges cleanly into the new tip`);
   if (process.platform === 'darwin') warn.push('a laptop with the lid closed on battery may still sleep, even under caffeinate: leave it on power');
   const run = newRunName(workspace);
   return {
     ok: refuse.length === 0, refuse, warn, integration, freeGb, workspace, clone, run, runDir: runDirOf(workspace, run), settingsFileExists: exists(path.join(workspace, 'settings.json')),
+    projectSettingsFile: projectSettingsFile(project), projectSettingsFileExists: exists(projectSettingsFile(project)),
     runs, lastRun, openGates, decidedGates, sync, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
   };
 }
@@ -1609,7 +1646,7 @@ export function decideGate(workspace, gateName, answer, { by, note } = {}) {
   return {
     gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect: 'resume',
     enters: entry?.fresh ? 'PLAN (from scratch, on a fresh branch)' : entry?.phase ?? null,
-    validWhile: entry?.fresh ? null : `${gate.branch} stays at ${String(gate.branchTip).slice(0, 9)} and the integration line does not move; otherwise the decision is void and the epic is planned again`,
+    validWhile: entry?.fresh ? null : `${gate.branch} stays at ${String(gate.branchTip).slice(0, 9)} and still merges cleanly into the integration line; otherwise the decision is void and the epic is planned again`,
     resume: gate.resume ?? null,
   };
 }
