@@ -16,6 +16,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] — 2026-11-10
+
+### Added
+
+- **Bundles `peak-media` v0.2.0** — adds `/peak-media:web2video` (a page or folder to an MP4 for a named destination, with presets, sign-in and one approval) and breaking `video-capture` changes: `beat()` storyboards and `--out` as the MP4. See the [peak-media changelog](plugins/peak-media/CHANGELOG.md).
+
 ## [1.4.0] — 2026-11-10
 
 ### Added
