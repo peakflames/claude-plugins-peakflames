@@ -225,7 +225,13 @@ test('human-check gate, "Not right — describe": the fix round gets the owner\'
   assert.deepEqual([g2.kind, g2.decided, g2.branchTip], ['human-check', null, git(p.clone, 'rev-parse', e5.branch)]);
 
   // The second look passes: verify, merge.
-  decide(p, e5.id, ANSWERS.looksRight, { n: 2 });
+  // A look without the owner's words is refused: the note is the evidence.
+  const bare = cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-2.json`, '--answer', ANSWERS.looksRight, '--by', 'Pat Owner');
+  assert.notEqual(bare.status, 0);
+  assert.match(bare.stderr, /a human-check answer needs --note: what you did to check and what you saw/);
+  assert.equal(gate(p, e5.id, 2).decided, null);
+  assert.match(cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-2.json`, '--answer', ANSWERS.notRight, '--by', 'Pat Owner', '--note', '  ').stderr, /needs --note: what you looked at and what is wrong/);
+  decide(p, e5.id, ANSWERS.looksRight, { n: 2, note: 'opened chart.html: the bars no longer overlap' });
   p.scenario({ [`${e5.id}/verify`]: wrapupScript(e5) });
   const last = await again(p, { queue: [e5.id] });
   assert.deepEqual(last.steps, [`${e5.id}/verify-1`]);
@@ -531,7 +537,7 @@ test('P3.5 exit: one run parks an epic at each resumable gate kind; decided thro
   const tips = Object.fromEntries([ef, eq, ea, eh, el, er].map((e) => [e.id, git(p.clone, 'rev-parse', e.branch)]));
   const ran1 = p.steps();
 
-  for (const [e, answer] of [[ef, ANSWERS.auditReal], [eq, 'Fix now'], [ea, ANSWERS.auditNotReal], [eh, ANSWERS.looksRight], [el, ANSWERS.approvePlan], [er, ANSWERS.resume]]) decide(p, e.id, answer);
+  for (const [e, answer] of [[ef, ANSWERS.auditReal], [eq, 'Fix now'], [ea, ANSWERS.auditNotReal], [eh, ANSWERS.looksRight], [el, ANSWERS.approvePlan], [er, ANSWERS.resume]]) decide(p, e.id, answer, answer === ANSWERS.looksRight ? { note: 'opened the page: it reads well' } : {});
   assert.match(readJson(path.join(p.state, 'runs', run1, 'report.json')).next.join('\n'), /6 decided gates \(.*\) resume their epics on the branch this run left/);
 
   p.scenario({

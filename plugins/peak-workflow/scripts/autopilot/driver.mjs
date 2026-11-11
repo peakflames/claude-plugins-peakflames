@@ -1668,11 +1668,14 @@ export function decideGate(workspace, gateName, answer, { by, note } = {}) {
   const label = options.find((o) => o.trim().toLowerCase() === String(answer).trim().toLowerCase());
   if (options.length && !label) throw new Error(`"${answer}" is not one of this gate's options: ${options.map((o) => `"${o}"`).join(', ')}`);
   if (!String(answer ?? '').trim()) throw new Error('an answer is required');
+  // A look is evidence: the verify session records the owner's words as the operator's observation,
+  // and a fix round is briefed from them. An answer alone says nothing about what was checked.
+  if (gate.kind === 'human-check' && !String(note ?? '').trim()) throw new Error(`a human-check answer needs --note: ${label === ANSWERS.notRight ? 'what you looked at and what is wrong' : 'what you did to check and what you saw'}, in your own words`);
   const run = gate.run && exists(runDirOf(workspace, gate.run)) ? gate.run : currentRun(workspace);
   const project = tryJson(path.join(workspace, 'settings.json'))?.project ?? (run ? tryJson(path.join(runDirOf(workspace, run), 'config.json'))?.project : null) ?? null;
   const who = by ?? (project ? sh('git', ['config', 'user.name'], { cwd: project }).out : '') ?? '';
   if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
-  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(note ? { note } : {}) };
+  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}) };
   writeJson(file, gate);
   if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
   // Every decided gate resumes its epic in the next run; the by-hand command stays as the fallback.

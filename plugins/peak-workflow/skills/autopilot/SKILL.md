@@ -315,6 +315,27 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       to record — the fix is in the project, and it clears when preflight passes: say what to
       fix (its `question`) and move on.
 
+      **A `human-check` gate also needs the owner's own account of the check** — the driver
+      refuses the answer without it, because the next run hands these words to the verifier as
+      the operator's observation (or to the fix round as its brief). After the owner answers
+      `Looks right` or `Not right — describe`, ask two things:
+
+      1. With `AskUserQuestion` (`multiSelect: true`): "What did you do to check it?" Offer up
+         to three options that describe ways of looking, built from this gate's `artifacts` —
+         for example `Opened <built file> myself` (a page, a chart), `Followed the checklist
+         in <tests/manual/… file>`, `Ran <the command in run-output.txt> myself`, `Read the
+         output autopilot captured`. Say that they should tick only what they really did; the
+         tool's own "Other" takes anything else in their words. These options describe a
+         method, never a verdict.
+      2. As a plain-text question: after `Looks right` — "In a sentence or two, what did you
+         see?", and to help, show the Then lines of the gate's operator-observed requirement
+         (`tor-lifecycle text`, as in item a) as the things worth mentioning; after
+         `Not right — describe` — "What is wrong, and what should it look like instead?"
+
+      The note is `<what they did>. <what they saw, verbatim>`. Never write it for them, pad it,
+      or fill it from the artifacts yourself. If the owner will not describe the check, record
+      nothing and treat the gate as `Decide later`.
+
    c. **Record what the owner chose**, exactly, unless it was `Decide later`:
 
       ```bash
@@ -322,7 +343,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       ```
 
       `<file>` is the gate's `file` value. Add `--note "<their words>"` when the owner explained
-      the choice (for example after "Not right — describe"). The command writes
+      the choice; for a `human-check` gate the note from item b is required. The command writes
       `decided: {answer, by, date, scope: "next-run"}` into the gate file, with `by` taken from
       `git config user.name`, and re-renders the report. It refuses an answer that is not one of
       the gate's options; if it refuses, ask again — never substitute a different option.

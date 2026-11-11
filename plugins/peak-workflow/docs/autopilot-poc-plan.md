@@ -1318,8 +1318,10 @@ go-ahead each time, $2.66 in all:
    the owner's look, and the Complete handoff carries the observation and "Manual verification
    performed: Yes" with the owner's name, date and tip. No skill edit.
 
-Still a judgement call for P5: the observation is the owner's gate note, so a "Looks right" with
-no note gives the verifier only the answer. Also unseen in a real session: the skill's
+**The note is mandatory (owner decision, 2026-11-11).** The observation is the owner's gate
+note, so `driver.mjs decide` refuses a `human-check` answer without one, and `autopilot report`
+asks what the owner did to check (suggested ways of looking, built from the gate's artifacts)
+and what they saw. Also unseen in a real session: the skill's
 plain-language report presentation, and its going straight into the report when a run has
 already ended at the launch check — the owner sees both on Run A's `report`.
 

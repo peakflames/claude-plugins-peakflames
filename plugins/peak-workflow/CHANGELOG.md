@@ -38,6 +38,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Owner's look reaches the verifier** — after a decided human-check gate, the verify session is
   given the owner's recorded observation, so `wrapup-epic` records it as operator-observed
   evidence instead of parking on a question nobody can answer.
+- **Human-check answers need the owner's account** — `autopilot report` asks what the owner did
+  to check and what they saw, with suggested ways of looking; `driver.mjs decide` refuses a
+  human-check answer without that note.
 - **Report TL;DR and glossary** — `report.md` opens with a plain-language TL;DR and ends with
   "Words used in this report"; `autopilot report` presents the TL;DR first and explains each term
   on first use; once merged work is in the project, the report stops listing the fetch command.
