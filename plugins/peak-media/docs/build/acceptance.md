@@ -29,7 +29,7 @@ A `D<n>` in the source column is an item of the original web2video plan at commi
 | WP15 | verified | wp/WP15/verify-1.md |
 | WP16 | verified | wp/WP16/verify-1.md |
 | WP17 | verified | wp/WP17/verify-1.md |
-| WP18 | not-started | — |
+| WP18 | implemented (Lead bookkeeping, no ACs) | — |
 
 ## Register
 

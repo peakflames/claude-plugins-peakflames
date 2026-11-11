@@ -8,6 +8,29 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **`web2video` skill** — `/peak-media:web2video` turns "make a video of this page" into an MP4: intake, one approval gate, sign-in, recording, checks and hand-off. It calls `video-capture` and `video-spine`; it never uploads or sends the file.
+- **Storyboard helpers and visible cursor** — `goto`, `click`, `type`, `point`, `scrollTo` and `scrollBy` move an arrow pointer that survives navigation; `--no-cursor` hides it.
+- **Output presets** — `capture --preset web|youtube|hifi` (default `web`) sets capture size, frame rate and encode; `probe-spec --preset` checks a file against one.
+- **Sign-in** — `capture signin <url>` saves a session after the user signs in by hand (file 0600, outside the project); `--storage-state` starts a take signed in; `--headed` records in a visible window.
+- **Take reports** — every take prints size, format, per-beat timing and page errors; the take manifest records them.
+- **Hide before the first frame** — a storyboard's `export const hide = [...]` or `setup()` runs before recording starts, so private elements never reach frame 0.
+- **`capture serve <dir>`** — serves a local folder on 127.0.0.1 for exploring a page before writing its storyboard.
+
+### Changed
+
+- **Breaking: `beat(id, fn?)` replaces `say()` and `waitForVoice()`** — caption and narration text live once in `script.md` or the spine; unknown, out-of-order, repeated, nested or uncalled beats stop the take with a one-line fix.
+- **Breaking: `capture` needs a beat source** — exactly one of `--script`, `--spine` or `--plates/--plate`.
+- **Breaking: `--out` is the MP4 deliverable** — with audio and the preset's encode; `--mp4` and `.webm`/`.mkv` takes are removed. Live plates stay picture-only.
+- **Live plates run their plate's beat** — `capture --plates --plate <id>` plays the beat named by the plate, not a time window.
+- **`setup.sh` also installs Playwright's Chromium** (about 380 MB) for `signin` and `--headed`; recording stays on the headless shell.
+- **`check-take` ignores captions and the cursor** — the caption band is masked and the threshold scales with frame size, so narrated takes with captions pass at 1080p.
+
+### Fixed
+
+- **`contact-sheet` past the last video frame** — sample times are clamped to the video stream, so audio longer than the picture no longer fails.
+
 ## [0.1.0] — 2026-11-10
 
 ### Added

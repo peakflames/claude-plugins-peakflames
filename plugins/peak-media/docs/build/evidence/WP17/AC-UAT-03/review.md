@@ -1,6 +1,6 @@
 # AC-UAT-03 — fresh reviewer verdict
 
-Reviewer: fresh general-purpose subagent, given only `contact-sheet.jpg` (1 s sheet, 1280 px frames, 2 cols; made with `--at 0s..21s,21.7s`, see `contact-sheet.note.txt`) and the case's Then clause.
+Reviewer: fresh general-purpose subagent, given only `contact-sheet.jpg` (1 s sheet, 1280 px frames, 2 cols; made with `--at 0s..21s,21.7s`, see `contact-sheet.note.md`) and the case's Then clause.
 
 1 PASS: The three slides appear in order. Slide 1/3, "Water in the morning", runs from 00.00 to 06.00. Slide 2/3, "Less is lost", runs from 07.00 to 14.00. Slide 3/3, "Aim at the roots", runs from 15.00 to 21.70. That makes two slide changes. 15.00 catches a crossfade mid-way, with slide 2's "WHY MORNINGS" and "Dry leaves by noon" ghosting under slide 3. That is one transition, not an extra cut. Between those changes the slide content stays the same in every frame.
 
