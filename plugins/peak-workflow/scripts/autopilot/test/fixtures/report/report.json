@@ -969,6 +969,7 @@
       "low": 1
     }
   },
+  "workInProject": null,
   "next": [
     "Answer 2 waiting questions: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)",
     "Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.",

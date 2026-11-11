@@ -228,8 +228,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 3. **Check it started:** wait three seconds, then `cat "<launch.workspace>/lock"` and
    `tail -n 5 "<launch.runDir>/autopilot.log"`. A `lock` file (JSON with a `pid`) means it is running.
    If there is no lock but the log tail has a `run ended:` line, the run already finished (a
-   short queue, or a red base): say so, point to `/peak-workflow:autopilot report`, and stop —
-   skip item 4. If there
+   short queue, or a red base): say so in one line, skip item 4, and **go straight on to
+   Step 4 (Report) in this session** — present the report and ask any waiting question now,
+   rather than telling the owner to run `/peak-workflow:autopilot report`. Step 4 item 1's
+   preflight is still run: it names the run that just ended. If there
    is no lock and no such line, show the log tail — it holds the reason — and stop; do not retry
    blindly.
 
@@ -338,8 +340,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       so, and that continuing by hand is then the way forward.
 
 6. **Bring the work in.** Only when `launch.sync.state` from item 1 is `clone-ahead` (when it is
-   `same`, say the merged work is already in `<integration>` and ignore any fetch line in the
-   report's list). Print — do not run:
+   `same`, say the merged work is already in `<integration>`; the report's own list says so too). Print — do not run:
 
    ```bash
    git fetch "<ws>/clone" <integration>:autopilot/<integration> && git log <integration>..autopilot/<integration>

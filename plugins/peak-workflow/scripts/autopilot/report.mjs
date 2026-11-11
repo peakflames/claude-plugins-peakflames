@@ -1,6 +1,7 @@
 // Autopilot morning report (autopilot-poc-plan.md §6.9). `collectReport` reads a run directory
 // and returns the data written as report.json; `renderReport` turns that data into report.md.
 // Both are pure with respect to the run: they read files and never touch the clone.
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gateEntry } from './lib.mjs';
@@ -109,6 +110,10 @@ export function collectReport(runDir) {
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null,
     driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
+  // Is the clone's integration tip already in the project? (null: cannot tell — no project, no clone.) Read-only.
+  const git = (cwd, ...args) => { try { return spawnSync('git', args, { cwd, encoding: 'utf8' }); } catch { return { status: 1, stdout: '' }; } };
+  const cloneTip = fs.existsSync(clone) ? (git(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${s.integration}`).stdout ?? '').trim() : '';
+  report.workInProject = cloneTip && config.project && fs.existsSync(config.project) ? git(config.project, 'merge-base', '--is-ancestor', cloneTip, s.integration).status === 0 : null;
   report.next = nextSteps(report);
   report.tldr = tldr(report);
   return report;
@@ -129,7 +134,9 @@ function tldr(r) {
   const T = [];
   T.push(r.epics.length ? `Autopilot worked through ${plural(r.epics.length, 'epic')} (an epic is one planned piece of work): ${parts.join(', ') || 'none was started'}.` : 'Autopilot had nothing to work on: the queue was empty.');
   T.push(merged
-    ? `The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; you bring the work in yourself with one command (under "Do this next").`
+    ? (r.workInProject === true
+      ? `The finished work is already in your project: you brought it in from autopilot's private copy.`
+      : `The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; you bring the work in yourself with one command (under "Do this next").`)
     : 'Nothing in your project has changed. Autopilot works in its own private copy and never writes to your project.');
   if (open) T.push(`${plural(open, 'question')} only you can answer ${open === 1 ? 'is' : 'are'} waiting. Run \`/peak-workflow:autopilot report\` and it asks you each one; the work then continues from where it stopped in the next run.`);
   if (r.baseRed) T.push(`Nothing was built, because your project's own tests were already failing before autopilot started.`);
@@ -177,7 +184,8 @@ function nextSteps(r) {
   if (by('FAILED').length) next.push(`Read why ${plural(by('FAILED').length, 'epic')} failed verification (${ids(by('FAILED'))}); its branch is kept in the clone.`);
   const waiting = r.sync?.state === 'clone-ahead' ? r.sync.waiting : [];
   const fetch = `git fetch "${r.clone}" ${r.integration}:autopilot/${r.integration} && git log ${r.integration}..autopilot/${r.integration}`;
-  if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}${waiting.length ? `, and ${plural(waiting.length, 'commit')} from earlier runs still waiting in the clone` : ''}):\n   ${fetch}`);
+  if (r.workInProject === true) { if (by('MERGED').length) next.push(`The merged work (${ids(by('MERGED'))}) is already in your project's \`${r.integration}\`: nothing to bring in.`); }
+  else if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}${waiting.length ? `, and ${plural(waiting.length, 'commit')} from earlier runs still waiting in the clone` : ''}):\n   ${fetch}`);
   else if (waiting.length) next.push(`Bring in the work earlier runs merged, still waiting in the clone (${plural(waiting.length, 'commit')}):\n   ${fetch}`);
   if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into \`${r.integration}\`.`);
   if (r.referee.testChanges.length) next.push(`Read the recorded reason for ${plural(r.referee.testChanges.length, 'changed existing test')} (under "Per epic").`);

@@ -26,7 +26,15 @@ test('sync, P == C: nothing moves; the clone is reused as it is', async (t) => {
   const e2 = addEpic(p.project, E2);
   p.scenario({ ...happy(E1), ...happy(e2) });
   await p.go({ queue: [E1.id] });
+  assert.equal(readJson(path.join(p.runDir(), 'report.json')).workInProject, false);
   ownerFetches(p);
+  // Once the work is in the project, a re-rendered report stops telling the owner to fetch it.
+  assert.equal(cli('report', '--workspace', p.state).status, 0);
+  const after = readJson(path.join(p.runDir(), 'report.json'));
+  assert.equal(after.workInProject, true);
+  assert.ok(!after.next.some((n) => n.includes('git fetch')), after.next.join('\n'));
+  assert.match(after.next.join('\n'), /The merged work \(Lg1Csv7\) is already in your project's `develop`: nothing to bring in\./);
+  assert.match(after.tldr.join('\n'), /The finished work is already in your project/);
   const c = tip(p.clone);
   assert.deepEqual([preflight(p).launch.sync.state, tip(p.project)], ['same', c]);
 
