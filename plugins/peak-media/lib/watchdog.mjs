@@ -37,6 +37,20 @@ export function killTree(pid, platform = process.platform) {
   }
 }
 
+/**
+ * Delete dir, retrying for up to ms: on win32 a just-killed process releases its open files a moment
+ * after it ends, and until then the folder can't be removed. Returns true when it is gone.
+ */
+export function removeDir(dir, ms = 0) {
+  const end = Date.now() + ms;
+  for (;;) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* still held */ }
+    if (!existsSync(dir)) return true;
+    if (Date.now() >= end) return false;
+    nap(100);
+  }
+}
+
 /** Read an env var case-insensitively (Windows keeps `Path`, not `PATH`, in a copied env). */
 function envVar(env, name) {
   const key = Object.keys(env).find((k) => k.toUpperCase() === name);
@@ -95,6 +109,6 @@ export function runWatched(bin, args = [], { cwd, env, input, timeoutMs = 10 * 6
     const status = Number(readFileSync(f('status'), 'utf8').trim());
     return { status, stdout, stderr, timedOut: false };
   } finally {
-    try { rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* a killed step may still hold a file (win32) */ }
+    removeDir(dir, process.platform === 'win32' ? 5000 : 0); // win32: a killed step may still hold a file
   }
 }

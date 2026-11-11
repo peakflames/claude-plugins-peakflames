@@ -30,7 +30,7 @@ export function tmpDir(prefix = 'pm-') {
 export function run(script, args = [], opts = {}) {
   const pre = opts.network ? [] : ['--import', pathToFileURL(path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')).href];
   const t0 = Date.now();
-  const [bin, argv] = [process.execPath, [...pre, path.join(ROOT, script), ...args]];
+  const [bin, argv] = [process.execPath, [...pre, path.resolve(ROOT, script), ...args]]; // script: relative to ROOT, or absolute
   // per-step watchdog (lib/watchdog.mjs): a hung step fails its test in one line instead of hanging the suite
   const limit = (Number(process.env.PEAK_MEDIA_EVAL_STEP_TIMEOUT_S) || 0) * 1000 || opts.timeoutMs || 30 * 60_000;
   const r = runWatched(bin, argv, { cwd: opts.cwd ?? ROOT, env: { ...process.env, ...opts.env }, timeoutMs: limit });

@@ -192,7 +192,7 @@ test('watchdog: a hung HyperFrames step and a hung eval step are stopped with th
   // the eval helper's own per-step watchdog: a script that never exits fails its step in one line
   const hang = path.join(dir, 'hang.mjs');
   writeFileSync(hang, 'setInterval(() => {}, 1000);\n');
-  const h = run(path.relative(ROOT, hang), [], { timeoutMs: 1500 });
+  const h = run(hang, [], { timeoutMs: 1500 }); // absolute: tmp may be on another drive than ROOT (win32)
   assert.equal(h.timedOut, true);
   assert.equal(h.code, null);
   assert.match(h.stderr, /eval step timed out after 1\.5 s: /);

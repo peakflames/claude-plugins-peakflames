@@ -8,9 +8,9 @@
 //
 // argv: <status file> <stdin file|''> <stdout file> <stderr file> <temp folder> <parent pid> <bin> [args...]
 import { spawn } from 'node:child_process';
-import { openSync, closeSync, writeFileSync, renameSync, rmSync } from 'node:fs';
+import { openSync, closeSync, writeFileSync, renameSync } from 'node:fs';
 import os from 'node:os';
-import { killTree } from './watchdog.mjs';
+import { killTree, removeDir } from './watchdog.mjs';
 
 const [statusFile, inFile, outFile, errFile, dir, ppidArg, bin, ...args] = process.argv.slice(2);
 const ppid = Number(ppidArg);
@@ -34,19 +34,27 @@ function finish(status) {
 }
 
 const child = spawn(bin, args, { stdio: fds, windowsHide: true });
+const exited = new Promise((resolve) => child.once('exit', resolve).once('error', resolve));
 child.on('error', (e) => finish(e.code === 'ENOENT' ? 127 : 126));
 child.on('exit', (code, signal) => finish(code ?? 128 + (os.constants.signals[signal] ?? 0)));
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
-const watch = setInterval(() => {
+const watch = setInterval(async () => {
   if (alive(ppid)) return;
   done = true;
   clearInterval(watch);
   closeFds();
-  // win32: the step's tree, by parent pid. POSIX: this wrapper leads the step's process group,
-  // so the group goes down after the cleanup, this wrapper included.
-  if (process.platform === 'win32' && child.pid) killTree(child.pid);
-  try { rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* best effort */ }
-  if (process.platform !== 'win32') killTree(process.pid);
+  if (process.platform === 'win32') {
+    // the step's tree, by parent pid; then wait for it to end so its files are released
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
+      killTree(child.pid);
+      await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);
+    }
+    removeDir(dir, 10_000);
+  } else {
+    // this wrapper leads the step's process group: clean up, then take the group down, itself included
+    removeDir(dir);
+    killTree(process.pid);
+  }
   process.exit(1);
 }, 1000);
