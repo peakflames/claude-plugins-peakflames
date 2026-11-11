@@ -19,11 +19,12 @@ const opts = { skip: LIVE ? false : 'set AUTOPILOT_LIVE=1 to run the real audito
 /** Builds the bundle and launches the auditor exactly as the driver's AUDIT step does. */
 async function audit(t, variant) {
   const c = cannedBuild(t, variant);
-  const stepDir = path.join(c.state, 'epics', E1.id, 'audit-1');
+  const runDir = c.mockRun();
+  const stepDir = path.join(runDir, 'epics', E1.id, 'audit-1');
   c.bundle(stepDir);
   fs.writeFileSync(path.join(stepDir, 'settings.json'), JSON.stringify(sessionSettings()));
   const config = { ...defaultConfig(c.project), claudeBin: 'claude' };
-  const cmd = sessionCommand(config, { kind: 'audit', epicId: E1.id, stateDir: c.state, stepDir, sessionId: randomUUID() });
+  const cmd = sessionCommand(config, { kind: 'audit', epicId: E1.id, workspace: c.state, runDir, stepDir, sessionId: randomUUID() });
   const env = { ...process.env, ...cmd.env };
   delete env.NODE_TEST_CONTEXT;
   const child = spawn(cmd.bin, cmd.args, { cwd: cmd.cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -68,21 +69,21 @@ test('live auditor through the driver: the AUDIT step launches real `claude -p`,
   const bin = path.join(p.tmp, 'claude-mixed');
   const wrapper = ['#!/bin/sh', 'if [ "$AUTOPILOT_ROLE" = "auditor" ]; then exec claude "$@"; fi', `exec "${process.execPath}" "${FAKE}" "$@"`, ''].join('\n');
   fs.writeFileSync(bin, wrapper, { mode: 0o755 });
-  fs.writeFileSync(path.join(p.state, 'config.json'), JSON.stringify({ ...readJson(path.join(p.state, 'config.json')), claudeBin: bin }));
+  fs.writeFileSync(path.join(p.state, 'settings.json'), JSON.stringify({ ...readJson(path.join(p.state, 'settings.json')), claudeBin: bin }));
   p.scenario(happy(E1));
 
-  await run({ stateDir: p.state });
+  await p.go(); // the wrapper is a test double for every role but the auditor
 
   const e = p.epic(E1.id);
   const session = e.sessions.find((s) => s.name === 'audit-1');
   t.diagnostic(`audit-1: ${session?.outcome} (${session?.why}), $${session?.costUsd}, ${session?.turns} turns; epic ${e.state} — ${e.reason}`);
   assert.equal(session?.outcome, 'ok', `the driver could not read the real auditor's result: ${session?.why}`);
   assert.ok(session.costUsd > 0, 'a real session was paid for');
-  const audit = readJson(path.join(p.state, 'epics', E1.id, 'audit-1', 'audit.json'));
+  const audit = readJson(p.dir(E1.id, 'audit-1', 'audit.json'));
   t.diagnostic(`decision ${audit.decision}, recommend ${audit.recommend}: ${audit.findings.map((f) => `${f.id} ${f.severity} ${f.category}`).join('; ') || 'no findings'}`);
   assert.ok(Array.isArray(audit.findings) && ['park', 'proceed'].includes(audit.decision));
   assert.ok(!/no usable result|could not start|infra/.test(e.reason ?? ''), e.reason);
   assert.equal(e.state, audit.decision === 'park' ? 'PARKED' : 'MERGED');
-  const lines = fs.readFileSync(path.join(p.state, 'epics', E1.id, 'audit-1', 'stream.jsonl'), 'utf8').trim().split('\n').length;
+  const lines = fs.readFileSync(p.dir(E1.id, 'audit-1', 'stream.jsonl'), 'utf8').trim().split('\n').length;
   t.diagnostic(`real --output-format json printed ${lines} line(s)`);
 });

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PLUGIN_DIR } from '../driver.mjs';
+import { PLUGIN_DIR, run } from '../driver.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DRIVER = path.resolve(HERE, '..', 'driver.mjs');
@@ -27,7 +27,10 @@ process.on('exit', () => fs.rmSync(gitHome, { recursive: true, force: true }));
 export const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 export const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
-/** A fresh repo from the ledger seed (main + develop, no remote) and an empty state directory beside it. */
+/**
+ * A fresh repo from the ledger seed (main + develop, no remote) and a workspace beside it whose
+ * settings.json names the test double. `p.state` is the workspace; `p.runDir()` the latest run.
+ */
 export function makeProject(t, { config = {} } = {}) {
   const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-test-')));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -39,7 +42,7 @@ export function makeProject(t, { config = {} } = {}) {
   git(project, 'commit', '-q', '-m', 'seed');
   git(project, 'checkout', '-q', '-b', 'develop');
   fs.mkdirSync(state);
-  fs.writeFileSync(path.join(state, 'config.json'), JSON.stringify({
+  fs.writeFileSync(path.join(state, 'settings.json'), JSON.stringify({
     project, claudeBin: FAKE, endBy: null, diskFloorGb: 0,
     timing: { pollMs: 100, killGraceMs: 300, infraRetryMs: 0 }, ...config,
   }));
@@ -49,7 +52,20 @@ export function makeProject(t, { config = {} } = {}) {
   p.scenario = (s) => fs.writeFileSync(p.scenarioFile, JSON.stringify(s));
   p.calls = () => (fs.existsSync(p.log) ? fs.readFileSync(p.log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
   p.steps = () => p.calls().map((c) => c.key);
-  p.epic = (id) => readJson(path.join(state, 'state.json')).queue.find((q) => q.id === id);
+  p.runName = () => fs.readFileSync(path.join(state, 'current'), 'utf8').trim();
+  p.runDir = () => path.join(state, 'runs', p.runName());
+  p.rel = () => `runs/${p.runName()}`; // as gate files and the report name paths
+  p.dir = (id, ...parts) => path.join(p.runDir(), 'epics', id, ...parts);
+  p.epic = (id) => readJson(path.join(p.runDir(), 'state.json')).queue.find((q) => q.id === id);
+  // A run directory laid out by hand, as the driver leaves it mid-run (for tests that launch no driver).
+  p.mockRun = (name = '20261111-220500') => {
+    const dir = path.join(state, 'runs', name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ integration: 'develop', queue: [{ id: E1.id, name: 'CSV import' }] }));
+    fs.writeFileSync(path.join(state, 'current'), `${name}\n`);
+    return dir;
+  };
+  p.go = (opts = {}) => run({ workspace: state, allowTestDouble: true, ...opts });
   return p;
 }
 

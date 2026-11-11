@@ -1,10 +1,12 @@
 {
   "run": "2026-11-13T06:05:00.000Z",
+  "name": "20261112-220500",
   "ended": "2026-11-13T12:41:00.000Z",
   "status": "DONE",
   "stoppedBecause": "queue done",
   "integration": "develop",
-  "clone": "<state>/clone",
+  "workspace": "<workspace>",
+  "clone": "<workspace>/clone",
   "startSha": "1111111111111111111111111111111111111111",
   "spentUsd": 41.2,
   "budgetUsd": 80,
@@ -17,10 +19,10 @@
       "label": "Lg1Csv7 (csv-import) — CSV import",
       "outcome": "MERGED",
       "reason": "verify PASS, merge gate green",
-      "evidence": "epics/Lg1Csv7/check-verify-1.json",
+      "evidence": "runs/20261112-220500/epics/Lg1Csv7/check-verify-1.json",
       "checks": [
         {
-          "file": "epics/Lg1Csv7/check-build-1.json",
+          "file": "runs/20261112-220500/epics/Lg1Csv7/check-build-1.json",
           "pass": true,
           "failed": [],
           "items": [
@@ -63,7 +65,7 @@
           ]
         },
         {
-          "file": "epics/Lg1Csv7/check-verify-1.json",
+          "file": "runs/20261112-220500/epics/Lg1Csv7/check-verify-1.json",
           "pass": true,
           "failed": [],
           "items": [
@@ -107,7 +109,7 @@
         "runs": [
           {
             "step": "audit-1",
-            "file": "epics/Lg1Csv7/audit-1/audit.json",
+            "file": "runs/20261112-220500/epics/Lg1Csv7/audit-1/audit.json",
             "delta": false,
             "base": "1111111",
             "tip": "2222222",
@@ -186,17 +188,17 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
-      "plan": "epics/Lg1Csv7/plan-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg1Csv7/plan-1/plan.md"
     },
     {
       "id": "Lg4Fx2q",
       "label": "Lg4Fx2q (currency) — Currency conversion",
       "outcome": "PARKED",
       "reason": "auditor: F1 stand-in, F2 test-weakened (audit-1)",
-      "evidence": "epics/Lg4Fx2q/audit-1/audit.json F1, F2",
+      "evidence": "runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json F1, F2",
       "checks": [
         {
-          "file": "epics/Lg4Fx2q/check-build-1.json",
+          "file": "runs/20261112-220500/epics/Lg4Fx2q/check-build-1.json",
           "pass": true,
           "failed": [],
           "items": [
@@ -274,7 +276,7 @@
         "runs": [
           {
             "step": "audit-1",
-            "file": "epics/Lg4Fx2q/audit-1/audit.json",
+            "file": "runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json",
             "delta": false,
             "base": "3333333",
             "tip": "4444444",
@@ -355,7 +357,7 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
-      "plan": "epics/Lg4Fx2q/plan-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg4Fx2q/plan-1/plan.md"
     },
     {
       "id": "Lg5Chr8",
@@ -365,7 +367,7 @@
       "evidence": "gates/Lg5Chr8-1.json",
       "checks": [
         {
-          "file": "epics/Lg5Chr8/check-build-1.json",
+          "file": "runs/20261112-220500/epics/Lg5Chr8/check-build-1.json",
           "pass": true,
           "failed": [],
           "items": [
@@ -415,7 +417,7 @@
         "runs": [
           {
             "step": "audit-1",
-            "file": "epics/Lg5Chr8/audit-1/audit.json",
+            "file": "runs/20261112-220500/epics/Lg5Chr8/audit-1/audit.json",
             "delta": false,
             "base": "5555555",
             "tip": "6666666",
@@ -471,17 +473,17 @@
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
-      "plan": "epics/Lg5Chr8/plan-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg5Chr8/plan-1/plan.md"
     },
     {
       "id": "Lg3Sum9",
       "label": "Lg3Sum9 (monthly-summary) — Monthly summary",
       "outcome": "FAILED",
       "reason": "verify-2 FAIL after the fix round: TOR-03-Jm2Wq8z totals test fails (test/summary.test.js:41)",
-      "evidence": "epics/Lg3Sum9/verify-2/result.json",
+      "evidence": "runs/20261112-220500/epics/Lg3Sum9/verify-2/result.json",
       "checks": [
         {
-          "file": "epics/Lg3Sum9/check-build-1.json",
+          "file": "runs/20261112-220500/epics/Lg3Sum9/check-build-1.json",
           "pass": true,
           "failed": [],
           "items": [
@@ -524,7 +526,7 @@
           ]
         },
         {
-          "file": "epics/Lg3Sum9/check-build-2.json",
+          "file": "runs/20261112-220500/epics/Lg3Sum9/check-build-2.json",
           "pass": true,
           "failed": [],
           "items": [
@@ -584,7 +586,7 @@
         "runs": [
           {
             "step": "audit-1",
-            "file": "epics/Lg3Sum9/audit-1/audit.json",
+            "file": "runs/20261112-220500/epics/Lg3Sum9/audit-1/audit.json",
             "delta": false,
             "base": "7777777",
             "tip": "8888888",
@@ -594,7 +596,7 @@
           },
           {
             "step": "audit-2",
-            "file": "epics/Lg3Sum9/audit-2/audit.json",
+            "file": "runs/20261112-220500/epics/Lg3Sum9/audit-2/audit.json",
             "delta": true,
             "base": "8888888",
             "tip": "9999999",
@@ -712,7 +714,7 @@
       "rejected": [],
       "fixRounds": 1,
       "planApprovedBy": "lint, not a person",
-      "plan": "epics/Lg3Sum9/plan-fix-1/plan.md"
+      "plan": "runs/20261112-220500/epics/Lg3Sum9/plan-fix-1/plan.md"
     },
     {
       "id": "Lg6Bud2",
@@ -805,13 +807,14 @@
       "tor": null,
       "why": "a high finding in a park category; the auditor only advises, so a person judges it",
       "artifacts": [
-        "epics/Lg4Fx2q/audit-1/audit.json",
-        "epics/Lg4Fx2q/audit-1/bundle/diff.patch"
+        "runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json",
+        "runs/20261112-220500/epics/Lg4Fx2q/audit-1/bundle/diff.patch"
       ],
       "branch": "feature/epic-Lg4Fx2q-currency",
       "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built",
       "decided": null,
-      "carried": null,
+      "run": "20261112-220500",
+      "fromEarlierRun": false,
       "effect": "by-hand"
     },
     {
@@ -837,7 +840,8 @@
         "date": "2026-11-13",
         "scope": "next-run"
       },
-      "carried": null,
+      "run": "20261112-220500",
+      "fromEarlierRun": false,
       "effect": "by-hand"
     },
     {
@@ -859,7 +863,8 @@
       "branch": "feature/epic-Lg6Bud2-budgets",
       "resume": "open a new session in the fetched repo: /peak-workflow:start-epic Lg6Bud2",
       "decided": null,
-      "carried": null,
+      "run": "20261112-220500",
+      "fromEarlierRun": false,
       "effect": "by-hand"
     }
   ],
@@ -913,7 +918,7 @@
     "Decide 2 parked gates: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)",
     "Carry on by hand where you decided a gate (Lg5Chr8): the command is under \"Per epic\".",
     "Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.",
-    "Review and bring in the merged work (Lg1Csv7):\n   git fetch \"<state>/clone\" develop:autopilot/develop && git log develop..autopilot/develop",
+    "Review and bring in the merged work (Lg1Csv7):\n   git fetch \"<workspace>/clone\" develop:autopilot/develop && git log develop..autopilot/develop",
     "Read the recorded reason for 1 changed existing test (under \"Per epic\").",
     "1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has."
   ]

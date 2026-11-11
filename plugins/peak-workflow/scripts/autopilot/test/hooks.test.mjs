@@ -14,16 +14,16 @@ const UID = process.getuid();
 const Q_START = `Start Epic ${E1.id} (${E1.slug}) — CSV import? Phase 1 — Core, planned by Todd Schavey on 2026-11-11`;
 const START_OPTS = ['Start it', 'Show me the ready epics instead', 'Stop'];
 
-/** A state directory as the driver leaves it mid-run: private clone, state.json, one step directory. */
+/** A workspace as the driver leaves it mid-run: private clone, a run with state.json, one step directory. */
 function referee(t, { role = 'builder', branch = E1.branch, config = {} } = {}) {
   const p = makeProject(t, { config });
   git(p.project, 'clone', '-q', '--no-hardlinks', '--branch', 'develop', p.project, p.clone);
   git(p.clone, 'remote', 'remove', 'origin');
   if (branch !== 'develop') git(p.clone, 'checkout', '-q', '-b', branch);
-  fs.writeFileSync(path.join(p.state, 'state.json'), JSON.stringify({ integration: 'develop', queue: [{ id: E1.id, name: 'CSV import' }] }));
-  const step = path.join(p.state, 'epics', E1.id, `${role === 'planner' ? 'plan' : role === 'verifier' ? 'verify' : 'build'}-1`);
+  const runDir = p.mockRun();
+  const step = path.join(runDir, 'epics', E1.id, `${role === 'planner' ? 'plan' : role === 'verifier' ? 'verify' : 'build'}-1`);
   fs.mkdirSync(step, { recursive: true });
-  const env = { ...process.env, AUTOPILOT_STATE: p.state, AUTOPILOT_STEP: step, AUTOPILOT_ROLE: role, AUTOPILOT_EPIC: E1.id };
+  const env = { ...process.env, AUTOPILOT_STATE: p.state, AUTOPILOT_RUN: runDir, AUTOPILOT_STEP: step, AUTOPILOT_ROLE: role, AUTOPILOT_EPIC: E1.id };
   const run = (hook, input, extraEnv = {}) => {
     const r = spawnSync(process.execPath, [path.join(HOOKS, hook)], { input: typeof input === 'string' ? input : JSON.stringify({ session_id: 's', cwd: p.clone, permission_mode: 'acceptEdits', ...input }), encoding: 'utf8', env: { ...env, ...extraEnv } });
     return { code: r.status, out: r.stdout ? JSON.parse(r.stdout) : null, stderr: r.stderr };
@@ -32,7 +32,7 @@ function referee(t, { role = 'builder', branch = E1.branch, config = {} } = {}) 
   const bash = (command, extraEnv) => pre('Bash', { command }, extraEnv);
   const ask = (question, options, extraEnv) => pre('AskUserQuestion', { questions: [{ question, header: 'Gate', multiSelect: false, options: options.map((label) => ({ label, description: '' })) }] }, extraEnv);
   const hooksLog = () => fs.readFileSync(path.join(step, 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-  return { ...p, step, run, pre, bash, ask, hooksLog, gate: (n) => readJson(path.join(p.state, 'gates', `${E1.id}-${n}.json`)) };
+  return { ...p, runDir, step, run, pre, bash, ask, hooksLog, gate: (n) => readJson(path.join(p.state, 'gates', `${E1.id}-${n}.json`)) };
 }
 
 const passes = (r, msg) => { assert.equal(r.code, 0, msg); assert.equal(r.out, null, `${msg}: expected no opinion, got ${JSON.stringify(r.out)}`); };
@@ -69,8 +69,8 @@ test('R2 path jail: file tools stay in the clone; state, home and system files a
   passes(h.pre('Write', { file_path: path.join(h.clone, 'src', 'new.js'), content: 'x' }), 'write in clone');
   passes(h.pre('Grep', { pattern: 'x' }), 'grep with no path');
   denied(h.pre('Read', { file_path: '/etc/hosts' }), 'R2', /outside the private clone/);
-  denied(h.pre('Read', { file_path: path.join(h.state, 'state.json') }), 'R2', /state directory/);
-  denied(h.pre('Write', { file_path: path.join(h.state, 'config.json'), content: '{}' }), 'R2', /state directory/);
+  denied(h.pre('Read', { file_path: path.join(h.runDir, 'state.json') }), 'R2', /autopilot workspace/);
+  denied(h.pre('Write', { file_path: path.join(h.state, 'settings.json'), content: '{}' }), 'R2', /autopilot workspace/);
   denied(h.pre('Edit', { file_path: path.join(h.state, 'gates', 'x.json'), old_string: 'a', new_string: 'b' }), 'R2');
   denied(h.pre('Read', { file_path: path.join(h.project, 'README.md') }), 'R2', /outside the private clone/);
   denied(h.pre('Glob', { pattern: '**/*', path: os.homedir() }), 'R2');
@@ -105,11 +105,12 @@ test('R2 path jail: Bash absolute paths, cd targets and git -C are checked (best
   passes(h.bash('curl -s https://example.com/x'), 'a URL is not a path');
   denied(h.bash('cd /tmp && ls'), 'R2', /cd target/);
   denied(h.bash('git -C ../x commit -m y'), 'R2', /git target/);
-  denied(h.bash('cat ../state.json'), 'R2', /state directory/);
-  denied(h.bash(`cat ${h.state}/config.json`), 'R2');
+  denied(h.bash('cat ../settings.json'), 'R2', /autopilot workspace/);
+  denied(h.bash(`cat ${h.runDir}/config.json`), 'R2');
   denied(h.bash('ls ~/Documents'), 'R2');
   denied(h.bash('cat "$HOME/.ssh/id_rsa"'), 'R2');
   denied(h.bash('ls "$AUTOPILOT_STATE/gates"'), 'R2', /may not name/);
+  denied(h.bash('cat "$AUTOPILOT_RUN/state.json"'), 'R2', /may not name/);
   denied(h.bash(`echo hi > ${h.project}/x.txt`), 'R2');
 });
 
@@ -118,7 +119,8 @@ test('R2 auditor: reads the bundle and the clone, and nothing else is allowed', 
   fs.mkdirSync(path.join(h.step, 'bundle'));
   passes(h.pre('Read', { file_path: path.join(h.step, 'bundle', 'diff.patch') }), 'bundle');
   passes(h.pre('Grep', { pattern: 'x', path: h.clone }), 'clone');
-  denied(h.pre('Read', { file_path: path.join(h.state, 'state.json') }), 'R2');
+  denied(h.pre('Read', { file_path: path.join(h.runDir, 'state.json') }), 'R2');
+  denied(h.pre('Read', { file_path: path.join(h.runDir, 'epics', E1.id, 'build-1', 'hooks.jsonl') }), 'R2'); // another step of the same run
   denied(h.pre('Write', { file_path: path.join(h.clone, 'x.txt'), content: 'x' }), 'R2', /only reads/);
   denied(h.bash('ls'), 'R2', /only reads/);
 });
@@ -289,8 +291,28 @@ test('R8 a gate a person decided is answered with their answer, once, for that k
   fs.writeFileSync(file, JSON.stringify({ ...readJson(file), decided: { answer: 'Fix now', by: 'Todd', date: '2026-11-12', scope: 'next-run' } }));
   parked(h.ask(q.replace(E1.tors[1], E1.tors[2]), opts)); // another TOR: not covered
   answered(h.ask(q, opts), q, 'Fix now');
-  assert.equal(readJson(file).decided.used.session, 'build-1');
+  assert.deepEqual([readJson(file).decided.used.run, readJson(file).decided.used.session], [path.basename(h.runDir), 'build-1']);
   parked(h.ask(q, opts)); // and only once
+});
+
+test('workspace layout: the jail covers everything but clone/, in this run and every other; hooks read the current run', (t) => {
+  const h = referee(t, { config: { diskFloorGb: 0 } });
+  const older = path.join(h.state, 'runs', '20261110-220500');
+  fs.mkdirSync(path.join(older, 'epics', E1.id, 'build-1'), { recursive: true });
+  fs.writeFileSync(path.join(older, 'report.md'), 'an earlier run');
+  for (const f of [path.join(older, 'report.md'), path.join(older, 'epics', E1.id, 'build-1', 'stream.jsonl'), path.join(h.runDir, 'autopilot.log'), path.join(h.step, 'plan.md'), path.join(h.state, 'current'), path.join(h.state, 'lock'), path.join(h.state, 'gates', `${E1.id}-1.json`)]) {
+    denied(h.pre('Read', { file_path: f }), 'R2', /autopilot workspace/, f);
+    denied(h.pre('Write', { file_path: f, content: 'x' }), 'R2', /autopilot workspace/, f);
+    denied(h.bash(`cat ${f}`), 'R2', undefined, f);
+  }
+  denied(h.pre('Glob', { pattern: '**/*.json', path: path.join(h.state, 'runs') }), 'R2');
+  denied(h.bash('ls ../runs ../gates'), 'R2');
+  passes(h.pre('Read', { file_path: path.join(h.state, 'clone', 'README.md') }), 'the clone is the one way in');
+
+  // The run is found from AUTOPILOT_RUN, or from the workspace's `current` file without it.
+  fs.writeFileSync(path.join(h.runDir, 'state.json'), JSON.stringify({ integration: 'develop', queue: [{ id: E1.id, name: 'CSV import (from state.json)' }] }));
+  parked(h.ask('Which colour?', ['Red', 'Blue'], { AUTOPILOT_RUN: '' }));
+  assert.deepEqual([h.gate(1).epicName, h.gate(1).run], ['CSV import (from state.json)', path.basename(h.runDir)]);
 });
 
 test('R9 planner: ExitPlanMode saves and lints the plan, then ends the session', (t) => {
@@ -312,7 +334,7 @@ test('R9 planner: a plan missing a TOR ID or a closing step parks with the plan 
   denied(r, 'R9', new RegExp(`plan lint failed: does not name anchor ${E1.tors[0]}; missing "Reconcile spec"`));
   assert.equal(r.out.stopReason, 'autopilot: parked at human gate');
   assert.equal(h.gate(1).kind, 'plan-lint');
-  assert.deepEqual(h.gate(1).artifacts, [`epics/${E1.id}/plan-1/plan.md`]);
+  assert.deepEqual(h.gate(1).artifacts, [`runs/${path.basename(h.runDir)}/epics/${E1.id}/plan-1/plan.md`]);
   assert.equal(readJson(path.join(h.step, 'plan-lint.json')).pass, false);
   denied(h.pre('ExitPlanMode', {}), 'R9', /no plan text/);
 });

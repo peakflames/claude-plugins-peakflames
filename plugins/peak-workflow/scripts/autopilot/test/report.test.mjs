@@ -1,5 +1,5 @@
-// Morning report (autopilot-poc-plan.md §6.9, §10 P3): golden-file rendering from a fixture state
-// directory. Regenerate after an intended change with:
+// Morning report (autopilot-poc-plan.md §6.9, §10 P3): golden-file rendering from a fixture
+// workspace (`fixtures/report/state/`: gates/, current, runs/<run>/). Regenerate after an intended change with:
 //   UPDATE_GOLDEN=1 node --test plugins/peak-workflow/scripts/autopilot/test/report.test.mjs
 process.env.TZ = 'UTC'; // the report prints local times; the golden file is written in UTC
 import assert from 'node:assert/strict';
@@ -14,8 +14,10 @@ import { DRIVER, readJson } from './helpers.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(HERE, 'fixtures', 'report');
-const STATE = path.join(FIXTURE, 'state');
-const scrub = (text, dir = STATE) => text.replaceAll(dir, '<state>');
+const STATE = path.join(FIXTURE, 'state'); // the workspace
+const RUN = '20261112-220500';
+const runDir = (ws = STATE) => path.join(ws, 'runs', RUN);
+const scrub = (text, dir = STATE) => text.replaceAll(dir, '<workspace>');
 
 function golden(name, actual) {
   const file = path.join(FIXTURE, name);
@@ -24,15 +26,15 @@ function golden(name, actual) {
 }
 
 test('report.md and report.json render from a fixture state.json exactly as the golden files', () => {
-  const report = collectReport(STATE);
+  const report = collectReport(runDir());
   golden('report.md', scrub(renderReport(report)));
   golden('report.json', scrub(JSON.stringify(report, null, 2) + '\n'));
 });
 
 test('report data: outcomes, evidence, referee counts and next steps come from files, not from prose', () => {
-  const r = collectReport(STATE);
+  const r = collectReport(runDir());
   assert.deepEqual(r.epics.map((e) => e.outcome), ['MERGED', 'PARKED', 'PARKED', 'FAILED', 'PARKED', 'BLOCKED', 'SKIPPED']);
-  assert.equal(r.epics[1].evidence, 'epics/Lg4Fx2q/audit-1/audit.json F1, F2');
+  assert.equal(r.epics[1].evidence, 'runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json F1, F2');
   assert.deepEqual(r.epics[1].audit.findings.filter((f) => f.parks).map((f) => f.category), ['stand-in', 'test-weakened']);
   assert.deepEqual(r.referee.blocked.map((b) => b.rule), ['R7', 'R7', 'R4']);
   assert.equal(r.referee.gatesAnswered, 4);
@@ -50,11 +52,11 @@ test('a session that loaded a different plugin copy is flagged in the Referee se
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-report-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
   fs.cpSync(STATE, tmp, { recursive: true });
-  const file = path.join(tmp, 'epics', 'Lg1Csv7', 'verify-1', 'effective-setup.json');
+  const file = path.join(runDir(tmp), 'epics', 'Lg1Csv7', 'verify-1', 'effective-setup.json');
   const setup = readJson(file);
   setup.init.plugins[0].version = '1.10.0'; setup.init.plugins[0].source = 'peak-workflow@synced';
   fs.writeFileSync(file, JSON.stringify(setup));
-  assert.match(renderReport(collectReport(tmp)), /DIFFERS between sessions: .*Lg1Csv7\/verify-1: Claude Code 2\.1\.322, peak-workflow 1\.10\.0 \(peak-workflow@synced\)/);
+  assert.match(renderReport(collectReport(runDir(tmp))), /DIFFERS between sessions: .*Lg1Csv7\/verify-1: Claude Code 2\.1\.322, peak-workflow 1\.10\.0 \(peak-workflow@synced\)/);
 });
 
 test('decide records a person\'s answer in the §6.8 shape and re-renders the report; report re-renders on request', (t) => {
@@ -63,12 +65,12 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   fs.cpSync(STATE, tmp, { recursive: true });
   const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
 
-  let r = cli('report', '--state', tmp);
+  let r = cli('report', '--workspace', tmp);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(fs.readFileSync(path.join(tmp, 'report.md'), 'utf8'), /Decide 2 parked gates/);
+  assert.match(fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8'), /Decide 2 parked gates/);
 
   // An answer that is not one of the gate's options is refused: the driver never invents one.
-  r = cli('decide', '--state', tmp, '--gate', 'Lg6Bud2-1.json', '--answer', 'Quarterly', '--by', 'Pat Owner');
+  r = cli('decide', '--workspace', tmp, '--gate', 'Lg6Bud2-1.json', '--answer', 'Quarterly', '--by', 'Pat Owner');
   assert.equal(r.status, 2);
   assert.match(r.stderr, /not one of this gate's options: "Monthly", "Weekly", "Both"/);
   assert.equal(readJson(path.join(tmp, 'gates', 'Lg6Bud2-1.json')).decided, null);
@@ -84,7 +86,7 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   assert.equal(decided.by, 'Pat Owner');
   assert.match(decided.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(decided.scope, 'next-run');
-  const md = fs.readFileSync(path.join(tmp, 'report.md'), 'utf8');
+  const md = fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8');
   assert.match(md, /Decide 1 parked gate: `\/peak-workflow:autopilot report` \(Lg6Bud2\)/);
   assert.match(md, /decided "Real — fix before verify" by Pat Owner/);
 });

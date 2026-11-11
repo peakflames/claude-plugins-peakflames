@@ -34,7 +34,8 @@ export function decide(input, env = process.env) {
     const epic = env.AUTOPILOT_EPIC; const name = path.basename(step);
     const sidecar = parseSidecar(readText(path.join(state, 'clone', 'docs', 'implementation-plan', 'status', `epic-${epic}.md`)));
     const gates = path.join(state, 'gates');
-    const gated = fs.existsSync(gates) && fs.readdirSync(gates).some((f) => f.startsWith(`${epic}-`) && readJson(path.join(gates, f), {}).session === name);
+    const run = env.AUTOPILOT_RUN ? path.basename(env.AUTOPILOT_RUN) : null; // gates/ holds every run's gates
+    const gated = fs.existsSync(gates) && fs.readdirSync(gates).some((f) => { if (!f.startsWith(`${epic}-`)) return false; const g = readJson(path.join(gates, f), {}); return g.session === name && (!run || !g.run || g.run === run); });
     if (sidecar.fields.status !== 'Implemented' && !gated) {
       save({ ...memo, nudged: true });
       return { out: { decision: 'block', reason: 'finish the plan\'s closing steps (self-assessment, handoff, Mark as Implemented, Commit) or stop at a gate' }, log: { decision: 'block', reason: `sidecar status is ${sidecar.fields.status ?? 'missing'}, no gate written` } };

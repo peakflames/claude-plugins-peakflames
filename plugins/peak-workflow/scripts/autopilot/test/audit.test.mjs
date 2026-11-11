@@ -11,10 +11,10 @@ import { CATEGORIES, auditOutput, buildDigest, judgeAudit, validateAudit } from 
 import { cannedBuild } from './audit-canned.mjs';
 import { E1, git, happy, makeProject, planScript, readJson } from './helpers.mjs';
 
-const go = (p) => run({ stateDir: p.state });
+const go = (p) => p.go();
 const finding = (category, severity, extra = {}) => ({ category, severity, evidence: 'test/x.test.js:3', explanation: `a ${severity} ${category} finding for TOR-01-Hd3Yc8L`, ...extra });
 const auditScript = (findings, recommend = 'proceed') => ({ result: { total_cost_usd: 0.5, structured_output: { findings, recommend, summary: 'canned' } } });
-const dir = (p, ...parts) => path.join(p.state, 'epics', E1.id, ...parts);
+const dir = (p, ...parts) => p.dir(E1.id, ...parts);
 
 test('a high finding in a park category parks the epic before verify, with a gate and the evidence', async (t) => {
   const p = makeProject(t);
@@ -33,11 +33,11 @@ test('a high finding in a park category parks the epic before verify, with a gat
   assert.equal(gate.kind, 'audit');
   assert.equal(gate.session, 'audit-1');
   assert.deepEqual(gate.options, ['Real — fix before verify', 'Not real — verify as built']);
-  assert.deepEqual(gate.artifacts, [`epics/${E1.id}/audit-1/audit.json`, `epics/${E1.id}/audit-1/bundle/diff.patch`]);
+  assert.deepEqual(gate.artifacts, [`${p.rel()}/epics/${E1.id}/audit-1/audit.json`, `${p.rel()}/epics/${E1.id}/audit-1/bundle/diff.patch`]);
   assert.equal(gate.branchTip, git(p.clone, 'rev-parse', E1.branch)); // the build is kept on its branch
-  const report = readJson(path.join(p.state, 'report.json'));
-  assert.equal(report.epics[0].evidence, `epics/${E1.id}/audit-1/audit.json F1`);
-  assert.match(fs.readFileSync(path.join(p.state, 'report.md'), 'utf8'), /\| F1 \| high \| test-weakened \| yes \|/);
+  const report = readJson(path.join(p.runDir(), 'report.json'));
+  assert.equal(report.epics[0].evidence, `${p.rel()}/epics/${E1.id}/audit-1/audit.json F1`);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /\| F1 \| high \| test-weakened \| yes \|/);
 });
 
 test('the auditor is launched as plain `claude -p`, read-only, in its bundle; the bundle holds the six inputs', async (t) => {
@@ -80,7 +80,7 @@ test('the auditor is launched as plain `claude -p`, read-only, in its bundle; th
   // A clean audit proceeds to verify; the audit is in the state and the report.
   assert.equal(p.epic(E1.id).state, 'MERGED');
   assert.deepEqual(p.epic(E1.id).audits.map((a) => [a.step, a.delta, a.findings]), [['audit-1', false, 0]]);
-  assert.equal(readJson(path.join(p.state, 'report.json')).epics[0].audit.runs[0].file, `epics/${E1.id}/audit-1/audit.json`);
+  assert.equal(readJson(path.join(p.runDir(), 'report.json')).epics[0].audit.runs[0].file, `${p.rel()}/epics/${E1.id}/audit-1/audit.json`);
 });
 
 test('the driver decides, not the auditor: `recommend: park`, medium findings and a high finding outside parkOn all proceed', async (t) => {
@@ -95,7 +95,7 @@ test('the driver decides, not the auditor: `recommend: park`, medium findings an
   assert.equal(audit.decision, 'proceed');
   assert.ok(audit.findings.every((f) => !f.parks));
   assert.ok(!fs.existsSync(path.join(p.state, 'gates')));
-  assert.match(fs.readFileSync(path.join(p.state, 'report.md'), 'utf8'), /Auditor audit-1 \(the whole epic diff\): recommends park/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Auditor audit-1 \(the whole epic diff\): recommends park/);
 });
 
 test('config.audit.parkOn is the rule: a category added there parks, one removed does not', async (t) => {
@@ -151,7 +151,7 @@ test('the auditor session is read-only under the real referee hook, and may retu
     { do: 'tool', tool_name: 'Read', tool_input: { file_path: '{{step}}/bundle/diff.patch' } },
     { do: 'tool', tool_name: 'Grep', tool_input: { pattern: 'TOR-', path: '{{state}}/clone/test' } },
     { do: 'tool', tool_name: 'StructuredOutput', tool_input: { findings: [], recommend: 'proceed', summary: '' } },
-    { do: 'tool', tool_name: 'Read', tool_input: { file_path: '{{state}}/state.json' } },
+    { do: 'tool', tool_name: 'Read', tool_input: { file_path: '{{state}}/settings.json' } },
     { do: 'tool', tool_name: 'Write', tool_input: { file_path: '{{state}}/clone/src/x.js', content: 'x' } },
     { do: 'tool', tool_name: 'Bash', tool_input: { command: 'git commit -am x' } },
   ], ...auditScript([]) } });
@@ -211,7 +211,7 @@ test('the canned builds are what they claim: both pass their tests; only `widene
     const c = cannedBuild(t, variant);
     const tests = spawnSync(process.execPath, ['--test'], { cwd: c.clone, encoding: 'utf8', env: { ...process.env, NODE_TEST_CONTEXT: undefined } });
     assert.equal(tests.status, 0, `${variant}: ${tests.stdout}`);
-    const step = path.join(c.state, 'epics', E1.id, 'audit-1');
+    const step = path.join(c.mockRun(), 'epics', E1.id, 'audit-1');
     const meta = c.bundle(step);
     assert.equal(meta.digestCalls, variant === 'widened' ? 18 : 13);
     const diff = fs.readFileSync(path.join(step, 'bundle', 'diff.patch'), 'utf8');

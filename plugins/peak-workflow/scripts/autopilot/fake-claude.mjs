@@ -14,7 +14,7 @@
 //   script = { "actions": [ … ], "result": { …overrides… } | false, "exit": 0 }
 //
 // Actions run in order in the session's cwd (the private clone). Strings may use {{step}}
-// (the step directory), {{state}}, {{plugin}} and {{epic}}.
+// (the step directory), {{state}} (the workspace), {{plugin}} and {{epic}}.
 //   {do:"branch", name}                 create and check out, or check out if it exists
 //   {do:"checkout", name}
 //   {do:"write", path, content, append?}    {do:"rm", path}
@@ -47,7 +47,8 @@ const stepDir = settings ? path.dirname(settings) : process.cwd();
 const step = path.basename(stepDir);
 const kind = step.replace(/-\d+$/, '');
 const epic = process.env.AUTOPILOT_EPIC ?? path.basename(path.dirname(stepDir));
-const state = process.env.AUTOPILOT_STATE ?? path.resolve(stepDir, '..', '..', '..');
+const state = process.env.AUTOPILOT_STATE ?? path.resolve(stepDir, '..', '..', '..', '..', '..'); // the workspace
+const runName = path.basename(process.env.AUTOPILOT_RUN ?? path.resolve(stepDir, '..', '..', '..'));
 const plugin = flag('--plugin-dir') ?? '';
 const sessionId = flag('--session-id') ?? 'fake-session';
 const started = Date.now();
@@ -97,7 +98,7 @@ async function act(a) {
       const dir = path.join(state, 'gates');
       fs.mkdirSync(dir, { recursive: true });
       const n = fs.readdirSync(dir).filter((f) => f.startsWith(`${epic}-`)).length + 1;
-      fs.writeFileSync(path.join(dir, `${epic}-${n}.json`), JSON.stringify({ epic, session: step, decided: null, ...a.gate }, null, 2));
+      fs.writeFileSync(path.join(dir, `${epic}-${n}.json`), JSON.stringify({ epic, run: runName, session: step, decided: null, ...a.gate }, null, 2));
       break;
     }
     case 'control_request': {

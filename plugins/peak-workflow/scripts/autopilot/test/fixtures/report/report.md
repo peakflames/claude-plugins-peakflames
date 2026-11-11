@@ -1,22 +1,23 @@
 # Autopilot — 2026-11-13 06:05 → 2026-11-13 12:41 (stopped: queue done)
-Integration line: develop in <state>/clone (not pushed). Spent $41.20 of $80.
+Workspace: <workspace> — run 20261112-220500. Paths below are relative to the workspace.
+Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80.
 
 ## Do this next
 1. Decide 2 parked gates: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)
 2. Carry on by hand where you decided a gate (Lg5Chr8): the command is under "Per epic".
 3. Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.
 4. Review and bring in the merged work (Lg1Csv7):
-   git fetch "<state>/clone" develop:autopilot/develop && git log develop..autopilot/develop
+   git fetch "<workspace>/clone" develop:autopilot/develop && git log develop..autopilot/develop
 5. Read the recorded reason for 1 changed existing test (under "Per epic").
 6. 1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has.
 
 ## Results
 | Epic | Outcome | Why | Evidence | Cost | Time |
 |---|---|---|---|---|---|
-| Lg1Csv7 (csv-import) — CSV import | MERGED | verify PASS, merge gate green | epics/Lg1Csv7/check-verify-1.json | $9.10 | 52 m |
-| Lg4Fx2q (currency) — Currency conversion | PARKED | auditor: F1 stand-in, F2 test-weakened (audit-1) | epics/Lg4Fx2q/audit-1/audit.json F1, F2 | $11.30 | 61 m |
+| Lg1Csv7 (csv-import) — CSV import | MERGED | verify PASS, merge gate green | runs/20261112-220500/epics/Lg1Csv7/check-verify-1.json | $9.10 | 52 m |
+| Lg4Fx2q (currency) — Currency conversion | PARKED | auditor: F1 stand-in, F2 test-weakened (audit-1) | runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json F1, F2 | $11.30 | 61 m |
 | Lg5Chr8 (spending-chart) — Spending chart | PARKED | human check needed before verify | gates/Lg5Chr8-1.json | $7.80 | 40 m |
-| Lg3Sum9 (monthly-summary) — Monthly summary | FAILED | verify-2 FAIL after the fix round: TOR-03-Jm2Wq8z totals test fails (test/summary.test.js:41) | epics/Lg3Sum9/verify-2/result.json | $13.00 | 88 m |
+| Lg3Sum9 (monthly-summary) — Monthly summary | FAILED | verify-2 FAIL after the fix round: TOR-03-Jm2Wq8z totals test fails (test/summary.test.js:41) | runs/20261112-220500/epics/Lg3Sum9/verify-2/result.json | $13.00 | 88 m |
 | Lg6Bud2 (budgets) — Category budgets | PARKED | parked at a human gate (Lg6Bud2-1.json) | gates/Lg6Bud2-1.json | $0.00 | 12 m |
 | Lg7Exp5 (export) — Export to CSV | BLOCKED | dependency not merged: Lg3Sum9 (FAILED) | — | $0.00 | 0 m |
 | Lg8Hw01 (receipt-printer) — Receipt printer | SKIPPED | TOR-08-Ab1Cd2E is a Safety requirement (hardware-in-the-loop) | — | $0.00 | 0 m |
@@ -34,7 +35,7 @@ Every plan was approved by lint, not by a person.
 
 verify PASS, merge gate green
 
-Plan: `epics/Lg1Csv7/plan-1/plan.md` — approved by lint, not by a person.
+Plan: `runs/20261112-220500/epics/Lg1Csv7/plan-1/plan.md` — approved by lint, not by a person.
 
 | Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |
 |---|---|---|---|---|---|
@@ -45,10 +46,10 @@ Plan: `epics/Lg1Csv7/plan-1/plan.md` — approved by lint, not by a person.
 
 | Driver check | Result | Failed |
 |---|---|---|
-| `epics/Lg1Csv7/check-build-1.json` | pass | — |
-| `epics/Lg1Csv7/check-verify-1.json` | pass | — |
+| `runs/20261112-220500/epics/Lg1Csv7/check-build-1.json` | pass | — |
+| `runs/20261112-220500/epics/Lg1Csv7/check-verify-1.json` | pass | — |
 
-Auditor audit-1 (the whole epic diff): recommends proceed — The import is exercised through the real CLI in every test. One note on scope. (`epics/Lg1Csv7/audit-1/audit.json`)
+Auditor audit-1 (the whole epic diff): recommends proceed — The import is exercised through the real CLI in every test. One note on scope. (`runs/20261112-220500/epics/Lg1Csv7/audit-1/audit.json`)
 
 | # | Severity | Category | Parks | Evidence | Explanation |
 |---|---|---|---|---|---|
@@ -61,7 +62,7 @@ Existing tests changed:
 
 auditor: F1 stand-in, F2 test-weakened (audit-1)
 
-Plan: `epics/Lg4Fx2q/plan-1/plan.md` — approved by lint, not by a person.
+Plan: `runs/20261112-220500/epics/Lg4Fx2q/plan-1/plan.md` — approved by lint, not by a person.
 
 | Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |
 |---|---|---|---|---|---|
@@ -71,9 +72,9 @@ Plan: `epics/Lg4Fx2q/plan-1/plan.md` — approved by lint, not by a person.
 
 | Driver check | Result | Failed |
 |---|---|---|
-| `epics/Lg4Fx2q/check-build-1.json` | pass | — |
+| `runs/20261112-220500/epics/Lg4Fx2q/check-build-1.json` | pass | — |
 
-Auditor audit-1 (the whole epic diff): recommends park — The live-rates path is only ever run against a local double, and an existing rounding test was loosened. (`epics/Lg4Fx2q/audit-1/audit.json`)
+Auditor audit-1 (the whole epic diff): recommends park — The live-rates path is only ever run against a local double, and an existing rounding test was loosened. (`runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json`)
 
 | # | Severity | Category | Parks | Evidence | Explanation |
 |---|---|---|---|---|---|
@@ -83,14 +84,14 @@ Auditor audit-1 (the whole epic diff): recommends park — The live-rates path i
 
 Gates:
 - `gates/Lg4Fx2q-1.json` (audit) — The auditor reported 2 high finding(s) on Lg4Fx2q (currency) — Currency conversion: F1 stand-in — every test replaces the fetch with fakeRates() \| F2 test-weakened — the rounding assertion was loosened. Are they real? — NOT DECIDED
-  Look at: `epics/Lg4Fx2q/audit-1/audit.json`, `epics/Lg4Fx2q/audit-1/bundle/diff.patch`
+  Look at: `runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json`, `runs/20261112-220500/epics/Lg4Fx2q/audit-1/bundle/diff.patch`
   By hand: open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built
 
 ### Lg5Chr8 (spending-chart) — Spending chart — PARKED
 
 human check needed before verify
 
-Plan: `epics/Lg5Chr8/plan-1/plan.md` — approved by lint, not by a person.
+Plan: `runs/20261112-220500/epics/Lg5Chr8/plan-1/plan.md` — approved by lint, not by a person.
 
 | Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |
 |---|---|---|---|---|---|
@@ -100,9 +101,9 @@ Plan: `epics/Lg5Chr8/plan-1/plan.md` — approved by lint, not by a person.
 
 | Driver check | Result | Failed |
 |---|---|---|
-| `epics/Lg5Chr8/check-build-1.json` | pass | — |
+| `runs/20261112-220500/epics/Lg5Chr8/check-build-1.json` | pass | — |
 
-Auditor audit-1 (the whole epic diff): recommends proceed — Nothing found. (`epics/Lg5Chr8/audit-1/audit.json`)
+Auditor audit-1 (the whole epic diff): recommends proceed — Nothing found. (`runs/20261112-220500/epics/Lg5Chr8/audit-1/audit.json`)
 
 Gates:
 - `gates/Lg5Chr8-1.json` (human-check) — TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify — decided "Looks right" by Todd Schavey on 2026-11-13 — continue by hand
@@ -112,7 +113,7 @@ Gates:
 
 verify-2 FAIL after the fix round: TOR-03-Jm2Wq8z totals test fails (test/summary.test.js:41)
 
-Plan: `epics/Lg3Sum9/plan-fix-1/plan.md` — approved by lint, not by a person. One fix round was used.
+Plan: `runs/20261112-220500/epics/Lg3Sum9/plan-fix-1/plan.md` — approved by lint, not by a person. One fix round was used.
 
 | Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |
 |---|---|---|---|---|---|
@@ -127,12 +128,12 @@ Plan: `epics/Lg3Sum9/plan-fix-1/plan.md` — approved by lint, not by a person. 
 
 | Driver check | Result | Failed |
 |---|---|---|
-| `epics/Lg3Sum9/check-build-1.json` | pass | — |
-| `epics/Lg3Sum9/check-build-2.json` | pass | — |
+| `runs/20261112-220500/epics/Lg3Sum9/check-build-1.json` | pass | — |
+| `runs/20261112-220500/epics/Lg3Sum9/check-build-2.json` | pass | — |
 
-Auditor audit-1 (the whole epic diff): recommends proceed — Nothing found. (`epics/Lg3Sum9/audit-1/audit.json`)
+Auditor audit-1 (the whole epic diff): recommends proceed — Nothing found. (`runs/20261112-220500/epics/Lg3Sum9/audit-1/audit.json`)
 
-Auditor audit-2 (changes since the last audit only): recommends proceed — The fix changes one function. Its handoff claims a full test run that the digest does not show. (`epics/Lg3Sum9/audit-2/audit.json`)
+Auditor audit-2 (changes since the last audit only): recommends proceed — The fix changes one function. Its handoff claims a full test run that the digest does not show. (`runs/20261112-220500/epics/Lg3Sum9/audit-2/audit.json`)
 
 | # | Severity | Category | Parks | Evidence | Explanation |
 |---|---|---|---|---|---|

@@ -311,16 +311,17 @@ The original idea was a git worktree per epic. That clashes with the skills as w
 - `wrapup-epic` Step 5a runs `git checkout <base>`, merges and deletes the branch.
 - Git refuses to check out `develop` in a worktree while another worktree has it checked out.
 
-So autopilot works in **one private clone** per run: `<state>/clone/`, made with
-`git clone --no-hardlinks <project> <state>/clone`, followed by `git remote remove origin`.
-This choice has these effects:
+So autopilot works in **one private clone per project** (P3.5 Part 1; it was one per run until
+then): `<workspace>/clone/`, made once with `git clone --no-hardlinks <project> <workspace>/clone`
+followed by `git remote remove origin`, and reused by every later run, so a parked or failed
+epic's branch is still there when the owner has decided its gate. This choice has these effects:
 
 - Serial order needs only one working tree.
 - With no `origin`, `start-epic`'s Freshness Guard skips silently. `wrapup-epic` Step 5 skips the
   ship-mode question and ships **solo**: "No remote — shipping solo (local merge)". Push becomes
   physically impossible as well as denied by hook.
 - The user's own repository and working copy are never touched. In the morning the user runs
-  `git fetch <state>/clone develop:autopilot/develop`, reviews, and merges it like any branch.
+  `git fetch <workspace>/clone develop:autopilot/develop`, reviews, and merges it like any branch.
 - **Integration line = `develop` in the clone.** That is the base `start-epic` and `wrapup-epic`
   already detect (`develop` > `main` > `master`).
 
@@ -334,30 +335,45 @@ decides whether a merge stands.
 
 ### 6.3 State and file layout
 
+One **workspace** per project, long-lived (P3.5 Part 1; `<state>` elsewhere in this plan means
+the workspace, and a step's files are under `runs/<run>/`):
+
 ```
 <project>/                              user's repository — never written by autopilot
-<project>.autopilot/                  state dir (sibling; path configurable)
-  config.json                           queue, budgets, policy choices, end time — written at confirm
-  lock                                  {"pid":…, "started":…} single-instance lock
-  STOP                                  kill switch (presence = stop)
-  state.json                            the state machine; atomic write (tmp + rename) before every action
-  autopilot.log                             driver log
-  clone/                                private clone, no origin; develop = integration line
-  epics/<id>/
-    preflight.json                      eligibility, flags, anchors, deps
-    plan-1/   settings.json  stream.jsonl  result.json  stderr.log  hooks.jsonl  plan.md  plan-lint.json
-    build-1/  settings.json  prompt.md  stream.jsonl  result.json  stderr.log  hooks.jsonl  effective-setup.json
-    check-build-1.json                  driver done-ness checks with evidence
-    audit-1/  bundle/  result.json      auditor input bundle and output
-    verify-1/ …                         same files as build
-    check-verify-1.json                 merge-gate checks
-    plan-fix-1/ … fix-1/ … verify-2/ …  at most one fix round (plan + implement again)
-  gates/<id>-<n>.json                   queued human gates (§6.8)
-  report.md  report.json                morning report (§6.9)
+<project>.autopilot/                    the workspace (sibling; path configurable with --workspace)
+  settings.json                         owner settings that outlive a run: budgets, scope, audit, claudeBin, …
+                                        edited by hand; the driver creates it once, holding only `project`
+  lock                                  {"pid":…, "started":…} single-instance lock, one driver per workspace
+  STOP                                  kill switch (presence = stop); removed once a run has honoured it
+  clone/                                the one private clone, no origin; develop = integration line;
+                                        parked and failed branches stay here between runs
+  gates/<id>-<n>.json                   every queued human gate, across runs (§6.8); each names its `run`
+  current                               a one-line file: the name of the latest run
+  runs/<YYYYMMDD-HHMMSS>/               one directory per run
+    config.json                         that run's queue, explicit, end time, run budget, allowTestDouble
+    state.json                          the state machine; atomic write (tmp + rename) before every action
+    preflight.json  autopilot.log       the preflight it ran from; the driver log
+    report.md  report.json              morning report (§6.9); its paths are relative to the workspace
+    epics/<id>/
+      preflight.json                    eligibility, flags, anchors, deps
+      plan-1/   settings.json  stream.jsonl  result.json  stderr.log  hooks.jsonl  plan.md  plan-lint.json
+      build-1/  settings.json  prompt.md  stream.jsonl  result.json  stderr.log  hooks.jsonl  effective-setup.json
+      check-build-1.json                driver done-ness checks with evidence
+      audit-1/  bundle/  result.json    auditor input bundle and output
+      verify-1/ …                       same files as build
+      check-verify-1.json               merge-gate checks
+      plan-fix-1/ … fix-1/ … verify-2/ …  at most one fix round (plan + implement again)
 ```
 
-Hooks deny every session access to `<state>/` except `<state>/clone/` (and the auditor's bundle,
-for the auditor only). That prevents the WP17 D1 contamination.
+A run's effective config is the defaults, then `settings.json`, then the run's `config.json`,
+then command-line flags. A `claudeBin` other than `claude` is refused, by preflight and by the
+driver, unless that run's `config.json` says `allowTestDouble: true`: a rehearsal's test double
+is never inherited by a real run.
+
+Sessions get `AUTOPILOT_STATE` (the workspace), `AUTOPILOT_RUN` (the run directory) and
+`AUTOPILOT_STEP`. Hooks deny every session access to the workspace except `clone/` (and the
+auditor's bundle, for the auditor only), in this run and every earlier one. That prevents the
+WP17 D1 contamination.
 
 `state.json` sketch:
 
@@ -877,7 +893,9 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
 ## 9. Operational design
 
 - **Crash-safe resume.** Before each action the driver writes the intended step to `state.json`
-  (tmp + rename). On restart (`driver.mjs run --resume`), an in-flight step is never re-trusted:
+  (tmp + rename). On restart (`driver.mjs run --workspace <dir> --resume`, which continues the
+  latest run; a new run is refused while the latest one is unfinished), an in-flight step is
+  never re-trusted:
   - PLAN in flight: kill leftovers and re-run it once. `start-epic` resumes on the existing empty
     branch (Step 3), and its Leftover check removes the branch if needed.
   - BUILD or FIX in flight: kill leftover processes, then run CHECK_BUILD from files. If it
@@ -886,16 +904,17 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
     re-run VERIFY once.
   - AUDIT in flight: re-run it.
 - **Kill switch.** The `STOP` file is checked by the driver between steps and every 30 s, and by
-  hook R1 on every tool call. `driver.mjs stop` writes it and waits for a clean report.
+  hook R1 on every tool call. `driver.mjs stop` writes it and waits for a clean report. The
+  workspace outlives the run, so the driver removes `STOP` once the run has stopped for it.
 - **Single-instance lock.** `lock` holds pid and start time. A lock whose pid isn't alive is
   stale and is taken over with a log line.
 - **Sleep.** macOS laptops sleep. The launch wraps the driver in `caffeinate -i`. Readiness warns
   that a closed lid on battery may still sleep.
-- **Logs.** Per session: `stream.jsonl`, `stderr.log`, `hooks.jsonl`. Per run: `autopilot.log`.
-  All live outside the clone.
+- **Logs.** Per session: `stream.jsonl`, `stderr.log`, `hooks.jsonl`. Per run:
+  `runs/<run>/autopilot.log`. All live outside the clone.
 - **Dry run.** `driver.mjs run --dry-run` prints the queue, each exact command line, the
   settings JSON and the policy table, and invokes nothing. `--claude-bin <path>` swaps in
-  `fake-claude.mjs` for tests.
+  `fake-claude.mjs` for tests; a real run with it also needs `--allow-test-double`.
 - **Local by default.** No push. No `origin` in the clone. `gh` is denied. Network tools are
   denied for sessions (WebFetch, WebSearch). Package installs inside the project are allowed,
   because an epic may add a dependency; the report lists any lockfile change.
@@ -1038,8 +1057,8 @@ writes itself (`audit`, `human-check`, `plan-lint`, `preflight`) and unmatched q
 continued at all except by hand. Runs B and C exist to measure parks and human review time, so
 they must run on the workflow that is meant to ship.
 
-**Starting point (commit `15eacb5`, branch `feature/peak-workflow-autopilot-poc`, not pushed past
-`6f02233` unless the owner has since said so).** Suite: `node --test
+**Starting point (commit `0afe1d7`, branch `feature/peak-workflow-autopilot-poc`, pushed to
+`origin`).** Suite: `node --test
 plugins/peak-workflow/scripts/autopilot/test/` → 69 tests, 59 pass, 10 live skipped. Code to know,
 all under `plugins/peak-workflow/scripts/autopilot/`:
 

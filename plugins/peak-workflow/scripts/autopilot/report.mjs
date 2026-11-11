@@ -1,4 +1,4 @@
-// Autopilot morning report (autopilot-poc-plan.md §6.9). `collectReport` reads a state directory
+// Autopilot morning report (autopilot-poc-plan.md §6.9). `collectReport` reads a run directory
 // and returns the data written as report.json; `renderReport` turns that data into report.md.
 // Both are pure with respect to the run: they read files and never touch the clone.
 import fs from 'node:fs';
@@ -32,25 +32,31 @@ export function replayableKinds(pluginAutopilotDir = HERE) {
   return new Set([...policy.answer, ...policy.park].map((r) => r.kind));
 }
 
-export function collectReport(stateDir) {
-  const s = readJson(path.join(stateDir, 'state.json'));
-  if (!s) throw new Error(`${path.join(stateDir, 'state.json')} is missing or unreadable: no run to report`);
-  const config = readJson(path.join(stateDir, 'config.json'), {});
-  const clone = path.join(stateDir, 'clone');
+/**
+ * `runDir` is `<workspace>/runs/<run>`. The report is per run; gates and the clone belong to the
+ * workspace, and every path in the report is relative to the workspace.
+ */
+export function collectReport(runDir) {
+  const s = readJson(path.join(runDir, 'state.json'));
+  if (!s) throw new Error(`${path.join(runDir, 'state.json')} is missing or unreadable: no run to report`);
+  const workspace = path.resolve(runDir, '..', '..'); const runName = path.basename(runDir);
+  const config = { ...readJson(path.join(workspace, 'settings.json'), {}), ...readJson(path.join(runDir, 'config.json'), {}) };
+  const clone = path.join(workspace, 'clone');
   const replay = replayableKinds();
 
-  const gateDir = path.join(stateDir, 'gates');
+  // This run's gates: the ones it wrote, and the ones (from an earlier run) it used an answer of.
+  const gateDir = path.join(workspace, 'gates');
   const gates = (fs.existsSync(gateDir) ? fs.readdirSync(gateDir).filter((f) => f.endsWith('.json')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [])
-    .map((file) => ({ file, g: readJson(path.join(gateDir, file)) })).filter(({ g }) => g)
+    .map((file) => ({ file, g: readJson(path.join(gateDir, file)) })).filter(({ g }) => g && ((g.run ?? runName) === runName || g.decided?.used?.run === runName))
     .map(({ file, g }) => ({
       file: `gates/${file}`, epic: g.epic, label: (s.queue ?? []).find((q) => q.id === g.epic)?.label ?? g.epic, kind: g.kind, session: g.session ?? null, skillStep: g.skillStep ?? null, question: g.question ?? null, options: g.options ?? [],
       tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], branch: g.branch ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
-      carried: g.carriedFrom ?? null, effect: replay.has(g.kind) ? 'next-run' : 'by-hand',
+      run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, effect: replay.has(g.kind) ? 'next-run' : 'by-hand',
     }));
 
   const blocked = []; const setups = []; let gatesAnswered = 0; let ownerAnswers = 0;
   const epics = (s.queue ?? []).map((q) => {
-    const rel = `epics/${q.id}`; const dir = path.join(stateDir, rel);
+    const rel = `runs/${runName}/epics/${q.id}`; const dir = path.join(workspace, rel);
     for (const ses of q.sessions ?? []) {
       for (const h of readLines(path.join(dir, ses.name, 'hooks.jsonl'))) {
         if (h.hook !== 'PreToolUse') continue;
@@ -93,13 +99,13 @@ export function collectReport(stateDir) {
   const referee = {
     blocked, gatesAnswered, ownerAnswers,
     testChanges: epics.flatMap((e) => e.testChanges.map((t) => ({ epic: e.id, ...t }))),
-    unmatchedParks: gates.filter((g) => g.kind === 'unmatched' && !g.carried).map((g) => g.file),
+    unmatchedParks: gates.filter((g) => g.kind === 'unmatched' && !g.fromEarlierRun).map((g) => g.file),
     setup: { digest: digests[0] ?? null, differs: digests.length > 1 ? setups : [] },
     auditFindings: Object.fromEntries(['high', 'medium', 'low'].map((sev) => [sev, findings.filter((f) => f.severity === sev).length])),
   };
 
   const report = {
-    run: s.run, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, clone, startSha: s.startSha ?? null,
+    run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null,
     driverVersion: s.driverVersion ?? null, epics, gates, referee,
   };
@@ -115,12 +121,12 @@ function nextSteps(r) {
   if (r.baseRed) next.push(`Fix the failing tests on \`${r.integration}\` (\`${r.testCommand}\`), then run autopilot again. Nothing was built on a red base.`);
   if (/^preflight:/.test(r.stoppedBecause ?? '')) next.push(`Fix what preflight refused (${r.stoppedBecause.replace(/^preflight:\s*/, '')}), then run autopilot again.`);
   const parked = by('PARKED');
-  const open = r.gates.filter((g) => !g.decided && !g.carried && parked.some((e) => e.id === g.epic));
+  const open = r.gates.filter((g) => !g.decided && parked.some((e) => e.id === g.epic));
   const withGate = parked.filter((e) => open.some((g) => g.epic === e.id));
-  const noGate = parked.filter((e) => !r.gates.some((g) => g.epic === e.id && !g.carried && e.gates.includes(path.basename(g.file))));
+  const noGate = parked.filter((e) => !r.gates.some((g) => g.epic === e.id && e.gates.includes(path.basename(g.file))));
   if (open.length) next.push(`Decide ${plural(open.length, 'parked gate')}: \`/peak-workflow:autopilot report\` (${ids(withGate)})`);
   if (noGate.length) next.push(`Look at ${plural(noGate.length, 'parked epic')} with no question to answer (${ids(noGate)}): the reason and the branch are under "Per epic".`);
-  const decided = r.gates.filter((g) => g.decided && !g.decided.used && !g.carried);
+  const decided = r.gates.filter((g) => g.decided && !g.decided.used);
   const epicsOf = (list) => [...new Set(list.map((g) => g.epic))].join(', ');
   const byHand = decided.filter((g) => g.effect === 'by-hand'); const replay = decided.filter((g) => g.effect === 'next-run');
   if (byHand.length) next.push(`Carry on by hand where you decided a gate (${epicsOf(byHand)}): the command is under "Per epic".`);
@@ -135,6 +141,7 @@ function nextSteps(r) {
 export function renderReport(r) {
   const L = [];
   L.push(`# Autopilot — ${stamp(r.run)} → ${r.ended ? stamp(r.ended) : 'still running'} (stopped: ${r.stoppedBecause ?? 'not yet'})`);
+  L.push(`Workspace: ${r.workspace} — run ${r.name}. Paths below are relative to the workspace.`);
   L.push(`Integration line: ${r.integration} in ${r.clone} (not pushed). Spent ${usd(r.spentUsd)}${r.budgetUsd == null ? '' : ` of $${r.budgetUsd}`}.`);
 
   L.push('', '## Do this next');
@@ -183,7 +190,7 @@ export function renderReport(r) {
       L.push('', 'Gates:');
       for (const g of mine) {
         const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.used ? ' (used)' : g.effect === 'next-run' ? ' — pre-approved once for the next run' : ' — continue by hand'}` : 'NOT DECIDED';
-        L.push(`- \`${g.file}\` (${g.kind}${g.carried ? ', carried in from the last run' : ''}) — ${cell(g.question)} — ${d}`);
+        L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.question)} — ${d}`);
         if (g.artifacts.length) L.push(`  Look at: ${g.artifacts.map((a) => `\`${a}\``).join(', ')}`);
         if (!g.decided?.used && g.resume && g.effect === 'by-hand') L.push(`  By hand: ${g.resume}`);
       }
@@ -203,10 +210,10 @@ function writeAtomic(file, text) {
   fs.renameSync(tmp, file);
 }
 
-/** Writes report.json and report.md into the state directory and returns the report data. */
-export function writeReport(stateDir) {
-  const report = collectReport(stateDir);
-  writeAtomic(path.join(stateDir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
-  writeAtomic(path.join(stateDir, 'report.md'), renderReport(report));
+/** Writes report.json and report.md into the run directory and returns the report data. */
+export function writeReport(runDir) {
+  const report = collectReport(runDir);
+  writeAtomic(path.join(runDir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+  writeAtomic(path.join(runDir, 'report.md'), renderReport(report));
   return report;
 }

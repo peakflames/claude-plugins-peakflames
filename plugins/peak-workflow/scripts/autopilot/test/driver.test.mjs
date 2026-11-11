@@ -8,7 +8,7 @@ import test from 'node:test';
 import { PLUGIN_DIR, lintPlan, run, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
-const go = (p, opts = {}) => run({ stateDir: p.state, ...opts });
+const go = (p, opts = {}) => p.go(opts);
 
 test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT} resolved, epic MERGED', async (t) => {
   const p = makeProject(t);
@@ -33,6 +33,8 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
     assert.equal(c.cwd, p.clone);
     assert.equal(c.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, '1');
     assert.equal(c.env.AUTOPILOT_STATE, p.state);
+    assert.equal(c.env.AUTOPILOT_RUN, p.runDir());
+    assert.ok(c.env.AUTOPILOT_STEP.startsWith(path.join(p.runDir(), 'epics', E1.id) + path.sep));
   }
   const [plan, build, audit, verify] = p.calls();
   assert.equal(audit.env.AUTOPILOT_ROLE, 'auditor');
@@ -43,7 +45,7 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.equal(verify.argv[verify.argv.indexOf('--model') + 1], 'opus');
 
   // The build session's prompt is the captured plan in the clear-context handoff shape.
-  const dir = path.join(p.state, 'epics', E1.id);
+  const dir = p.dir(E1.id);
   assert.equal(readJson(path.join(dir, 'plan-1', 'plan-lint.json')).pass, true);
   const prompt = fs.readFileSync(path.join(dir, 'build-1', 'prompt.md'), 'utf8');
   assert.equal(build.prompt, prompt);
@@ -70,7 +72,7 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.equal(git(p.project, 'branch', '--list', 'feature/*'), '');
   assert.equal(git(p.project, 'status', '--porcelain'), '');
 
-  const report = readJson(path.join(p.state, 'report.json'));
+  const report = readJson(path.join(p.runDir(), 'report.json'));
   assert.equal(report.epics[0].outcome, 'MERGED');
   assert.equal(report.spentUsd, 2.01); // plan 0.40 + build 0.30 + audit 0.01 + verify 1.30
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
@@ -88,8 +90,8 @@ test('plan lint fail parks the epic and no build session starts', async (t) => {
   assert.deepEqual(p.steps(), [`${E1.id}/plan-1`]);
   const gate = readJson(path.join(p.state, 'gates', `${E1.id}-1.json`));
   assert.equal(gate.kind, 'plan-lint');
-  assert.deepEqual(gate.artifacts, [`epics/${E1.id}/plan-1/plan.md`]);
-  assert.equal(readJson(path.join(p.state, 'epics', E1.id, 'plan-1', 'plan-lint.json')).pass, false);
+  assert.deepEqual(gate.artifacts, [`${p.rel()}/epics/${E1.id}/plan-1/plan.md`]);
+  assert.equal(readJson(p.dir(E1.id, 'plan-1', 'plan-lint.json')).pass, false);
 });
 
 test('build over budget: uncommitted work becomes a WIP commit and the epic parks', async (t) => {
@@ -126,7 +128,7 @@ test('check failure: exactly one fix round (plan + build), then park', async (t)
   assert.equal(e.state, 'PARKED');
   assert.match(e.reason, /CHECK_BUILD still fails after the fix round \(tests-green\)/);
   assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'plan-fix-1', 'fix-1'].map((s) => `${E1.id}/${s}`));
-  const dir = path.join(p.state, 'epics', E1.id);
+  const dir = p.dir(E1.id);
   assert.deepEqual(readJson(path.join(dir, 'check-build-1.json')).checks.filter((c) => !c.pass).map((c) => c.name), ['tests-green']);
   assert.equal(readJson(path.join(dir, 'check-build-2.json')).pass, false);
   // Both fix sessions carry the brief that names the failed check.
@@ -153,7 +155,7 @@ test('verify FAIL, one fix round, verify PASS: MERGED', async (t) => {
   assert.equal(e.state, 'MERGED');
   assert.equal(e.fixRounds, 1);
   assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1', 'plan-fix-1', 'fix-1', 'audit-2', 'verify-2'].map((s) => `${E1.id}/${s}`));
-  assert.match(fs.readFileSync(path.join(p.state, 'epics', E1.id, 'fix-brief.md'), 'utf8'), /TOR-01-Hd3Yc8L: the description is trimmed/);
+  assert.match(fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8'), /TOR-01-Hd3Yc8L: the description is trimmed/);
   assert.ok(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('src/fix.js'));
 });
 
@@ -173,7 +175,7 @@ test('bad merge (an extra commit on develop) is rolled back and the epic parks',
   assert.equal(git(p.clone, 'status', '--porcelain'), '');
   // The rejected tip stays reachable for the morning review.
   assert.equal(git(p.clone, 'log', '-1', '--format=%s', e.rejected[0]), 'chore: extra commit on develop');
-  assert.match(readJson(path.join(p.state, 'epics', E1.id, 'check-verify-1.json')).checks[0].evidence[0], /advanced by 2 first-parent commits/);
+  assert.match(readJson(p.dir(E1.id, 'check-verify-1.json')).checks[0].evidence[0], /advanced by 2 first-parent commits/);
 });
 
 test('merge gate: a commit added during verify may touch only docs/', async (t) => {
@@ -185,7 +187,7 @@ test('merge gate: a commit added during verify may touch only docs/', async (t) 
 
   const e = p.epic(E1.id);
   assert.equal(e.state, 'PARKED');
-  assert.match(readJson(path.join(p.state, 'epics', E1.id, 'check-verify-1.json')).checks[0].evidence[0], /outside docs\/: src\/sneaky\.js/);
+  assert.match(readJson(p.dir(E1.id, 'check-verify-1.json')).checks[0].evidence[0], /outside docs\/: src\/sneaky\.js/);
   assert.equal(git(p.clone, 'rev-parse', 'develop'), e.preVerify.developSha);
 });
 
@@ -198,7 +200,7 @@ test('merge gate: no waivers — the Deferrals Count line is parsed, and a waive
 
   const e = p.epic(E1.id);
   assert.equal(e.state, 'PARKED');
-  const check = readJson(path.join(p.state, 'epics', E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'no-waivers');
+  const check = readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'no-waivers');
   assert.equal(check.pass, false);
   assert.equal(check.evidence.waivedLineInSidecar, true);
   assert.match(check.evidence.countLine, /^Count: 1 \(undisclosed: 0, waived: 1,/);
@@ -234,8 +236,8 @@ test('base red stops the run before any session', async (t) => {
   assert.equal(state.stoppedBecause, 'base red');
   assert.equal(p.epic(E1.id).state, 'QUEUED');
   assert.deepEqual(p.calls(), []);
-  assert.equal(readJson(path.join(p.state, 'report.json')).epics[0].outcome, 'NOT STARTED');
-  assert.match(fs.readFileSync(path.join(p.state, 'report.md'), 'utf8'), /Fix the failing tests on `develop`/);
+  assert.equal(readJson(path.join(p.runDir(), 'report.json')).epics[0].outcome, 'NOT STARTED');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fix the failing tests on `develop`/);
 });
 
 test('STOP mid-step kills the session, parks the epic and stops the run', async (t) => {
@@ -256,13 +258,13 @@ test('STOP mid-step kills the session, parks the epic and stops the run', async 
   assert.equal(alive(pid), false);
   assert.equal(git(p.clone, 'log', '-1', '--format=%s', E1.branch), 'wip(autopilot): uncommitted work at park');
   assert.equal(p.epic(d.id).state, 'QUEUED'); // nothing else starts after STOP
-  assert.ok(fs.existsSync(path.join(p.state, 'report.md')));
+  assert.ok(fs.existsSync(path.join(p.runDir(), 'report.md')));
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
 });
 
 /** Starts the driver as its own process and SIGKILLs it once the verify session is running. */
 async function killDriverMidVerify(p) {
-  const child = spawn(process.execPath, [DRIVER, 'run', '--state', p.state], { stdio: 'ignore' });
+  const child = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
   const exited = new Promise((r) => child.on('exit', r));
   const sessionPid = await waitFor(() => p.epic(E1.id).step?.name === 'verify-1' && p.epic(E1.id).step.pid);
   return { child, exited, sessionPid };
@@ -278,7 +280,7 @@ test('kill -9 of the driver mid-VERIFY, then --resume: leftovers killed, verify 
   assert.equal(alive(sessionPid), true, 'the session outlives the driver (own process group)');
   assert.equal(p.epic(E1.id).state, 'VERIFY');
 
-  await assert.rejects(go(p), /already exists: pass --resume/);
+  await assert.rejects(go(p), /did not finish .*pass --resume/);
   const state = await go(p, { resume: true });
 
   assert.equal(alive(sessionPid), false);
@@ -286,7 +288,7 @@ test('kill -9 of the driver mid-VERIFY, then --resume: leftovers killed, verify 
   assert.equal(p.epic(E1.id).state, 'MERGED');
   assert.deepEqual(p.steps().slice(3), [`${E1.id}/verify-1`, `${E1.id}/verify-2`]);
   assert.ok(!git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('half-written.md'));
-  assert.match(fs.readFileSync(path.join(p.state, 'autopilot.log'), 'utf8'), /stale lock taken over[\s\S]*killed leftover session verify-1[\s\S]*re-entering at VERIFY/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /stale lock taken over[\s\S]*killed leftover session verify-1[\s\S]*re-entering at VERIFY/);
 });
 
 test('kill -9 mid-VERIFY after the merge landed, then --resume: the merge gate decides, no second verify', async (t) => {
@@ -301,7 +303,7 @@ test('kill -9 mid-VERIFY after the merge landed, then --resume: the merge gate d
 
   assert.equal(p.epic(E1.id).state, 'MERGED');
   assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
-  assert.equal(readJson(path.join(p.state, 'epics', E1.id, 'check-verify-1.json')).pass, true);
+  assert.equal(readJson(p.dir(E1.id, 'check-verify-1.json')).pass, true);
 });
 
 test('stale lock is taken over with a log line; a live lock refuses', async (t) => {
@@ -320,7 +322,7 @@ test('stale lock is taken over with a log line; a live lock refuses', async (t) 
 
   assert.equal(state.status, 'DONE');
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  assert.match(fs.readFileSync(path.join(p.state, 'autopilot.log'), 'utf8'), new RegExp(`stale lock taken over \\(pid ${dead}, started 2026-11-10T22:05:00Z`));
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`stale lock taken over \\(pid ${dead}, started 2026-11-10T22:05:00Z`));
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
 });
 
@@ -332,7 +334,7 @@ test('dry run prints the queue, commands, settings and policy, and invokes and w
 
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /1\. Lg1Csv7 \(csv-import\) — CSV import {3}deps: — {3}branch: feature\/epic-Lg1Csv7-csv-import {3}\[eligible\]/);
-  assert.ok(r.stdout.includes(`$ ${FAKE} -p --input-format stream-json --output-format stream-json --verbose --permission-prompt-tool stdio --include-hook-events --plugin-dir ${PLUGIN_DIR} --settings ${p.state}/epics/Lg1Csv7/plan-1/settings.json --permission-mode acceptEdits`));
+  assert.ok(r.stdout.includes(`$ ${FAKE} -p --input-format stream-json --output-format stream-json --verbose --permission-prompt-tool stdio --include-hook-events --plugin-dir ${PLUGIN_DIR} --settings '${p.state}/runs/<run>/epics/Lg1Csv7/plan-1/settings.json' --permission-mode acceptEdits`));
   assert.ok(r.stdout.includes('"text":"/peak-workflow:start-epic Lg1Csv7"'));
   assert.ok(r.stdout.includes('"text":"/peak-workflow:wrapup-epic Lg1Csv7"'));
   assert.match(r.stdout, /--max-turns 150 --max-budget-usd 10 --session-id '<uuid>' --model opus/);
@@ -390,7 +392,7 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
   await go(p);
 
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  const dir = path.join(p.state, 'epics', E1.id);
+  const dir = p.dir(E1.id);
   const tools = (step) => fs.readFileSync(path.join(dir, step, 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).out);
   const [start, exit] = tools('plan-1');
   assert.equal(Object.values(start.hookSpecificOutput.updatedInput.answers)[0], 'Start it');

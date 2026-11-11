@@ -1,10 +1,11 @@
 {
+  "run": "20261112-220500",
   "session": "audit-1",
   "branch": "feature/epic-Lg4Fx2q-currency",
   "branchTip": null,
   "artifacts": [
-    "epics/Lg4Fx2q/audit-1/audit.json",
-    "epics/Lg4Fx2q/audit-1/bundle/diff.patch"
+    "runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json",
+    "runs/20261112-220500/epics/Lg4Fx2q/audit-1/bundle/diff.patch"
   ],
   "decided": null,
   "epic": "Lg4Fx2q",

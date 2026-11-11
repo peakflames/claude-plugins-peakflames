@@ -35,11 +35,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   epic before verification. After a fix round it audits only the delta.
 - **Autopilot morning report** — `report.md` and `report.json` list what to do next, each epic's
   outcome with evidence, referee blocks, test changes with reasons, and auditor findings.
-- **Autopilot readiness facts** — `driver.mjs preflight --json` adds a `launch` block (state
-  directory, earlier runs, refusals, warnings) and per-epic `scopeFlags` for requirements that
-  need network, keys, big data or long runs.
+- **Autopilot readiness facts** — `driver.mjs preflight --json` adds a `launch` block (workspace,
+  the new run's directory, earlier runs, open and decided gates, refusals, warnings) and per-epic
+  `scopeFlags` for requirements that need network, keys, big data or long runs.
 - **`driver.mjs decide` and `report`** — record a person's gate answer (only one of the gate's own
-  options) and re-render the report; a decided answer is carried into the next run and used once.
+  options) and re-render the report; the next run in the same workspace uses a decided answer once.
+- **Autopilot workspace** — one long-lived `<project>.autopilot/` per project holds
+  `settings.json`, the single private clone and every gate; each run gets `runs/<timestamp>/` with
+  its own config, state, log and report.
+- **Test-double guard** — a `claudeBin` other than `claude` in `settings.json` is refused by
+  preflight and by the driver unless that run's `config.json` sets `allowTestDouble`.
 
 ## [3.0.1] — 2026-11-05
 

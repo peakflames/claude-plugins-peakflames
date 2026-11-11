@@ -21,14 +21,14 @@ async function session(t, { kind = 'build', model = 'haiku', prompt, env = {}, b
   git(p.project, 'clone', '-q', '--no-hardlinks', '--branch', 'develop', p.project, p.clone);
   git(p.clone, 'remote', 'remove', 'origin');
   if (kind !== 'plan') git(p.clone, 'checkout', '-q', '-b', E1.branch);
-  fs.writeFileSync(path.join(p.state, 'state.json'), JSON.stringify({ integration: 'develop', queue: [{ id: E1.id, name: 'CSV import' }] }));
-  const stepDir = path.join(p.state, 'epics', E1.id, `${kind}-1`);
+  const runDir = p.mockRun();
+  const stepDir = path.join(runDir, 'epics', E1.id, `${kind}-1`);
   fs.mkdirSync(stepDir, { recursive: true });
   fs.writeFileSync(path.join(stepDir, 'settings.json'), JSON.stringify(sessionSettings()));
   before?.(p);
   const config = { ...defaultConfig(p.project), claudeBin: 'claude' };
   config.budgets[kind] = { wallMin: 4, turns: 12, usd: 1, model };
-  const cmd = sessionCommand(config, { kind, epicId: E1.id, stateDir: p.state, stepDir, sessionId: randomUUID() });
+  const cmd = sessionCommand(config, { kind, epicId: E1.id, workspace: p.state, runDir, stepDir, sessionId: randomUUID() });
   const childEnv = { ...process.env, ...cmd.env, ...env };
   delete childEnv.NODE_TEST_CONTEXT;
   for (const k of Object.keys(env)) if (env[k] === null) delete childEnv[k];

@@ -6,7 +6,8 @@
 // ends the session; it never allows a tool call that would otherwise be asked about.
 // Every decision is appended to <step>/hooks.jsonl. An internal error denies (fail closed).
 //
-// Environment (set by driver.mjs): AUTOPILOT_STATE, AUTOPILOT_STEP, AUTOPILOT_ROLE
+// Environment (set by driver.mjs): AUTOPILOT_STATE (the workspace: clone/, gates/, STOP),
+// AUTOPILOT_RUN (this run's directory: state.json, config.json), AUTOPILOT_STEP, AUTOPILOT_ROLE
 // (planner | builder | verifier | auditor), AUTOPILOT_EPIC.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -38,13 +39,16 @@ const within = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ?
 
 function context(input, env) {
   const state = realDeep(env.AUTOPILOT_STATE);
-  const run = readJson(path.join(state, 'state.json'), {});
-  const config = readJson(path.join(state, 'config.json'), {});
+  // The current run: named by the driver, else the workspace's `current` pointer.
+  let current = ''; try { current = fs.readFileSync(path.join(state, 'current'), 'utf8').trim(); } catch { /* no run yet */ }
+  const runDir = env.AUTOPILOT_RUN ? realDeep(env.AUTOPILOT_RUN) : path.join(state, 'runs', current || '-');
+  const run = readJson(path.join(runDir, 'state.json'), {});
+  const config = { ...readJson(path.join(state, 'settings.json'), {}), ...readJson(path.join(runDir, 'config.json'), {}) };
   const home = realDeep(os.homedir());
   const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
   const clone = path.join(state, 'clone');
   return {
-    input, env, state, clone, run, config, home,
+    input, env, state, clone, run, runDir, runName: path.basename(runDir), config, home,
     step: env.AUTOPILOT_STEP ? realDeep(env.AUTOPILOT_STEP) : null,
     role: env.AUTOPILOT_ROLE ?? 'builder',
     epic: env.AUTOPILOT_EPIC ?? '',
@@ -70,7 +74,7 @@ function classify(ctx, raw, { bash = false } = {}) {
     if (within(p, ctx.clone)) return 'ro';
   } else if (within(p, ctx.clone)) return 'rw';
   if (ctx.temp.some((t) => within(p, t))) return ctx.role === 'auditor' ? 'ro' : 'rw';
-  if (within(p, ctx.state)) return `${raw} is inside the autopilot state directory`;
+  if (within(p, ctx.state)) return `${raw} is inside the autopilot workspace`;
   if (within(p, path.join(ctx.home, '.claude', 'plans'))) return ctx.role === 'auditor' ? 'ro' : 'rw';
   if (within(p, PLUGIN_DIR)) return 'ro';
   const claude = path.join(ctx.home, '.claude');
@@ -116,7 +120,7 @@ function parseBash(command) {
 }
 
 function ruleR2Bash(ctx, segs, command) {
-  if (/\$\{?AUTOPILOT_(STATE|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot state directory');
+  if (/\$\{?AUTOPILOT_(STATE|RUN|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot workspace');
   for (const s of segs) {
     const check = (raw, why) => {
       const c = classify(ctx, raw, { bash: true });
@@ -284,7 +288,7 @@ function writeGate(ctx, gate) {
   const branch = git(ctx.clone, 'branch', '--show-current').out;
   const name = `${ctx.epic}-${n}.json`;
   fs.writeFileSync(path.join(dir, name), JSON.stringify({
-    epic: ctx.epic, epicName: ctx.run.queue?.find((q) => q.id === ctx.epic)?.name ?? null, session: ctx.step ? path.basename(ctx.step) : null,
+    epic: ctx.epic, epicName: ctx.run.queue?.find((q) => q.id === ctx.epic)?.name ?? null, run: ctx.runName, session: ctx.step ? path.basename(ctx.step) : null,
     branch, branchTip: git(ctx.clone, 'rev-parse', 'HEAD').out,
     resume: `open a new session in the fetched repo: /peak-workflow:${ctx.role === 'verifier' ? 'wrapup-epic' : 'start-epic'} ${ctx.epic}`,
     decided: null, ...gate,
@@ -333,10 +337,8 @@ function ruleR8(ctx) {
     return { rule: 'R8', decision: 'park', reason: `parked at human gate (${park.kind}): ${park.why}`, gate, stop: 'autopilot: parked at human gate' };
   }
   for (const { f, g } of used) {
-    const done = { ...g, decided: { ...g.decided, used: { session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
+    const done = { ...g, decided: { ...g.decided, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
     fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
-    // A gate carried in from the last run is marked used there too, so that run's report stops offering it.
-    if (g.carriedFrom) { try { const src = readJson(g.carriedFrom); if (src?.decided) fs.writeFileSync(g.carriedFrom, JSON.stringify({ ...src, decided: { ...src.decided, used: done.decided.used } }, null, 2) + '\n'); } catch { /* the old run is gone */ } }
   }
   const source = used.length === 0 ? 'policy' : used.length === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
   return { rule: 'R8', decision: 'answer', owner: used.length, reason: `answered from ${source}: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers } };

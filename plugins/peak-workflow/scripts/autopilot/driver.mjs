@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 // peak-workflow autopilot driver (PoC). Node 22+, no dependencies.
 //
-//   node driver.mjs preflight --project <dir> [--json]
-//   node driver.mjs run --project <dir> [--state <dir>] [--queue id,id] [--dry-run] [--resume]
-//                       [--claude-bin <path>]
-//   node driver.mjs stop --state <dir>
-//   node driver.mjs report --state <dir>                      re-render report.md and report.json
-//   node driver.mjs decide --state <dir> --gate <file> --answer <text> [--note <text>]
+//   node driver.mjs preflight --project <dir> [--workspace <dir>] [--json]
+//   node driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id]
+//                       [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double]
+//   node driver.mjs stop --workspace <dir>
+//   node driver.mjs report --workspace <dir> [--run <name>]   re-render report.md and report.json
+//   node driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>]
+//
+// The workspace (`<project>.autopilot` by default) is one per project and long-lived: the private
+// clone, every gate and the owner's settings.json live there; each run gets `runs/<timestamp>/`.
+// `--state` is accepted as an alias of `--workspace`.
 //
 // Design: plugins/peak-workflow/docs/autopilot-poc-plan.md §6 and §9; SPIKE.md wins where they
 // differ. The driver is a plain script: it launches one headless Claude Code session per step,
@@ -141,6 +145,7 @@ export function defaultConfig(project) {
     diskFloorGb: 15,
     growthCapMb: 1024,
     claudeBin: 'claude',
+    allowTestDouble: false, // run-level: never inherited from settings.json by accident (a rehearsal's fake binary)
     budgets: {
       plan: { wallMin: 30, turns: 80, usd: 5, model: 'sonnet' },
       build: { wallMin: 90, turns: 200, usd: 15, model: 'sonnet' },
@@ -156,15 +161,47 @@ export function defaultConfig(project) {
   };
 }
 
-export function loadConfig(stateDir, project, overrides = {}) {
-  const file = path.join(stateDir, 'config.json');
-  const saved = exists(file) ? readJson(file) : {};
-  const root = path.resolve(project ?? saved.project ?? '');
-  if (!project && !saved.project) throw new Error('no project: pass --project, or a --state directory that holds config.json');
-  const cfg = merge(merge(defaultConfig(root), saved), overrides);
+// ---- the workspace: <project>.autopilot/{settings.json, lock, STOP, clone/, gates/, runs/<run>/, current}
+
+const tryJson = (p, fallback = null) => { try { return readJson(p); } catch { return fallback; } };
+export const runDirOf = (workspace, name) => path.join(workspace, 'runs', name);
+export function listRuns(workspace) {
+  const dir = path.join(workspace, 'runs');
+  return exists(dir) ? fs.readdirSync(dir).filter((n) => fs.statSync(path.join(dir, n)).isDirectory()).sort() : [];
+}
+/** The latest run's name, from the `current` file (a plain file, not a symlink: it survives every filesystem). */
+export function currentRun(workspace) {
+  let name = null;
+  try { name = read(path.join(workspace, 'current')).trim(); } catch { /* no run yet */ }
+  return name && exists(runDirOf(workspace, name)) ? name : listRuns(workspace).at(-1) ?? null;
+}
+/** A run directory name that is not taken: local `YYYYMMDD-HHMMSS`, then `-2`, `-3`, … within one second. */
+export function newRunName(workspace, now = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  const base = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+  let name = base;
+  for (let n = 2; exists(runDirOf(workspace, name)); n++) name = `${base}-${n}`;
+  return name;
+}
+
+/**
+ * The effective config of a run: defaults, then the workspace's `settings.json` (what the owner set
+ * for every run: budgets, scope, audit, claudeBin, …), then the run's own `config.json` (queue,
+ * explicit, end time, run budget, allowTestDouble), then command-line overrides.
+ */
+export function loadConfig(workspace, { project, run: runName, overrides = {} } = {}) {
+  const settings = tryJson(path.join(workspace, 'settings.json'), {});
+  const runCfg = runName ? tryJson(path.join(runDirOf(workspace, runName), 'config.json'), {}) : {};
+  const given = project ?? runCfg.project ?? settings.project;
+  if (!given) throw new Error('no project: pass --project, or a --workspace whose settings.json names it');
+  const root = path.resolve(given);
+  const cfg = merge(merge(merge(defaultConfig(root), settings), runCfg), overrides);
   cfg.project = root;
   return cfg;
 }
+/** The keys that belong to one run; everything else is a workspace setting. */
+const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble'];
+const TEST_DOUBLE = (bin) => `claudeBin is ${bin}, not the real \`claude\`: a test double runs only when the run's config.json says "allowTestDouble": true (or --allow-test-double)`;
 
 // ---------------------------------------------------------------------------------------------
 // Project reading and preflight
@@ -342,11 +379,12 @@ export function sessionSettings() {
  * The exact command for one step: host mode for plan, build and verify (SPIKE.md "Host mode"),
  * plain `-p` for the auditor (plan §6.6 "Audit"). Pure: used by the dry run too.
  */
-export function sessionCommand(config, { kind, epicId, stateDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema }) {
+export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema }) {
   const b = config.budgets[kind];
-  const clone = path.join(stateDir, 'clone');
+  const clone = path.join(workspace, 'clone');
   const env = {
-    AUTOPILOT_STATE: stateDir,
+    AUTOPILOT_STATE: workspace, // the workspace: hooks jail on it and find clone/ and gates/ there
+    AUTOPILOT_RUN: runDir, // this run: state.json, config.json and the step directories
     AUTOPILOT_ROLE: KINDS[kind].role,
     AUTOPILOT_EPIC: epicId,
     AUTOPILOT_STEP: stepDir,
@@ -407,7 +445,8 @@ export function buildPrompt(plan, pluginDir = PLUGIN_DIR) {
 // Dry run
 // ---------------------------------------------------------------------------------------------
 
-export function dryRun({ project, stateDir, config, pluginDir = PLUGIN_DIR, out = console.log }) {
+export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out = console.log }) {
+  const stateDir = workspace; const runDir = runDirOf(workspace, '<run>');
   const pre = preflight(project, config, { pluginDir });
   const queue = buildQueue(pre, config);
   const integration = detectIntegration(project);
@@ -415,7 +454,7 @@ export function dryRun({ project, stateDir, config, pluginDir = PLUGIN_DIR, out 
   const p = (s = '') => out(s);
   p('Autopilot dry run — nothing is invoked and nothing is written');
   p(`Project:          ${project}`);
-  p(`State directory:  ${stateDir}`);
+  p(`Workspace:        ${stateDir} (this run: ${runDir})`);
   p(`Plugin:           ${pluginDir} (peak-workflow ${version}, driver ${DRIVER_VERSION})`);
   p(`Integration line: ${integration ?? 'develop (assumed: the project is not the root of a git repository with a develop, main or master branch)'} in ${path.join(stateDir, 'clone')} — never pushed`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
@@ -432,7 +471,7 @@ export function dryRun({ project, stateDir, config, pluginDir = PLUGIN_DIR, out 
   const rest = pre.epics.filter((e) => !queue.includes(e));
   if (rest.length) { p(); p('Not queued:'); rest.forEach((e) => p(`  - ${e.label}   [${e.eligibility}] ${e.reasons.join('; ')}`)); }
 
-  p(); p('Workspace:');
+  p(); p(exists(path.join(stateDir, 'clone')) ? 'Private clone (exists; reused):' : 'Private clone:');
   p(`  $ git clone --no-hardlinks --branch ${integration ?? 'develop'} ${shellQuote(project)} ${shellQuote(path.join(stateDir, 'clone'))}`);
   p(`  $ git -C ${shellQuote(path.join(stateDir, 'clone'))} remote remove origin`);
 
@@ -444,16 +483,16 @@ export function dryRun({ project, stateDir, config, pluginDir = PLUGIN_DIR, out 
       ['verify', `/peak-workflow:wrapup-epic ${e.id}`, [], 'then CHECK_VERIFY, the merge gate; a failed gate is rolled back'],
     ];
     for (const [kind, prompt, append, note] of steps) {
-      const stepDir = path.join(stateDir, 'epics', e.id, `${KINDS[kind].prefix}-1`);
-      const c = sessionCommand(config, { kind, epicId: e.id, stateDir, stepDir, pluginDir, sessionId: '<uuid>', appendFiles: append.map((f) => path.join(stepDir, f)) });
+      const stepDir = path.join(runDir, 'epics', e.id, `${KINDS[kind].prefix}-1`);
+      const c = sessionCommand(config, { kind, epicId: e.id, workspace, runDir, stepDir, pluginDir, sessionId: '<uuid>', appendFiles: append.map((f) => path.join(stepDir, f)) });
       p(`  ${KINDS[kind].prefix}-1 — role ${KINDS[kind].role}, wall clock ${c.wallMin} min; ${note}`);
       p(`    cwd:   ${c.cwd}`);
       p(`    env:   ${Object.entries(c.env).map(([k, v]) => `${k}=${shellQuote(v)}`).join(' ')}`);
       p(`    $ ${[c.bin, ...c.args].map(shellQuote).join(' ')} > ${shellQuote(path.join(stepDir, 'stream.jsonl'))} 2> ${shellQuote(path.join(stepDir, 'stderr.log'))}`);
       p(`    stdin: ${userLine(prompt)}`);
       if (kind === 'build') {
-        const auditDir = path.join(stateDir, 'epics', e.id, 'audit-1');
-        const a = sessionCommand(config, { kind: 'audit', epicId: e.id, stateDir, stepDir: auditDir, pluginDir, sessionId: '<uuid>', prompt: '<audit/prompt.md>', schema: '<audit/schema.json>' });
+        const auditDir = path.join(runDir, 'epics', e.id, 'audit-1');
+        const a = sessionCommand(config, { kind: 'audit', epicId: e.id, workspace, runDir, stepDir: auditDir, pluginDir, sessionId: '<uuid>', prompt: '<audit/prompt.md>', schema: '<audit/schema.json>' });
         p(`  audit-1 — role auditor (advisory, read-only), wall clock ${a.wallMin} min; the driver parks only on a high finding in: ${config.audit.parkOn.join(', ')}`);
         p(`    cwd:   ${a.cwd}   (the bundle: diff.patch, spec.md, tors.md, handoff.md, digest.md, test-changes.jsonl)`);
         p(`    env:   ${Object.entries(a.env).map(([k, v]) => `${k}=${shellQuote(v)}`).join(' ')}`);
@@ -462,7 +501,7 @@ export function dryRun({ project, stateDir, config, pluginDir = PLUGIN_DIR, out 
       }
     }
     p('  fix round (at most one): plan-fix-1 and fix-1 use the plan and build commands with');
-    p(`    --append-system-prompt-file ${shellQuote(path.join(stateDir, 'epics', e.id, 'fix-brief.md'))} and the fix budgets`);
+    p(`    --append-system-prompt-file ${shellQuote(path.join(runDir, 'epics', e.id, 'fix-brief.md'))} and the fix budgets`);
     p(`    (plan-fix: ${config.budgets.planFix.turns} turns, $${config.budgets.planFix.usd}, ${config.budgets.planFix.wallMin} min; fix: ${config.budgets.fix.turns} turns, $${config.budgets.fix.usd}, ${config.budgets.fix.wallMin} min)`);
     p('    after it the auditor runs again on the changes since its last audit only');
   }
@@ -480,21 +519,27 @@ export function dryRun({ project, stateDir, config, pluginDir = PLUGIN_DIR, out 
 // ---------------------------------------------------------------------------------------------
 
 class Run {
-  constructor({ stateDir, config, pluginDir, verbose }) {
-    this.stateDir = stateDir; this.config = config; this.pluginDir = pluginDir; this.verbose = verbose;
-    this.clone = path.join(stateDir, 'clone');
-    this.stateFile = path.join(stateDir, 'state.json');
+  constructor({ workspace, runName, config, pluginDir, verbose }) {
+    this.stateDir = workspace; // the workspace: lock, STOP, clone/, gates/ (shared by every run)
+    this.config = config; this.pluginDir = pluginDir; this.verbose = verbose;
+    this.clone = path.join(workspace, 'clone');
+    this.runName = runName; this.runDir = runDirOf(workspace, runName);
+    this.stateFile = path.join(this.runDir, 'state.json');
     this.stopReason = null;
     this.entry = {}; // epic id -> phase to re-enter after a crash
+    this.early = []; // log lines from before the run directory exists
   }
 
   log(msg) {
     const line = `${new Date().toISOString()} ${msg}\n`;
-    fs.appendFileSync(path.join(this.stateDir, 'autopilot.log'), line);
     if (this.verbose) process.stdout.write(line);
+    if (!exists(this.runDir)) { this.early.push(line); return; }
+    fs.appendFileSync(path.join(this.runDir, 'autopilot.log'), this.early.splice(0).join('') + line);
   }
   save() { writeJson(this.stateFile, this.state); }
-  epicDir(e) { return path.join(this.stateDir, 'epics', e.id); }
+  epicDir(e) { return path.join(this.runDir, 'epics', e.id); }
+  /** A path as gate files and the report name it: relative to the workspace. */
+  rel(p) { return path.relative(this.stateDir, p).split(path.sep).join('/'); }
   meta(e) { return this.metaById.get(e.id); }
 
   // ---- lock, STOP, run-level stops -----------------------------------------------------------
@@ -599,7 +644,7 @@ class Run {
     const n = this.gateFiles().filter((f) => f.startsWith(`${e.id}-`)).length + 1;
     const name = `${e.id}-${n}.json`;
     writeJson(path.join(this.stateDir, 'gates', name), {
-      epic: e.id, epicName: m.name, session: e.lastStep ?? null, branch: m.branch, branchTip: this.branchTip(m.branch),
+      epic: e.id, epicName: m.name, run: this.runName, session: e.lastStep ?? null, branch: m.branch, branchTip: this.branchTip(m.branch),
       resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${e.id}`, decided: null, ...gate,
     });
     e.gates.push(name);
@@ -631,7 +676,7 @@ class Run {
     const sessionId = randomUUID();
     const { prompt, appendFiles = [] } = prepare(stepDir) ?? {};
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings());
-    const cmd = sessionCommand(cfg, { kind, epicId: e.id, stateDir: this.stateDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles });
+    const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles });
 
     // The intended step is on disk before anything is launched (crash-safe resume, §9).
     e.state = k.state; e.lastStep = name;
@@ -762,7 +807,7 @@ class Run {
     const lint = lintPlan(read(planFile), m.anchors);
     writeJson(path.join(s.stepDir, 'plan-lint.json'), lint);
     if (!lint.pass) {
-      this.writeGate(e, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: 'The captured plan failed plan lint. Approve it by hand, or fix what it lacks.', options: [], why: lint.problems.join('; '), artifacts: [path.relative(this.stateDir, planFile)] });
+      this.writeGate(e, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: 'The captured plan failed plan lint. Approve it by hand, or fix what it lacks.', options: [], why: lint.problems.join('; '), artifacts: [this.rel(planFile)] });
       return this.park(e, `plan lint failed: ${lint.problems.join('; ')}`);
     }
     e.planStep = s.name;
@@ -923,7 +968,7 @@ class Run {
         question: `The auditor reported ${judged.parks.length} high finding(s) on ${m.label}: ${judged.parks.map((f) => `${f.id} ${f.category} — ${f.explanation}`).join(' | ')}. Are they real?`,
         options: ['Real — fix before verify', 'Not real — verify as built'],
         why: `a high finding in a park category (${this.config.audit.parkOn.join(', ')}); the auditor only advises, so a person judges it`,
-        artifacts: [`epics/${e.id}/${file}`, `epics/${e.id}/${s.name}/bundle/diff.patch`],
+        artifacts: [this.rel(path.join(this.epicDir(e), file)), this.rel(path.join(s.stepDir, 'bundle', 'diff.patch'))],
         resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${e.id} to fix it, or /peak-workflow:wrapup-epic ${e.id} to verify it as built`,
       });
       return this.park(e, `auditor: ${list} (${s.name})`);
@@ -1092,8 +1137,14 @@ class Run {
     this.acquireLock();
     try {
       const resuming = exists(this.stateFile);
-      if (resuming && !resume) throw new Error(`${this.stateFile} already exists: pass --resume to continue that run, or use a fresh --state directory`);
-      if (!exists(path.join(this.stateDir, 'config.json'))) writeJson(path.join(this.stateDir, 'config.json'), cfg);
+      if (resume && !resuming) throw new Error(`${this.stateFile} does not exist: there is no run to resume`);
+      if (resuming && !resume) throw new Error(`${this.stateFile} already exists: pass --resume to continue that run`);
+      if (!resuming) {
+        const last = currentRun(this.stateDir);
+        const unfinished = last && last !== this.runName && tryJson(path.join(runDirOf(this.stateDir, last), 'state.json'))?.status === 'running';
+        if (unfinished) throw new Error(`run ${last} did not finish (the driver was killed): pass --resume to continue that run first`);
+      }
+      if (cfg.claudeBin !== 'claude' && !cfg.allowTestDouble) throw new Error(TEST_DOUBLE(cfg.claudeBin));
 
       if (!exists(this.clone)) {
         const integration = detectIntegration(cfg.project);
@@ -1104,31 +1155,40 @@ class Run {
       }
       const integration = detectIntegration(this.clone);
 
+      // From here the run exists on disk: its directory, its config, and the workspace's pointer to it.
+      fs.mkdirSync(this.runDir, { recursive: true });
+      const cfgFile = path.join(this.runDir, 'config.json');
+      const saved = tryJson(cfgFile, {});
+      writeJson(cfgFile, { ...Object.fromEntries(RUN_KEYS.filter((k) => cfg[k] !== undefined).map((k) => [k, cfg[k]])), ...saved, project: cfg.project });
+      if (!exists(path.join(this.stateDir, 'settings.json'))) writeJson(path.join(this.stateDir, 'settings.json'), { project: cfg.project });
+      writeAtomic(path.join(this.stateDir, 'current'), `${this.runName}\n`);
+
       if (resuming) {
         this.state = readJson(this.stateFile);
         this.state.status = 'running'; this.state.stoppedBecause = null;
-        this.log(`resuming run ${this.state.run}`);
+        this.log(`resuming run ${this.runName}`);
       } else {
-        this.state = { run: new Date().toISOString(), driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, queue: [] };
+        this.state = { run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, queue: [] };
       }
 
       // Preflight reads the integration line, so the clone must be on it.
-      if (!resuming) { this.g('checkout', '-q', integration); this.state.startSha = this.integrationSha(); }
-      else if (!this.state.queue.some((q) => !TERMINAL.has(q.state) && q.state !== 'QUEUED') && this.currentBranch() !== integration && !this.dirty()) this.g('checkout', '-q', integration);
+      if (!resuming) {
+        if (this.currentBranch() !== integration) { if (this.dirty()) throw new Error(`the private clone has uncommitted changes on ${this.currentBranch()}; a run does not start on a dirty clone`); this.g('checkout', '-q', integration); }
+        this.state.startSha = this.integrationSha();
+      } else if (!this.state.queue.some((q) => !TERMINAL.has(q.state) && q.state !== 'QUEUED') && this.currentBranch() !== integration && !this.dirty()) this.g('checkout', '-q', integration);
       this.pre = preflight(this.clone, cfg, { pluginDir: this.pluginDir });
       this.pre.epics = this.pre.epics.map((p) => ({ ...p }));
       this.metaById = new Map(this.pre.epics.map((p) => [p.id, p]));
       if (!resuming) {
         this.state.queue = buildQueue(this.pre, cfg).map((m) => ({ id: m.id, name: m.name, label: m.label, state: 'QUEUED', reason: null, attempts: {}, fixRounds: 0, costUsd: 0, turns: 0, wallMs: 0, sessions: [], gates: [], checks: [], planStep: null, preVerify: null, step: null }));
-        writeJson(path.join(this.stateDir, 'preflight.json'), this.pre);
+        writeJson(path.join(this.runDir, 'preflight.json'), this.pre);
         this.state.testCommand = this.pre.testCommand;
-        this.carryGates();
       } else {
         // Epics already in the run keep the eligibility they started with; their sidecars have moved since.
         for (const q of this.state.queue) { const m = this.metaById.get(q.id); if (m && q.state !== 'QUEUED') { m.eligibility = 'eligible'; m.reasons = []; } }
       }
       this.save();
-      this.log(`run ${this.state.run}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
+      this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
 
       if (!this.pre.ok) this.stopReason = `preflight: ${this.pre.refuse.join('; ')}`;
       if (resuming && !this.stopReason) this.recover();
@@ -1162,98 +1222,78 @@ class Run {
       this.state.status = this.stopReason ? 'STOPPED' : 'DONE';
       this.state.endedAt = new Date().toISOString();
       this.save();
-      writeReport(this.stateDir);
-      this.log(`run ended: ${this.state.stoppedBecause}; report at ${path.join(this.stateDir, 'report.md')}`);
+      if (this.stopReason === 'STOP file') fs.rmSync(path.join(this.stateDir, 'STOP'), { force: true }); // honoured; the workspace outlives the run
+      writeReport(this.runDir);
+      this.log(`run ended: ${this.state.stoppedBecause}; report at ${path.join(this.runDir, 'report.md')}`);
       return this.state;
     } finally {
+      // A run refused before its directory existed still leaves its lines (a stale lock taken over) in the latest run's log.
+      const last = currentRun(this.stateDir);
+      if (this.early.length && !exists(this.runDir) && last) fs.appendFileSync(path.join(runDirOf(this.stateDir, last), 'autopilot.log'), this.early.splice(0).join(''));
       this.releaseLock();
     }
   }
-
-  /**
-   * A person's answers from the last run (`config.carryGatesFrom`, written by the skill): decided,
-   * unused gate files of queued epics are copied in, so hook R8 answers each of them once.
-   */
-  carryGates() {
-    const from = this.config.carryGatesFrom;
-    if (!from) return;
-    const dir = path.join(path.resolve(from), 'gates');
-    const queued = new Set(this.state.queue.map((q) => q.id));
-    for (const f of exists(dir) ? fs.readdirSync(dir).filter((n) => n.endsWith('.json')).sort() : []) {
-      let g; try { g = readJson(path.join(dir, f)); } catch { continue; }
-      if (!g.decided?.answer || g.decided.used || !queued.has(g.epic)) continue;
-      writeJson(path.join(this.stateDir, 'gates', f), { ...g, carriedFrom: path.join(dir, f) });
-      this.log(`${g.epic}: carried in the decided gate ${f} (${g.kind}: "${g.decided.answer}" by ${g.decided.by})`);
-    }
-  }
 }
 
-/** A new run never reuses a state directory that already holds a run: `<project>.autopilot`, then `-2`, `-3`, … */
-export function nextStateDir(project) {
-  let next = `${project}.autopilot`;
-  for (let n = 2; exists(path.join(next, 'state.json')); n++) next = `${project}.autopilot-${n}`;
-  return next;
+/** Every gate file of the workspace, oldest first: `{file, …gate}`. */
+export function readGates(workspace) {
+  const dir = path.join(workspace, 'gates');
+  return (exists(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [])
+    .map((f) => ({ file: `gates/${f}`, ...tryJson(path.join(dir, f), {}) })).filter((g) => g.epic);
 }
 
-/** The last run's saved settings, minus what belongs to that run alone; null when there is none. */
-export function carriedSettings(project, stateDir) {
-  const base = `${project}.autopilot`;
-  const dirs = [base, ...Array.from({ length: 200 }, (_, i) => `${base}-${i + 2}`)].filter((d) => d !== stateDir && exists(path.join(d, 'state.json')) && exists(path.join(d, 'config.json')));
-  if (!dirs.length) return null;
-  let saved; try { saved = readJson(path.join(dirs.at(-1), 'config.json')); } catch { return null; }
-  for (const k of ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'carryGatesFrom', 'testCommand', 'testDirs']) delete saved[k];
-  return Object.keys(saved).length ? saved : null;
-}
-
-/** What the skill needs to know before it offers a launch: read-only facts about the project and its state directory. */
-export function launchFacts(project, stateDir, config) {
+/** What the skill needs to know before it offers a launch: read-only facts about the project and its workspace. */
+export function launchFacts(project, workspace, config) {
   const refuse = []; const warn = [];
   const integration = detectIntegration(project);
   if (!integration) refuse.push(`${project} is not the root of a git repository with a develop, main or master branch`);
   const dirty = integration ? gitRun(project, 'status', '--porcelain').out.split('\n').filter(Boolean).length : 0;
   if (dirty) warn.push(`${dirty} uncommitted change(s) in the project are not part of the run: autopilot clones committed work on ${integration}`);
   let freeGb = null;
-  try { const f = fs.statfsSync(exists(stateDir) ? stateDir : path.dirname(stateDir)); freeGb = +((f.bavail * f.bsize) / 1024 ** 3).toFixed(1); } catch { /* unknown */ }
+  try { const f = fs.statfsSync(exists(workspace) ? workspace : path.dirname(workspace)); freeGb = +((f.bavail * f.bsize) / 1024 ** 3).toFixed(1); } catch { /* unknown */ }
   if (freeGb !== null && freeGb < config.diskFloorGb) refuse.push(`free disk is ${freeGb} GB, under the ${config.diskFloorGb} GB floor`);
-  const bin = sh(/\.(mjs|cjs|js)$/.test(config.claudeBin) ? process.execPath : config.claudeBin, ['--version'], { timeout: 20000 });
-  if (bin.code !== 0 && !/\.(mjs|cjs|js)$/.test(config.claudeBin)) refuse.push(`\`${config.claudeBin} --version\` failed: Claude Code is not on PATH`);
-  if (config.claudeBin !== 'claude') warn.push(`claudeBin is ${config.claudeBin}, not the real \`claude\``);
+  const script = /\.(mjs|cjs|js)$/.test(config.claudeBin);
+  const bin = sh(script ? process.execPath : config.claudeBin, ['--version'], { timeout: 20000 });
+  if (bin.code !== 0 && !script) refuse.push(`\`${config.claudeBin} --version\` failed: Claude Code is not on PATH`);
+  if (config.claudeBin !== 'claude') (config.allowTestDouble ? warn : refuse).push(config.allowTestDouble ? `claudeBin is ${config.claudeBin}, not the real \`claude\`: this run is a rehearsal against a test double` : TEST_DOUBLE(config.claudeBin));
   if (config.endBy && Date.parse(config.endBy) <= Date.now()) { warn.push(`the saved end time ${config.endBy} is in the past; using the next 06:30 instead`); config.endBy = nextEndBy(); }
 
-  // Earlier runs: the default state directory and its numbered siblings.
-  const runs = [];
-  const parent = path.dirname(project); const base = `${path.basename(project)}.autopilot`;
-  for (const name of fs.readdirSync(parent).filter((n) => n === base || new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`).test(n)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))) {
-    const dir = path.join(parent, name);
-    let st = null; try { st = readJson(path.join(dir, 'state.json')); } catch { /* no run yet */ }
-    let lock = null; try { lock = readJson(path.join(dir, 'lock')); } catch { /* none */ }
-    const running = !!(lock?.pid && pidAlive(lock.pid));
-    const gateDir = path.join(dir, 'gates');
-    const gates = (exists(gateDir) ? fs.readdirSync(gateDir).filter((f) => f.endsWith('.json')) : []).map((f) => { try { return readJson(path.join(gateDir, f)); } catch { return {}; } });
-    let unfetched = null;
-    if (st && integration && exists(path.join(dir, 'clone'))) {
-      const tip = gitRun(path.join(dir, 'clone'), 'rev-parse', st.integration).out;
-      unfetched = tip && tip !== st.startSha && !gitOk(project, 'merge-base', '--is-ancestor', tip, integration);
-    }
-    runs.push({ stateDir: dir, started: !!st, run: st?.run ?? null, status: running ? 'running' : st ? st.status : 'not started', pid: running ? lock.pid : null, stoppedBecause: st?.stoppedBecause ?? null,
-      undecidedGates: gates.filter((g) => !g.decided).length, decidedUnusedGates: gates.filter((g) => g.decided?.answer && !g.decided.used).length, mergedWorkNotInProject: unfetched });
-  }
-  const live = runs.find((r) => r.status === 'running');
-  if (live) refuse.push(`autopilot is already running for this project (pid ${live.pid}, ${live.stateDir})`);
+  const lock = tryJson(path.join(workspace, 'lock'));
+  const running = lock?.pid && pidAlive(lock.pid) ? lock.pid : null;
+  const current = currentRun(workspace);
+  const runs = listRuns(workspace).map((name) => {
+    const dir = runDirOf(workspace, name);
+    const st = tryJson(path.join(dir, 'state.json'));
+    return { run: name, runDir: dir, started: !!st, startedAt: st?.run ?? null, status: running && name === current ? 'running' : st ? (st.status === 'running' ? 'interrupted' : st.status) : 'not started', pid: running && name === current ? running : null, stoppedBecause: st?.stoppedBecause ?? null };
+  });
   const lastRun = runs.filter((r) => r.started).at(-1) ?? null;
-  if (lastRun?.mergedWorkNotInProject) warn.push(`the last run merged work that is not on ${integration} in the project yet (${lastRun.stateDir}); a new run starts from the project and would build those epics again`);
-  if (lastRun?.undecidedGates) warn.push(`the last run has ${lastRun.undecidedGates} undecided gate(s); decide them first with /peak-workflow:autopilot report`);
-  if (exists(path.join(stateDir, 'state.json'))) refuse.push(`${stateDir} already holds a run; a new run needs a fresh state directory`);
+  if (running) refuse.push(`autopilot is already running for this project (pid ${running}, ${workspace})`);
+  else if (lastRun?.status === 'interrupted') refuse.push(`run ${lastRun.run} did not finish (the driver was killed): continue it with \`driver.mjs run --workspace "${workspace}" --resume\``);
+  if (exists(path.join(workspace, 'STOP')) && !running) warn.push(`a STOP file is left in ${workspace}; remove it or the next run stops at once`);
+
+  const gates = readGates(workspace);
+  const brief = (g) => ({ file: g.file, epic: g.epic, kind: g.kind, run: g.run ?? null, question: g.question ?? null, answer: g.decided?.answer ?? null });
+  const openGates = gates.filter((g) => !g.decided && (g.options ?? []).length).map(brief);
+  const decidedGates = gates.filter((g) => g.decided?.answer && !g.decided.used).map(brief);
+  if (openGates.length) warn.push(`${openGates.length} gate(s) wait for your decision (${[...new Set(openGates.map((g) => g.epic))].join(', ')}); decide them with /peak-workflow:autopilot report`);
+
+  const clone = path.join(workspace, 'clone');
+  let mergedWorkNotInProject = null;
+  if (integration && exists(clone)) {
+    const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out;
+    mergedWorkNotInProject = !!tip && !gitOk(project, 'merge-base', '--is-ancestor', tip, integration);
+  }
   if (process.platform === 'darwin') warn.push('a laptop with the lid closed on battery may still sleep, even under caffeinate: leave it on power');
+  const run = newRunName(workspace);
   return {
-    ok: refuse.length === 0, refuse, warn, integration, freeGb, stateDir, configFileExists: exists(path.join(stateDir, 'config.json')), runs, lastRun,
-    carryGatesFrom: lastRun?.decidedUnusedGates ? lastRun.stateDir : null, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
+    ok: refuse.length === 0, refuse, warn, integration, freeGb, workspace, clone, run, runDir: runDirOf(workspace, run), settingsFileExists: exists(path.join(workspace, 'settings.json')),
+    runs, lastRun, openGates, decidedGates, mergedWorkNotInProject, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
   };
 }
 
 /** Records a person's answer in a gate file (§6.8). The driver never chooses the answer; it only writes what it is given. */
-export function decideGate(stateDir, gateName, answer, { by, note } = {}) {
-  const file = path.join(stateDir, 'gates', path.basename(gateName));
+export function decideGate(workspace, gateName, answer, { by, note } = {}) {
+  const file = path.join(workspace, 'gates', path.basename(gateName));
   if (!exists(file)) throw new Error(`no gate file ${file}`);
   const gate = readJson(file);
   if (gate.decided?.used) throw new Error(`${path.basename(file)} was already decided and used (${gate.decided.used.date})`);
@@ -1261,26 +1301,31 @@ export function decideGate(stateDir, gateName, answer, { by, note } = {}) {
   const label = options.find((o) => o.trim().toLowerCase() === String(answer).trim().toLowerCase());
   if (options.length && !label) throw new Error(`"${answer}" is not one of this gate's options: ${options.map((o) => `"${o}"`).join(', ')}`);
   if (!String(answer ?? '').trim()) throw new Error('an answer is required');
-  let project = null; try { project = readJson(path.join(stateDir, 'config.json')).project; } catch { /* no config */ }
+  const run = gate.run && exists(runDirOf(workspace, gate.run)) ? gate.run : currentRun(workspace);
+  const project = tryJson(path.join(workspace, 'settings.json'))?.project ?? (run ? tryJson(path.join(runDirOf(workspace, run), 'config.json'))?.project : null) ?? null;
   const who = by ?? (project ? sh('git', ['config', 'user.name'], { cwd: project }).out : '') ?? '';
   if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
   gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(note ? { note } : {}) };
   writeJson(file, gate);
   const effect = replayableKinds().has(gate.kind) ? 'next-run' : 'by-hand';
-  if (exists(path.join(stateDir, 'state.json'))) writeReport(stateDir);
+  if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
   return { gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect, resume: effect === 'by-hand' ? gate.resume ?? null : null };
 }
 
-/** Programmatic entry point (the CLI and the tests both use it). */
-export async function run({ project, stateDir, queue, resume = false, claudeBin, pluginDir = PLUGIN_DIR, verbose = false, dryRun: dry = false, out }) {
+/** Programmatic entry point (the CLI and the tests both use it). `stateDir` is an alias of `workspace`. */
+export async function run({ project, workspace, stateDir, run: runName, queue, resume = false, claudeBin, allowTestDouble, pluginDir = PLUGIN_DIR, verbose = false, dryRun: dry = false, out }) {
   const root = project ? path.resolve(project) : null;
-  const state = path.resolve(stateDir ?? `${root}.autopilot`);
+  if (!root && !(workspace ?? stateDir)) throw new Error('run needs a project or a workspace');
+  const ws = path.resolve(workspace ?? stateDir ?? `${root}.autopilot`);
   const overrides = {};
   if (queue) overrides.queue = queue;
   if (claudeBin) overrides.claudeBin = claudeBin;
-  const config = loadConfig(state, root, overrides);
-  if (dry) return dryRun({ project: config.project, stateDir: state, config, pluginDir, out });
-  return new Run({ stateDir: state, config, pluginDir, verbose }).run({ resume });
+  if (allowTestDouble) overrides.allowTestDouble = true;
+  const name = resume ? runName ?? currentRun(ws) : runName ?? newRunName(ws);
+  if (!name) throw new Error(`${ws} holds no run to resume`);
+  const config = loadConfig(ws, { project: root, run: name, overrides });
+  if (dry) return dryRun({ project: config.project, workspace: ws, config, pluginDir, out });
+  return new Run({ workspace: ws, runName: name, config, pluginDir, verbose }).run({ resume });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1293,7 +1338,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith('--')) { o._.push(a); continue; }
     const key = a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-    if (['dryRun', 'resume', 'json', 'verbose', 'help'].includes(key)) o[key] = true;
+    if (['dryRun', 'resume', 'json', 'verbose', 'help', 'allowTestDouble'].includes(key)) o[key] = true;
     else o[key] = argv[++i];
   }
   return o;
@@ -1302,47 +1347,49 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--state <dir>] [--json]\n       driver.mjs run [--project <dir>] [--state <dir>] [--queue id,id] [--dry-run] [--resume] [--claude-bin <path>] [--verbose]\n       driver.mjs stop --state <dir>\n       driver.mjs report --state <dir>\n       driver.mjs decide --state <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
+  const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
     if (!o.project) throw new Error('preflight needs --project');
     const root = path.resolve(o.project);
-    // Without --state, the directory a new run would use: the first one that holds no run yet.
-    const state = o.state ? path.resolve(o.state) : nextStateDir(root);
-    // A fresh state directory inherits the settings (not the queue or end time) the last run was confirmed with.
-    const carried = exists(path.join(state, 'config.json')) ? null : carriedSettings(root, state);
-    const config = loadConfig(state, root, carried ?? {});
+    const ws = path.resolve(wsArg ?? `${root}.autopilot`);
+    const config = loadConfig(ws, { project: root, overrides: o.allowTestDouble ? { allowTestDouble: true } : {} });
     const pre = preflight(root, config);
-    pre.launch = { ...launchFacts(root, state, config), carriedSettings: carried };
+    pre.launch = launchFacts(root, ws, config);
     if (o.json) console.log(JSON.stringify(pre, null, 2));
     else { pre.refuse.forEach((r) => console.log(`REFUSE: ${r}`)); pre.epics.forEach((e) => console.log(`${e.label}  [${e.eligibility}${e.humanCheck ? ', human check' : ''}]  deps: ${e.deps.join(', ') || '—'}  ${e.reasons.join('; ')}`)); }
     return pre.ok ? 0 : 1;
   }
   if (cmd === 'run') {
-    if (!o.project && !o.state) throw new Error('run needs --project or --state');
-    const result = await run({ project: o.project, stateDir: o.state, queue: o.queue ? o.queue.split(',').filter(Boolean) : undefined, resume: !!o.resume, claudeBin: o.claudeBin, verbose: !!o.verbose || process.stdout.isTTY, dryRun: !!o.dryRun });
+    if (!o.project && !wsArg) throw new Error('run needs --project or --workspace');
+    const result = await run({ project: o.project, workspace: wsArg, run: o.run, queue: o.queue ? o.queue.split(',').filter(Boolean) : undefined, resume: !!o.resume, claudeBin: o.claudeBin, allowTestDouble: !!o.allowTestDouble, verbose: !!o.verbose || process.stdout.isTTY, dryRun: !!o.dryRun });
     return o.dryRun ? (result.pre.ok ? 0 : 1) : 0;
   }
+  if (!wsArg && ['stop', 'report', 'decide'].includes(cmd)) throw new Error(`${cmd} needs --workspace`);
+  const ws = path.resolve(wsArg ?? '.');
   if (cmd === 'stop') {
-    if (!o.state) throw new Error('stop needs --state');
-    const state = path.resolve(o.state);
-    fs.writeFileSync(path.join(state, 'STOP'), `${new Date().toISOString()} stop requested\n`);
-    console.log(`STOP written to ${state}; waiting for the driver to finish its report…`);
-    const lock = path.join(state, 'lock');
+    fs.writeFileSync(path.join(ws, 'STOP'), `${new Date().toISOString()} stop requested\n`);
+    console.log(`STOP written to ${ws}; waiting for the driver to finish its report…`);
+    const lock = path.join(ws, 'lock');
     const holder = () => { try { return readJson(lock).pid; } catch { return null; } };
+    const wasRunning = !!holder();
     for (let pid = holder(); pid && pidAlive(pid); pid = holder()) await sleep(1000);
-    console.log(exists(path.join(state, 'report.md')) ? `Stopped. Report: ${path.join(state, 'report.md')}` : 'No driver is running. Remove the STOP file before the next run.');
+    const report = currentRun(ws) ? path.join(runDirOf(ws, currentRun(ws)), 'report.md') : null;
+    fs.rmSync(path.join(ws, 'STOP'), { force: true }); // honoured (or nothing to stop): the next run must not stop at once
+    console.log(wasRunning && report && exists(report) ? `Stopped. Report: ${report}` : 'No driver is running.');
     return 0;
   }
   if (cmd === 'report') {
-    if (!o.state) throw new Error('report needs --state');
-    const r = writeReport(path.resolve(o.state));
-    console.log(`${path.join(path.resolve(o.state), 'report.md')} (${r.epics.length} epic(s); ${r.stoppedBecause ?? 'still running'})`);
+    const name = o.run ?? currentRun(ws);
+    if (!name) throw new Error(`${ws} holds no run to report`);
+    const r = writeReport(runDirOf(ws, name));
+    console.log(`${path.join(runDirOf(ws, name), 'report.md')} (${r.epics.length} epic(s); ${r.stoppedBecause ?? 'still running'})`);
     return 0;
   }
   if (cmd === 'decide') {
-    if (!o.state || !o.gate || o.answer === undefined) throw new Error('decide needs --state, --gate and --answer');
-    console.log(JSON.stringify(decideGate(path.resolve(o.state), o.gate, o.answer, { by: o.by, note: o.note }), null, 2));
+    if (!o.gate || o.answer === undefined) throw new Error('decide needs --workspace, --gate and --answer');
+    console.log(JSON.stringify(decideGate(ws, o.gate, o.answer, { by: o.by, note: o.note }), null, 2));
     return 0;
   }
   throw new Error(`unknown command ${cmd}\n${usage}`);

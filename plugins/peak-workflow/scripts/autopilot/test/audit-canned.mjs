@@ -287,7 +287,7 @@ function buildLog(widened, clone) {
 
 /**
  * A project whose private clone holds the canned build on the epic branch, plus the build
- * session's log under `<state>/epics/<id>/build-1/`. `bundle(stepDir)` builds the auditor's bundle.
+ * session's log under `<workspace>/runs/<run>/epics/<id>/build-1/`. `bundle(stepDir)` builds the auditor's bundle.
  */
 export function cannedBuild(t, variant) {
   const widened = variant === 'widened';
@@ -313,11 +313,10 @@ export function cannedBuild(t, variant) {
   git(p.clone, 'add', '-A');
   git(p.clone, 'commit', '-q', '-m', `feat(epic-${E1.id}): CSV import`);
 
-  const buildDir = path.join(p.state, 'epics', E1.id, 'build-1');
+  const buildDir = path.join(p.mockRun(), 'epics', E1.id, 'build-1');
   fs.mkdirSync(buildDir, { recursive: true });
   fs.writeFileSync(path.join(buildDir, 'hooks.jsonl'), buildLog(widened, p.clone).map((l) => JSON.stringify(l)).join('\n') + '\n');
   fs.writeFileSync(path.join(buildDir, 'result.json'), JSON.stringify({ type: 'result', subtype: 'success', result: `Epic ${E1.id} is implemented and committed on ${E1.branch}. All five requirements pass their tests; the suite is green (7 tests).` }));
-  fs.writeFileSync(path.join(p.state, 'state.json'), JSON.stringify({ integration: 'develop', queue: [{ id: E1.id, name: 'CSV import' }] }));
 
   const epic = readEpics(p.clone).find((e) => e.id === E1.id);
   const bundle = (stepDir) => buildBundle({ clone: p.clone, pluginDir: PLUGIN_DIR, bundleDir: path.join(stepDir, 'bundle'), epic, integration: 'develop', steps: [{ name: 'build-1', dir: buildDir }] });
