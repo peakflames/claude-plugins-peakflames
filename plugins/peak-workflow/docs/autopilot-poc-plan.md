@@ -1297,16 +1297,31 @@ waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 
   Not shown by it: a run outliving its session for hours (P0 S10 covers the mechanism).
 - **Not done here:** Linux / Windows launch stays a P6 item.
 
-**Before P4 (open):** see the owner's recorded look work in one real verify session — a live
-wrapup on a human-check epic, about $1.50 on Opus, owner's go-ahead needed. **Ready to run, not
-yet run:** `AUTOPILOT_LIVE=1 node --test plugins/peak-workflow/scripts/autopilot/test/live-look.test.mjs`
-(plan, build and audit on `fake-claude.mjs` with a real working build; the gate decided "Looks
-right"; then one real `/peak-workflow:wrapup-epic` on Opus). It asserts that R8 answered Step 2.0
-from the look, that no other question parked the session, and that the epic merged; its
-diagnostics print every question asked. Its plumbing up to the real session was checked with a
-no-op `claude`. Also unseen in a real session: the skill's plain-language report presentation, and
-its going straight into the report when a run has already ended at the launch check (both added
-after the owner's real skill run) — the owner sees both on Run A's `report`.
+**Before P4: done 2026-11-11 — the owner's recorded look works in a real verify session**
+(`AUTOPILOT_LIVE=1 node --test plugins/peak-workflow/scripts/autopilot/test/live-look.test.mjs`:
+plan, build and audit on `fake-claude.mjs` with a real working build, the gate decided "Looks
+right", then one real `/peak-workflow:wrapup-epic` on Opus). Three real sessions, owner's
+go-ahead each time, $2.66 in all:
+
+1. **Parked ($0.67, 9 turns).** Wrapup Step 1.2 item 7 asked "TOR-… is operator-observed … What
+   do you see?" with `AskUserQuestion`, long before Step 2.0. No policy row matches a question
+   the model words itself, so R8 parked it as `unmatched`. R8's Step 2.0 answer alone was never
+   enough.
+2. **Merged, but asked nothing ($1.02, 15 turns).** Fix: the driver appends `owner-look.md` to
+   the verify session's system prompt when the epic has a look (who, when, what they looked at,
+   the branch tip, their words; record it as `operator-observed: <words> (recorded by <owner> on
+   <date>, before this session)`, do not ask for item 7, CANNOT VERIFY if it does not settle the
+   Then). The first wording also said nobody could answer a question, and the verifier then
+   skipped Step 1.5 and Step 2.0 as well.
+3. **Merged as designed ($0.96, 18 turns).** With that sentence removed and "ask every other
+   question the skill tells you to ask" added: Step 1.5 was answered from policy, Step 2.0 from
+   the owner's look, and the Complete handoff carries the observation and "Manual verification
+   performed: Yes" with the owner's name, date and tip. No skill edit.
+
+Still a judgement call for P5: the observation is the owner's gate note, so a "Looks right" with
+no note gives the verifier only the answer. Also unseen in a real session: the skill's
+plain-language report presentation, and its going straight into the report when a run has
+already ended at the launch check — the owner sees both on Run A's `report`.
 
 ### P4: Real unattended runs (typically overnight) on the seeded `ledger` project
 
@@ -1356,7 +1371,7 @@ scripts/autopilot-lab/test/` → 7 tests pass, no model called. What exists and 
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
-go-ahead run `test/live-look.test.mjs`, then walk me through Run A. Ask before any push."
+go-ahead walk me through Run A. Real `claude` sessions only with my go-ahead. Ask before any push."
 
 ### P5: Evaluate
 

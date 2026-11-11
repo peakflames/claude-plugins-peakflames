@@ -196,6 +196,13 @@ test('human-check gate carries an artifact; "Looks right" goes to VERIFY and R8 
   assert.match(answer.hookSpecificOutput.updatedInput.annotations[manual].notes, /Pat Owner looked at clone:tests\/manual\/.* and answered "Looks right" — "one bar per category, labels readable"/);
   assert.match(answer.hookSpecificOutput.permissionDecisionReason, /answered from the owner's recorded decision/);
   assert.equal(readJson(p.dir(e5.id, 'verify-1', 'step.json')).look.branchTip, tip);
+  // The verifier is handed the owner's observation up front, so wrapup Step 1.2 item 7 does not ask for it.
+  const lookFile = r.calls[0].argv[r.calls[0].argv.indexOf('--append-system-prompt-file') + 1];
+  assert.equal(lookFile, p.dir(e5.id, 'verify-1', 'owner-look.md'));
+  const lookText = fs.readFileSync(lookFile, 'utf8');
+  assert.match(lookText, /Pat Owner, \d{4}-\d{2}-\d{2}/);
+  assert.ok(lookText.includes(`branch tip ${tip}`) && lookText.includes('"one bar per category, labels readable"') && lookText.includes(e5.tors[0]), lookText);
+  assert.match(lookText, /do not use\s+`AskUserQuestion`/);
   assert.ok(merged(p, tip));
 });
 

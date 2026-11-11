@@ -35,6 +35,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   epic before verification. After a fix round it audits only the delta.
 - **Autopilot morning report** — `report.md` and `report.json` list what to do next, each epic's
   outcome with evidence, referee blocks, test changes with reasons, and auditor findings.
+- **Owner's look reaches the verifier** — after a decided human-check gate, the verify session is
+  given the owner's recorded observation, so `wrapup-epic` records it as operator-observed
+  evidence instead of parking on a question nobody can answer.
 - **Report TL;DR and glossary** — `report.md` opens with a plain-language TL;DR and ends with
   "Words used in this report"; `autopilot report` presents the TL;DR first and explains each term
   on first use; once merged work is in the project, the report stops listing the fetch command.

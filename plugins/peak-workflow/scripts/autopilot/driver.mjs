@@ -433,6 +433,32 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
   return { ok: refuse.length === 0, refuse, testCommand: config.testCommand ?? facts.testCommand, testDirs: config.testDirs?.length ? config.testDirs : facts.testDirs, epics };
 }
 
+/** What a verify session is told when the owner has already looked at this exact branch tip. */
+export function ownerLook(look, meta) {
+  const observed = meta.reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]);
+  return `# The operator's observation is already recorded
+
+Before this session started, the project's owner looked at what was built and recorded what they saw. That record is the operator's
+observation for this epic. It was made by a person; it is not your inference and you must not add to it.
+
+- **Who and when:** ${look.by}, ${look.date}
+- **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, the commit you are verifying
+- **Their answer:** "Looks right"
+- **Their words:** ${look.note ? `"${look.note}"` : '(none beyond the answer)'}
+${observed.length ? `- **Operator-observed requirements it covers:** ${observed.join(', ')}\n` : ''}
+In Step 1.2 item 7, do not ask the person to perform the check again and do not use
+\`AskUserQuestion\` for it. Do everything else the step says yourself (the checklist mirrors the
+Gherkin, the automated parts run, the implementation is inspected), then judge the recorded
+observation against the Then and record the evidence as
+\`operator-observed: <their words> (recorded by ${look.by} on ${look.date}, before this session)\`.
+If the record does not let you judge a Then, do not guess: give that requirement CANNOT VERIFY.
+
+This changes item 7 only. Ask every other question the skill tells you to ask, with
+\`AskUserQuestion\` and in the skill's own words (Step 1.5, Step 2.0, the ship mode, any failure):
+they are answered for you. Never skip one or choose its answer yourself.
+`;
+}
+
 /** The run queue: `config.queue`, or every epic that is not Complete, in phase/index order. */
 export function buildQueue(pre, config) {
   const byId = new Map(pre.epics.map((e) => [e.id, e]));
@@ -1206,7 +1232,15 @@ class Run {
     const m = this.meta(e);
     e.preVerify = { developSha: this.integrationSha(), branchTip: this.branchTip(m.branch), branch: m.branch };
     this.save();
-    const s = await this.step(e, 'verify', () => ({ prompt: `/peak-workflow:wrapup-epic ${e.id}` }));
+    const s = await this.step(e, 'verify', (stepDir) => {
+      if (!e.look) return { prompt: `/peak-workflow:wrapup-epic ${e.id}` };
+      // The owner already looked (a decided human-check gate). The verifier gets their recorded
+      // observation up front, so wrapup Step 1.2 item 7 records it instead of asking a person who is
+      // not there. Seen live: without this the session asks "What do you see?" and parks.
+      const file = path.join(stepDir, 'owner-look.md');
+      fs.writeFileSync(file, ownerLook(e.look, m));
+      return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [file] };
+    });
     if (!s) return null;
     if (this.integrationSha() !== e.preVerify.developSha) return 'CHECK_VERIFY';
     // No merge and no gate: the verdict was FAIL (policy answers "Stop — epic FAILs").
