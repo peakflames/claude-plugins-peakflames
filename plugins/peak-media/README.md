@@ -44,15 +44,15 @@ supported.
 ## Setup
 
 The runtime (the pinned HyperFrames CLI, Playwright, GSAP and ajv, plus a headless Chromium) is not
-shipped in the plugin. `scripts/setup.sh` installs it once into the plugin's data folder
+shipped in the plugin. `scripts/setup.mjs` installs it once into the plugin's data folder
 (`$CLAUDE_PLUGIN_DATA`, or `~/.cache/peak-media`), so plugin updates don't wipe it.
 
 The easiest way: ask Claude to *"run the peak-media setup"*. Any skill that finds a dependency
 missing also offers to run it. By hand:
 
 ```bash
-bash ~/.claude/plugins/cache/peakflames-plugins/peak-media/<version>/scripts/setup.sh
-bash …/scripts/setup.sh --check     # report what's missing; install nothing
+node ~/.claude/plugins/cache/peakflames-plugins/peak-media/<version>/scripts/setup.mjs
+node …/scripts/setup.mjs --check     # report what's missing; install nothing
 ```
 
 It is safe to re-run; it only downloads what is missing. Options: `--data-dir <dir>` to install
@@ -241,5 +241,5 @@ Keep `script.md`, `spine/` and `plates/` with the video: they reproduce it exact
 
 ## Third-party material
 
-The vendored HyperFrames references (Apache-2.0), the bundled OFL fonts, and what `setup.sh`
+The vendored HyperFrames references (Apache-2.0), the bundled OFL fonts, and what `setup.mjs`
 fetches (including GSAP, which is downloaded, never shipped) are listed in [VENDORED.md](VENDORED.md).

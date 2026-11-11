@@ -2,7 +2,7 @@
   "name": "peak-media-runtime",
   "private": true,
   "type": "module",
-  "description": "Runtime dependencies for the peak-media plugin, mirrored from lib/pins.json (the source of truth). Installed by scripts/setup.sh into the plugin data dir.",
+  "description": "Runtime dependencies for the peak-media plugin, mirrored from lib/pins.json (the source of truth). Installed by scripts/setup.mjs into the plugin data dir.",
   "engines": {
     "node": ">=22"
   },

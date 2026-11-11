@@ -20,7 +20,7 @@ const SHEET = (mp4, out) => `cd ${P} && ${node('lib/verify/contact-sheet.mjs', `
 function goodSteps() {
   return [
     ['user', '<command-name>/peak-media:plate-factory</command-name>\n<command-args>brief.md, target 26 s</command-args>'],
-    ['bash', `bash "${ROOT}/scripts/setup.sh" --check`, 'ready'],
+    ['bash', `node "${ROOT}/scripts/setup.mjs" --check`, 'ready'],
     ['read', `${P}/brief.md`],
     ['ask', 'Brief: 26 s, 3 beats (hook, compare, close), default brand, 1280x720 30 fps. Go?', 'Yes'],
     ['say', 'Brief confirmed.\n\nGATE 0 brief: APPROVED — brief.md'],

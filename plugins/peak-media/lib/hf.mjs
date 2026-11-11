@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { CliError, EXIT, PLUGIN_ROOT } from './cli.mjs';
+import { CliError, EXIT, setupCommand } from './cli.mjs';
 import { depRoot, pins } from './deps.mjs';
 import { runWatched, stepTimeoutMs, fmtDuration } from './watchdog.mjs';
 
@@ -11,7 +11,7 @@ import { runWatched, stepTimeoutMs, fmtDuration } from './watchdog.mjs';
 const RENDER_TIMEOUT_MS = 30 * 60_000;
 const HF_TIMEOUT_MS = 10 * 60_000;
 
-const SETUP = path.join(PLUGIN_ROOT, 'scripts', 'setup.sh');
+const SETUP = setupCommand();
 
 export function hfEnv(extra = {}) {
   const env = {
@@ -23,8 +23,8 @@ export function hfEnv(extra = {}) {
     DO_NOT_TRACK: '1',
     ...extra,
   };
-  // Cloud sessions ship a Playwright headless shell; `browser ensure` can hang there.
-  if (!env.HYPERFRAMES_BROWSER_PATH && existsSync('/opt/pw-browsers')) {
+  // Linux cloud sessions ship a Playwright headless shell; `browser ensure` can hang there.
+  if (process.platform === 'linux' && !env.HYPERFRAMES_BROWSER_PATH && existsSync('/opt/pw-browsers')) {
     const shell = readdirSync('/opt/pw-browsers').filter((d) => d.startsWith('chromium_headless_shell-')).sort().at(-1);
     const p = shell && path.join('/opt/pw-browsers', shell, 'chrome-linux', 'headless_shell');
     if (p && existsSync(p)) env.HYPERFRAMES_BROWSER_PATH = p;
@@ -101,21 +101,22 @@ const LIB_PACKAGES = {
 /**
  * Start the render browser once (headless, about:blank). Returns {ok} or {ok:false, message} where
  * message is one line naming the fix: on Linux, the missing shared libraries and the apt command.
+ * `what` names the browser in the message (setup.mjs also checks the headed browser on Linux).
  */
-export function browserCheck(bin) {
-  if (!bin || !existsSync(bin)) return { ok: false, message: `render browser not found at ${bin} — run ${SETUP} (or set HYPERFRAMES_BROWSER_PATH)` };
+export function browserCheck(bin, { what = 'render browser' } = {}) {
+  if (!bin || !existsSync(bin)) return { ok: false, message: `${what} not found at ${bin} — run ${SETUP} (or set HYPERFRAMES_BROWSER_PATH)` };
   const r = runWatched(bin, ['--headless', '--no-sandbox', '--disable-gpu', '--dump-dom', 'about:blank'], { timeoutMs: stepTimeoutMs(60_000) });
-  if (r.timedOut) return { ok: false, message: `render browser didn't answer within ${fmtDuration(stepTimeoutMs(60_000))} (${bin}) — run ${SETUP} to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium` };
+  if (r.timedOut) return { ok: false, message: `${what} didn't answer within ${fmtDuration(stepTimeoutMs(60_000))} (${bin}) — run ${SETUP} to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium` };
   if (r.status === 0 && /<html/i.test(r.stdout ?? '')) return { ok: true };
   if (process.platform === 'linux') {
-    const ldd = spawnSync('ldd', [bin], { encoding: 'utf8' });
+    const ldd = spawnSync('ldd', [bin], { encoding: 'utf8', timeout: 30_000 });
     const libs = [...new Set([...(ldd.stdout ?? '').matchAll(/^\s*(\S+) => not found/gm)].map((m) => m[1]))].sort();
     if (libs.length) {
       const pkgs = [...new Set(libs.map((l) => LIB_PACKAGES[l]).filter(Boolean))].sort();
       const fix = pkgs.length ? `install them (Debian/Ubuntu: sudo apt-get install ${pkgs.join(' ')})` : 'install the packages that provide them';
-      return { ok: false, message: `render browser can't start — missing system libraries: ${libs.join(' ')} — ${fix}` };
+      return { ok: false, message: `${what} can't start — missing system libraries: ${libs.join(' ')} — ${fix}` };
     }
   }
   const why = `${r.error?.message ?? ''}\n${r.stderr ?? ''}`.split('\n').map((l) => l.trim()).filter(Boolean).at(-1) ?? `exit ${r.status}`;
-  return { ok: false, message: `render browser can't start (${bin}): ${why.slice(0, 300)} — run ${SETUP} to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium` };
+  return { ok: false, message: `${what} can't start (${bin}): ${why.slice(0, 300)} — run ${SETUP} to fetch the render browser, or point HYPERFRAMES_BROWSER_PATH at a working Chromium` };
 }

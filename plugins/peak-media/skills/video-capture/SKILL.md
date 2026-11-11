@@ -17,7 +17,7 @@ the frame-by-frame alternative for designed motion.
 Scripts: `${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/` (`capture.mjs`, `check-take.mjs`).
 `node "${CLAUDE_PLUGIN_ROOT}/skills/video-capture/scripts/capture.mjs" --help` and the same with
 `signin --help` or `serve --help` list every flag; `--version` prints the plugin version. If a script says a
-dependency is missing, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh"` and retry. Before
+dependency is missing, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"` and retry. Before
 writing a storyboard, Read `references/storyboard-api.md`.
 
 ## When to use it
@@ -209,8 +209,8 @@ The session file is a credential:
 - At hand-off, offer to delete it.
 - No session available: record only the public part, or use a demo account with seeded data.
 
-`signin` and `--headed` need Playwright's Chromium, which `setup.sh` installs; if it is missing
-they stop with one line naming `setup.sh`. Recording otherwise uses the headless shell.
+`signin` and `--headed` need Playwright's Chromium, which `setup.mjs` installs; if it is missing
+they stop with one line naming `setup.mjs`. Recording otherwise uses the headless shell.
 
 ## Report
 

@@ -1,12 +1,12 @@
 // The headed browser (DEC-49): Playwright's own Chromium for the pinned Playwright, installed by
-// setup.sh into <dataDir>/browsers. `capture signin` and `capture --headed` launch it; recording
+// setup.mjs into <dataDir>/browsers. `capture signin` and `capture --headed` launch it; recording
 // otherwise stays on the render browser (lib/hf.mjs browserPath()).
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { dataDir, resolveDep } from './deps.mjs';
 
-/** Where setup.sh installs Playwright's browsers (PLAYWRIGHT_BROWSERS_PATH). */
+/** Where setup.mjs installs Playwright's browsers (PLAYWRIGHT_BROWSERS_PATH). */
 export const browsersDir = () => path.join(dataDir(), 'browsers');
 
 /**

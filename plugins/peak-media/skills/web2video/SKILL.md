@@ -58,8 +58,8 @@ steps 9–10.
 
 ## Workflow
 
-1. **Setup check.** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh" --check`. If it reports
-   anything missing, ask before running `bash "${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh"` (it
+1. **Setup check.** `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --check`. If it reports
+   anything missing, ask before running `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"` (it
    downloads). `capture signin` also needs the headed browser it reports.
 
 2. **Intake.** Infer what you can from the prompt; ask (one `AskUserQuestion`) only for the rest,

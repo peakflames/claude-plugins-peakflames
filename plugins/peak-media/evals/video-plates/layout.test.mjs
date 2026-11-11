@@ -50,7 +50,7 @@ let chrome;
 const projects = {};
 before(() => {
   chrome = browserPath();
-  assert.ok(chrome, 'HyperFrames browser installed (run scripts/setup.sh)');
+  assert.ok(chrome, 'HyperFrames browser installed (run scripts/setup.mjs)');
   // ADV: F2's spine with two edge-case slides (WP4 verify-3 N-2/N-3): a table whose last column
   // holds a 97-character URL next to a hyphenated word, and six bullets that fill the content box.
   const adv = JSON.parse(readFileSync(F2, 'utf8'));

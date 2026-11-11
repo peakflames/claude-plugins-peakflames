@@ -20,7 +20,7 @@ command; the user does the signing in, in the window.
   `$CLAUDE_PLUGIN_DATA`, else `~/.cache/peak-media`). Keep that path for the take and hand-off.
 - On timeout, or if the browser was quit instead of the tab closed, it saves nothing and exits 1.
   Explain and offer to run it again.
-- Missing headed browser: it stops with one line naming `setup.sh`. Ask before running setup.
+- Missing headed browser: it stops with one line naming `setup.mjs`. Ask before running setup.
 
 Keep the default path. `--save` refuses `./web2video/` and any git work tree, but other folders
 are allowed, and the session belongs outside the project.

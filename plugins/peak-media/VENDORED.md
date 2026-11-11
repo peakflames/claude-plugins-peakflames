@@ -4,7 +4,7 @@ Three kinds of third-party material reach a peak-media user:
 
 - **Vendored** — copied into `vendor/` with local changes, all listed below.
 - **Bundled** — shipped in the plugin unmodified.
-- **Fetched** — downloaded by `scripts/setup.sh` into the plugin data dir
+- **Fetched** — downloaded by `scripts/setup.mjs` into the plugin data dir
   (`${CLAUDE_PLUGIN_DATA:-~/.cache/peak-media}`); never shipped in the plugin.
 
 The plugin ships no music, sound effects or other audio.
@@ -95,10 +95,10 @@ woff2 files were copied unmodified, and `OFL.txt` is the package's `LICENSE` fil
 
 Latin subset only: other scripts fall back to system fonts.
 
-## Fetched by setup.sh (not shipped)
+## Fetched by setup.mjs (not shipped)
 
 Versions are pinned in `lib/pins.json` (the only place they are set) and mirrored in
-`package.json` / `package-lock.json`. `setup.sh` runs `npm ci --ignore-scripts` from that lockfile
+`package.json` / `package-lock.json`. `setup.mjs` runs `npm ci --ignore-scripts` from that lockfile
 into `<data dir>/deps/<lockhash>/`, then `hyperframes browser ensure`.
 
 | Package | Kind | Source | Version | Licence | Where it ends up |
