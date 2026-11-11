@@ -6,7 +6,7 @@
 // `intro` from its own plate list (a motion entrance would itself be a scene change for check-take).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import path from 'node:path';
 import { run, ROOT, tmpDir } from '../helpers/run.mjs';
 
@@ -81,5 +81,13 @@ test('AC-PKG-04: on any supported OS, setup.mjs --check then the smoke run (rend
   // narration silence as long as assemble's (DEC-13: 300 ms; the fake/tone spine's gaps are ~700 ms)
   const ct = JSON.parse(step('check-take', 'skills/video-capture/scripts/check-take.mjs', [path.join(dir, 'review', 'review.mp4'), '--expect-cuts', '2', '--min-silence-ms', '300', '--json']).stdout);
   assert.equal(ct.ok, true);
+
+  // CI keeps the video (PEAK_MEDIA_SMOKE_OUT): uploaded as an artifact and linked from the PR
+  const keep = process.env.PEAK_MEDIA_SMOKE_OUT;
+  if (keep) {
+    mkdirSync(keep, { recursive: true });
+    const tag = `${process.platform}-${process.arch}`;
+    copyFileSync(final, path.join(keep, `peak-media-smoke-${tag}.mp4`));
+  }
   process.stdout.write(`# smoke: ${process.platform}/${process.arch}, ${manifest.totalMs} ms spine, plate cuts at ${asm.cuts.map((c) => c.timecode).join(', ')} in silence\n`);
 });
