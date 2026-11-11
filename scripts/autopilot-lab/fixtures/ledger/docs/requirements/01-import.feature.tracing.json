@@ -1,0 +1,118 @@
+{
+  "feature_id": "01",
+  "feature_file": "01-import.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-01-Kq7Rm2x",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Getting the bank's export into one local file is the first goal; nothing else in the product can work until the rows are in the ledger."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 2,
+            "paraphrase": "The user points the tool at the downloaded export and expects every row to land in the ledger, with a count confirming it."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Zb4Nw9T",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "A single date format in the ledger is what lets later reports group by month without guessing how each bank writes dates."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 3,
+            "paraphrase": "The user's banks export dates in two styles and they want one consistent form in the ledger without editing files by hand."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Hd3Yc8L",
+      "rationale": "Whole cents avoid floating-point drift when totals are summed; the sign carries direction so a refund can net against spending later.",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Totals must be exact to the cent, and refunds must be able to net against spending, so amounts are stored as signed whole cents."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 3,
+            "paraphrase": "The user expects the stored amounts to match the bank statement to the cent, whichever way the bank formats them."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Vp6Js1G",
+      "rationale": "The description is the user's evidence of what the bank reported; matching rules interpret it later without altering what is stored.",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "The ledger is a faithful record of what the bank said, so the description text is never tidied on the way in."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 3,
+            "paraphrase": "The user wants to recognise each line exactly as it appears on the bank statement when they look in the ledger."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Xt5Fa0M",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A budget that double-counts is worse than none; importing must be safe to repeat."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 4,
+            "paraphrase": "The user downloads overlapping date ranges each month and expects rows already in the ledger to be skipped."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": [
+    {
+      "gap_type": "uncovered_source",
+      "source_type": "conops_step",
+      "source_ref": "S2.1",
+      "note": "This ConOps scenario step is not covered by any TOR requirement in this feature file."
+    },
+    {
+      "gap_type": "uncovered_source",
+      "source_type": "conops_step",
+      "source_ref": "S2.2",
+      "note": "This ConOps scenario step is not covered by any TOR requirement in this feature file."
+    }
+  ]
+}

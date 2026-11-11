@@ -9,6 +9,11 @@ in `plugins/peak-media/docs/build/decisions.md`. Facts about Claude Code cite
 docs is marked **UNCONFIRMED** and is a P0 spike item. Section 14 maps Anthropic's own guidance for
 unattended agents onto this design.*
 
+*Updated 2026-11-11 after P0. The spike's answers and the owner's decisions are in
+`plugins/peak-workflow/scripts/autopilot/SPIKE.md`; where this plan and SPIKE.md differ, SPIKE.md
+wins. Changed here: host-mode sessions and `--plugin-dir` (§6.6), the merge gate and no-waivers
+checks (§6.5), the `git remote` rule and gate matching (§6.7), and the P0 status (§10, §13).*
+
 ---
 
 ## 1. TL;DR
@@ -46,6 +51,10 @@ unattended agents onto this design.*
   3. Do **P0** (section 10): a half-day spike that answers the UNCONFIRMED items in a throwaway
      directory. Record the answers in `plugins/peak-workflow/scripts/autopilot/SPIKE.md`.
   4. Only then start P1. Ask the owner before every push.
+
+  **P0 is done (2026-11-11).** Start at P1 after reading `SPIKE.md`. The E1 seed is in
+  `scripts/autopilot-lab/fixtures/ledger/` and the spike's host and hook scripts are in
+  `scripts/autopilot-lab/spike/`.
 
 ### 1.1 The parts and who does what
 
@@ -462,9 +471,9 @@ feature branch until merge (`start-epic` Step 2.5).
 
 | Check | How |
 |---|---|
-| Verdict | The verify session ended `success`, and `develop` advanced from `preVerify.developSha` by exactly one merge commit whose second parent is `preVerify.branchTip`, plus nothing else. The wrapup commit and the Haiku docs-refresh commit are on the branch side, which is expected (`wrapup-epic` Step 2.3, Step 4) |
+| Verdict | The verify session ended `success`, and `develop` advanced from `preVerify.developSha` by exactly one merge commit, plus nothing else. Its second parent must **descend from** `preVerify.branchTip`, and the commits between them may touch only `docs/` and the epic's sidecar; otherwise roll back and park (decided, SPIKE.md). Wrapup adds commits on the branch side before merging — three in the spike: complete, docs refresh, a docs follow-up (`wrapup-epic` Step 2.3, Step 4) |
 | Sidecar on develop | `status: Complete`, `completed:` set, a `verified:` line for each anchor TOR (written by `tor-lifecycle mark`, `wrapup-epic` Step 2.2) |
-| No waivers | No `waived:` line; no `FIXED DURING WRAPUP`, `UNDISCLOSED`, `PENDING` or `AMENDED` strings in `session-handoffs/epic-<id>-complete.md`. Policy never offers those answers, so their presence is an anomaly. Roll back and park |
+| No waivers | No `waived:` line in the sidecar, and every number on the Deferrals `Count:` line of `session-handoffs/epic-<id>-complete.md` is 0 (a clean handoff reads `Count: 0 (undisclosed: 0, waived: 0, fixed at wrapup: 0, amended: 0, pending: 0)`, so the words themselves always appear — parse the counts). Policy never offers those answers, so a non-zero count is an anomaly. Roll back and park |
 | Tests green on develop | The driver runs the test command on `develop` |
 | Requirements health | `tor-lifecycle check --base develop` has no blocking finding |
 
@@ -478,13 +487,26 @@ AUTOPILOT_STATE=<state>  AUTOPILOT_ROLE=planner|builder|verifier|auditor  AUTOPI
 CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1      # removes run_in_background (env-vars)
 BASH_MAX_TIMEOUT_MS=900000  BASH_DEFAULT_TIMEOUT_MS=300000
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=60000  # belt and braces (headless "background tasks at exit")
-TMPDIR=<state>/epics/<id>/<step>/tmp        # per-session temp dir, removed after the step
 ```
 
-`$PLUGIN_DIR` is the **installed** peak-workflow root, the directory `driver.mjs` runs from.
-Epic sessions load plugins the normal way (no `--plugin-dir`, no `--setting-sources`), so they
-see the user's own plugins, settings, `CLAUDE.md` and memory, as by hand. Decided (owner,
-2026-11-11). Autopilot's `--settings` layer adds the referee on top.
+No per-step `TMPDIR`: the sandbox sets its own (`/tmp/claude-<uid>`) for Bash and overrides it.
+
+`$PLUGIN_DIR` is the peak-workflow root that `driver.mjs` runs from — the copy that launched
+autopilot. Every epic session gets `--plugin-dir "$PLUGIN_DIR"`, so the skills and the referee
+are always the same version; a same-named installed or synced copy is replaced, not double-loaded
+(P0 S7). Everything else is inherited (no `--setting-sources`): the user's other plugins,
+settings, `CLAUDE.md` and memory, as by hand. Decided (owner, 2026-11-11). Autopilot's
+`--settings` layer adds the referee on top.
+
+**Host mode (P0 finding).** Plain `claude -p` has no `AskUserQuestion`, `EnterPlanMode` or
+`ExitPlanMode` tool, and `--tools` cannot add them. Plan, build and verify sessions are therefore
+launched as a stdio host — `claude -p --input-format stream-json --output-format stream-json
+--verbose --permission-prompt-tool stdio` plus the flags below — with the prompt sent as one
+`{"type":"user",…}` line on stdin and stdin closed at the `result` line. The driver denies and
+logs any `control_request` (`can_use_tool`) that arrives; none did in the spike, because hooks
+and `acceptEdits` decide everything. SPIKE.md "Host mode" has the message shapes. **Read the
+command blocks below with those flags and `--plugin-dir "$PLUGIN_DIR"` added, and the prompt
+moved to stdin.** The auditor stays on plain `-p`.
 
 **Plan (and fix plan):**
 
@@ -567,7 +589,8 @@ sessions); autopilot does not need it, because each step is a fresh session.
 **Result fields used:** `session_id`, `total_cost_usd`, `num_turns`, `usage`, `modelUsage` (whole
 tree, including subagents such as wrapup's Haiku docs refresh), `stop_reason`, the subtypes listed
 above, and `permission_denials`. `is_error`, `duration_ms` and the presence of every field in the
-CLI's JSON form are **UNCONFIRMED** (P0). The driver also measures wall clock itself.
+CLI's JSON form are confirmed (P0 S1), as is `terminal_reason` (`completed`, `hook_stopped`). The
+driver also measures wall clock itself.
 
 **Inherited setup and the referee layer.** Sessions inherit the user's setup on purpose. The
 referee must still hold:
@@ -582,23 +605,22 @@ session in `effective-setup.json`: the settings files that applied, enabled plug
 version, the `--settings` layer, and the stream-json init message. The report shows a one-line
 digest and flags any difference between sessions.
 
-**Testing an unreleased copy.** For the PoC, the installed peak-workflow *is* the branch copy. Add
-this repository checkout as a local marketplace and install peak-workflow from it, so the
-working tree on `feature/peak-workflow-autopilot-poc` is what loads. Don't add `--plugin-dir` on
-top of an install, which risks a double load. Reinstall the released version after the PoC. P0
-S7 confirms which copy loaded.
+**Testing an unreleased copy.** Nothing to install: run the driver from the checkout, and
+`--plugin-dir` makes the working tree on `feature/peak-workflow-autopilot-poc` the copy that
+loads (P0 S7: one `peak-workflow`, source `peak-workflow@inline`).
 
 `--bare` is **not** usable, because it skips hooks passed with `--settings` (`headless` bare mode).
 
 ### 6.7 Referee hooks
 
 The driver writes `settings.json` per session. The JSON fields are confirmed in `hooks`; whether
-non-bare `-p` honours hooks from `--settings` is inferred, not stated (**UNCONFIRMED**, P0):
+non-bare `-p` honours hooks from `--settings` is confirmed, in an untrusted directory too (P0 S2):
 
 ```json
 {
   "permissions": { "deny": [
-    "Bash(git push *)", "Bash(git remote *)", "Bash(docker *)", "Bash(podman *)", "Bash(colima *)",
+    "Bash(git push *)", "Bash(git remote add *)", "Bash(git remote set-url *)", "Bash(git remote rename *)",
+    "Bash(git remote remove *)", "Bash(docker *)", "Bash(podman *)", "Bash(colima *)",
     "Bash(lima *)", "Bash(limactl *)", "Bash(multipass *)", "Bash(vagrant *)", "Bash(qemu* *)",
     "Bash(sudo *)", "Bash(gh *)", "Bash(npm publish *)", "WebFetch", "WebSearch" ] },
   "hooks": {
@@ -619,7 +641,7 @@ Two additions follow Anthropic's guidance (§14):
   to the clone and the session `TMPDIR`, and **no network** (an allowlist only if config names a
   registry). Command deny-lists match only the text as written; the sandbox's network isolation
   doesn't depend on it (`security`, `sandboxing`). The sandbox confines Bash only; Read, Edit and
-  Write stay under hook R2. The exact settings keys are **UNCONFIRMED** (P0 S11).
+  Write stay under hook R2. The settings keys are in SPIKE.md (P0 S11).
 - **`ConfigChange` hook.** Block settings changes during a session, so a session cannot unload
   its own referee (`hooks` ConfigChange; `security`).
 
@@ -631,13 +653,13 @@ input (`hooks`). The rules:
 | Rule | Applies to | Logic |
 |---|---|---|
 | R1 kill switch | all | `<state>/STOP` exists: deny, plus `continue: false` with `stopReason` |
-| R2 path jail | Read, Edit, Write, NotebookEdit, Glob, Grep, Bash paths | Resolve `realpath`. Allow under `<state>/clone` and the session `TMPDIR`. Allow read-only access to `$PLUGIN_DIR` and the user's inherited setup (`~/.claude/` plugins, `CLAUDE.md`, memory). Deny `<state>/` outside the clone (except the bundle for the auditor) and anything else. For Bash, it scans absolute paths and `cd` targets in the command (best effort) |
-| R3 git rules | Bash `git …` | Deny push, remote, `--force`, `reset --hard`, `branch -D`, `checkout main`, `rebase` on develop or main, `tag`. **Builder:** deny `commit` or `merge` when `git branch --show-current` is `develop` or `main`. **Verifier:** allow `git merge --no-ff feature/epic-<AUTOPILOT_EPIC>-*` and `git branch -d` of that branch only |
+| R2 path jail | Read, Edit, Write, NotebookEdit, Glob, Grep, Bash paths | Resolve `realpath`. Allow under `<state>/clone` and the session `TMPDIR`. Allow read-only access to `$PLUGIN_DIR` and the user's inherited setup (`~/.claude/` plugins, `CLAUDE.md`, memory). Allow writes to `~/.claude/plans/` (plan mode writes its plan file there) and the sandbox temp directory. Deny `<state>/` outside the clone (except the bundle for the auditor) and anything else. For Bash, it scans absolute paths and `cd` targets in the command (best effort) |
+| R3 git rules | Bash `git …` | Deny push, `remote add/set-url/rename/remove` (the bare `git remote` listing is allowed; both skills' Freshness Guard runs it), `--force`, `reset --hard`, `branch -D`, `checkout main`, `rebase` on develop or main, `tag`. **Builder:** deny `commit` or `merge` when `git branch --show-current` is `develop` or `main`. **Verifier:** allow `git merge --no-ff feature/epic-<AUTOPILOT_EPIC>-*` and `git branch -d` of that branch only |
 | R4 containers and VMs | Bash | Deny docker, podman, colima, lima, multipass, vagrant, qemu, VirtualBox, kind, minikube, nvm/asdf/volta installs, `brew`, global `npm -g` / `pip install --user` |
 | R5 disk and growth | Bash, Write | Deny when free disk < `config.diskFloorGb` (default 15) or `du` of the clone grows by more than `config.growthCapMb` (default 1024) since the step started. The driver checks the same every 30 s and kills the step |
 | R6 background | Bash, Agent | Deny `run_in_background: true`. This duplicates the env var in case it is ignored |
 | R7 test integrity | Edit, Write, MultiEdit, NotebookEdit; Bash `rm`, `git rm`, `mv`, `sed -i`, `>` redirect on a path | If the target is a test file that exists on `develop` (by `git cat-file -e develop:<path>`) and `.autopilot/test-changes.jsonl` has no line for that path, deny with the instruction: "append {path, reason} to .autopilot/test-changes.jsonl first". Writing that file is allowed. The driver's diff check (§6.5) backs this up |
-| R8 gate policy | AskUserQuestion | Match each question against `policy/gates.json` (§7). **Answer:** `permissionDecision: "allow"` with `updatedInput` = the original `questions` plus `answers` {question text → option label}, which is documented for PreToolUse (`hooks`; `agent-sdk/user-input`). **Park:** write `gates/<id>-<n>.json`, deny, and `continue: false` with `stopReason: "autopilot: parked at human gate"` |
+| R8 gate policy | AskUserQuestion | Match each question against `policy/gates.json` (§7) by a stable fragment of the skill's question plus the queued epic ID, and require the answer label to be among the offered options (the model appends detail to question text; decided, SPIKE.md). Anything unmatched parks. **Answer:** `permissionDecision: "allow"` with `updatedInput` = the original `questions` plus `answers` {question text exactly as asked → option label}, which is documented for PreToolUse (`hooks`; `agent-sdk/user-input`). **Park:** write `gates/<id>-<n>.json`, deny, and `continue: false` with `stopReason: "autopilot: parked at human gate"` |
 | R9 plan capture and lint | ExitPlanMode | **Planner role:** save `tool_input.plan` to `plan.md`, then lint it. The plan must name every anchor TOR ID; contain the PLAN_TEMPLATE opening steps ("Create (or verify) feature branch", "Update status to \"In Progress\"") and closing-step headings ("Implementer self-assessment", "Reconcile spec", "Mark as Implemented", "Commit"); copy the Deferral and Amendment gate paragraphs; and contain no `git push`, container or `sudo` command. On pass, write `plan-lint.json`, deny the call, and return `continue: false` with `stopReason: "autopilot: plan captured"`. The driver then starts the build session. On fail, write a gate file and park with the plan attached. The report always says "plan approved by lint, not by a person". **Builder and verifier roles:** deny EnterPlanMode and ExitPlanMode, since the build session runs an already-approved plan |
 
 `stop.mjs`: if the `Stop` input's `background_tasks` is non-empty, return `decision: "block"` with
@@ -923,9 +945,12 @@ the answers to `SPIKE.md`.
 
 **Exit:** S1–S4, S7 and S8 pass, or each failure has a decided fallback (§13 risks).
 
+**Status: done 2026-11-11 — exit met.** S3 and S4b pass only in host mode (§6.6). S12 was not
+run. E1 ran plan, build, verify and merge headlessly for $2.19 in about 5 minutes. See SPIKE.md.
+
 ### P1: Driver with a fake `claude`
 
-Build `driver.mjs`: config load, preflight (sidecars, phase indexes, deps, flags), the state
+Build `driver.mjs` with the host-mode launcher (§6.6) and `--plugin-dir`: config load, preflight (sidecars, phase indexes, deps, flags), the state
 machine, process-group launch with wall clock, the checks in §6.5, rollback, crash resume, lock,
 STOP and dry-run. Build `fake-claude.mjs`: it reads a scenario file and emits stream-json lines,
 writes the git commits or sidecar edits the scenario names, and can hang, crash, exceed a budget
@@ -1119,17 +1144,19 @@ inputs to the explainer §10 recommendation.
    with the plan captured and linted (R9), and a fresh session implements it, mirroring
    `showClearContextOnPlanAccept`. S4 verifies the handoff format and the post-approval steps. A
    skill change is a last-resort fallback only.
-2. **CLI JSON field names** (S1): `is_error`, `duration_ms`, and whether `permission_denials` and
-   `modelUsage` appear in plain `json` (they are documented for stream-json and the SDK).
-3. **Hook trust and `--settings` in non-bare `-p`** (S2): documented only by inference.
+2. **CLI JSON field names. Answered (P0 S1):** all present in plain `json`; list in SPIKE.md.
+3. **Hook trust and `--settings` in non-bare `-p`. Answered (P0 S2):** hooks fire in an untrusted
+   directory with no trust step.
 4. **Plugin isolation. Decided (owner, 2026-11-11):** inherit the user's setup (plugins,
-   settings, `CLAUDE.md`, memory), with the referee layered on top via `--settings`. No
-   `--plugin-dir`-only loading and no `--setting-sources` isolation. S7 verifies precedence and
-   which copy loads.
+   settings, `CLAUDE.md`, memory), with the referee layered on top via `--settings`, and no
+   `--setting-sources` isolation. **Refined after P0 (owner, 2026-11-11):** peak-workflow itself
+   always loads from the copy that launched autopilot, via `--plugin-dir` (§6.6). Cloud sessions
+   are verified later.
 5. **Permission mode. Decided (owner, 2026-11-11):** `acceptEdits` plus referee hooks; `dontAsk`
    is not a target (S12 is an optional note). Whether hooks run under `bypassPermissions` is moot,
    because bypass is not used.
-6. **Agent SDK vs CLI.** The SDK (`query()` with `canUseTool`, `hooks`, `maxBudgetUsd`) may be
+6. **Agent SDK vs CLI. Answered (P0):** the CLI, driven as a stdio host (§6.6) — the same
+   control protocol the SDK uses, with no dependency. Original note: the SDK (`query()` with `canUseTool`, `hooks`, `maxBudgetUsd`) may be
    cleaner, but whether slash-command prompts work through `query()` is unconfirmed. The PoC
    starts with the CLI.
 7. **Builder model.** Sonnet for builds, Opus for verify (wrapup's frontmatter); is Sonnet strong
@@ -1146,6 +1173,10 @@ inputs to the explainer §10 recommendation.
     container with no host secrets mounted (Anthropic warns that `~/.claude` credentials can leak,
     §14) is evaluated only after the go/no-go. It is a deliberate, whole-run container, not the
     per-epic VM that incident 8 warns about.
+12. **Inference for gate matching. Open; the runs decide (owner, 2026-11-11).** The PoC stays
+    deterministic. The report counts needless parks (a gate parked only because its wording
+    missed the table). If inference is added later, it only classifies a question to a table
+    row, never chooses an answer, and anything uncertain parks.
 
 ---
 

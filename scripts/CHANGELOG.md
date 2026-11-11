@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **`autopilot-lab/fixtures/ledger/` seed (epic E1 only).** A pre-planned peak-workflow project
+  for the autopilot proof of concept; passes `tor-lifecycle format` and `check`.
+- **`autopilot-lab/spike/` P0 harness.** The stdio host and hook scripts used to answer the
+  spike's questions; reference only, replaced by the driver in P1.
+
 ## [0.1.1] — 2026-11-04
 
 ### Fixed

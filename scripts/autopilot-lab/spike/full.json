@@ -1,0 +1,91 @@
+{
+ "permissions": {
+  "deny": [
+   "Bash(git push *)",
+   "Bash(docker *)",
+   "Bash(podman *)",
+   "Bash(colima *)",
+   "Bash(sudo *)",
+   "Bash(gh *)",
+   "Bash(npm publish *)",
+   "WebFetch",
+   "WebSearch",
+   "Bash(git remote add *)",
+   "Bash(git remote set-url *)"
+  ]
+ },
+ "sandbox": {
+  "enabled": true,
+  "allowUnsandboxedCommands": false,
+  "failIfUnavailable": true,
+  "network": {
+   "allowedDomains": [],
+   "strictAllowlist": true
+  }
+ },
+ "hooks": {
+  "PreToolUse": [
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node $SPIKE_HOOKS/pretool.mjs"
+     }
+    ]
+   }
+  ],
+  "PostToolUse": [
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node $SPIKE_HOOKS/log.mjs"
+     }
+    ]
+   }
+  ],
+  "PostToolUseFailure": [
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node $SPIKE_HOOKS/log.mjs"
+     }
+    ]
+   }
+  ],
+  "Stop": [
+   {
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node $SPIKE_HOOKS/log.mjs"
+     }
+    ]
+   }
+  ],
+  "SessionStart": [
+   {
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node $SPIKE_HOOKS/log.mjs"
+     }
+    ]
+   }
+  ],
+  "SubagentStop": [
+   {
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node $SPIKE_HOOKS/log.mjs"
+     }
+    ]
+   }
+  ]
+ }
+}
