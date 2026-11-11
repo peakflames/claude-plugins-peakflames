@@ -32,10 +32,13 @@ jobs:
       run:
         shell: bash
     env:
-      CLAUDE_PLUGIN_DATA: ${{ runner.temp }}/peak-media-data
       PM: plugins/peak-media
     steps:
       - uses: actions/checkout@v4
+
+      # the plugin data dir (the runner context isn't available in job-level env)
+      - name: Data dir
+        run: echo "CLAUDE_PLUGIN_DATA=$RUNNER_TEMP/peak-media-data" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
