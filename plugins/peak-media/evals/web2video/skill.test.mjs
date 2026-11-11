@@ -116,7 +116,8 @@ test('AC-W2V-38: no brand or organization name in the plugin runtime tree, web2v
 test('web2video docs: every command runs a plugin script as node "${CLAUDE_PLUGIN_ROOT}/…" with flags that script accepts (not AC-bound)', () => {
   let n = 0;
   for (const [name, doc] of DOCS) {
-    for (const m of doc.matchAll(/(?:^|[\s`(])node\s+(\S+)/gm)) {
+    // the one inline exception: stopping `capture serve` by pid, portable to Windows (DEC-53)
+    for (const m of doc.replaceAll('node -e "process.kill(<pid>)"', '').matchAll(/(?:^|[\s`(])node\s+(\S+)/gm)) {
       assert.match(m[1], /^"\$\{CLAUDE_PLUGIN_ROOT\}\//, `${name}: node runs "\${CLAUDE_PLUGIN_ROOT}/…", not ${m[1]}`);
     }
     for (const m of doc.matchAll(/node "\$\{CLAUDE_PLUGIN_ROOT\}\/([^"]+)"([^\n`]*)/g)) {
@@ -176,7 +177,7 @@ test('WP17 UAT fixes in SKILL.md: serve for local folders (D1), silent keeps the
   assert.match(s4, /blocks `file:\/\/`/);
   assert.equal(commandLine('skills/video-capture/scripts/capture.mjs', /\bserve <folder>$/).length > 0, true);
   assert.match(s4, /run_in_background/);
-  assert.match(s4, /kill <pid>/);
+  assert.match(s4, /node -e "process\.kill\(<pid>\)"/);
   assert.match(s4, /don't\s+start any other server/);
   // D2: silent = --no-captions only
   assert.match(step(2), /mean `--no-captions` only: the cursor stays/);

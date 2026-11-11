@@ -4,7 +4,7 @@
 // polls for that file and, past the deadline, kills the step's whole process tree.
 // Why: under emulation (linux/amd64 on Apple silicon via Rosetta) spawnSync was seen to sleep in
 // epoll forever after its children had exited, ignoring its own `timeout` (WP9 verify-1 F1).
-// One implementation on every OS (DEC-52): no /bin/sh, so it runs the same on Windows.
+// One implementation on every OS (DEC-53): no /bin/sh, so it runs the same on Windows.
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

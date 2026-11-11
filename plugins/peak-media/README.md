@@ -28,18 +28,30 @@ it to change without a release.
 
 ## Prerequisites
 
+| Platform | Status | Notes |
+|---|---|---|
+| **macOS** (Apple silicon or Intel) | Supported | |
+| **Windows x64** | **Beta** | Claude Code on Windows needs [Git for Windows](https://git-scm.com/downloads/win) (Git Bash) |
+| **Linux x64** (Debian/Ubuntu tested) | **Beta** | Setup names any missing system libraries and the `apt-get` command |
+
+Windows ARM and Linux arm64 are not supported: there is no render browser for them. Windows and
+Linux pass the automated checks on every change; the beta label comes off once they have made a
+full video on a real PC.
+
 | Need | Why | Check |
 |---|---|---|
-| **macOS** | The only supported platform | |
 | **Node.js 22 or newer** (with npm) | Every script is Node; HyperFrames needs 22 | `node -v` |
 | **ffmpeg and ffprobe** | Encoding, loudness, cut checks | `ffmpeg -version` |
 | **About 1 GB of disk** for the runtime, plus room for renders | Runtime deps ≈ 140 MB, render browser ≈ 400 MB, sign-in browser ≈ 380 MB; a 1–2 minute video needs a few hundred MB more while it is built | |
 | **Network** for setup, and for narration | Setup downloads the pinned packages and a headless browser once; rendering is offline | |
 
-Install ffmpeg with `brew install ffmpeg`.
+Install ffmpeg:
 
-**peak-media 0.1.0 supports macOS only** (Apple silicon or Intel). Linux and Windows are not
-supported.
+| OS | Command |
+|---|---|
+| macOS | `brew install ffmpeg` |
+| Windows | `winget install Gyan.FFmpeg` (then open a new terminal so `ffmpeg` is on PATH) |
+| Linux | `sudo apt-get install ffmpeg` |
 
 ## Setup
 
@@ -54,6 +66,8 @@ missing also offers to run it. By hand:
 node ~/.claude/plugins/cache/peakflames-plugins/peak-media/<version>/scripts/setup.mjs
 node …/scripts/setup.mjs --check     # report what's missing; install nothing
 ```
+
+The same command works in Terminal (macOS), Git Bash (Windows) and any Linux shell.
 
 It is safe to re-run; it only downloads what is missing. Options: `--data-dir <dir>` to install
 elsewhere, `--skip-browser` when `HYPERFRAMES_BROWSER_PATH` already points at a Chromium headless

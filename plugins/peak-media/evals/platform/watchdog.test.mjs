@@ -1,4 +1,4 @@
-// DEC-52 platform subset: lib/watchdog.mjs on every OS (AC-XP-01, -02, -03). The fake steps are
+// DEC-53 platform subset: lib/watchdog.mjs on every OS (AC-XP-01, -02, -03). The fake steps are
 // Node scripts, so this file runs the same on macOS, Windows and Linux.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

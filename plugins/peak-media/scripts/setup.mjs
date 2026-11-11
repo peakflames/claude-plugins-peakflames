@@ -2,7 +2,7 @@
 // setup.mjs — install peak-media's pinned runtime deps (HyperFrames, Playwright, GSAP, ajv) into the
 // plugin data dir and make sure the render browser and the headed browser (Playwright's own
 // Chromium, for capture signin/--headed, DEC-49) are present. Safe to re-run. Runs the same on
-// macOS, Windows x64 and Linux x64 (DEC-52; it replaces setup.sh).
+// macOS, Windows x64 and Linux x64 (DEC-53; it replaces setup.sh).
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, accessSync, constants, realpathSync } from 'node:fs';
 import path from 'node:path';
@@ -18,7 +18,7 @@ const NAME = 'setup.mjs';
 const SETUP = setupCommand();
 const INSTALL_TIMEOUT_MS = 30 * 60_000;
 
-// render browser targets HyperFrames maps (DEC-52): Windows ARM and Linux arm64 have none
+// render browser targets HyperFrames maps (DEC-53): Windows ARM and Linux arm64 have none
 const SUPPORTED = new Set(['darwin/arm64', 'darwin/x64', 'win32/x64', 'linux/x64']);
 
 /** One-line reason this OS/CPU can't run peak-media, or null when it can. A Chromium of one's own (HYPERFRAMES_BROWSER_PATH) lifts the limit. */

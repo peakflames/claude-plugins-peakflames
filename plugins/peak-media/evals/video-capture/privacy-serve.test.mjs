@@ -117,7 +117,7 @@ test('WP17-D1: capture serve <dir> serves the folder on 127.0.0.1, prints the UR
     assert.match(await home.text(), /Page one/, '/ serves index.html');
     assert.equal((await fetch(url + 'page2.html')).status, 200);
     assert.equal((await fetch(url + '..%2F..%2F..%2Fpackage.json')).status, 404, 'nothing outside the folder');
-    assert.match(s.stderr(), /stop with Ctrl-C or kill \d+/);
+    assert.match(s.stderr(), /stop with Ctrl-C or node -e "process\.kill\(\d+\)"/);
     s.child.kill('SIGTERM');
     const { code } = await s.exited;
     assert.equal(code, 0, s.stderr());

@@ -1,4 +1,4 @@
-// DEC-52 platform subset: path handling that differs on Windows (AC-XP-04), checked with
+// DEC-53 platform subset: path handling that differs on Windows (AC-XP-04), checked with
 // path.win32 / path.posix so every OS runs both.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

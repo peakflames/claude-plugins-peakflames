@@ -8,6 +8,28 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [0.3.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **Windows x64 and Linux x64 support (beta)** — peak-media now runs on macOS, Windows x64 and Linux x64; Windows ARM and Linux arm64 stop setup with one "unsupported platform" line.
+- **CI on three OSes** — a GitHub Actions matrix (macOS, Windows, Ubuntu) runs the platform evals and an end-to-end smoke test on every PR and push to `develop`.
+
+### Changed
+
+- **Breaking: `scripts/setup.mjs` replaces `setup.sh`** — run `node …/scripts/setup.mjs`; same flags (`--check`, `--skip-browser`, `--data-dir`, `-q`) and exit codes.
+- **Step watchdog is pure Node** — no `/bin/sh`; a timeout or a killed session stops the step's whole process tree on every OS.
+- **ffmpeg hint names every OS** — `brew install ffmpeg` · `winget install Gyan.FFmpeg` · `sudo apt-get install ffmpeg`.
+- **`capture serve` stop command** — help, skills and the stderr line say `node -e "process.kill(<pid>)"`, which works in Git Bash on Windows.
+
+### Fixed
+
+- **`capture` serves local folders on Windows** — request paths compare case-insensitively and a drive root works.
+- **Scripts start from any path spelling** — entry-point checks ignore drive-letter case on Windows.
+
+### Documentation
+
+- **README prerequisites per OS** — a platform table (Windows and Linux beta) and one ffmpeg install line per OS.
+- **Sign-in file on Windows** — documented: file modes don't apply; the user's profile folder protects it.
+
 ## [0.2.0] — 2026-11-10
 
 ### Added

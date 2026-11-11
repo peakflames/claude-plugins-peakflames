@@ -2,6 +2,10 @@
 
 Items the Lead does after WP10, before the release.
 
+**Moved to 0.4.0 (DEC-53, 2026-11-10):** 0.3.0 is the Windows/Linux port only. Every open item below that was planned for 0.3.0 (the `(v0.2)` carry-forward nits still open, the WP16 engine gaps) and the brand-pack captions now target **0.4.0**.
+
+- [ ] **After 0.3.0 ships:** a coachee runs `/peak-media:web2video` end to end on a real Windows PC; when it passes, drop the README "beta" label for Windows (and Linux, once run there) in a patch release (DEC-53).
+
 - [ ] **Update `orchestration-plan.md` to require strict order** (user request, 2026-11-08; DEC-32). Replace the parallel-wave model in §4/§8 with one WP at a time, each verified and merged before the next starts, plus an end-to-end fixture run before any human listening or viewing gate. Record why: Wave 2 ran five builders in parallel, and builders filled unmerged dependencies with stand-ins (test-pattern plates, a test brand pack, macOS `say` sped up with `atempo`). That hid a blocker (the default pack's outro wouldn't render in `assemble`), produced a meaningless listening test for the user, and cost a fix round on WP6 plus re-verification. Carry the builder rule "build only on merged work; stop and ask instead of using stand-ins" into the plan and `agents/builder.md` (already added there).
 
 - [ ] **Evals must clean up their temp dirs** (found 2026-11-08: 1,218 `pm-*` folders, ~3 GB, filled the disk mid-verify). Add an auto-cleaning `tmpDir()` to `evals/helpers/run.mjs` and switch every eval to it — WP9 sweep. Until then, run suites with `TMPDIR=$(mktemp -d)` and delete it after.
@@ -31,6 +35,6 @@ Items the Lead does after WP10, before the release.
 
 - [ ] **WP15 verify-1 carry-forward (v0.2):** nits 8 (beat-error examples show only `script.md`), 10 (DOM cursor fallback undocumented), 11 (narrated beat end shifts with `--audio-offset-ms`). Findings 1–6 fixed in fix round 1 (`b13f8ab`), spot-checked by the Lead (docs test 2/2).
 
-- [ ] **WP16 carry-forward (v0.3 engine gaps):** `contact-sheet --beats <take.json>` (one still per beat from the manifest); `capture --hide <selector>` for private data; `sample-voice --cache-dir`; contact-sheet timecode covers each still's top-left corner (verify-1 #10). WP16 fix round 1 (`92b0aeb`) was spot-checked by the Lead; the runtime sizing (verify-1 #1, blocker) is proven only by WP17's AC-UAT-01/05.
+- [ ] **WP16 carry-forward (v0.4 engine gaps; was v0.3, DEC-53):** `contact-sheet --beats <take.json>` (one still per beat from the manifest); `capture --hide <selector>` for private data; `sample-voice --cache-dir`; contact-sheet timecode covers each still's top-left corner (verify-1 #10). WP16 fix round 1 (`92b0aeb`) was spot-checked by the Lead; the runtime sizing (verify-1 #1, blocker) is proven only by WP17's AC-UAT-01/05.
 
 - [ ] **WP17 verify-1 carry-forward (v0.2):** F-02 re-record-from-project (D7) and F-03 D9/D10/D11 are text-tested only — one AC-UAT-03 and AC-UAT-12 re-run would exercise them; F-04 `hide` + page errors in one take unexercised; F-05 the post-recording privacy stop never triggered (every case caught it while exploring). F-01 fixed (chat message before the sign-in window).

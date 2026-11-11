@@ -1,4 +1,4 @@
-// DEC-52 platform subset: scripts/setup.mjs (it replaces setup.sh) on every OS. No network: every
+// DEC-53 platform subset: scripts/setup.mjs (it replaces setup.sh) on every OS. No network: every
 // run here is --check, --help, --version or a refusal, so nothing is installed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

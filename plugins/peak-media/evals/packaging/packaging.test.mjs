@@ -1,5 +1,5 @@
 // WP9 packaging: AC-PKG-01, -03, -04, -06, -07, -08. WP16: AC-W2V-40 (six skills, DEC-45).
-// AC-PKG-04 and -08 run setup.mjs for real (a no-op when the runtime is already installed). DEC-52
+// AC-PKG-04 and -08 run setup.mjs for real (a no-op when the runtime is already installed). DEC-53
 // (supersedes DEC-41): macOS, Windows x64 and Linux x64. -04 is setup then the no-key F1 video (the
 // full F1 eval stays macOS-only; evals/smoke is the end-to-end run on Windows and Linux); -08 is
 // setup + F0 with a prerequisite missing (ffmpeg, the render browser, the narration key), each
@@ -148,7 +148,7 @@ test('packaging: docs/ ships nothing heavier than Markdown, scripts, JSON, logs 
   assert.deepEqual(media, [], 'no audio or video files in the plugin');
 });
 
-const POSIX_ONLY = process.platform === 'win32' && 'POSIX shell fake; the full suite is macOS-only (DEC-52)';
+const POSIX_ONLY = process.platform === 'win32' && 'POSIX shell fake; the full suite is macOS-only (DEC-53)';
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 const until = async (cond, ms, what) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) assert.fail(what); await new Promise((r) => setTimeout(r, 100)); } };
 // a Node step whose own child never exits; the child's pid goes to pidFile (runs the same on every OS)
@@ -238,10 +238,10 @@ test('watchdog: "not found" only when the binary does not exist, not from a real
 });
 
 const SUPPORTED = ['darwin/arm64', 'darwin/x64', 'win32/x64', 'linux/x64'];
-const F1_MACOS_ONLY = process.platform !== 'darwin' && 'the full F1 eval is macOS-only (DEC-52); evals/smoke covers Windows and Linux';
+const F1_MACOS_ONLY = process.platform !== 'darwin' && 'the full F1 eval is macOS-only (DEC-53); evals/smoke covers Windows and Linux';
 
 test('AC-PKG-04: on a supported OS with the prerequisites, setup.mjs then the F1 neutral eval (no key: fake/tone spine, default pack) passes with no manual steps', { skip: F1_MACOS_ONLY }, () => {
-  assert.ok(SUPPORTED.includes(`${process.platform}/${process.arch}`), `${process.platform}/${process.arch} is supported (DEC-52)`);
+  assert.ok(SUPPORTED.includes(`${process.platform}/${process.arch}`), `${process.platform}/${process.arch} is supported (DEC-53)`);
   const setup = run('scripts/setup.mjs', [], { network: true });
   assert.equal(setup.code, 0, `setup.mjs: ${setup.stdout}${setup.stderr}`);
   assert.match(lines(setup.stdout).at(-1), /^peak-media ready: /);

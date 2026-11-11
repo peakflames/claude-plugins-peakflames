@@ -1,4 +1,4 @@
-// The wrapper process lib/watchdog.mjs starts for every watched step (DEC-52: one Node
+// The wrapper process lib/watchdog.mjs starts for every watched step (DEC-53: one Node
 // implementation on every OS, no /bin/sh). It runs the real binary with stdin/stdout/stderr bound
 // to files, waits for it, and writes its exit status to the status file atomically (.tmp, rename).
 // Every second it checks that the node process that started it is still alive: that process is

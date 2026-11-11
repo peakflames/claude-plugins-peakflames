@@ -1,4 +1,4 @@
-// DEC-52 end-to-end smoke test: the one real run on every OS in CI (macOS, Windows x64, Linux x64).
+// DEC-53 end-to-end smoke test: the one real run on every OS in CI (macOS, Windows x64, Linux x64).
 // Real binaries (HyperFrames, the render browser, Playwright, ffmpeg), no API key, and no network
 // after setup: setup.mjs --check → render one plate → capture the example deck → assemble →
 // check-take. The project is the example deck's narration on a fake/tone spine (beats intro, why,
