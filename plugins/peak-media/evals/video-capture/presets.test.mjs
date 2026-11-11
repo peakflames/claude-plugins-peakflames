@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ROOT, run, tmpDir } from '../helpers/run.mjs';
 import { CAPTURE, SPINE, DECK, NO_KEY, makeF3Project, LOCAL_PAGE } from './helpers/projects.mjs';
 import { toneOnsets } from './helpers/sync.mjs';
@@ -24,7 +25,7 @@ const UI = path.join(ROOT, 'skills', 'video-capture', 'examples', 'ui-demo');
 const UI_STORYBOARD = path.join(UI, 'storyboard.mjs');
 const UI_SCRIPT = path.join(UI, 'script.md');
 const CHECK_TAKE = 'skills/video-capture/scripts/check-take.mjs';
-const LOOPBACK_ONLY = path.join(ROOT, 'evals', 'video-capture', 'helpers', 'loopback-only.mjs');
+const LOOPBACK_ONLY = pathToFileURL(path.join(ROOT, 'evals', 'video-capture', 'helpers', 'loopback-only.mjs')).href;
 /** Hosts a TTS call would go to (OpenRouter is the only TTS provider). */
 const TTS_HOSTS = /openrouter|api\.openai|texttospeech|elevenlabs/i;
 

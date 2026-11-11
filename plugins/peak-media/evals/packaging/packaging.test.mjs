@@ -10,6 +10,7 @@ import { readFileSync, readdirSync, statSync, existsSync, copyFileSync, writeFil
 import path from 'node:path';
 import { run, ROOT, pluginVersion, tmpDir } from '../helpers/run.mjs';
 import { depsDir as depsRoot } from '../../lib/deps.mjs';
+import { pathToFileURL } from 'node:url';
 
 const REPO = path.resolve(ROOT, '..', '..');
 // DEC-45 (supersedes DEC-21's five in part): the five engine skills plus the web2video front door
@@ -209,7 +210,7 @@ test('watchdog: Ctrl-C (SIGINT) or SIGTERM to node stops the running step\'s who
     const step = path.join(dir, 'hang.mjs');
     writeFileSync(step, sleeperStep(pidFile));
     const script = path.join(dir, 'step.mjs');
-    writeFileSync(script, `import { runWatched } from ${JSON.stringify(path.join(ROOT, 'lib', 'watchdog.mjs'))};\n`
+    writeFileSync(script, `import { runWatched } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib', 'watchdog.mjs')).href)};\n`
       + `runWatched(process.execPath, [${JSON.stringify(step)}], { timeoutMs: 600000 });\n`);
     const child = spawn(process.execPath, [script], { env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp }, stdio: 'ignore', windowsHide: true });
     const exited = new Promise((res) => child.on('exit', (c, s) => res({ c, s })));

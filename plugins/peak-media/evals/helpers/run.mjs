@@ -1,6 +1,6 @@
 // Helpers for evals: run a plugin entry point and capture its output.
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
 import { runWatched } from '../../lib/watchdog.mjs';
@@ -28,7 +28,7 @@ export function tmpDir(prefix = 'pm-') {
 
 /** Run `node <script> ...args` with network blocked unless opts.network. */
 export function run(script, args = [], opts = {}) {
-  const pre = opts.network ? [] : ['--import', path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')];
+  const pre = opts.network ? [] : ['--import', pathToFileURL(path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')).href];
   const t0 = Date.now();
   const [bin, argv] = [process.execPath, [...pre, path.join(ROOT, script), ...args]];
   // per-step watchdog (lib/watchdog.mjs): a hung step fails its test in one line instead of hanging the suite

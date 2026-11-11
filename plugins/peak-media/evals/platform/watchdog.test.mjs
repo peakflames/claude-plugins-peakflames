@@ -7,6 +7,7 @@ import { writeFileSync, readFileSync, existsSync, readdirSync, mkdirSync, realpa
 import path from 'node:path';
 import { runWatched, resolveBin } from '../../lib/watchdog.mjs';
 import { ROOT, tmpDir } from '../helpers/run.mjs';
+import { pathToFileURL } from 'node:url';
 
 const node = process.execPath;
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
@@ -76,7 +77,7 @@ test('AC-XP-02: when the parent node process dies mid-step, the step\'s tree is 
   mkdirSync(tmp);
   const pidFile = path.join(dir, 'grandchild.pid');
   const step = fake(dir, 'hang', parentOfSleeper(pidFile));
-  const parent = fake(dir, 'parent', `import { runWatched } from ${JSON.stringify(path.join(ROOT, 'lib', 'watchdog.mjs'))};\n`
+  const parent = fake(dir, 'parent', `import { runWatched } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib', 'watchdog.mjs')).href)};\n`
     + `runWatched(process.execPath, [${JSON.stringify(step)}], { timeoutMs: 600000 });\n`);
   const child = spawn(node, [parent], { env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp }, stdio: 'ignore', windowsHide: true });
   const exited = new Promise((res) => child.on('exit', res));

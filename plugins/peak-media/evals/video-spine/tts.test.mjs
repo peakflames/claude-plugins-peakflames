@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, copyFi
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { run, fx, ROOT, baseline, tmpDir } from '../helpers/run.mjs';
 import { makeFakeFetch, FAKE_OR_RATE } from './helpers/fake-openrouter.mjs';
 import {
@@ -153,8 +154,8 @@ test('AC-TTS-06: sample-voice with 3 Gemini voices (fake transport) → 3 WAVs a
   const style = 'Clear, friendly, unhurried explainer tone.';
   const env = { ...process.env, ...isoEnv({ PEAK_MEDIA_OPENROUTER_API_KEY: KEY, PEAK_MEDIA_FAKE_OR_LOG: log }) };
   const r = spawnSync(process.execPath, [
-    '--import', path.join(ROOT, 'evals', 'helpers', 'no-network.mjs'),
-    '--import', path.join(ROOT, 'evals', 'video-spine', 'helpers', 'fake-openrouter.mjs'),
+    '--import', pathToFileURL(path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')).href,
+    '--import', pathToFileURL(path.join(ROOT, 'evals', 'video-spine', 'helpers', 'fake-openrouter.mjs')).href,
     path.join(ROOT, SV), '--voices', 'Achird,kore,Puck', '--style', style, '--out-dir', out, '--debug-requests',
   ], { encoding: 'utf8', env, cwd: d });
   assert.equal(r.status, 0, r.stderr);

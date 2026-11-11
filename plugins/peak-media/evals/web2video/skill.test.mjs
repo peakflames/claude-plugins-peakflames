@@ -6,6 +6,7 @@ import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, chmodSy
 import { spawnSync, spawn } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ROOT, tmpDir } from '../helpers/run.mjs';
 
 const SKILL_DIR = path.join(ROOT, 'skills', 'web2video');
@@ -13,7 +14,7 @@ const SKILL = readFileSync(path.join(SKILL_DIR, 'SKILL.md'), 'utf8');
 const REFS = readdirSync(path.join(SKILL_DIR, 'references')).filter((f) => f.endsWith('.md'));
 const DOCS = [['SKILL.md', SKILL], ...REFS.map((f) => [`references/${f}`, readFileSync(path.join(SKILL_DIR, 'references', f), 'utf8')])];
 const NO_KEY = { PEAK_MEDIA_OPENROUTER_API_KEY: '', TTS_OPENROUTER_API_KEY: '' };
-const NO_NET = path.join(ROOT, 'evals', 'helpers', 'no-network.mjs');
+const NO_NET = pathToFileURL(path.join(ROOT, 'evals', 'helpers', 'no-network.mjs')).href;
 const UI_DEMO = path.join(ROOT, 'skills', 'video-capture', 'examples', 'ui-demo');
 const lines = (s) => s.trim().split('\n').filter(Boolean);
 
