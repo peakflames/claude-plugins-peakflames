@@ -1,4 +1,4 @@
-# peak-media on every supported OS (DEC-52): macOS, Windows x64, Linux x64. Runs the platform
+# peak-media on every supported OS (DEC-53): macOS, Windows x64, Linux x64. Runs the platform
 # subset of the evals plus one end-to-end smoke test; the full eval suite stays a local macOS run.
 name: peak-media
 
