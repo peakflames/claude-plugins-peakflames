@@ -8,6 +8,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [3.1.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **Autopilot driver (proof of concept)** — `scripts/autopilot/driver.mjs` runs queued epics
+  unattended in a private clone: plan, build, driver checks, verify, and a merge gate that rolls
+  back a bad merge. Not yet reachable from a skill.
+- **Autopilot dry run** — `driver.mjs run --dry-run` prints the queue, each exact session
+  command, the settings JSON and the gate policy, and invokes nothing.
+- **`fake-claude.mjs` test double** — scripted stand-in for `claude` that drives the driver's
+  `node:test` suite without calling a model.
+
 ## [3.0.1] — 2026-11-05
 
 ### Fixed

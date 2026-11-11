@@ -964,6 +964,11 @@ mid-VERIFY then resume; stale lock; dry-run invokes nothing.
 
 **Exit:** all green; the dry run of the ledger seed prints the expected queue and commands.
 
+**Status: done 2026-11-11 — exit met.** 17 tests green. Deviations: the driver lints `plan.md`
+itself (P2's hook reuses `lintPlan`); AUDIT is recorded as skipped until P3; rollback also keeps
+the rejected tip under `refs/autopilot/rejected/` and cleans untracked files; sessions get
+`AUTOPILOT_STEP` and `AUTOPILOT_HOOKS`; `report.md` is a plain rendering until P3.
+
 ### P2: Referee hooks
 
 Build `pretool.mjs`, `stop.mjs`, `log.mjs` and `policy/gates.json`. Unit tests pipe fixture hook
