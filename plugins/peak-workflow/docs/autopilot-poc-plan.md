@@ -1287,7 +1287,15 @@ waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 
   sessions. R1–R4 and R6–R9 denied, answered or parked as designed on the workspace layout; the
   real auditor returned a high `test-weakened` finding on the widened build and none that parks
   on the clean one.
-- **Not done here:** the owner's real skill run. Linux / Windows launch stays a P6 item.
+- **Real skill run (owner, 2026-11-11):** done from two real Claude Code sessions with the plugin
+  loaded by `--plugin-dir`, against `fake-claude.mjs` on a `git init` copy of the seed: dry run,
+  a run that parked at a deferral gate, `report` with the gate decided, a second run that resumed
+  at BUILD and merged, and the final `report`. `${CLAUDE_PLUGIN_ROOT}` resolved, the launch and
+  gate questions used `AskUserQuestion`, and the `nohup` launch ran detached (the second run was
+  still running at the three-second check). One finding, fixed: the rehearsal question was left
+  in the chat as plain text; every fixed-answer question now goes through `AskUserQuestion`.
+  Not shown by it: a run outliving its session for hours (P0 S10 covers the mechanism).
+- **Not done here:** Linux / Windows launch stays a P6 item.
 
 **Before P4:** the owner's real skill run and the live re-runs in the table above. To pick P4 up
 in a new session, say: "Continue the peak-workflow autopilot PoC on
