@@ -1412,6 +1412,16 @@ E6 and E4 re-entered at VERIFY and BUILD with the owner's answer replayed once. 
   test file. Also seen: the fix-round planning session edited a test and tried to commit
   instead of planning (R3 denied the commit); it ended without a plan.
 
+**Evidence for `onPark: stop` as the default (owner, 2026-11-12).** E6's conflict is the risk
+the default exists for, seen on the first real run. The lab sets `"onPark": "continue"` (§10.5
+expects E6 to run after an upstream park), so in the first run E6 was built while E3 sat parked;
+both edit `src/index.js`, and when E3 merged in the second run E6 was stale — a conflict, and a
+usage text missing `summary`. Under `stop` the first run ends at E3's park, E3 merges first in
+the next run, and E6 is built on top of it: no conflict. "Independent" was true in the phase
+index and false in the code. The verifier caught it and asked, so nothing wrong merged; the
+cost was a wasted build and one more question for the owner. The lab still uses `continue`
+(the owner has not asked to change it); Run A's results are the `continue` run.
+
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
