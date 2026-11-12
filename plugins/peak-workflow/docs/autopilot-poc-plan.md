@@ -1486,10 +1486,53 @@ from a look reports CANNOT VERIFY on an operator-observed anchor, the driver now
 verifier also raised a real product point in its code review: income is drawn on the same scale
 as spending, so PAYROLL is a 240 px bar and the spending bars are slivers under 6 px.
 
+**Run A is closed (owner, 2026-11-12).** Seven launches after the aborted first attempt, $16.93
+in sessions ($17.52 with the attempt), about 40 minutes of run time over an evening with the
+owner answering between runs. It was not one overnight run: the tooling defects above made it
+iterative, and several fixes landed between launches, so its numbers describe the PoC being
+debugged, not the PoC as it now stands.
+
+| Epic | Final state | Notes |
+|---|---|---|
+| E1 CSV import | MERGED, first run | — |
+| E2 Categorization rules | MERGED, first run | E1's test untouched; oracle passes |
+| E3 Monthly summary | MERGED, second run | one needless park (Step 1.5 wording) |
+| E6 Config and help | MERGED, fourth run | a real verifier question, a stale-base conflict under `onPark: continue`, a void decision, one needless park (lint wording) |
+| E4 Currency conversion | PARKED, as designed | deferral gate on the live TOR; left undecided |
+| E5 Spending chart | PARKED, not merged | reached the human check with `chart.html`; the owner's look was recorded and a real verifier found it incomplete; left at the repair session's question |
+
+No false merge. Three needless parks, all wording matches. Defects found and fixed during the
+run: the sandbox crash in `tor-lifecycle`, three wording matches, traceability of an
+operator-observed TOR, the two-session repair, the merge gate after an owner's "Fix now", and
+the unsettled look. Not exercised in a real session: the one-session repair, the inline
+"Fix now" merge, and the unsettled-look gate (all fake-backed only). `lab.mjs evaluate` scores
+the first run only (3 of 6 as expected); the table above is the record for the whole run.
+
+**Proposed rule, from the owner (2026-11-12) — decide after Runs B and C:** *when an HTML file
+or a website is involved and Playwright is available, use Playwright to "see" the result
+instead of stopping for a person.* Raised when E5's verifier would not pass the height clause
+on the owner's note. Notes for the decision:
+
+- E5's operator-observed TOR is all geometry (the tallest bar is the largest total, half the
+  total is half the height, no label overlaps), which a measurement can settle; the build's own
+  test already checks the heights from the SVG, with no browser. The lab tagged it
+  operator-observed to force the human-look path. Claims like these belong in automated checks.
+- A judgement call still needs a person: "is it readable", or the verifier's finding that
+  income on the same scale leaves the spending bars under 6 px. No measurement turns that into
+  a decision.
+- A likely shape: measurable visual claims are written as ordinary TORs and checked by a test
+  (DOM or SVG geometry, Playwright where layout needs a real browser); `operator-observed` is
+  kept for judgement, and autopilot parks only for those. That is a `capture-requirements` and
+  `start-epic` change as much as an autopilot one.
+- Open: whether a browser can launch inside the unattended sessions' sandbox (no network,
+  restricted process and file access) — needs a spike. §12 put automated perceptual checks out
+  of scope for the PoC because, in the peak-media build, numbers stood in badly for looking;
+  this rule narrows that, it does not reverse it.
+
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
-go-ahead walk me through Run A. Real `claude` sessions only with my go-ahead. Ask before any push."
+go-ahead walk me through Run B (the lab still sets `onPark: continue`; ask me whether to change it first). Real `claude` sessions only with my go-ahead. Ask before any push."
 
 ### P5: Evaluate
 
