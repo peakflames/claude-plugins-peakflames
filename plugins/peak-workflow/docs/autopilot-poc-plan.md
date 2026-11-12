@@ -1595,6 +1595,15 @@ ConOps or CLAUDE.md's stdout rule. A real verifier checks the requirements and t
 not catch a brief that contradicts the wider project documents. The reading page's second look
 was then sent back because the owner's note named one of the requirement's three Then lines.
 
+**Scenario D rerun, end state: all five `shelf` epics MERGED, four launches, $13.10.** The reading
+page went through every path in real sessions: built, parked for a look, repaired in one session
+on the owner's note, parked for a second look, sent back once by the verifier (the note named
+one Then line of three), then verified and merged after a catch-up merge with `develop`, with no
+hand edits to the workspace this time. Its last verify ran with the new instruction that "Looks
+right" answers the whole requirement; the owner's short note was accepted. Still unproven live:
+the inline "Fix now" merge, and the park for a verified-but-unmerged epic (neither arose). The
+yes/no look form has not run live either: this run's gates were written before it existed.
+
 **Owner's UX feedback and decisions (2026-11-12).** (1) The confirm screen's limits table read as
 estimates and was "very wrong" as such: show the caps as t-shirt sizes, labelled as caps; no
 estimates and no estimate-versus-actual. (2) The look is too onerous and the verifier too
