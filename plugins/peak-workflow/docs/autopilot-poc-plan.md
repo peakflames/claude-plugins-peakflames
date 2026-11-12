@@ -1525,6 +1525,9 @@ ran as designed:
 Both oracle tests pass. Needless parks so far: five wording matches in Runs A and B. The start-of-epic
 row now also accepts a question that names the epic and ends "Start it?" (not rerun live).
 
+**Run C (owner, 2026-11-12): done, 6 of 6 as expected, $0.** `node --test` fails on `develop`; the
+driver stopped within a second with "base red", started no session, and touched no epic.
+
 **Proposed rule, from the owner (2026-11-12) — decide after Runs B and C:** *when an HTML file
 or a website is involved and Playwright is available, use Playwright to "see" the result
 instead of stopping for a person.* Raised when E5's verifier would not pass the height clause
