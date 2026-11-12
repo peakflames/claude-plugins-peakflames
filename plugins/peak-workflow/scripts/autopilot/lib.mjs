@@ -22,11 +22,13 @@ export function lintPlan(plan, anchors) {
   const problems = [];
   for (const tor of anchors) if (!plan.includes(tor)) problems.push(`does not name anchor ${tor}`);
   const headings = [
-    ['Create (or verify) feature branch', /Create \(or verify\) feature branch/i],
-    ['Update status to "In Progress"', /Update status to ["“]In Progress["”]/i],
+    // The model keeps every template step but often shortens its heading ("Feature branch",
+    // "Status → In Progress", "Mark Implemented"), so these match the step, not the exact words.
+    ['Create (or verify) feature branch', /feature branch/i],
+    ['Update status to "In Progress"', /status\b[^\n]{0,40}In Progress/i],
     ['Implementer self-assessment', /Implementer self-assessment/i],
     ['Reconcile spec', /Reconcile spec/i],
-    ['Mark as Implemented', /Mark as Implemented/i],
+    ['Mark as Implemented', /Mark (as )?Implemented|status\b[^\n]{0,40}\bImplemented\b/i],
     ['Commit', /^[\s>#*\-\d.)]*\**Commit\b/m],
     ['Deferral gate', /Deferral gate/i],
     ['Amendment gate', /Amendment gate/i],

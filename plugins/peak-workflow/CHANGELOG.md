@@ -75,6 +75,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Test-double guard** — a `claudeBin` other than `claude` in `settings.json` is refused by
   preflight and by the driver unless that run's `config.json` sets `allowTestDouble`.
 
+### Fixed
+
+- **`tor-lifecycle` in a sandbox** — with four or more feature files the helper crashed where
+  process pools are denied (Claude Code's sandbox on macOS); it now parses in-process instead.
+- **Autopilot plan lint accepts shortened step headings** — a plan that keeps every template
+  step under a shorter heading ("Feature branch", "Mark Implemented") no longer parks.
+
 ## [3.0.1] — 2026-11-05
 
 ### Fixed

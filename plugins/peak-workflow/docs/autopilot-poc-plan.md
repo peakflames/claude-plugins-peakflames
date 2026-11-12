@@ -1370,6 +1370,16 @@ scripts/autopilot-lab/test/` → 7 tests pass, no model called. What exists and 
 - **Not built:** the §11 stopwatch and per-rule metrics that need a person or the hook logs
   (gate re-asks, auditor precision). `evaluate` reports counts; P5 fills the table.
 
+**Run A, first attempt (2026-11-11): ended in a minute, $0.59, nothing built — two defects, both
+fixed.** (1) `tor_lifecycle.py` parses four or more feature files in a process pool, and the
+sandbox denies the semaphore call it needs (`PermissionError` from `os.sysconf`); E6's planning
+session stopped with no plan, correctly refusing to plan without requirement states. P0 and the
+live tests never saw it: their seed has one feature file. It now falls back to parsing
+in-process. (2) E1's plan kept every template step but headed three of them "Feature branch",
+"Status → In Progress" and "Mark Implemented"; the lint wanted the template's exact words and
+parked a complete plan. The lint now matches the step, not the wording. Everything downstream
+was BLOCKED as designed. The attempt is discarded: Run A starts again from `reset --force`.
+
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my

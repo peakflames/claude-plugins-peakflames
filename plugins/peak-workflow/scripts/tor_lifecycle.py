@@ -30,7 +30,7 @@ import os
 import re
 import subprocess
 import tomllib
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import BrokenExecutor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -171,8 +171,14 @@ def parse_files(paths: list[str], full: bool = False) -> list[list]:
     func = _parse_file_full if full else _parse_file
     if len(paths) < POOL_MIN_FILES:
         return [func(p) for p in paths]
-    with ProcessPoolExecutor(max_workers=min(len(paths), os.cpu_count() or 1)) as pool:
-        return list(pool.map(func, paths))
+    try:
+        with ProcessPoolExecutor(max_workers=min(len(paths), os.cpu_count() or 1)) as pool:
+            return list(pool.map(func, paths))
+    except (OSError, ImportError, NotImplementedError, BrokenExecutor):
+        # No process pool here: a sandbox that denies semaphores (macOS Seatbelt raises
+        # PermissionError from os.sysconf), or a platform without them. Parsing in this process
+        # gives the same result, only slower. A DataError from a worker is not caught here.
+        return [func(p) for p in paths]
 
 
 def write_text(path: Path, text: str) -> None:
