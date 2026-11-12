@@ -1550,6 +1550,38 @@ keeps one command per file (`src/commands/<name>.js`) so that epics which wait f
 not conflict in a shared file when they merge late, the failure Run A's E6 hit. `evaluate --run D`
 judges the first launch only.
 
+**Scenario D, run with the owner (2026-11-12): four launches, $13.16, about 25 minutes of run time.**
+
+| Path | Result in real sessions |
+|---|---|
+| One-session repair | **Works.** On the owner's "Not right" note, one repair session changed the page and committed it (34 s, $0.23) |
+| Unsettled look | **Works.** The verifier would not judge the chart from a note that left the bar heights out; the driver came back to the owner with the verifier's reason and started no repair. With a full note the chart verified and MERGED |
+| Inline "Fix now" | **Not reached.** The builder handled the missing settings file itself, so the verifier had nothing to ask. Still fake-backed only |
+
+Final states: `Sh1Add4`, `Sh4Cfg9`, `Sh3Chr2` MERGED; `Sh2Pag6` verified 4/4 but not merged (below).
+The first launch matched 4 of 4 expected outcomes with no needless park. Three driver defects
+surfaced, all in what happens *after* a repair or a wait, and all hidden by the test double:
+
+1. **The build check rejected the repair's commit.** It wanted a `feat(epic-…)` subject; the
+   repair prompt asks for `fix(epic-…)`. Fixed (`478b2b8`).
+2. **The merge gate blamed a verifier for another epic's files.** A branch that waited for the
+   owner is behind `develop`; the verifier merged `develop` into it first, and the gate counted
+   those files as written during verify and rolled the merge back. Fixed (`b3a361b`).
+3. **Open: a verified epic that the verifier could not merge is reported FAILED.** `Sh2Pag6`'s
+   docs refresh conflicted with `Sh4Cfg9`'s in `architecture.md` and `design-notes.md`. The
+   verifier resolved it on `develop`, the hook denied the commit there (R3), it then merged
+   `develop` into the branch instead and stopped without retrying the merge. The driver read "no
+   merge" as a FAIL verdict. To fix: the hook's denial should say how to proceed (abort, merge
+   `develop` into the branch, merge again), and a verify that ends verified-but-unmerged should
+   park, not fail. The docs refresh on the branch is a standing conflict source for any two
+   epics that verify from the same base.
+
+Two epics were un-stuck by hand in the throwaway workspace, with the owner's yes each time: a
+`resume` gate written for `Sh2Pag6` after defect 1, and the `used` mark removed from the owner's
+decision on `Sh3Chr2` after defect 2. Neither park left a question, so a plain rerun would have
+planned each epic again and thrown the work away: a park with no gate after a fix round or a
+rolled-back merge should be resumable.
+
 **Proposed rule, from the owner (2026-11-12) — decide after Runs B and C:** *when an HTML file
 or a website is involved and Playwright is available, use Playwright to "see" the result
 instead of stopping for a person.* Raised when E5's verifier would not pass the height clause
