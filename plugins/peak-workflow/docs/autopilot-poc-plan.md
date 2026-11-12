@@ -1380,6 +1380,22 @@ in-process. (2) E1's plan kept every template step but headed three of them "Fea
 parked a complete plan. The lint now matches the step, not the wording. Everything downstream
 was BLOCKED as designed. The attempt is discarded: Run A starts again from `reset --force`.
 
+**Run A (2026-11-12, run `20261111-190916`): 17 minutes, $8.30, unattended; 3 of 6 outcomes as
+expected, no false merge.** E1 and E2 MERGED (E1's test untouched). E4 PARKED as expected, at a
+deferral gate on the live TOR. Three differences:
+
+- **E3 PARKED needlessly.** The verifier worded Step 1.5 as "Epic … verdict is PASS: 5/5 … Proceed
+  to Phase 2 …?"; the policy row wanted "Verdict PASS" and R8 parked it as unmatched. Fixed after
+  the run (the row now matches "verdict is PASS" too). One needless park.
+- **E5 BLOCKED**, only because E3 parked. The human-check path was not exercised.
+- **E6 PARKED on a real question.** The verifier's code review found that `ledger config` with
+  no settings file is an error, where ConOps S5 says it is fine; no TOR covers it, so it asked
+  Fix now / Leave as is / Stop. Unmatched, so it parked: a correct park the plan did not predict
+  (the seed's requirements are thinner than its ConOps here).
+
+The first evaluation also reported a false merge on E2. It was the oracle's mistake (a rule
+pattern with a double space, which no TOR promises to tolerate) and is corrected.
+
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my

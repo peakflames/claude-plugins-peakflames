@@ -5,7 +5,7 @@
     { "kind": "start-epic-confirm", "skillStep": "start-epic Step 2.5", "roles": ["planner"], "fragments": ["Start Epic "], "requires": "epicId", "answer": "Start it" },
     { "kind": "tor-fail", "skillStep": "wrapup-epic Step 1.4b (TOR FAIL or CANNOT VERIFY)", "roles": ["verifier"], "pattern": "^\\W*TOR-\\d{2}-[A-Za-z0-9]{7} is (FAIL|CANNOT VERIFY): ", "requires": "anchorTor", "answer": "Stop — epic FAILs" },
     { "kind": "quality-gate-fail", "skillStep": "wrapup-epic Step 1.4b (failing quality gate)", "roles": ["verifier"], "fragments": [" failed: ", "How to proceed?"], "answer": "Stop — epic FAILs" },
-    { "kind": "verdict-pass-proceed", "skillStep": "wrapup-epic Step 1.5", "roles": ["verifier"], "fragments": ["Verdict PASS", "Proceed to Phase 2"], "answer": "Proceed" },
+    { "kind": "verdict-pass-proceed", "skillStep": "wrapup-epic Step 1.5", "roles": ["verifier"], "fragments": ["Proceed to Phase 2"], "pattern": "[Vv]erdict (is )?PASS\\b", "answer": "Proceed" },
     { "kind": "manual-verification", "skillStep": "wrapup-epic Step 2.0", "roles": ["verifier"], "fragments": ["Did you perform any manual verification"], "answer": "No — only automated gates were run" },
     { "kind": "ship-mode", "skillStep": "wrapup-epic Step 5", "roles": ["verifier"], "fragments": ["Ship mode", "solo", "team"], "answer": "Solo — local merge only" }
   ],

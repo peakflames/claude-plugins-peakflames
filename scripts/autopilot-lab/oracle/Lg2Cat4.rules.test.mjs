@@ -16,7 +16,7 @@ test('the first matching rule wins, whatever the order of the transactions', (t)
 test('matching ignores letter case and extra spaces; unmatched transactions are uncategorized', (t) => {
   const s = sandbox(t);
   s.write('bank.csv', csv('2026-10-01,-45.10,"  SafeWay    #123 "', '2026-10-02,-12.50,coffee shop', '2026-10-03,-31.40,PHARMACY'));
-  s.write('rules.txt', 'groceries: /SAFEWAY #123/\ncoffee: /Coffee  Shop/\n');
+  s.write('rules.txt', 'groceries: /SAFEWAY #123/\ncoffee: /Coffee Shop/\n');
   s.ledger(['import', 'bank.csv']);
   assert.equal(s.ledger(['categorize']).code, 0);
   assert.deepEqual(s.ledgerJson().transactions.map((x) => x.category), ['groceries', 'coffee', 'uncategorized']);

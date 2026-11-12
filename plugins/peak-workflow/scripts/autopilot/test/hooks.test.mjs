@@ -244,6 +244,8 @@ test('R8 wrapup-epic: each pre-approved question gets its one answer', (t) => {
     [`${E1.tors[0]} is CANNOT VERIFY: no test exercises the When. Recommendation: Fix now — small. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
     ['Tests failed: node --test: 2 failing. Recommendation: Fix now — one assertion. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
     ['Verdict PASS. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop'], 'Proceed'],
+    // Run A: the verifier put the epic and the counts into the question; it is still Step 1.5.
+    ['Epic Lg3Sum9 (monthly summary) verdict is PASS: 5/5 requirements pass and all 20 tests pass. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop'], 'Proceed'],
     ['Did you perform any manual verification beyond the automated gates I ran?', ['Yes — I performed manual verification', 'No — only automated gates were run'], 'No — only automated gates were run'],
     ['Ship mode — solo (merge locally to the base branch) or team (push the branch and open a pull request)?', ['Team — push and open PR', 'Solo — local merge only'], 'Solo — local merge only'],
   ];
