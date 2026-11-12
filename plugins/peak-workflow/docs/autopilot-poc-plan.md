@@ -1528,6 +1528,28 @@ row now also accepts a question that names the epic and ends "Start it?" (not re
 **Run C (owner, 2026-11-12): done, 6 of 6 as expected, $0.** `node --test` fails on `develop`; the
 driver stopped within a second with "base red", started no session, and touched no epic.
 
+**Owner's decisions after Runs A–C (2026-11-12).** Keep wording matching for now and see whether
+it survives more scenarios. Prove the three fake-only fixes in real sessions with a fourth,
+separate test project. Not now: changing the lab scenarios to `onPark: stop` (already the
+driver's default), and a rerun of A.
+
+**Scenario D (built, not yet run).** `lab.mjs reset --run D` seeds `shelf`, a reading-list CLI
+with four epics, each aimed at one path; `scripts/autopilot-lab/scenarios/D.md` is the owner's
+walkthrough (about three launches, with answers between them):
+
+| Epic | Path it is built to reach | How |
+|---|---|---|
+| `Sh1Add4` Add and list | none | merges on its own |
+| `Sh2Pag6` Reading page | one-session repair | a judgement requirement; the owner answers "Not right" with a note |
+| `Sh3Chr2` Pages chart | unsettled look | a three-part requirement; the owner's note leaves the bar heights out |
+| `Sh4Cfg9` Settings check | inline "Fix now" | the ConOps covers a missing settings file and no requirement does, the gap that made Run A's verifier ask |
+
+The first two are driven by the owner's answers. The third depends on a real verifier raising the
+gap, as one did in Run A; if it does not, `Sh4Cfg9` merges and "Fix now" stays unproven. The seed
+keeps one command per file (`src/commands/<name>.js`) so that epics which wait for the owner do
+not conflict in a shared file when they merge late, the failure Run A's E6 hit. `evaluate --run D`
+judges the first launch only.
+
 **Proposed rule, from the owner (2026-11-12) — decide after Runs B and C:** *when an HTML file
 or a website is involved and Playwright is available, use Playwright to "see" the result
 instead of stopping for a person.* Raised when E5's verifier would not pass the height clause
@@ -1552,7 +1574,7 @@ on the owner's note. Notes for the decision:
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
-go-ahead walk me through Run C (the lab still sets `onPark: continue`). Real `claude` sessions only with my go-ahead. Ask before any push."
+go-ahead walk me through scenario D (`scripts/autopilot-lab/scenarios/D.md`). Real `claude` sessions only with my go-ahead. Ask before any push."
 
 ### P5: Evaluate
 

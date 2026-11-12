@@ -1,0 +1,22 @@
+{
+  "run": "D",
+  "title": "the three repair paths, on a fresh project (shelf): a repair after the owner's look, an unsettled look, and a verifier's \"Fix now\"",
+  "project": "shelf",
+  "walkthrough": "scenarios/D.md",
+  "queue": [
+    "Sh1Add4",
+    "Sh2Pag6",
+    "Sh3Chr2",
+    "Sh4Cfg9"
+  ],
+  "settings": {
+    "onPark": "continue",
+    "humanCheck": {
+      "Sh2Pag6": "cp samples/shelf.json shelf.json && node bin/shelf.js page --out shelf.html; rm -f shelf.json",
+      "Sh3Chr2": "cp samples/shelf.json shelf.json && node bin/shelf.js chart --out chart.html; rm -f shelf.json"
+    }
+  },
+  "edits": [],
+  "files": {},
+  "baseGreen": true
+}

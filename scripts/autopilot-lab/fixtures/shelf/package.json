@@ -1,0 +1,17 @@
+{
+  "name": "shelf",
+  "version": "0.1.0",
+  "description": "Reading-list CLI: keep a list of books, mark them finished, and write pages to look at.",
+  "type": "module",
+  "bin": {
+    "shelf": "bin/shelf.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "private": true
+}

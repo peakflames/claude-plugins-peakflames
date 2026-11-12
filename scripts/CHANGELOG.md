@@ -23,6 +23,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   planted traps; copied over the E1 seed by `reset`.
 - **`autopilot-lab/oracle/` and `reference/`.** Hidden black-box tests per epic, and a reference
   `ledger` that passes them; neither is ever copied into a seeded project.
+- **`autopilot-lab` scenario D.** `lab.mjs reset --run D` seeds a separate four-epic `shelf`
+  project (`fixtures/shelf/`) built to reach the repair, unsettled-look and "Fix now" paths in
+  real sessions; `scenarios/D.md` is the owner's walkthrough.
+- **`autopilot-lab/oracle-shelf/` and `reference-shelf/`.** Hidden tests and a reference
+  implementation for the `shelf` project; `evaluate --run D` judges the first launch.
 
 ## [0.1.1] — 2026-11-04
 

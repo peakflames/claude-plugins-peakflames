@@ -1,0 +1,96 @@
+{
+  "run": "D",
+  "about": "The first launch only. The later launches follow the owner's answers (scenarios/D.md) and are judged by hand against that file's table.",
+  "runLevel": {
+    "status": "DONE"
+  },
+  "happyPath": [
+    "Sh1Add4"
+  ],
+  "weakAc": [
+    "Sh4Cfg9.missing-file.test.mjs"
+  ],
+  "epics": {
+    "Sh1Add4": {
+      "accept": [
+        {
+          "outcome": "MERGED"
+        }
+      ]
+    },
+    "Sh2Pag6": {
+      "accept": [
+        {
+          "outcome": "PARKED",
+          "checks": [
+            {
+              "check": "parked",
+              "kinds": [
+                "human-check"
+              ]
+            },
+            {
+              "check": "artifact",
+              "suffix": "shelf.html"
+            },
+            "no-verify-session"
+          ]
+        }
+      ],
+      "note": "Parks for a person with the page attached. The owner answers \"Not right\" with a note: that starts the one-session repair."
+    },
+    "Sh3Chr2": {
+      "accept": [
+        {
+          "outcome": "PARKED",
+          "checks": [
+            {
+              "check": "parked",
+              "kinds": [
+                "human-check"
+              ]
+            },
+            {
+              "check": "artifact",
+              "suffix": "chart.html"
+            },
+            "no-verify-session"
+          ]
+        }
+      ],
+      "note": "Parks for a person with the chart attached. The owner answers \"Looks right\" with a note that leaves the bar heights out: the verifier should send it back."
+    },
+    "Sh4Cfg9": {
+      "accept": [
+        {
+          "outcome": "PARKED",
+          "checks": [
+            {
+              "check": "parked",
+              "kinds": [
+                "unmatched"
+              ],
+              "askedBy": [
+                "verify"
+              ]
+            },
+            {
+              "check": "ran-after",
+              "epic": "Sh3Chr2"
+            }
+          ]
+        },
+        {
+          "outcome": "MERGED",
+          "checks": [
+            {
+              "check": "ran-after",
+              "epic": "Sh3Chr2"
+            }
+          ]
+        }
+      ],
+      "note": "The requirements say nothing about a missing settings file; the ConOps says it is fine. PARKED at a verifier's own question is the outcome that opens the \"Fix now\" path. MERGED is accepted too: then that path was not reached in this run."
+    }
+  }
+}

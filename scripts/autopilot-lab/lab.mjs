@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // Autopilot lab (plugins/peak-workflow/docs/autopilot-poc-plan.md §10 P4 and §10.5).
 //
-//   node scripts/autopilot-lab/lab.mjs reset    --run A|B|C --dir <dir> [--force]
-//   node scripts/autopilot-lab/lab.mjs evaluate --run A|B|C --dir <dir> [--run-name <YYYYMMDD-HHMMSS>] [--out <file>] [--rehearsal]
+//   node scripts/autopilot-lab/lab.mjs reset    --run A|B|C|D --dir <dir> [--force]
+//   node scripts/autopilot-lab/lab.mjs evaluate --run A|B|C|D --dir <dir> [--run-name <YYYYMMDD-HHMMSS>] [--out <file>] [--rehearsal]
 //
 // `reset` builds the seeded `ledger` project for one scenario: fixtures/ledger (epic E1, shared
 // with the driver's tests) + fixtures/ledger-full (epics E2–E6) + fixtures/ledger-full.json
 // (edits) + scenarios/<run>.json (edits, files, project settings). The result is the same bytes
-// every time. It starts no session.
+// every time. It starts no session. Scenario D names its own seed (`project`: fixtures/shelf, a
+// separate four-epic project with its own oracle in oracle-shelf/); see scenarios/D.md.
 //
 // `evaluate` compares what a run left — `<dir>.autopilot/runs/<run>/report.json`, state.json, the
 // gates and the private clone — with expected/<run>.json, and runs the hidden oracle tests
@@ -22,11 +23,14 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN = path.resolve(HERE, '..', '..', 'plugins', 'peak-workflow');
-const SEED = [path.join(HERE, 'fixtures', 'ledger'), path.join(HERE, 'fixtures', 'ledger-full')];
-const SEED_EDITS = path.join(HERE, 'fixtures', 'ledger-full.json');
-const ORACLE = path.join(HERE, 'oracle');
+// A seeded project: the fixture layers copied over each other, the edits applied after, where its
+// hidden oracle tests live, and the variable that tells them where the project under test is.
+const PROJECTS = {
+  ledger: { seed: ['ledger', 'ledger-full'], edits: 'ledger-full.json', oracle: 'oracle', rootEnv: 'LEDGER_ROOT' },
+  shelf: { seed: ['shelf'], edits: null, oracle: 'oracle-shelf', rootEnv: 'SHELF_ROOT' },
+};
 const SEED_DATE = '2026-11-11T12:00:00Z';
-const RUNS = ['A', 'B', 'C'];
+const RUNS = ['A', 'B', 'C', 'D'];
 
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const tryJson = (p, fallback = null) => { try { return readJson(p); } catch { return fallback; } };
@@ -46,6 +50,13 @@ export const scenario = (run) => {
   return readJson(path.join(HERE, 'scenarios', `${run}.json`));
 };
 export const expected = (run) => readJson(path.join(HERE, 'expected', `${run}.json`));
+/** The seeded project a scenario runs on (`project` in its file; `ledger` when it names none). */
+export function projectOf(run) {
+  const name = scenario(run).project ?? 'ledger';
+  const p = PROJECTS[name];
+  if (!p) throw new Error(`scenario ${run} names an unknown project: ${name}`);
+  return { name, seed: p.seed.map((d) => path.join(HERE, 'fixtures', d)), edits: p.edits ? path.join(HERE, 'fixtures', p.edits) : null, oracle: path.join(HERE, p.oracle), rootEnv: p.rootEnv };
+}
 
 /** Applies `{file, find, replace}` edits; a `find` that is absent is an error, so a drifted seed is noticed. */
 function applyEdits(root, edits = []) {
@@ -61,6 +72,7 @@ function applyEdits(root, edits = []) {
 
 export function reset({ run, dir, force = false, out = console.log }) {
   const sc = scenario(run);
+  const proj = projectOf(run);
   const root = path.resolve(dir);
   const workspace = `${root}.autopilot`;
   for (const p of [root, workspace]) {
@@ -69,8 +81,8 @@ export function reset({ run, dir, force = false, out = console.log }) {
     fs.rmSync(p, { recursive: true, force: true });
   }
   fs.mkdirSync(root, { recursive: true });
-  for (const src of SEED) fs.cpSync(src, root, { recursive: true });
-  applyEdits(root, readJson(SEED_EDITS).edits);
+  for (const src of proj.seed) fs.cpSync(src, root, { recursive: true });
+  if (proj.edits) applyEdits(root, readJson(proj.edits).edits);
   applyEdits(root, sc.edits);
   for (const [rel, content] of Object.entries(sc.files ?? {})) {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
@@ -87,7 +99,7 @@ export function reset({ run, dir, force = false, out = console.log }) {
   const g = (...args) => { const r = sh('git', args, { cwd: root, env }); if (r.code !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.err || r.out}`); return r.out; };
   g('init', '-q', '-b', 'main');
   g('add', '-A');
-  g('commit', '-q', '-m', `chore: seed the ledger project (autopilot lab, run ${run})`);
+  g('commit', '-q', '-m', `chore: seed the ${proj.name} project (autopilot lab, run ${run})`);
   g('checkout', '-q', '-b', 'develop');
 
   const tl = path.join(PLUGIN, 'scripts', 'tor-lifecycle');
@@ -100,7 +112,9 @@ export function reset({ run, dir, force = false, out = console.log }) {
   const baseGreen = tests.code === 0;
   if (baseGreen !== (sc.baseGreen ?? true)) throw new Error(`the seeded project's tests are ${baseGreen ? 'green' : 'red'}, but scenario ${run} expects ${sc.baseGreen ?? true ? 'green' : 'red'}`);
   const me = gitTry(root, 'config', 'user.name').out;
-  const planner = (fs.readFileSync(path.join(root, 'docs', 'implementation-plan', 'phase-1-core', 'epic-Lg1Csv7-csv-import.md'), 'utf8').match(/\*\*Planned by:\*\*\s*(.+)/) ?? [])[1]?.trim();
+  const phase1 = path.join(root, 'docs', 'implementation-plan', 'phase-1-core');
+  const spec = fs.readdirSync(phase1).filter((f) => /^epic-.+\.md$/.test(f)).sort()[0];
+  const planner = (fs.readFileSync(path.join(phase1, spec), 'utf8').match(/\*\*Planned by:\*\*\s*(.+)/) ?? [])[1]?.trim();
 
   out(`Run ${run} — ${sc.title}`);
   out(`  project    ${root}   (branches main and develop, on develop, no remote; ${g('rev-parse', '--short', 'HEAD')})`);
@@ -112,6 +126,7 @@ export function reset({ run, dir, force = false, out = console.log }) {
   out(`  cd ${root} && claude --plugin-dir ${PLUGIN}`);
   out('  /peak-workflow:autopilot');
   out(`  queue, in this order: ${sc.queue.join(', ')}`);
+  if (sc.walkthrough) out(`  this scenario takes several launches with your answers between them: follow ${path.join(HERE, sc.walkthrough)}`);
   out('Afterwards:');
   out(`  node ${fileURLToPath(import.meta.url)} evaluate --run ${run} --dir ${root}`);
   return { root, workspace, queue: sc.queue, baseGreen };
@@ -146,6 +161,7 @@ const CHECKS = {
     const gates = ctx.report.gates.filter((g) => g.epic === e.id && !g.fromEarlierRun);
     const g = gates.at(-1);
     const cats = (e.audit?.findings ?? []).filter((f) => f.parks).map((f) => f.category);
+    if (g && c.askedBy && !c.askedBy.includes(String(g.session ?? '').replace(/-\d+$/, ''))) return { pass: false, detail: `${g.kind} gate ${g.file} was asked by ${g.session ?? 'the driver'}, not by a ${c.askedBy.join(' or ')} session` };
     if (g && (c.kinds ?? []).includes(g.kind)) {
       if (g.kind === 'audit' && c.auditCategories && !cats.some((x) => c.auditCategories.includes(x))) return { pass: false, detail: `audit gate, but its parking findings are ${cats.join(', ') || 'none'}, not one of ${c.auditCategories.join(', ')}` };
       return { pass: true, detail: `${g.kind} gate ${g.file}${g.kind === 'audit' ? ` (${cats.join(', ')})` : ''}` };
@@ -178,6 +194,7 @@ function mergeOf(ctx, id) {
 
 /** Runs the hidden oracle tests against the clone's integration line, exported to a throwaway directory. */
 function runOracle(ctx, merged) {
+  const { oracle: ORACLE, rootEnv } = ctx.project;
   const files = fs.readdirSync(ORACLE).filter((f) => f.endsWith('.test.mjs')).sort();
   if (!merged.length) return files.map((file) => ({ file, epic: file.split('.')[0], ran: false, pass: null }));
   const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-oracle-')));
@@ -189,7 +206,7 @@ function runOracle(ctx, merged) {
     return files.map((file) => {
       const epic = file.split('.')[0];
       if (!merged.includes(epic)) return { file, epic, ran: false, pass: null };
-      const env = { ...process.env, LEDGER_ROOT: tmp };
+      const env = { ...process.env, [rootEnv]: tmp };
       delete env.NODE_TEST_CONTEXT;
       const r = sh('node', ['--test', path.join(ORACLE, file)], { cwd: tmp, env, timeout: 120000 });
       return { file, epic, ran: true, pass: r.code === 0, ...(r.code === 0 ? {} : { tail: `${r.out}\n${r.err}`.trim().split('\n').slice(-40).join('\n') }) };
@@ -213,7 +230,7 @@ export function evaluate({ run, dir, runName = null, out: outFile = null, rehear
   const clone = path.join(workspace, 'clone');
   const claudeMd = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
   const testDirs = ((claudeMd.match(/\*\*Test directories:\*\*\s*(.+)/) ?? [])[1] ?? 'test/').split(/[,\s]+/).filter(Boolean);
-  const ctx = { report, state, workspace, clone, testDirs };
+  const ctx = { report, state, workspace, clone, testDirs, project: projectOf(run) };
 
   const runChecks = [];
   if (exp.runLevel?.status) runChecks.push({ name: 'run status', pass: report.status === exp.runLevel.status, detail: `${report.status} (${report.stoppedBecause ?? '—'})` });
@@ -296,7 +313,7 @@ function main(argv) {
     else if (rest[i].startsWith('--')) { a[rest[i].slice(2)] = rest[i + 1]; i += 1; }
   }
   if (!['reset', 'evaluate'].includes(cmd) || !a.run || !a.dir) {
-    console.error('usage: lab.mjs reset --run A|B|C --dir <dir> [--force]\n       lab.mjs evaluate --run A|B|C --dir <dir> [--run-name <name>] [--out <file>] [--rehearsal]');
+    console.error('usage: lab.mjs reset --run A|B|C|D --dir <dir> [--force]\n       lab.mjs evaluate --run A|B|C|D --dir <dir> [--run-name <name>] [--out <file>] [--rehearsal]');
     return 2;
   }
   if (cmd === 'reset') { reset({ run: a.run, dir: a.dir, force: !!a.force }); return 0; }
