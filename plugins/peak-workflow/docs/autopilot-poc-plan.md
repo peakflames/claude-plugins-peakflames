@@ -1508,6 +1508,23 @@ the unsettled look. Not exercised in a real session: the one-session repair, the
 "Fix now" merge, and the unsettled-look gate (all fake-backed only). `lab.mjs evaluate` scores
 the first run only (3 of 6 as expected); the table above is the record for the whole run.
 
+**Run B (owner, 2026-11-12): done, 5 of 6 as expected, no false merge.** The first launch ($3.65,
+7 min) parked E1 and E6 at the verifier's "verdict: PASS. Proceed to Phase 2?" question: the
+policy matched "verdict is PASS" only. After widening it, the second launch ($5.11, ~14 min)
+ran as designed:
+
+| Epic | Result |
+|---|---|
+| E1 CSV import | MERGED |
+| E2 Categorization rules | PARKED: amendment gate (its requirement contradicts E1's verbatim rule); left undecided |
+| E3 Monthly summary | BLOCKED behind E2 |
+| E4 Currency conversion | PARKED at the start-of-epic question: its wording ("Epic … Start it?") lacked the words "Start Epic", so no policy row matched (expected: the live-rates park) |
+| E5 Spending chart | BLOCKED behind E3 |
+| E6 Config and help | MERGED after E2 parked, no conflict |
+
+Both oracle tests pass. Needless parks so far: five wording matches in Runs A and B. The start-of-epic
+row now also accepts a question that names the epic and ends "Start it?" (not rerun live).
+
 **Proposed rule, from the owner (2026-11-12) — decide after Runs B and C:** *when an HTML file
 or a website is involved and Playwright is available, use Playwright to "see" the result
 instead of stopping for a person.* Raised when E5's verifier would not pass the height clause
@@ -1532,7 +1549,7 @@ on the owner's note. Notes for the decision:
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
-go-ahead walk me through Run B (the lab still sets `onPark: continue`; ask me whether to change it first). Real `claude` sessions only with my go-ahead. Ask before any push."
+go-ahead walk me through Run C (the lab still sets `onPark: continue`). Real `claude` sessions only with my go-ahead. Ask before any push."
 
 ### P5: Evaluate
 
