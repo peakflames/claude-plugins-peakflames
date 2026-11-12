@@ -1313,6 +1313,22 @@ class Run {
       });
       return this.park(e, `the owner's recorded look did not settle ${unsettled.map((u) => u.tor).join(', ')}`);
     }
+    // Verified but not merged (seen live: the merge into the integration line hit a conflict, the
+    // verifier settled it on the branch and stopped). Nothing failed and nothing needs repair: the
+    // branch says Complete with every anchor verified. Park it for the owner; never call it FAIL.
+    const sc = parseSidecar(gitShow(this.clone, m.branch, m.sidecar));
+    if (sc.fields.status === 'Complete' && m.anchors.length > 0 && m.anchors.every((t) => sc.verified[t])) {
+      const reason = `${s.name} verified every requirement and marked the epic Complete on ${m.branch}, but did not merge it into ${this.state.integration}`;
+      this.writeGate(e, {
+        kind: 'resume', skillStep: 'wrapup-epic Step 5', phase: 'VERIFY',
+        question: `${m.label}: ${reason}. Continue it in the next run?`,
+        options: [ANSWERS.resume, ANSWERS.startOver],
+        why: `nothing failed: the verifier's report is attached. "${ANSWERS.resume}" runs the verify step again on the same branch; or merge it by hand: git merge --no-ff ${m.branch}`,
+        artifacts: [this.rel(path.join(s.stepDir, 'result.json'))],
+        resume: `in the fetched repo: git checkout ${this.state.integration} && git merge --no-ff ${m.branch}`,
+      });
+      return this.park(e, reason);
+    }
     if (e.fixRounds >= 1) return this.finish(e, 'FAILED', `${s.name} FAIL after the fix round: ${verdict.split('\n')[0].slice(0, 200)}`);
     e.fixRounds = 1;
     this.writeFixBrief(e, 'The independent verifier returned FAIL. Its final report:', [verdict]);

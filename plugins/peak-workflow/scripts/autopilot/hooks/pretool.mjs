@@ -195,7 +195,10 @@ function ruleR3(ctx, segs, command) {
     const writes = ['commit', 'cherry-pick', 'revert', 'am', 'pull'].includes(sub);
     const merge = sub === 'merge' && !has('--abort', '--quit', '--continue');
     if (ctx.role === 'planner' && (writes || merge)) return deny('R3', `git ${sub} is denied in a planning session; it only plans`);
-    if (writes && onProtected) return deny('R3', `git ${sub} on ${branch} is denied; work is committed on the epic branch`);
+    // Seen live: a verifier's merge into the integration line stopped on a conflict, it resolved
+    // the files there and this denial left it guessing. Say where a conflict is resolved.
+    const conflictHint = ctx.role === 'verifier' && sub === 'commit' && branch === ctx.integration ? ` If a merge into ${branch} stopped on a conflict: run \`git merge --abort\`, check out the epic branch, merge ${branch} into it and resolve the conflict there, then merge the epic branch into ${branch} again with --no-ff.` : '';
+    if (writes && onProtected) return deny('R3', `git ${sub} on ${branch} is denied; work is committed on the epic branch.${conflictHint}`);
     if (merge && onProtected) {
       const heads = args.filter((a, k) => !a.startsWith('-') && !/^(-m|--message|-F|--file|-s|--strategy|-X|--strategy-option)$/.test(args[k - 1] ?? ''));
       const ok = ctx.role === 'verifier' && branch === ctx.integration && has('--no-ff') && heads.length === 1 && epicBranch.test(heads[0]);

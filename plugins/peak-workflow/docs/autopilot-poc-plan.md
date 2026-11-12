@@ -1567,14 +1567,15 @@ surfaced, all in what happens *after* a repair or a wait, and all hidden by the 
 2. **The merge gate blamed a verifier for another epic's files.** A branch that waited for the
    owner is behind `develop`; the verifier merged `develop` into it first, and the gate counted
    those files as written during verify and rolled the merge back. Fixed (`b3a361b`).
-3. **Open: a verified epic that the verifier could not merge is reported FAILED.** `Sh2Pag6`'s
+3. **A verified epic that the verifier could not merge was reported FAILED (fixed after the run).** `Sh2Pag6`'s
    docs refresh conflicted with `Sh4Cfg9`'s in `architecture.md` and `design-notes.md`. The
    verifier resolved it on `develop`, the hook denied the commit there (R3), it then merged
    `develop` into the branch instead and stopped without retrying the merge. The driver read "no
    merge" as a FAIL verdict. To fix: the hook's denial should say how to proceed (abort, merge
    `develop` into the branch, merge again), and a verify that ends verified-but-unmerged should
-   park, not fail. The docs refresh on the branch is a standing conflict source for any two
-   epics that verify from the same base.
+   park, not fail; both are now done (fake-backed tests only). Still open: the docs refresh on
+   the branch (wrapup-epic Step 4) is a standing conflict source for any two epics that verify
+   from the same base.
 
 Two epics were un-stuck by hand in the throwaway workspace, with the owner's yes each time: a
 `resume` gate written for `Sh2Pag6` after defect 1, and the `used` mark removed from the owner's

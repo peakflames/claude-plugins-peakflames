@@ -166,6 +166,27 @@ test('verify FAIL, one fix round, verify PASS: MERGED', async (t) => {
   assert.ok(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('src/fix.js'));
 });
 
+test('verified but not merged: the epic parks with a resume gate and is never called FAILED, even after a fix round', async (t) => {
+  const unmerged = { actions: wrapupActions(E1).slice(0, 5), result: { result: 'Epic passed verification, 4/4, and is marked Complete on its feature branch. It is not merged into develop yet.' } };
+  const p = makeProject(t);
+  p.scenario({
+    ...happy(E1),
+    [`${E1.id}/verify-1`]: { actions: [], result: { result: 'Verdict: FAIL\nTOR-01-Hd3Yc8L: the description is trimmed' } },
+    [`${E1.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'export const fixed = true;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): keep the description verbatim` }] },
+    [`${E1.id}/verify-2`]: unmerged,
+  });
+
+  await go(p);
+
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'PARKED', e.reason);
+  assert.match(e.reason, /verified every requirement and marked the epic Complete .* but did not merge it into develop/);
+  const g = readJson(path.join(p.state, 'gates', e.gates.at(-1)));
+  assert.deepEqual([g.kind, g.phase, g.options], ['resume', 'VERIFY', ['Resume from where it stopped', 'Start over']]);
+  assert.match(g.why, /nothing failed/);
+  assert.equal(git(p.clone, 'rev-parse', 'develop'), e.preVerify.developSha, 'develop is untouched');
+});
+
 test('bad merge (an extra commit on develop) is rolled back and the epic parks', async (t) => {
   const p = makeProject(t);
   const extra = [{ do: 'write', path: 'src/extra.js', content: '// straight onto develop\n' }, { do: 'commit', message: 'chore: extra commit on develop' }];

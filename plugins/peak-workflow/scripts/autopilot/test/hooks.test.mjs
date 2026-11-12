@@ -156,6 +156,9 @@ test('R3 git: a builder commits on the epic branch only; nobody but the verifier
   denied(h.bash('git commit -m "straight onto develop"'), 'R3', /commit on develop/);
   denied(h.bash('git cherry-pick abc123'), 'R3');
   passes(h.bash(`git checkout ${E1.branch} && git commit -m "feat: y"`), 'checkout then commit');
+  assert.doesNotMatch(JSON.stringify(h.bash('git commit -m "straight onto develop"')), /merge --abort/, 'the conflict advice is for the verifier only');
+  const v = referee(t, { role: 'verifier', branch: 'develop' });
+  denied(v.bash('git add docs/architecture.md && git commit -q --no-edit'), 'R3', /commit on develop is denied.*merge --abort.*merge develop into it and resolve the conflict there.*--no-ff/);
 
   const planner = referee(t, { role: 'planner' });
   passes(planner.bash(`git checkout -b ${E1.branch}`), 'planner creates the branch');

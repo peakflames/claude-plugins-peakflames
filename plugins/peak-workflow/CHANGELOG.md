@@ -101,6 +101,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   subject, so a repair that committed as its prompt asks was parked; after a fix round both pass.
 - **Autopilot merge gate allows a catch-up merge** — a verifier that merges the integration line
   into a branch that waited for the owner is no longer blamed for the other epics' files.
+- **Autopilot parks a verified, unmerged epic** — an epic the verifier marked Complete but did not
+  merge now waits with a resume question; it was reported FAILED. The hook's denial of a commit on
+  the integration line now says where to resolve a merge conflict.
 
 ## [3.0.1] — 2026-11-05
 
