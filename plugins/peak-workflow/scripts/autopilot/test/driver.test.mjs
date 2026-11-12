@@ -408,6 +408,7 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
     ] },
     [`${E1.id}/verify`]: { actions: [
       ask('Verdict PASS. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop']),
+      ask('Epic X verdict: PASS. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop']),
       ask('Did you perform any manual verification beyond the automated gates I ran?', ['Yes — I performed manual verification', 'No — only automated gates were run']),
       { do: 'tool', tool_name: 'Bash', tool_input: { command: 'git push origin develop' } },
       ...wrapupActions(E1),
@@ -425,12 +426,13 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
   assert.equal(fs.readFileSync(path.join(dir, 'plan-1', 'plan.md'), 'utf8'), planText(E1));
   assert.equal(readJson(path.join(dir, 'plan-1', 'result.json')).terminal_reason, 'hook_stopped');
   assert.ok(!fs.existsSync(path.join(p.clone, 'src', 'never.js')));
-  const [proceed, manual, push] = tools('verify-1');
+  const [proceed, proceedColon, manual, push] = tools('verify-1');
   assert.equal(Object.values(proceed.hookSpecificOutput.updatedInput.answers)[0], 'Proceed');
+  assert.equal(Object.values(proceedColon.hookSpecificOutput.updatedInput.answers)[0], 'Proceed');
   assert.equal(Object.values(manual.hookSpecificOutput.updatedInput.answers)[0], 'No — only automated gates were run');
   assert.match(push.hookSpecificOutput.permissionDecisionReason, /^autopilot R3: git push/);
   assert.equal(p.epic(E1.id).sessions.find((s) => s.name === 'verify-1').denials, 1);
-  assert.deepEqual(fs.readFileSync(path.join(dir, 'verify-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).decision), ['answer', 'answer', 'deny']);
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'verify-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).decision), ['answer', 'answer', 'answer', 'deny']);
 });
 
 test('driver + real hooks: a deferral question in the build session parks the epic with the hook\'s gate file', async (t) => {

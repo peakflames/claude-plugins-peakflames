@@ -91,6 +91,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   only by its `tests/manual/` checklist no longer fails the build check.
 - **Autopilot plan lint accepts shortened step headings** — a plan that keeps every template
   step under a shorter heading ("Feature branch", "Mark Implemented") no longer parks.
+- **Autopilot answers "verdict: PASS"** — the verifier's "Proceed to Phase 2" question is now
+  answered when it reads "verdict: PASS", not only "verdict is PASS"; it no longer parks a passed epic.
 
 ## [3.0.1] — 2026-11-05
 
