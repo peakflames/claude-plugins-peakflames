@@ -1617,6 +1617,13 @@ unconfirmed lines; and the verifier is told that "Looks right" answers the whole
 CANNOT VERIFY is for a contradiction or an unchecked line only. Trade-off recorded: a tick is
 weaker evidence than a description. Fake-backed tests only.
 
+**Owner's closing decisions for the lab runs (2026-11-12).** The inline "Fix now" merge is
+accepted as tested against the test double only: two planted situations did not make a real
+verifier ask. The yes/no look form is not rerun live in the lab; the owner intends to use
+autopilot on a real project soon and will meet it there. The report's closing message now names
+one next step, after the owner found its list of alternatives confusing. With that the lab work
+(Runs A, B, C and scenario D) is closed.
+
 **A fifth `shelf` epic for "Fix now" (owner approved, 2026-11-12).** `Sh5Exp3` CSV export. The
 first attempt (`Sh4Cfg9`) left a gap and the builder closed it. This one puts the contradiction
 in the epic's own brief: the Description says `export` "prints nothing when it succeeds", the

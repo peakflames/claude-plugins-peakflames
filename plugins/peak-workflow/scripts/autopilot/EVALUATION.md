@@ -90,6 +90,18 @@ the phrasing already seen.
 7. **Make every park resumable.** A park with no question (after a fix round, after a rolled-back
    merge) throws the work away on the next run.
 
+## Owner's decisions after scenario D (2026-11-12)
+
+- The lab runs are closed. Scenario D's rerun merged all five epics over four launches ($13.10)
+  with no hand edits; the repair, the unsettled look and the catch-up merge are proven live.
+- The inline "Fix now" merge is accepted as tested against the test double only.
+- The look was reworked after the owner found it too onerous: a yes/no form per line of the
+  requirement, the page opened for the owner, a verifier that no longer rejects an unmentioned
+  line, and safety caps shown as sizes. None of that has run live; the owner will use autopilot
+  on a real project next and meet it there.
+- Items 2, 3 and 6 of "To reach go" are therefore closed by decision, not by evidence. Items 4
+  and 7 remain open.
+
 ## Open product questions (not blockers)
 
 - Owner's Playwright rule: let measurable visual claims be checked by a browser instead of a

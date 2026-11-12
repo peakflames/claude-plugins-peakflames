@@ -96,6 +96,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   look is kept and only lines not yet confirmed are asked.
 - **Autopilot safety caps shown as sizes** — the confirm screen labels the per-step limits as caps,
   sized XS to XL with the ceiling beside each, and no longer shows turns.
+- **Autopilot report ends with one next step** — after the owner's answers it names a single
+  action; the fetch commands, the by-hand route and the conditions are given only when asked for.
 
 ### Fixed
 

@@ -376,40 +376,47 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       `git config user.name`, and re-renders the report. It refuses an answer that is not one of
       the gate's options; if it refuses, ask again — never substitute a different option.
 
-   d. **Say what the answer does**, from the command's output. Every decided gate resumes its
-      epic in the next run: "the next autopilot run continues this epic at `<enters>`, on the
-      branch this run left; nothing happens until then." Add the `validWhile` line in plain
-      words — the decision holds while that branch is unchanged and still merges cleanly into
-      the integration line; otherwise it is void and the epic is planned again from scratch. Then, as the fallback
-      only, the gate's `resume` line: the owner may instead continue that epic by hand, in their
-      own repository, after fetching the branch (`git fetch "<ws>/clone" <branch>:<branch>`) —
-      in which case they should not queue it for autopilot again. An answer that tells the
-      session to stop (a deferral gate's "Stop — I'll take it from here") is replayed like any
-      other: the resumed session receives it and stops, and the epic parks or fails again — say
-      so, and that continuing by hand is then the way forward.
+   d. **Say what the answer does, in one sentence**, from the command's output: "Recorded. The
+      next autopilot run continues this epic at `<enters>`." Nothing else here: no conditions,
+      no commands, no alternatives. An answer that tells the session to stop (a deferral gate's
+      "Stop — I'll take it from here") is replayed like any other and the epic parks or fails
+      again: say that in the same sentence, and that continuing by hand is then the way forward.
 
-6. **Bring the work in.** Only when `launch.sync.state` from item 1 is `clone-ahead` (when it is
-   `same`, say the merged work is already in `<integration>`; the report's own list says so too). Print — do not run:
+6. **Close with the one thing to do next.** Many owners are not developers: a list of options
+   reads as a list of chores. Print a heading "Do this next" and exactly one action, chosen in
+   this order:
 
-   ```bash
-   git fetch "<ws>/clone" <integration>:autopilot/<integration> && git log <integration>..autopilot/<integration>
-   git merge --ff-only autopilot/<integration>
-   ```
+   1. Gates are still undecided and the owner chose `Decide later` → "Run
+      `/peak-workflow:autopilot report` again when you are ready to answer <n> question(s)."
+   2. A gate was decided and not yet used, or epics are still unbuilt → "Run
+      `/peak-workflow:autopilot`" with the queue to give, as IDs in order, in a code block.
+   3. Otherwise, `launch.sync.state` is `clone-ahead` → "Bring the finished work into your
+      project" with these two lines in a code block — print, do not run — and one sentence:
+      the first line shows what will come in, the second brings it in.
 
-   and say: review what the first line lists, then merge it — the second line, or any merge the
-   owner prefers. A resumed epic's history includes a `wip(autopilot)` commit from its park;
-   that is expected. The private clone is the only copy of that work until it is fetched, so the
-   workspace must not be deleted first. If any gate is decided and not yet used (`decided` set,
-   no `decided.used`), add: those decisions stay usable however the work is merged, as long as the
-   parked branch still merges cleanly into `<integration>`; the next run checks that.
+      ```bash
+      git fetch "<ws>/clone" <integration>:autopilot/<integration> && git log <integration>..autopilot/<integration>
+      git merge --ff-only autopilot/<integration>
+      ```
+   4. Otherwise → "Nothing. Everything autopilot built is already in `<integration>`."
 
-7. **Next.** Read `<run>/report.md` again — recording an answer re-rendered it — and print its
-   "Do this next" list verbatim (it names epics by ID; that list is the one exception to the
-   label rule). If gates are still undecided, say how many and that this command can be run
-   again when the owner is ready. If any gate was decided, or epics are still unbuilt, add that
-   `/peak-workflow:autopilot` starts the next run in the same workspace and clone, where each
-   decided gate resumes its epic and an epic whose gate is still undecided is left alone. Then
-   stop.
+   Then one line, and only this line, for everything else: "Other things I can help with if
+   you ask: bring finished work into your project now, continue a stopped epic by hand, or
+   walk through the full report (`<run>/report.md`)." Do not print the fetch commands, the
+   by-hand `resume` line, the `validWhile` condition or the report's own "Do this next" list
+   unless the owner asks. When they do ask:
+   - **Bring the work in**: the two lines above. Add that the private clone is the only copy
+     of that work until it is fetched, so the workspace must not be deleted first; that a
+     resumed epic's history includes a `wip(autopilot)` commit from its park, which is
+     expected; and that decisions not yet used stay usable however the work is merged, as long
+     as the parked branch still merges cleanly into `<integration>`.
+   - **Continue by hand**: the gate's `resume` line, after fetching the branch
+     (`git fetch "<ws>/clone" <branch>:<branch>`); the epic should then not be queued for
+     autopilot again.
+   - **How long a decision holds**: while that branch is unchanged and still merges cleanly
+     into the integration line; otherwise it is void and the epic is planned again.
+
+   Then stop.
 
 ## Step 5: Stop (`/peak-workflow:autopilot stop`)
 
