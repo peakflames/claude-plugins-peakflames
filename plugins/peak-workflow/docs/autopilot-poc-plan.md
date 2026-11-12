@@ -1469,6 +1469,23 @@ above zero). For a verify resumed from an owner's "Fix now" the gate accepts bot
 count must still be zero — and the report says so: "Fixed during verification, on your Fix
 now … no separate audit ran on it". Before this the gate would have rolled such a merge back.
 
+**Run A, fifth to seventh runs (2026-11-12): the chart reaches the owner, and the owner's look
+reaches a real verifier.** `20261111-220956` ($1.19): E5 planned, built, passed CHECK_BUILD
+through its checklist, the auditor found nothing that parks, and it PARKED for a person with
+`chart.html` attached and no verify session — §10.5's expected outcome. The report's new
+prompts recorded what the owner did and saw. `20261111-221716` ($1.12): E5 resumed at VERIFY,
+and the verifier **refused to pass on an incomplete observation**: the note covered the bars and
+labels but not "a bar with half that total should look half as tall", so it reported CANNOT
+VERIFY rather than infer it from "Looks right". Policy answered "Stop — epic FAILs"; the driver
+then spent the fix round on a repair session, which correctly said it could not fabricate an
+observation and parked on a question of its own.
+
+**An unsettled look goes back to the owner, not to a repair (fixed).** When a verify resumed
+from a look reports CANNOT VERIFY on an operator-observed anchor, the driver now writes a new
+`human-check` gate carrying the verifier's reason and parks; the fix round is not used. The
+verifier also raised a real product point in its code review: income is drawn on the same scale
+as spending, so PAYROLL is a 240 px bar and the spending bars are slivers under 6 px.
+
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my

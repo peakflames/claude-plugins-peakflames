@@ -46,6 +46,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   fix-round planning session is gone.
 - **Owner-approved "Fix now" during verify** — when the owner answers a verifier's own question
   with Fix now, the resumed verify may repair inline and merge; the report names what it fixed.
+- **An unsettled look returns to the owner** — when the verifier cannot judge an
+  operator-observed requirement from the owner's note, autopilot asks the owner again with the
+  verifier's reason instead of starting a repair.
 - **Report TL;DR and glossary** — `report.md` opens with a plain-language TL;DR and ends with
   "Words used in this report"; `autopilot report` presents the TL;DR first and explains each term
   on first use; once merged work is in the project, the report stops listing the fetch command.

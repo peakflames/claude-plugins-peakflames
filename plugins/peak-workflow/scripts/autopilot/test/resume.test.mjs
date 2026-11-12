@@ -251,6 +251,37 @@ test('human-check gate carries an artifact; "Looks right" goes to VERIFY and R8 
   assert.ok(merged(p, tip));
 });
 
+test('a look that does not settle the requirement goes back to the owner with the verifier\'s reason; no repair session, no fix round used', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
+  const tip = git(p.clone, 'rev-parse', e5.branch);
+
+  // The real wrapup asks this when it cannot judge; policy answers "Stop — epic FAILs" and nothing merges.
+  const cannot = `${e5.tors[0]} is CANNOT VERIFY: the recorded observation says nothing about the bar heights. Recommendation: Stop — the missing observation has to be recorded. How to proceed?`;
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(cannot, ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'])], result: { result: '## Verdict: FAIL' } } });
+  const r = await again(p, { queue: [e5.id] });
+
+  assert.deepEqual(r.steps, [`${e5.id}/verify-1`], 'no repair session: no code is wrong');
+  const e = p.epic(e5.id);
+  assert.deepEqual([e.state, e.fixRounds ?? 0, e.look], ['PARKED', 0, null]);
+  assert.equal(e.reason, `the owner's recorded look did not settle ${e5.tors[0]}`);
+  const g2 = gate(p, e5.id, 2);
+  assert.deepEqual([g2.kind, g2.options, g2.decided, g2.branchTip], ['human-check', [ANSWERS.looksRight, ANSWERS.notRight], null, tip]);
+  assert.equal(g2.question, `The verifier could not judge ${e5.tors[0]} from what you recorded. the recorded observation says nothing about the bar heights. Look again with that in mind: does what was built look right?`);
+  assert.deepEqual(g2.artifacts, gate(p, e5.id, 1).artifacts, 'the same things to look at');
+
+  // The owner looks again and says what was missing: verify runs on the same tip and merges.
+  assert.equal(decide(p, e5.id, ANSWERS.looksRight, { n: 2, note: 'the tallest bar is the largest total; the half-size one is half as tall' }).enters, 'VERIFY');
+  p.scenario({ [`${e5.id}/verify`]: wrapupScript(e5) });
+  const last = await again(p, { queue: [e5.id] });
+  assert.deepEqual(last.steps, [`${e5.id}/verify-1`]);
+  assert.equal(p.epic(e5.id).state, 'MERGED');
+  assert.match(fs.readFileSync(last.calls[0].argv[last.calls[0].argv.indexOf('--append-system-prompt-file') + 1], 'utf8'), /the half-size one is half as tall/);
+});
+
 test('human-check gate, "Not right — describe": the fix round gets the owner\'s note, and the changed build parks for a new look', async (t) => {
   const p = makeProject(t);
   const e5 = addLookEpic(p);

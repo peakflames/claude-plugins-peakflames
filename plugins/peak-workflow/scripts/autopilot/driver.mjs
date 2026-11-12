@@ -164,6 +164,7 @@ export function defaultConfig(project) {
 
 // ---- the workspace: <project>.autopilot/{settings.json, lock, STOP, clone/, gates/, runs/<run>/, current}
 
+const tryParse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const tryJson = (p, fallback = null) => { try { return readJson(p); } catch { return fallback; } };
 export const runDirOf = (workspace, name) => path.join(workspace, 'runs', name);
 export function listRuns(workspace) {
@@ -1278,11 +1279,46 @@ class Run {
     // No merge and no gate: the verdict was FAIL (policy answers "Stop — epic FAILs").
     const verdict = (s.result?.result ?? '').trim() || '(the verify session gave no result text)';
     this.wipCommit(e);
+    // The verifier could not judge an operator-observed requirement from the owner's recorded look
+    // (seen live: the note covered the labels and said nothing of the bar heights). No code is
+    // wrong, so this is not a repair: the missing observation is the owner's to give. Ask again,
+    // with the verifier's reason, and leave the fix round unused.
+    const unsettled = e.look ? this.unsettledLook(e, s) : [];
+    if (unsettled.length) {
+      const look = e.look; e.look = null;
+      this.writeGate(e, {
+        kind: 'human-check', skillStep: 'wrapup-epic Step 1.2 item 7',
+        question: `The verifier could not judge ${unsettled.map((u) => u.tor).join(', ')} from what you recorded. ${unsettled.map((u) => u.reason).join(' ')} Look again with that in mind: does what was built look right?`,
+        options: [ANSWERS.looksRight, ANSWERS.notRight],
+        why: `your recorded look ("${look.note ?? look.gate}") did not settle every part of the requirement; autopilot never fills in an observation`,
+        artifacts: look.artifacts ?? [], verifierReport: this.rel(path.join(s.stepDir, 'result.json')),
+        resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
+      });
+      return this.park(e, `the owner's recorded look did not settle ${unsettled.map((u) => u.tor).join(', ')}`);
+    }
     if (e.fixRounds >= 1) return this.finish(e, 'FAILED', `${s.name} FAIL after the fix round: ${verdict.split('\n')[0].slice(0, 200)}`);
     e.fixRounds = 1;
     this.writeFixBrief(e, 'The independent verifier returned FAIL. Its final report:', [verdict]);
     this.log(`${e.id}: ${s.name} verdict FAIL; starting the one fix round`);
     return 'FIX_BUILD';
+  }
+
+  /** Operator-observed anchors the verify session reported CANNOT VERIFY, with its reason (from the question policy answered). */
+  unsettledLook(e, s) {
+    const m = this.meta(e);
+    const observed = new Set(m.reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]));
+    const out = [];
+    const file = path.join(s.stepDir, 'hooks.jsonl');
+    for (const line of exists(file) ? read(file).split('\n').filter(Boolean) : []) {
+      let h; try { h = JSON.parse(line); } catch { continue; }
+      if (h.hook !== 'PreToolUse' || h.tool_name !== 'AskUserQuestion') continue;
+      const input = typeof h.tool_input === 'string' ? tryParse(h.tool_input) : h.tool_input;
+      for (const q of input?.questions ?? []) {
+        const hit = String(q.question ?? '').match(/^\W*(TOR-\d{2}-[A-Za-z0-9]{7}) is CANNOT VERIFY:\s*([\s\S]*?)(?:\s*Recommendation:|\s*How to proceed\?|$)/);
+        if (hit && observed.has(hit[1]) && !out.some((u) => u.tor === hit[1])) out.push({ tor: hit[1], reason: hit[2].trim().replace(/\s+/g, ' ').slice(0, 900) });
+      }
+    }
+    return out;
   }
 
   /** CHECK_VERIFY, the merge gate (§6.5 and SPIKE.md "Owner decisions"). */
