@@ -504,6 +504,29 @@ test('another epic merged after the park: the decision still holds, because the 
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /The branch was \d+ commits? behind `develop` and merged cleanly in a trial merge\./);
 });
 
+test('a verifier that first merges develop into the waiting branch is not blamed for the other epic\'s files; a file it writes itself still is', async (t) => {
+  const setup = async () => {
+    const p = makeProject(t);
+    const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+    p.scenario({ ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d) });
+    await p.go();
+    decide(p, E1.id, ANSWERS.auditNotReal);
+    return p;
+  };
+  const catchUp = { do: 'merge', branch: 'develop', message: `Merge branch 'develop' into ${E1.branch}` };
+
+  const p = await setup();
+  p.scenario({ [`${E1.id}/verify`]: wrapupScript(E1, { extraOnBranch: [catchUp] }) });
+  await again(p);
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+
+  const q = await setup();
+  q.scenario({ [`${E1.id}/verify`]: wrapupScript(E1, { extraOnBranch: [catchUp, { do: 'write', path: 'src/extra.js', content: 'export const x = 1;\n' }, { do: 'commit', message: 'fix: something of the verifier\'s own' }] }) });
+  await again(q);
+  assert.equal(q.epic(E1.id).state, 'PARKED');
+  assert.match(JSON.stringify(q.epic(E1.id).checks.at(-1)), /verdict/);
+});
+
 test('void decision: the parked branch no longer merges cleanly into the integration line — reported with the files, re-planned from scratch', async (t) => {
   const p = makeProject(t);
   const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });

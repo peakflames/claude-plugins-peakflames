@@ -1359,7 +1359,11 @@ class Run {
       if (p1 !== pre.developSha) problems.push('the merge\'s first parent is not the pre-verify integration tip');
       if (!gitOk(this.clone, 'merge-base', '--is-ancestor', pre.branchTip, p2)) problems.push('the merge\'s second parent does not descend from the pre-verify branch tip');
       else {
-        const stray = this.g('diff', '--name-only', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && !f.startsWith('docs/') && f !== m.sidecar);
+        // A branch that waited for the owner is behind the integration line, and the verifier merges
+        // that line into it first (seen live). A file that arrives exactly as the integration line
+        // has it is another epic's merged work, not something this verify session wrote.
+        const blob = (rev, f) => { const r = gitRun(this.clone, 'rev-parse', '-q', '--verify', `${rev}:${f}`); return r.code === 0 ? r.out : ''; };
+        const stray = this.g('diff', '--name-only', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && !f.startsWith('docs/') && f !== m.sidecar && blob(p2, f) !== blob(pre.developSha, f));
         if (stray.length && ownerFix) fixedFiles.push(...stray);
         else if (stray.length) problems.push(`commits added during verify touch files outside docs/: ${stray.join(', ')}`);
         if (gitOk(this.clone, 'merge-base', '--is-ancestor', pre.developSha, p2) && this.g('rev-parse', `${dev}^{tree}`) !== this.g('rev-parse', `${p2}^{tree}`)) problems.push('the merge commit itself changes files');

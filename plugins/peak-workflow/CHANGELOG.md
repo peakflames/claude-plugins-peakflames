@@ -99,6 +99,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   the queued epic and ends "Start it?" is answered, even without the words "Start Epic"; it no longer parks.
 - **Autopilot accepts a repair's `fix(epic-<id>):` commit** — the build check required a `feat`
   subject, so a repair that committed as its prompt asks was parked; after a fix round both pass.
+- **Autopilot merge gate allows a catch-up merge** — a verifier that merges the integration line
+  into a branch that waited for the owner is no longer blamed for the other epics' files.
 
 ## [3.0.1] — 2026-11-05
 
