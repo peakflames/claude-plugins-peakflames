@@ -11,7 +11,8 @@ Node.js 22 or later on macOS, Linux or Windows. No network. The reading list is 
 
 ## 3. Inputs
 
-Commands typed by the reader: `add`, `list`, `finish`, `page`, `chart` and `config`. An
+Commands typed by the reader: `add`, `list`, `finish`, `page`, `chart`, `config` and
+`export`. An
 optional settings file: the file named by the `SHELFRC` environment variable, or else
 `.shelfrc` in the reader's home directory. It is JSON and may hold `pageTitle` (text) and
 `finishedLast` (true or false).
@@ -51,3 +52,9 @@ file that is complete in itself.
 1. The reader runs `shelf config`. If the settings file is missing or correct the tool says the
    settings are fine. If it is not valid JSON, holds a key the tool does not know, or holds a
    value of the wrong kind, the tool prints one line naming the file, the problem and what to do.
+
+### S5 — Hand the list to a spreadsheet
+
+1. The reader runs `shelf export --out books.csv`. The tool writes every book to the file as CSV
+   and says how many books it wrote and where.
+2. If `books.csv` is already there, the tool leaves it alone and says so.

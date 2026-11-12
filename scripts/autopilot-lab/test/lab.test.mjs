@@ -177,12 +177,12 @@ test('evaluate: a directory with no run says what to do', (t) => {
 
 // ---- Scenario D: the `shelf` project ---------------------------------------------------------------
 
-const SHELF_IDS = ['Sh1Add4', 'Sh2Pag6', 'Sh3Chr2', 'Sh4Cfg9'];
+const SHELF_IDS = ['Sh1Add4', 'Sh2Pag6', 'Sh3Chr2', 'Sh4Cfg9', 'Sh5Exp3'];
 const SHELF_REF = path.join(LAB, 'reference-shelf', 'src');
 const shelfFiles = (...names) => names.map((n) => ({ do: 'write', path: `src/${n}`, content: fs.readFileSync(path.join(SHELF_REF, n), 'utf8') }));
 const ask = (question, options) => ({ do: 'tool', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question, options: options.map((label) => ({ label })) }] } });
 
-test('reset D: a separate four-epic project, valid, the same bytes every time, with two epics that park for a look', (t) => {
+test('reset D: a separate five-epic project, valid, the same bytes every time, with two epics that park for a look', (t) => {
   const tmp = tmpdir(t);
   const a = reset({ run: 'D', dir: path.join(tmp, 'd1'), out: quiet });
   const b = reset({ run: 'D', dir: path.join(tmp, 'd2'), out: quiet });
@@ -193,7 +193,7 @@ test('reset D: a separate four-epic project, valid, the same bytes every time, w
   assert.deepEqual(pre.epics.map((e) => e.id), SHELF_IDS);
   assert.deepEqual(pre.epics.map((e) => e.eligibility), SHELF_IDS.map(() => 'eligible'), JSON.stringify(pre.epics.map((e) => e.reasons)));
   assert.deepEqual(pre.epics.filter((e) => e.humanCheck).map((e) => e.id), ['Sh2Pag6', 'Sh3Chr2']);
-  assert.deepEqual(Object.fromEntries(pre.epics.map((e) => [e.id, e.deps])), { Sh1Add4: [], Sh2Pag6: ['Sh1Add4'], Sh3Chr2: ['Sh1Add4'], Sh4Cfg9: [] });
+  assert.deepEqual(Object.fromEntries(pre.epics.map((e) => [e.id, e.deps])), { Sh1Add4: [], Sh2Pag6: ['Sh1Add4'], Sh3Chr2: ['Sh1Add4'], Sh4Cfg9: [], Sh5Exp3: ['Sh1Add4'] });
   assert.deepEqual(pre.epics.flatMap((e) => e.scopeFlags), [], 'no requirement reads as needing the network or big data');
   assert.deepEqual([...scenario('D').queue].sort(), [...SHELF_IDS].sort());
   assert.deepEqual(Object.keys(expected('D').epics).sort(), [...SHELF_IDS].sort());
@@ -202,6 +202,11 @@ test('reset D: a separate four-epic project, valid, the same bytes every time, w
   // The gap the "Fix now" path rests on: the ConOps covers a missing settings file, no requirement does.
   assert.match(fs.readFileSync(path.join(a.root, 'docs', 'product-vision-planning', 'concept-of-operations.md'), 'utf8'), /If the settings file is missing or correct the tool says the\s+settings are fine/);
   assert.doesNotMatch(fs.readFileSync(path.join(a.root, 'docs', 'requirements', '04-settings.feature.md'), 'utf8'), /missing|no settings file|does not exist/i);
+  // The second planted gap: the export epic's own brief contradicts the ConOps and the stdout rule, and no requirement settles it.
+  assert.match(fs.readFileSync(path.join(a.root, 'docs', 'implementation-plan', 'phase-1-core', 'epic-Sh5Exp3-csv-export.md'), 'utf8'), /prints nothing when it\s+succeeds/);
+  assert.match(fs.readFileSync(path.join(a.root, 'docs', 'product-vision-planning', 'concept-of-operations.md'), 'utf8'), /says how many books it wrote/);
+  assert.match(fs.readFileSync(path.join(a.root, 'CLAUDE.md'), 'utf8'), /stdout — results and confirmations/);
+  assert.doesNotMatch(fs.readFileSync(path.join(a.root, 'docs', 'requirements', '05-export.feature.md'), 'utf8'), /standard output/i);
 });
 
 test('oracle D: the reference passes every shelf oracle test; treating a missing settings file as an error fails only the declared gap', (t) => {
@@ -218,10 +223,17 @@ test('oracle D: the reference passes every shelf oracle test; treating a missing
   assert.notEqual(strict, fs.readFileSync(config, 'utf8'));
   fs.writeFileSync(config, strict);
   assert.deepEqual(oracle(), ['Sh4Cfg9.missing-file.test.mjs']);
-  assert.deepEqual(expected('D').weakAc, ['Sh4Cfg9.missing-file.test.mjs']);
+  // An export that follows its brief to the letter and prints nothing fails only the second declared gap.
+  fs.writeFileSync(config, fs.readFileSync(path.join(SHELF_REF, 'commands', 'config.js'), 'utf8'));
+  const exp = path.join(root, 'src', 'commands', 'export.js');
+  const silent = fs.readFileSync(exp, 'utf8').replace(/  io\.stdout\.write\(`Wrote [^\n]+\n/, '');
+  assert.notEqual(silent, fs.readFileSync(exp, 'utf8'));
+  fs.writeFileSync(exp, silent);
+  assert.deepEqual(oracle(), ['Sh5Exp3.says-so.test.mjs']);
+  assert.deepEqual(expected('D').weakAc, ['Sh4Cfg9.missing-file.test.mjs', 'Sh5Exp3.says-so.test.mjs']);
 });
 
-test('evaluate D: the first launch merges E1, parks the two looks with their pages, and accepts E4 merged or parked at a verifier\'s question', async (t) => {
+test('evaluate D: the first launch merges E1, parks the two looks with their pages, and accepts E4 and E5 merged or parked at a verifier\'s question', async (t) => {
   const run1 = async (verifyE4) => {
     const p = rehearsal(t, 'D');
     const e = p.epics;
@@ -231,6 +243,7 @@ test('evaluate D: the first launch merges E1, parks the two looks with their pag
     s['Sh2Pag6/build'] = build(e.Sh2Pag6, [...shelfFiles('commands/page.js'), { do: 'write', path: 'tests/manual/TOR-02-Pg4Gl9v.md', content: '# TOR-02-Pg4Gl9v\n\n1. Open shelf.html in a browser.\n' }]);
     s['Sh3Chr2/build'] = build(e.Sh3Chr2, [...shelfFiles('commands/chart.js'), { do: 'write', path: 'tests/manual/TOR-03-Ch4Lk7z.md', content: '# TOR-03-Ch4Lk7z\n\n1. Open chart.html in a browser.\n' }]);
     s['Sh4Cfg9/build'] = build(e.Sh4Cfg9, shelfFiles('commands/config.js'));
+    s['Sh5Exp3/build'] = build(e.Sh5Exp3, shelfFiles('commands/export.js'));
     if (verifyE4) s['Sh4Cfg9/verify'] = verifyE4;
     p.script(s);
     await p.go();
@@ -239,13 +252,13 @@ test('evaluate D: the first launch merges E1, parks the two looks with their pag
 
   const merged = await run1(null);
   assert.equal(merged.pass, true, render(merged));
-  assert.deepEqual(Object.fromEntries(merged.epics.map((x) => [x.id, x.outcome])), { Sh1Add4: 'MERGED', Sh2Pag6: 'PARKED', Sh3Chr2: 'PARKED', Sh4Cfg9: 'MERGED' });
+  assert.deepEqual(Object.fromEntries(merged.epics.map((x) => [x.id, x.outcome])), { Sh1Add4: 'MERGED', Sh2Pag6: 'PARKED', Sh3Chr2: 'PARKED', Sh4Cfg9: 'MERGED', Sh5Exp3: 'MERGED' });
   assert.deepEqual(merged.metrics.parkedCorrectly, { matched: 2, of: 2 });
   assert.deepEqual(merged.metrics.falseMerges, []);
   const artifact = (id) => merged.epics.find((x) => x.id === id).tried[0].checks.find((c) => c.check === 'artifact').detail;
   assert.match(artifact('Sh2Pag6'), /artifacts\/files\/shelf\.html \(\d{3,} bytes\)/);
   assert.match(artifact('Sh3Chr2'), /artifacts\/files\/chart\.html \(\d{3,} bytes\)/);
-  assert.deepEqual(merged.oracle.filter((o) => o.ran).map((o) => [o.file, o.pass]), [['Sh1Add4.list.test.mjs', true], ['Sh4Cfg9.config.test.mjs', true], ['Sh4Cfg9.missing-file.test.mjs', true]]);
+  assert.deepEqual(merged.oracle.filter((o) => o.ran).map((o) => [o.file, o.pass]), [['Sh1Add4.list.test.mjs', true], ['Sh4Cfg9.config.test.mjs', true], ['Sh4Cfg9.missing-file.test.mjs', true], ['Sh5Exp3.export.test.mjs', true], ['Sh5Exp3.says-so.test.mjs', true]]);
 
   // The outcome that opens the "Fix now" path: the verifier asks a question of its own and E4 parks on it.
   const question = { actions: [ask('Code review: `shelf config` treats a missing settings file as an error, but ConOps S4 says a missing file is fine. No requirement covers it. How to proceed?', ['Fix now', 'Leave as is', 'Stop'])], result: { total_cost_usd: 0.9, result: 'Waiting for a decision.' } };

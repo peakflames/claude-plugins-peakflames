@@ -18,6 +18,7 @@ be a plain file on their own computer.
 2. Write the reading list as a page the reader can open in a browser and take in at a glance.
 3. Draw how many pages were finished each month as a chart.
 4. Tell the reader in plain words when their settings file is wrong.
+5. Hand the list to other programs as a CSV file.
 
 ## 4. Principles
 

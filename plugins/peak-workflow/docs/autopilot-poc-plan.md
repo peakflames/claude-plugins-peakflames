@@ -1586,6 +1586,13 @@ with a resume question. The owner's recorded look stays valid: the verifier is t
 of the epic's own work and that only other epics' merged work arrived since. Built, fake-backed
 tests only; scenario D rerun to prove it live is next.
 
+**A fifth `shelf` epic for "Fix now" (owner approved, 2026-11-12).** `Sh5Exp3` CSV export. The
+first attempt (`Sh4Cfg9`) left a gap and the builder closed it. This one puts the contradiction
+in the epic's own brief: the Description says `export` "prints nothing when it succeeds", the
+ConOps (S5) and CLAUDE.md's stdout rule say the tool confirms what it did, and no requirement
+covers the standard output. The builder follows its brief; the verifier's code review should
+find the contradiction and ask. Still not certain: a builder that notices it may ask first.
+
 Two epics were un-stuck by hand in the throwaway workspace, with the owner's yes each time: a
 `resume` gate written for `Sh2Pag6` after defect 1, and the `used` mark removed from the owner's
 decision on `Sh3Chr2` after defect 2. Neither park left a question, so a plain rerun would have

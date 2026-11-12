@@ -8,7 +8,8 @@
     "Sh1Add4"
   ],
   "weakAc": [
-    "Sh4Cfg9.missing-file.test.mjs"
+    "Sh4Cfg9.missing-file.test.mjs",
+    "Sh5Exp3.says-so.test.mjs"
   ],
   "epics": {
     "Sh1Add4": {
@@ -91,6 +92,28 @@
         }
       ],
       "note": "The requirements say nothing about a missing settings file; the ConOps says it is fine. PARKED at a verifier's own question is the outcome that opens the \"Fix now\" path. MERGED is accepted too: then that path was not reached in this run."
+    },
+    "Sh5Exp3": {
+      "accept": [
+        {
+          "outcome": "PARKED",
+          "checks": [
+            {
+              "check": "parked",
+              "kinds": [
+                "unmatched"
+              ],
+              "askedBy": [
+                "verify"
+              ]
+            }
+          ]
+        },
+        {
+          "outcome": "MERGED"
+        }
+      ],
+      "note": "The epic's own brief says export prints nothing on success; the ConOps (S5) and CLAUDE.md's stdout rule say the tool confirms what it did; no requirement covers it. PARKED at a verifier's own question is the outcome that opens the \"Fix now\" path. MERGED is accepted: then that path was not reached. A question from the build session instead is a correct stop, reported here as a miss."
     }
   }
 }

@@ -3,8 +3,8 @@
 ## Project Overview
 
 `shelf` is a reading-list command-line tool. One person runs it in a terminal to keep a list of
-books in a local `shelf.json` file, mark books finished, and write two pages to open in a
-browser: the reading list, and a chart of pages read per month. It needs no account and no
+books in a local `shelf.json` file, mark books finished, write two pages to open in a
+browser (the reading list, and a chart of pages read per month), and export the list as CSV. It needs no account and no
 network.
 
 ## Tech Stack

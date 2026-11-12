@@ -1,0 +1,65 @@
+{
+  "feature_id": "05",
+  "feature_file": "05-export.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-05-Ex1Wr4e",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Handing the list to other programs as CSV is the fifth goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 1,
+            "paraphrase": "export writes every book to the file as CSV."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-05-Ex2Qt7f",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Faithful record: a title with a comma or a quote survives the export as typed."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 1,
+            "paraphrase": "Every book is written to the file as CSV."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-05-Ex3Ov2g",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Faithful record: the tool does not destroy a file the reader already has."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S5",
+            "step": 2,
+            "paraphrase": "An existing file is left alone and the tool says so."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}
