@@ -378,6 +378,9 @@ test('plan lint keys on headings and anchors, and refuses push, sudo and contain
   const short = planText(E1).replace('Create (or verify) feature branch', 'Feature branch').replace('Update status to "In Progress"', 'Status → In Progress').replace('Mark as Implemented', 'Mark Implemented');
   assert.doesNotMatch(short, /Create \(or verify\)|Update status to|Mark as Implemented/);
   assert.deepEqual(lintPlan(short, E1.tors).problems, []);
+  // Run A again: "1. **Branch** — verify with `git show-ref … refs/heads/feature/epic-…`".
+  assert.deepEqual(lintPlan(planText(E1).replace(/1\. \*\*Create \(or verify\) feature branch\*\* — `[^`]+`/, `1. **Branch** — verify with \`git show-ref --verify --quiet refs/heads/${E1.branch}\``), E1.tors).problems, []);
+  assert.deepEqual(lintPlan(planText(E1, { omit: ['branch'] }), E1.tors).problems, ['missing "Create (or verify) feature branch"']);
   assert.deepEqual(lintPlan(planText(E1, { omit: ['status', 'mark'] }), E1.tors).problems, ['missing "Update status to "In Progress""', 'missing "Mark as Implemented"']);
   assert.deepEqual(lintPlan(planText(E1), [...E1.tors, 'TOR-09-Missing']).problems, ['does not name anchor TOR-09-Missing']);
   assert.deepEqual(lintPlan(planText(E1) + '\nThen run `git push origin develop` and `sudo make install` and `docker run x`.\n', E1.tors).problems, ['contains git push', 'contains sudo', 'contains a container or VM command']);

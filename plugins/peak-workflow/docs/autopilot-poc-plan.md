@@ -1422,6 +1422,24 @@ index and false in the code. The verifier caught it and asked, so nothing wrong 
 cost was a wasted build and one more question for the owner. The lab still uses `continue`
 (the owner has not asked to change it); Run A's results are the `continue` run.
 
+**Run A, third run (`20261111-195316`): 3 minutes, $1.20.**
+
+- **E5 passed the build check** (the checklist fix held) and then **PARKED at the auditor**: a
+  true high finding. TOR-05-Ch2Lb7t asks for one `<text` holding both the category and the
+  total; the build drew two, and its test would pass either way. The auditor's first real catch
+  in a run.
+- **E6's decision was void**, as designed: its branch no longer merged cleanly, so it was
+  planned again from scratch on a fresh branch (the old one kept under
+  `refs/autopilot/superseded/`). The new plan then **parked at the lint again**: its first step
+  was headed "Branch — verify … refs/heads/feature/epic-…". Fixed (a branch step may name the
+  epic's branch instead of saying "feature branch").
+
+**Needless parks so far: 3** — two plan-lint wordings and one Step 1.5 wording, each a complete
+plan or a pre-approved question that the wording check missed. All three matched on the exact
+words of a heading or question; each was fixed by widening one pattern. This is the brittleness
+SPIKE.md's open question is about (deterministic matching versus an inference call that only
+classifies).
+
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my

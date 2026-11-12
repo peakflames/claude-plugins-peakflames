@@ -24,7 +24,7 @@ export function lintPlan(plan, anchors) {
   const headings = [
     // The model keeps every template step but often shortens its heading ("Feature branch",
     // "Status → In Progress", "Mark Implemented"), so these match the step, not the exact words.
-    ['Create (or verify) feature branch', /feature branch/i],
+    ['Create (or verify) feature branch', /feature branch|\bbranch\b[^\n]{0,160}feature\/epic-/i],
     ['Update status to "In Progress"', /status\b[^\n]{0,40}In Progress/i],
     ['Implementer self-assessment', /Implementer self-assessment/i],
     ['Reconcile spec', /Reconcile spec/i],
