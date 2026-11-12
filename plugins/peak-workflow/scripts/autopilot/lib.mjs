@@ -47,7 +47,7 @@ export const ANSWERS = {
   approvePlan: 'Approve this plan', replan: 'Re-plan',
   resume: 'Resume from where it stopped', startOver: 'Start over',
 };
-const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_PLAN', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
+const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_BUILD', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
 const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
 
 /**
@@ -59,11 +59,11 @@ export function gateEntry(g) {
   if (!a) return null;
   if (g.kind === 'preflight') return null; // the fix is in the project; it clears when preflight passes
   if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
-  if (g.kind === 'audit') return a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_PLAN', fix: 'audit' } : null;
-  if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_PLAN', fix: 'look' } : null;
+  if (g.kind === 'audit') return a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_BUILD', fix: 'audit' } : null;
+  if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_BUILD', fix: 'look' } : null;
   if (g.kind === 'plan-lint') {
     const fix = asked === 'plan-fix';
-    return a === ANSWERS.approvePlan ? { phase: fix ? 'FIX_BUILD' : 'BUILD', approve: true } : a === ANSWERS.replan ? { phase: fix ? 'FIX_PLAN' : 'PLAN' } : null;
+    return a === ANSWERS.approvePlan ? { phase: fix ? 'FIX_BUILD' : 'BUILD', approve: true } : a === ANSWERS.replan ? { phase: fix ? 'FIX_BUILD' : 'PLAN' } : null;
   }
   // A question a session asked: the same kind of session again; hook R8 answers that one question once.
   return STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;

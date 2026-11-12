@@ -36,7 +36,6 @@ const KINDS = {
   plan: { prefix: 'plan', role: 'planner', state: 'PLAN' },
   build: { prefix: 'build', role: 'builder', state: 'BUILD' },
   verify: { prefix: 'verify', role: 'verifier', state: 'VERIFY' },
-  planFix: { prefix: 'plan-fix', role: 'planner', state: 'FIX_PLAN' },
   fix: { prefix: 'fix', role: 'builder', state: 'FIX_BUILD' },
   audit: { prefix: 'audit', role: 'auditor', state: 'AUDIT' },
 };
@@ -153,7 +152,6 @@ export function defaultConfig(project) {
       plan: { wallMin: 30, turns: 80, usd: 5, model: 'sonnet' },
       build: { wallMin: 90, turns: 200, usd: 15, model: 'sonnet' },
       verify: { wallMin: 45, turns: 150, usd: 10, model: 'opus' },
-      planFix: { wallMin: 20, turns: 60, usd: 4, model: 'sonnet' },
       fix: { wallMin: 60, turns: 150, usd: 12, model: 'sonnet' },
       audit: { wallMin: 15, turns: 40, usd: 3, model: 'opus' },
       testRunMin: 10,
@@ -570,6 +568,39 @@ execution script for this session.
   Never answer such a question yourself and never work around it.
 `;
 
+export const FIX_RULES = `# Autopilot repair rules
+
+You are repairing an already-built epic, unattended. The list in your prompt is the whole job.
+
+- Do not enter plan mode: \`EnterPlanMode\` and \`ExitPlanMode\` are denied. Do not run \`/peak-workflow:start-epic\`.
+- Do not change the epic's status, and do not merge or push.
+- Where you must ask, ask with \`AskUserQuestion\`. Never answer such a question yourself and never work around it.
+`;
+
+/**
+ * `prompt.md` for the repair session. A repair is one builder session, not a plan and a build:
+ * what to fix is already spelled out (by the driver's checks, the auditor and the owner, the
+ * owner's look, or the verifier), and in real runs a planning session given that brief made the
+ * fix on the spot and then could not commit it. Every check that follows a build follows this.
+ */
+export function fixPrompt(meta, brief) {
+  return `This is the one repair round for epic ${meta.label}. The epic is already built on branch \`${meta.branch}\`; you are repairing it, unattended.
+
+${brief.trim()}
+
+Do this, in order:
+
+1. Check out \`${meta.branch}\` (it exists; never create another branch) and read the requirement text of every TOR named above in \`docs/requirements/\`.
+2. Make exactly the fixes listed, in the code and in the tests. Nothing else: no refactoring, no new features, no other epic's files, no file under \`docs/requirements/\`.
+3. Keep every test that names a TOR ID naming it, and make each test you touch able to fail: it must assert what the requirement's Then says.
+4. Run the project's test command from \`CLAUDE.md\` and the other quality gates listed there. Everything must pass.
+5. Update \`${PLAN_DIR}/session-handoffs/epic-${meta.id}-implemented.md\` wherever the repair changes what it says (what was built, spec deviations, TOR coverage). Keep its \`## Deferrals\` section and \`Count:\` line truthful. Leave the status sidecar as it is (\`status: Implemented\`).
+6. Commit on the branch, staging files by path: \`fix(epic-${meta.id}): <what was repaired>\`. Do not push and do not merge.
+
+If a listed fix cannot be made as asked, or making it would leave a requirement unmet, stop and ask with \`AskUserQuestion\` — say which fix, why, and offer the options a person would need. Do not work around it.
+`;
+}
+
 /** `prompt.md` for a build session: Claude Code's clear-context handoff, minus the transcript pointer. */
 export function buildPrompt(plan, pluginDir = PLUGIN_DIR) {
   return 'Implement the following plan:\n\n' + plan.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
@@ -642,9 +673,9 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
         if (e.humanCheck) p('  (this epic parks here for a person; no verify session runs)');
       }
     }
-    p('  fix round (at most one): plan-fix-1 and fix-1 use the plan and build commands with');
-    p(`    --append-system-prompt-file ${shellQuote(path.join(runDir, 'epics', e.id, 'fix-brief.md'))} and the fix budgets`);
-    p(`    (plan-fix: ${config.budgets.planFix.turns} turns, $${config.budgets.planFix.usd}, ${config.budgets.planFix.wallMin} min; fix: ${config.budgets.fix.turns} turns, $${config.budgets.fix.usd}, ${config.budgets.fix.wallMin} min)`);
+    p('  repair round (at most one): fix-1 is one builder session whose prompt is the list of fixes');
+    p(`    (${shellQuote(path.join(runDir, 'epics', e.id, 'fix-brief.md'))}); it uses the build command with the fix budget`);
+    p(`    (${config.budgets.fix.turns} turns, $${config.budgets.fix.usd}, ${config.budgets.fix.wallMin} min). No planning session: what to fix is already spelled out`);
     p('    after it the auditor runs again on the changes since its last audit only');
   }
 
@@ -979,7 +1010,7 @@ class Run {
     const undo = () => { if (kind === 'verify') this.rollback(e); else if (moved) this.resetIntegration(e, devBefore); };
 
     // Re-entry after a park that is nobody's question: a parked build is judged from its WIP commit; any other step is run again once.
-    const again = { plan: 'PLAN', planFix: 'FIX_PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind];
+    const again = { plan: 'PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind];
     if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return this.parkResumable(e, `stopped by the STOP file during ${s.name}`, again); }
     if (s.outcome === 'infra') { undo(); return this.parkResumable(e, `infra error during ${s.name}: ${s.why}`, again); }
     if (s.outcome === 'budget') { undo(); return this.parkResumable(e, `budget: ${s.name} hit ${s.why}`, again); }
@@ -991,10 +1022,9 @@ class Run {
 
   // ---- phases: each returns the next phase, or null when the epic reached a terminal state -----
 
-  async doPlan(e, fix) {
+  async doPlan(e) {
     const m = this.meta(e);
-    const brief = path.join(this.epicDir(e), 'fix-brief.md');
-    const s = await this.step(e, fix ? 'planFix' : 'plan', () => ({ prompt: `/peak-workflow:start-epic ${e.id}`, appendFiles: fix ? [brief] : [] }));
+    const s = await this.step(e, 'plan', () => ({ prompt: `/peak-workflow:start-epic ${e.id}` }));
     if (!s) return null;
     const planFile = path.join(s.stepDir, 'plan.md');
     if (!exists(planFile)) return this.park(e, `${s.name} ended without a captured plan`);
@@ -1006,16 +1036,15 @@ class Run {
     }
     e.planStep = s.name; e.plan = this.rel(planFile); e.planApprovedBy = 'lint';
     this.log(`${e.id}: plan approved by lint, not by a person (${s.name}/plan.md)`);
-    return fix ? 'FIX_BUILD' : 'BUILD';
+    return 'BUILD';
   }
 
   async doBuild(e, fix) {
     const brief = path.join(this.epicDir(e), 'fix-brief.md');
-    const plan = read(path.join(this.stateDir, e.plan));
     const s = await this.step(e, fix ? 'fix' : 'build', (stepDir) => {
       (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir) }); // what the next audit reads, in this run or a later one
-      fs.writeFileSync(path.join(stepDir, 'prompt.md'), buildPrompt(plan, this.pluginDir));
-      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), BUILD_RULES + (fix ? '\n' + read(brief) : ''));
+      fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir));
+      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), fix ? FIX_RULES : BUILD_RULES);
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
     });
     return s ? 'CHECK_BUILD' : null;
@@ -1117,7 +1146,7 @@ class Run {
     e.fixRounds = 1;
     this.writeFixBrief(e, 'The driver\'s done-ness checks failed after the build session:', failed.map((c) => `- **${c.name}** — ${typeof c.evidence === 'string' ? c.evidence : JSON.stringify(c.evidence)}`));
     this.log(`${e.id}: CHECK_BUILD failed (${names}); starting the one fix round`);
-    return 'FIX_PLAN';
+    return 'FIX_BUILD';
   }
 
   /**
@@ -1253,7 +1282,7 @@ class Run {
     e.fixRounds = 1;
     this.writeFixBrief(e, 'The independent verifier returned FAIL. Its final report:', [verdict]);
     this.log(`${e.id}: ${s.name} verdict FAIL; starting the one fix round`);
-    return 'FIX_PLAN';
+    return 'FIX_BUILD';
   }
 
   /** CHECK_VERIFY, the merge gate (§6.5 and SPIKE.md "Owner decisions"). */
@@ -1261,6 +1290,11 @@ class Run {
     const m = this.meta(e); const dev = this.state.integration; const pre = e.preVerify;
     const checks = [];
     const add = (name, pass, evidence) => checks.push({ name, pass: !!pass, evidence });
+    // The verifier may repair what it found only when the owner said so: this verify session was
+    // resumed from a gate the owner answered "Fix now" (as wrapup-epic allows with a person
+    // present). Unattended, policy answers "Stop — epic FAILs" and a separate session repairs.
+    const ownerFix = e.resumed?.phase === 'VERIFY' && /^fix now\b/i.test(e.resumed.answer ?? '') ? e.resumed.gate : null;
+    const fixedFiles = [];
 
     const firstParent = this.g('rev-list', '--first-parent', `${pre.developSha}..${dev}`).split('\n').filter(Boolean);
     const parents = firstParent.length === 1 ? this.g('rev-list', '--parents', '-n', '1', dev).split(' ').slice(1) : [];
@@ -1273,11 +1307,12 @@ class Run {
       if (!gitOk(this.clone, 'merge-base', '--is-ancestor', pre.branchTip, p2)) problems.push('the merge\'s second parent does not descend from the pre-verify branch tip');
       else {
         const stray = this.g('diff', '--name-only', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && !f.startsWith('docs/') && f !== m.sidecar);
-        if (stray.length) problems.push(`commits added during verify touch files outside docs/: ${stray.join(', ')}`);
+        if (stray.length && ownerFix) fixedFiles.push(...stray);
+        else if (stray.length) problems.push(`commits added during verify touch files outside docs/: ${stray.join(', ')}`);
         if (gitOk(this.clone, 'merge-base', '--is-ancestor', pre.developSha, p2) && this.g('rev-parse', `${dev}^{tree}`) !== this.g('rev-parse', `${p2}^{tree}`)) problems.push('the merge commit itself changes files');
       }
     }
-    add('verdict', problems.length === 0, problems.length ? problems : { merge: this.integrationSha(), parents });
+    add('verdict', problems.length === 0, problems.length ? problems : { merge: this.integrationSha(), parents, ...(fixedFiles.length ? { fixedDuringWrapup: fixedFiles, approvedBy: ownerFix } : {}) });
 
     const sc = parseSidecar(gitShow(this.clone, dev, m.sidecar));
     const unverified = m.anchors.filter((t) => !sc.verified[t]);
@@ -1289,7 +1324,13 @@ class Run {
     const countLine = section ? (section.match(/^Count:.*$/m) ?? [])[0] : null;
     const numbers = countLine ? countLine.match(/\d+/g) ?? [] : [];
     const waivedLine = 'waived' in sc.fields;
-    add('no-waivers', !waivedLine && numbers.length > 0 && numbers.every((x) => Number(x) === 0), { waivedLineInSidecar: waivedLine, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line') });
+    // "fixed at wrapup" may be above zero only for an owner-approved Fix now; every other count stays zero.
+    const fixed = Number((countLine?.match(/fixed at wrapup:\s*(\d+)/i) ?? [])[1] ?? 0);
+    const others = countLine ? [...countLine.matchAll(/([a-z][a-z ]*):\s*(\d+)/gi)].filter(([, k]) => !/^fixed at wrapup$/i.test(k.trim()) && !/^count$/i.test(k.trim())).map(([, , n]) => Number(n)) : [];
+    const total = Number(numbers[0] ?? NaN);
+    const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (ownerFix ? total === fixed : numbers.every((x) => Number(x) === 0));
+    add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: waivedLine, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}) });
+    if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: ownerFix };
 
     if (this.currentBranch() !== dev && !this.dirty()) this.g('checkout', '-q', dev);
     if (this.currentBranch() === dev && !this.dirty()) {
@@ -1323,10 +1364,9 @@ class Run {
     while (phase) {
       const stop = this.runStop();
       if (stop) return this.parkResumable(e, `run stopped (${stop}) before ${phase}`, phase === 'CHECK_BUILD_INTERRUPTED' ? 'CHECK_BUILD' : phase);
-      if (phase === 'PLAN') phase = await this.doPlan(e, false);
+      if (phase === 'PLAN') phase = await this.doPlan(e);
       else if (phase === 'BUILD') phase = await this.doBuild(e, false);
-      else if (phase === 'FIX_PLAN') phase = await this.doPlan(e, true);
-      else if (phase === 'FIX_BUILD') phase = await this.doBuild(e, true);
+      else if (phase === 'FIX_PLAN' || phase === 'FIX_BUILD') phase = await this.doBuild(e, true); // FIX_PLAN: a state saved by an earlier driver, when a repair was two sessions
       else if (phase === 'CHECK_BUILD') phase = this.doCheckBuild(e);
       else if (phase === 'CHECK_BUILD_INTERRUPTED') phase = this.doCheckBuild(e, { interrupted: true });
       else if (phase === 'AUDIT') phase = await this.doAudit(e);
@@ -1421,7 +1461,7 @@ class Run {
         }
       }
       // Phases that run a captured plan need it; without one the epic is planned again.
-      if ((phase === 'BUILD' || phase === 'FIX_BUILD') && !(e.plan && exists(path.join(this.stateDir, e.plan)))) { phase = phase === 'BUILD' ? 'PLAN' : 'FIX_PLAN'; e.resumed.phase = phase; }
+      if (phase === 'BUILD' && !(e.plan && exists(path.join(this.stateDir, e.plan)))) { phase = 'PLAN'; e.resumed.phase = phase; }
       if (f.kind === 'audit' && phase === 'VERIFY') e.auditOverruled = { gate: f.gate, by: g.decided.by };
       if (!entry.question) used(); // a question gate is marked used by hook R8 when it answers
       e.resumed.behind = f.behind ?? 0;
@@ -1456,7 +1496,8 @@ class Run {
       e.resumes = e.resumes ?? {};
       const again = (key) => { e.resumes[key] = (e.resumes[key] ?? 0) + 1; return e.resumes[key] <= 1; };
       let entry;
-      if (e.state === 'PLAN' || e.state === 'FIX_PLAN') entry = again(e.state) ? e.state : null;
+      if (e.state === 'PLAN') entry = again(e.state) ? e.state : null;
+      else if (e.state === 'FIX_PLAN') entry = again(e.state) ? 'FIX_BUILD' : null;
       else if (e.state === 'BUILD' || e.state === 'FIX_BUILD') entry = 'CHECK_BUILD_INTERRUPTED';
       else if (e.state === 'CHECK_BUILD' || e.state === 'AUDIT' || e.state === 'CHECK_VERIFY') entry = e.state;
       else if (e.state === 'VERIFY') {

@@ -195,7 +195,8 @@
       "voided": null,
       "superseded": [],
       "auditOverruled": null,
-      "look": null
+      "look": null,
+      "fixedAtWrapup": null
     },
     {
       "id": "Lg4Fx2q",
@@ -369,7 +370,8 @@
       "voided": null,
       "superseded": [],
       "auditOverruled": null,
-      "look": null
+      "look": null,
+      "fixedAtWrapup": null
     },
     {
       "id": "Lg5Chr8",
@@ -490,7 +492,8 @@
       "voided": null,
       "superseded": [],
       "auditOverruled": null,
-      "look": null
+      "look": null,
+      "fixedAtWrapup": null
     },
     {
       "id": "Lg3Sum9",
@@ -736,7 +739,8 @@
       "voided": null,
       "superseded": [],
       "auditOverruled": null,
-      "look": null
+      "look": null,
+      "fixedAtWrapup": null
     },
     {
       "id": "Lg6Bud2",
@@ -775,7 +779,8 @@
       "voided": null,
       "superseded": [],
       "auditOverruled": null,
-      "look": null
+      "look": null,
+      "fixedAtWrapup": null
     },
     {
       "id": "Lg7Exp5",
@@ -800,7 +805,8 @@
       "voided": null,
       "superseded": [],
       "auditOverruled": null,
-      "look": null
+      "look": null,
+      "fixedAtWrapup": null
     },
     {
       "id": "Lg8Hw01",
@@ -825,7 +831,8 @@
       "voided": null,
       "superseded": [],
       "auditOverruled": null,
-      "look": null
+      "look": null,
+      "fixedAtWrapup": null
     }
   ],
   "gates": [

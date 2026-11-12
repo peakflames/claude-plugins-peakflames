@@ -41,6 +41,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Human-check answers need the owner's account** — `autopilot report` asks what the owner did
   to check and what they saw, with suggested ways of looking; `driver.mjs decide` refuses a
   human-check answer without that note.
+- **Autopilot repair is one session** — a failed check, a confirmed audit finding, a "Not right"
+  look or a verify FAIL goes to a single builder session with the fixes as its prompt; the
+  fix-round planning session is gone.
+- **Owner-approved "Fix now" during verify** — when the owner answers a verifier's own question
+  with Fix now, the resumed verify may repair inline and merge; the report names what it fixed.
 - **Report TL;DR and glossary** — `report.md` opens with a plain-language TL;DR and ends with
   "Words used in this report"; `autopilot report` presents the TL;DR first and explains each term
   on first use; once merged work is in the project, the report stops listing the fetch command.

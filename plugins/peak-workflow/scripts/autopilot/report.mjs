@@ -91,7 +91,7 @@ export function collectReport(runDir) {
       costUsd: q.costUsd ?? 0, turns: q.turns ?? 0, wallMs: q.wallMs ?? 0, elapsedMs, sessions: q.sessions ?? [],
       testChanges: q.testChanges ?? [], rejected: q.rejected ?? [], fixRounds: q.fixRounds ?? 0,
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
-      resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null,
+      resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
     };
   });
 
@@ -235,6 +235,7 @@ export function renderReport(r) {
     if (e.resumed) L.push('', e.resumed.fresh ? `Started over: ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`.` : `Resumed at ${e.resumed.phase} on \`${e.resumed.branch}\` (${String(e.resumed.branchTip).slice(0, 9)}, left by run ${e.resumed.fromRun ?? '?'}): ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`. No earlier session was run again.${e.resumed.behind ? ` The branch was ${plural(e.resumed.behind, 'commit')} behind \`${r.integration}\` and merged cleanly in a trial merge.` : ''}`);
     if (e.voided) L.push('', `Your decision "${e.voided.answer}" on \`${e.voided.gate}\` was void — ${e.voided.why}. The epic was planned again from scratch.`);
     for (const ref of e.superseded) L.push('', `The earlier branch is kept in the clone at \`${ref}\`.`);
+    if (e.fixedAtWrapup?.approvedBy) L.push('', `Fixed during verification, on your "Fix now" (\`${e.fixedAtWrapup.approvedBy}\`): ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. The verifier checked its own fix; no separate audit ran on it.`);
     if (e.auditOverruled) L.push('', `Verified as built: ${e.auditOverruled.by} judged the auditor's findings not real (\`${e.auditOverruled.gate}\`).`);
     if (e.look) L.push('', `Human check: ${e.look.by} looked on ${e.look.date} and answered "Looks right" (\`${e.look.gate}\`); wrapup's manual-verification question was answered with that.`);
     if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);

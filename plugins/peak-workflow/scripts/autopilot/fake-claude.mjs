@@ -6,7 +6,7 @@
 //
 //   { "<epic>/<step>": script,      e.g. "Lg1Csv7/build-1"   (most specific)
 //     "<epic>/<kind>": script,      e.g. "Lg1Csv7/build"
-//     "*/<kind>":      script }     kinds: plan, build, verify, plan-fix, fix, audit
+//     "*/<kind>":      script }     kinds: plan, build, verify, fix, audit
 //
 // An audit step with no script is a clean audit: `structured_output` with no findings. A scripted
 // one sets `result.structured_output` to what the auditor would return.

@@ -112,7 +112,7 @@ test('build over budget: uncommitted work becomes a WIP commit and the epic park
   assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${E1.id}/build-1`]);
 });
 
-test('check failure: exactly one fix round (plan + build), then park', async (t) => {
+test('check failure: exactly one repair session, then park', async (t) => {
   const p = makeProject(t);
   const failing = { testBody: " throw new Error('red'); " };
   p.scenario({
@@ -127,16 +127,21 @@ test('check failure: exactly one fix round (plan + build), then park', async (t)
   const e = p.epic(E1.id);
   assert.equal(e.state, 'PARKED');
   assert.match(e.reason, /CHECK_BUILD still fails after the fix round \(tests-green\)/);
-  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'plan-fix-1', 'fix-1'].map((s) => `${E1.id}/${s}`));
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'fix-1'].map((s) => `${E1.id}/${s}`));
   const dir = p.dir(E1.id);
   assert.deepEqual(readJson(path.join(dir, 'check-build-1.json')).checks.filter((c) => !c.pass).map((c) => c.name), ['tests-green']);
   assert.equal(readJson(path.join(dir, 'check-build-2.json')).pass, false);
-  // Both fix sessions carry the brief that names the failed check.
+  // The repair is one builder session: its prompt is the brief that names the failed check, and it has its own rules.
   const brief = path.join(dir, 'fix-brief.md');
   assert.match(fs.readFileSync(brief, 'utf8'), /\*\*tests-green\*\*/);
-  const [, , planFix, fix] = p.calls();
-  assert.ok(planFix.argv.includes(brief));
-  assert.match(fs.readFileSync(path.join(dir, 'fix-1', 'build-rules.md'), 'utf8'), /Autopilot fix brief/);
+  const [, , fix] = p.calls();
+  assert.match(fix.prompt, /^This is the one repair round for epic Lg1Csv7 \(csv-import\) — CSV import\. The epic is already built on branch `feature\/epic-Lg1Csv7-csv-import`/);
+  assert.ok(fix.prompt.includes(fs.readFileSync(brief, 'utf8').trim()));
+  assert.match(fix.prompt, /Commit on the branch[^\n]*`fix\(epic-Lg1Csv7\): /);
+  assert.equal(fix.env?.AUTOPILOT_ROLE ?? 'builder', 'builder');
+  const rules = fs.readFileSync(path.join(dir, 'fix-1', 'build-rules.md'), 'utf8');
+  assert.match(rules, /# Autopilot repair rules/);
+  assert.ok(fix.argv.includes(path.join(dir, 'fix-1', 'build-rules.md')));
   assert.equal(fix.argv[fix.argv.indexOf('--max-turns') + 1], '150');
 });
 
@@ -154,7 +159,7 @@ test('verify FAIL, one fix round, verify PASS: MERGED', async (t) => {
   const e = p.epic(E1.id);
   assert.equal(e.state, 'MERGED');
   assert.equal(e.fixRounds, 1);
-  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1', 'plan-fix-1', 'fix-1', 'audit-2', 'verify-2'].map((s) => `${E1.id}/${s}`));
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1', 'fix-1', 'audit-2', 'verify-2'].map((s) => `${E1.id}/${s}`));
   assert.match(fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8'), /TOR-01-Hd3Yc8L: the description is trimmed/);
   assert.ok(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('src/fix.js'));
 });

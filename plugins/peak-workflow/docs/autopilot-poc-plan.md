@@ -368,7 +368,7 @@ the workspace, and a step's files are under `runs/<run>/`):
       audit-1/  bundle/  result.json    auditor input bundle and output
       verify-1/ …                       same files as build
       check-verify-1.json               merge-gate checks
-      plan-fix-1/ … fix-1/ … verify-2/ …  at most one fix round (plan + implement again)
+      fix-1/ … verify-2/ …                at most one repair round (one builder session)
 ```
 
 A run's effective config is the defaults, then `settings.json`, then the run's `config.json`,
@@ -406,7 +406,7 @@ WP17 D1 contamination.
              │  park gate / budget / crash ──────────────────────────────────────► PARKED ───────┤
              ▼                                                                                    │
         CHECK_BUILD (driver: sidecar, commit, tests, trace, scope, test-integrity, tor-lifecycle) │
-             │  fail ──(fix round left?)── yes ─► FIX (plan + build) ─► CHECK_BUILD               │
+             │  fail ──(fix round left?)── yes ─► FIX (one session) ─► CHECK_BUILD               │
              │                             no ──────────────────────────────────► PARKED/FAILED ─┤
              ▼                                                                                    │
            AUDIT  (fresh read-only session; advisory) ── parkOn rule hit ───────────► PARKED ─────┤
@@ -469,8 +469,9 @@ lot of context, so implementation starts fresh.
   hook R8 parks them. R9's lint checks that those items are present before approving.
 
 **Fix round.** There is at most one per epic, shared between CHECK_BUILD and VERIFY failures. The
-fix round is a planning session that runs `/peak-workflow:start-epic <id>` again, followed by a
-fresh build session given its plan. The epic is In Progress or Implemented,
+fix round is **one builder session** whose prompt is the fix brief (owner decision 2026-11-12,
+§10 P4; it was first built as a planning session followed by a build session, and the rest of
+this paragraph describes that). The epic is In Progress or Implemented,
 so `start-epic` treats it as a resumption: "rework after a wrapup FAIL", per PLAN_TEMPLATE opening
 step 2. Both fix sessions get `--append-system-prompt-file <state>/epics/<id>/fix-brief.md`, which
 lists the driver's failed checks and the verifier's FAIL items, copied from the verify session's
@@ -748,9 +749,9 @@ skipped ("waiting for your decision"), never rebuilt.
 
 | Gate kind | Written by | Owner's answer | Re-entry |
 |---|---|---|---|
-| a question a session asked (`deferral`, `amendment`, any policy `park` row, `unmatched`) | hook R8 | one of its options | the session kind that asked: PLAN, BUILD, FIX_PLAN, FIX_BUILD or VERIFY, as a fresh session on the existing branch (a build session gets the first run's captured plan). R8 answers that question once: by kind and TOR, or for `unmatched` by the recorded question text |
+| a question a session asked (`deferral`, `amendment`, any policy `park` row, `unmatched`) | hook R8 | one of its options | the session kind that asked: PLAN, BUILD, FIX_BUILD or VERIFY, as a fresh session on the existing branch (a build session gets the first run's captured plan). R8 answers that question once: by kind and TOR, or for `unmatched` by the recorded question text |
 | `audit` | driver | `Not real — verify as built` | VERIFY on the same tip; the audit is not re-run |
-| `audit` | driver | `Real — fix before verify` | FIX_PLAN → FIX_BUILD → CHECK_BUILD → AUDIT (delta), with the parking findings as `fix-brief.md`. Uses the one fix round; if it is already used, the epic is FAILED |
+| `audit` | driver | `Real — fix before verify` | FIX_BUILD → CHECK_BUILD → AUDIT (delta), with the parking findings as `fix-brief.md`. Uses the one fix round; if it is already used, the epic is FAILED |
 | `human-check` | driver | `Looks right` | VERIFY. The look is recorded against `branchTip`; R8 answers wrapup's Step 2.0 question "Yes" with the owner's look as its note |
 | `human-check` | driver | `Not right — describe` | the fix round with the owner's note as the brief; the changed build parks for a new look |
 | `plan-lint` | driver or hook | `Approve this plan` / `Re-plan` | BUILD with the captured plan, recorded as approved by the owner, or PLAN again |
@@ -1174,7 +1175,7 @@ Preflight treats an epic with a valid decided gate as eligible although its side
 |---|---|---|---|
 | a question a session asked (`deferral`, `amendment`, any policy `park` row, `unmatched`) | hook R8 | one of its options | the session kind that asked (`session` field): a fresh plan or build session on the existing branch through `start-epic`'s own resume path (the sidecar is In Progress; PLAN_TEMPLATE opening step 2). R8 answers that exact question once. `unmatched` becomes replayable: match on the recorded question text |
 | `audit` | driver | `Not real — verify as built` | VERIFY on the same tip. The audit is not re-run |
-| `audit` | driver | `Real — fix before verify` | the fix round (FIX_PLAN → FIX_BUILD → CHECK_BUILD → AUDIT delta), with the parking findings as `fix-brief.md`. It uses the epic's one fix round |
+| `audit` | driver | `Real — fix before verify` | the fix round (FIX_BUILD → CHECK_BUILD → AUDIT delta), with the parking findings as `fix-brief.md`. It uses the epic's one fix round |
 | `human-check` | driver | `Looks right` | VERIFY. The look is recorded against `branchTip`; R8 answers wrapup's Step 2.0 manual-verification question with the owner's recorded look instead of the policy "No" |
 | `human-check` | driver | `Not right — describe` | the fix round, with the owner's note as the brief |
 | `plan-lint` | driver or hook | `Approve this plan` / `Re-plan` (add these options; today it has none) | BUILD with the captured plan, recorded as "approved by <owner>", or PLAN again |
@@ -1439,6 +1440,34 @@ plan or a pre-approved question that the wording check missed. All three matched
 words of a heading or question; each was fixed by widening one pattern. This is the brittleness
 SPIKE.md's open question is about (deterministic matching versus an inference call that only
 classifies).
+
+**Run A, fourth run (`20261111-200628`): 4 minutes, $1.85.** E6 resumed at BUILD from the
+owner-approved plan and MERGED. E5 resumed at the fix round ("Real — fix before verify") and
+parked again with no plan: for the second time the fix-round planning session made the fix on
+the spot and was then denied the commit.
+
+**A repair is now one session (owner decision, 2026-11-12).** Where this plan says FIX_PLAN →
+FIX_BUILD, read FIX_BUILD alone: one builder session (`fix-1`) whose prompt is the fix brief —
+what failed the driver's checks, the auditor's confirmed findings, the owner's "Not right" note,
+or the verifier's FAIL report — with its own short rules (no plan mode, no status change, no
+merge). CHECK_BUILD, the delta audit, the human check and a fresh verify follow it as they
+follow a build. `planFix` and its budget are gone; a state or gate saved as FIX_PLAN enters
+FIX_BUILD.
+
+**Who may repair what** (owner's question: `wrapup-epic` lets the verifier fix inline — should
+autopilot?):
+
+| Found by | Unattended | With the owner's answer |
+|---|---|---|
+| Driver checks, auditor, owner's look | One repair session, then every check again | — |
+| Verifier (a TOR or quality gate fails) | Policy answers "Stop — epic FAILs"; one repair session; a fresh verify | — |
+| Verifier asks a question of its own | Parks | If the owner answers **Fix now**, the resumed verify may repair inline, as the skill allows with a person present |
+
+Unattended, an inline fix would have the verifier pass its own work with nobody between it and
+the merge, so the merge gate still rejects it (code changed during verify, or "fixed at wrapup"
+above zero). For a verify resumed from an owner's "Fix now" the gate accepts both — every other
+count must still be zero — and the report says so: "Fixed during verification, on your Fix
+now … no separate audit ran on it". Before this the gate would have rolled such a merge back.
 
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then

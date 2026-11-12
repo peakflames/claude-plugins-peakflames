@@ -152,8 +152,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      happens: "resumes at `<gate.enters>` on its branch — you answered "<gate.answer>"", or
      "starts over" with the reason from `reasons`.
    - Per-epic limits from `launch.config.budgets`, as a table with minutes, turns, dollars and
-     model per row: `plan`, `build`, `audit`, `verify`, then `planFix` and `fix` marked "only if
-     the one fix round happens". Each driver test run is capped at `budgets.testRunMin` minutes.
+     model per row: `plan`, `build`, `audit`, `verify`, then `fix` marked "only if
+     the one repair round happens" (one session; a repair has no planning session). Each driver test run is capped at `budgets.testRunMin` minutes.
    - Run limits: `launch.config.runBudgetUsd` dollars; end time `launch.endByLocal`; the run also
      stops on a red base, low disk (`launch.config.diskFloorGb` GB), or two infrastructure errors
      in a row.

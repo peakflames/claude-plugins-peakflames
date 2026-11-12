@@ -126,12 +126,12 @@ test('audit gate, "Real — fix before verify": the fix round runs with the park
   p.scenario({ ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in'), finding('scope', 'low')]) });
   await p.go();
   const run1 = p.runName(); const tip = git(p.clone, 'rev-parse', E1.branch);
-  assert.equal(decide(p, E1.id, ANSWERS.auditReal, { note: 'the live path must be exercised' }).enters, 'FIX_PLAN');
+  assert.equal(decide(p, E1.id, ANSWERS.auditReal, { note: 'the live path must be exercised' }).enters, 'FIX_BUILD');
 
   p.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/live.js', content: 'export const live = true;\n' }, { do: 'commit', message: `feat(epic-${E1.id}): exercise the live path` }] }, [`${E1.id}/verify`]: wrapupScript(E1) });
   const r = await again(p);
 
-  assert.deepEqual(r.steps, ['plan-fix-1', 'fix-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  assert.deepEqual(r.steps, ['fix-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
   const e = p.epic(E1.id);
   assert.deepEqual([e.state, e.fixRounds], ['MERGED', 1]);
   const brief = fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8');
@@ -139,7 +139,7 @@ test('audit gate, "Real — fix before verify": the fix round runs with the park
   assert.match(brief, /\*\*F1 stand-in\*\* — the stand-in problem/);
   assert.ok(!brief.includes('scope'), 'only the findings that parked');
   assert.match(brief, /The owner's note: the live path must be exercised/);
-  assert.ok(r.calls[0].argv.includes(p.dir(E1.id, 'fix-brief.md')));
+  assert.ok(r.calls[0].prompt.includes(fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8').trim()), 'the one repair session is given the brief as its prompt');
   // The audit after the fix covers only the delta since the first run's audit, and only the fix session.
   const a = readJson(p.dir(E1.id, 'audit-1', 'audit.json'));
   assert.deepEqual([a.delta, a.base], [true, tip]);
@@ -163,6 +163,50 @@ test('audit gate, "Real", when the one fix round is already used: FAILED without
   assert.deepEqual(r.steps, []);
   assert.equal(p.epic(E1.id).state, 'FAILED');
   assert.match(p.epic(E1.id).reason, /one fix round is already used/);
+});
+
+test('unattended, a verifier that repairs code on its own and merges is rolled back, whatever it reports', async (t) => {
+  const p = makeProject(t);
+  const inline = [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/usage.js', content: 'export const usage = 1;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): usage text` }];
+  // Unattended: a verifier that changes code on its own and merges is rolled back, whatever it reports.
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [...inline, ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  assert.match(p.epic(E1.id).reason, /merge gate/);
+  const failed = readJson(p.dir(E1.id, 'check-verify-1.json')).checks.filter((c) => !c.pass).map((c) => c.name);
+  assert.deepEqual(failed, ['verdict', 'no-waivers']);
+  assert.equal(merged(p, git(p.clone, 'rev-parse', E1.branch)), false, 'the merge was rolled back');
+});
+
+test('owner-approved "Fix now" in verify: the inline repair merges and the report names it', async (t) => {
+  const p = makeProject(t);
+  const q = 'Code-review finding in Epic Lg1Csv7: the usage text omits a command. Recommendation: Fix now. How to proceed?';
+  const options = ['Fix now (Recommended)', 'Leave as is', 'Stop — epic FAILs'];
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q, options)] } });
+  await p.go();
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind], ['PARKED', 'unmatched']);
+  assert.equal(decide(p, E1.id, 'Fix now (Recommended)').enters, 'VERIFY');
+
+  const inline = [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/usage.js', content: 'export const usage = 1;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): usage text` }];
+  p.scenario({ [`${E1.id}/verify`]: { actions: [ask(q, options), ...inline, ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  const r = await again(p);
+  assert.deepEqual(r.steps, [`${E1.id}/verify-1`]);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual([e.fixedAtWrapup.count, e.fixedAtWrapup.files, e.fixedAtWrapup.approvedBy], [1, ['src/usage.js'], `gates/${E1.id}-1.json`]);
+  const verdict = readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'verdict');
+  assert.deepEqual(verdict.evidence.fixedDuringWrapup, ['src/usage.js']);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fixed during verification, on your "Fix now" \(`gates\/Lg1Csv7-1\.json`\): src\/usage\.js\. The verifier checked its own fix/);
+
+  // The same approval does not cover a waiver or an undisclosed deferral.
+  const p2 = makeProject(t);
+  p2.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q, options)] } });
+  await p2.go();
+  decide(p2, E1.id, 'Fix now (Recommended)');
+  p2.scenario({ [`${E1.id}/verify`]: { actions: [ask(q, options), ...inline, ...wrapupActions(E1, { counts: [2, 1, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  await again(p2);
+  assert.equal(p2.epic(E1.id).state, 'PARKED');
+  assert.deepEqual(readJson(p2.dir(E1.id, 'check-verify-1.json')).checks.filter((c) => !c.pass).map((c) => c.name), ['no-waivers']);
 });
 
 // ---- human-check -------------------------------------------------------------------------------
@@ -214,12 +258,12 @@ test('human-check gate, "Not right — describe": the fix round gets the owner\'
   await p.go({ queue: [e5.id] });
   // No humanCheck command: the artifact is the project's **Run:** command from CLAUDE.md, placeholders dropped.
   assert.match(fs.readFileSync(path.join(p.state, gate(p, e5.id).artifacts[1]), 'utf8'), /^\$ node bin\/ledger\.js\n/);
-  assert.equal(decide(p, e5.id, ANSWERS.notRight, { note: 'the bars overlap' }).enters, 'FIX_PLAN');
+  assert.equal(decide(p, e5.id, ANSWERS.notRight, { note: 'the bars overlap' }).enters, 'FIX_BUILD');
 
   p.scenario({ [`${e5.id}/plan-fix`]: planScript(e5), [`${e5.id}/fix`]: { actions: [{ do: 'checkout', name: e5.branch }, { do: 'write', path: 'src/bars.js', content: 'export const gap = 4;\n' }, { do: 'commit', message: `feat(epic-${e5.id}): space the bars` }] } });
   const r = await again(p, { queue: [e5.id] });
 
-  assert.deepEqual(r.steps, ['plan-fix-1', 'fix-1', 'audit-1'].map((s) => `${e5.id}/${s}`));
+  assert.deepEqual(r.steps, ['fix-1', 'audit-1'].map((s) => `${e5.id}/${s}`));
   assert.match(fs.readFileSync(p.dir(e5.id, 'fix-brief.md'), 'utf8'), /Pat Owner\) looked at what was built and answered "Not right — describe":\n[\s\S]*> the bars overlap/);
   assert.deepEqual([p.epic(e5.id).state, p.epic(e5.id).fixRounds], ['PARKED', 1]);
   const g2 = gate(p, e5.id, 2);
@@ -371,7 +415,7 @@ test('resume gate (STOP mid-build): the STOP file is cleared, and resuming finis
   p.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: buildActions(E1) }, [`${E1.id}/verify`]: wrapupScript(E1) });
   const r = await again(p);
 
-  assert.deepEqual(r.steps, ['plan-fix-1', 'fix-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  assert.deepEqual(r.steps, ['fix-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
   assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).fixRounds], ['MERGED', 1]);
   assert.ok(merged(p, tip), 'the WIP commit is part of what merged');
 });
@@ -481,7 +525,7 @@ test('onPark defaults to "stop": the first epic that parks ends the run, and the
   const pre2 = JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
   assert.deepEqual([pre2.launch.config.onPark, pre2.launch.projectSettingsFileExists, pre2.launch.config.queue], ['continue', true, null]);
   assert.match(pre2.launch.config.claudeBin, /fake-claude\.mjs$/, 'a project file never names the session binary');
-  p.scenario({ [`${E1.id}/verify`]: { actions: [], result: { result: 'Verdict: FAIL' } }, [`${E1.id}/plan-fix`]: planScript(E1, { omit: ['mark'] }), ...happy(d) });
+  p.scenario({ [`${E1.id}/verify`]: { actions: [], result: { result: 'Verdict: FAIL' } }, [`${E1.id}/fix`]: { actions: [ask('Should the repair also rename the command?', ['Yes', 'No'])] }, ...happy(d) });
   const r = await again(p);
   assert.deepEqual(r.state.queue.map((q) => [q.id, q.state]), [[E1.id, 'PARKED'], [d.id, 'MERGED']]);
   assert.equal(r.state.stoppedBecause, 'queue done');
