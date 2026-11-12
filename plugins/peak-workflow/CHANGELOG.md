@@ -79,6 +79,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **`tor-lifecycle` in a sandbox** — with four or more feature files the helper crashed where
   process pools are denied (Claude Code's sandbox on macOS); it now parses in-process instead.
+- **Autopilot traceability check accepts a checklist** — an operator-observed requirement named
+  only by its `tests/manual/` checklist no longer fails the build check.
 - **Autopilot plan lint accepts shortened step headings** — a plan that keeps every template
   step under a shorter heading ("Feature branch", "Mark Implemented") no longer parks.
 

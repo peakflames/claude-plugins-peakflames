@@ -40,7 +40,8 @@ function addLookEpic(p, spec = { id: 'Lg5Chr8', slug: 'chart', name: 'Spending c
   git(p.project, 'commit', '-qam', 'docs: the chart is checked by a person');
   return e;
 }
-const buildWithManual = (e) => ({ actions: [...buildActions(e, { commit: false }), { do: 'write', path: `tests/manual/${e.tors[0]}.md`, content: '# Manual check\n\n1. Open chart.html\n' }, { do: 'commit', message: `feat(epic-${e.id}): implement ${e.slug}` }] });
+// As a real build leaves it: the operator-observed requirement is named only by its checklist, not by a test under test/.
+const buildWithManual = (e) => ({ actions: [...buildActions(e, { commit: false }), { do: 'write', path: `test/${e.slug}.test.js`, content: "import test from 'node:test';\ntest('the chart command exists', () => {});\n" }, { do: 'write', path: `tests/manual/${e.tors[0]}.md`, content: `# Manual check — ${e.tors[0]}\n\n1. Open chart.html\n` }, { do: 'commit', message: `feat(epic-${e.id}): implement ${e.slug}` }] });
 
 // ---- a question a session asked ----------------------------------------------------------------
 

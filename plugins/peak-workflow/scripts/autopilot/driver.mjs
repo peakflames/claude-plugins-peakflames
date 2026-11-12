@@ -1050,7 +1050,10 @@ class Run {
     if (!add('handoff', count === '0', handoff === null ? 'handoff file missing on the branch' : count === undefined ? 'no "## Deferrals" section with a Count: line' : `Deferrals Count: ${count}`) && Number(count) > 0) parkOnly = parkOnly ?? `the handoff records ${count} deferral(s): a human decision`;
 
     const dirs = this.pre.testDirs;
-    const untraced = m.anchors.filter((tor) => gitRun(this.clone, 'grep', '-l', '-F', tor, b, '--', ...dirs).code !== 0);
+    // An operator-observed requirement is traced by its checklist under tests/manual/ (or tests/hil/),
+    // whether or not those are on the Test directories line (wrapup-epic Step 1.2 item 2).
+    const observed = new Set(m.reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]));
+    const untraced = m.anchors.filter((tor) => gitRun(this.clone, 'grep', '-l', '-F', tor, b, '--', ...dirs, ...(observed.has(tor) ? ['tests/manual', 'tests/hil'] : [])).code !== 0);
     add('traceability', untraced.length === 0, untraced.length ? { missingFromTests: untraced, testDirs: dirs } : `${m.anchors.length} anchors found under ${dirs.join(' ')}`);
 
     if (status === '' && this.currentBranch() === b) {

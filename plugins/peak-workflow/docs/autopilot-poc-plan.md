@@ -1396,6 +1396,22 @@ deferral gate on the live TOR. Three differences:
 The first evaluation also reported a false merge on E2. It was the oracle's mistake (a rule
 pattern with a double space, which no TOR promises to tolerate) and is corrected.
 
+**Run A, second run (`20261111-193555`, after the owner's three decisions): 7 minutes, $3.27.**
+Resume worked in real sessions: E3 re-entered at VERIFY on the first run's branch and MERGED;
+E6 and E4 re-entered at VERIFY and BUILD with the owner's answer replayed once. Then:
+
+- **E6 parked again, correctly.** After "Fix now" the verifier found that merging `develop`
+  conflicts in `src/index.js` and would drop the `summary` command from the usage text, and
+  asked before resolving it. E6 was built before E3 merged; the staleness is real.
+- **E4 parked again.** The owner answered "Defer"; the skill's follow-up "Which later epic
+  creates the code this Then clause depends on?" is free of options and unmatched.
+- **E5 parked on a driver defect, before the human check.** CHECK_BUILD's traceability looked
+  for every anchor under the Test directories only, but an operator-observed requirement is
+  traced by its checklist in `tests/manual/`. Fixed: those anchors are also searched for under
+  `tests/manual/` and `tests/hil/`. The fake-backed tests had hidden it by naming every TOR in a
+  test file. Also seen: the fix-round planning session edited a test and tried to commit
+  instead of planning (R3 denied the commit); it ended without a plan.
+
 To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
 `feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
 `docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
