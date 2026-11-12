@@ -3,6 +3,7 @@
   "about": "Gate policy for hook R8 (autopilot-poc-plan.md §7). A question is matched by fragments of the skill's own wording, never by a model. `park` rows are checked first. An `answer` row applies only when its role runs the session, its extra requirement holds (`epicId`: the question names the queued epic; `anchorTor`: the TOR it names is one of the epic's anchors), and its answer is among the options actually offered. Anything else parks.",
   "answer": [
     { "kind": "start-epic-confirm", "skillStep": "start-epic Step 2.5", "roles": ["planner"], "fragments": ["Start Epic "], "requires": "epicId", "answer": "Start it" },
+    { "kind": "start-epic-confirm", "skillStep": "start-epic Step 2.5 (question without the words \"Start Epic\")", "roles": ["planner"], "fragments": ["Start it?"], "requires": "epicId", "answer": "Start it" },
     { "kind": "tor-fail", "skillStep": "wrapup-epic Step 1.4b (TOR FAIL or CANNOT VERIFY)", "roles": ["verifier"], "pattern": "^\\W*TOR-\\d{2}-[A-Za-z0-9]{7} is (FAIL|CANNOT VERIFY): ", "requires": "anchorTor", "answer": "Stop — epic FAILs" },
     { "kind": "quality-gate-fail", "skillStep": "wrapup-epic Step 1.4b (failing quality gate)", "roles": ["verifier"], "fragments": [" failed: ", "How to proceed?"], "answer": "Stop — epic FAILs" },
     { "kind": "verdict-pass-proceed", "skillStep": "wrapup-epic Step 1.5", "roles": ["verifier"], "fragments": ["Proceed to Phase 2"], "pattern": "[Vv]erdict(:| is)? PASS\\b", "answer": "Proceed" },

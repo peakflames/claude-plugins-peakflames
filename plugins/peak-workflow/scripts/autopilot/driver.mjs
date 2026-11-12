@@ -133,6 +133,15 @@ export function readProjectFacts(root) {
   };
 }
 
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+/** Default effort by model family: haiku and sonnet run high, opus and fable run medium. */
+export const DEFAULT_EFFORT = [[/haiku|sonnet/i, 'high'], [/opus|fable/i, 'medium']];
+/** A step's `--effort`: its own `effort` setting, else its model's family default, else null (the flag is left off). */
+export function effortFor(budget) {
+  if (budget.effort) return budget.effort;
+  return DEFAULT_EFFORT.find(([re]) => re.test(budget.model ?? ''))?.[1] ?? null;
+}
+
 export function defaultConfig(project) {
   const facts = readProjectFacts(project);
   return {
@@ -212,6 +221,10 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   const cfg = merge(merge(merge(merge(defaultConfig(root), projectSettings(root)), settings), runCfg), overrides);
   cfg.project = root;
   if (!['stop', 'continue'].includes(cfg.onPark)) throw new Error(`onPark must be "stop" or "continue", not ${JSON.stringify(cfg.onPark)} (${projectSettingsFile(root)})`);
+  for (const [kind, b] of Object.entries(cfg.budgets)) {
+    if (b && typeof b === 'object' && b.effort !== undefined && !EFFORT_LEVELS.includes(b.effort)) throw new Error(`budgets.${kind}.effort must be one of ${EFFORT_LEVELS.join(', ')}, not ${JSON.stringify(b.effort)}`);
+    if (b && typeof b === 'object' && b.model && b.effort === undefined) { const e = effortFor(b); if (e) b.effort = e; } // resolved here so preflight and the dry run show it
+  }
   return cfg;
 }
 /** The keys that belong to one run; everything else is a workspace setting. */
@@ -514,6 +527,7 @@ export function sessionSettings() {
  */
 export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema }) {
   const b = config.budgets[kind];
+  const effort = effortFor(b);
   const clone = path.join(workspace, 'clone');
   const env = {
     AUTOPILOT_STATE: workspace, // the workspace: hooks jail on it and find clone/ and gates/ there
@@ -539,6 +553,7 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
       '--max-turns', String(b.turns), '--max-budget-usd', String(b.usd),
       '--session-id', sessionId, '--model', b.model, '--no-session-persistence',
     ];
+    if (effort) args.push('--effort', effort);
     return { bin: config.claudeBin, args, env, cwd: path.join(stepDir, 'bundle'), wallMin: b.wallMin, host: false };
   }
   const args = [
@@ -552,6 +567,7 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
     '--max-turns', String(b.turns), '--max-budget-usd', String(b.usd),
     '--session-id', sessionId, '--model', b.model,
   ];
+  if (effort) args.push('--effort', effort);
   for (const f of appendFiles) args.push('--append-system-prompt-file', f);
   return { bin: config.claudeBin, args, env, cwd: clone, wallMin: b.wallMin, host: true };
 }

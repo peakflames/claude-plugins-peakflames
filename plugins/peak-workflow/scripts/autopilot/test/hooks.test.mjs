@@ -224,6 +224,14 @@ test('R7 test integrity: an existing test changes only after a reason is recorde
   passes(h.bash('rm test/smoke.test.js'), 'with a reason (Bash)');
 });
 
+test('R8 start-epic Step 2.5: a question that ends "Start it?" without the words "Start Epic" is answered when it names the queued epic', (t) => {
+  const h = referee(t, { role: 'planner', branch: 'develop' });
+  const q = `Epic ${E1.id} (${E1.slug}) — CSV import. Phase 2 Extras; planned by Todd Schavey 2026-11-11; no owner yet. Start it?`;
+  answered(h.ask(q, START_OPTS), q, 'Start it');
+  parked(h.ask('Epic Lg2Cat4 (categorize) — Categorization rules. Start it?', START_OPTS)); // not the queued epic
+  assert.match(h.gate(1).why, /does not name the queued epic/);
+});
+
 test('R8 start-epic Step 2.5: answered "Start it" by fragment plus the queued epic ID, keyed by the question as asked', (t) => {
   const h = referee(t, { role: 'planner', branch: 'develop' });
   answered(h.ask(Q_START, START_OPTS), Q_START, 'Start it');

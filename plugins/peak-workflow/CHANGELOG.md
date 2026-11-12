@@ -10,6 +10,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Autopilot `--effort`** — each session passes `--effort`: `high` for haiku and sonnet, `medium` for
+  opus and fable. Override per step with `budgets.<step>.effort` in `<project>/.claude/peak-workflow/autopilot.json`.
 - **Autopilot driver (proof of concept)** — `scripts/autopilot/driver.mjs` runs queued epics
   unattended in a private clone: plan, build, driver checks, verify, and a merge gate that rolls
   back a bad merge.
@@ -93,6 +95,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   step under a shorter heading ("Feature branch", "Mark Implemented") no longer parks.
 - **Autopilot answers "verdict: PASS"** — the verifier's "Proceed to Phase 2" question is now
   answered when it reads "verdict: PASS", not only "verdict is PASS"; it no longer parks a passed epic.
+- **Autopilot answers a "Start it?" question worded differently** — a start-of-epic question that names
+  the queued epic and ends "Start it?" is answered, even without the words "Start Epic"; it no longer parks.
 
 ## [3.0.1] — 2026-11-05
 

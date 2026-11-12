@@ -5,7 +5,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, lintPlan, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, effortFor, loadConfig, lintPlan, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -43,6 +43,8 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.equal(verify.prompt, `/peak-workflow:wrapup-epic ${E1.id}`);
   assert.equal(verify.env.AUTOPILOT_ROLE, 'verifier');
   assert.equal(verify.argv[verify.argv.indexOf('--model') + 1], 'opus');
+  const eff = (c) => c.argv[c.argv.indexOf('--effort') + 1];
+  assert.equal(eff(verify), 'medium'); assert.equal(eff(audit), 'medium'); assert.equal(eff(plan), 'high');
 
   // The build session's prompt is the captured plan in the clear-context handoff shape.
   const dir = p.dir(E1.id);
@@ -342,7 +344,7 @@ test('dry run prints the queue, commands, settings and policy, and invokes and w
   assert.ok(r.stdout.includes(`$ ${FAKE} -p --input-format stream-json --output-format stream-json --verbose --permission-prompt-tool stdio --include-hook-events --plugin-dir ${PLUGIN_DIR} --settings '${p.state}/runs/<run>/epics/Lg1Csv7/plan-1/settings.json' --permission-mode acceptEdits`));
   assert.ok(r.stdout.includes('"text":"/peak-workflow:start-epic Lg1Csv7"'));
   assert.ok(r.stdout.includes('"text":"/peak-workflow:wrapup-epic Lg1Csv7"'));
-  assert.match(r.stdout, /--max-turns 150 --max-budget-usd 10 --session-id '<uuid>' --model opus/);
+  assert.match(r.stdout, /--max-turns 150 --max-budget-usd 10 --session-id '<uuid>' --model opus --effort medium/);
   assert.ok(r.stdout.includes('"Bash(git remote set-url *)"'));
   assert.match(r.stdout, /Gate policy:/);
   assert.deepEqual(p.calls(), []);
@@ -453,4 +455,25 @@ test('driver + real hooks: a deferral question in the build session parks the ep
   assert.equal(git(p.clone, 'log', '-1', '--format=%s', E1.branch), 'wip(autopilot): uncommitted work at park');
   assert.ok(!git(p.clone, 'ls-tree', '-r', '--name-only', E1.branch).includes('src/never.js'));
   assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${E1.id}/build-1`]);
+});
+
+test('effort defaults by model family (haiku/sonnet high, opus/fable medium) and is overridable per step', (t) => {
+  assert.equal(effortFor({ model: 'sonnet' }), 'high');
+  assert.equal(effortFor({ model: 'claude-haiku-5-5' }), 'high');
+  assert.equal(effortFor({ model: 'opus' }), 'medium');
+  assert.equal(effortFor({ model: 'claude-fable-5-2' }), 'medium');
+  assert.equal(effortFor({ model: 'something-else' }), null);
+  assert.equal(effortFor({ model: 'opus', effort: 'max' }), 'max');
+
+  const p = makeProject(t);
+  fs.mkdirSync(path.join(p.project, '.claude', 'peak-workflow'), { recursive: true });
+  const file = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
+  fs.writeFileSync(file, JSON.stringify({ budgets: { build: { effort: 'xhigh' }, verify: { model: 'sonnet' } } }));
+  const cfg = loadConfig(p.state, { project: p.project });
+  assert.equal(effortFor(cfg.budgets.build), 'xhigh');
+  assert.equal(effortFor(cfg.budgets.verify), 'high', 'a model override moves the default with it');
+  assert.equal(effortFor(cfg.budgets.audit), 'medium');
+
+  fs.writeFileSync(file, JSON.stringify({ budgets: { build: { effort: 'huge' } } }));
+  assert.throws(() => loadConfig(p.state, { project: p.project }), /budgets\.build\.effort must be one of/);
 });
