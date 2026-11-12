@@ -84,6 +84,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   its own config, state, log and report.
 - **Test-double guard** — a `claudeBin` other than `claude` in `settings.json` is refused by
   preflight and by the driver unless that run's `config.json` sets `allowTestDouble`.
+- **Autopilot catches a waiting branch up before verify** — a branch behind the integration line is
+  merged with it first, so the verifier checks the code as it will land and its docs refresh no
+  longer conflicts with an earlier epic's.
 
 ### Fixed
 

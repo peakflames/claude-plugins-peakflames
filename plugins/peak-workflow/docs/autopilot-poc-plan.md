@@ -1573,9 +1573,18 @@ surfaced, all in what happens *after* a repair or a wait, and all hidden by the 
    `develop` into the branch instead and stopped without retrying the merge. The driver read "no
    merge" as a FAIL verdict. To fix: the hook's denial should say how to proceed (abort, merge
    `develop` into the branch, merge again), and a verify that ends verified-but-unmerged should
-   park, not fail; both are now done (fake-backed tests only). Still open: the docs refresh on
-   the branch (wrapup-epic Step 4) is a standing conflict source for any two epics that verify
-   from the same base.
+   park, not fail; both are now done (fake-backed tests only).
+
+**Owner's decision (2026-11-12): catch up before verify.** wrapup-epic Step 4 refreshes
+`docs/architecture.md` and `docs/design-notes.md` on the feature branch, so two epics verified
+from the same base rewrite the same lines. One refresh at the end of the run was rejected:
+later epics must see the earlier epics' architecture and design decisions. Instead the driver
+merges the integration line (the branch the feature branch was cut from) into a branch that is
+behind it, just before the verify session; the refresh is then written on top of the current
+docs, and the verifier checks the code as it will land. A conflict in that merge parks the epic
+with a resume question. The owner's recorded look stays valid: the verifier is told the look was
+of the epic's own work and that only other epics' merged work arrived since. Built, fake-backed
+tests only; scenario D rerun to prove it live is next.
 
 Two epics were un-stuck by hand in the throwaway workspace, with the owner's yes each time: a
 `resume` gate written for `Sh2Pag6` after defect 1, and the `used` mark removed from the owner's

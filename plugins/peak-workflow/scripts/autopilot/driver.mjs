@@ -446,7 +446,7 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
 }
 
 /** What a verify session is told when the owner has already looked at this exact branch tip. */
-export function ownerLook(look, meta) {
+export function ownerLook(look, meta, caughtUp = null) {
   const observed = meta.reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]);
   return `# The operator's observation is already recorded
 
@@ -454,7 +454,7 @@ Before this session started, the project's owner looked at what was built and re
 observation for this epic. It was made by a person; it is not your inference and you must not add to it.
 
 - **Who and when:** ${look.by}, ${look.date}
-- **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, the commit you are verifying
+- **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, ${caughtUp && caughtUp.from === look.branchTip ? `this epic's own work. Since then autopilot merged the integration line into the branch (other epics' merged work only), so the tip you are verifying is ${caughtUp.to}` : 'the commit you are verifying'}
 - **Their answer:** "Looks right"
 - **Their words:** ${look.note ? `"${look.note}"` : '(none beyond the answer)'}
 ${observed.length ? `- **Operator-observed requirements it covers:** ${observed.join(', ')}\n` : ''}
@@ -1278,8 +1278,34 @@ class Run {
     return { artifacts, notes };
   }
 
+  /**
+   * Before VERIFY, a branch that is behind the integration line is brought up to date with it (the
+   * owner's decision after scenario D). A branch that waited for a person was cut before other
+   * epics merged; wrapup-epic refreshes the shared docs on the branch, and from an old copy of
+   * them that refresh conflicts at the merge. Caught up first, it is written on top of what the
+   * earlier epics left, and the verifier checks the code as it will land. Returns a reason when
+   * the two do not merge cleanly: a person resolves that.
+   */
+  catchUp(e) {
+    const m = this.meta(e); const dev = this.state.integration; const b = m.branch;
+    if (!this.branchTip(b) || gitOk(this.clone, 'merge-base', '--is-ancestor', dev, b)) return null;
+    if (this.currentBranch() !== b) { if (this.dirty()) return `the clone has uncommitted changes, so ${b} could not be brought up to date with ${dev}`; this.g('checkout', '-q', b); }
+    const from = this.branchTip(b);
+    const r = gitRun(this.clone, 'merge', '--no-ff', '--no-edit', '-m', `Merge ${dev} into ${b} (autopilot: catch up before verify)`, dev);
+    if (r.code !== 0) {
+      const files = gitRun(this.clone, 'diff', '--name-only', '--diff-filter=U').out.split('\n').filter(Boolean);
+      gitRun(this.clone, 'merge', '--abort');
+      return `${b} does not merge cleanly with ${dev} (${files.join(', ') || r.err.split('\n')[0]}): merge ${dev} into the branch by hand, then resume`;
+    }
+    e.caughtUp = { from, to: this.branchTip(b), integration: this.integrationSha() };
+    this.log(`${e.id}: ${b} brought up to date with ${dev} before verify (${from.slice(0, 9)} → ${e.caughtUp.to.slice(0, 9)})`);
+    return null;
+  }
+
   async doVerify(e) {
     const m = this.meta(e);
+    const stuck = this.catchUp(e);
+    if (stuck) return this.parkResumable(e, stuck, 'VERIFY');
     e.preVerify = { developSha: this.integrationSha(), branchTip: this.branchTip(m.branch), branch: m.branch };
     this.save();
     const s = await this.step(e, 'verify', (stepDir) => {
@@ -1288,7 +1314,7 @@ class Run {
       // observation up front, so wrapup Step 1.2 item 7 records it instead of asking a person who is
       // not there. Seen live: without this the session asks "What do you see?" and parks.
       const file = path.join(stepDir, 'owner-look.md');
-      fs.writeFileSync(file, ownerLook(e.look, m));
+      fs.writeFileSync(file, ownerLook(e.look, m, e.caughtUp));
       return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [file] };
     });
     if (!s) return null;

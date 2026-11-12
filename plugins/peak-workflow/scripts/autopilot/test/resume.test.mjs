@@ -501,6 +501,12 @@ test('another epic merged after the park: the decision still holds, because the 
   const e = p.epic(E1.id);
   assert.deepEqual([e.state, e.voided, e.resumed.behind > 0], ['MERGED', undefined, true]);
   assert.ok(merged(p, tip));
+  // Before the verify session started, the driver brought the waiting branch up to date with develop.
+  assert.equal(e.caughtUp.from, tip);
+  assert.match(git(p.clone, 'log', '-1', '--format=%s', e.caughtUp.to), /^Merge develop into .* \(autopilot: catch up before verify\)$/);
+  assert.deepEqual(git(p.clone, 'rev-list', '--parents', '-n', '1', e.caughtUp.to).split(' ').slice(1), [tip, e.caughtUp.integration]);
+  assert.equal(e.preVerify.branchTip, e.caughtUp.to, 'the merge gate measures the verifier from the caught-up tip');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /brought up to date with develop before verify/);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /The branch was \d+ commits? behind `develop` and merged cleanly in a trial merge\./);
 });
 
