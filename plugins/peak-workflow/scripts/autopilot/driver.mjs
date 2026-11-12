@@ -439,11 +439,24 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
     }
     if (ui && e.hasScreens) { humanCheck = true; reasons.push('UI epic: parks for a human look before verify'); }
     e = { ...e, scopeFlags: e.anchors.map((tor) => ({ tor, flags: scopeFlags(reqs[tor]?.text ?? '') })).filter((x) => x.flags.length) };
+    // What a person is asked to confirm at the look: each Then / And line of an operator-observed requirement, in its own words.
+    e = { ...e, observed: e.anchors.filter((tor) => /operator-observed/.test(reqs[tor]?.text ?? '')).map((tor) => ({ tor, clauses: thenClauses(reqs[tor].text) })) };
     if (tbd) set('park', 'CLAUDE.md still has values to decide (TBD / Not decided yet)');
     return { ...e, eligibility, humanCheck, reasons };
   });
   return { ok: refuse.length === 0, refuse, testCommand: config.testCommand ?? facts.testCommand, testDirs: config.testDirs?.length ? config.testDirs : facts.testDirs, epics };
 }
+
+/** The Then line of a scenario and the And / But lines after it, without the keyword: what the requirement promises. */
+export function thenClauses(text) {
+  const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim());
+  const at = lines.findIndex((l) => /^Then\b/.test(l));
+  if (at < 0) return [];
+  return lines.slice(at).filter((l) => /^(Then|And|But)\b/.test(l)).map((l) => l.replace(/^(Then|And|But)\s+/, ''));
+}
+
+/** Safety caps as sizes: a cap is a ceiling a session is stopped at, not what it usually takes. */
+export function capSize(minutes) { return minutes <= 15 ? 'XS' : minutes <= 30 ? 'S' : minutes <= 60 ? 'M' : minutes <= 120 ? 'L' : 'XL'; }
 
 /** What a verify session is told when the owner has already looked at this exact branch tip. */
 export function ownerLook(look, meta, caughtUp = null) {
@@ -455,15 +468,20 @@ observation for this epic. It was made by a person; it is not your inference and
 
 - **Who and when:** ${look.by}, ${look.date}
 - **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, ${caughtUp && caughtUp.from === look.branchTip ? `this epic's own work. Since then autopilot merged the integration line into the branch (other epics' merged work only), so the tip you are verifying is ${caughtUp.to}` : 'the commit you are verifying'}
-- **Their answer:** "Looks right"
+- **Their answer:** "Looks right"${look.observations?.length ? `\n- **What they confirmed, one Then at a time** (each is the owner's own yes to that line, shown to them in the requirement's words):\n${look.observations.map((o) => `  - ${o.tor}: "${o.clause}" — ${o.answer === 'yes' ? 'yes, I saw this' : o.answer}${o.note ? ` (${o.note})` : ''}`).join('\n')}` : ''}
 - **Their words:** ${look.note ? `"${look.note}"` : '(none beyond the answer)'}
 ${observed.length ? `- **Operator-observed requirements it covers:** ${observed.join(', ')}\n` : ''}
+"Looks right" is the owner's answer to the whole requirement: they were shown its Then lines and
+were asked whether what was built meets them. Their words add detail; they do not have to repeat
+every line. Treat a Then as observed unless their words contradict it or say they did not check it.
+
 In Step 1.2 item 7, do not ask the person to perform the check again and do not use
 \`AskUserQuestion\` for it. Do everything else the step says yourself (the checklist mirrors the
 Gherkin, the automated parts run, the implementation is inspected), then judge the recorded
 observation against the Then and record the evidence as
 \`operator-observed: <their words> (recorded by ${look.by} on ${look.date}, before this session)\`.
-If the record does not let you judge a Then, do not guess: give that requirement CANNOT VERIFY.
+Give CANNOT VERIFY only where the record contradicts a Then or says it was not checked; never
+because their words leave a line unmentioned. Never add an observation of your own.
 
 This changes item 7 only. Ask every other question the skill tells you to ask, with
 \`AskUserQuestion\` and in the skill's own words (Step 1.5, Step 2.0, the ship mode, any failure):
@@ -1239,11 +1257,25 @@ class Run {
       question: `${m.reasons.filter((r) => /operator-observed|UI epic/.test(r)).join('; ') || 'this epic needs a person to look'}. Does what was built look right?`,
       options: [ANSWERS.looksRight, ANSWERS.notRight],
       why: `autopilot never self-approves a look${made.artifacts.length ? '' : ` — and it could not produce anything to look at: ${made.notes.join('; ')}`}`,
-      artifacts: made.artifacts, artifactNotes: made.notes,
+      artifacts: made.artifacts, artifactNotes: made.notes, ...this.lookAids(e, made.artifacts),
       resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
     });
     this.park(e, made.artifacts.length ? 'human check needed before verify' : 'human check needed before verify (nothing could be produced to look at)');
     return true;
+  }
+
+  /**
+   * What makes a look easy for someone who is not a developer: the files to open, by full path;
+   * the build's checklist, as text; and the requirement's own Then lines to confirm one at a time
+   * (`checks`). `skip` leaves out the lines an earlier look already confirmed.
+   */
+  lookAids(e, artifacts, skip = []) {
+    const m = this.meta(e);
+    const done = new Set(skip.filter((o) => o.answer === 'yes').map((o) => `${o.tor}\n${o.clause}`));
+    const checks = (m.observed ?? []).flatMap((o) => o.clauses.map((clause) => ({ tor: o.tor, clause }))).filter((c) => !done.has(`${c.tor}\n${c.clause}`)).map((c, i) => ({ n: i + 1, ...c }));
+    const open = artifacts.filter((a) => !a.startsWith('clone:') && /\/artifacts\/files\//.test(a)).map((a) => path.join(this.stateDir, a));
+    const checklists = artifacts.filter((a) => a.startsWith('clone:')).map((a) => ({ path: a.slice(6), text: gitShow(this.clone, m.branch, a.slice(6)) ?? '' })).filter((c) => c.text);
+    return { checks, open, checklists };
   }
 
   /**
@@ -1333,8 +1365,11 @@ class Run {
         kind: 'human-check', skillStep: 'wrapup-epic Step 1.2 item 7',
         question: `The verifier could not judge ${unsettled.map((u) => u.tor).join(', ')} from what you recorded. ${unsettled.map((u) => u.reason).join(' ')} Look again with that in mind: does what was built look right?`,
         options: [ANSWERS.looksRight, ANSWERS.notRight],
-        why: `your recorded look ("${look.note ?? look.gate}") did not settle every part of the requirement; autopilot never fills in an observation`,
+        why: `your recorded look ("${look.note ?? look.gate}") did not settle every part of the requirement; autopilot never fills in an observation. What you already recorded is kept: only what is missing is asked`,
         artifacts: look.artifacts ?? [], verifierReport: this.rel(path.join(s.stepDir, 'result.json')),
+        ...this.lookAids(e, look.artifacts ?? [], look.observations ?? []),
+        earlier: { note: look.note ?? null, observations: look.observations ?? [], by: look.by, date: look.date, gate: look.gate },
+        asks: unsettled.map((u) => `${u.tor}: ${u.reason}`),
         resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
       });
       return this.park(e, `the owner's recorded look did not settle ${unsettled.map((u) => u.tor).join(', ')}`);
@@ -1547,7 +1582,7 @@ class Run {
       this.supersedeGates(e, f.gate);
       const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
       if (entry.approve) { e.plan = g.artifacts?.[0] ?? null; e.planApprovedBy = g.decided.by; e.planStep = g.session ?? null; }
-      if (entry.look) e.look = { gate: f.gate, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, branchTip: g.branchTip, artifacts: g.artifacts ?? [] };
+      if (entry.look) e.look = { gate: f.gate, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, observations: g.decided.observations ?? [], branchTip: g.branchTip, artifacts: g.artifacts ?? [] };
       if (entry.fix) {
         if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used; ${g.resume ?? 'continue it by hand'}`); }
         e.fixRounds = 1;
@@ -1796,11 +1831,13 @@ export function launchFacts(project, workspace, config) {
     ok: refuse.length === 0, refuse, warn, integration, freeGb, workspace, clone, run, runDir: runDirOf(workspace, run), settingsFileExists: exists(path.join(workspace, 'settings.json')),
     projectSettingsFile: projectSettingsFile(project), projectSettingsFileExists: exists(projectSettingsFile(project)),
     runs, lastRun, openGates, decidedGates, sync, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
+    // The per-session safety caps, sized for the confirm screen: ceilings, never estimates.
+    caps: ['plan', 'build', 'audit', 'verify', 'fix'].filter((k) => config.budgets[k]).map((k) => ({ session: k, size: capSize(config.budgets[k].wallMin), minutes: config.budgets[k].wallMin, usd: config.budgets[k].usd, model: config.budgets[k].model ?? null, effort: config.budgets[k].effort ?? null })),
   };
 }
 
 /** Records a person's answer in a gate file (§6.8). The driver never chooses the answer; it only writes what it is given. */
-export function decideGate(workspace, gateName, answer, { by, note } = {}) {
+export function decideGate(workspace, gateName, answer, { by, note, observations } = {}) {
   const file = path.join(workspace, 'gates', path.basename(gateName));
   if (!exists(file)) throw new Error(`no gate file ${file}`);
   const gate = readJson(file);
@@ -1813,12 +1850,40 @@ export function decideGate(workspace, gateName, answer, { by, note } = {}) {
   if (!String(answer ?? '').trim()) throw new Error('an answer is required');
   // A look is evidence: the verify session records the owner's words as the operator's observation,
   // and a fix round is briefed from them. An answer alone says nothing about what was checked.
-  if (gate.kind === 'human-check' && !String(note ?? '').trim()) throw new Error(`a human-check answer needs --note: ${label === ANSWERS.notRight ? 'what you looked at and what is wrong' : 'what you did to check and what you saw'}, in your own words`);
+  // The look as a short form: one yes or no per Then line of the requirement (`gate.checks`). The
+  // answers are the owner's, each to a line they were shown, so together they are a complete record
+  // and no free text is needed for "Looks right". A "no" is "Not right" and needs their words.
+  let obs = null;
+  if (gate.kind === 'human-check' && observations !== undefined) {
+    const given = typeof observations === 'string' ? JSON.parse(observations) : observations;
+    const checks = gate.checks ?? [];
+    if (!checks.length) throw new Error(`${path.basename(file)} lists no lines to confirm: answer it with --note`);
+    obs = checks.map((c) => {
+      const a = (given ?? []).find((x) => Number(x.n) === c.n);
+      const v = String(a?.answer ?? '').trim().toLowerCase();
+      if (v !== 'yes' && v !== 'no') throw new Error(`line ${c.n} ("${c.clause}") needs a yes or a no; "could not tell" is not an answer to record — look again, or decide later`);
+      return { n: c.n, tor: c.tor, clause: c.clause, answer: v, ...(String(a.note ?? '').trim() ? { note: String(a.note).trim() } : {}) };
+    });
+    const anyNo = obs.some((o) => o.answer === 'no');
+    if (anyNo && label !== ANSWERS.notRight) throw new Error(`a "no" on a line means the answer is "${ANSWERS.notRight}", not "${label}"`);
+    if (!anyNo && label !== ANSWERS.looksRight) throw new Error(`every line was answered yes, so the answer is "${ANSWERS.looksRight}"; to answer "${label}", say no to the line that is wrong`);
+    if (anyNo && !String(note ?? '').trim() && !obs.some((o) => o.answer === 'no' && o.note)) throw new Error('a "no" needs --note: what is wrong, and what it should look like instead, in your own words');
+  }
+  if (gate.kind === 'human-check' && !obs && !String(note ?? '').trim()) throw new Error(`a human-check answer needs --note: ${label === ANSWERS.notRight ? 'what you looked at and what is wrong' : 'what you did to check and what you saw'}, in your own words${(gate.checks ?? []).length ? ' (or --observations: a yes or no for each line the gate lists)' : ''}`);
+  if (obs) {
+    const lines = obs.map((o) => `${o.answer === 'yes' ? 'Yes' : 'No'}: ${o.clause}${o.note ? ` — ${o.note}` : ''}`);
+    note = [`Confirmed line by line by the owner. ${lines.join(' ')}`, String(note ?? '').trim()].filter(Boolean).join(' ');
+  }
+  // A second look after the verifier asked for more: what was recorded before is kept and added to.
+  if (gate.kind === 'human-check' && gate.earlier) {
+    if (gate.earlier.note) note = `${gate.earlier.note} Added after the verifier asked: ${String(note).trim()}`;
+    obs = [...(gate.earlier.observations ?? []).filter((o) => o.answer === 'yes'), ...(obs ?? [])];
+  }
   const run = gate.run && exists(runDirOf(workspace, gate.run)) ? gate.run : currentRun(workspace);
   const project = tryJson(path.join(workspace, 'settings.json'))?.project ?? (run ? tryJson(path.join(runDirOf(workspace, run), 'config.json'))?.project : null) ?? null;
   const who = by ?? (project ? sh('git', ['config', 'user.name'], { cwd: project }).out : '') ?? '';
   if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
-  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}) };
+  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}), ...(obs?.length ? { observations: obs } : {}) };
   writeJson(file, gate);
   if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
   // Every decided gate resumes its epic in the next run; the by-hand command stays as the fallback.
@@ -1916,7 +1981,7 @@ async function main(argv) {
   }
   if (cmd === 'decide') {
     if (!o.gate || o.answer === undefined) throw new Error('decide needs --workspace, --gate and --answer');
-    console.log(JSON.stringify(decideGate(ws, o.gate, o.answer, { by: o.by, note: o.note }), null, 2));
+    console.log(JSON.stringify(decideGate(ws, o.gate, o.answer, { by: o.by, note: o.note, observations: o.observations }), null, 2));
     return 0;
   }
   throw new Error(`unknown command ${cmd}\n${usage}`);

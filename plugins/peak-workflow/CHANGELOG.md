@@ -87,6 +87,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot catches a waiting branch up before verify** — a branch behind the integration line is
   merged with it first, so the verifier checks the code as it will land and its docs refresh no
   longer conflicts with an earlier epic's.
+- **Autopilot look as a yes/no form** — a human-check gate lists the requirement's own Then lines;
+  the report asks one yes or no per line and records them as the look. No free-text note is needed
+  for "Looks right".
+- **Autopilot opens what there is to look at** — the report opens the built page or chart for the
+  owner, gives its full path, and shows the build's checklist steps in the chat.
+- **Autopilot second look asks only what is missing** — when the verifier wants more, the earlier
+  look is kept and only lines not yet confirmed are asked.
+- **Autopilot safety caps shown as sizes** — the confirm screen labels the per-step limits as caps,
+  sized XS to XL with the ceiling beside each, and no longer shows turns.
 
 ### Fixed
 
@@ -107,6 +116,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot parks a verified, unmerged epic** — an epic the verifier marked Complete but did not
   merge now waits with a resume question; it was reported FAILED. The hook's denial of a commit on
   the integration line now says where to resolve a merge conflict.
+- **Autopilot verifier no longer rejects a look for an unmentioned line** — "Looks right" is the
+  owner's answer to the whole requirement; the verifier sends it back only when the record
+  contradicts a line or says it was not checked.
 
 ## [3.0.1] — 2026-11-05
 

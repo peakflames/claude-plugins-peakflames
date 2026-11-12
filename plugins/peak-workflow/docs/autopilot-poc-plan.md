@@ -1586,6 +1586,28 @@ with a resume question. The owner's recorded look stays valid: the verifier is t
 of the epic's own work and that only other epics' merged work arrived since. Built, fake-backed
 tests only; scenario D rerun to prove it live is next.
 
+**Scenario D rerun on the fixed driver (2026-11-12, five epics).** First launch: 5 of 5 as
+expected, no needless park, $9.02. Proven live: the repair's `fix(…)` commit passes the build
+check; the catch-up merge before verify (the chart merged with no conflict and no rollback).
+"Fix now" was not reached a second time: the export builder followed its brief and made the
+command silent, and the verifier accepted "no output on success" without comparing it with the
+ConOps or CLAUDE.md's stdout rule. A real verifier checks the requirements and the brief; it does
+not catch a brief that contradicts the wider project documents. The reading page's second look
+was then sent back because the owner's note named one of the requirement's three Then lines.
+
+**Owner's UX feedback and decisions (2026-11-12).** (1) The confirm screen's limits table read as
+estimates and was "very wrong" as such: show the caps as t-shirt sizes, labelled as caps; no
+estimates and no estimate-versus-actual. (2) The look is too onerous and the verifier too
+aggressive: the report did not show the checklist, did not help a non-developer open the page,
+and demanded a free-text note covering every line. Built: a human-check gate carries the
+requirement's Then lines (`checks`), full paths to open (`open`) and the checklist text; the
+report opens the file itself and asks one yes / no / couldn't-tell per line; `decide
+--observations` records them as the look (a "no" is "Not right" and needs words; "couldn't tell"
+is never recorded); a second look after the verifier asks keeps what was recorded and asks only
+unconfirmed lines; and the verifier is told that "Looks right" answers the whole requirement, so
+CANNOT VERIFY is for a contradiction or an unchecked line only. Trade-off recorded: a tick is
+weaker evidence than a description. Fake-backed tests only.
+
 **A fifth `shelf` epic for "Fix now" (owner approved, 2026-11-12).** `Sh5Exp3` CSV export. The
 first attempt (`Sh4Cfg9`) left a gap and the builder closed it. This one puts the contradiction
 in the epic's own brief: the Description says `export` "prints nothing when it succeeds", the

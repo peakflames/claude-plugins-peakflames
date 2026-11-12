@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR, defaultConfig, effortFor, loadConfig, lintPlan, scopeFlags, sessionSettings } from '../driver.mjs';
@@ -185,6 +186,15 @@ test('verified but not merged: the epic parks with a resume gate and is never ca
   assert.deepEqual([g.kind, g.phase, g.options], ['resume', 'VERIFY', ['Resume from where it stopped', 'Start over']]);
   assert.match(g.why, /nothing failed/);
   assert.equal(git(p.clone, 'rev-parse', 'develop'), e.preVerify.developSha, 'develop is untouched');
+});
+
+test('safety caps are sized for the confirm screen, and a scenario\'s Then lines are read without their keywords', async () => {
+  const { capSize, thenClauses, launchFacts, defaultConfig } = await import('../driver.mjs');
+  assert.deepEqual([15, 30, 45, 60, 90, 121].map(capSize), ['XS', 'S', 'M', 'M', 'L', 'XL']);
+  assert.deepEqual(thenClauses("Scenario: [TOR-01-AAAAAAA] x\n    # Verification: operator-observed\n    Given a file\n    And another\n    When the user opens it\n    Then the user should see one bar\n    And every label should be readable\n    But no label should overlap"), ['the user should see one bar', 'every label should be readable', 'no label should overlap']);
+  assert.deepEqual(thenClauses('Scenario: nothing promised\n    Given a file'), []);
+  const caps = launchFacts(SEED, path.join(os.tmpdir(), 'autopilot-no-such-workspace'), defaultConfig(SEED)).caps;
+  assert.deepEqual(caps.map((c) => [c.session, c.size, c.minutes, c.usd]), [['plan', 'S', 30, 5], ['build', 'L', 90, 15], ['audit', 'XS', 15, 3], ['verify', 'M', 45, 10], ['fix', 'M', 60, 12]]);
 });
 
 test('bad merge (an extra commit on develop) is rolled back and the epic parks', async (t) => {

@@ -282,6 +282,73 @@ test('a look that does not settle the requirement goes back to the owner with th
   assert.match(fs.readFileSync(last.calls[0].argv[last.calls[0].argv.indexOf('--append-system-prompt-file') + 1], 'utf8'), /the half-size one is half as tall/);
 });
 
+test('the look as a form: the gate lists the requirement\'s Then lines, the file to open and the checklist; a yes to every line is a complete "Looks right"', async (t) => {
+  const p = makeProject(t, { config: { humanCheck: { Lg5Chr8: "echo '<svg/>' > chart.html" } } });
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  const g = gate(p, e5.id);
+  assert.ok(g.checks.length >= 2, JSON.stringify(g.checks));
+  assert.deepEqual(g.checks.map((c) => [c.n, c.tor]), g.checks.map((_, i) => [i + 1, e5.tors[0]]));
+  assert.ok(g.checks.every((c) => c.clause && !/^(Then|And|But)\b/.test(c.clause)), 'the lines are the requirement\'s own, without the keyword');
+  assert.deepEqual(g.open, [path.join(p.state, `${p.rel()}/epics/${e5.id}/artifacts/files/chart.html`)], 'a full path a person can open');
+  assert.deepEqual(g.checklists.map((c) => c.path), [`tests/manual/${e5.tors[0]}.md`]);
+  assert.match(g.checklists[0].text, /Manual check/);
+
+  const dec = (answer, obs, note) => cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-1.json`, '--answer', answer, '--by', 'Pat Owner', '--observations', JSON.stringify(obs), ...(note ? ['--note', note] : []));
+  const all = (v) => g.checks.map((c) => ({ n: c.n, answer: v }));
+  assert.match(dec(ANSWERS.looksRight, all('yes').slice(1)).stderr, /line 1 .* needs a yes or a no/);
+  assert.match(dec(ANSWERS.looksRight, [{ n: 1, answer: "couldn't tell" }, ...all('yes').slice(1)]).stderr, /"could not tell" is not an answer to record/);
+  assert.match(dec(ANSWERS.looksRight, [{ n: 1, answer: 'no' }, ...all('yes').slice(1)]).stderr, /a "no" on a line means the answer is "Not right — describe"/);
+  assert.match(dec(ANSWERS.notRight, all('yes')).stderr, /every line was answered yes/);
+  assert.match(dec(ANSWERS.notRight, [{ n: 1, answer: 'no' }, ...all('yes').slice(1)]).stderr, /a "no" needs --note/);
+  assert.equal(gate(p, e5.id).decided, null, 'nothing was recorded by a refused answer');
+
+  const ok = dec(ANSWERS.looksRight, all('yes'));
+  assert.equal(ok.status, 0, ok.stderr);
+  const d = gate(p, e5.id).decided;
+  assert.deepEqual(d.observations.map((o) => [o.n, o.answer, o.clause]), g.checks.map((c) => [c.n, 'yes', c.clause]));
+  assert.ok(d.note.startsWith('Confirmed line by line by the owner. Yes: ') && g.checks.every((c) => d.note.includes(c.clause)), d.note);
+
+  p.scenario({ [`${e5.id}/verify`]: wrapupScript(e5) });
+  const r = await again(p, { queue: [e5.id] });
+  assert.equal(p.epic(e5.id).state, 'MERGED');
+  const look = fs.readFileSync(r.calls[0].argv[r.calls[0].argv.indexOf('--append-system-prompt-file') + 1], 'utf8');
+  assert.match(look, /What they confirmed, one Then at a time/);
+  for (const c of g.checks) assert.ok(look.includes(`"${c.clause}" — yes, I saw this`), c.clause);
+  assert.match(look, /"Looks right" is the owner's answer to the whole requirement/);
+  assert.match(look, /Give CANNOT VERIFY only where the record contradicts a Then or says it was not checked/);
+});
+
+test('after the verifier asks for more, the earlier look is kept: only the lines not yet confirmed are asked, and the new words are added to the old', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
+  const cannot = `${e5.tors[0]} is CANNOT VERIFY: the record says the heights were not checked. Recommendation: Stop. How to proceed?`;
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(cannot, ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'])], result: { result: '## Verdict: FAIL' } } });
+  await again(p, { queue: [e5.id] });
+
+  const g2 = gate(p, e5.id, 2);
+  assert.deepEqual([g2.earlier.note, g2.earlier.by], ['six bars, labels readable', 'Pat Owner']);
+  assert.deepEqual(g2.asks, [`${e5.tors[0]}: the record says the heights were not checked.`]);
+  assert.deepEqual(g2.checks.map((c) => c.clause), gate(p, e5.id, 1).checks.map((c) => c.clause), 'a free-text look confirmed no line, so every line is asked once');
+  const r = cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-2.json`, '--answer', ANSWERS.looksRight, '--by', 'Pat Owner', '--observations', JSON.stringify(g2.checks.map((c) => ({ n: c.n, answer: 'yes' }))));
+  assert.equal(r.status, 0, r.stderr);
+  const d = gate(p, e5.id, 2).decided;
+  assert.ok(d.note.startsWith('six bars, labels readable Added after the verifier asked: Confirmed line by line by the owner.'), d.note);
+  assert.equal(d.observations.length, g2.checks.length);
+
+  // A second time round, the lines already confirmed are not asked again.
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(cannot, ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'])], result: { result: '## Verdict: FAIL' } } });
+  await again(p, { queue: [e5.id] });
+  const g3 = gate(p, e5.id, 3);
+  assert.deepEqual(g3.checks, [], 'every line has the owner\'s yes already');
+  assert.equal(g3.earlier.observations.length, g2.checks.length);
+  assert.match(cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-3.json`, '--answer', ANSWERS.looksRight, '--by', 'Pat Owner').stderr, /needs --note/);
+});
+
 test('human-check gate, "Not right — describe": the fix round gets the owner\'s note, and the changed build parks for a new look', async (t) => {
   const p = makeProject(t);
   const e5 = addLookEpic(p);

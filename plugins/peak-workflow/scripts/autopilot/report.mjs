@@ -46,7 +46,7 @@ export function collectReport(runDir) {
     .map((file) => ({ file, g: readJson(path.join(gateDir, file)) })).filter(({ g }) => g && ((g.run ?? runName) === runName || g.decided?.used?.run === runName || g.void?.run === runName || (queued.has(g.epic) && live(g) && g.kind !== 'preflight')))
     .map(({ file, g }) => ({
       file: `gates/${file}`, epic: g.epic, label: (s.queue ?? []).find((q) => q.id === g.epic)?.label ?? g.epic, kind: g.kind, session: g.session ?? null, skillStep: g.skillStep ?? null, question: g.question ?? null, options: g.options ?? [],
-      tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], branch: g.branch ?? null, branchTip: g.branchTip ?? null, phase: g.phase ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
+      tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], open: g.open ?? [], checks: g.checks ?? [], checklists: g.checklists ?? [], earlier: g.earlier ?? null, asks: g.asks ?? [], branch: g.branch ?? null, branchTip: g.branchTip ?? null, phase: g.phase ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
       run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, void: g.void ?? null, superseded: !!g.superseded, cleared: !!g.cleared,
       // Every gate with options resumes its epic in the next run once decided; `resume` is the by-hand fallback.
       effect: (g.options ?? []).length ? 'resume' : 'none',
@@ -264,6 +264,9 @@ export function renderReport(r) {
         L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.question)} — ${d}`);
         if (g.options.length && !g.decided) L.push(`  Options: ${g.options.map((o) => `"${o}"`).join(', ')}`);
         if (g.artifacts.length) L.push(`  Look at: ${g.artifacts.map((a) => `\`${a}\``).join(', ')}`);
+        if (!g.decided && g.open?.length) L.push(`  Open: ${g.open.map((a) => `\`${a}\``).join(', ')}`);
+        if (!g.decided && g.checks?.length) { L.push('  To confirm, one yes or no each:'); for (const c of g.checks) L.push(`  ${c.n}. ${c.clause} (${c.tor})`); }
+        if (g.decided?.observations?.length) L.push(`  Confirmed line by line: ${g.decided.observations.map((o) => `${o.answer} — ${o.clause}`).join('; ')}`);
         if (!g.decided?.used && !g.superseded && !g.cleared && g.resume) L.push(`  By hand instead: ${g.resume}`);
       }
     }

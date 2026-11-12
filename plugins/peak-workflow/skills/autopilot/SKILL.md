@@ -151,9 +151,14 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    - The queue, numbered, each with its dependencies. For an epic with a `gate`, say what
      happens: "resumes at `<gate.enters>` on its branch — you answered "<gate.answer>"", or
      "starts over" with the reason from `reasons`.
-   - Per-epic limits from `launch.config.budgets`, as a table with minutes, turns, dollars, model and
-     effort per row: `plan`, `build`, `audit`, `verify`, then `fix` marked "only if
-     the one repair round happens" (one session; a repair has no planning session). Each driver test run is capped at `budgets.testRunMin` minutes.
+   - **Safety caps** from `launch.caps`, under exactly that heading, with this sentence first:
+     "A cap is where autopilot stops a step that has run away. It is a ceiling, not what a step
+     usually takes or costs." Then a table with one row per entry — `plan`, `build`, `audit`,
+     `verify`, then `fix` marked "only if the one repair round happens" — and the columns
+     Step, Cap, Model, Effort. The Cap cell is the entry's `size` followed by its ceiling in
+     brackets, for example `S (30 min, $5)`. Under the table, one line: "Sizes: XS up to 15
+     minutes, S up to 30, M up to 60, L up to 120." Do not show turns, and do not call any of
+     these an estimate or say what a run will cost.
    - Run limits: `launch.config.runBudgetUsd` dollars; end time `launch.endByLocal`; the run also
      stops on a red base, low disk (`launch.config.diskFloorGb` GB), or two infrastructure errors
      in a row.
@@ -305,6 +310,16 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       empty, say so and point to the session's files and the branch. Offer to open any of
       them; reading is fine, changing anything is not.
 
+      **For a `human-check` gate, do the opening for them.** Many owners are not developers.
+      For each path in the gate's `open` list (a built page, a chart), run the system's opener
+      yourself — macOS `open "<path>"`, Windows `cmd.exe /c start "" "<path>"`, Linux
+      `xdg-open "<path>"` — and say: "I've opened `<file name>` for you; it should be in front
+      of you now." Then give the full path on its own line in case nothing appeared. If `open`
+      is empty, say there is nothing to open and show `run-output.txt` in the chat instead.
+      Then print each entry of `checklists` (the steps the build wrote for looking at it) as a
+      short numbered list under "How to check it", in plain words. Never ask the owner to find
+      or open a file themselves.
+
    b. **Ask the gate's own question.** Use `AskUserQuestion` with `question` verbatim and
       `options` verbatim as the option labels, plus one more option, `Decide later`. No
       "(Recommended)", no reordering, no added options. If the question's own text carries a
@@ -315,32 +330,45 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       to record — the fix is in the project, and it clears when preflight passes: say what to
       fix (its `question`) and move on.
 
-      **A `human-check` gate also needs the owner's own account of the check** — the driver
-      refuses the answer without it, because the next run hands these words to the verifier as
-      the operator's observation (or to the fix round as its brief). After the owner answers
-      `Looks right` or `Not right — describe`, ask two things:
+      **A `human-check` gate with `checks` is a short form, not the gate's own question.**
+      `checks` holds the requirement's own Then lines: what a person must see for it to be met.
+      Ask one `AskUserQuestion` question per entry, at most four per call, in `n` order. The
+      question is the line as a plain question a non-developer can answer by looking (for
+      "every label should be readable in full, with no label drawn over another label or over
+      a bar": "Can you read every label in full, with none overlapping?"); the options are
+      exactly `Yes, I saw this`, `No`, `Couldn't tell`, and each option's description quotes
+      the line verbatim. Do not ask the gate's `question` as well: the answers decide it.
+      - If the gate has `asks` (the verifier asked for more after an earlier look), show them
+        first in plain words, and say that what was recorded before is kept: only these lines
+        are asked.
+      - Every answer `Yes, I saw this` → the answer is `Looks right`. No note is needed; offer
+        "Anything you want to add?" once and accept "no".
+      - Any `No` → the answer is `Not right — describe`. Ask in plain text: "What is wrong, and
+        what should it look like instead?" That is the note; it briefs the repair.
+      - Any `Couldn't tell` → help them look again (re-open the file, re-read the step). If it
+        stays, record nothing and treat the gate as `Decide later`. Never turn it into a yes.
 
-      1. With `AskUserQuestion` (`multiSelect: true`): "What did you do to check it?" Offer up
-         to three options that describe ways of looking, built from this gate's `artifacts` —
-         for example `Opened <built file> myself` (a page, a chart), `Followed the checklist
-         in <tests/manual/… file>`, `Ran <the command in run-output.txt> myself`, `Read the
-         output autopilot captured`. Say that they should tick only what they really did; the
-         tool's own "Other" takes anything else in their words. These options describe a
-         method, never a verdict.
-      2. As a plain-text question: after `Looks right` — "In a sentence or two, what did you
-         see?", and to help, show the Then lines of the gate's operator-observed requirement
-         (`tor-lifecycle text`, as in item a) as the things worth mentioning; after
-         `Not right — describe` — "What is wrong, and what should it look like instead?"
+      Never tick a line for them and never infer an answer from the artifacts: each yes is the
+      owner's observation, and the next run hands it to the verifier as such.
 
-      The note is `<what they did>. <what they saw, verbatim>`. Never write it for them, pad it,
-      or fill it from the artifacts yourself. If the owner will not describe the check, record
-      nothing and treat the gate as `Decide later`.
+      **A `human-check` gate without `checks`** (an older gate, or a UI epic with no
+      operator-observed requirement) keeps the earlier flow: ask the gate's own question, then
+      "What did you do to check it?" (`AskUserQuestion`, `multiSelect: true`, up to three ways
+      of looking built from `artifacts`), then in plain text "In a sentence or two, what did you
+      see?" or, after `Not right — describe`, "What is wrong, and what should it look like
+      instead?" The note is `<what they did>. <what they saw, verbatim>`; never write it for
+      them. The driver refuses a look with neither a note nor the form's answers.
 
    c. **Record what the owner chose**, exactly, unless it was `Decide later`:
 
       ```bash
       node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" decide --workspace "<ws>" --gate "<file>" --answer "<the chosen option label>"
       ```
+
+      For a `human-check` form, add `--observations '<json>'`: an array with one
+      `{"n": <the check's n>, "answer": "yes" | "no"}` per entry of `checks` (and `--note` for
+      the words that go with a "no"). The driver refuses a missing line, a "couldn't tell", and
+      an answer that does not follow from the lines.
 
       `<file>` is the gate's `file` value. Add `--note "<their words>"` when the owner explained
       the choice; for a `human-check` gate the note from item b is required. The command writes
