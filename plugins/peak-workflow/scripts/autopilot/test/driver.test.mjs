@@ -153,7 +153,7 @@ test('verify FAIL, one fix round, verify PASS: MERGED', async (t) => {
     ...happy(E1),
     [`${E1.id}/verify-1`]: { actions: [], result: { result: 'Verdict: FAIL\nTOR-01-Hd3Yc8L: the description is trimmed (test/import.test.js:41)' } },
     [`${E1.id}/plan-fix`]: planScript(E1),
-    [`${E1.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'export const fixed = true;\n' }, { do: 'commit', message: `feat(epic-${E1.id}): keep the description verbatim` }] },
+    [`${E1.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'export const fixed = true;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): keep the description verbatim` }] }, // the subject the repair prompt asks for
   });
 
   await go(p);

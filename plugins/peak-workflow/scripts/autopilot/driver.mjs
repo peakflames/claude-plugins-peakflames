@@ -1079,7 +1079,8 @@ class Run {
     else {
       const ahead = Number(this.g('rev-list', '--count', `${dev}..${b}`));
       const subject = this.g('log', '-1', '--format=%s', b);
-      add('branch-and-commit', ahead >= 1 && new RegExp(`^feat\\(epic-${e.id}\\):`).test(subject), { branch: b, tip, commitsAhead: ahead, tipSubject: subject });
+      // The repair prompt asks for `fix(epic-<id>): …`, so after a fix round that subject is as good as the build's `feat`.
+      add('branch-and-commit', ahead >= 1 && new RegExp(`^(feat${e.fixRounds >= 1 ? '|fix' : ''})\\(epic-${e.id}\\):`).test(subject), { branch: b, tip, commitsAhead: ahead, tipSubject: subject });
     }
     if (!tip) return { pass: false, checks, parkOnly };
 
