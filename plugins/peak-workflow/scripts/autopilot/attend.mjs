@@ -43,7 +43,7 @@ export function plainReason(reason) {
     [/disk floor/, 'the disk is nearly full'],
     [/growth cap/, 'the work grew far larger on disk than expected'],
     [/hit wall clock/, 'a step reached its time limit'],
-    [/^budget:/, 'a step reached its spending limit'],
+    [/^budget:/, 'a step reached its limit'],
     [/^infra error/, 'a technical error stopped a step'],
     [/^auditor: .*(could not start|no usable result)/, 'the independent reviewer could not run'],
     [/^auditor:/, 'the independent reviewer found a serious problem'],

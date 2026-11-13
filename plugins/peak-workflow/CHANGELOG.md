@@ -152,6 +152,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot `driver.mjs watch`** — follows a run and prints one line per milestone, each
   referee refusal once, the result of each test run, a heartbeat, and `RUN ENDED` when it is
   over. Read-only; `--once` returns after the first line.
+- **Autopilot `driver.mjs status`** — one read-only answer to where the run is and what comes
+  next (`readiness`, `attend`, `decide`, `continue`, `fetch`, `nothing`), with the waiting gates,
+  what merged, the spend, and what the referee refused.
+- **Autopilot standing answer for technical stops** — a run's `autoContinue: <n>` lets
+  `driver.mjs continue` resume an epic stopped by an infra error, a step's own cap or autopilot's
+  own check, up to `n` times per epic, recorded as the owner's standing answer. Every other gate
+  is still asked.
 
 ### Fixed
 
