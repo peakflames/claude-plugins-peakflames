@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, defaultConfig, effortFor, loadConfig, lintPlan, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, effortFor, loadConfig, lintPlan, networkProblems, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -407,6 +407,21 @@ test('owner decision: git remote writes are denied, the read-only listing is not
   for (const verb of ['add', 'set-url', 'rename', 'remove']) assert.ok(deny.includes(`Bash(git remote ${verb} *)`), verb);
   assert.ok(!deny.some((r) => /^Bash\(git remote \*?\)?$/.test(r) || r === 'Bash(git remote *)'));
   assert.ok(deny.includes('Bash(git push *)'));
+});
+
+test('network allow-list: the named hosts reach the sandbox settings of every session but the auditor; nothing else opens', () => {
+  const closed = sessionSettings().sandbox;
+  assert.deepEqual([closed.enabled, closed.allowUnsandboxedCommands, closed.failIfUnavailable, closed.network], [true, false, true, { allowedDomains: [], strictAllowlist: true }]);
+  const cfg = { network: ['api.nuget.org', ' Registry.NPMJS.org ', 'api.nuget.org'] };
+  for (const kind of ['plan', 'build', 'fix', 'verify', 'probe']) assert.deepEqual(sessionSettings(cfg, { kind }).sandbox.network, { allowedDomains: ['api.nuget.org', 'registry.npmjs.org'], strictAllowlist: true }, kind);
+  assert.deepEqual(sessionSettings(cfg, { kind: 'audit' }).sandbox.network.allowedDomains, []);
+  const open = sessionSettings(cfg, { kind: 'build' });
+  for (const tool of ['WebFetch', 'WebSearch']) assert.ok(open.permissions.deny.includes(tool), tool);
+  assert.deepEqual(open.permissions, sessionSettings().permissions);
+
+  assert.deepEqual(networkProblems(['api.nuget.org', 'files.pythonhosted.org', 'static.crates.io', '*.pkg.example.org', '*.example.org']), []);
+  for (const bad of ['https://api.nuget.org', 'api.nuget.org/v3', 'api.nuget.org:443', '*', '*.org', 'a.*.example.org', 'pkg*.example.org', '10.0.0.1', 'localhost', 'user@host.org', 'two words.org', '']) assert.equal(networkProblems([bad]).length, 1, bad);
+  assert.deepEqual(networkProblems('api.nuget.org'), ['`network` must be a list of host names']);
 });
 
 test('plan lint keys on headings and anchors, and refuses push, sudo and container commands', () => {

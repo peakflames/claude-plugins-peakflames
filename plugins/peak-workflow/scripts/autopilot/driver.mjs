@@ -39,6 +39,7 @@ const KINDS = {
   verify: { prefix: 'verify', role: 'verifier', state: 'VERIFY' },
   fix: { prefix: 'fix', role: 'builder', state: 'FIX_BUILD' },
   audit: { prefix: 'audit', role: 'auditor', state: 'AUDIT' },
+  probe: { prefix: 'probe', role: 'verifier', state: null }, // readiness's sandbox probe: no epic, no state
 };
 const PLAN_DIR = 'docs/implementation-plan';
 
@@ -159,6 +160,7 @@ export function defaultConfig(project) {
     setup: null, // one shell command that rebuilds, in the clone, what git does not carry (a venv, node_modules); run with network
     readOnly: [], // directories outside the clone that sessions may read and never write: a dependency cache (~/.nuget/packages, ~/.cargo/registry)
     copy: [], // git-ignored files copied from the project into the clone at each run (a .env): what cannot be rebuilt
+    network: [], // host names build sessions may reach from inside the sandbox (a package registry); empty = no network at all
     claudeBin: 'claude',
     allowTestDouble: false, // run-level: never inherited from settings.json by accident (a rehearsal's fake binary)
     budgets: {
@@ -167,6 +169,7 @@ export function defaultConfig(project) {
       verify: { wallMin: 45, turns: 150, usd: 10, model: 'opus' },
       fix: { wallMin: 60, turns: 150, usd: 12, model: 'sonnet' },
       audit: { wallMin: 15, turns: 40, usd: 3, model: 'opus' },
+      probe: { wallMin: 15, turns: 10, usd: 0.5, model: 'haiku' }, // `prepare --probe`: one cheap session that runs the test command in the sandbox
       testRunMin: 10,
       setupMin: 20,
     },
@@ -451,7 +454,7 @@ export function envFacts(project, workspace, config) {
     const copied = copy.some((c) => rel === c || rel.startsWith(`${c}/`) || c.startsWith(`${rel}/`));
     return { path: p, dir: p.endsWith('/'), status: copied ? 'copied' : exists(path.join(clone, rel)) ? 'present' : 'absent' };
   });
-  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace })], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
+  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], network: cleanNetwork(config.network), problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
 }
 /** `~`-expanded, absolute, symlinks resolved where the path exists. */
 const expandHome = (p) => { const x = path.resolve(String(p).trim().replace(/^~(?=\/|$)/, os.homedir())); try { return fs.realpathSync(x); } catch { return x; } };
@@ -483,11 +486,35 @@ export function readOnlyProblems(list, { project = null, workspace = null } = {}
 /** The `readOnly` list as the referee uses it: resolved absolute paths. */
 export const resolveReadOnly = (list) => (Array.isArray(list) ? list : []).filter((e) => typeof e === 'string' && e.trim()).map(expandHome);
 
+/**
+ * Why a `network` list cannot be used. An entry is one host name a sandboxed session may reach (a
+ * package registry): no scheme, no path, no port, no address, and a wildcard only as a whole first
+ * label with at least two labels after it (`*.pkg.example.org`, never `*.org` or `*`).
+ */
+export function networkProblems(list) {
+  if (list === undefined || list === null) return [];
+  if (!Array.isArray(list)) return ['`network` must be a list of host names'];
+  const out = [];
+  for (const entry of list) {
+    const h = typeof entry === 'string' ? entry.trim().toLowerCase() : '';
+    const say = (why) => out.push(`network: ${JSON.stringify(entry)} ${why}`);
+    if (!h) say('is not a host name');
+    else if (/:\/\//.test(h)) say('names a scheme; give the host name only (registry.npmjs.org)');
+    else if (/[/?#@:\s]/.test(h)) say('is not a bare host name: no path, port or address');
+    else if (/^[\d.]+$/.test(h)) say('is an address; name the host');
+    else if (h.includes('*') && !/^\*\.[^*]+$/.test(h)) say('uses a wildcard somewhere other than as its whole first label');
+    else if (h.startsWith('*.') && h.split('.').length < 3) say('is a wildcard over a whole top-level domain; name the host (*.example.org at the widest)');
+    else if (!/^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]$/.test(h)) say('is not a host name');
+  }
+  return out;
+}
+const cleanNetwork = (list) => [...new Set((Array.isArray(list) ? list : []).filter((h) => typeof h === 'string' && h.trim()).map((h) => h.trim().toLowerCase()))];
+
 /** A shell's "command not found" (127) or "cannot execute" (126): the command never ran, which is not a failing test. */
 export const couldNotRun = (code) => code === 127 || code === 126;
 
-/** Writes `setup`, `copy` and `readOnly` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
-export function configureProject(project, { setup, copy, readOnly } = {}) {
+/** Writes `setup`, `copy`, `readOnly` and `network` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
+export function configureProject(project, { setup, copy, readOnly, network } = {}) {
   const file = projectSettingsFile(project);
   let j = {};
   if (exists(file)) { try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); } }
@@ -503,6 +530,12 @@ export function configureProject(project, { setup, copy, readOnly } = {}) {
     const bad = readOnlyProblems(list, { project, workspace: `${project}.autopilot` });
     if (bad.length) throw new Error(bad.join('; '));
     if (list.length) j.readOnly = list; else delete j.readOnly;
+  }
+  if (network !== undefined) {
+    const bad = networkProblems(network.map((h) => String(h).trim()).filter(Boolean));
+    if (bad.length) throw new Error(bad.join('; '));
+    const list = cleanNetwork(network);
+    if (list.length) j.network = list; else delete j.network;
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeJson(file, j);
@@ -634,7 +667,9 @@ function detectIntegration(root) {
 // ---------------------------------------------------------------------------------------------
 
 /** The referee layer written as each session's `settings.json` (plan §6.7, SPIKE.md S11). */
-export function sessionSettings() {
+export function sessionSettings(config = {}, { kind = null } = {}) {
+  // The auditor reads a bundle and needs nothing from outside; every other session may reach the project's named hosts and nothing else.
+  const allowedDomains = kind === 'audit' ? [] : cleanNetwork(config.network);
   const hook = (file, extra = {}) => ({ type: 'command', command: `node "$AUTOPILOT_HOOKS/${file}"`, ...extra });
   return {
     permissions: {
@@ -647,7 +682,7 @@ export function sessionSettings() {
     },
     sandbox: {
       enabled: true, allowUnsandboxedCommands: false, failIfUnavailable: true,
-      network: { allowedDomains: [], strictAllowlist: true },
+      network: { allowedDomains, strictAllowlist: true },
     },
     hooks: {
       PreToolUse: [{ matcher: '*', hooks: [hook('pretool.mjs', { timeout: 30 })] }],
@@ -802,6 +837,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`When an epic parks: ${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set in ${projectSettingsFile(project)}`);
   p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}`);
+  p(`Network:          ${cleanNetwork(config.network).length ? `plan, build, repair and verify sessions may reach ${cleanNetwork(config.network).join(', ')} and nothing else; the auditor has no network` : 'sessions have no network'} (WebFetch and WebSearch are always denied)`);
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
 
@@ -850,12 +886,49 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
     p('    after it the auditor runs again on the changes since its last audit only');
   }
 
-  p(); p('Settings JSON (written as each step\'s settings.json):');
-  p(JSON.stringify(sessionSettings(), null, 2));
+  p(); p('Settings JSON (written as each step\'s settings.json; the auditor\'s has an empty allowedDomains):');
+  p(JSON.stringify(sessionSettings(config), null, 2));
   p(); p('Gate policy:');
   const policy = path.join(pluginDir, 'scripts', 'autopilot', 'policy', 'gates.json');
   p(exists(policy) ? read(policy) : '  policy/gates.json is not built yet (P2). Until then every AskUserQuestion parks.');
   return { pre, queue };
+}
+
+/**
+ * One host-mode session outside any epic (the probe): launched as `launch` launches a step, the
+ * host approving nothing, killed at its wall clock. Resolves with how it ended; never throws.
+ */
+async function hostSession(cmd, prompt, { stepDir, killGraceMs = 30000 }) {
+  const isScript = /\.(mjs|cjs|js)$/.test(cmd.bin);
+  const started = Date.now();
+  const s = { result: null, killed: null, exitCode: null, signal: null, spawnError: null };
+  const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, { cwd: cmd.cwd, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const stream = fs.createWriteStream(path.join(stepDir, 'stream.jsonl'));
+  child.stderr.pipe(fs.createWriteStream(path.join(stepDir, 'stderr.log')));
+  child.stdin.on('error', () => {});
+  const send = (o) => { if (child.stdin.writable) child.stdin.write((typeof o === 'string' ? o : JSON.stringify(o)) + '\n'); };
+  const done = new Promise((resolve) => {
+    child.on('error', (err) => { s.spawnError = err.message; resolve(); });
+    child.on('close', (code, signal) => { s.exitCode = code; s.signal = signal; resolve(); });
+  });
+  let grace = null;
+  const wall = setTimeout(() => { s.killed = 'wall clock'; killGroup(child.pid, 'SIGTERM'); grace = setTimeout(() => killGroup(child.pid, 'SIGKILL'), killGraceMs); }, cmd.wallMin * 60000);
+  if (child.pid) {
+    send(userLine(prompt));
+    readline.createInterface({ input: child.stdout }).on('line', (line) => {
+      stream.write(line + '\n');
+      const d = tryParse(line);
+      if (d?.type === 'control_request') send({ type: 'control_response', response: { subtype: 'success', request_id: d.request_id, response: d.request?.subtype === 'can_use_tool' ? { behavior: 'deny', message: 'autopilot: the host approves nothing; this request was not covered by a rule' } : {} } });
+      if (d?.type === 'result') { s.result = d; child.stdin.end(); }
+    });
+  }
+  await done;
+  clearTimeout(wall); clearTimeout(grace);
+  if (child.pid && killGroup(child.pid, 0)) killGroup(child.pid, 'SIGKILL');
+  await new Promise((r) => stream.end(r));
+  s.wallMs = Date.now() - started;
+  if (s.result) writeJson(path.join(stepDir, 'result.json'), s.result);
+  return s;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1019,7 +1092,7 @@ class Run {
    * Writes only inside the workspace. Whatever setup or the tests leave that git would commit is
    * reported and removed, so the run starts on a clean clone.
    */
-  prepare() {
+  async prepare({ probe = false } = {}) {
     fs.mkdirSync(this.stateDir, { recursive: true });
     this.acquireLock();
     try {
@@ -1031,14 +1104,58 @@ class Run {
       const tests = env.pass ? { command: this.config.testCommand ?? null, ...(this.config.testCommand ? this.runTests() : { pass: false, code: null, tail: 'CLAUDE.md has no **Tests:** command' }) } : null;
       const leftovers = gitRun(this.clone, 'status', '--porcelain').out.split('\n').filter(Boolean);
       if (leftovers.length) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); }
+      const base = env.pass && !!tests?.pass && !leftovers.length;
+      // The probe is worth its few cents only once the plain shell passes: it answers the one question left, the sandbox.
+      const probed = probe ? (base ? await this.probe(integration) : { ran: false, skipped: 'the proof failed before the probe' }) : null;
       const result = {
-        ok: env.pass && !!tests?.pass && !leftovers.length, at: new Date().toISOString(), clone: this.clone, cloneMade: made, integration, tip: gitRun(this.clone, 'rev-parse', 'HEAD').out, sync: sync.state,
-        failed: !env.pass ? env.step : !tests.pass ? 'tests' : leftovers.length ? 'leftovers' : null,
-        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers,
+        ok: base && !(probed?.ran && !probed.pass), at: new Date().toISOString(), clone: this.clone, cloneMade: made, integration, tip: gitRun(this.clone, 'rev-parse', 'HEAD').out, sync: sync.state,
+        failed: !env.pass ? env.step : !tests.pass ? 'tests' : leftovers.length ? 'leftovers' : probed?.ran && !probed.pass ? 'probe' : null,
+        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers, ...(probed ? { probe: probed } : {}),
+        // The latest probe that ran, with what it ran against, kept across later proofs: readiness says whether it still stands.
+        lastProbe: probed?.ran ? { at: new Date().toISOString(), pass: probed.pass, exit: probed.exit, against: { testCommand: this.config.testCommand ?? null, setup: this.config.setup ?? null, readOnly: this.config.readOnly ?? [], network: cleanNetwork(this.config.network) } } : tryJson(path.join(this.stateDir, 'prepare.json'))?.lastProbe ?? null,
       };
       writeJson(path.join(this.stateDir, 'prepare.json'), result);
       return result;
     } finally { this.releaseLock(); }
+  }
+
+  /**
+   * The sandbox probe (`prepare --probe`): one cheap real session, launched exactly as a build is
+   * (same settings, same referee, same sandbox and network allow-list), told to run the test
+   * command once. The plain-shell proof cannot say whether `dotnet`, `cargo` or `npm` work inside
+   * the sandbox; this can, before an epic is spent finding out. Judged from a file the command
+   * itself writes, not from what the session says. Costs money, so the skill asks first.
+   */
+  async probe(integration) {
+    const cfg = this.config;
+    if (cfg.claudeBin !== 'claude' && !cfg.allowTestDouble) return { ran: false, skipped: `sessions would use a test double (${path.basename(cfg.claudeBin)}), which has no sandbox to probe` };
+    const dir = path.join(this.stateDir, 'probe'); const stepDir = path.join(dir, 'probe-1');
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(stepDir, { recursive: true });
+    const sessionId = randomUUID(); const marker = '.autopilot-probe-exit';
+    writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), queue: [] }); // what the referee reads
+    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind: 'probe' }));
+    writeJson(path.join(stepDir, 'step.json'), { name: 'probe-1', kind: 'probe', role: KINDS.probe.role, epic: 'probe', sessionId, startedAt: new Date().toISOString(), startMb: this.cloneMb() });
+    const command = `${cfg.testCommand}; echo $? > ${marker}`;
+    const ms = Math.min(cfg.budgets.testRunMin * 60000, 900000);
+    const prompt = `This is a readiness probe, not a task. Do exactly this and nothing else:\n\n1. With the Bash tool, from the current directory, run this one command exactly as written, with a timeout of ${ms} ms:\n\n   ${command}\n\n2. Whatever happens, do not run it again, do not change it, do not fix anything and do not edit any file.\n3. Reply with the command's exit code and the last 15 lines of its output, or the exact refusal you were given. Then stop.\n`;
+    fs.writeFileSync(path.join(stepDir, 'prompt.md'), prompt);
+    const cmd = sessionCommand(cfg, { kind: 'probe', epicId: 'probe', workspace: this.stateDir, runDir: dir, stepDir, pluginDir: this.pluginDir, sessionId });
+    fs.rmSync(path.join(this.clone, marker), { force: true });
+    const s = await hostSession(cmd, prompt, { stepDir, killGraceMs: cfg.timing.killGraceMs });
+    const file = path.join(this.clone, marker);
+    const exit = exists(file) && /^\d+$/.test(read(file).trim()) ? Number(read(file).trim()) : null;
+    if (gitRun(this.clone, 'status', '--porcelain').out) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); } // the marker, and whatever the tests wrote
+    const hooks = (exists(path.join(stepDir, 'hooks.jsonl')) ? read(path.join(stepDir, 'hooks.jsonl')).split('\n') : []).map(tryParse).filter(Boolean);
+    const denials = hooks.filter((h) => h.hook === 'PreToolUse' && h.decision === 'deny').map((h) => `${h.rule}: ${h.reason}`);
+    const ran = hooks.filter((h) => h.tool_name === 'Bash' && /^PostToolUse/.test(h.hook ?? '')).at(-1);
+    const text = (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v));
+    const tail = [text(ran?.error), text(ran?.tool_response), text(s.result?.result), s.spawnError ?? '', s.killed ? `killed: ${s.killed}` : ''].filter(Boolean).join('\n').trim().split('\n').slice(-25).join('\n');
+    return {
+      ran: true, pass: exit === 0, exit, command: cfg.testCommand, model: cfg.budgets.probe.model, network: cleanNetwork(cfg.network), costUsd: s.result?.total_cost_usd ?? 0, wallMs: s.wallMs,
+      why: exit === 0 ? null : exit === null ? 'the command did not run to its end inside the sandbox (no exit code was written)' : `the command exited ${exit} inside the sandbox, although it passed in a plain shell`,
+      denials, tail, dir: this.rel(stepDir),
+    };
   }
 
   health(base) {
@@ -1138,7 +1255,7 @@ class Run {
     fs.mkdirSync(stepDir, { recursive: true });
     const sessionId = randomUUID();
     const { prompt, appendFiles = [] } = prepare(stepDir) ?? {};
-    writeJson(path.join(stepDir, 'settings.json'), sessionSettings());
+    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind }));
     const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles });
 
     // The intended step is on disk before anything is launched (crash-safe resume, §9).
@@ -1943,7 +2060,11 @@ class Run {
       const badRead = readOnlyProblems(cfg.readOnly, { project: cfg.project, workspace: this.stateDir });
       if (badRead.length) throw new Error(badRead.join('; '));
       this.state.readOnly = resolveReadOnly(cfg.readOnly);
+      const badNet = networkProblems(cfg.network);
+      if (badNet.length) throw new Error(badNet.join('; '));
+      this.state.network = cleanNetwork(cfg.network);
       this.save();
+      if (this.state.network.length) this.log(`sessions may reach (sandbox allow-list): ${this.state.network.join(', ')}`);
       if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
 
@@ -2143,7 +2264,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith('--')) { o._.push(a); continue; }
     const key = a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-    if (['dryRun', 'resume', 'json', 'verbose', 'help', 'allowTestDouble'].includes(key)) o[key] = true;
+    if (['dryRun', 'resume', 'json', 'verbose', 'help', 'allowTestDouble', 'probe'].includes(key)) o[key] = true;
     else o[key] = argv[++i];
   }
   return o;
@@ -2152,7 +2273,7 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>] [--probe] [--allow-test-double]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir] [--network host,host]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
   const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
@@ -2177,16 +2298,17 @@ async function main(argv) {
     if (!o.project) throw new Error('prepare needs --project');
     const root = path.resolve(o.project);
     const ws = path.resolve(wsArg ?? `${root}.autopilot`);
-    const config = loadConfig(ws, { project: root });
-    const result = new Run({ workspace: ws, runName: '(prepare)', config, pluginDir: PLUGIN_DIR, verbose: false }).prepare();
+    const config = loadConfig(ws, { project: root, overrides: o.allowTestDouble ? { allowTestDouble: true } : {} });
+    const result = await new Run({ workspace: ws, runName: '(prepare)', config, pluginDir: PLUGIN_DIR, verbose: false }).prepare({ probe: !!o.probe });
     result.env = envFacts(root, ws, config);
     console.log(JSON.stringify(result, null, 2));
     return result.ok ? 0 : 1;
   }
   if (cmd === 'configure') {
     if (!o.project) throw new Error('configure needs --project');
-    if (o.setup === undefined && o.copy === undefined && o.readOnly === undefined) throw new Error('configure needs --setup, --copy or --read-only (an empty value removes the entry)');
-    console.log(JSON.stringify(configureProject(path.resolve(o.project), { setup: o.setup, copy: o.copy === undefined ? undefined : String(o.copy).split(','), readOnly: o.readOnly === undefined ? undefined : String(o.readOnly).split(',') }), null, 2));
+    const list = (v) => (v === undefined ? undefined : String(v).split(','));
+    if ([o.setup, o.copy, o.readOnly, o.network].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only or --network (an empty value removes the entry)');
+    console.log(JSON.stringify(configureProject(path.resolve(o.project), { setup: o.setup, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network) }), null, 2));
     return 0;
   }
   if (cmd === 'run') {
