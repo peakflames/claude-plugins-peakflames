@@ -20,7 +20,10 @@ export function parseSidecar(text) {
  */
 export function lintPlan(plan, anchors) {
   const problems = [];
-  for (const tor of anchors) if (!plan.includes(tor)) problems.push(`does not name anchor ${tor}`);
+  // A plan with many anchors lists them in shorthand ("TOR-03-Vaata1w, nt9zDad, …; TOR-01-Ji4u6Ta"): the
+  // seven-character suffix is the identity (random, never reused), so it counts when it stands as its own token.
+  const named = (tor) => plan.includes(tor) || new RegExp(`(?<![A-Za-z0-9])${tor.split('-').at(-1)}(?![A-Za-z0-9])`).test(plan);
+  for (const tor of anchors) if (!named(tor)) problems.push(`does not name anchor ${tor}`);
   const headings = [
     // The model keeps every template step but often shortens its heading ("Feature branch",
     // "Status → In Progress", "Mark Implemented"), so these match the step, not the exact words.
