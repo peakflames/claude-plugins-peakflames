@@ -73,7 +73,7 @@ export function plainEnd(why) {
     [/STOP file/, 'you asked it to stop'], [/^end time$/, 'it reached its end time'], [/^run budget$/, 'it reached its spending limit'],
     [/^disk floor$/, 'the disk is nearly full'], [/^infra$/, 'two technical errors in a row'],
     [/^base red$/, "your project's own tests were failing before it started"], [/^setup failed$/, "autopilot's copy of your project could not be made ready"],
-    [/onPark: stop/, 'an epic needs you'], [/^preflight:/, 'the project is not ready for an unattended run'], [/^lock lost$/, 'another autopilot took over'],
+    [/onPark: stop/, 'an epic stopped'], [/^preflight:/, 'the project is not ready for an unattended run'], [/^lock lost$/, 'another autopilot took over'],
   ];
   return table.find(([re]) => re.test(w))?.[1] ?? (w || 'it stopped');
 }

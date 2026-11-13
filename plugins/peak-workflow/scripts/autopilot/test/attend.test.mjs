@@ -285,3 +285,11 @@ test('status reports the gate a dead-end park still needs without writing it; co
   assert.deepEqual([c.status, c.json().continued.map((x) => x.gate)], [0, [`gates/${E1.id}-1.json`]]);
   assert.equal(gateFile(p, E1.id).decided.standing, true);
 });
+
+test('status.next: readiness when the only epics left are ones the owner could queue explicitly; never once a queue is confirmed', (t) => {
+  const p = makeProject(t);
+  git(p.project, 'config', 'user.name', 'Someone Else'); // the seed's epic is planned by another person
+  const s = st(p);
+  assert.deepEqual([s.next, s.why], ['readiness', '1 epic(s) can be queued explicitly']);
+  assert.equal(st(p, '--queue', 'Lg9None').next, 'nothing');
+});

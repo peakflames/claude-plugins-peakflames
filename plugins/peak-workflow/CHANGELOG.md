@@ -159,6 +159,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `driver.mjs continue` resume an epic stopped by an infra error, a step's own cap or autopilot's
   own check, up to `n` times per epic, recorded as the owner's standing answer. Every other gate
   is still asked.
+- **Autopilot stays with the run** — `/peak-workflow:autopilot` is one command and one session:
+  it launches, relays each milestone in plain words, asks each question when it arises,
+  relaunches the confirmed queue, and ends on a closing screen. Closing the session is safe.
+- **Autopilot closing screen** — lists what merged, what waits for the owner, the spend, one
+  next step, and what the referee got in the way of, in plain words.
+
+### Changed
+
+- **Autopilot launch question** — carries the standing answer ("I'll continue a technical stop
+  automatically, up to 2 times per epic"); an attended run has no end time unless the owner
+  gives one, and the run budget is the ceiling.
+- **Autopilot `report` and `stop`** — now shortcuts into the same loop; the skill no longer ends
+  with a `tail -f` line or a command to run next.
 
 ### Fixed
 

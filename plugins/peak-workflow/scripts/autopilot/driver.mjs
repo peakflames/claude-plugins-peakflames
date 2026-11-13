@@ -2452,7 +2452,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
 
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
   const gates = [...readGates(ws), ...(pid ? [] : missingResumeGates(ws).map((m) => ({ file: `gates/${m.name}`, ...m.gate })))];
-  const open = pid ? [] : openGates(gates);
+  const open = openGates(gates); // while a driver runs these are the questions already asked; they can be answered now and are used by the next run
   const brief = (g) => ({ file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: g.question ?? null, ...(g.kind === 'resume' ? { why: plainReason(gateReason(g)) } : {}) });
   const covered = open.filter((g) => standingCovers(g, gates, n));
   const waiting = open.filter((g) => !covered.includes(g));
@@ -2476,7 +2476,8 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   // Not running: what could run next, read as readiness reads it.
   let pre = null; let launch = null;
   try {
-    const config = loadConfig(ws, { project: root, overrides: lastCfg.allowTestDouble ? { allowTestDouble: true } : {} });
+    // Read as the last run was confirmed: the epics the owner queued on purpose, and a rehearsal's stand-in.
+    const config = loadConfig(ws, { project: root, overrides: { explicit: lastCfg.explicit ?? [], ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) } });
     const integration = detectIntegration(root);
     const sync = syncFacts(root, ws, integration);
     const clone = path.join(ws, 'clone');
@@ -2495,6 +2496,8 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const interrupted = launch?.lastRun?.status === 'interrupted';
   const held = new Set(open.map((g) => g.epic));
   const runnable = (pre?.epics ?? []).filter((e) => e.eligibility === 'eligible' && !held.has(e.id) && (!queue || queue.includes(e.id)));
+  // Skipped only because it is paused or someone else's: readiness may offer it to be queued explicitly. Never once a queue is confirmed.
+  const askable = queue ? [] : (pre?.epics ?? []).filter((e) => e.eligibility === 'skip' && !held.has(e.id) && e.reasons.length > 0 && e.reasons.every((r) => /queue it explicitly/.test(r)));
 
   // A decided gate waits to be used: the run that continues the last one, exactly as the owner confirmed it.
   if (pre && launch && state && !interrupted && !out.refuse.length) {
@@ -2515,6 +2518,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   else if (waiting.length) { out.next = 'decide'; out.why = `${waiting.length} gate(s) need the owner`; }
   else if (covered.length) { out.next = 'continue'; out.why = `${covered.length} technical stop(s) the standing answer covers`; }
   else if (runnable.length) { out.next = 'readiness'; out.why = out.relaunch ? 'a decided gate waits to be used' : `${runnable.length} epic(s) can run`; }
+  else if (askable.length) { out.next = 'readiness'; out.why = `${askable.length} epic(s) can be queued explicitly`; }
   else if (out.sync?.state === 'clone-ahead') { out.next = 'fetch'; out.why = 'merged work waits in the clone'; }
   else out.why = out.refuse.length ? 'nothing can run' : 'nothing is left to run';
   return say();

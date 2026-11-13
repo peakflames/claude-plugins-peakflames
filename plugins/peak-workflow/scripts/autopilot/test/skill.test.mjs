@@ -230,3 +230,63 @@ test('the queue is remembered: readiness offers the last confirmed queue minus w
   assert.deepEqual(eligible, [e2.id, e3.id]);
   assert.match(SKILL, /Same queue as last time \(<labels>\) or all <N> eligible epics\?/);
 });
+
+test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`, the skill attends the run, and nothing hands the owner a command to come back with', () => {
+  const flat = SKILL.replace(/\s+/g, ' ');
+  for (const rule of [
+    '## Step 0: Where are we', 'status --project "<root>" --json', 'the driver decides it, you do not', 'add `--queue <id>,<id>`',
+    '## Step 3b: Attend', 'watch --workspace "<ws>" --run "<run>" --replay', '`timeout_ms: 1800000`', '`--once --after <n>`', 'go to Step 0. That is the loop.',
+    "Running. I'll stay here and tell you what happens. You can ask how it's going, say stop, or close this window — it keeps running, and `/peak-workflow:autopilot` picks it back up.",
+    'A `REFUSED …` line is kept for the closing screen\'s friction list, not relayed', '`REFUSED 3 times …` is relayed once', '`PushNotification`',
+    "If it stops for a technical reason I'll continue it automatically (up to 2 times per epic).", '`DRIVER continue --workspace "<ws>" --json`', 'It stopped for a technical reason (<the entry\'s `why`>); continuing, as you asked.',
+    'Only `DRIVER continue` applies it', 'you never record "resume" on a gate yourself', '"autoContinue": 2', '"endBy": null',
+    'The popup hides the chat: put what the owner must read inside the question text.',
+    'Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`', 'ask nothing again',
+    '## Closing screen', '**Things autopilot got in the way of:**', '**Do this next:** <exactly one thing>',
+  ]) assert.ok(flat.includes(rule), rule);
+  // Every answer `driver.mjs status` can give has its row in Step 0.
+  for (const next of ['attend', 'decide', 'continue', 'readiness', 'fetch', 'nothing']) assert.match(SKILL, new RegExp(`^\\| \`${next}\` \\| `, 'm'), next);
+  // What the loop made unnecessary is gone.
+  for (const old of ['tail -f', 'You can close Claude Code now', 'In the morning: `/peak-workflow:autopilot report`', 'Tell the user, then end', 'Do not wait for the run, poll it', 'Run `/peak-workflow:autopilot report` again', 'Then offer `/peak-workflow:autopilot report`']) assert.ok(!flat.includes(old), old);
+});
+
+test('the loop, end to end: launch, a technical stop, status says continue, the standing answer, a relaunch from status, merged, fetch', async (t) => {
+  const p = makeProject(t);
+  git(p.project, 'config', 'user.name', 'Todd Schavey'); // the owner (the seed's epic is planned by them), as `decide` and `continue` record them
+  const status = (...more) => driver('status', '--project', p.project, '--json', ...more).json();
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: buildActions(E1, { commit: false }), result: { subtype: 'error_max_turns', is_error: true } } });
+
+  // Step 0 → readiness; Steps 1–3 as before, with the attended config: no end time, the standing answer.
+  assert.equal(status().next, 'readiness');
+  const pre = preflight(p, '--allow-test-double');
+  confirm(pre.launch, p.project, [E1.id], { allowTestDouble: true, endBy: null, autoContinue: 2 });
+  await launchAndWait(pre.launch);
+  // Step 3b's watch command, as SKILL.md words it, on the run that just ended.
+  const watchLine = SKILL.split('\n').find((l) => l.includes('driver.mjs" watch ')).trim().replaceAll('${CLAUDE_PLUGIN_ROOT}', PLUGIN_DIR).replaceAll('<ws>', p.state).replaceAll('<run>', pre.launch.run);
+  const watched = spawnSync('sh', ['-c', watchLine], { encoding: 'utf8' });
+  assert.equal(watched.status, 0, watched.stderr);
+  const said = watched.stdout.trim().split('\n');
+  assert.deepEqual(said.slice(-2), [`Stopped: ${E1.id} — CSV import — a step reached its limit`, 'RUN ENDED: everything queued was worked through. Spent $0.41.']);
+
+  // Step 0 → continue: the driver applies the owner's standing answer; the skill only relaunches.
+  const s1 = status('--queue', E1.id);
+  assert.deepEqual([s1.next, s1.autoContinue.length, s1.waiting.length], ['continue', 1, 0]);
+  const c = driver('continue', '--workspace', s1.workspace, '--json');
+  assert.equal(c.status, 0, c.stderr);
+  assert.deepEqual(readJson(path.join(p.state, 'gates', `${E1.id}-1.json`)).decided, { answer: 'Resume from where it stopped', by: 'Todd Schavey', date: new Date().toISOString().slice(0, 10), scope: 'next-run', standing: true });
+  const s2 = status('--queue', E1.id);
+  assert.equal(s2.next, 'readiness');
+  assert.deepEqual([s2.relaunch.config.queue, s2.relaunch.config.continues, s2.relaunch.config.autoContinue, s2.relaunch.config.endBy], [[E1.id], pre.launch.run, 2, null]);
+
+  // Step 3 item 5: relaunch.config written as given, the same launch line with the names status gave.
+  p.scenario(happy(E1));
+  fs.mkdirSync(s2.relaunch.runDir, { recursive: true });
+  fs.writeFileSync(path.join(s2.relaunch.runDir, 'config.json'), JSON.stringify(s2.relaunch.config, null, 2));
+  await launchAndWait({ workspace: s2.workspace, run: s2.relaunch.run, runDir: s2.relaunch.runDir });
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+
+  // Step 0 → fetch: the closing screen's facts.
+  const end = status('--queue', E1.id);
+  assert.deepEqual([end.next, end.merged, end.waiting, end.spentUsd, end.runBudgetUsd, end.sync.fetch.length], ['fetch', [`${E1.id} (${E1.slug}) — CSV import`], [], 2.02, 80, 2]);
+  assert.equal(git(p.project, 'status', '--porcelain'), '', 'the project is never written by the loop');
+});
