@@ -49,6 +49,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot readiness fits one screen** — the skill saves the settings a run cannot work without
   (`setup`, `readOnly`, `network`) and runs the proof and probe without asking, then shows one
   short screen; tables, caps and the scope review appear only on request.
+- **Autopilot keeps a finished build** — the driver commits the referee's own record
+  (`.autopilot/`) when a build leaves it uncommitted, judges the session's commit and not its own,
+  and no longer asks for a reason when a test project's manifest changes.
+- **Every park has a question** — a build parked for uncommitted work now gets a resume gate, and
+  `driver.mjs report` writes one for an epic an earlier driver parked without any.
 - **Autopilot plan lint accepts shorthand anchors** — a plan that writes the prefix once and then bare
   seven-character suffixes (`TOR-03-Vaata1w, nt9zDad`) names those requirements; it no longer parks.
 - **Autopilot missing-command message** — a test or setup command the shell cannot find (exit 126

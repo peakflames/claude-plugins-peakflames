@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, gateFacts } from '../driver.mjs';
+import { ANSWERS, ensureResumeGates, gateFacts } from '../driver.mjs';
 import { DRIVER, E1, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
@@ -773,4 +773,57 @@ test('P3.5 exit: one run parks an epic at each resumable gate kind; decided thro
   for (const e of [ef, eq, ea, eh, el, er]) assert.equal(gate(p, e.id).decided.used.run, p.runName(), e.id);
   assert.deepEqual(Object.keys(readJson(path.join(p.state, 'epics.json'))), [ef.id]);
   assert.equal(git(p.project, 'status', '--porcelain'), '', 'the project is never written');
+});
+
+// ---- a finished build must not die on autopilot's own bookkeeping ---------------------------------
+
+/** A build that changes an existing test, records why as the referee asks, and commits its work file by file — leaving the record uncommitted. */
+const buildLeavingRecord = (e) => ({ actions: [
+  ...buildActions(e, { commit: false }),
+  { do: 'write', path: 'test/ledger.test.js', content: "import test from 'node:test';\ntest('still passes', () => {});\n" },
+  { do: 'write', path: 'test/package.json', content: '{"type":"module","devDependencies":{"x":"1"}}\n' },
+  { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/ledger.test.js","reason":"the epic changes what it prints"}\n' },
+  { do: 'exec', cmd: `git add src test docs && git commit -q -m "feat(epic-${e.id}): implement ${e.slug}"` },
+] });
+
+test('a build that leaves only the referee\'s record uncommitted is not parked: the driver commits it and the checks run', async (t) => {
+  const p = makeProject(t);
+  fs.writeFileSync(path.join(p.project, 'test', 'ledger.test.js'), "import test from 'node:test';\ntest('passes', () => {});\n");
+  fs.writeFileSync(path.join(p.project, 'test', 'package.json'), '{"type":"module"}\n');
+  git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'test: an existing test and a manifest');
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: buildLeavingRecord(E1) });
+  await p.go();
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  const check = readJson(p.dir(E1.id, 'check-build-1.json'));
+  assert.equal(check.pass, true, JSON.stringify(check.checks.filter((c) => !c.pass)));
+  // The session's own commit is what is judged; the manifest under test/ needs no reason, the test does and has one.
+  assert.match(check.checks.find((c) => c.name === 'branch-and-commit').evidence.tipSubject, /^feat\(epic-/);
+  assert.deepEqual(check.checks.find((c) => c.name === 'test-integrity').evidence.existingTestsChanged, [{ path: 'test/ledger.test.js', reason: 'the epic changes what it prints' }]);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /committed the referee's record \(\.autopilot\/\)/);
+});
+
+test('an epic an earlier driver parked on that record, with no question, gets one from `driver.mjs report` and then finishes from CHECK_BUILD', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: buildScript(E1) });
+  // As driver 0.5.0 left it: built and committed, then parked at CHECK_BUILD with a wip commit on top and no gate.
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [...buildActions(E1), { do: 'write', path: 'stray.txt', content: 'x' }] } });
+  await p.go();
+  assert.match(p.epic(E1.id).reason, /^CHECK_BUILD: the build left uncommitted work/);
+  for (const f of fs.readdirSync(path.join(p.state, 'gates'))) fs.rmSync(path.join(p.state, 'gates', f)); // the old driver wrote none
+  git(p.clone, 'rm', '-q', 'stray.txt'); git(p.clone, 'commit', '-q', '-m', 'wip(autopilot): uncommitted work at park'); // its tip: a driver commit, tree as the build left it
+
+  assert.deepEqual(cli('preflight', '--project', p.project, '--workspace', p.state, '--json', '--allow-test-double').stdout.includes('"openGates": []'), true);
+  const r = cli('report', '--workspace', p.state);
+  assert.equal(r.status, 0, r.stderr);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.phase, g.options, g.branchTip], ['resume', 'CHECK_BUILD', [ANSWERS.resume, ANSWERS.startOver], git(p.clone, 'rev-parse', E1.branch)]);
+  assert.ok(readJson(path.join(p.runDir(), 'report.json')).gates.some((x) => x.file === `gates/${E1.id}-1.json` && !x.decided), 'the report asks it');
+  assert.deepEqual(ensureResumeGates(p.state), [], 'written once');
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'CHECK_BUILD');
+
+  p.scenario({ [`${E1.id}/verify`]: wrapupScript(E1) });
+  const again2 = await again(p);
+  assert.deepEqual(again2.steps, [`${E1.id}/audit-1`, `${E1.id}/verify-1`], 'no rebuild');
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
 });
