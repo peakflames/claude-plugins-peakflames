@@ -27,7 +27,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
-| `autopilot` | Proof of concept — front door to the unattended driver: readiness (preflight, the clone's `setup`/`copy` environment and its proof, scope and cost review), confirm, detached launch; `report` mode presents the morning report and records the owner's answers to parked gates. Never edits project code (it writes only the `setup` and `copy` entries of the project's `autopilot.json`, on the owner's confirmation), runs `start-epic` or `wrapup-epic`, answers a gate, or picks among ready epics |
+| `autopilot` | Proof of concept — front door to the unattended driver: readiness (preflight, the clone's `setup`/`copy`/`readOnly` environment and its proof, scope and cost review), confirm, detached launch; `report` mode presents the morning report and records the owner's answers to parked gates. Never edits project code (it writes only the `setup`, `copy` and `readOnly` entries of the project's `autopilot.json`, on the owner's confirmation), runs `start-epic` or `wrapup-epic`, answers a gate, or picks among ready epics |
 
 ## Key Design Invariants
 
