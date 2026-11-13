@@ -856,9 +856,12 @@ execution script for this session.
 - Do not enter plan mode. The plan is approved; \`EnterPlanMode\` and \`ExitPlanMode\` are denied.
 - Where the plan says to ask the user, ask with \`AskUserQuestion\` exactly as the plan words it.
   Never answer such a question yourself and never work around it.
-- Commit everything you leave behind. If you were asked to record why you changed an existing
-  test, \`.autopilot/test-changes.jsonl\` is part of your work: stage it with your final commit.
-  \`git status\` must be clean when you finish.
+- Before you change, move or delete a test file that already exists on the integration line,
+  append one line to \`.autopilot/test-changes.jsonl\`: \`{"path":"<the file>","reason":"<why this
+  change is right>"}\`. Without it the change is refused. New test files need no line. A person
+  reads every reason.
+- Commit everything you leave behind. \`.autopilot/test-changes.jsonl\` is part of your work:
+  stage it with your final commit. \`git status\` must be clean when you finish.
 - Do not start a command that waits for the project's owner (a sign-in in a browser, a device
   to plug in). A build does the part that needs no person; the final check is where a person is
   asked to come, once. Say in your handoff what you left for it and the exact command.
@@ -1659,7 +1662,9 @@ class Run {
     e.step = null;
     this.save();
     this.log(`${e.id}: ${name} ended — ${s.outcome} (${s.why}), $${cost}, ${Math.round(s.wallMs / 1000)} s`);
-    this.event('step-end', e, { step: name, kind, outcome: s.outcome, why: s.why, minutes: +(s.wallMs / 60000).toFixed(1), costUsd: cost });
+    // A session the referee ended at its own question (not a captured plan, not the STOP file) did not finish: it asked.
+    const asked = s.outcome === 'ok' && kind !== 'plan' && s.result?.terminal_reason === 'hook_stopped';
+    this.event('step-end', e, { step: name, kind, outcome: s.outcome, why: s.why, minutes: +(s.wallMs / 60000).toFixed(1), costUsd: cost, ...(asked ? { asked: true } : {}) });
     return s;
   }
 
@@ -2712,7 +2717,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };
     out.say = [
-      snapshotLine(state, { running: !!pid }),
+      snapshotLine(state, { running: !!pid, spentUsd, runBudgetUsd }),
       epics.length ? epics.map((e) => `${shortLabel(e.label)}: ${word[e.state] ?? (pid ? `in progress (${e.minutes} min so far)` : 'interrupted')}`).join('; ') : 'No epic has been queued yet.',
       out.waiting.length ? `${out.waiting.length} question(s) wait for you.` : out.autoContinue.length ? 'It stopped for a technical reason and can continue.' : inFlight?.needsYou ? `It is waiting for you at this computer: ${inFlight.description || 'a step needs you'} (${inFlight.minutes} min so far).` : pid ? `Nothing needs you right now${activity(state) ? `: it is ${activity(state)}` : ''}${inFlight && inFlight.minutes >= 1 ? ` (one command running ${inFlight.minutes} min${inFlight.description ? `: "${inFlight.description}"` : ''})` : ''}.` : 'Nothing needs you right now.',
     ];
@@ -2926,7 +2931,7 @@ async function main(argv) {
   }
   if (cmd === 'watch') {
     const num = (v, d) => (v === undefined || Number.isNaN(Number(v)) ? d : Number(v));
-    await watch({ workspace: ws, run: o.run ?? null, heartbeatMin: num(o.heartbeatMin, 10), once: !!o.once, onceMin: num(o.onceMin, 10), longMin: num(o.longMin, 3), replay: !!o.replay, after: o.after === undefined ? null : num(o.after, 0), pollMs: num(o.pollMs, 2000), graceMs: num(o.graceMs, 15000) });
+    await watch({ workspace: ws, run: o.run ?? null, heartbeatMin: num(o.heartbeatMin, 10), once: !!o.once, onceMin: num(o.onceMin, 10), longMin: num(o.longMin, 3), routine: !!o.verbose, replay: !!o.replay, after: o.after === undefined ? null : num(o.after, 0), pollMs: num(o.pollMs, 2000), graceMs: num(o.graceMs, 15000) });
     return 0;
   }
   if (cmd === 'stop') {

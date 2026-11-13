@@ -252,9 +252,13 @@ function ruleR3(ctx, segs, command) {
     const conflictHint = ctx.role === 'verifier' && sub === 'commit' && branch === ctx.integration ? ` If a merge into ${branch} stopped on a conflict: run \`git merge --abort\`, check out the epic branch, merge ${branch} into it and resolve the conflict there, then merge the epic branch into ${branch} again with --no-ff.` : '';
     if (writes && onProtected) return deny('R3', `git ${sub} on ${branch} is denied; work is committed on the epic branch.${conflictHint}`);
     if (merge && onProtected) {
-      const heads = args.filter((a, k) => !a.startsWith('-') && !/^(-m|--message|-F|--file|-s|--strategy|-X|--strategy-option)$/.test(args[k - 1] ?? ''));
+      // Seen live, twice: `B=feature/epic-… && git merge $B --no-ff`. A name given one plain value in this command stands for it.
+      const vars = new Map(); const twice = new Set();
+      for (const [, k, v] of command.matchAll(/(?:^|[\s;&(])([A-Za-z_]\w*)=([\w./-]+)(?=[\s;&)]|$)/g)) { if (vars.has(k)) twice.add(k); vars.set(k, v); }
+      const plain = (a) => { const m = a.match(/^"?\$\{?([A-Za-z_]\w*)\}?"?$/); return m && vars.has(m[1]) && !twice.has(m[1]) ? vars.get(m[1]) : a; };
+      const heads = args.filter((a, k) => !a.startsWith('-') && !/^(-m|--message|-F|--file|-s|--strategy|-X|--strategy-option)$/.test(args[k - 1] ?? '')).map(plain);
       const ok = ctx.role === 'verifier' && branch === ctx.integration && has('--no-ff') && heads.length === 1 && epicBranch.test(heads[0]);
-      if (!ok) return deny('R3', ctx.role === 'verifier' ? `only \`git merge --no-ff feature/epic-${ctx.epic}-…\` into ${ctx.integration} is allowed` : `git merge into ${branch} is denied; only the verify session merges`);
+      if (!ok) return deny('R3', ctx.role === 'verifier' ? `only \`git merge --no-ff feature/epic-${ctx.epic}-…\` into ${ctx.integration} is allowed: one branch, named in the command, with --no-ff` : `git merge into ${branch} is denied; only the verify session merges`);
     }
   }
   return null;

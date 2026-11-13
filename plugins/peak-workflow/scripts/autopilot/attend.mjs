@@ -66,7 +66,7 @@ export function plainReason(reason) {
 }
 
 /** Reviewer findings that say the work was not exercised for real, whatever their severity. */
-export const UNPROVEN_CATEGORIES = ['never-ran-real', 'stand-in'];
+export const UNPROVEN_CATEGORIES = ['never-ran-real', 'stand-in', 'cannot-fail'];
 /**
  * What a verifier's final report says it did not run or could not prove for real: the bullets under
  * a "Not proven for real" heading, and any "Not run: …" line. Pure. The report is the session's own
@@ -111,9 +111,10 @@ export function eventLine(ev) {
   switch (ev.type) {
     case 'run-start': return ev.resuming ? 'Autopilot picked the run back up.' : `Autopilot started: ${plural((ev.queue ?? []).length, 'epic')} queued.`;
     case 'epic-start': return ev.resumedAt ? `Continuing ${who} from where it stopped` : `Starting ${who}`;
-    case 'step-start': return `${ev.continuing ? `${doing} (carrying on)` : doing} ${who}`;
+    case 'step-start': return ev.continuing ? `Picking ${who} back up where it stopped (${doing.toLowerCase()}); nothing is started over` : `${doing} ${who}`;
     case 'step-end': {
       const cost = ev.costUsd ? ` (${usd(ev.costUsd)})` : '';
+      if (ev.outcome === 'ok' && ev.asked) return `${done} stopped to ask you something after ${took(ev.minutes)}${cost}`;
       if (ev.outcome === 'ok') return `${done} finished in ${took(ev.minutes)}${cost}`;
       if (ev.outcome === 'stopped') return `${done} stopped, as you asked, after ${took(ev.minutes)}${cost}`;
       if (ev.outcome === 'budget') return `${done} stopped at its ${/wall clock/.test(ev.why ?? '') ? 'time' : /disk|growth/.test(ev.why ?? '') ? 'disk' : 'spending'} limit after ${took(ev.minutes)}${cost}`;
@@ -190,15 +191,15 @@ export function activity(state) {
   return `${words} ${shortLabel(q.label ?? q.id)}${q.step?.startedAt ? `, ${sinceMin(q.step.startedAt)} min` : ''}`;
 }
 /** One line on where a run is: what merged, what waits, what is in flight, what was spent. */
-export function snapshotLine(state, { running }) {
+export function snapshotLine(state, { running, spentUsd = state?.spentUsd, runBudgetUsd = state?.runBudgetUsd }) {
   if (!state) return running ? 'Autopilot is starting: getting its copy of your project ready.' : 'No autopilot run has started here yet.';
   const n = (s) => (state.queue ?? []).filter((q) => q.state === s).length;
   const parts = [
     n('MERGED') && `${n('MERGED')} finished and merged`, n('PARKED') && `${n('PARKED')} stopped and waiting`, n('FAILED') && `${n('FAILED')} did not pass`,
     running && activity(state) && `now ${activity(state)}`, running && n('QUEUED') && `${n('QUEUED')} still to start`,
   ].filter(Boolean);
-  const budget = state.runBudgetUsd == null ? '' : ` of $${state.runBudgetUsd}`;
-  return `${running ? 'Autopilot is running' : 'The last autopilot run has ended'}: ${parts.join(', ') || (running ? 'just started' : 'nothing was built')}. Spent ${usd(state.spentUsd)}${budget}.`;
+  const budget = runBudgetUsd == null ? '' : ` of $${runBudgetUsd}`; // runs chained by `continues` are one piece of work: the caller passes their sum
+  return `${running ? 'Autopilot is running' : 'The last autopilot run has ended'}: ${parts.join(', ') || (running ? 'just started' : 'nothing was built')}. Spent ${usd(spentUsd)}${budget}.`;
 }
 
 /** What the referee is for, one phrase per rule (the report's own names). */
@@ -293,9 +294,10 @@ const errorOf = (h) => oneLine(typeof h.error === 'string' ? h.error : h.error ?
  * Follows one run and prints a line per thing worth saying. Read-only and long-running.
  *   first line   where the run is now (left out with `after`: the caller already knows)
  *   then         one `eventLine` per new event, and a `Progress: …` line after each epic ends
- *                (runs of more than one epic); `REFUSED …` the first and the third time the
- *                referee refuses the same thing; `TESTS passed|failed` when a session runs the
- *                project's test command; `NEEDS YOU: …` when the session starts a command that
+ *                (runs of more than one epic); `REFUSED 3 times …` when the referee refuses the
+ *                same thing a third time; with `routine`, also the first `REFUSED …` and
+ *                `TESTS passed|failed` when a session runs the project's test command (an
+ *                attending session is not woken for those); `NEEDS YOU: …` when the session starts a command that
  *                waits for the owner, and `NO LONGER NEEDS YOU: …` when that command ends (done,
  *                or given up); one line for a command open `longMin` minutes; a heartbeat
  *                when nothing else was said for a while
@@ -304,7 +306,7 @@ const errorOf = (h) => oneLine(typeof h.error === 'string' ? h.error : h.error ?
  * Monitor tool runs this in a loop, passing the returned `after` back in).
  * Resolves with `{ ended, after }`: whether the run ended, and how many events have been said.
  */
-export async function watch({ workspace, run = null, heartbeatMin = 10, longMin = 3, once = false, onceMin = 10, replay = false, after = null, pollMs = 2000, graceMs = 15000, out = (line) => process.stdout.write(`${line}\n`) }) {
+export async function watch({ workspace, run = null, heartbeatMin = 10, longMin = 3, routine = false, once = false, onceMin = 10, replay = false, after = null, pollMs = 2000, graceMs = 15000, out = (line) => process.stdout.write(`${line}\n`) }) {
   const started = Date.now();
   // A driver that was just launched has not made its run directory or state yet, and until it has, the latest run
   // on disk is the one before it. Wait for the driver to say which run is its own before reading anything.
@@ -361,7 +363,8 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
       for (const h of r.rows) {
         if (h.hook === 'PreToolUse' && h.decision === 'deny') {
           const key = `${h.rule}\n${h.reason}`; const n = (refusals.get(key) ?? 0) + 1; refusals.set(key, n);
-          if (n === 1) say(`REFUSED (${RULES[h.rule] ?? h.rule ?? 'rule'}): ${oneLine(h.reason, 240)}`);
+          // One refusal is routine (the session reads the reason and carries on): it is on the closing screen's list.
+          if (n === 1 && routine) say(`REFUSED (${RULES[h.rule] ?? h.rule ?? 'rule'}): ${oneLine(h.reason, 240)}`);
           else if (n === 3) say(`REFUSED 3 times (${RULES[h.rule] ?? h.rule ?? 'rule'}): ${oneLine(h.reason, 240)}`);
         } else if (h.tool_name === 'Bash' && /^PostToolUse/.test(h.hook ?? '')) {
           // A command the owner was told to come for has ended: say how, so nobody goes looking for it.
@@ -374,7 +377,7 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
             else say(`NO LONGER NEEDS YOU: it gave up${took} without that being done — ${w.description}${errorOf(h) ? ` (${errorOf(h)})` : ''}`);
           }
           // Only an exit that is the test command's own says how the tests went: otherwise stay silent rather than guess.
-          if (testsOutcomeKnown(commandOf(h), testCommand)) say(h.hook === 'PostToolUse' ? 'TESTS passed' : 'TESTS failed');
+          if (routine && testsOutcomeKnown(commandOf(h), testCommand)) say(h.hook === 'PostToolUse' ? 'TESTS passed' : 'TESTS failed');
         }
       }
     }

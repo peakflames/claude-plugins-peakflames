@@ -252,6 +252,7 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     '**Real money, asked in the same popup.**', '`Yes — when a check needs it (Recommended)`', '`No — never spend`', '"realSpend": true', 'Never write `true` unasked.',
     // Seen live: with the owner away, two sessions each waited five minutes on a browser sign-in, and nobody could say how it ended.
     '**Whether they will be there, asked in the same popup.**', "`No — I'll be away`", "`Yes — I'm here`", '"attended": false', 'that is `false`, whatever was picked',
+    '**A question about a requirement, in plain words first.**', 'A gate with four options goes in the popup with its four options and no `Decide later`', '"Close the popup to decide later."',
     '`NO LONGER NEEDS YOU: …`', 'Never say whether a `NEEDS YOU` step was done from anything but this line.', '`Progress: …`',
   ]) assert.ok(flat.includes(rule), rule);
   // Every answer `driver.mjs status` can give has its row in Step 0.

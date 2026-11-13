@@ -743,9 +743,20 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       `options` verbatim as the option labels, plus one more option, `Decide later`. No
       "(Recommended)", no reordering, no added options. If the question's own text carries a
       recommendation (a build session's deferral question does), say before asking that it is
-      that session's recommendation, not autopilot's and not yours. If the gate has fewer than two options or
-      more than three, do not use `AskUserQuestion`: print the question and its options as a
-      numbered list and take the typed answer. A gate with no options (`preflight`) has no answer
+      that session's recommendation, not autopilot's and not yours. A gate with four options goes
+      in the popup with its four options and no `Decide later`: say in the lines before it
+      "Close the popup to decide later." If the gate has fewer than two options or more than
+      four, do not use `AskUserQuestion`: print the question and its options as a numbered list
+      and take the typed answer.
+
+      **A question about a requirement, in plain words first.** When the gate's `kind` starts
+      with `amendment`, or its question says a requirement looks wrong or cannot be met, the
+      owner needs to know what the rule is for before they can judge it. Before asking, say in
+      three short lines: what the requirement is for, in one sentence with no ID and no
+      Given/When/Then; why it cannot be met as written; and what each answer does —
+      "Amend: the build rewrites this one requirement as proposed, in your name, and carries
+      on. Nothing else in the requirements may change." Read the requirement's text and where
+      it traces to (`tor-lifecycle text <TOR>`) for the first line; never guess it. A gate with no options (`preflight`) has no answer
       to record — the fix is in the project, and it clears when preflight passes: say what to
       fix (its `question`) and move on.
 

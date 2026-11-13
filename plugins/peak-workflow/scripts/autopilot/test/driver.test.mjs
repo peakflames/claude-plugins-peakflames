@@ -115,6 +115,9 @@ test('events: a happy run writes one line per milestone, in order, and each read
   assert.equal(eventLine({ type: 'run-end', why: 'Lg1Csv7 parked (onPark: stop)', spentUsd: 4.2 }), 'RUN ENDED: an epic stopped. Spent $4.20.');
   for (const o of [{ type: 'parked', reason: 'CHECK_BUILD: the build left uncommitted work (failed: clean-tree)' }, { type: 'parked', reason: 'run stopped (end time) before VERIFY' }, { type: 'blocked', reason: 'dependency not merged: Lg1Csv7 (PARKED)' }]) assert.ok(!/[A-Z]{2,}_[A-Z]+|VERIFY|\.json|\//.test(ev(o)), ev(o));
   assert.equal(eventLine({ type: 'something-new' }), null);
+  // A step taken up again is not a second go at it, and a step that stopped to ask did not finish.
+  assert.equal(ev({ type: 'step-start', kind: 'verify', continuing: true }), `Picking ${E1.id} — CSV import back up where it stopped (verifying); nothing is started over`);
+  assert.equal(ev({ type: 'step-end', kind: 'build', outcome: 'ok', asked: true, minutes: 1.5, costUsd: 1.17 }), 'Build stopped to ask you something after 2 min ($1.17)');
 });
 
 test('plan lint fail parks the epic and no build session starts', async (t) => {
@@ -609,7 +612,7 @@ test('real money: the owner\'s answer at launch reaches every build, repair and 
       assert.match(text, want, file); assert.doesNotMatch(text, never, file);
       // Only the final check asks a person to come; a build leaves that to it.
       if (/verify-rules/.test(file)) assert.match(text, /start its Bash `description` with `Needs you:`/);
-      else { assert.match(text, /Do not start a command that waits for the project's owner/); assert.doesNotMatch(text, /Needs you:/); }
+      else { assert.match(text, /Do not start a command that waits for the project's owner/); assert.doesNotMatch(text, /Needs you:/); assert.match(text, /Before you change, move or delete a test file that already exists on the integration line,\s+append one line to `\.autopilot\/test-changes\.jsonl`/); }
       assert.doesNotMatch(text, /# The owner is away/, 'not said unless the owner said so');
     }
     const [, build, , verify] = p.calls();

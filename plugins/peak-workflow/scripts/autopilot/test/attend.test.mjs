@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, ensureResumeGates, gateReason, newRunName, standingCovers, strayProcesses } from '../driver.mjs';
-import { progressLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
+import { progressLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, lines: () => r.stdout.trim().split('\n'), json: () => JSON.parse(r.stdout) }; };
@@ -56,7 +56,7 @@ test('watch on a live run: step lines as they happen, a repeated refusal said on
   const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
   t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
   await waitFor(() => readJson(path.join(p.state, 'lock')).pid);
-  const w = startWatch(p, '--replay');
+  const w = startWatch(p, '--replay', '--verbose');
   t.after(() => w.child.kill('SIGKILL'));
 
   await waitFor(() => fs.existsSync(path.join(p.state, 'mid-build')) && w.lines().some((l) => l === 'TESTS passed'));
@@ -106,7 +106,9 @@ test('watch --once: returns after the first thing said, with where to pick up; a
   assert.match(caught.lines()[0], /^Plan finished/);
   assert.deepEqual(caught.lines().slice(1), [`Building ${NAME}`, '(next: --after 5)']);
   // The whole step, replayed: the refusal is said the first time and the third.
-  const all = driver('watch', '--workspace', p.state, '--once', '--replay', '--poll-ms', '40').lines().filter((l) => /^REFUSED/.test(l));
+  const all = driver('watch', '--workspace', p.state, '--once', '--replay', '--verbose', '--poll-ms', '40').lines().filter((l) => /^REFUSED/.test(l));
+  // An attending session is not woken for a first refusal or a test run: without --verbose only the third refusal is said.
+  assert.deepEqual(driver('watch', '--workspace', p.state, '--once', '--replay', '--poll-ms', '40').lines().filter((l) => /^REFUSED|^TESTS/.test(l)).map((l) => l.slice(0, 15)), ['REFUSED 3 times']);
   assert.equal(all.length, 2);
   assert.match(all[1], /^REFUSED 3 times \(git rule\): /);
 
@@ -352,7 +354,7 @@ test('a command the owner was called for and that gave up is said so; only an ex
   const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
   t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
   await waitFor(() => fs.existsSync(path.join(p.state, 'at-1')));
-  const w = startWatch(p);
+  const w = startWatch(p, '--verbose');
   t.after(() => w.child.kill('SIGKILL'));
   await waitFor(() => w.lines().some((l) => /^NEEDS YOU/.test(l)));
   fs.writeFileSync(path.join(p.state, 'go-1'), '');
@@ -365,6 +367,13 @@ test('a command the owner was called for and that gave up is said so; only an ex
   const test = '.venv/bin/python build.py test';
   for (const [command, known] of [[test, true], [`cd x && ${test} 2>&1`, true], [`${test} > /tmp/x.log 2>&1`, true], [`echo a; ${test} --filter X`, true], [`${test}-live`, false], [`${test} | tail -3`, false], [`${test}; echo done`, false], [`x${test}`, false], ['echo hi', false]]) assert.equal(testsOutcomeKnown(command, test), known, command);
   assert.equal(testsOutcomeKnown(test, ''), false);
+});
+
+test('the first line counts the spend of every run chained to this one, when the caller knows it', () => {
+  const state = { queue: [{ state: 'MERGED' }], spentUsd: 2.44, runBudgetUsd: 72.91 };
+  assert.equal(snapshotLine(state, { running: false }), 'The last autopilot run has ended: 1 finished and merged. Spent $2.44 of $72.91.');
+  // Seen live: "$2.44 of $72.91" for work that had cost $9.53 of the $80 the owner set.
+  assert.equal(snapshotLine(state, { running: false, spentUsd: 9.53, runBudgetUsd: 80 }), 'The last autopilot run has ended: 1 finished and merged. Spent $9.53 of $80.');
 });
 
 test('the progress line counts how each epic of the run ended, and what is still to go', () => {
