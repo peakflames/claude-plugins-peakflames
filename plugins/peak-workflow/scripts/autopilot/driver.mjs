@@ -8,6 +8,8 @@
 //   node driver.mjs report --workspace <dir> [--run <name>]   re-render report.md and report.json
 //   node driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>]
 //   node driver.mjs watch --workspace <dir> [--run <name>] [--heartbeat-min 10] [--once [--after <n>]] [--replay]
+//   node driver.mjs status --project <dir> [--workspace <dir>] [--queue id,id] [--json]   where things stand, and what comes next
+//   node driver.mjs continue --workspace <dir> [--json]   apply the owner's standing answer to technical stops
 //
 // The workspace (`<project>.autopilot` by default) is one per project and long-lived: the private
 // clone, every gate and the owner's settings.json live there; each run gets `runs/<timestamp>/`.
@@ -23,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { eventLine, watch } from './attend.mjs';
+import { activity, driverPid, eventLine, friction, plainReason, shortLabel, snapshotLine, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
 import { writeReport } from './report.mjs';
@@ -158,6 +160,7 @@ export function defaultConfig(project) {
     testDirs: facts.testDirs,
     endBy: nextEndBy(),
     runBudgetUsd: 80,
+    autoContinue: 0, // run-level: how many technical stops per epic the owner's standing answer continues without asking (0 = always ask)
     diskFloorGb: 15,
     growthCapMb: 1024,
     onPark: 'stop', // 'stop': the first epic that parks or fails ends the run; 'continue': independent epics still run
@@ -241,7 +244,7 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   return cfg;
 }
 /** The keys that belong to one run; everything else is a workspace setting. */
-const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble'];
+const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues'];
 const TEST_DOUBLE = (bin) => `claudeBin is ${bin}, not the real \`claude\`: a test double runs only when the run's config.json says "allowTestDouble": true (or --allow-test-double)`;
 
 // ---------------------------------------------------------------------------------------------
@@ -1331,7 +1334,7 @@ class Run {
    */
   parkResumable(e, reason, phase) {
     this.writeGate(e, {
-      kind: 'resume', skillStep: 'autopilot driver', phase,
+      kind: 'resume', skillStep: 'autopilot driver', phase, reason,
       question: `${this.meta(e).label} stopped: ${reason}. Continue it in the next run?`,
       options: [ANSWERS.resume, ANSWERS.startOver],
       why: `nothing was decided for you: the run stopped the epic before ${phase}. "${ANSWERS.resume}" re-enters at ${phase} on the same branch${phase === 'CHECK_BUILD' ? ' (or, when the build session was cut short, a new session continues the build from what is committed there)' : ''}; "${ANSWERS.startOver}" plans it again from scratch`,
@@ -2312,7 +2315,13 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
  * decide. For every such epic on record (parked, its branch still there, no live gate) this writes the `resume` gate
  * an up-to-date driver would have written, so the report can ask "continue it?" like any other park.
  */
-export function ensureResumeGates(workspace) {
+export function ensureResumeGates(workspace, { write = true } = {}) {
+  const missing = missingResumeGates(workspace);
+  if (write) for (const m of missing) writeJson(path.join(workspace, 'gates', m.name), m.gate);
+  return missing.map((m) => m.name);
+}
+/** The gates `ensureResumeGates` would write, as `[{name, gate}]`. Reads only. */
+function missingResumeGates(workspace) {
   const clone = path.join(workspace, 'clone'); const made = [];
   const records = tryJson(path.join(workspace, 'epics.json'), {}) ?? {};
   const gates = readGates(workspace);
@@ -2324,24 +2333,195 @@ export function ensureResumeGates(workspace) {
     if (!m || !tip || !integration) continue;
     const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
     const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
-    const n = gates.filter((g) => g.epic === id).length + made.filter((x) => x.startsWith(`${id}-`)).length + 1;
+    const n = gates.filter((g) => g.epic === id).length + 1;
     const last = (rec.buildSteps ?? []).at(-1);
-    writeJson(path.join(workspace, 'gates', `${id}-${n}.json`), {
+    made.push({ name: `${id}-${n}.json`, gate: {
       epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: last?.name ?? null, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
       resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${id}`, decided: null,
-      kind: 'resume', skillStep: 'autopilot driver', phase: 'CHECK_BUILD',
+      kind: 'resume', skillStep: 'autopilot driver', phase: 'CHECK_BUILD', reason: rec.reason,
       question: `${q.label ?? id} stopped: ${rec.reason}. Continue it in the next run?`,
       options: [ANSWERS.resume, ANSWERS.startOver],
       why: `nothing was decided for you: the build finished and autopilot's own checks stopped it. "${ANSWERS.resume}" runs those checks again on the same branch, with the current driver; "${ANSWERS.startOver}" plans it again from scratch`,
       artifacts: last ? [last.dir] : [],
-    });
-    made.push(`${id}-${n}.json`);
+    } });
   }
   return made;
 }
 
+// ---- the standing answer for technical stops ---------------------------------------------------
+
+/**
+ * A stop that is nobody's decision and that running again can cure: an infra error, a step's own
+ * time, turn or dollar cap, autopilot's own check on a finished build, an auditor that could not
+ * run. Listed, not inferred: the owner's own stop (the STOP file), a run limit (end time, run
+ * budget, disk), a branch that no longer merges and anything else stay questions for the owner.
+ */
+const TECHNICAL_STOP = [
+  /^infra error during /, /^budget: \S+ hit (wall clock|error_max_turns|error_max_budget_usd)\b/,
+  /^CHECK_BUILD\b(?!.*deferral)/, /^interrupted: .*CHECK_BUILD/, /^auditor: .*(could not start|returned no usable result)/,
+];
+/** Why a `resume` gate was written: its `reason`, or (a gate from an earlier driver) the reason inside its question. */
+export const gateReason = (g) => g.reason ?? (String(g.question ?? '').match(/ stopped: ([\s\S]*)\. Continue it in the next run\?$/) ?? [])[1] ?? '';
+/**
+ * Whether the owner's standing answer ("continue a technical stop, up to `n` times per epic")
+ * covers this gate. Pure. Only an undecided `resume` gate for a technical stop, and only while the
+ * epic has had fewer than `n` standing answers; every other gate is the owner's to answer.
+ */
+export function standingCovers(gate, gates, n) {
+  if (!(Number(n) > 0) || gate.kind !== 'resume' || gate.decided || !gateLive(gate)) return false;
+  if (!gate.phase || !(gate.options ?? []).includes(ANSWERS.resume)) return false;
+  if (!TECHNICAL_STOP.some((re) => re.test(gateReason(gate)))) return false;
+  return gates.filter((g) => g.epic === gate.epic && g.decided?.standing).length < Number(n);
+}
+/** Per epic, its latest live gate when that gate still needs an answer (the one `gateFacts` would call `waiting`). */
+function openGates(gates) {
+  const live = gates.filter((g) => gateLive(g) && g.kind !== 'preflight');
+  return [...new Set(live.map((g) => g.epic))].map((id) => live.filter((g) => g.epic === id).at(-1)).filter((g) => !g.decided?.answer && (g.options ?? []).length);
+}
+/** An epic's label as the latest run that queued it named it. */
+function labelOf(workspace, id) {
+  for (const name of listRuns(workspace).reverse()) {
+    const q = (tryJson(path.join(runDirOf(workspace, name), 'state.json'))?.queue ?? []).find((x) => x.id === id);
+    if (q?.label) return q.label;
+  }
+  return id;
+}
+const standingLimit = (workspace, run) => Number((run ? tryJson(path.join(runDirOf(workspace, run), 'config.json')) : null)?.autoContinue ?? 0) || 0;
+
+/**
+ * `driver.mjs continue`: records "Resume from where it stopped" on every gate the standing answer
+ * covers, in the owner's name and marked `standing`, and returns what it did. It never touches
+ * another kind of gate, and never runs while a driver does.
+ */
+export function continueRun(workspace, { by } = {}) {
+  const ws = path.resolve(workspace);
+  const pid = driverPid(ws);
+  if (pid) throw new Error(`autopilot is running here (pid ${pid}): a stop is continued after the run has ended`);
+  ensureResumeGates(ws);
+  const n = standingLimit(ws, currentRun(ws));
+  const continued = []; const left = [];
+  for (const g of openGates(readGates(ws))) {
+    const gates = readGates(ws);
+    const had = gates.filter((x) => x.epic === g.epic && x.decided?.standing).length;
+    if (!standingCovers(g, gates, n)) {
+      left.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, why: n <= 0 ? 'no standing answer was given for this run' : g.kind !== 'resume' ? `a question only the owner answers (${g.kind})` : had >= n ? `this epic was already continued ${had} time(s); the standing answer covers ${n}` : `not a technical stop: ${plainReason(gateReason(g))}` });
+      continue;
+    }
+    const d = decideGate(ws, g.file, ANSWERS.resume, { by, standing: true });
+    continued.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), why: plainReason(gateReason(g)), enters: d.enters, standingAnswers: had + 1, of: n });
+  }
+  return { autoContinue: n, continued, left };
+}
+
+// ---- where things stand: the one answer an attending session asks for --------------------------
+
+/** The runs one attended session chained together: each relaunch's `config.json` names the run it `continues`. Oldest first. */
+function runChain(workspace, run) {
+  const chain = [];
+  for (let name = run; name && !chain.includes(name) && chain.length < 50; name = tryJson(path.join(runDirOf(workspace, name), 'config.json'))?.continues ?? null) {
+    if (!exists(runDirOf(workspace, name))) break;
+    chain.unshift(name);
+  }
+  return chain;
+}
+
+/**
+ * `driver.mjs status`: where the project's autopilot is, and what an attending session does next.
+ * Reads only. `next` is decided here, never by a prompt:
+ *   attend     a driver is running                    decide    a gate needs the owner
+ *   continue   only standing-answer gates are open    readiness there is work that can run
+ *   fetch      nothing left to run, and the clone holds merged work the project has not fetched
+ *   nothing    otherwise
+ * `queue` narrows "work that can run" to the epics the owner confirmed in this session.
+ * `relaunch` is set when a decided gate waits to be used: the next run's name and the exact
+ * `config.json` that continues the last one (same queue, what is left of its budget).
+ */
+export function status(project, workspace = null, { queue = null, pluginDir = PLUGIN_DIR } = {}) {
+  const root = path.resolve(project); const ws = path.resolve(workspace ?? `${root}.autopilot`);
+  const pid = driverPid(ws);
+  const run = currentRun(ws); const runDir = run ? runDirOf(ws, run) : null;
+  const stateOf = (name) => tryJson(path.join(runDirOf(ws, name), 'state.json'));
+  const cfgOf = (name) => tryJson(path.join(runDirOf(ws, name), 'config.json'), {}) ?? {};
+  const state = run ? stateOf(run) : null; const lastCfg = run ? cfgOf(run) : {};
+  const chain = runChain(ws, run);
+  const spentUsd = +chain.reduce((sum, name) => sum + (stateOf(name)?.spentUsd ?? 0), 0).toFixed(2);
+  const runBudgetUsd = (chain.length ? cfgOf(chain[0]).runBudgetUsd ?? stateOf(chain[0])?.runBudgetUsd : null) ?? null;
+  const n = standingLimit(ws, run);
+  const epics = (state?.queue ?? []).map((q) => ({ id: q.id, label: q.label ?? q.id, state: q.state, step: q.step?.name ?? null, minutes: Math.round((q.wallMs ?? 0) / 60000) + (q.step?.startedAt ? Math.max(0, Math.round((Date.now() - Date.parse(q.step.startedAt)) / 60000)) : 0), costUsd: q.costUsd ?? 0 }));
+  const merged = new Map(chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').map((q) => [q.id, q.label ?? q.id])));
+
+  // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
+  const gates = [...readGates(ws), ...(pid ? [] : missingResumeGates(ws).map((m) => ({ file: `gates/${m.name}`, ...m.gate })))];
+  const open = pid ? [] : openGates(gates);
+  const brief = (g) => ({ file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: g.question ?? null, ...(g.kind === 'resume' ? { why: plainReason(gateReason(g)) } : {}) });
+  const covered = open.filter((g) => standingCovers(g, gates, n));
+  const waiting = open.filter((g) => !covered.includes(g));
+
+  const out = {
+    next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
+    epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n,
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+  };
+  const say = () => {
+    const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };
+    out.say = [
+      snapshotLine(state, { running: !!pid }),
+      epics.length ? epics.map((e) => `${shortLabel(e.label)}: ${word[e.state] ?? (pid ? `in progress (${e.minutes} min so far)` : 'interrupted')}`).join('; ') : 'No epic has been queued yet.',
+      out.waiting.length ? `${out.waiting.length} question(s) wait for you.` : out.autoContinue.length ? 'It stopped for a technical reason and can continue.' : pid ? `Nothing needs you right now${activity(state) ? `: it is ${activity(state)}` : ''}.` : 'Nothing needs you right now.',
+    ];
+    return out;
+  };
+  if (pid) { out.next = 'attend'; out.why = 'a driver is running'; return say(); }
+
+  // Not running: what could run next, read as readiness reads it.
+  let pre = null; let launch = null;
+  try {
+    const config = loadConfig(ws, { project: root, overrides: lastCfg.allowTestDouble ? { allowTestDouble: true } : {} });
+    const integration = detectIntegration(root);
+    const sync = syncFacts(root, ws, integration);
+    const clone = path.join(ws, 'clone');
+    pre = preflight(root, config, {
+      pluginDir, gates: gateFacts(ws, integration, { integrationTip: sync.state === 'project-ahead' ? sync.projectTip : null }),
+      sidecarText: sync.state === 'clone-ahead' ? (rel) => gitShow(clone, integration, rel) : null,
+    });
+    launch = launchFacts(root, ws, config, { epics: pre.epics });
+    out.integration = integration;
+    out.sync = { state: sync.state, waiting: sync.waiting ?? [], fetch: integration && sync.state === 'clone-ahead' ? [`${fetchCommand(clone, integration)} && git log ${integration}..autopilot/${integration}`, `git merge --ff-only autopilot/${integration}`] : [] };
+    out.refuse = [...pre.refuse, ...launch.refuse];
+    for (const e of pre.epics) if (e.eligibility === 'complete' && e.reasons.some((r) => /not fetched into the project yet/.test(r))) merged.set(e.id, e.label);
+    out.merged = [...merged.values()];
+  } catch (err) { out.refuse = [err.message]; }
+
+  const interrupted = launch?.lastRun?.status === 'interrupted';
+  const held = new Set(open.map((g) => g.epic));
+  const runnable = (pre?.epics ?? []).filter((e) => e.eligibility === 'eligible' && !held.has(e.id) && (!queue || queue.includes(e.id)));
+
+  // A decided gate waits to be used: the run that continues the last one, exactly as the owner confirmed it.
+  if (pre && launch && state && !interrupted && !out.refuse.length) {
+    const byId = new Map(pre.epics.map((e) => [e.id, e]));
+    const before = Array.isArray(lastCfg.queue) ? lastCfg.queue : (state.queue ?? []).map((q) => q.id);
+    const ids = before.filter((id) => byId.get(id)?.eligibility === 'eligible' && !held.has(id));
+    const left = runBudgetUsd == null ? null : +(runBudgetUsd - spentUsd).toFixed(2);
+    const limit = ['end time', 'run budget'].includes(state.stoppedBecause) ? state.stoppedBecause : left !== null && left <= 0 ? 'run budget' : null;
+    if (ids.some((id) => ['resume', 'fresh'].includes(byId.get(id).gate?.state)) && !limit) {
+      out.relaunch = {
+        run: launch.run, runDir: launch.runDir,
+        config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
+      };
+    }
+  }
+
+  if (interrupted) { out.next = 'readiness'; out.why = 'the last run did not finish'; }
+  else if (waiting.length) { out.next = 'decide'; out.why = `${waiting.length} gate(s) need the owner`; }
+  else if (covered.length) { out.next = 'continue'; out.why = `${covered.length} technical stop(s) the standing answer covers`; }
+  else if (runnable.length) { out.next = 'readiness'; out.why = out.relaunch ? 'a decided gate waits to be used' : `${runnable.length} epic(s) can run`; }
+  else if (out.sync?.state === 'clone-ahead') { out.next = 'fetch'; out.why = 'merged work waits in the clone'; }
+  else out.why = out.refuse.length ? 'nothing can run' : 'nothing is left to run';
+  return say();
+}
+
 /** Records a person's answer in a gate file (§6.8). The driver never chooses the answer; it only writes what it is given. */
-export function decideGate(workspace, gateName, answer, { by, note, observations } = {}) {
+export function decideGate(workspace, gateName, answer, { by, note, observations, standing = false } = {}) {
   const file = path.join(workspace, 'gates', path.basename(gateName));
   if (!exists(file)) throw new Error(`no gate file ${file}`);
   const gate = readJson(file);
@@ -2387,7 +2567,7 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   const project = tryJson(path.join(workspace, 'settings.json'))?.project ?? (run ? tryJson(path.join(runDirOf(workspace, run), 'config.json'))?.project : null) ?? null;
   const who = by ?? (project ? sh('git', ['config', 'user.name'], { cwd: project }).out : '') ?? '';
   if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
-  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}), ...(obs?.length ? { observations: obs } : {}) };
+  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}), ...(obs?.length ? { observations: obs } : {}), ...(standing ? { standing: true } : {}) }; // `standing`: the owner's answer given once at launch, applied by `continue`
   writeJson(file, gate);
   if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
   // Every decided gate resumes its epic in the next run; the by-hand command stays as the fallback.
@@ -2436,7 +2616,7 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>] [--gate <command>]… [--probe] [--allow-test-double]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir] [--network host,host] [--budget <step>.<key>=<value>]…\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       driver.mjs watch --workspace <dir> [--run <name>] [--heartbeat-min <n>] [--once [--after <n>]] [--replay]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>] [--gate <command>]… [--probe] [--allow-test-double]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir] [--network host,host] [--budget <step>.<key>=<value>]…\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       driver.mjs watch --workspace <dir> [--run <name>] [--heartbeat-min <n>] [--once [--after <n>]] [--replay]\n       driver.mjs status --project <dir> [--workspace <dir>] [--queue id,id] [--json]\n       driver.mjs continue --workspace <dir> [--json]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
   const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
@@ -2480,8 +2660,19 @@ async function main(argv) {
     const result = await run({ project: o.project, workspace: wsArg, run: o.run, queue: o.queue ? o.queue.split(',').filter(Boolean) : undefined, explicit: o.explicit ? o.explicit.split(',').filter(Boolean) : undefined, resume: !!o.resume, claudeBin: o.claudeBin, allowTestDouble: !!o.allowTestDouble, verbose: !!o.verbose || process.stdout.isTTY, dryRun: !!o.dryRun });
     return o.dryRun ? (result.pre.ok ? 0 : 1) : 0;
   }
-  if (!wsArg && ['stop', 'report', 'decide', 'watch'].includes(cmd)) throw new Error(`${cmd} needs --workspace`);
+  if (cmd === 'status') {
+    if (!o.project) throw new Error('status needs --project');
+    const s = status(o.project, wsArg ?? null, { queue: o.queue ? o.queue.split(',').filter(Boolean) : null });
+    console.log(o.json ? JSON.stringify(s, null, 2) : [...s.say, `next: ${s.next} (${s.why})`].join('\n'));
+    return 0;
+  }
+  if (!wsArg && ['stop', 'report', 'decide', 'watch', 'continue'].includes(cmd)) throw new Error(`${cmd} needs --workspace`);
   const ws = path.resolve(wsArg ?? '.');
+  if (cmd === 'continue') {
+    const r = continueRun(ws, { by: o.by });
+    console.log(o.json ? JSON.stringify(r, null, 2) : [...r.continued.map((c) => `continued ${c.label}: ${c.why} (${c.standingAnswers} of ${c.of})`), ...r.left.map((l) => `left for the owner ${l.label}: ${l.why}`)].join('\n') || 'nothing to continue');
+    return r.continued.length ? 0 : 1;
+  }
   if (cmd === 'watch') {
     const num = (v, d) => (v === undefined || Number.isNaN(Number(v)) ? d : Number(v));
     await watch({ workspace: ws, run: o.run ?? null, heartbeatMin: num(o.heartbeatMin, 10), once: !!o.once, onceMin: num(o.onceMin, 10), replay: !!o.replay, after: o.after === undefined ? null : num(o.after, 0), pollMs: num(o.pollMs, 2000), graceMs: num(o.graceMs, 15000) });
