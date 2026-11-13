@@ -19,10 +19,13 @@ work yourself.
 **Four things this skill never does.** They hold in every mode, whatever the user says mid-skill:
 
 1. **It never edits project code.** It changes a file in the project in two cases only, and
-   never without the owner's yes to that change:
+   never beyond them:
    - **Autopilot's own settings** — the `setup`, `copy`, `readOnly`, `network` and `budgets`
-     entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
-     `DRIVER configure` after the owner confirms them (Step 1 item 5, Step 2 item 3).
+     entries of `<root>/.claude/peak-workflow/autopilot.json`, always through
+     `DRIVER configure`. What a run cannot work without (`setup`, `readOnly`, `network`,
+     drafted from the project's stack) is saved without asking and reported in one line. A
+     `copy` file may hold secrets and a budget is the owner's preference: those are saved
+     only on the owner's word (Step 1 item 5, Step 2 item 3).
    - **A project fix it has named itself** — the `**Tests:**` or `**Build:**` line of
      `CLAUDE.md`, or a `.gitignore` line — when readiness found that this line is what stops
      the run. Show the file and the line as it is and as it would be, then ask with
@@ -49,6 +52,22 @@ work yourself.
 **Asking the owner.** Every question with a fixed set of answers goes through
 `AskUserQuestion`, never as a question left in the chat. Plain text is only for answers that are
 free text (a changed queue, a budget, an end time) or a list too long for the tool.
+
+**Say little.** Most owners are not developers, and a long screen reads as something gone
+wrong. Readiness and Confirm together print **one short screen** (Step 2 item 2) — before it,
+only a line of progress per slow command ("Checking that autopilot's copy builds…"). What
+Step 1 learns is used, not recited: no table of every epic, no list of ignored files, no table
+of quality gates, no paragraph per flagged requirement, no warning that asks nothing of the
+owner. A line earns its place only when the owner must decide it, must do it, or would be
+surprised in the morning without it. No file paths, setting names or command lines unless the
+owner has to type them. The rest is given when asked ("details").
+
+**Do what the run needs; ask only what is the owner's to decide.** If autopilot cannot work
+without something and you can do it within rule 1, do it and say so in one line — never ask
+the owner to approve a technical setting they cannot judge. When a question is really theirs,
+put the answer you would give first, marked `(Recommended)`, with one short sentence on why
+in its description. Two exceptions, where nothing is ever recommended: a parked gate (rule 3)
+and which epics to run (rule 4).
 
 **Epic references.** Name an epic as `<id> (<slug>) — <Name>` everywhere (the `label` field in the
 driver's output), never by ID alone.
@@ -109,15 +128,15 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    purpose, so a rehearsal's stand-in is never inherited by a real run. After a yes, the
    `claudeBin` warning is expected: state it once, in the Step 2 block.
 
-4. **Warnings.** Print every line of `launch.warn`. If it says gates wait for a decision,
-   recommend `/peak-workflow:autopilot report` first and ask with `AskUserQuestion` — "<N>
-   gate(s) wait for your decision. Launch a run anyway? Those epics are left alone." with options
-   `Decide the gates first` and `Continue anyway`; stop unless the owner chooses to continue. `launch.sync.state` says how the project and
-   the clone compare, and the run acts on it by itself: `project-ahead` — the clone is
-   fast-forwarded first (a decision on a parked branch still holds if the branch merges cleanly
-   into the new tip; the run checks that when it starts); `clone-ahead` — merged work is still waiting to be fetched, and
-   the run builds on top of it (epics merged there show as already Complete); `same` — nothing
-   to do; `no-clone` — the first run, which makes the clone at launch.
+4. **Warnings.** Read every line of `launch.warn`; print only what needs the owner. If gates
+   wait for a decision, ask with `AskUserQuestion` — "<N> question(s) from the last run wait
+   for your answer. Answer them first?" with options `Answer them first (Recommended)` and
+   `Launch anyway — those epics are left alone`; on the first, go to Step 4 in this session. A
+   leftover STOP file: say so and stop (the owner removes it). Uncommitted changes: mention
+   them, in one line on the Step 2 screen, only when a tracked file is modified
+   (`git status --porcelain` shows a line not starting with `??`). The rest — the laptop
+   note, how the project and the clone compare (`launch.sync.state`: the run fast-forwards or
+   builds on top by itself) — is not printed.
 
 5. **Make the copy able to build and test.** Autopilot works in a private copy of the project
    (the clone), and a clone holds only what git carries. Everything git ignores — installed
@@ -130,11 +149,9 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    a session may reach from inside its sandbox (a package registry) — with none, sessions have
    no network at all. Skip this item when no epic is runnable.
 
-   a. **Show what the copy starts without.** From `launch.env.ignored` (each entry has `path` and
-      `status`), under "In your project, but not in autopilot's copy": one line per entry, in
-      plain words — `copied` → "copied in each run"; `present` → "rebuilt in the copy"; `absent`
-      → "not carried over". Fold build output and caches (`bin/`, `obj/`, `target/`, `dist/`,
-      `__pycache__/`) into one line with a count. If the list is empty, say so in one line.
+   a. **See what the copy starts without** — `launch.env.ignored` (each entry has `path` and
+      `status`: `copied`, `present` = rebuilt in the copy, `absent` = not carried over). Use
+      it in item b; do not print it.
 
    b. **Work out the entries** when any is missing, or when the proof in item d fails.
       Learn it from how the project is really built and tested without autopilot: read
@@ -168,35 +185,37 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         command and say, for each, whether it can run in the copy: does it need a file git
         ignores (a `.env` with a real key)? a running server or database? a person? Reason from
         what the command does, never from the tests alone. A gate that needs a real key means
-        that file goes in `copy`, or the owner is told now that verify may park on it. The
-        ones that can run are passed to the proof in item d.
+        that file goes in `copy` (item c asks), or the owner is told on the Step 2 screen, in
+        one line, that the last check of each epic may stop for them. The ones that can run
+        are passed to the proof in item d. Do not print the list.
       - A `**Tests:**` line that names a shell alias or an activated environment (`python` for
         `python3`, a bare tool that lives in `.venv/bin`) cannot run unattended. Say which line
         and what it should say, and offer the change as rule 1 allows: one named line, the
         owner's yes to exactly that, then your commit — or the owner makes it.
 
-   c. **Confirm, then save.** Show the entries exactly as they will be saved; for each
-      `copy` file one sentence — with no `network` entry: "The build sessions can read this
-      file. They have no network, so it cannot leave this machine, and git ignores it, so it is
-      never committed."; with one: "The build sessions can read this file. Git ignores it, so it
-      is never committed. They can reach <the hosts> and nowhere else, so that is the only place
-      its contents could be sent." For each `readOnly` directory: "The build sessions can read
-      everything in this directory and can change nothing in it." For `network`: "Build sessions
-      may download from these hosts and reach nothing else." Say the last two plainly even when
-      the owner did not ask: they widen what a session can touch. Ask with
-      `AskUserQuestion`: "Save these so autopilot's copy can build and test?" — options
-      `Save these`, `Change them`, `Skip — leave the copy as it is`. On save:
+   c. **Save what the run needs; ask only about `copy`.** Save `setup`, `readOnly` and
+      `network` without asking: autopilot cannot build without them, the lists in item b are
+      fixed per stack, and the driver refuses anything broad or private. A `network` host that
+      is not in item b's list (a private registry) is the one exception: ask about it.
 
       ```bash
       node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --setup '<command>' --copy <path>,<path> --read-only <dir>,<dir> --network <host>,<host>
       ```
 
       Pass only the flags for entries that change; an empty value removes an entry. It keeps
-      the file's other keys, refuses a `copy` path that is missing or that git does not ignore,
-      refuses a `readOnly` directory that is missing, too broad, private, or overlaps the
-      project, and refuses a `network` entry that is not a bare host name. Never write that file any other way, and do not commit it: the driver reads it
-      from the project as it is. Say once that the file is the owner's to commit so teammates
-      get the same setup.
+      the file's other keys and refuses a path or host it cannot accept — print the refusal
+      and correct the entry. Never write that file any other way, and do not commit it. What
+      was saved goes on the Step 2 screen as one plain line, for example: "I set autopilot up
+      to read and download .NET packages (nothing else on your machine or the internet)."
+
+      **A `copy` file is the owner's call**, because it may hold a key. Ask only when a test
+      or a quality gate cannot run without it, one `AskUserQuestion` per file: "Let autopilot's
+      build sessions read your `<file>`? <the check> cannot run without it." — options
+      `Yes, copy it in (Recommended)` and `No — that check may stop for me`. The first
+      option's description is the honest sentence: with no `network`, "It stays on this
+      machine: sessions have no network, and git never commits it."; with one, "Git never
+      commits it. Sessions can reach <hosts> and nowhere else, so that is the only place it
+      could be sent." Recommend "No" instead when only an optional check needs the file.
 
    d. **Prove it** — not in `dry-run` mode, which writes nothing: say the proof is skipped and
       carry on. Run `DRIVER prepare --project "<root>"` with a ten-minute timeout, adding one
@@ -206,21 +225,23 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       test command in the clone, in the same plain shell a run uses, and then each gate. It
       writes only inside the workspace and prints JSON; exit 1 means the proof failed. A gate
       never fails the proof: only the tests refuse a launch.
-      - `ok: true` → one line: "Autopilot's copy builds and passes your tests (<n> files copied,
-        setup ran)." Then, from `gates`, one line per gate: passed, or failed with its `tail`
-        (`couldNotRun` true: the command was not found in a plain shell). For each gate in
-        `gatesFailed` say plainly: "The verify step runs this gate and will most likely stop
-        on it", and what would fix it (a `setup` step, a `copy` file, or a fix in the
-        project). It is a warning; the owner decides whether to launch. Then run the item 1
-        preflight again and use its output: the clone now exists.
+      - `ok: true` → print nothing yet; the Step 2 screen says it in one line. For each gate
+        in `gatesFailed`, first try to fix it yourself (a `setup` step; a `copy` file through
+        item c) and prove again. One that still fails becomes one line under "Needs you" on
+        the Step 2 screen: "<what the check is, in plain words> does not pass in autopilot's
+        copy, so each epic's final check will probably stop for you", with the one thing that
+        would fix it. It is a warning, not a refusal. Then run the item 1 preflight again and
+        use its output: the clone now exists.
       - `failed: "copy"` → print `problems`. `failed: "setup"` or `"tests"` → print that step's
         `tail`; when its `couldNotRun` is true say plainly that the command was not found in a
         plain shell and the tests never ran, which is a missing tool or setup step and not a
         failing test. `failed: "leftovers"` → `leftovers` lists files that setup or the tests
         changed or created and git would commit; the fix is a different setup command or a
         `.gitignore` line.
-      - Diagnose from the output, go back to item b with a corrected entry, and prove again —
-        at most three rounds, each confirmed by the owner. A fix that belongs in the project is
+      - A failed proof is the one place the owner sees detail. Lead with one plain sentence
+        on what is wrong, then the output. Diagnose from it, go back to item b with a
+        corrected entry, save it and prove again — at most three rounds, without asking in
+        between unless the fix is a `copy` file or a project fix. A fix that belongs in the project is
         offered only where rule 1 allows it (the `**Tests:**` or `**Build:**` line, a
         `.gitignore` line): name the exact change and ask. Anything else — a test that truly
         fails on `<integration>`, code, another line — is the owner's: say exactly what to
@@ -228,35 +249,34 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         this session.
       - **Never launch while the proof fails.** The run would stop at its first test check.
 
-      If the owner chose `Skip`, still run the proof: with no entries it passes for a project
-      that needs nothing git ignores.
-
    e. **Probe the sandbox** — after the proof passes, and not in `dry-run` mode. The proof runs
       the tests in a plain shell. Build sessions run them inside a sandbox: no writes outside
       the copy, no network beyond `network`. Whether `dotnet`, `cargo`, `npm` or the project's
       own tools work in there is known only by trying, and a build that finds out costs an
       epic. The probe is one short real session (the `probe` budget: haiku, capped at
       `launch.config.budgets.probe.usd` dollars, usually a few cents), launched exactly as a
-      build is, that runs the test command once. It costs money, so ask first with
-      `AskUserQuestion`: "Run the sandbox probe? One short session runs your tests the way a
-      build session will, for a few cents." — options `Run the probe`, `Skip it`. Say first
-      where things stand, from `launch.env.prepared.lastProbe`: none yet; the last one failed;
-      it passed but `setup`, `readOnly`, `network` or the test command differ from its
-      `against` (so it no longer stands); or it passed against exactly these (say when).
-      On `Run the probe`: `DRIVER prepare --project "<root>" --probe`, fifteen-minute timeout.
-      - `probe.ran` false → say why (`probe.skipped`) and carry on.
-      - `probe.pass` true → one line: "Your tests also pass inside the build sandbox."
-      - Otherwise print `probe.why`, every line of `probe.denials` (what the referee refused)
-        and `probe.tail`. Diagnose from them. The usual causes: a tool writes outside the copy
-        (a cache or home directory — make `setup` or the `**Tests:**` line point it inside the
-        copy, or do the write in `setup`, which runs outside the sandbox); a tool reads a
-        directory that is not in `readOnly`; a tool needs a host that is not in `network`. Go
-        back to item b, confirm the change with the owner, prove and probe again — the same
-        three rounds. **Never launch while a probe that ran fails**: every build would fail the
-        same way. The session's files are under `<ws>/<probe.dir>`.
+      build is, that runs the test command once.
 
-6. **Readiness table.** One row per entry of `epics`, in the order given (phase and index order —
-   do not re-sort):
+      Run it without asking when no probe stands — `launch.env.prepared.lastProbe` is null,
+      did not pass, or its `against` differs from the current `setup`, `readOnly`, `network`
+      or test command — and skip it when one does. It is part of what the run needs, and it
+      costs far less than the epic it protects. Say one line first: "Trying your tests the
+      way a build session will run them (one short session, a few cents)…" Then
+      `DRIVER prepare --project "<root>" --probe`, with the same `--gate` flags and a
+      fifteen-minute timeout.
+      - `probe.ran` false, or `probe.pass` true → nothing to print.
+      - Otherwise lead with one plain sentence on what is wrong, then `probe.why`, every line
+        of `probe.denials` (what the referee refused) and `probe.tail`. The usual causes: a
+        tool writes outside the copy (a cache or home directory — make `setup` or the
+        `**Tests:**` line point it inside the copy, or do the write in `setup`, which runs
+        outside the sandbox); a tool reads a directory that is not in `readOnly`; a tool needs
+        a host that is not in `network`. Go back to item b, save the correction, prove and
+        probe again — the same three rounds. **Never launch while a probe that ran fails**:
+        every build would fail the same way. The session's files are under `<ws>/<probe.dir>`.
+
+6. **Readiness table** — worked out, not printed (Step 2 item 2 shows the part that runs
+   tonight; the whole table is given when the owner asks for details). One row per entry of
+   `epics`, in the order given (phase and index order — do not re-sort):
 
    | Column | Source |
    |---|---|
@@ -269,17 +289,15 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    itself going to run to a merge tonight (a dependency that is skipped, waits for a decision,
    parks, or builds and then parks). The driver will not start it; say which dependency holds it.
 
-7. **Scope and cost review.** For each epic that will run, look at `scopeFlags`. For every
-   requirement listed there, print its Scenario with
-   `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" text <TOR-ID>` and write **one plain
-   paragraph**: what its Given or Then needs that an unattended session does not have or should
-   not spend (network — sessions run with no network; keys or accounts; containers; big data;
-   a long run; another platform), what will most likely happen tonight (the build parks, or it
-   passes against a stand-in and the auditor parks it), and one recommendation: keep it, drop
-   the epic from tonight's queue, or fix the requirement by day with
-   `/peak-workflow:capture-requirements <TOR-ID>`. The flags are word matches, so say so when a
-   flag is a false alarm. If no epic has a flag, print one line: "No requirement in the queue
-   asks for network, keys, containers, big data, a long run or another platform."
+7. **Scope and cost review.** For each epic that will run, look at `scopeFlags`. The flags
+   are word matches and most are false alarms, so judge each one yourself: read the Scenario
+   (`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" text <TOR-ID>`) and decide whether its
+   Given or Then really needs something an unattended session lacks or should not spend
+   (network beyond `network`; real keys or accounts; containers; big data; a long real wait;
+   another platform). Print nothing for a false alarm, and no count of them. A real one is
+   one line under "Needs you" on the Step 2 screen: the epic's label, what it needs in plain
+   words, and what will happen ("will stop and wait for you"). Recommend dropping an epic
+   only when it cannot succeed tonight. The full review is given when asked.
 
 8. **Nothing runnable.** Before stopping, look at the skipped epics. If any is skipped only
    because its status is not `Not Started` or because it belongs to someone else (the two
@@ -309,11 +327,45 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    null, equals the proposed queue, or names an epic that cannot run tonight (say which, and
    propose the full queue). The owner still chooses; you do not pick.
 
-2. **Show the run**, as one block:
+2. **Show the run: one short screen.** This is everything Readiness and Confirm print when
+   nothing failed. Keep to this shape; leave out a part that has nothing to say.
 
-   - The queue, numbered, each with its dependencies. For an epic with a `gate`, say what
-     happens: "resumes at `<gate.enters>` on its branch — you answered "<gate.answer>"", or
-     "starts over" with the reason from `reasons`.
+   ```
+   ## Ready to run
+
+   **Tonight**
+   1. <label> — <continues where it stopped | runs | starts over | builds, then waits for you to look at it>
+   2. …
+
+   **Not tonight:** <n> epic(s) wait on #<k>, which needs you first.
+
+   **It stops** by <end time, as a clock time> or at $<run budget>, whichever comes first —
+   and at the first epic that needs you.
+
+   **Set up for you:** <one line: what item 5 saved, in plain words>. Autopilot's copy of your
+   project builds and passes your tests.
+
+   **Needs you:** <only when there is something: one line each>
+
+   Your project is not changed and nothing is pushed. Ask for "details" to see models and
+   limits, what autopilot answers for you, and the settings it uses.
+   ```
+
+   - "Tonight" is the proposed queue. Say what happens to each epic in a few plain words,
+     never a phase name: "continues where it stopped", not "resumes at BUILD".
+   - "It stops": with `launch.config.onPark` `continue`, the last clause is "an epic that needs
+     you is set aside and independent ones carry on".
+   - "Needs you" holds: a real scope risk (Step 1 item 7); a quality gate that does not pass
+     in the copy; modified tracked files that will not be part of the run; an end time too
+     near (when the time left is less than the `plan` + `build` + `verify` caps of one epic,
+     say "The end time is <time>, which may not be enough for even the first epic" — the
+     owner changes it with `Change the queue or limits`); a `claudeBin` other than `claude`
+     (sessions will not be real Claude Code sessions); a `workspaceBudgets` value that
+     overrides what the owner asked for. Nothing else.
+
+   **Details, only when the owner asks** (any of these, on request, not before):
+
+   - The queue with each epic's dependencies, and the full readiness table (Step 1 item 6).
    - **Safety caps** from `launch.caps`, under exactly that heading, with this sentence first:
      "A cap is where autopilot stops a step that has run away. It is a ceiling, not what a step
      usually takes or costs." Then a table with one row per entry — `plan`, `build`, `audit`,
@@ -338,22 +390,16 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      for you: <skillStep> — <why>". Add: every other question parks; the plan is approved by a
      lint, not by a person; an auditor reads each build and a high finding in
      `launch.config.audit.parkOn` parks it.
-   - **The copy's environment:** the `setup` command, the `copy` files and the `readOnly`
-     directories from `launch.env` (or "none needed") — for `readOnly`: "sessions may read
-     these and change nothing in them" — and that the copy passed the project's tests in
-     Step 1 item 5, and whether the sandbox probe passed, failed or was skipped. The
-     driver runs `setup` and the copy again at the start of the run and after each merge.
-   - **Network** (`launch.env.network`): with entries — "build sessions may download from
-     <hosts> and reach nothing else; the reviewer (auditor) has no network"; with none —
-     "sessions have no network; a build that needs a package it does not have parks".
+   - **The copy's environment:** the `setup` command, the `copy` files, the `readOnly`
+     directories and the `network` hosts from `launch.env`, what the copy starts without
+     (Step 1 item 5a), each quality gate and whether it passed in the copy, and the probe's
+     result. The settings file is the owner's to commit so teammates get the same setup.
    - Where it runs: the private clone at `<launch.clone>`, on `launch.integration`. The clone is
-     kept between runs. **Nothing is pushed.** The project directory is never written. Merged
-     work is fetched by hand in the morning.
-   - Anything in `launch.config` the owner would not expect: a `claudeBin` other than `claude`
-     (say plainly that sessions will not be real Claude Code sessions), any entry in
+     kept between runs. Merged work is fetched by hand in the morning.
+   - Anything else in `launch.config` the owner would not expect: any entry in
      `scope.allow` or `scope.lockfiles`, a `diskFloorGb` under 15, or a `timing` or `audit` key
-     in `<ws>/settings.json`. When `launch.settingsFileExists` is true, say that these come from
-     `<ws>/settings.json`, which applies to every run until the owner edits it.
+     in `<ws>/settings.json`, which applies to every run until the owner edits it.
+   - The scope review in full (Step 1 item 7), false alarms included.
 
 3. **Ask** with `AskUserQuestion`: "Launch autopilot on these <N> epics?" ("on this 1 epic?"
    for one) — options `Launch`,
