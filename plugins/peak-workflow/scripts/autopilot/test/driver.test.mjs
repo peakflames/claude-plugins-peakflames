@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -569,4 +569,57 @@ test('effort defaults by model family (haiku/sonnet high, opus/fable medium) and
 
   fs.writeFileSync(file, JSON.stringify({ budgets: { build: { effort: 'huge' } } }));
   assert.throws(() => loadConfig(p.state, { project: p.project }), /budgets\.build\.effort must be one of/);
+});
+
+test('real money: the owner\'s answer at launch reaches every build, repair and verify session; undecided, a session is told to ask', async (t) => {
+  for (const [realSpend, want, never] of [[true, /has approved spending real money on calls to outside services/, /Never skip\s+it silently/], [false, /has said not to spend real money/, /Make that call/], [undefined, /is the project's owner's decision, not\s+yours\. If a test or a check needs such a call to prove a requirement, ask with `AskUserQuestion`/, /Make that call/]]) {
+    const p = makeProject(t);
+    p.scenario(happy(E1));
+    const name = '20261113-120000';
+    fs.mkdirSync(path.join(p.state, 'runs', name), { recursive: true });
+    fs.writeFileSync(path.join(p.state, 'runs', name, 'config.json'), JSON.stringify({ project: p.project, queue: [E1.id], allowTestDouble: true, ...(realSpend === undefined ? {} : { realSpend }) }));
+    const state = await p.go({ run: name });
+    assert.equal(state.realSpend, realSpend ?? null);
+    for (const file of [p.dir(E1.id, 'build-1', 'build-rules.md'), p.dir(E1.id, 'verify-1', 'verify-rules.md')]) {
+      const text = fs.readFileSync(file, 'utf8');
+      assert.match(text, /# Calls that cost real money/);
+      assert.match(text, want, file); assert.doesNotMatch(text, never, file);
+      assert.match(text, /start its Bash `description` with `Needs you:`/);
+    }
+    const [, build, , verify] = p.calls();
+    assert.ok(build.argv.includes(p.dir(E1.id, 'build-1', 'build-rules.md')) && verify.argv.includes(p.dir(E1.id, 'verify-1', 'verify-rules.md')));
+    assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), realSpend === true ? /Real money on outside services: you allowed it when a check needs it\./ : realSpend === false ? /Real money on outside services: you said not to spend any/ : /Real money on outside services: not decided at launch/);
+    assert.equal(readJson(path.join(p.runDir(), 'config.json')).realSpend ?? null, realSpend ?? null);
+  }
+  assert.match(spendRule(true), /"Not proven for real"/);
+  assert.match(spendRule(false), /"Not proven for real"/);
+});
+
+test('not proven for real: a reviewer finding that never parks and the verifier\'s own "not run" lines reach the owner at the merge, in status and in the report', async (t) => {
+  const p = makeProject(t);
+  const findings = [
+    { category: 'never-ran-real', severity: 'medium', evidence: 'src/cost.js:10', explanation: 'The cost path is tested only against a fake written from the same guess; no real request was sent.' },
+    { category: 'claim-without-evidence', severity: 'low', evidence: 'handoff', explanation: 'The handoff counts 113 tests; the last run shows 112.' },
+  ];
+  const verdict = '## Verdict: PASS\n\n- **Live gateway:** signed in, tools listed.\n- **Not run:** a real synthesis, to avoid spending the shared credit.\n\n**Not proven for real**\n- The cost lookup: checked against the fake only\n- None of the rest\n\n**What changed**\n- docs only\n';
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: { result: { structured_output: { findings, recommend: 'proceed', summary: 'canned' } } }, [`${E1.id}/verify`]: { ...wrapupScript(E1), result: { total_cost_usd: 1.3, result: verdict } } });
+  await go(p);
+
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', 'nothing here parks: a medium finding and a note in a PASS report');
+  assert.deepEqual(e.unproven.map((u) => [u.source, u.text]), [
+    ['reviewer', findings[0].explanation],
+    ['verifier', 'a real synthesis, to avoid spending the shared credit.'],
+    ['verifier', 'The cost lookup: checked against the fake only'],
+  ]);
+  const events = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const merged = events.find((x) => x.type === 'merged');
+  assert.equal(merged.unproven, 3);
+  assert.equal(eventLine(merged), `Finished and merged: ${E1.id} — CSV import (under a minute, $2.01) — 3 things not proven for real`);
+  const status = JSON.parse(spawnSync(process.execPath, [DRIVER, 'status', '--project', p.project, '--json', '--queue', E1.id], { encoding: 'utf8' }).stdout);
+  assert.deepEqual(status.unproven.map((u) => [u.epic, u.source, u.text]), e.unproven.map((u) => [E1.id, u.source, u.text]));
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Not proven for real \(said by the reviewer or the verifier; nothing here stopped the epic\):\n- Reviewer F1: The cost path is tested only against a fake .*\n- Verifier: a real synthesis, to avoid spending the shared credit\.\n- Verifier: The cost lookup: checked against the fake only\n/);
+  // The wording the parser accepts, and what it leaves alone.
+  assert.deepEqual(unprovenLines('All good.\n- Not run - the soak test\n### Not proven for real\n1. Windows paths\n\n## Next\n- Not this\n'), ['the soak test', 'Windows paths']);
+  assert.deepEqual(unprovenLines('Verdict: PASS. Everything ran.'), []);
 });

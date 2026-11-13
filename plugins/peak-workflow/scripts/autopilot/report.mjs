@@ -86,7 +86,7 @@ export function collectReport(runDir) {
     return {
       id: q.id, label: q.label ?? q.id, outcome, reason: q.reason ?? null, evidence, checks, audit, gates: q.gates ?? [],
       costUsd: q.costUsd ?? 0, turns: q.turns ?? 0, wallMs: q.wallMs ?? 0, elapsedMs, sessions: q.sessions ?? [],
-      testChanges: q.testChanges ?? [], rejected: q.rejected ?? [], fixRounds: q.fixRounds ?? 0,
+      testChanges: q.testChanges ?? [], unproven: q.unproven ?? [], rejected: q.rejected ?? [], fixRounds: q.fixRounds ?? 0,
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
       resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
     };
@@ -105,7 +105,7 @@ export function collectReport(runDir) {
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, setupFailed: s.setupFailed ?? null,
-    driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
+    realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
   // Is the clone's integration tip already in the project? (null: cannot tell — no project, no clone.) Read-only.
   const git = (cwd, ...args) => { try { return spawnSync('git', args, { cwd, encoding: 'utf8' }); } catch { return { status: 1, stdout: '' }; } };
@@ -211,6 +211,8 @@ export function renderReport(r) {
   if (r.sync?.state === 'project-ahead') L.push(`At the start the clone's ${r.integration} was fast-forwarded to the project's (${String(r.sync.cloneTip).slice(0, 9)} → ${String(r.sync.projectTip).slice(0, 9)}).`);
   if (r.sync?.state === 'clone-ahead') L.push(`At the start the clone was ahead of the project by work not fetched yet; this run built on top of it: ${r.sync.waiting.join('; ')}.`);
 
+  L.push(`Real money on outside services: ${r.realSpend === true ? 'you allowed it when a check needs it' : r.realSpend === false ? 'you said not to spend any; what that left unproven is in each verify report under "Not proven for real"' : 'not decided at launch; a session that needs it asks you'}.`);
+
   L.push('', '## Do this next');
   if (r.next.length) r.next.forEach((n, i) => L.push(`${i + 1}. ${n}`)); else L.push('Nothing to do.');
 
@@ -273,6 +275,10 @@ export function renderReport(r) {
         if (g.decided?.observations?.length) L.push(`  Confirmed line by line: ${g.decided.observations.map((o) => `${o.answer} — ${o.clause}`).join('; ')}`);
         if (!g.decided?.used && !g.superseded && !g.cleared && g.resume) L.push(`  By hand instead: ${g.resume}`);
       }
+    }
+    if (e.unproven.length) {
+      L.push('', 'Not proven for real (said by the reviewer or the verifier; nothing here stopped the epic):');
+      for (const u of e.unproven) L.push(`- ${u.source === 'reviewer' ? `Reviewer${u.id ? ` ${u.id}` : ''}` : 'Verifier'}: ${cell(u.text)}`);
     }
     if (e.testChanges.length) {
       L.push('', 'Existing tests changed:');

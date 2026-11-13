@@ -65,6 +65,28 @@ export function plainReason(reason) {
   return table.find(([re]) => re.test(r))?.[1] ?? 'it needs you';
 }
 
+/** Reviewer findings that say the work was not exercised for real, whatever their severity. */
+export const UNPROVEN_CATEGORIES = ['never-ran-real', 'stand-in'];
+/**
+ * What a verifier's final report says it did not run or could not prove for real: the bullets under
+ * a "Not proven for real" heading, and any "Not run: …" line. Pure. The report is the session's own
+ * account, so this is quoted to the owner as the verifier's words, never as a finding of autopilot's.
+ */
+export function unprovenLines(text) {
+  const out = []; let under = false;
+  const clean = (l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\*\*/g, '').trim();
+  for (const raw of String(text ?? '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (/^(#+\s*|\*\*)?not proven for real\b[^\n]{0,6}$/i.test(line.replace(/\*\*\s*$/, ''))) { under = true; continue; }
+    const notRun = clean(line).match(/^not run\s*[:—–-]\s*(.+)$/i);
+    if (notRun) { out.push(notRun[1].trim()); continue; }
+    if (!under) continue;
+    if (/^(#+\s|\*\*[^*]+\*\*:?\s*$)/.test(line)) { under = false; continue; } // the next heading ends the section
+    if (/^(?:[-*•]|\d+[.)])\s+\S/.test(line) && !/^[-*•]?\s*(none|nothing)\b/i.test(clean(line))) out.push(clean(line));
+  }
+  return [...new Set(out)].map((t) => oneLine(t, 400));
+}
+
 /** Why a run ended, in plain words. */
 export function plainEnd(why) {
   const w = String(why ?? '');
@@ -104,7 +126,7 @@ export function eventLine(ev) {
     }
     case 'fix-round': return `${who} needs a repair: starting the one repair round`;
     case 'audit': return ev.parks ? `The independent reviewer found ${plural(ev.parks, 'serious problem')}` : ev.findings ? `The independent reviewer found ${plural(ev.findings, 'thing')} to note, none serious` : 'The independent reviewer found nothing';
-    case 'merged': return `Finished and merged: ${who} (${took(ev.minutes)}, ${usd(ev.costUsd)})`;
+    case 'merged': return `Finished and merged: ${who} (${took(ev.minutes)}, ${usd(ev.costUsd)})${ev.unproven ? ` — ${plural(ev.unproven, 'thing')} not proven for real` : ''}`;
     case 'parked':
       if (ev.question && ev.kind !== 'resume') return `Waiting for you: ${who} — ${oneLine(ev.question)}`;
       return `Stopped: ${who} — ${plainReason(ev.reason)}`;

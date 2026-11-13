@@ -247,6 +247,9 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     '`NEEDS YOU: …`', 'Relay it at once, as "Needs you now: <what>"', 'never guess beyond them', '**Say what an option asks of the owner.**',
     'means you must be at this computer in the next few minutes', 'That is a fact about the option, not a recommendation', '**Say what the answer does, and what the owner will see**',
     'The session that asked picks up where it was; it does not start the step over.',
+    // The owner decides about real money once, at launch; no session decides it silently.
+    '**Not proven for real:** <only when `unproven` has entries>', 'Never soften it, never leave one out, and never fold it into a count.',
+    '**Real money, asked in the same popup.**', '`Yes — when a check needs it (Recommended)`', '`No — never spend`', '"realSpend": true', 'Never write `true` unasked.',
   ]) assert.ok(flat.includes(rule), rule);
   // Every answer `driver.mjs status` can give has its row in Step 0.
   for (const next of ['attend', 'decide', 'continue', 'readiness', 'fetch', 'nothing']) assert.match(SKILL, new RegExp(`^\\| \`${next}\` \\| `, 'm'), next);
@@ -263,7 +266,7 @@ test('the loop, end to end: launch, a technical stop, status says continue, the 
   // Step 0 → readiness; Steps 1–3 as before, with the attended config: no end time, the standing answer.
   assert.equal(status().next, 'readiness');
   const pre = preflight(p, '--allow-test-double');
-  confirm(pre.launch, p.project, [E1.id], { allowTestDouble: true, endBy: null, autoContinue: 2 });
+  confirm(pre.launch, p.project, [E1.id], { allowTestDouble: true, endBy: null, autoContinue: 2, realSpend: true });
   await launchAndWait(pre.launch);
   // Step 3b's watch command, as SKILL.md words it, on the run that just ended.
   const watchLine = SKILL.split('\n').find((l) => l.includes('driver.mjs" watch ')).trim().replaceAll('${CLAUDE_PLUGIN_ROOT}', PLUGIN_DIR).replaceAll('<ws>', p.state).replaceAll('<run>', pre.launch.run);
@@ -280,7 +283,7 @@ test('the loop, end to end: launch, a technical stop, status says continue, the 
   assert.deepEqual(readJson(path.join(p.state, 'gates', `${E1.id}-1.json`)).decided, { answer: 'Resume from where it stopped', by: 'Todd Schavey', date: new Date().toISOString().slice(0, 10), scope: 'next-run', standing: true });
   const s2 = status('--queue', E1.id);
   assert.equal(s2.next, 'readiness');
-  assert.deepEqual([s2.relaunch.config.queue, s2.relaunch.config.continues, s2.relaunch.config.autoContinue, s2.relaunch.config.endBy], [[E1.id], pre.launch.run, 2, null]);
+  assert.deepEqual([s2.relaunch.config.queue, s2.relaunch.config.continues, s2.relaunch.config.autoContinue, s2.relaunch.config.endBy, s2.relaunch.config.realSpend, s2.realSpend], [[E1.id], pre.launch.run, 2, null, true, true]);
 
   // Step 3 item 5: relaunch.config written as given, the same launch line with the names status gave.
   p.scenario(happy(E1));

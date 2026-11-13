@@ -25,12 +25,12 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, snapshotLine, watch } from './attend.mjs';
+import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, snapshotLine, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
-export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, watch };
+export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, unprovenLines, watch };
 
 export const DRIVER_VERSION = '0.6.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -189,6 +189,7 @@ export function defaultConfig(project) {
     testDirs: facts.testDirs,
     endBy: nextEndBy(),
     runBudgetUsd: 80,
+    realSpend: null, // run-level, the owner's answer at launch: true = sessions may spend real money on an outside service when a check needs it; false = never; null = not decided, a session asks
     autoContinue: 0, // run-level: how many technical stops per epic the owner's standing answer continues without asking (0 = always ask)
     diskFloorGb: 15,
     growthCapMb: 1024,
@@ -273,7 +274,7 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   return cfg;
 }
 /** The keys that belong to one run; everything else is a workspace setting. */
-const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues'];
+const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues', 'realSpend'];
 const TEST_DOUBLE = (bin) => `claudeBin is ${bin}, not the real \`claude\`: a test double runs only when the run's config.json says "allowTestDouble": true (or --allow-test-double)`;
 
 // ---------------------------------------------------------------------------------------------
@@ -875,6 +876,32 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
   do. They are told at once. Give them time: a timeout of at least five minutes.
 `;
 
+/**
+ * What every session is told about spending real money on an outside service (a paid API called
+ * with the keys in the copy). It is the owner's decision, given at launch as the run's `realSpend`:
+ * `true` spend when a check needs it, `false` never, anything else not decided — then the session
+ * asks. Seen live: a verifier skipped the one real call "to avoid spending the shared credit",
+ * nobody was asked, and the epic merged proven only against a stand-in.
+ */
+export function spendRule(realSpend) {
+  const head = '\n# Calls that cost real money\n\n';
+  if (realSpend === true) return `${head}The project's owner has approved spending real money on calls to outside services (with the keys
+in this copy) when a test or a check needs one to prove a requirement. Make that call. Do not skip
+it to save money, and do not put a stand-in in its place. Keep it to the smallest call that proves
+the point, once. In your final report say what you called and roughly what it cost; if a real call
+could not be made (no key, the service refused), say that under the heading "Not proven for real".
+`;
+  if (realSpend === false) return `${head}The project's owner has said not to spend real money on calls to outside services in this run. Do
+not make one. In your final report list, under the heading "Not proven for real", each thing a
+real call would have proven and what it was checked against instead.
+`;
+  return `${head}Whether to spend real money on a call to an outside service is the project's owner's decision, not
+yours. If a test or a check needs such a call to prove a requirement, ask with \`AskUserQuestion\`:
+say what would be called, why a stand-in does not prove it, and roughly what it costs. Never skip
+it silently, and never decide it yourself.
+`;
+}
+
 /** Appended to every verify session: the one operational rule a verifier needs from autopilot. It says nothing about what to verify or how to judge it. */
 export const VERIFY_RULES = `# Autopilot session rules
 
@@ -1405,7 +1432,7 @@ class Run {
     if (e.state === 'MERGED') delete all[e.id];
     else {
       const brief = path.join(this.epicDir(e), 'fix-brief.md');
-      all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], fixBrief: exists(brief) ? read(brief) : null };
+      all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], unproven: e.unproven ?? [], fixBrief: exists(brief) ? read(brief) : null };
     }
     writeJson(path.join(this.stateDir, 'epics.json'), all);
   }
@@ -1430,7 +1457,7 @@ class Run {
       // The question the owner will be asked, when this run wrote one for the epic.
       const name = (e.gates ?? []).at(-1); const g = name ? tryJson(this.gatePath(name)) : null;
       this.event(type, e, { reason, ...(g && !g.decided ? { gate: `gates/${name}`, kind: g.kind ?? null, question: (g.options ?? []).length ? g.question ?? null : null } : {}) });
-    } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0 } : {}) });
+    } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0, ...((e.unproven ?? []).length ? { unproven: e.unproven.length } : {}) } : {}) });
     return null;
   }
   park(e, reason) { try { this.wipCommit(e); } catch (err) { this.log(`${e.id}: could not commit uncommitted work: ${err.message}`); } return this.finish(e, 'PARKED', reason); }
@@ -1461,6 +1488,12 @@ class Run {
       this.log(`${e.id}: ${name} left ${left.length} process(es) running in the clone; stopped: ${left.map((p) => `${p.pid} ${p.command.slice(0, 120)}`).join(' | ')}`);
     } catch (err) { this.log(`${e.id}: could not check for processes ${name} left behind: ${err.message}`); }
     return left.map((p) => `${p.pid} ${p.command.slice(0, 200)}`);
+  }
+
+  /** Adds to what this epic leaves not proven for real (a reviewer's finding, a verifier's own "not run"), once each. */
+  unproven(e, items) {
+    e.unproven = e.unproven ?? [];
+    for (const it of items) if (it.text && !e.unproven.some((x) => x.source === it.source && x.text === it.text)) e.unproven.push(it);
   }
 
   // ---- one session -----------------------------------------------------------------------------
@@ -1654,7 +1687,7 @@ class Run {
     const s = await this.step(e, fix ? 'fix' : 'build', (stepDir) => {
       (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir), ...(continuing ? { continues: e.continuing } : {}) }); // what the next audit reads, in this run or a later one
       fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? (continuing ? CONTINUE_LEAD : '') + fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir, { continuing }));
-      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), fix ? FIX_RULES : BUILD_RULES);
+      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend));
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
     });
     if (s) e.continuing = null; // it ended by itself: what follows is judged like any build
@@ -1813,6 +1846,9 @@ class Run {
     this.save();
     this.log(`${e.id}: ${s.name} — ${judged.findings.length} finding(s), ${judged.parks.length} that park; the auditor recommends ${judged.recommend} (no effect)`);
     this.event('audit', e, { step: s.name, findings: judged.findings.length, parks: judged.parks.length });
+    // A finding that the work never ran for real is told to the owner whether or not it parks: seen live, a medium
+    // one ("the cost path is tested only against a fake built on the same guess") reached them as "none serious".
+    this.unproven(e, judged.findings.filter((f) => UNPROVEN_CATEGORIES.includes(f.category)).map((f) => ({ source: 'reviewer', step: s.name, id: f.id, severity: f.severity, text: String(f.explanation ?? '').replace(/\s+/g, ' ').trim() })));
 
     if (judged.parks.length) {
       const list = judged.parks.map((f) => `${f.id} ${f.category}`).join(', ');
@@ -1933,7 +1969,7 @@ class Run {
     this.save();
     const s = await this.step(e, 'verify', (stepDir) => {
       const rules = path.join(stepDir, 'verify-rules.md');
-      fs.writeFileSync(rules, VERIFY_RULES);
+      fs.writeFileSync(rules, VERIFY_RULES + spendRule(this.config.realSpend));
       if (!e.look) return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [rules] };
       // The owner already looked (a decided human-check gate). The verifier gets their recorded
       // observation up front, so wrapup Step 1.2 item 7 records it instead of asking a person who is
@@ -1943,6 +1979,8 @@ class Run {
       return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [file, rules] };
     });
     if (!s) return null;
+    this.unproven(e, unprovenLines(s.result?.result).map((text) => ({ source: 'verifier', step: s.name, text })));
+    this.save();
     if (this.integrationSha() !== e.preVerify.developSha) return 'CHECK_VERIFY';
     // No merge and no gate: the verdict was FAIL (policy answers "Stop — epic FAILs").
     const verdict = (s.result?.result ?? '').trim() || '(the verify session gave no result text)';
@@ -2175,7 +2213,7 @@ class Run {
       const to = resumePhase(this.stateDir, g, phase);
       const fixBrief = rec.fixBrief ?? null;
       if (to !== phase && (to === 'BUILD' ? rec.plan && exists(path.join(this.stateDir, rec.plan)) : fixBrief)) { phase = to; e.continuing = (rec.buildSteps ?? []).at(-1)?.name ?? 'an earlier session'; }
-      Object.assign(e, { fixRounds: rec.fixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [] });
+      Object.assign(e, { fixRounds: rec.fixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [], unproven: (rec.unproven ?? []).filter((u) => u.source !== 'verifier') }); // a verifier's "not run" is of that verify session; the next one says its own
       if (rec.fixBrief) fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'), rec.fixBrief);
       e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null };
       this.supersedeGates(e, f.gate);
@@ -2313,7 +2351,7 @@ class Run {
         this.state.status = 'running'; this.state.stoppedBecause = null;
         this.log(`resuming run ${this.runName}`);
       } else {
-        this.state = { run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, sync, queue: [] };
+        this.state = { realSpend: typeof cfg.realSpend === 'boolean' ? cfg.realSpend : null, run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, sync, queue: [] };
       }
 
       // Preflight reads the integration line, so the clone must be on it.
@@ -2611,6 +2649,8 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const inFlight = active ? openCommand(path.join(runDir, 'epics', active.id, active.step.name, 'hooks.jsonl')) : null;
   const epics = (state?.queue ?? []).map((q) => ({ id: q.id, label: q.label ?? q.id, state: q.state, step: q.step?.name ?? null, minutes: Math.round((q.wallMs ?? 0) / 60000) + (q.step?.startedAt ? Math.max(0, Math.round((Date.now() - Date.parse(q.step.startedAt)) / 60000)) : 0), costUsd: q.costUsd ?? 0 }));
   const merged = new Map(chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').map((q) => [q.id, q.label ?? q.id])));
+  // What the merged work leaves not proven for real: the reviewer's findings of that kind and the verifier's own "not run" lines.
+  const unproven = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, text: u.text }))));
 
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
   const gates = [...readGates(ws), ...(pid ? [] : missingResumeGates(ws).map((m) => ({ file: `gates/${m.name}`, ...m.gate })))];
@@ -2621,9 +2661,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
 
   const out = {
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
-    epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n,
+    epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
-    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };
@@ -2672,7 +2712,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     if (ids.some((id) => ['resume', 'fresh'].includes(byId.get(id).gate?.state)) && !limit) {
       out.relaunch = {
         run: launch.run, runDir: launch.runDir,
-        config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
+        config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(typeof lastCfg.realSpend === 'boolean' ? { realSpend: lastCfg.realSpend } : {}), ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
       };
     }
   }
