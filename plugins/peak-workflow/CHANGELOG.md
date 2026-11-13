@@ -19,6 +19,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot drafts its own setup** — the skill works out `setup` and `copy` from how the project
   is built and tested, saves them through `driver.mjs configure` on the owner's confirmation, and
   never launches while the proof fails.
+- **Autopilot read-only directories** — `readOnly` in the project's `autopilot.json` names
+  directories outside the clone (a dependency cache such as `~/.nuget/packages`) that sessions may
+  read and never write; `driver.mjs configure --read-only` saves it and refuses broad or private paths.
 - **Autopilot plan lint accepts shorthand anchors** — a plan that writes the prefix once and then bare
   seven-character suffixes (`TOR-03-Vaata1w, nt9zDad`) names those requirements; it no longer parks.
 - **Autopilot missing-command message** — a test or setup command the shell cannot find (exit 126

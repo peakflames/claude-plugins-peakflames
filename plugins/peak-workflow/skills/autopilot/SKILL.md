@@ -18,8 +18,8 @@ work yourself.
 
 **Four things this skill never does.** They hold in every mode, whatever the user says mid-skill:
 
-1. **It never edits project code** — or any file in the project, with one exception: the `setup`
-   and `copy` entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
+1. **It never edits project code** — or any file in the project, with one exception: the `setup`,
+   `copy` and `readOnly` entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
    `DRIVER configure` after the owner confirms them (Step 1 item 5). Otherwise it writes only
    inside the workspace (a sibling of the project): the new run's `config.json`, through the
    driver a gate's recorded answer, and through `DRIVER prepare` the private clone.
@@ -107,10 +107,12 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 5. **Make the copy able to build and test.** Autopilot works in a private copy of the project
    (the clone), and a clone holds only what git carries. Everything git ignores — installed
    dependencies, a virtual environment, a `.env`, local data — is missing from it unless the
-   project says how to get it there. Two entries in `launch.projectSettingsFile` say so:
+   project says how to get it there. Three entries in `launch.projectSettingsFile` say so:
    `setup`, one shell command the driver runs in the clone before each run's first test check
-   (with network), and `copy`, the git-ignored files it copies in from the project each run.
-   Skip this item when no epic is runnable.
+   (with network); `copy`, the git-ignored files it copies in from the project each run; and
+   `readOnly`, directories outside the clone that sessions may read and never write (a
+   dependency cache the build tools keep in the home directory). Skip this item when no epic is
+   runnable.
 
    a. **Show what the copy starts without.** From `launch.env.ignored` (each entry has `path` and
       `status`), under "In your project, but not in autopilot's copy": one line per entry, in
@@ -118,7 +120,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       → "not carried over". Fold build output and caches (`bin/`, `obj/`, `target/`, `dist/`,
       `__pycache__/`) into one line with a count. If the list is empty, say so in one line.
 
-   b. **Work out the two entries** when either is missing, or when the proof in item d fails.
+   b. **Work out the entries** when any is missing, or when the proof in item d fails.
       Learn it from how the project is really built and tested without autopilot: read
       `CLAUDE.md` (prerequisites, the `**Tests:**` and `**Run:**` lines, and every quality gate
       `/peak-workflow:wrapup-epic` will run), the README, the manifests and lockfiles, the build
@@ -131,22 +133,33 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       - `copy` lists only ignored files that cannot be rebuilt and that the tests or quality
         gates read: a `.env`, a local configuration file. Never a dependency directory or build
         output; never large data unless a test needs it.
+      - `readOnly` lists the dependency caches the stack reads from outside the project. A
+        session may otherwise read nothing outside the clone, so a build that opens a package's
+        files there is refused. Draft it from the stack, and list only directories that exist
+        (`ls -d`): .NET → `~/.nuget/packages`; Rust → `~/.cargo/registry`; Go → the output of
+        `go env GOMODCACHE`; Java → `~/.m2/repository` (Gradle: `~/.gradle/caches`). Node and
+        Python projects keep their packages inside the clone and need none. Never the home
+        directory, a whole folder of it, or anywhere credentials live: the driver refuses those.
       - A `**Tests:**` line that names a shell alias or an activated environment (`python` for
         `python3`, a bare tool that lives in `.venv/bin`) cannot run unattended. Say which line
         and what it should say; the owner changes and commits it, you do not.
 
-   c. **Confirm, then save.** Show the two entries exactly as they will be saved, and for each
+   c. **Confirm, then save.** Show the entries exactly as they will be saved; for each
       `copy` file one sentence: "The build sessions can read this file. They have no network, so
-      it cannot leave this machine, and git ignores it, so it is never committed." Ask with
+      it cannot leave this machine, and git ignores it, so it is never committed."; and for each
+      `readOnly` directory: "The build sessions can read everything in this directory and can
+      change nothing in it." Ask with
       `AskUserQuestion`: "Save these so autopilot's copy can build and test?" — options
       `Save these`, `Change them`, `Skip — leave the copy as it is`. On save:
 
       ```bash
-      node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --setup '<command>' --copy <path>,<path>
+      node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --setup '<command>' --copy <path>,<path> --read-only <dir>,<dir>
       ```
 
-      It keeps the file's other keys and refuses a `copy` path that is missing or that git does
-      not ignore. Never write that file any other way, and do not commit it: the driver reads it
+      Pass only the flags for entries that change; an empty value removes an entry. It keeps
+      the file's other keys, refuses a `copy` path that is missing or that git does not ignore,
+      and refuses a `readOnly` directory that is missing, too broad, private, or overlaps the
+      project. Never write that file any other way, and do not commit it: the driver reads it
       from the project as it is. Say once that the file is the owner's to commit so teammates
       get the same setup.
 
@@ -244,8 +257,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      for you: <skillStep> — <why>". Add: every other question parks; the plan is approved by a
      lint, not by a person; an auditor reads each build and a high finding in
      `launch.config.audit.parkOn` parks it.
-   - **The copy's environment:** the `setup` command and the `copy` files from `launch.env`
-     (or "none needed"), and that the copy passed the project's tests in Step 1 item 5. The
+   - **The copy's environment:** the `setup` command, the `copy` files and the `readOnly`
+     directories from `launch.env` (or "none needed") — for `readOnly`: "sessions may read
+     these and change nothing in them" — and that the copy passed the project's tests in
+     Step 1 item 5. The
      driver runs `setup` and the copy again at the start of the run and after each merge; a
      session that adds a new dependency has no network to fetch it, and parks.
    - Where it runs: the private clone at `<launch.clone>`, on `launch.integration`. The clone is
@@ -516,4 +531,4 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `runs/<run>/report.md`, `report.json`, `autopilot.log` | The morning report and the driver's log |
 | `lock`, `STOP` | The single-instance lock and the kill switch, one per workspace |
 | `prepare.json` | The latest proof from Step 1 item 5: what was copied, how `setup` and the tests ended |
-| `<project>/.claude/peak-workflow/autopilot.json` | The owner's project settings, such as `"onPark": "continue"`. Autopilot writes only its `setup` and `copy` entries, through `driver.mjs configure`, after the owner confirms them |
+| `<project>/.claude/peak-workflow/autopilot.json` | The owner's project settings, such as `"onPark": "continue"`. Autopilot writes only its `setup`, `copy` and `readOnly` entries, through `driver.mjs configure`, after the owner confirms them |

@@ -18,6 +18,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -27,7 +28,7 @@ import { writeReport } from './report.mjs';
 
 export { ANSWERS, gateEntry, lintPlan, parseSidecar };
 
-export const DRIVER_VERSION = '0.4.0';
+export const DRIVER_VERSION = '0.5.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PLUGIN_DIR = path.resolve(HERE, '..', '..');
 
@@ -156,6 +157,7 @@ export function defaultConfig(project) {
     growthCapMb: 1024,
     onPark: 'stop', // 'stop': the first epic that parks or fails ends the run; 'continue': independent epics still run
     setup: null, // one shell command that rebuilds, in the clone, what git does not carry (a venv, node_modules); run with network
+    readOnly: [], // directories outside the clone that sessions may read and never write: a dependency cache (~/.nuget/packages, ~/.cargo/registry)
     copy: [], // git-ignored files copied from the project into the clone at each run (a .env): what cannot be rebuilt
     claudeBin: 'claude',
     allowTestDouble: false, // run-level: never inherited from settings.json by accident (a rehearsal's fake binary)
@@ -426,13 +428,43 @@ export function envFacts(project, workspace, config) {
     const copied = copy.some((c) => rel === c || rel.startsWith(`${c}/`) || c.startsWith(`${rel}/`));
     return { path: p, dir: p.endsWith('/'), status: copied ? 'copied' : exists(path.join(clone, rel)) ? 'present' : 'absent' };
   });
-  return { setup: config.setup ?? null, copy, problems: copyProblems(project, config.copy), ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
+  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace })], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
 }
+/** `~`-expanded, absolute, symlinks resolved where the path exists. */
+const expandHome = (p) => { const x = path.resolve(String(p).trim().replace(/^~(?=\/|$)/, os.homedir())); try { return fs.realpathSync(x); } catch { return x; } };
+const insideOrSame = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
+/** Where a session must never read, whatever a project lists: credentials, and Claude Code's own files. */
+const NEVER_READ = ['.ssh', '.aws', '.gnupg', '.azure', '.kube', '.docker', '.netrc', '.npmrc', '.pypirc', '.git-credentials', '.config', '.claude', 'Library'];
+/**
+ * Why a `readOnly` list cannot be used. An entry is a directory outside the clone that sessions may
+ * read: it must be absolute (or start with `~/`), exist, and be narrow — not `/`, not the home
+ * directory or anything above it, not a credentials directory, not the project or the workspace.
+ */
+export function readOnlyProblems(list, { project = null, workspace = null } = {}) {
+  if (list === undefined || list === null) return [];
+  if (!Array.isArray(list)) return ['`readOnly` must be a list of directories'];
+  const home = expandHome('~');
+  const out = [];
+  for (const entry of list) {
+    const raw = typeof entry === 'string' ? entry.trim() : '';
+    if (!raw || !(raw.startsWith('~/') || path.isAbsolute(raw))) { out.push(`readOnly: ${JSON.stringify(entry)} must be an absolute path or start with ~/`); continue; }
+    const p = expandHome(raw);
+    if (!exists(p) || !fs.statSync(p).isDirectory()) { out.push(`readOnly: ${raw} is not an existing directory`); continue; }
+    if (insideOrSame(home, p)) { out.push(`readOnly: ${raw} is the home directory or above it; name the one directory sessions need`); continue; }
+    if (NEVER_READ.some((d) => insideOrSame(p, path.join(home, d)))) { out.push(`readOnly: ${raw} is where credentials or private settings live; it is never readable by a session`); continue; }
+    if (insideOrSame(p, home) && path.relative(home, p).split(path.sep).length < 2 && !path.basename(p).startsWith('.')) { out.push(`readOnly: ${raw} is a whole folder of your home directory; name the dependency directory inside it`); continue; }
+    for (const [name, dir] of [['the project', project], ['the autopilot workspace', workspace]]) if (dir && (insideOrSame(p, expandHome(dir)) || insideOrSame(expandHome(dir), p))) out.push(`readOnly: ${raw} overlaps ${name}`);
+  }
+  return out;
+}
+/** The `readOnly` list as the referee uses it: resolved absolute paths. */
+export const resolveReadOnly = (list) => (Array.isArray(list) ? list : []).filter((e) => typeof e === 'string' && e.trim()).map(expandHome);
+
 /** A shell's "command not found" (127) or "cannot execute" (126): the command never ran, which is not a failing test. */
 export const couldNotRun = (code) => code === 127 || code === 126;
 
-/** Writes `setup` and `copy` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
-export function configureProject(project, { setup, copy } = {}) {
+/** Writes `setup`, `copy` and `readOnly` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
+export function configureProject(project, { setup, copy, readOnly } = {}) {
   const file = projectSettingsFile(project);
   let j = {};
   if (exists(file)) { try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); } }
@@ -442,6 +474,12 @@ export function configureProject(project, { setup, copy } = {}) {
     const bad = copyProblems(project, list);
     if (bad.length) throw new Error(bad.join('; '));
     if (list.length) j.copy = list; else delete j.copy;
+  }
+  if (readOnly !== undefined) {
+    const list = [...new Set(readOnly.map((c) => String(c).trim()).filter(Boolean))];
+    const bad = readOnlyProblems(list, { project, workspace: `${project}.autopilot` });
+    if (bad.length) throw new Error(bad.join('; '));
+    if (list.length) j.readOnly = list; else delete j.readOnly;
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeJson(file, j);
@@ -726,7 +764,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`When an epic parks: ${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set in ${projectSettingsFile(project)}`);
-  p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}`);
+  p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}`);
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
 
@@ -1856,7 +1894,12 @@ class Run {
         // Epics already in the run keep the eligibility they started with; their sidecars have moved since.
         for (const q of this.state.queue) { const m = this.metaById.get(q.id); if (m && q.state !== 'QUEUED') { m.eligibility = 'eligible'; m.reasons = []; } }
       }
+      // What sessions may read outside the clone, resolved once per launch: the referee reads it from state.json.
+      const badRead = readOnlyProblems(cfg.readOnly, { project: cfg.project, workspace: this.stateDir });
+      if (badRead.length) throw new Error(badRead.join('; '));
+      this.state.readOnly = resolveReadOnly(cfg.readOnly);
       this.save();
+      if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
 
       if (!this.pre.ok) this.stopReason = `preflight: ${this.pre.refuse.join('; ')}`;
@@ -2064,7 +2107,7 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
   const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
@@ -2097,8 +2140,8 @@ async function main(argv) {
   }
   if (cmd === 'configure') {
     if (!o.project) throw new Error('configure needs --project');
-    if (o.setup === undefined && o.copy === undefined) throw new Error('configure needs --setup or --copy (an empty value removes the entry)');
-    console.log(JSON.stringify(configureProject(path.resolve(o.project), { setup: o.setup, copy: o.copy === undefined ? undefined : String(o.copy).split(',') }), null, 2));
+    if (o.setup === undefined && o.copy === undefined && o.readOnly === undefined) throw new Error('configure needs --setup, --copy or --read-only (an empty value removes the entry)');
+    console.log(JSON.stringify(configureProject(path.resolve(o.project), { setup: o.setup, copy: o.copy === undefined ? undefined : String(o.copy).split(','), readOnly: o.readOnly === undefined ? undefined : String(o.readOnly).split(',') }), null, 2));
     return 0;
   }
   if (cmd === 'run') {

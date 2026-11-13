@@ -75,6 +75,8 @@ function classify(ctx, raw, { bash = false } = {}) {
   } else if (within(p, ctx.clone)) return 'rw';
   if (ctx.temp.some((t) => within(p, t))) return ctx.role === 'auditor' ? 'ro' : 'rw';
   if (within(p, ctx.state)) return `${raw} is inside the autopilot workspace`;
+  // The project's declared read-only directories (a dependency cache outside the clone), resolved by the driver at launch.
+  if ((ctx.run.readOnly ?? []).some((d) => typeof d === 'string' && d && within(p, d))) return 'ro';
   if (within(p, path.join(ctx.home, '.claude', 'plans'))) return ctx.role === 'auditor' ? 'ro' : 'rw';
   if (within(p, PLUGIN_DIR)) return 'ro';
   const claude = path.join(ctx.home, '.claude');
@@ -141,6 +143,11 @@ function ruleR2Bash(ctx, segs, command) {
         if (first !== '/' && !fs.existsSync(first)) continue;
       }
       const d = check(p, 'path in command'); if (d) return d;
+    }
+    // A declared read-only directory is read by commands and never written: a redirect into it is refused here (the sandbox refuses the rest).
+    for (const r of s.redirects) {
+      const p = realDeep(path.resolve(ctx.cwd, r.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home)));
+      if ((ctx.run.readOnly ?? []).some((d) => typeof d === 'string' && d && within(p, d))) return deny('R2', `path jail — ${r} is read-only for this session`);
     }
   }
   return null;

@@ -114,6 +114,27 @@ test('R2 path jail: Bash absolute paths, cd targets and git -C are checked (best
   denied(h.bash(`echo hi > ${h.project}/x.txt`), 'R2');
 });
 
+test('R2 declared read-only directories: Read, Grep and Bash may read them, nothing writes them, and an undeclared directory stays denied', (t) => {
+  const h = referee(t);
+  const cache = path.join(h.tmp, 'cache'); const other = path.join(h.tmp, 'other');
+  for (const d of [cache, other]) { fs.mkdirSync(path.join(d, 'pkg'), { recursive: true }); fs.writeFileSync(path.join(d, 'pkg', 'lib.txt'), 'x'); }
+  denied(h.pre('Read', { file_path: path.join(cache, 'pkg', 'lib.txt') }), 'R2', /outside the private clone/); // not declared yet
+  const stateFile = path.join(h.runDir, 'state.json');
+  fs.writeFileSync(stateFile, JSON.stringify({ ...readJson(stateFile), readOnly: [cache] }));
+  passes(h.pre('Read', { file_path: path.join(cache, 'pkg', 'lib.txt') }), 'read');
+  passes(h.pre('Grep', { pattern: 'x', path: cache }), 'grep');
+  passes(h.pre('Glob', { pattern: '**/*', path: cache }), 'glob');
+  passes(h.bash(`ls ${cache}/pkg && cat ${cache}/pkg/lib.txt`), 'bash read');
+  denied(h.pre('Write', { file_path: path.join(cache, 'pkg', 'new.txt'), content: 'x' }), 'R2', /read-only/);
+  denied(h.pre('Edit', { file_path: path.join(cache, 'pkg', 'lib.txt'), old_string: 'x', new_string: 'y' }), 'R2', /read-only/);
+  denied(h.bash(`echo hi > ${cache}/pkg/new.txt`), 'R2', /read-only/);
+  denied(h.pre('Read', { file_path: path.join(other, 'pkg', 'lib.txt') }), 'R2', /outside the private clone/);
+  denied(h.bash(`cat ${other}/pkg/lib.txt`), 'R2');
+  // A link inside a declared directory that leads out of it is resolved first.
+  fs.symlinkSync(other, path.join(cache, 'link'));
+  denied(h.pre('Read', { file_path: path.join(cache, 'link', 'pkg', 'lib.txt') }), 'R2', /outside the private clone/);
+});
+
 test('R2 auditor: reads the bundle and the clone, and nothing else is allowed', (t) => {
   const h = referee(t, { role: 'auditor' });
   fs.mkdirSync(path.join(h.step, 'bundle'));

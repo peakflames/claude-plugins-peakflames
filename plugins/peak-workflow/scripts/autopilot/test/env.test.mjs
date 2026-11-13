@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { DRIVER, E1, git, happy, makeProject, readJson } from './helpers.mjs';
@@ -120,4 +121,51 @@ test('base red from a missing command: the report says the tests never ran', asy
   const report = readJson(path.join(p.runDir(), 'report.json'));
   assert.match(report.tldr.join('\n'), /could not be run in autopilot's private copy .*The tests never ran/);
   assert.ok(!/already failing/.test(report.tldr.join('\n')));
+});
+
+test('configure --read-only accepts a narrow directory outside the project and refuses a broad, private or overlapping one', (t) => {
+  const p = makeProject(t);
+  const cache = path.join(p.tmp, 'cache'); fs.mkdirSync(cache);
+  const refuse = (value, re) => { const r = driver('configure', '--project', p.project, '--read-only', value); assert.equal(r.status, 2, value); assert.match(r.stderr, re, value); };
+  refuse('/', /home directory or above it/);
+  refuse('~/', /home directory or above it/);
+  refuse(path.dirname(os.homedir()), /home directory or above it/);
+  refuse('cache', /must be an absolute path or start with ~\//);
+  refuse(path.join(p.tmp, 'missing'), /not an existing directory/);
+  refuse(path.join(p.project, 'src'), /overlaps the project/);
+  refuse(p.tmp, /overlaps the project/);
+  refuse(p.state, /overlaps the autopilot workspace/);
+  for (const d of ['.ssh', '.claude', '.config']) if (fs.existsSync(path.join(os.homedir(), d))) refuse(`~/${d}`, /credentials or private settings/);
+  assert.ok(!fs.existsSync(settingsFile(p)), 'a refused list writes nothing');
+
+  const ok = driver('configure', '--project', p.project, '--read-only', `${cache},${cache}`);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.deepEqual(readJson(settingsFile(p)), { readOnly: [cache] });
+  const env = driver('preflight', '--project', p.project, '--json').json().launch.env;
+  assert.deepEqual([env.readOnly, env.problems], [[cache], []]);
+  const dry = driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout;
+  assert.ok(dry.includes(`readable outside the clone: ${cache}`), dry.split('\n').find((l) => l.startsWith('Clone environment')));
+  driver('configure', '--project', p.project, '--read-only', '');
+  assert.deepEqual(readJson(settingsFile(p)), {});
+});
+
+test('a run hands the declared directories to the referee: a build session reads the cache and is denied a write to it', async (t) => {
+  const p = makeProject(t);
+  const cache = path.join(p.tmp, 'cache'); fs.mkdirSync(cache); fs.writeFileSync(path.join(cache, 'lib.txt'), 'x');
+  driver('configure', '--project', p.project, '--read-only', cache);
+  const s = happy(E1);
+  s[`${E1.id}/build`].actions.unshift({ do: 'tool', tool_name: 'Read', tool_input: { file_path: path.join(cache, 'lib.txt') } }, { do: 'tool', tool_name: 'Write', tool_input: { file_path: path.join(cache, 'new.txt'), content: 'x' } });
+  p.scenario(s);
+  const state = await p.go();
+  assert.deepEqual(state.readOnly, [cache]);
+  assert.equal(state.queue[0].state, 'MERGED', JSON.stringify(state.queue[0]));
+  const tools = fs.readFileSync(p.dir(E1.id, 'build-1', 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(tools[0].out, null, 'the read is not the referee\'s business');
+  assert.match(tools[1].out.hookSpecificOutput.permissionDecisionReason, /read-only for this session/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /sessions may read \(never write\): /);
+
+  // A directory that has gone since it was saved refuses the launch rather than running without it.
+  fs.rmSync(cache, { recursive: true });
+  const pre = driver('preflight', '--project', p.project, '--json', '--allow-test-double').json();
+  assert.ok(pre.launch.refuse.some((r) => /is not an existing directory/.test(r)), JSON.stringify(pre.launch.refuse));
 });
