@@ -421,6 +421,9 @@ test('plan lint keys on headings and anchors, and refuses push, sudo and contain
   assert.deepEqual(lintPlan(planText(E1, { omit: ['branch'] }), E1.tors).problems, ['missing "Create (or verify) feature branch"']);
   assert.deepEqual(lintPlan(planText(E1, { omit: ['status', 'mark'] }), E1.tors).problems, ['missing "Update status to "In Progress""', 'missing "Mark as Implemented"']);
   assert.deepEqual(lintPlan(planText(E1), [...E1.tors, 'TOR-09-Missing']).problems, ['does not name anchor TOR-09-Missing']);
+  // Shorthand seen on a real 27-anchor plan: the prefix once, then bare suffixes. A suffix inside a longer word does not count.
+  const shorthand = planText(E1).replaceAll(E1.tors[1], E1.tors[1].split('-').at(-1)).replaceAll(E1.tors[2], `x${E1.tors[2].split('-').at(-1)}`);
+  assert.deepEqual(lintPlan(shorthand, E1.tors).problems, [`does not name anchor ${E1.tors[2]}`]);
   assert.deepEqual(lintPlan(planText(E1) + '\nThen run `git push origin develop` and `sudo make install` and `docker run x`.\n', E1.tors).problems, ['contains git push', 'contains sudo', 'contains a container or VM command']);
   assert.equal(lintPlan(planText(E1, { omit: ['commit'] }), E1.tors).pass, false);
 });
