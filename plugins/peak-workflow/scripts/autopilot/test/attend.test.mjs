@@ -7,7 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, ensureResumeGates, gateReason, newRunName, standingCovers } from '../driver.mjs';
+import { ANSWERS, ensureResumeGates, gateReason, newRunName, standingCovers, strayProcesses } from '../driver.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, lines: () => r.stdout.trim().split('\n'), json: () => JSON.parse(r.stdout) }; };
@@ -292,4 +292,60 @@ test('status.next: readiness when the only epics left are ones the owner could q
   const s = st(p);
   assert.deepEqual([s.next, s.why], ['readiness', '1 epic(s) can be queued explicitly']);
   assert.equal(st(p, '--queue', 'Lg9None').next, 'nothing');
+});
+
+// ---- inside a step: a command that waits for the owner, and what a session leaves running --------
+
+test('watch and status see inside the step: a command marked "Needs you:" is said at once, a long one once; neither is a guess', async (t) => {
+  const p = makeProject(t);
+  const pre = (id, description) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), hook: 'PreToolUse', tool_name: 'Bash', decision: 'pass', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description } })}\n` });
+  const post = (id) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), hook: 'PostToolUse', tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'x' } })}\n` });
+  const mark = (name) => ({ do: 'write', path: `{{state}}/${name}`, content: '' });
+  const until = (name) => ({ do: 'exec', cmd: `while [ ! -f "{{state}}/${name}" ]; do sleep 0.05; done` });
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [pre('t1', 'Run the unit tests'), mark('at-1'), until('go-1'), post('t1'), pre('t2', 'Needs you: sign in to Okta in the browser window that opens'), mark('at-2'), until('go-2'), post('t2'), ...wrapupScript(E1).actions], result: { result: 'Verdict: PASS', total_cost_usd: 1.3 } } });
+  const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
+  t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
+  await waitFor(() => fs.existsSync(path.join(p.state, 'at-1')));
+  const w = startWatch(p, '--long-min', '0.005');
+  t.after(() => w.child.kill('SIGKILL'));
+
+  // An ordinary command that has been open a while is said once, with the session's own description of it.
+  await waitFor(() => w.lines().some((l) => /^One command has been running/.test(l)));
+  assert.deepEqual(w.lines().filter((l) => /^One command/.test(l)), ['One command has been running for 0 min: "Run the unit tests"']);
+  const s1 = st(p);
+  assert.deepEqual([s1.next, s1.inFlight.description, s1.inFlight.needsYou], ['attend', 'Run the unit tests', false]);
+  assert.match(s1.say[2], /^Nothing needs you right now: it is verifying/);
+
+  // A command the session marked as waiting for the owner is said at once, and status says the same.
+  fs.writeFileSync(path.join(p.state, 'go-1'), '');
+  await waitFor(() => fs.existsSync(path.join(p.state, 'at-2')) && w.lines().some((l) => /^NEEDS YOU/.test(l)));
+  assert.deepEqual(w.lines().filter((l) => /^NEEDS YOU/.test(l)), ['NEEDS YOU: sign in to Okta in the browser window that opens']);
+  const s2 = st(p);
+  assert.deepEqual([s2.inFlight.description, s2.inFlight.needsYou], ['sign in to Okta in the browser window that opens', true]);
+  assert.match(s2.say[2], /^It is waiting for you at this computer: sign in to Okta in the browser window that opens \(\d+ min so far\)\.$/);
+
+  fs.writeFileSync(path.join(p.state, 'go-2'), '');
+  assert.equal(await w.done, 0);
+  await waitFor(() => !alive(run.pid));
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.equal(w.lines().filter((l) => /^NEEDS YOU|^One command/.test(l)).length, 2, 'each said once');
+  assert.equal(st(p, '--queue', E1.id).inFlight, null);
+});
+
+test('a process a session leaves running out of the clone is stopped when the session ends, and the log says so', async (t) => {
+  const p = makeProject(t);
+  // As seen live: a server started detached from the session (its own daemon mode, or nohup) keeps running after it.
+  const daemon = { do: 'exec', cmd: `node -e "const c=require('child_process').spawn('sleep',['300'],{detached:true,stdio:'ignore'});require('fs').writeFileSync(process.argv[1],String(c.pid));c.unref()" "{{state}}/stray.pid"` };
+  const scripts = happy(E1);
+  scripts[`${E1.id}/verify`].actions.unshift(daemon);
+  p.scenario(scripts);
+  await p.go();
+  const pid = Number(fs.readFileSync(path.join(p.state, 'stray.pid'), 'utf8'));
+  t.after(() => { try { process.kill(pid, 'SIGKILL'); } catch { /* gone, as it should be */ } });
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  await waitFor(() => !alive(pid), { timeoutMs: 5000 });
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`verify-1 left 1 process\\(es\\) running in the clone; stopped: ${pid} `));
+  assert.deepEqual(strayProcesses(p.clone), []);
+  // A status or a watch reading the clone, and this test, are never swept.
+  assert.equal(st(p, '--queue', E1.id).next, 'fetch');
 });

@@ -181,6 +181,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot resumes the session that asked** — after the owner answers a session's question,
   that session continues from where it stopped instead of a new one redoing the step; a session
   that cannot be resumed is replaced by a new one told the same answers.
+- **Autopilot says when a step waits for the owner** — a session marks a command that needs
+  the owner (a browser sign-in) with `Needs you:`; `watch` says it at once, `status` reports the
+  command in flight, and a command open three minutes is said once.
+- **Autopilot stops what a session leaves running** — a server or other process still working
+  out of the clone when a session ends is stopped and logged, so no port stays taken after a run.
+- **Autopilot questions say what an answer asks of the owner** — an option that needs them at
+  the computer is flagged in the question, and after answering they are told what will happen
+  and what they will see.
 - **`tor-lifecycle` in a sandbox** — with four or more feature files the helper crashed where
   process pools are denied (Claude Code's sandbox on macOS); it now parses in-process instead.
 - **Autopilot traceability check accepts a checklist** — an operator-observed requirement named

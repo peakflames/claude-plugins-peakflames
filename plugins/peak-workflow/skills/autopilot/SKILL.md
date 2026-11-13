@@ -598,13 +598,21 @@ A driver is running (you launched it, or Step 0 found it). Stay with it until it
    - `Waiting for you: …` while the run is still going (independent epics carry on): run
      Step 0; when it lists the question in `waiting`, ask it now (Step 4 item 5) and keep
      attending. The answer is used when this run has ended.
+   - `NEEDS YOU: …` — a step is waiting for the owner at this computer right now (a sign-in
+     in a browser, usually). Relay it at once, as "Needs you now: <what>", say they run
+     nothing themselves, and send the push notification of item 5. This is not a gate: there
+     is nothing to answer here.
+   - `One command has been running for N min: …` — relay it as it is, once. If it reads like
+     something that waits for a person, say so: "If a window opened on your screen, it is
+     waiting for you."
    - `Stopped: …` — relay it. What happens next is Step 0's answer once the run has ended.
    - `RUN ENDED: …` — relay it and **go to Step 0. That is the loop.** One exception: when
      the owner asked for the stop (Step 5), relay it and go to the closing screen instead.
 
 4. **When the owner speaks while it runs:**
    - "How is it going?" → `DRIVER status --project "<root>"` (no `--json`) and relay its
-     first three lines.
+     first three lines. They say what the step is doing inside, when a command has been
+     running a while or is waiting for the owner: never guess beyond them.
    - "Stop" → Step 5.
    - Anything that is a decision about a gate, the queue or the code → it waits for the run
      to end or for Step 4; never act on it by editing a file or answering a gate from memory.
@@ -612,7 +620,8 @@ A driver is running (you launched it, or Step 0 found it). Stay with it until it
 
 5. **Call them back when it matters.** When the `PushNotification` tool exists, send one —
    and only one each — for: a question waiting for them (the `Waiting for you` line, or
-   Step 0 saying `decide`), and the run finished with nothing left to ask. Never for a
+   Step 0 saying `decide`), a step waiting for them at the computer (`NEEDS YOU`), and the
+   run finished with nothing left to ask. Never for a
    milestone, a technical stop you are continuing, or a heartbeat.
 
 ## Step 4: Ask the owner, and report
@@ -706,6 +715,14 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       to record — the fix is in the project, and it clears when preflight passes: say what to
       fix (its `question`) and move on.
 
+      **Say what an option asks of the owner.** The run is unattended, and the popup hides
+      the chat. When an option can only work with the owner at this computer — it opens a
+      browser for a sign-in, needs a device plugged in, wants them to look at something —
+      add one plain sentence to the end of the question text, after the gate's own words:
+      "Choosing '<that option>' means you must be at this computer in the next few minutes:
+      <what you will be asked to do>." That is a fact about the option, not a recommendation;
+      the labels and their order stay as the gate gives them.
+
       **A `human-check` gate with `checks` is a short form, not the gate's own question.**
       `checks` holds the requirement's own Then lines: what a person must see for it to be met.
       Ask one `AskUserQuestion` question per entry, at most four per call, in `n` order. The
@@ -752,10 +769,14 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       `git config user.name`, and re-renders the report. It refuses an answer that is not one of
       the gate's options; if it refuses, ask again — never substitute a different option.
 
-   d. **Say what the answer does, in one sentence**, from the command's output: "Recorded.
-      I'm continuing this epic from where it stopped." (While a run is still going: "Recorded.
-      It continues once this run has ended.") Nothing else here: no conditions,
-      no commands, no alternatives. An answer that tells the session to stop (a deferral gate's
+   d. **Say what the answer does, and what the owner will see**, from the command's output:
+      "Recorded. I'm continuing this epic from where it stopped." (While a run is still going:
+      "Recorded. It continues once this run has ended.") The session that asked picks up
+      where it was; it does not start the step over. When the chosen option needs the owner,
+      add what to expect, so they are never left waiting on a guess: "Stay at this computer.
+      In a minute or two <a browser window will open for you to sign in>. You do not need to
+      run anything; I'll tell you when it is waiting for you and when it is done." Nothing
+      else here: no conditions, no commands, no alternatives. An answer that tells the session to stop (a deferral gate's
       "Stop — I'll take it from here") is replayed like any other and the epic parks or fails
       again: say that in the same sentence, and that continuing by hand is then the way forward.
 
