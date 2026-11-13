@@ -765,7 +765,7 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
  * The exact command for one step: host mode for plan, build and verify (SPIKE.md "Host mode"),
  * plain `-p` for the auditor (plan §6.6 "Audit"). Pure: used by the dry run too.
  */
-export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema }) {
+export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema, resume = null }) {
   const b = config.budgets[kind];
   const effort = effortFor(b);
   const clone = path.join(workspace, 'clone');
@@ -808,6 +808,8 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
     '--session-id', sessionId, '--model', b.model,
   ];
   if (effort) args.push('--effort', effort);
+  // A session stopped at its own question is taken up again with what it knows, under a new id (the old transcript stays as it was).
+  if (resume) args.push('--resume', resume, '--fork-session');
   for (const f of appendFiles) args.push('--append-system-prompt-file', f);
   return { bin: config.claudeBin, args, env, cwd: clone, wallMin: b.wallMin, host: true };
 }
@@ -859,6 +861,63 @@ Do this, in order:
 6. Commit on the branch, staging files by path: \`fix(epic-${meta.id}): <what was repaired>\`. Do not push and do not merge.
 
 If a listed fix cannot be made as asked, or making it would leave a requirement unmet, stop and ask with \`AskUserQuestion\` — say which fix, why, and offer the options a person would need. Do not work around it.
+`;
+}
+
+// ---- the owner's answers, handed to the session that takes a step up again ---------------------
+
+const stepKindOf = (session) => String(session ?? '').replace(/-\d+$/, '');
+/**
+ * Every question of this epic that a session asked and the owner answered, oldest first, each with
+ * the kind of session that asked (`plan`, `build`, `fix`, `verify`). A session that takes that step
+ * up again is told them before it does anything: seen live, a fresh session words the same
+ * question differently, the recorded answer matches nothing, and the owner is asked again.
+ * Answers already used stay on the list (the next session did not hear them); a start from
+ * scratch retires them.
+ */
+export function ownerAnswers(workspace, epicId) {
+  return readGates(workspace).filter((g) => g.epic === epicId && g.decided?.answer && !g.void && !g.superseded && !g.cleared && gateEntry(g)?.question)
+    .map((g) => ({ gate: g.file, kind: stepKindOf(g.session), gateKind: g.kind ?? 'unmatched', tor: g.tor ?? null, question: g.question ?? '', options: g.options ?? [], answer: g.decided.answer, by: g.decided.by ?? null, date: g.decided.date ?? null, ...(g.decided.note ? { note: g.decided.note } : {}) }));
+}
+const answerList = (answers) => answers.map((a, i) => `${i + 1}. **Asked:** "${a.question}"\n   **Options offered:** ${a.options.map((o) => `"${o}"`).join(', ') || '(none)'}\n   **The owner's answer:** "${a.answer}" — ${a.by ?? 'the owner'}, ${a.date ?? 'earlier'}${a.note ? `\n   **Their words:** "${a.note}"` : ''}`).join('\n');
+const ANSWER_RULES = `Act on each answer when you reach the point it concerns: do what the chosen option says, as if the
+owner had just picked it here. Do not ask the same thing again in any wording, and do not ask for
+confirmation. If the answer needs something only a person can do (a sign-in in a browser, a look
+at a screen), the owner chose it knowing that: start it, give them time, and carry on.
+
+Use \`AskUserQuestion\` only for a decision that is really a different one. Every other question
+the skill tells you to ask is still asked, in the skill's own words.`;
+/** Appended to the system prompt of a new session that takes up a step the owner has answered questions about. */
+export function ownerAnswersText(answers) {
+  return `# Questions the owner has already answered
+
+Before this session started, an earlier session doing this same step asked the project's owner the
+question${answers.length === 1 ? '' : 's'} below, and the owner answered. Each answer is a person's decision, recorded by
+autopilot. It is not yours to change, and not yours to ask for again.
+
+${answerList(answers)}
+
+${ANSWER_RULES}
+`;
+}
+/** The one message a stopped session is resumed with: the owner's answer, and what may have changed while it waited. */
+export function resumeMessage(answers, { branch }) {
+  return `You were stopped while the project's owner was asked your question. They have answered.
+
+${answerList(answers)}
+
+Continue from exactly where you stopped. Do not start the step over, and do not repeat work you
+have finished: what you read, ran and concluded earlier in this session still stands.
+
+Two things may have changed while you waited:
+
+- The working copy${branch ? ` (branch \`${branch}\`)` : ''} may have been put back to how it was when you started. Before you rely on a
+  file you changed or a commit you made earlier in this session, check it is still there
+  (\`git status\`, \`git log -3\`) and redo only what is missing. A commit named
+  \`wip(autopilot): uncommitted work at park\` is your own uncommitted work, kept for you.
+- Anything you left running (a server, a watcher) has been stopped. Start it again if you need it.
+
+${ANSWER_RULES}
 `;
 }
 
@@ -1314,7 +1373,7 @@ class Run {
       try {
         if (state !== 'MERGED') this.sealGates(e);
         // A resumed gate is spent once its epic ends again, whether or not the session re-asked the question.
-        if (e.resumed) this.markGate(e.resumed.gate, (g) => (g.decided && !g.decided.used ? { ...g, decided: { ...g.decided, used: { run: this.runName, phase: e.resumed.phase, date: new Date().toISOString(), note: 'the question was not asked again' } } } : g));
+        if (e.resumed) this.markGate(e.resumed.gate, (g) => (g.decided && !g.decided.used ? { ...g, decided: { ...g.decided, used: { run: this.runName, phase: e.resumed.phase, date: new Date().toISOString(), note: (e.answers ?? []).some((a) => a.gate === e.resumed.gate) ? 'the session was told this answer before it started and did not ask again' : 'the question was not asked again' } } } : g));
         if (e.sessions.length || e.resumed || state === 'MERGED') this.record(e);
       } catch (err) { this.log(`${e.id}: could not record the epic for the next run: ${err.message}`); }
     }
@@ -1349,28 +1408,45 @@ class Run {
    * Launches one host-mode session in its own process group and waits for it.
    * Resolves with how it ended; never throws for a session failure.
    */
-  async launch(e, kind, prepare) {
+  async launch(e, kind, prepare, { noResume = false } = {}) {
     const cfg = this.config; const k = KINDS[kind];
     const n = (e.attempts[kind] = (e.attempts[kind] ?? 0) + 1);
     const name = `${k.prefix}-${n}`;
     const stepDir = path.join(this.epicDir(e), name);
     fs.mkdirSync(stepDir, { recursive: true });
     const sessionId = randomUUID();
-    const { prompt, appendFiles = [] } = prepare(stepDir) ?? {};
+    const prepared = prepare(stepDir) ?? {};
+    let prompt = prepared.prompt; const appendFiles = [...(prepared.appendFiles ?? [])];
+    // The owner's answers to questions an earlier session of this step asked. The session that was stopped at its
+    // question is resumed with them (it keeps what it had worked out); any other session is told them up front.
+    const answers = (e.answers ?? []).filter((a) => a.kind === kind);
+    const from = e.resumeSession?.kind === kind ? e.resumeSession : null;
+    if (from) e.resumeSession = null; // one attempt: a second session of this step starts fresh
+    let resume = null;
+    if (answers.length && from && !noResume) {
+      resume = from.sessionId;
+      prompt = resumeMessage(answers, { branch: this.meta(e).branch });
+      fs.writeFileSync(path.join(stepDir, 'resume-prompt.md'), prompt);
+    } else if (answers.length) {
+      const file = path.join(stepDir, 'owner-answers.md');
+      fs.writeFileSync(file, ownerAnswersText(answers));
+      appendFiles.push(file);
+    }
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind }));
-    const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles });
+    const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles, resume });
 
     // The intended step is on disk before anything is launched (crash-safe resume, §9).
     e.state = k.state; e.lastStep = name;
     e.step = { name, kind, sessionId, pid: null, startedAt: new Date().toISOString() };
     this.save();
-    this.log(`${e.id}: ${name} starting (${k.role}, ${cmd.wallMin} min, session ${sessionId})`);
-    this.event('step-start', e, { step: name, kind, capMin: cmd.wallMin, ...(e.continuing && (kind === 'build' || kind === 'fix') ? { continuing: true } : {}) });
+    this.log(`${e.id}: ${name} starting (${k.role}, ${cmd.wallMin} min, session ${sessionId}${resume ? `, resuming session ${resume} (${from.step} of run ${from.run}) with the owner's answer` : answers.length ? `, told ${answers.length} answer(s) the owner already gave` : ''})`);
+    this.event('step-start', e, { step: name, kind, capMin: cmd.wallMin, ...((e.continuing && (kind === 'build' || kind === 'fix')) || resume ? { continuing: true } : {}) });
 
     const startMb = this.cloneMb();
     const started = Date.now();
-    // Read by hook R5 (startMb) and hook R8 (`look`: the owner's recorded look, for wrapup's manual-verification question).
-    writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb, ...(kind === 'verify' && e.look ? { look: e.look } : {}) });
+    // Read by hook R5 (startMb) and hook R8 (`look`: the owner's recorded look, for wrapup's manual-verification question;
+    // `answers`: what the owner already answered for this step, so a reworded question is not put to them twice).
+    writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb, ...(kind === 'verify' && e.look ? { look: e.look } : {}), ...(answers.length ? { answers } : {}), ...(resume ? { resumeOf: { sessionId: resume, step: from.step, run: from.run } } : {}) });
     const isScript = /\.(mjs|cjs|js)$/.test(cmd.bin);
     const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, {
       cwd: cmd.cwd, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'],
@@ -1381,7 +1457,7 @@ class Run {
     child.stdin.on('error', () => {});
     const send = (o) => { if (child.stdin.writable) child.stdin.write((typeof o === 'string' ? o : JSON.stringify(o)) + '\n'); };
 
-    const s = { name, stepDir, kind, result: null, init: null, controlRequests: [], killed: null, exitCode: null, signal: null, spawnError: null };
+    const s = { name, stepDir, kind, result: null, init: null, controlRequests: [], killed: null, exitCode: null, signal: null, spawnError: null, resumed: !!resume };
     let graceTimer = null;
     const kill = (why) => {
       if (s.killed) return;
@@ -1462,6 +1538,11 @@ class Run {
     let s;
     for (;;) {
       s = await this.launch(e, kind, prepare);
+      // A stopped session that cannot be resumed (its transcript is gone) is not an infra error: a new session takes the step, told the same answers.
+      if (s.resumed && s.outcome === 'infra') {
+        this.log(`${e.id}: ${s.name} could not resume the earlier session (${s.why}); starting a new session for this step`);
+        s = await this.launch(e, kind, prepare, { noResume: true });
+      }
       if (s.outcome !== 'infra') { this.state.consecutiveInfra = 0; break; }
       this.state.consecutiveInfra = (this.state.consecutiveInfra ?? 0) + 1;
       if (this.state.consecutiveInfra >= 2) { this.stopReason = 'infra'; break; }
@@ -1780,8 +1861,10 @@ class Run {
 
   async doVerify(e) {
     const m = this.meta(e);
+    const before = e.caughtUp ?? null;
     const stuck = this.catchUp(e);
     if (stuck) return this.parkResumable(e, stuck, 'VERIFY');
+    if ((e.caughtUp ?? null) !== before) e.resumeSession = null; // the branch now holds other epics' work: a session that remembers the old branch is not resumed
     e.preVerify = { developSha: this.integrationSha(), branchTip: this.branchTip(m.branch), branch: m.branch };
     this.save();
     const s = await this.step(e, 'verify', (stepDir) => {
@@ -2047,6 +2130,13 @@ class Run {
       }
       // Phases that run a captured plan need it; without one the epic is planned again.
       if (phase === 'BUILD' && !(e.plan && exists(path.join(this.stateDir, e.plan)))) { phase = 'PLAN'; e.resumed.phase = phase; }
+      // What the owner answered for this epic's sessions so far: every session of that step in this run is told.
+      e.answers = ownerAnswers(this.stateDir, e.id);
+      if (entry.question && g.session && g.run) {
+        // The session that asked is resumed with the answer, when it can be: same step, its record still on disk.
+        const prev = tryJson(path.join(runDirOf(this.stateDir, g.run), 'epics', e.id, g.session, 'step.json'));
+        if (prev?.sessionId && prev.kind && KINDS[prev.kind]?.state === phase) e.resumeSession = { kind: prev.kind, sessionId: prev.sessionId, step: g.session, run: g.run };
+      }
       if (f.kind === 'audit' && phase === 'VERIFY') e.auditOverruled = { gate: f.gate, by: g.decided.by };
       if (!entry.question) used(); // a question gate is marked used by hook R8 when it answers
       e.resumed.behind = f.behind ?? 0;
@@ -2063,6 +2153,9 @@ class Run {
       this.log(`${e.id}: starting over: ${f.by} answered "${f.answer}" on ${f.gate}`);
     }
     this.supersedeGates(e, null);
+    // From scratch: answers given about the earlier attempt are not handed to the new one.
+    for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && x.decided?.used && !x.superseded && !x.void && gateEntry(x)?.question)) this.markGate(g.file, { superseded: { run: this.runName, date: now() } });
+    e.answers = []; e.resumeSession = null;
     this.supersedeBranch(e);
     this.forget(e);
     return 'PLAN';
