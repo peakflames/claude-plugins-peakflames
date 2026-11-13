@@ -107,7 +107,7 @@ export function collectReport(runDir) {
 
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
-    spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null,
+    spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, setupFailed: s.setupFailed ?? null,
     driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
   // Is the clone's integration tip already in the project? (null: cannot tell — no project, no clone.) Read-only.
@@ -139,13 +139,18 @@ function tldr(r) {
       : `The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; you bring the work in yourself with one command (under "Do this next").`)
     : 'Nothing in your project has changed. Autopilot works in its own private copy and never writes to your project.');
   if (open) T.push(`${plural(open, 'question')} only you can answer ${open === 1 ? 'is' : 'are'} waiting. Run \`/peak-workflow:autopilot report\` and it asks you each one; the work then continues from where it stopped in the next run.`);
-  if (r.baseRed) T.push(`Nothing was built, because your project's own tests were already failing before autopilot started.`);
+  if (r.setupFailed) T.push(`Nothing was built, because autopilot could not get its private copy of your project ready: ${setupWhy(r.setupFailed)}.`);
+  else if (r.baseRed?.couldNotRun) T.push(`Nothing was built, because the test command could not be run in autopilot's private copy (\`${r.testCommand}\`: ${lastLine(r.baseRed.tail) || `exit ${r.baseRed.exit}`}). The tests never ran; this is a missing tool or setup step, not a failing test.`);
+  else if (r.baseRed) T.push(`Nothing was built, because your project's own tests were already failing before autopilot started.`);
   else if (r.stoppedOnPark) T.push('The run ended early on purpose: by default it stops at the first epic that needs you, so nothing else is built on a guess.');
   else if (r.stoppedBecause && !['queue done', 'nothing runnable'].includes(r.stoppedBecause)) T.push(`The run ended early: ${r.stoppedBecause}.`);
   T.push(`It ran from ${stamp(r.run)} to ${r.ended ? stamp(r.ended) : '(still running)'} and spent ${usd(r.spentUsd)}${r.budgetUsd == null ? '' : ` of a $${r.budgetUsd} limit`}.`);
   T.push(r.next.length ? `What to do: follow "Do this next" below, from the top. It has ${plural(r.next.length, 'step')}.` : 'Nothing needs you.');
   return T;
 }
+
+const lastLine = (text) => String(text ?? '').trim().split('\n').filter(Boolean).at(-1) ?? '';
+const setupWhy = (f) => (f.step === 'copy' ? f.problems.join('; ') : `the setup command \`${f.command}\` ${f.timedOut ? 'timed out' : f.couldNotRun ? 'could not be run' : 'failed'} (${lastLine(f.tail) || `exit ${f.exit}`})`);
 
 const GLOSSARY = [
   ['Epic', 'one planned piece of work, built from its written requirements.'],
@@ -167,7 +172,9 @@ function nextSteps(r) {
   const next = [];
   const ids = (list) => list.map((e) => e.id).join(', ');
   const by = (o) => r.epics.filter((e) => e.outcome === o);
-  if (r.baseRed) next.push(`Fix the failing tests on \`${r.integration}\` (\`${r.testCommand}\`), then run autopilot again. Nothing was built on a red base.`);
+  if (r.setupFailed) next.push(`Fix what stopped the private copy from being made ready (${setupWhy(r.setupFailed)}), then run \`/peak-workflow:autopilot\` again: it checks this before it launches.`);
+  else if (r.baseRed?.couldNotRun) next.push(`Make \`${r.testCommand}\` runnable in autopilot's private copy, then run \`/peak-workflow:autopilot\` again: it lists what the copy is missing and tries the command before it launches. Nothing was built.`);
+  else if (r.baseRed) next.push(`Fix the failing tests on \`${r.integration}\` (\`${r.testCommand}\`), then run autopilot again. Nothing was built on a red base.`);
   if (/^preflight:/.test(r.stoppedBecause ?? '')) next.push(`Fix what preflight refused (${r.stoppedBecause.replace(/^preflight:\s*/, '')}), then run autopilot again.`);
   const parked = by('PARKED');
   const liveGate = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;

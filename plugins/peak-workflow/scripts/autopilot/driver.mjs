@@ -27,7 +27,7 @@ import { writeReport } from './report.mjs';
 
 export { ANSWERS, gateEntry, lintPlan, parseSidecar };
 
-export const DRIVER_VERSION = '0.3.0';
+export const DRIVER_VERSION = '0.4.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PLUGIN_DIR = path.resolve(HERE, '..', '..');
 
@@ -155,6 +155,8 @@ export function defaultConfig(project) {
     diskFloorGb: 15,
     growthCapMb: 1024,
     onPark: 'stop', // 'stop': the first epic that parks or fails ends the run; 'continue': independent epics still run
+    setup: null, // one shell command that rebuilds, in the clone, what git does not carry (a venv, node_modules); run with network
+    copy: [], // git-ignored files copied from the project into the clone at each run (a .env): what cannot be rebuilt
     claudeBin: 'claude',
     allowTestDouble: false, // run-level: never inherited from settings.json by accident (a rehearsal's fake binary)
     budgets: {
@@ -164,6 +166,7 @@ export function defaultConfig(project) {
       fix: { wallMin: 60, turns: 150, usd: 12, model: 'sonnet' },
       audit: { wallMin: 15, turns: 40, usd: 3, model: 'opus' },
       testRunMin: 10,
+      setupMin: 20,
     },
     audit: { parkOn: ['stand-in', 'test-weakened', 'cannot-fail', 'never-ran-real'] },
     scope: { allow: [], lockfiles: [] },
@@ -388,6 +391,63 @@ export function syncFacts(project, workspace, integration) {
   }
   return { state: 'diverged', ...facts };
 }
+// ---- the clone's environment: what git does not carry ------------------------------------------
+
+const noSlash = (p) => String(p).replace(/\/+$/, '');
+/** Files and directories that exist in `root` and git ignores: exactly what a clone of it will not have. */
+export function ignoredPaths(root) {
+  const r = spawnSync('git', ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'], { cwd: root, encoding: 'utf8', env: childEnv(), maxBuffer: 64 * 1024 * 1024 });
+  return r.status === 0 ? (r.stdout ?? '').split('\0').filter(Boolean).sort() : [];
+}
+/** Why a `copy` list cannot be used. An entry must be a git-ignored path inside the project: anything else could end up in a commit. */
+export function copyProblems(project, copy) {
+  if (copy === undefined || copy === null) return [];
+  if (!Array.isArray(copy)) return ['`copy` must be a list of paths'];
+  const out = [];
+  for (const entry of copy) {
+    const rel = typeof entry === 'string' ? path.posix.normalize(noSlash(entry.trim())) : '';
+    if (!rel || rel === '.' || path.isAbsolute(rel) || rel.startsWith('..') || rel === '.git' || rel.startsWith('.git/')) { out.push(`copy: ${JSON.stringify(entry)} is not a path inside the project`); continue; }
+    if (!exists(path.join(project, rel))) { out.push(`copy: ${rel} does not exist in the project`); continue; }
+    if (!gitOk(project, 'check-ignore', '-q', rel)) out.push(`copy: ${rel} is not ignored by git, so a session's commit would include it; add it to .gitignore first`);
+  }
+  return out;
+}
+/**
+ * What the clone will lack, and what is declared about it. Read-only. Each ignored path of the
+ * project is `copied` (listed in `copy`), `present` (it exists in the clone now: setup or the tests
+ * rebuilt it) or `absent` (nothing carries it over).
+ */
+export function envFacts(project, workspace, config) {
+  const clone = path.join(workspace, 'clone');
+  const copy = (Array.isArray(config.copy) ? config.copy : []).filter((c) => typeof c === 'string').map((c) => path.posix.normalize(noSlash(c.trim())));
+  const all = ignoredPaths(project);
+  const ignored = all.slice(0, 200).map((p) => {
+    const rel = noSlash(p);
+    const copied = copy.some((c) => rel === c || rel.startsWith(`${c}/`) || c.startsWith(`${rel}/`));
+    return { path: p, dir: p.endsWith('/'), status: copied ? 'copied' : exists(path.join(clone, rel)) ? 'present' : 'absent' };
+  });
+  return { setup: config.setup ?? null, copy, problems: copyProblems(project, config.copy), ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
+}
+/** A shell's "command not found" (127) or "cannot execute" (126): the command never ran, which is not a failing test. */
+export const couldNotRun = (code) => code === 127 || code === 126;
+
+/** Writes `setup` and `copy` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
+export function configureProject(project, { setup, copy } = {}) {
+  const file = projectSettingsFile(project);
+  let j = {};
+  if (exists(file)) { try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); } }
+  if (setup !== undefined) { if (String(setup).trim()) j.setup = String(setup).trim(); else delete j.setup; }
+  if (copy !== undefined) {
+    const list = [...new Set(copy.map((c) => path.posix.normalize(noSlash(String(c).trim()))).filter((c) => c && c !== '.'))];
+    const bad = copyProblems(project, list);
+    if (bad.length) throw new Error(bad.join('; '));
+    if (list.length) j.copy = list; else delete j.copy;
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeJson(file, j);
+  return { file, settings: j };
+}
+
 const fetchCommand = (clone, integration) => `git fetch "${clone}" ${integration}:autopilot/${integration}`;
 const divergedText = (s, project, clone, integration) => `the project and the autopilot clone have diverged on ${integration}: the project is at ${String(s.projectTip).slice(0, 12)} (${project}), the clone at ${String(s.cloneTip).slice(0, 12)} (${clone}). Bring them together first — in the project: \`${fetchCommand(clone, integration)}\`, then merge \`autopilot/${integration}\` into ${integration} (to keep both sides), or decide which side wins — and run autopilot again`;
 
@@ -666,6 +726,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`When an epic parks: ${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set in ${projectSettingsFile(project)}`);
+  p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}`);
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
 
@@ -832,7 +893,77 @@ class Run {
     const r = sh(this.config.testCommand, [], { cwd: this.clone, shell: true, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
     const text = `${r.out}\n${r.err}`;
     const skips = (text.match(/^(?:#|ℹ)\s*skipped\s+(\d+)/m) ?? [])[1];
-    return { pass: r.code === 0 && !r.timedOut, code: r.code, timedOut: r.timedOut, skips: skips === undefined ? null : Number(skips), ms: Date.now() - started, tail: text.trim().split('\n').slice(-15).join('\n') };
+    return { pass: r.code === 0 && !r.timedOut, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), skips: skips === undefined ? null : Number(skips), ms: Date.now() - started, tail: text.trim().split('\n').slice(-15).join('\n') };
+  }
+
+  // ---- the clone's environment ---------------------------------------------------------------
+
+  /** Makes the private clone if there is none. Returns whether it was made. */
+  ensureClone() {
+    if (exists(this.clone)) return false;
+    const integration = detectIntegration(this.config.project);
+    if (!integration) throw new Error(`${this.config.project} is not the root of a git repository with a develop, main or master branch`);
+    git(this.config.project, 'clone', '-q', '--no-hardlinks', '--branch', integration, this.config.project, this.clone);
+    this.g('remote', 'remove', 'origin');
+    this.log(`private clone made at ${this.clone} (${integration}, no origin)`);
+    return true;
+  }
+
+  /**
+   * Gives the clone what git does not carry: the owner's `copy` files (ignored, so never
+   * committed) and then the `setup` command (run like the tests: in the clone, outside the
+   * sandbox, with network). Run at the start of a run and again whenever the integration line moved.
+   */
+  prepareEnv() {
+    const cfg = this.config;
+    const out = { pass: true, step: null, copied: [], problems: [], setup: { ran: false, command: cfg.setup ?? null } };
+    out.problems = copyProblems(cfg.project, cfg.copy);
+    if (out.problems.length) return { ...out, pass: false, step: 'copy' };
+    for (const entry of cfg.copy ?? []) {
+      const rel = path.posix.normalize(noSlash(entry.trim()));
+      const dst = path.join(this.clone, rel);
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.cpSync(path.join(cfg.project, rel), dst, { recursive: true, force: true, verbatimSymlinks: true });
+      out.copied.push(rel);
+    }
+    if (out.copied.length) this.log(`environment: copied ${out.copied.join(', ')} from the project`);
+    if (cfg.setup) {
+      const started = Date.now();
+      const r = sh(cfg.setup, [], { cwd: this.clone, shell: true, timeout: (cfg.budgets.setupMin ?? 20) * 60000, killSignal: 'SIGKILL' });
+      out.setup = { ran: true, command: cfg.setup, pass: r.code === 0 && !r.timedOut, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), ms: Date.now() - started, tail: `${r.out}\n${r.err}`.trim().split('\n').slice(-15).join('\n') };
+      this.log(`environment: setup \`${cfg.setup}\` ${out.setup.pass ? 'passed' : `failed (exit ${r.code}${r.timedOut ? ', timed out' : ''})`} in ${Math.round(out.setup.ms / 1000)}s`);
+      if (!out.setup.pass) return { ...out, pass: false, step: 'setup' };
+    }
+    this.envSha = gitRun(this.clone, 'rev-parse', 'HEAD').out;
+    return out;
+  }
+
+  /**
+   * Readiness's proof (`driver.mjs prepare`): the clone is made or brought up to date, given its
+   * environment, and the project's test command is run in it, in the shell the run will use.
+   * Writes only inside the workspace. Whatever setup or the tests leave that git would commit is
+   * reported and removed, so the run starts on a clean clone.
+   */
+  prepare() {
+    fs.mkdirSync(this.stateDir, { recursive: true });
+    this.acquireLock();
+    try {
+      const made = this.ensureClone();
+      const integration = detectIntegration(this.clone);
+      const sync = this.syncWithProject(integration);
+      if (this.currentBranch() !== integration) this.g('checkout', '-q', integration);
+      const env = this.prepareEnv();
+      const tests = env.pass ? { command: this.config.testCommand ?? null, ...(this.config.testCommand ? this.runTests() : { pass: false, code: null, tail: 'CLAUDE.md has no **Tests:** command' }) } : null;
+      const leftovers = gitRun(this.clone, 'status', '--porcelain').out.split('\n').filter(Boolean);
+      if (leftovers.length) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); }
+      const result = {
+        ok: env.pass && !!tests?.pass && !leftovers.length, at: new Date().toISOString(), clone: this.clone, cloneMade: made, integration, tip: gitRun(this.clone, 'rev-parse', 'HEAD').out, sync: sync.state,
+        failed: !env.pass ? env.step : !tests.pass ? 'tests' : leftovers.length ? 'leftovers' : null,
+        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers,
+      };
+      writeJson(path.join(this.stateDir, 'prepare.json'), result);
+      return result;
+    } finally { this.releaseLock(); }
   }
 
   health(base) {
@@ -1686,13 +1817,7 @@ class Run {
       }
       if (cfg.claudeBin !== 'claude' && !cfg.allowTestDouble) throw new Error(TEST_DOUBLE(cfg.claudeBin));
 
-      if (!exists(this.clone)) {
-        const integration = detectIntegration(cfg.project);
-        if (!integration) throw new Error(`${cfg.project} is not the root of a git repository with a develop, main or master branch`);
-        git(cfg.project, 'clone', '-q', '--no-hardlinks', '--branch', integration, cfg.project, this.clone);
-        this.g('remote', 'remove', 'origin');
-        this.log(`private clone made at ${this.clone} (${integration}, no origin)`);
-      }
+      this.ensureClone();
       const integration = detectIntegration(this.clone);
       const sync = resuming ? null : this.syncWithProject(integration); // refuses a diverged project before anything is written
 
@@ -1753,8 +1878,13 @@ class Run {
           }
           // Base red stops the whole run: every epic would build on it.
           if (this.currentBranch() !== integration) { if (this.dirty()) { this.stopReason = `clone is dirty on ${this.currentBranch()}`; break; } this.g('checkout', '-q', integration); }
+          // What git does not carry (dependencies, local files): once per run, and again after every merge.
+          if ((cfg.setup || (cfg.copy ?? []).length) && this.envSha !== this.integrationSha()) {
+            const env = this.prepareEnv();
+            if (!env.pass) { this.stopReason = 'setup failed'; this.state.setupFailed = { before: e.id, step: env.step, problems: env.problems, command: env.setup.command, exit: env.setup.code ?? null, timedOut: env.setup.timedOut ?? false, couldNotRun: env.setup.couldNotRun ?? false, tail: env.setup.tail ?? null }; this.log(`setup failed (${env.step}) on ${integration}; stopping the run`); break; }
+          }
           const t = this.runTests();
-          if (!t.pass) { this.stopReason = 'base red'; this.state.baseRed = { before: e.id, exit: t.code, timedOut: t.timedOut, tail: t.tail }; this.log(`base red: \`${cfg.testCommand}\` fails on ${integration} (exit ${t.code}); stopping the run`); break; }
+          if (!t.pass) { this.stopReason = 'base red'; this.state.baseRed = { before: e.id, exit: t.code, timedOut: t.timedOut, couldNotRun: t.couldNotRun, tail: t.tail }; this.log(`base red: \`${cfg.testCommand}\` fails on ${integration} (exit ${t.code}); stopping the run`); break; }
           this.state.baseSkips = t.skips;
           e.startedAt = new Date().toISOString();
         }
@@ -1822,6 +1952,8 @@ export function launchFacts(project, workspace, config) {
   if (voidGates.length) warn.push(`${voidGates.length} decision(s) can no longer be used (${voidGates.map((g) => `${g.epic}: ${g.why}`).join('; ')}); those epics are planned again from scratch`);
   if (openGates.length) warn.push(`${openGates.length} gate(s) wait for your decision (${[...new Set(openGates.map((g) => g.epic))].join(', ')}); decide them with /peak-workflow:autopilot report`);
 
+  const env = integration ? envFacts(project, workspace, config) : null;
+  for (const p of env?.problems ?? []) refuse.push(p);
   if (sync.state === 'diverged') refuse.push(divergedText(sync, project, clone, integration));
   if (sync.state === 'clone-ahead') warn.push(`autopilot has merged work the project has not fetched yet; the run builds on top of it. Waiting in the clone: ${sync.waiting.join('; ')}. Bring it in with: ${fetchCommand(clone, integration)}`);
   if (sync.state === 'project-ahead') warn.push(`${integration} moved in the project since the last run; the run fast-forwards the clone to it first; a decision on a parked branch still holds if that branch merges cleanly into the new tip`);
@@ -1830,7 +1962,7 @@ export function launchFacts(project, workspace, config) {
   return {
     ok: refuse.length === 0, refuse, warn, integration, freeGb, workspace, clone, run, runDir: runDirOf(workspace, run), settingsFileExists: exists(path.join(workspace, 'settings.json')),
     projectSettingsFile: projectSettingsFile(project), projectSettingsFileExists: exists(projectSettingsFile(project)),
-    runs, lastRun, openGates, decidedGates, sync, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
+    runs, lastRun, openGates, decidedGates, sync, env, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
     // The per-session safety caps, sized for the confirm screen: ceilings, never estimates.
     caps: ['plan', 'build', 'audit', 'verify', 'fix'].filter((k) => config.budgets[k]).map((k) => ({ session: k, size: capSize(config.budgets[k].wallMin), minutes: config.budgets[k].wallMin, usd: config.budgets[k].usd, model: config.budgets[k].model ?? null, effort: config.budgets[k].effort ?? null })),
   };
@@ -1932,7 +2064,7 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
   const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
@@ -1952,6 +2084,22 @@ async function main(argv) {
     if (o.json) console.log(JSON.stringify(pre, null, 2));
     else { pre.refuse.forEach((r) => console.log(`REFUSE: ${r}`)); pre.epics.forEach((e) => console.log(`${e.label}  [${e.eligibility}${e.humanCheck ? ', human check' : ''}]  deps: ${e.deps.join(', ') || '—'}  ${e.reasons.join('; ')}`)); }
     return pre.ok ? 0 : 1;
+  }
+  if (cmd === 'prepare') {
+    if (!o.project) throw new Error('prepare needs --project');
+    const root = path.resolve(o.project);
+    const ws = path.resolve(wsArg ?? `${root}.autopilot`);
+    const config = loadConfig(ws, { project: root });
+    const result = new Run({ workspace: ws, runName: '(prepare)', config, pluginDir: PLUGIN_DIR, verbose: false }).prepare();
+    result.env = envFacts(root, ws, config);
+    console.log(JSON.stringify(result, null, 2));
+    return result.ok ? 0 : 1;
+  }
+  if (cmd === 'configure') {
+    if (!o.project) throw new Error('configure needs --project');
+    if (o.setup === undefined && o.copy === undefined) throw new Error('configure needs --setup or --copy (an empty value removes the entry)');
+    console.log(JSON.stringify(configureProject(path.resolve(o.project), { setup: o.setup, copy: o.copy === undefined ? undefined : String(o.copy).split(',') }), null, 2));
+    return 0;
   }
   if (cmd === 'run') {
     if (!o.project && !wsArg) throw new Error('run needs --project or --workspace');

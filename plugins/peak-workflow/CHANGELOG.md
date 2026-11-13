@@ -10,6 +10,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Autopilot clone environment** — `setup` (a command) and `copy` (git-ignored files) in
+  `.claude/peak-workflow/autopilot.json` give the private clone what git does not carry; the driver
+  applies them at run start and after each merge.
+- **Autopilot readiness proof** — `driver.mjs prepare` makes the clone, applies `setup` and `copy`,
+  and runs the project's test command there before launch; readiness lists every git-ignored path
+  the clone lacks.
+- **Autopilot drafts its own setup** — the skill works out `setup` and `copy` from how the project
+  is built and tested, saves them through `driver.mjs configure` on the owner's confirmation, and
+  never launches while the proof fails.
+- **Autopilot missing-command message** — a test or setup command the shell cannot find (exit 126
+  or 127) is reported as "could not be run", with its own next step, instead of as failing tests.
 - **Autopilot `--effort`** — each session passes `--effort`: `high` for haiku and sonnet, `medium` for
   opus and fable. Override per step with `budgets.<step>.effort` in `<project>/.claude/peak-workflow/autopilot.json`.
 - **Autopilot driver (proof of concept)** — `scripts/autopilot/driver.mjs` runs queued epics
