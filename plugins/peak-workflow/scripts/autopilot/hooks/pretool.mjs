@@ -134,6 +134,13 @@ function parseBash(command) {
   });
 }
 
+/** The paths one command segment visibly writes: redirects and the arguments of commands that create, change or delete files. */
+function visibleWrites(s) {
+  const a = s.argv.slice(1).filter((x) => !x.startsWith('-'));
+  const more = ['touch', 'mkdir', 'rmdir', 'ln', 'chmod', 'chown', 'rsync'].includes(s.cmd) ? (s.cmd === 'rsync' || s.cmd === 'ln' ? a.slice(-1) : a) : [];
+  return [...bashWriteTargets([s]), ...more].filter((t) => t && !t.includes('://') && !t.startsWith('/dev/') && !t.startsWith('&'));
+}
+
 function ruleR2Bash(ctx, segs, command) {
   if (/\$\{?AUTOPILOT_(STATE|RUN|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot workspace');
   for (const s of segs) {
@@ -147,7 +154,9 @@ function ruleR2Bash(ctx, segs, command) {
       if (dirArg) {
         // Where a command goes, its relative writes follow: only the clone and the temp directories.
         const c = classify(ctx, t, { bash: true });
-        if (c !== 'rw') return deny('R2', `path jail — ${s.cmd} target: ${c === 'ro' ? `${t} is outside the private clone` : c}`);
+        // Going somewhere readable only to look (cd into a package cache, then ls and grep) is fine; going there in a command that also writes is not.
+        const looking = c === 'ro' && !ctx.strict && s.cmd !== 'git' && !segs.some((x) => visibleWrites(x).length);
+        if (c !== 'rw' && !looking) return deny('R2', `path jail — ${s.cmd} target: ${c === 'ro' ? `${t} is outside the private clone` : c}`);
         continue;
       }
       const p = t.replace(/^-{1,2}[A-Za-z][\w-]*=/, '').replace(/^\d*&?>>?/, '');
@@ -165,10 +174,7 @@ function ruleR2Bash(ctx, segs, command) {
     // With no sandbox the referee is what keeps writes inside the clone: every path a command visibly writes must be writable.
     // Best effort — a script or an interpreter can still write where its own code says.
     if (!ctx.strict) {
-      const a = s.argv.slice(1).filter((x) => !x.startsWith('-'));
-      const more = ['touch', 'mkdir', 'rmdir', 'ln', 'chmod', 'chown', 'rsync'].includes(s.cmd) ? (s.cmd === 'rsync' || s.cmd === 'ln' ? a.slice(-1) : a) : [];
-      for (const tgt of [...bashWriteTargets([s]), ...more]) {
-        if (!tgt || tgt.includes('://') || tgt.startsWith('/dev/')) continue;
+      for (const tgt of visibleWrites(s)) {
         const c = classify(ctx, tgt, { bash: true });
         if (c !== 'rw') return deny('R2', `path jail — ${c === 'ro' ? `${tgt} is outside the private clone: a session writes only inside it` : c}`);
       }

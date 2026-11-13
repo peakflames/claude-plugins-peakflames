@@ -174,6 +174,9 @@ test('R2 with the sandbox off (the default): a session reads anywhere but privat
   denied(h.bash('mkdir -p ~/scratch && touch ~/scratch/a'), 'R2', /writes only inside it/);
   denied(h.bash('sed -i "" s/a/b/ /etc/hosts'), 'R2', /writes only inside it/);
   denied(h.bash('cd ~/Documents && rm -rf old'), 'R2', /cd target/);
+  passes(h.bash("cd ~/.nuget/packages/x/lib && ls; f=$(ls */X.xml | tail -1); grep -o 'T:X[^\"]*' $f | head 2>/dev/null"), 'cd somewhere readable only to look (seen live)');
+  denied(h.bash('cd ~/Documents && echo hi > note.txt'), 'R2', /cd target/);
+  denied(h.bash('cd ~/.ssh && ls'), 'R2', /credentials/);
   denied(h.bash(`git -C ${h.project} commit -m y`), 'R2', /git target/);
   denied(h.bash('ls "$AUTOPILOT_STATE/gates"'), 'R2', /may not name/);
   // A link out of the clone is still seen for what it is.
