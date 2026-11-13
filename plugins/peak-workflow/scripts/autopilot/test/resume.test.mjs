@@ -498,7 +498,7 @@ test('auditor outage fails closed with a resume gate: the next run audits again 
   assert.deepEqual(readJson(p.dir(E1.id, 'audit-1', 'bundle', 'bundle.json')).steps, ['build-1']);
 });
 
-test('resume gate (STOP mid-build): the STOP file is cleared, and resuming finishes the half-built branch through the one fix round', async (t) => {
+test('resume gate (STOP mid-build): the STOP file is cleared, and resuming continues the build in a new session instead of checking a half-built branch', async (t) => {
   const p = makeProject(t);
   p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'hang' }] } });
   const running = p.go();
@@ -508,14 +508,51 @@ test('resume gate (STOP mid-build): the STOP file is cleared, and resuming finis
   assert.ok(!fs.existsSync(path.join(p.state, 'STOP')), 'a STOP that was honoured does not stop the next run');
   assert.deepEqual([gate(p, E1.id).kind, gate(p, E1.id).phase], ['resume', 'CHECK_BUILD']);
   const tip = git(p.clone, 'rev-parse', E1.branch);
-  decide(p, E1.id, ANSWERS.resume);
+  assert.match(git(p.clone, 'log', '-1', '--format=%s', E1.branch), /^wip\(autopilot\)/);
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'BUILD');
+  assert.equal(JSON.parse(cli('preflight', '--project', p.project, '--workspace', p.state, '--json', '--allow-test-double').stdout).epics.find((e) => e.id === E1.id).gate.enters, 'BUILD');
 
-  p.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: buildActions(E1) }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  p.scenario({ [`${E1.id}/build`]: buildScript(E1), [`${E1.id}/verify`]: wrapupScript(E1) });
   const r = await again(p);
 
-  assert.deepEqual(r.steps, ['fix-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
-  assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).fixRounds], ['MERGED', 1]);
+  assert.deepEqual(r.steps, ['build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`), 'no check before the build, no fix round');
+  assert.match(r.calls[0].prompt, /^An earlier session started this work and was stopped before it finished\.[\s\S]*wip\(autopilot\)[\s\S]*\n\nImplement the following plan:\n\n# Plan — epic Lg1Csv7/);
+  assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).fixRounds, p.epic(E1.id).resumed.phase], ['MERGED', 0, 'BUILD']);
+  assert.equal(readJson(p.dir(E1.id, 'check-build-1.json')).pass, true);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /resuming at BUILD on .*build-1 was cut short/);
+  // The auditor reads both build sessions: the one that was stopped and the one that finished.
+  assert.deepEqual(readJson(p.dir(E1.id, 'audit-1', 'bundle', 'bundle.json')).steps, ['build-1', 'build-1']);
   assert.ok(merged(p, tip), 'the WIP commit is part of what merged');
+});
+
+test('STOP honoured by the referee (the session ends itself with a success line): parked as stopped, and resumed at BUILD', async (t) => {
+  const p = makeProject(t, { config: { timing: { pollMs: 600000, killGraceMs: 300, infraRetryMs: 0 } } }); // the driver's own STOP poll stays out of it
+  // As seen live: the hook ends the session at its next tool call, before the driver's poll kills it.
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'exec', cmd: 'touch "{{state}}/STOP"' }, { do: 'tool', tool_name: 'Bash', tool_input: { command: 'ls' } }] } });
+  await p.go();
+  assert.match(p.epic(E1.id).reason, /stopped by the STOP file during build-1/);
+  assert.equal(readJson(p.dir(E1.id, 'build-1', 'result.json')).terminal_reason, 'hook_stopped');
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'BUILD');
+  p.scenario({ [`${E1.id}/build`]: buildScript(E1), [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+  assert.deepEqual(r.steps, ['build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+});
+
+test('a gate an earlier driver wrote ("stopped before CHECK_BUILD" after a build the referee ended) follows the same rule; a build that ended by itself is still checked', async (t) => {
+  const p = makeProject(t, { config: { timing: { pollMs: 600000, killGraceMs: 300, infraRetryMs: 0 } } });
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'exec', cmd: 'touch "{{state}}/STOP"' }, { do: 'tool', tool_name: 'Bash', tool_input: { command: 'ls' } }] } });
+  await p.go();
+  // Rewritten as driver 0.4.0 left it: the session counted as ended, and the run stopped before the check.
+  const file = path.join(p.state, 'gates', `${E1.id}-1.json`);
+  fs.writeFileSync(file, JSON.stringify({ ...readJson(file), question: 'stopped: run stopped (STOP file) before CHECK_BUILD. Continue it in the next run?' }));
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'BUILD');
+  assert.equal(gateFacts(p.state, 'develop').get(E1.id).enters, 'BUILD');
+
+  // The same branch, had its session ended by itself: the rule leaves it to CHECK_BUILD and the repair round.
+  const result = p.dir(E1.id, 'build-1', 'result.json');
+  fs.writeFileSync(result, JSON.stringify({ ...readJson(result), terminal_reason: 'completed' }));
+  assert.equal(gateFacts(p.state, 'develop').get(E1.id).enters, 'CHECK_BUILD');
 });
 
 // ---- void decisions, waiting gates -------------------------------------------------------------

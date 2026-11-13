@@ -365,9 +365,32 @@ export function gateFacts(workspace, integration, { integrationTip = null } = {}
         else f.behind = Number(gitRun(clone, 'rev-list', '--count', `${tip}..${dev}`).out || 0); // commits on the integration line the branch has not seen
       }
     }
-    facts.set(id, why ? { ...f, state: 'void', why } : { ...f, state: 'resume', entry, enters: entry.phase });
+    facts.set(id, why ? { ...f, state: 'void', why } : { ...f, state: 'resume', entry, enters: resumePhase(workspace, g, entry.phase) });
   }
   return facts;
+}
+
+/**
+ * Where a `resume` gate that names CHECK_BUILD really re-enters. A build that was cut short (STOP,
+ * a budget, the wall clock, an infra error) left a part-built branch: checking it fails every check
+ * and spends the one repair round on it. So when the branch tip is the driver's `wip(autopilot)`
+ * commit, or the sidecar on the branch is not `Implemented`, and the last build session did not
+ * end by itself, the epic re-enters the build (or the repair) and a session continues the work.
+ * Judged from files and git only, so a gate written by an earlier driver follows the same rule.
+ */
+export function resumePhase(workspace, g, phase) {
+  if (phase !== 'CHECK_BUILD' || g.kind !== 'resume' || !g.branch || !g.epic) return phase;
+  const clone = path.join(workspace, 'clone'); const ref = `refs/heads/${g.branch}`;
+  const subject = gitRun(clone, 'log', '-1', '--format=%s', ref);
+  if (subject.code !== 0) return phase;
+  const sidecar = parseSidecar(gitShow(clone, ref, path.posix.join(PLAN_DIR, 'status', `epic-${g.epic}.md`)));
+  if (!subject.out.startsWith('wip(autopilot)') && sidecar.fields.status === 'Implemented') return phase;
+  const rec = tryJson(path.join(workspace, 'epics.json'), {})?.[g.epic] ?? {};
+  const last = (rec.buildSteps ?? []).at(-1);
+  const result = last ? tryJson(path.join(workspace, last.dir, 'result.json')) : null;
+  // `hook_stopped` is the referee ending the session (the STOP file): a success line, and still not the session's own end.
+  if (result?.subtype === 'success' && result.terminal_reason !== 'hook_stopped') return phase;
+  return /^fix-/.test(last?.name ?? '') && rec.fixBrief ? 'FIX_BUILD' : 'BUILD';
 }
 
 // ---- sync with the project (plan P3.5 Part 3) --------------------------------------------------
@@ -735,9 +758,23 @@ If a listed fix cannot be made as asked, or making it would leave a requirement 
 }
 
 /** `prompt.md` for a build session: Claude Code's clear-context handoff, minus the transcript pointer. */
-export function buildPrompt(plan, pluginDir = PLUGIN_DIR) {
-  return 'Implement the following plan:\n\n' + plan.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
+export function buildPrompt(plan, pluginDir = PLUGIN_DIR, { continuing = false } = {}) {
+  return (continuing ? CONTINUE_LEAD : '') + 'Implement the following plan:\n\n' + plan.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
 }
+
+/** What a session is told first when it takes over a build or a repair that was cut short. */
+export const CONTINUE_LEAD = `An earlier session started this work and was stopped before it finished. Nothing is wrong with what
+it did: it ran out of time or the run was stopped. Its work is on the branch, and whatever it had
+not committed is there as a commit named \`wip(autopilot): uncommitted work at park\`.
+
+Before you change anything: read everything below, then find out what is already done — \`git log\`
+on the branch, the files, the tests, the status sidecar. Continue from the first item that is not
+done. Do not redo an item that is finished, and do not start over. Treat a half-written file as
+unfinished: read it, finish it, and run the tests before you rely on it. "Execute every item in
+order" applies to the items that are left. Close out exactly as written below; your last commit
+is the normal one, on top of the \`wip(autopilot)\` commit.
+
+`;
 
 // ---------------------------------------------------------------------------------------------
 // Dry run
@@ -1081,7 +1118,7 @@ class Run {
       kind: 'resume', skillStep: 'autopilot driver', phase,
       question: `${this.meta(e).label} stopped: ${reason}. Continue it in the next run?`,
       options: [ANSWERS.resume, ANSWERS.startOver],
-      why: `nothing was decided for you: the run stopped the epic before ${phase}. "${ANSWERS.resume}" re-enters at ${phase} on the same branch; "${ANSWERS.startOver}" plans it again from scratch`,
+      why: `nothing was decided for you: the run stopped the epic before ${phase}. "${ANSWERS.resume}" re-enters at ${phase} on the same branch${phase === 'CHECK_BUILD' ? ' (or, when the build session was cut short, a new session continues the build from what is committed there)' : ''}; "${ANSWERS.startOver}" plans it again from scratch`,
       artifacts: e.lastStep ? [this.rel(path.join(this.epicDir(e), e.lastStep))] : [],
     });
     return this.park(e, reason);
@@ -1175,11 +1212,13 @@ class Run {
 
     const sub = s.result?.subtype;
     if (s.killed === 'STOP file') s.outcome = 'stopped';
+    // The referee ends a session at its next tool call once STOP exists (rule R1); that arrives as a success line, often before the poll here sees the file.
+    else if (!s.killed && kind !== 'plan' && s.result?.terminal_reason === 'hook_stopped' && this.stopRequested()) { s.outcome = 'stopped'; s.stoppedBy = 'STOP file'; }
     else if (s.killed) s.outcome = 'budget';
     else if (sub === 'error_max_turns' || sub === 'error_max_budget_usd') s.outcome = 'budget';
     else if (s.exitCode === 0 && sub === 'success') s.outcome = 'ok';
     else s.outcome = 'infra';
-    s.why = s.killed ?? (s.outcome === 'ok' ? 'success' : sub ?? s.spawnError ?? `exit ${s.exitCode ?? s.signal}, no result line`);
+    s.why = s.killed ?? s.stoppedBy ?? (s.outcome === 'ok' ? 'success' : sub ?? s.spawnError ?? `exit ${s.exitCode ?? s.signal}, no result line`);
 
     const cost = s.result?.total_cost_usd ?? 0;
     this.state.spentUsd = +(this.state.spentUsd + cost).toFixed(4);
@@ -1245,12 +1284,14 @@ class Run {
 
   async doBuild(e, fix) {
     const brief = path.join(this.epicDir(e), 'fix-brief.md');
+    const continuing = !!e.continuing; // set by `enter` when this session takes over one that was cut short
     const s = await this.step(e, fix ? 'fix' : 'build', (stepDir) => {
-      (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir) }); // what the next audit reads, in this run or a later one
-      fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir));
+      (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir), ...(continuing ? { continues: e.continuing } : {}) }); // what the next audit reads, in this run or a later one
+      fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? (continuing ? CONTINUE_LEAD : '') + fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir, { continuing }));
       fs.writeFileSync(path.join(stepDir, 'build-rules.md'), fix ? FIX_RULES : BUILD_RULES);
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
     });
+    if (s) e.continuing = null; // it ended by itself: what follows is judged like any build
     return s ? 'CHECK_BUILD' : null;
   }
 
@@ -1745,6 +1786,10 @@ class Run {
     if (f?.state === 'resume') {
       const g = readJson(this.gatePath(f.gate)); const rec = this.records()[e.id] ?? {};
       const entry = f.entry; let phase = entry.phase;
+      // A build that was cut short is continued, not checked (see `resumePhase`).
+      const to = resumePhase(this.stateDir, g, phase);
+      const fixBrief = rec.fixBrief ?? null;
+      if (to !== phase && (to === 'BUILD' ? rec.plan && exists(path.join(this.stateDir, rec.plan)) : fixBrief)) { phase = to; e.continuing = (rec.buildSteps ?? []).at(-1)?.name ?? 'an earlier session'; }
       Object.assign(e, { fixRounds: rec.fixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [] });
       if (rec.fixBrief) fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'), rec.fixBrief);
       e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null };
@@ -1768,7 +1813,7 @@ class Run {
       if (f.kind === 'audit' && phase === 'VERIFY') e.auditOverruled = { gate: f.gate, by: g.decided.by };
       if (!entry.question) used(); // a question gate is marked used by hook R8 when it answers
       e.resumed.behind = f.behind ?? 0;
-      this.log(`${e.id}: resuming at ${phase} on ${g.branch} (${String(g.branchTip).slice(0, 9)}${f.behind ? `, ${f.behind} commit(s) behind ${this.state.integration}; it merges cleanly` : ''}): ${g.decided.by} answered "${f.answer}" on ${f.gate}`);
+      this.log(`${e.id}: resuming at ${phase} on ${g.branch} (${String(g.branchTip).slice(0, 9)}${f.behind ? `, ${f.behind} commit(s) behind ${this.state.integration}; it merges cleanly` : ''}): ${g.decided.by} answered "${f.answer}" on ${f.gate}${e.continuing ? ` — ${e.continuing} was cut short, so a session continues it instead of checking a part-built branch` : ''}`);
       return phase;
     }
     if (f?.state === 'void') {
@@ -2065,7 +2110,7 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   const entry = gateEntry(gate);
   return {
     gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect: 'resume',
-    enters: entry?.fresh ? 'PLAN (from scratch, on a fresh branch)' : entry?.phase ?? null,
+    enters: entry?.fresh ? 'PLAN (from scratch, on a fresh branch)' : entry?.phase ? resumePhase(workspace, gate, entry.phase) : null,
     validWhile: entry?.fresh ? null : `${gate.branch} stays at ${String(gate.branchTip).slice(0, 9)} and still merges cleanly into the integration line; otherwise the decision is void and the epic is planned again`,
     resume: gate.resume ?? null,
   };
