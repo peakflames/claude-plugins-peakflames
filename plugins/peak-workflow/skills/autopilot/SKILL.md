@@ -479,6 +479,16 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    `No — never spend`. The answer is the run's `realSpend`. Without it a session decides
    nothing by itself: it stops and asks. Skip this question when nothing is copied in (no
    session has a key to spend with), and in `dry-run` mode.
+
+   **Whether they will be there, asked in the same popup.** Add one more question to this
+   same `AskUserQuestion` call: "Will you be at this computer while it runs? Some checks can
+   only be finished by a person, such as a sign-in in a browser." — options
+   `No — I'll be away`, with the description "Nothing waits for you. Those checks are listed
+   at the end as not proven for real, each with the command to run by hand", and
+   `Yes — I'm here`, with the description "A step that needs you tells you, and waits about
+   five minutes". The answer is the run's `attended`. When the owner says in any answer that
+   they will be away, that is `false`, whatever was picked. Skip this question in `dry-run`
+   mode.
    - **Change:** take the change in plain text. (In `dry-run` mode nothing below is saved:
      show the dry run with the change applied in words only.) The owner may remove epics, reorder them (an
      epic never before one of its dependencies — refuse and say why), change the run budget,
@@ -519,7 +529,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      "endBy": null,
      "runBudgetUsd": <launch.config.runBudgetUsd, or the amount the owner chose>,
      "autoContinue": 2,
-     "realSpend": true
+     "realSpend": true,
+     "attended": false
    }
    ```
 
@@ -528,7 +539,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    per epic the owner's standing answer covers: `2` when they launched on the question as
    asked, the number they chose, or `0` when they turned it off. Never above what they agreed to.
    `realSpend` is the owner's answer to the real-money question: `true` or `false`, exactly as
-   they answered; leave the key out when the question was not asked. Never write `true` unasked. Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
+   they answered; leave the key out when the question was not asked. Never write `true` unasked.
+   `attended` is the owner's answer to whether they will be at the computer: `false` when
+   they will be away, `true` when they are here. Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
    A run's `config.json` holds only what belongs to that run. A step's model, effort and caps
    live in the project's `autopilot.json` (saved through `DRIVER configure`); scope, audit and
    the like live in `<ws>/settings.json`, which this skill never writes. This is the only file
@@ -604,6 +617,8 @@ A driver is running (you launched it, or Step 0 found it). Stay with it until it
    - A milestone — a step starting or finishing, a check, the reviewer's result, a merge —
      is relayed as it is. A merge line that ends "N thing(s) not proven for real" keeps that
      ending: the closing screen lists them. Several that arrive together are one short message.
+   - `Progress: …` — where the whole run stands (merged, waiting for you, still to go). It
+     comes after each epic ends in a run of more than one; relay it with that epic's line.
    - A `still …` heartbeat and a `TESTS passed` line are not relayed. `TESTS failed` is not
      either: a build session fixing its own tests is routine. Say them only when asked.
    - A `REFUSED …` line is kept for the closing screen's friction list, not relayed. One
@@ -616,6 +631,11 @@ A driver is running (you launched it, or Step 0 found it). Stay with it until it
      in a browser, usually). Relay it at once, as "Needs you now: <what>", say they run
      nothing themselves, and send the push notification of item 5. This is not a gate: there
      is nothing to answer here.
+   - `NO LONGER NEEDS YOU: …` — that step has ended: done, or it gave up waiting. Relay it at
+     once, in its own words, so the owner does not go looking for a window that is gone:
+     "That sign-in is done" or "Nobody was there for the sign-in, so it gave up after N min;
+     you do not need to do it now. What it left unproven is on the closing screen." Never
+     say whether a `NEEDS YOU` step was done from anything but this line.
    - `One command has been running for N min: …` — relay it as it is, once. If it reads like
      something that waits for a person, say so: "If a window opened on your screen, it is
      waiting for you."

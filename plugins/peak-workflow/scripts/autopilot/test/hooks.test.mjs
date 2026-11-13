@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR } from '../driver.mjs';
+import { offeredLabel } from '../hooks/pretool.mjs';
 import { E1, git, makeProject, planText, readJson } from './helpers.mjs';
 
 const HOOKS = path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'hooks');
@@ -420,6 +421,23 @@ test('R8 human-check: the verify session the driver resumes answers the manual-v
   assert.match(r.out.hookSpecificOutput.updatedInput.annotations[q].notes, /^Recorded by autopilot from the owner's decision, not typed in this session: Pat Owner looked at clone:tests\/manual\/TOR-05-Vw8Kp2d\.md on 2026-11-12 \(branch tip abcdef012\) and answered "Looks right" — "labels readable"\./);
   assert.match(r.out.hookSpecificOutput.permissionDecisionReason, /the owner's recorded decision/);
   parked(v.ask(q, ['Maybe', 'Skip'])); // neither the look's "Yes" nor the policy's "No" is offered
+});
+
+test('R8 a pre-approved answer still applies when the session shortened or padded the option; two options that fit is no match', (t) => {
+  const v = referee(t, { role: 'verifier' });
+  const q = 'Did you perform any manual verification of Epic X beyond the automated gates I ran?';
+  // Seen live: the skill's option "No — only automated gates were run" was offered as "No — only automated gates", and a passing epic parked.
+  answered(v.ask(q, ['No — only automated gates', 'Yes — I verified by hand']), q, 'No — only automated gates');
+  answered(v.ask(q, ['Yes — I did', 'No — only automated gates were run by you']), q, 'No — only automated gates were run by you');
+  assert.equal(offeredLabel(['Proceed with care', 'Proceed with caution'], 'Proceed'), undefined, 'one word is not enough to go on');
+  assert.equal(offeredLabel(['No — only automated gates', 'No — only automated gates were'], 'No — only automated gates were run'), undefined, 'two options fit: no guess');
+  assert.equal(offeredLabel(['Start it', 'Start it later'], 'Start it'), 'Start it', 'the same words win');
+  assert.equal(offeredLabel(['No — only automated gatesmen'], 'No — only automated gates'), undefined, 'a word boundary, not a letter');
+  parked(v.ask(q, ['No', 'Yes']));
+  // The owner looked: an option that says so is used even reworded, and without one the policy "No" never stands in.
+  fs.writeFileSync(path.join(v.step, 'step.json'), JSON.stringify({ look: { gate: 'gates/x-1.json', by: 'Pat Owner', date: '2026-11-12', branchTip: 'abcdef0123456789', artifacts: [] } }));
+  parked(v.ask(q, ['No — only automated gates', 'Yes — I verified by hand']));
+  assert.match(v.gate(2).why, /the owner looked at this build, and none of the options offered says a manual check was done/);
 });
 
 test('workspace layout: the jail covers everything but clone/, in this run and every other; hooks read the current run', (t) => {

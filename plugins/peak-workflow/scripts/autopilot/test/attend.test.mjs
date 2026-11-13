@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, ensureResumeGates, gateReason, newRunName, standingCovers, strayProcesses } from '../driver.mjs';
+import { progressLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, lines: () => r.stdout.trim().split('\n'), json: () => JSON.parse(r.stdout) }; };
@@ -329,7 +330,47 @@ test('watch and status see inside the step: a command marked "Needs you:" is sai
   await waitFor(() => !alive(run.pid));
   assert.equal(p.epic(E1.id).state, 'MERGED');
   assert.equal(w.lines().filter((l) => /^NEEDS YOU|^One command/.test(l)).length, 2, 'each said once');
+  // How the wait ended is said too: nobody is left looking for a window that is gone.
+  assert.deepEqual(w.lines().filter((l) => /^NO LONGER NEEDS YOU/.test(l)), ['NO LONGER NEEDS YOU: done after 0 min — sign in to Okta in the browser window that opens']);
   assert.equal(st(p, '--queue', E1.id).inFlight, null);
+});
+
+test('a command the owner was called for and that gave up is said so; only an exit that is the test command\'s own says how the tests went', async (t) => {
+  const p = makeProject(t);
+  const line = (row) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), tool_name: 'Bash', ...row })}\n` });
+  const mark = (name) => ({ do: 'write', path: `{{state}}/${name}`, content: '' });
+  const until = (name) => ({ do: 'exec', cmd: `while [ ! -f "{{state}}/${name}" ]; do sleep 0.05; done` });
+  const needs = { command: 'python build.py mcp tools --oauth', description: 'Needs you: sign in to Okta' };
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [
+    line({ hook: 'PreToolUse', decision: 'pass', tool_use_id: 'n1', tool_input: needs }), mark('at-1'), until('go-1'),
+    line({ hook: 'PostToolUseFailure', tool_use_id: 'n1', tool_input: needs, error: 'OAuth callback timed out after 300.0 seconds' }),
+    // Seen live: a command that only names `test-live`, and dies on a shell typo, is not a test result.
+    line({ hook: 'PostToolUseFailure', tool_use_id: 'x1', tool_input: { command: 'python build.py status; echo ===LIVE; node --test-live 2>&1 | tail -6' } }),
+    line({ hook: 'PostToolUseFailure', tool_use_id: 'x2', tool_input: { command: 'node --test; echo done' } }),
+    line({ hook: 'PostToolUseFailure', tool_use_id: 'x3', tool_input: { command: 'cd . && node --test > /tmp/t.log 2>&1' } }),
+    ...wrapupScript(E1).actions], result: { result: 'Verdict: PASS', total_cost_usd: 1.3 } } });
+  const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
+  t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
+  await waitFor(() => fs.existsSync(path.join(p.state, 'at-1')));
+  const w = startWatch(p);
+  t.after(() => w.child.kill('SIGKILL'));
+  await waitFor(() => w.lines().some((l) => /^NEEDS YOU/.test(l)));
+  fs.writeFileSync(path.join(p.state, 'go-1'), '');
+  assert.equal(await w.done, 0);
+  await waitFor(() => !alive(run.pid));
+  assert.deepEqual(w.lines().filter((l) => /NEEDS YOU/.test(l)), ['NEEDS YOU: sign in to Okta', 'NO LONGER NEEDS YOU: it gave up after 0 min without that being done — sign in to Okta (OAuth callback timed out after 300.0 seconds)']);
+  assert.deepEqual(w.lines().filter((l) => /^TESTS/.test(l)), ['TESTS failed'], 'one result: the command that ended with the test command');
+  assert.deepEqual(unansweredNeeds(p.dir(E1.id, 'verify-1', 'hooks.jsonl')).map((u) => [u.description, u.command, u.minutes]), [['sign in to Okta', 'python build.py mcp tools --oauth', 0]]);
+
+  const test = '.venv/bin/python build.py test';
+  for (const [command, known] of [[test, true], [`cd x && ${test} 2>&1`, true], [`${test} > /tmp/x.log 2>&1`, true], [`echo a; ${test} --filter X`, true], [`${test}-live`, false], [`${test} | tail -3`, false], [`${test}; echo done`, false], [`x${test}`, false], ['echo hi', false]]) assert.equal(testsOutcomeKnown(command, test), known, command);
+  assert.equal(testsOutcomeKnown(test, ''), false);
+});
+
+test('the progress line counts how each epic of the run ended, and what is still to go', () => {
+  assert.equal(progressLine(new Map([['a', 'merged'], ['b', 'parked']]), 3), 'Progress: 1 merged, 1 waiting for you, 1 still to go (3 epics in this run)');
+  assert.equal(progressLine(new Map([['a', 'merged'], ['b', 'failed'], ['c', 'blocked']]), 3), 'Progress: 1 merged, 1 did not pass, 1 not started, 0 still to go (3 epics in this run)');
+  assert.equal(progressLine(new Map(), 2), 'Progress: 2 still to go (2 epics in this run)');
 });
 
 test('a process a session leaves running out of the clone is stopped when the session ends, and the log says so', async (t) => {

@@ -26,26 +26,26 @@ Outcome: one command typed, three popups answered, epic merged in the clone, pro
 
 ### Major
 
-1. **A pre-approved answer does not apply when the session shortens the option label.** The
+1. **[Fixed 2026-11-13]** **A pre-approved answer does not apply when the session shortens the option label.** The
    wrapup-epic skill and `policy/gates.json` both say "No — only automated gates were run"; the
    verify session offered "No — only automated gates". R8 found no option equal to the answer and
    parked a finished, passing epic. Cost: a stopped run, a phone push, an owner question and a
    relaunch. *Hook R8 (`hooks/pretool.mjs`).* Fix: match the pre-approved answer to an option
    tolerantly (normalised case and punctuation, then prefix either way, then the unique option
    sharing its leading words); park only when no option or more than one fits.
-2. **Nothing reports how a `NEEDS YOU` command ended.** The sign-in timed out at 11:31; a minute
+2. **[Fixed 2026-11-13]** **Nothing reports how a `NEEDS YOU` command ended.** The sign-in timed out at 11:31; a minute
    later the attending session told the owner it "may still be waiting", then at step end "no
    longer needs you", then retracted that ("I don't actually know whether the sign-in was completed
    or skipped"). The phone push is never corrected. *Driver (`Run.event`) / `attend.mjs` / skill
    Step 3b.* Fix: when a `Needs you:` command returns, emit a closing line with the outcome
    (done, or "nobody answered; it gave up after N min"), and have the skill relay it.
-3. **The same human-only step is tried twice in one epic with nobody there.** Build and verify
+3. **[Fixed 2026-11-13]** **The same human-only step is tried twice in one epic with nobody there.** Build and verify
    each opened the Okta sign-in and each waited the full 5 minutes: 10 minutes of the 31-minute
    run and two phone pings for a check that never ran. *Driver (`BUILD_RULES`, `VERIFY_RULES`).*
    Fix: build sessions do not start steps that need a person (record them as not proven);
    remember per epic that a `Needs you:` command went unanswered and tell later sessions not to
    retry it; at launch, ask whether the owner will be at the computer.
-4. **A resumed session's cost is counted twice (confirmed in the afternoon run's data).** In the
+4. **[Fixed 2026-11-13]** **A resumed session's cost is counted twice (confirmed in the afternoon run's data).** In the
    result message of a `--resume --fork-session` session, `usage` is the session's own, but
    `modelUsage` and `total_cost_usd` include the parent: Opus cache-read 4,348,585 = 2,130,400
    (parent) + 2,218,185 (own); cache-write 138,482 = 111,034 + 27,448; output 21,660 = 12,083 +
@@ -133,7 +133,7 @@ No Okta prompt, no `NEEDS YOU`, no wording-mismatch park: two epics merged with 
 
 #### Major
 
-17. **The watch says `TESTS failed` when no test failed.** A verify command that only contained
+17. **[Fixed 2026-11-13]** **The watch says `TESTS failed` when no test failed.** A verify command that only contained
     `build.py test-live` died on a shell typo (`echo ===LIVE` in zsh) before any test ran; the
     owner-facing line was `TESTS failed`. *`attend.mjs` `watch` (the `testCommand` check).* Fix:
     match the test command on a word boundary (`test` must not match `test-live`); say "failed"
@@ -142,11 +142,11 @@ No Okta prompt, no `NEEDS YOU`, no wording-mismatch park: two epics merged with 
 
 #### Minor
 
-18. **Nowhere to record "I will not be at the computer".** The owner typed it into the real-money
+18. **[Fixed 2026-11-13]** **Nowhere to record "I will not be at the computer".** The owner typed it into the real-money
     answer; the run config has no field for it and no session was told. Only the PeakMedia fix
     kept the browser sign-in away. *Skill Step 2 / run config / `BUILD_RULES`, `VERIFY_RULES`.*
     Fix with major 3: an `attended` answer at launch that sessions receive as a rule.
-19. **Whether the manual-verification question parks is luck.** Both verify sessions quoted the
+19. **[Fixed 2026-11-13]** **Whether the manual-verification question parks is luck.** Both verify sessions quoted the
     option verbatim this time and policy answered; the morning session shortened it and parked.
     Same fix as major 1.
 20. **A "this test cannot fail" review note does not reach the run state.** `EYGrros` F1 (medium,

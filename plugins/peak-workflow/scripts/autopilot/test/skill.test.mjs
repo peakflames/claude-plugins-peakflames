@@ -250,6 +250,9 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     // The owner decides about real money once, at launch; no session decides it silently.
     '**Not proven for real:** <only when `unproven` has entries>', 'Never soften it, never leave one out, and never fold it into a count.',
     '**Real money, asked in the same popup.**', '`Yes — when a check needs it (Recommended)`', '`No — never spend`', '"realSpend": true', 'Never write `true` unasked.',
+    // Seen live: with the owner away, two sessions each waited five minutes on a browser sign-in, and nobody could say how it ended.
+    '**Whether they will be there, asked in the same popup.**', "`No — I'll be away`", "`Yes — I'm here`", '"attended": false', 'that is `false`, whatever was picked',
+    '`NO LONGER NEEDS YOU: …`', 'Never say whether a `NEEDS YOU` step was done from anything but this line.', '`Progress: …`',
   ]) assert.ok(flat.includes(rule), rule);
   // Every answer `driver.mjs status` can give has its row in Step 0.
   for (const next of ['attend', 'decide', 'continue', 'readiness', 'fetch', 'nothing']) assert.match(SKILL, new RegExp(`^\\| \`${next}\` \\| `, 'm'), next);
