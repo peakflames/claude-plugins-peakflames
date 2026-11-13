@@ -12,6 +12,7 @@
   "budgetUsd": 80,
   "testCommand": "node --test",
   "baseRed": null,
+  "setupFailed": null,
   "driverVersion": "0.2.0",
   "sync": null,
   "stoppedOnPark": null,

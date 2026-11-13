@@ -18,9 +18,11 @@ work yourself.
 
 **Four things this skill never does.** They hold in every mode, whatever the user says mid-skill:
 
-1. **It never edits project code** — or any file in the project. It writes only inside the
-   workspace (a sibling of the project), and only the new run's `config.json` and, through the
-   driver, a gate's recorded answer.
+1. **It never edits project code** — or any file in the project, with one exception: the `setup`
+   and `copy` entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
+   `DRIVER configure` after the owner confirms them (Step 1 item 5). Otherwise it writes only
+   inside the workspace (a sibling of the project): the new run's `config.json`, through the
+   driver a gate's recorded answer, and through `DRIVER prepare` the private clone.
 2. **It never runs `/peak-workflow:start-epic` or `/peak-workflow:wrapup-epic`**, and never does
    their work by hand. Only the driver's sessions build and verify.
 3. **It never answers a gate.** A parked gate is the owner's decision. Ask the gate's own
@@ -56,7 +58,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
 ## Step 1: Readiness
 
-1. Run `DRIVER preflight --project "<root>" --json`. It reads files only and changes nothing. It
+1. Run `DRIVER preflight --project "<root>" --json`. It reads files only and changes nothing
+   (item 5's `prepare` is the one readiness command that writes, and only in the workspace). It
    exits 1 when `ok` is false; a refusal in `launch.refuse` alone still exits 0, and the JSON is
    printed either way — always read it. If Node is
    missing or older than 22, say so and stop. Whenever this command is run again in this
@@ -81,7 +84,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
    **A test double.** If a refusal says `claudeBin` is not the real `claude`, `<ws>/settings.json`
    names a stand-in binary. If that is the only refusal and no epic is runnable, skip the
-   question and go to item 7. In `dry-run` mode, say that sessions would use the stand-in and
+   question and go to item 8. In `dry-run` mode, say that sessions would use the stand-in and
    carry on without asking (a dry run starts nothing). Otherwise say so plainly and ask with `AskUserQuestion`: "Sessions would use a
    stand-in binary (<its file name>), not real Claude Code. Is this run a rehearsal that should
    use it?" — options `Yes — this run is a rehearsal` and `No — stop here`. On no: stop — the
@@ -101,7 +104,75 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    the run builds on top of it (epics merged there show as already Complete); `same` — nothing
    to do; `no-clone` — the first run, which makes the clone at launch.
 
-5. **Readiness table.** One row per entry of `epics`, in the order given (phase and index order —
+5. **Make the copy able to build and test.** Autopilot works in a private copy of the project
+   (the clone), and a clone holds only what git carries. Everything git ignores — installed
+   dependencies, a virtual environment, a `.env`, local data — is missing from it unless the
+   project says how to get it there. Two entries in `launch.projectSettingsFile` say so:
+   `setup`, one shell command the driver runs in the clone before each run's first test check
+   (with network), and `copy`, the git-ignored files it copies in from the project each run.
+   Skip this item when no epic is runnable.
+
+   a. **Show what the copy starts without.** From `launch.env.ignored` (each entry has `path` and
+      `status`), under "In your project, but not in autopilot's copy": one line per entry, in
+      plain words — `copied` → "copied in each run"; `present` → "rebuilt in the copy"; `absent`
+      → "not carried over". Fold build output and caches (`bin/`, `obj/`, `target/`, `dist/`,
+      `__pycache__/`) into one line with a count. If the list is empty, say so in one line.
+
+   b. **Work out the two entries** when either is missing, or when the proof in item d fails.
+      Learn it from how the project is really built and tested without autopilot: read
+      `CLAUDE.md` (prerequisites, the `**Tests:**` and `**Run:**` lines, and every quality gate
+      `/peak-workflow:wrapup-epic` will run), the README, the manifests and lockfiles, the build
+      scripts, and any CI configuration. Reading the project is fine; changing it is not.
+      - `setup` rebuilds what can be rebuilt: a virtual environment and its packages, `npm ci`,
+        `dotnet restore`, `cargo fetch`, a code generator. It must work in a plain `/bin/sh`
+        with no alias and no activated environment, be safe to run again, and leave nothing git
+        would commit (so `npm ci`, never `npm install`). Include what the quality gates need,
+        not only the tests.
+      - `copy` lists only ignored files that cannot be rebuilt and that the tests or quality
+        gates read: a `.env`, a local configuration file. Never a dependency directory or build
+        output; never large data unless a test needs it.
+      - A `**Tests:**` line that names a shell alias or an activated environment (`python` for
+        `python3`, a bare tool that lives in `.venv/bin`) cannot run unattended. Say which line
+        and what it should say; the owner changes and commits it, you do not.
+
+   c. **Confirm, then save.** Show the two entries exactly as they will be saved, and for each
+      `copy` file one sentence: "The build sessions can read this file. They have no network, so
+      it cannot leave this machine, and git ignores it, so it is never committed." Ask with
+      `AskUserQuestion`: "Save these so autopilot's copy can build and test?" — options
+      `Save these`, `Change them`, `Skip — leave the copy as it is`. On save:
+
+      ```bash
+      node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --setup '<command>' --copy <path>,<path>
+      ```
+
+      It keeps the file's other keys and refuses a `copy` path that is missing or that git does
+      not ignore. Never write that file any other way, and do not commit it: the driver reads it
+      from the project as it is. Say once that the file is the owner's to commit so teammates
+      get the same setup.
+
+   d. **Prove it** — not in `dry-run` mode, which writes nothing: say the proof is skipped and
+      carry on. Run `DRIVER prepare --project "<root>"` with a ten-minute timeout. It makes the
+      clone (or brings it up to date), copies the files, runs `setup`, then runs the project's
+      test command in the clone, in the same plain shell a run uses. It writes only inside the
+      workspace and prints JSON; exit 1 means the proof failed.
+      - `ok: true` → one line: "Autopilot's copy builds and passes your tests (<n> files copied,
+        setup ran)." Then run the item 1 preflight again and use its output: the clone now exists.
+      - `failed: "copy"` → print `problems`. `failed: "setup"` or `"tests"` → print that step's
+        `tail`; when its `couldNotRun` is true say plainly that the command was not found in a
+        plain shell and the tests never ran, which is a missing tool or setup step and not a
+        failing test. `failed: "leftovers"` → `leftovers` lists files that setup or the tests
+        changed or created and git would commit; the fix is a different setup command or a
+        `.gitignore` line.
+      - Diagnose from the output, go back to item b with a corrected entry, and prove again —
+        at most three rounds, each confirmed by the owner. A fix that belongs in the project
+        (the `**Tests:**` line, `.gitignore`, a test that truly fails on `<integration>`) is the
+        owner's: say exactly what to change, and stop.
+      - **Never launch while the proof fails.** The run would stop at its first test check.
+
+      If the owner chose `Skip`, still run the proof: with no entries it passes for a project
+      that needs nothing git ignores.
+
+6. **Readiness table.** One row per entry of `epics`, in the order given (phase and index order —
    do not re-sort):
 
    | Column | Source |
@@ -115,7 +186,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    itself going to run to a merge tonight (a dependency that is skipped, waits for a decision,
    parks, or builds and then parks). The driver will not start it; say which dependency holds it.
 
-6. **Scope and cost review.** For each epic that will run, look at `scopeFlags`. For every
+7. **Scope and cost review.** For each epic that will run, look at `scopeFlags`. For every
    requirement listed there, print its Scenario with
    `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" text <TOR-ID>` and write **one plain
    paragraph**: what its Given or Then needs that an unattended session does not have or should
@@ -127,7 +198,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    flag is a false alarm. If no epic has a flag, print one line: "No requirement in the queue
    asks for network, keys, containers, big data, a long run or another platform."
 
-7. **Nothing runnable.** Before stopping, look at the skipped epics. If any is skipped only
+8. **Nothing runnable.** Before stopping, look at the skipped epics. If any is skipped only
    because its status is not `Not Started` or because it belongs to someone else (the two
    reasons Step 2 item 1 allows), list them and ask with `AskUserQuestion` (`multiSelect: true`, one option per
    epic, by label, plus `None — stop here`; a numbered plain-text list instead when there are
@@ -173,6 +244,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      for you: <skillStep> — <why>". Add: every other question parks; the plan is approved by a
      lint, not by a person; an auditor reads each build and a high finding in
      `launch.config.audit.parkOn` parks it.
+   - **The copy's environment:** the `setup` command and the `copy` files from `launch.env`
+     (or "none needed"), and that the copy passed the project's tests in Step 1 item 5. The
+     driver runs `setup` and the copy again at the start of the run and after each merge; a
+     session that adds a new dependency has no network to fetch it, and parks.
    - Where it runs: the private clone at `<launch.clone>`, on `launch.integration`. The clone is
      kept between runs. **Nothing is pushed.** The project directory is never written. Merged
      work is fetched by hand in the morning.
@@ -440,4 +515,5 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `runs/<run>/epics/<id>/…` | Every session's stream, referee log, plan, checks and audit |
 | `runs/<run>/report.md`, `report.json`, `autopilot.log` | The morning report and the driver's log |
 | `lock`, `STOP` | The single-instance lock and the kill switch, one per workspace |
-| `<project>/.claude/peak-workflow/autopilot.json` | Not written by autopilot: the owner's project settings, such as `"onPark": "continue"` |
+| `prepare.json` | The latest proof from Step 1 item 5: what was copied, how `setup` and the tests ended |
+| `<project>/.claude/peak-workflow/autopilot.json` | The owner's project settings, such as `"onPark": "continue"`. Autopilot writes only its `setup` and `copy` entries, through `driver.mjs configure`, after the owner confirms them |
