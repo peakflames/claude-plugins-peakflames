@@ -147,8 +147,11 @@ function visibleWrites(s, ctx = null) {
   return [...bashWriteTargets([s]), ...more].filter((t) => t && !t.includes('://') && !t.startsWith('/dev/') && !t.startsWith('&'));
 }
 
-function ruleR2Bash(ctx, segs, command) {
+function ruleR2Bash(base, segs, command) {
   if (/\$\{?AUTOPILOT_(STATE|RUN|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot workspace');
+  // The directory follows each `cd` through the command, so a later relative path (`cd tests/a/b && … ; cd ../../..`) is
+  // judged from where the command then is, not from where it started (seen live: a way back to the clone root was refused).
+  let ctx = base;
   for (const s of segs) {
     const check = (raw, why) => {
       const c = classify(ctx, raw, { bash: true });
@@ -163,6 +166,7 @@ function ruleR2Bash(ctx, segs, command) {
         // Going somewhere readable only to look (cd into a package cache, then ls and grep) is fine; going there in a command that also writes is not.
         const looking = c === 'ro' && !ctx.strict && s.cmd !== 'git' && !segs.some((x) => visibleWrites(x, ctx).length);
         if (c !== 'rw' && !looking) return deny('R2', `path jail — ${s.cmd} target: ${c === 'ro' ? `${t} is outside the private clone` : c}`);
+        if (s.cmd !== 'git') ctx = { ...ctx, cwd: realDeep(path.resolve(ctx.cwd, t.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home))) };
         continue;
       }
       const p = t.replace(/^-{1,2}[A-Za-z][\w-]*=/, '').replace(/^\d*&?>>?/, '');

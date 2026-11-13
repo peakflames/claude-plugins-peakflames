@@ -179,6 +179,11 @@ test('R2 with the sandbox off (the default): a session reads anywhere but privat
   denied(h.bash('cd ~/Documents && rm -rf old'), 'R2', /cd target/);
   passes(h.bash("cd ~/.nuget/packages/x/lib && ls; f=$(ls */X.xml | tail -1); grep -o 'T:X[^\"]*' $f | head 2>/dev/null"), 'cd somewhere readable only to look (seen live)');
   denied(h.bash('cd ~/Documents && echo hi > note.txt'), 'R2', /cd target/);
+  // The directory follows each cd: a relative path is judged from where the command then is.
+  passes(h.bash(`cd ${h.clone}/src && cat > New.js <<'EOF'\nexport const a = 1;\nEOF\ncd .. && node --test`), 'cd down, write, cd back up (seen live)');
+  passes(h.bash('cd src && ls ../README.md && cd .. && ls'), 'relative climbs that stay in the clone');
+  denied(h.bash('cd src && cd ../.. && ls'), 'R2', /cd target|autopilot workspace/);
+  denied(h.bash('cd /tmp && echo x > ../etc/hosts'), 'R2');
   denied(h.bash('cd ~/.ssh && ls'), 'R2', /credentials/);
   denied(h.bash(`git -C ${h.project} commit -m y`), 'R2', /git target/);
   denied(h.bash('ls "$AUTOPILOT_STATE/gates"'), 'R2', /may not name/);
