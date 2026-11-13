@@ -112,7 +112,7 @@ test('events: a happy run writes one line per milestone, in order, and each read
   assert.equal(ev({ type: 'parked', kind: 'human-check', gate: 'gates/x-1.json', question: 'UI epic. Does what was built look right?', reason: 'human check needed before verify' }), `Waiting for you: ${E1.id} — CSV import — UI epic. Does what was built look right?`);
   assert.equal(ev({ type: 'parked', kind: 'resume', gate: 'gates/x-1.json', question: 'x stopped: budget: build-1 hit wall clock. Continue it in the next run?', reason: 'budget: build-1 hit wall clock' }), `Stopped: ${E1.id} — CSV import — a step reached its time limit`);
   assert.equal(ev({ type: 'failed', reason: 'verify-2 FAIL after the fix round: no' }), `Did not pass: ${E1.id} — CSV import — it did not pass its independent check, even after the one repair`);
-  assert.equal(eventLine({ type: 'run-end', why: 'Lg1Csv7 parked (onPark: stop)', spentUsd: 4.2 }), 'RUN ENDED: an epic needs you. Spent $4.20.');
+  assert.equal(eventLine({ type: 'run-end', why: 'Lg1Csv7 parked (onPark: stop)', spentUsd: 4.2 }), 'RUN ENDED: an epic stopped. Spent $4.20.');
   for (const o of [{ type: 'parked', reason: 'CHECK_BUILD: the build left uncommitted work (failed: clean-tree)' }, { type: 'parked', reason: 'run stopped (end time) before VERIFY' }, { type: 'blocked', reason: 'dependency not merged: Lg1Csv7 (PARKED)' }]) assert.ok(!/[A-Z]{2,}_[A-Z]+|VERIFY|\.json|\//.test(ev(o)), ev(o));
   assert.equal(eventLine({ type: 'something-new' }), null);
 });

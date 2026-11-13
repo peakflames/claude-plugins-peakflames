@@ -2,9 +2,10 @@
 name: autopilot
 description: |
   Proof of concept. Runs queued epics unattended — plan, build, audit, verify, merge — in a
-  private clone, typically overnight, and parks anything that needs a person. This skill is the
-  front door: it checks readiness, confirms the queue, launches the driver, and next morning
-  presents the report and records the owner's decisions on parked gates. It never builds.
+  private clone, and parks anything that needs a person. This skill is the one command for all
+  of it: it checks readiness, confirms the queue, launches the driver, stays with the run and
+  says what happens, asks the owner each question when it arises, and carries on until the
+  queue is done. Closing the session is safe; the same command picks the run back up. It never builds.
   Triggers on: "autopilot", "run the epics overnight", "run epics unattended", "build while I
   sleep", "autopilot report", "what did autopilot do", "decide the parked gates", "stop autopilot".
 argument-hint: "[report | dry-run | stop]"
@@ -13,8 +14,9 @@ argument-hint: "[report | dry-run | stop]"
 You are the front door of peak-workflow autopilot. A plain script, the **driver**
 (`${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs`), does the unattended work: it launches one
 headless Claude Code session per step in a private clone of the project, judges every step from
-files and git, and writes a report. You talk to the user before and after. You do none of the
-work yourself.
+files and git, and writes a report. You talk to the user before the run, while it runs and
+after it. You do none of the work yourself, and you decide nothing the driver decides: what may
+run, what stops, and what comes next (`DRIVER status`) are the driver's answers, which you follow.
 
 **Four things this skill never does.** They hold in every mode, whatever the user says mid-skill:
 
@@ -45,13 +47,19 @@ work yourself.
    their work by hand. Only the driver's sessions build and verify.
 3. **It never answers a gate.** A parked gate is the owner's decision. Ask the gate's own
    question, with its own options, and record exactly what the owner chose. Do not recommend an
-   option, mark one as the default, or infer the answer from anything said earlier.
+   option, mark one as the default, or infer the answer from anything said earlier. One answer
+   is given ahead of time, and it is the owner's own: the standing answer for technical stops,
+   agreed in the launch question (Step 2 item 3). Only `DRIVER continue` applies it, to the
+   stops the driver says it covers; you never record "resume" on a gate yourself.
 4. **It never picks among ready epics.** The proposed queue is every eligible epic in phase and
    index order. The owner removes or reorders; you do not choose a subset or a "best first" epic.
 
 **Asking the owner.** Every question with a fixed set of answers goes through
 `AskUserQuestion`, never as a question left in the chat. Plain text is only for answers that are
 free text (a changed queue, a budget, an end time) or a list too long for the tool.
+**The popup hides the chat: put what the owner must read inside the question text.** Anything
+they need in order to answer — what stopped, what a choice does — goes in the question or an
+option's description, never only in a message printed just before it.
 
 **Say little.** Most owners are not developers, and a long screen reads as something gone
 wrong. Readiness and Confirm together print **one short screen** (Step 2 item 2) — before it,
@@ -72,23 +80,67 @@ and which epics to run (rule 4).
 **Epic references.** Name an epic as `<id> (<slug>) — <Name>` everywhere (the `label` field in the
 driver's output), never by ID alone.
 
-**Mode.** The first word of `$ARGUMENTS` selects it: empty → **Readiness, Confirm, Launch**
-(Steps 1–3); `report` → **Report** (Step 4); `dry-run` → Steps 1–2, then Step 3's dry-run variant;
-`stop` → **Stop** (Step 5).
+**One command, one session.** `/peak-workflow:autopilot` always starts at Step 0, which asks
+the driver where things are and goes where it says. The session then stays with the run: it
+launches, attends, asks, relaunches, and ends on the closing screen. The first word of
+`$ARGUMENTS` is only a shortcut into the same steps: `report` → Step 4, then on from there;
+`stop` → Step 5; `dry-run` → Steps 1–2, then Step 3's dry-run variant.
 
 Run every command from the project root (`git rev-parse --show-toplevel`). Below, `<root>` is that
 path and `DRIVER` stands for `node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs"`.
 
 **The workspace.** Autopilot keeps one long-lived directory per project, `<root>.autopilot`
-(`launch.workspace` in the driver's output): the private clone, every gate, the owner's
-`settings.json`, and one `runs/<timestamp>/` directory per run. Below, `<ws>` is that path.
+(`workspace` in `DRIVER status`, `launch.workspace` in the preflight): the private clone, every
+gate, the owner's `settings.json`, and one `runs/<timestamp>/` directory per run. Below, `<ws>`
+is that path.
+
+## Step 0: Where are we
+
+Always first, and again on every pass of the loop — after a run ends, after the owner answers,
+after a stop is continued. Run:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" status --project "<root>" --json
+```
+
+Once the owner has confirmed a queue in this session, or you have relaunched one
+(`relaunch.config.queue`), add `--queue <id>,<id>` (that queue), so
+"work that can run" means the work they agreed to. It reads only and changes nothing. If Node
+is missing or older than 22, say so and stop. Then follow `next` — the driver decides it, you
+do not:
+
+| `next` | Do |
+|---|---|
+| `attend` | A driver is running. Go to Step 3b |
+| `decide` | A question needs the owner (`waiting`). Go to Step 4. If every gate in `waiting` is one the owner chose `Decide later` on in this session, do not ask again: relaunch when `relaunch` is set (Step 3 item 5), otherwise closing screen |
+| `continue` | Only technical stops are open, and the owner's standing answer covers them (`autoContinue`). Run `DRIVER continue --workspace "<ws>" --json`, say one line — "It stopped for a technical reason (<the entry's `why`>); continuing, as you asked." — and come back to Step 0 |
+| `readiness` | There is work that can run. If `relaunch` is set **and** you came here from Step 4 or from `continue` in this session, relaunch (Step 3 item 5). Otherwise Steps 1–3 |
+| `fetch` | Everything queued is merged and waits in autopilot's copy. Closing screen |
+| `nothing` | Nothing is left to run. Closing screen |
+
+If `refuse` is not empty and `next` is `readiness`, Step 1 item 3 says what to do with each line.
+
+**Coming back.** On the first Step 0 of a session, when `run` is set, `running` is null and
+`next` is `readiness`, `fetch` or `nothing`, print `say[0]` and `say[1]` before anything else:
+the owner was away when the last run ended, and should not meet a launch screen with no word
+on what happened.
+
+**A run that was cut off.** When a line of `refuse` says a run "did not finish" (the computer
+slept, or the driver was killed), do not hand the owner its command. Ask with
+`AskUserQuestion`: "The last run was cut off before it finished. Pick it back up where it
+was? It carries on with the same queue and limits you confirmed." — options
+`Pick it back up (Recommended)` and `Not now`. On yes, start the driver with the Step 3 item 2
+line, with `--resume` in place of `--run "<launch.run>"` and `runDir` from this status output
+for the log, check it started (Step 3 item 3) and go to Step 3b. On no: closing screen.
+Never choose a different step because of something the owner said earlier, and never skip
+Step 0 because you think you know the answer: a run may have ended, or parked, since you looked.
 
 ## Format Guard
 
-**Before any other action, except in `report` and `stop` modes:** run
+**Before Step 1 (Readiness), once per session:** run
 `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" format`. On exit 0, continue. On any other exit,
 print its output and stop — it names the fix (`/peak-workflow:upgrade`, a plugin update, or a
-Python install). `report` and `stop` read only the workspace, so they skip the guard.
+Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the guard.
 
 ## Step 1: Readiness
 
@@ -99,16 +151,15 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    missing or older than 22, say so and stop. Whenever this command is run again in this
    session, use the newest output: `launch.run` and `launch.runDir` name a new run each time.
 
-2. **A run is already going** (`launch.lastRun.status` is `running`): do not offer a new one. Show
-   where it is — for each entry of `queue` in `<launch.lastRun.runDir>/state.json`, its label
-   and `state` — then the stop command from Step 3 item 4, and stop.
+2. **A run is already going** (`launch.lastRun.status` is `running`): do not offer a new one.
+   Step 0 normally catches this; go to Step 3b and attend it.
 
 3. **Refusals.** If `ok` is false or `launch.ok` is false, list every line of `refuse` and
    `launch.refuse` with what fixes it, and stop. Typical fixes: add the `**Test directories:**`
    or `**Tests:**` line through `/peak-workflow:setup`; run from a project that is the root of
    its own git repository with a `develop`, `main` or `master` branch; free disk space; wait for
-   the running autopilot or stop it; for a run that "did not finish", run the `--resume` command
-   the refusal prints (it parks what was in flight and writes the report).
+   the running autopilot or stop it; for a run that "did not finish", Step 0's
+   "A run that was cut off" (the driver re-enters the epic that was in flight and carries on).
 
    **Diverged** (`launch.sync.state` is `diverged`): the project and the autopilot clone each
    have commits the other lacks — the owner committed by day without first bringing in the work
@@ -128,10 +179,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    purpose, so a rehearsal's stand-in is never inherited by a real run. After a yes, the
    `claudeBin` warning is expected: state it once, in the Step 2 block.
 
-4. **Warnings.** Read every line of `launch.warn`; print only what needs the owner. If gates
-   wait for a decision, ask with `AskUserQuestion` — "<N> question(s) from the last run wait
-   for your answer. Answer them first?" with options `Answer them first (Recommended)` and
-   `Launch anyway — those epics are left alone`; on the first, go to Step 4 in this session. A
+4. **Warnings.** Read every line of `launch.warn`; print only what needs the owner. Gates that
+   still wait for a decision are ones the owner chose to decide later (Step 0 asks every
+   waiting question before it comes here): those epics are left alone, which is one line under
+   "Needs you" on the Step 2 screen. A
    leftover STOP file: say so and stop (the owner removes it). Uncommitted changes: mention
    them, in one line on the Step 2 screen, only when a tracked file is modified
    (`git status --porcelain` shows a line not starting with `??`). The rest — the laptop
@@ -199,7 +250,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         and what it should say, and offer the change as rule 1 allows: one named line, the
         owner's yes to exactly that, then your commit — or the owner makes it.
 
-   c. **Save what the run needs; ask only about `copy`.** Save `setup` (and, with the sandbox
+   c. **Save what the run needs; ask only about `copy`.** (In `dry-run` mode save nothing:
+      say what would be saved, and carry on.) Save `setup` (and, with the sandbox
       on, `readOnly`) without asking: autopilot cannot build without them, and the driver refuses anything broad or
       private. A `network` host (a private registry) is the one other thing to ask about, with
       adding it recommended when the project's configuration names it.
@@ -310,15 +362,13 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    reasons Step 2 item 1 allows), list them and ask with `AskUserQuestion` (`multiSelect: true`, one option per
    epic, by label, plus `None — stop here`; a numbered plain-text list instead when there are
    more than three) which the owner wants to queue explicitly; continue to Step 2 with those. Otherwise say that no
-   epic is runnable and stop: nothing is launched for an empty queue. If `launch.sync.state` is
-   `clone-ahead`, also print the fetch command from the warning — merged work is waiting — and
-   point to `/peak-workflow:autopilot report`.
+   epic is runnable and go to the closing screen: nothing is launched for an empty queue.
 
 ## Step 2: Confirm
 
 1. **Proposed queue.** Every epic whose Tonight column is "runs", "builds, then parks for you",
    "resumes at …" or "starts over", in the order given. Do not shorten it. An epic that "waits
-   for your decision" is not offered: it is decided in `/peak-workflow:autopilot report` first. An epic the owner asks to add although preflight skips
+   for your decision" is not offered: its question is answered first (Step 4). An epic the owner asks to add although preflight skips
    it is allowed only for two reasons — its status is not `Not Started` (for example, paused by
    `/peak-workflow:pause`), or it belongs to someone else — and goes into `explicit` as well as
    `queue`. Safety, hardware and no-anchor epics are never added. An epic that resumes or starts
@@ -345,8 +395,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
    **Not tonight:** <n> epic(s) wait on #<k>, which needs you first.
 
-   **It stops** by <end time, as a clock time> or at $<run budget>, whichever comes first —
-   and at the first epic that needs you.
+   **It stops** at $<run budget> — and at the first epic that needs you. I stay here, tell
+   you what happens, and ask you when it does.
 
    **Set up for you:** <one line: what item 5 saved, in plain words>. Autopilot's copy of your
    project builds and passes your tests.
@@ -359,8 +409,11 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
    - "Tonight" is the proposed queue. Say what happens to each epic in a few plain words,
      never a phase name: "continues where it stopped", not "resumes at BUILD".
-   - "It stops": with `launch.config.onPark` `continue`, the last clause is "an epic that needs
-     you is set aside and independent ones carry on".
+   - "It stops": an attended run has no end time unless the owner gives one — the run budget
+     is the ceiling. When they did give one, the line starts "by <end time, as a clock time>
+     or at $<run budget>, whichever comes first". With `launch.config.onPark` `continue`, the
+     clause about the first epic is "an epic that needs you is set aside and independent ones
+     carry on".
    - "Needs you" holds: a real scope risk (Step 1 item 7); a quality gate that does not pass
      in the copy; modified tracked files that will not be part of the run; an end time too
      near (when the time left is less than the `plan` + `build` + `verify` caps of one epic,
@@ -382,7 +435,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      effort: changing one step changes only that step." When `launch.workspaceBudgets` names
      a step, add which values come from `<ws>/settings.json`. Do not show turns, and do not call any of
      these an estimate or say what a run will cost.
-   - Run limits: `launch.config.runBudgetUsd` dollars; end time `launch.endByLocal`; the run also
+   - Run limits: `launch.config.runBudgetUsd` dollars; an end time only if the owner gave one; the run also
      stops on a red base, low disk (`launch.config.diskFloorGb` GB), or two infrastructure errors
      in a row.
    - **When an epic parks or fails** (`launch.config.onPark`): `stop` — "the run stops at the
@@ -401,19 +454,27 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      (Step 1 item 5a), each quality gate and whether it passed in the copy, and the probe's
      result. The settings file is the owner's to commit so teammates get the same setup.
    - Where it runs: the private clone at `<launch.clone>`, on `launch.integration`. The clone is
-     kept between runs. Merged work is fetched by hand in the morning.
+     kept between runs. Merged work is fetched by hand once the run is done.
    - Anything else in `launch.config` the owner would not expect: any entry in
      `scope.allow` or `scope.lockfiles`, a `diskFloorGb` under 15, or a `timing` or `audit` key
      in `<ws>/settings.json`, which applies to every run until the owner edits it.
    - The scope review in full (Step 1 item 7), false alarms included.
 
-3. **Ask** with `AskUserQuestion`: "Launch autopilot on these <N> epics?" ("on this 1 epic?"
-   for one) — options `Launch`,
+3. **Ask** with `AskUserQuestion`: "Launch autopilot on these <N> epics? If it stops for a
+   technical reason I'll continue it automatically (up to 2 times per epic)." ("on this 1
+   epic?" for one) — options `Launch`,
    `Change the queue or limits`, `Cancel`. In `dry-run` mode the first option is
-   `Show the dry run` instead.
-   - **Change:** take the change in plain text. The owner may remove epics, reorder them (an
+   `Show the dry run` instead. The second sentence is the owner's **standing answer**: it is
+   inside the question because the popup hides the chat. A technical reason is an error in the
+   tooling, a step reaching its own time or spending cap, or one of autopilot's own checks —
+   never a question about the product, a look, or a stop the owner asked for; those are always
+   asked. Say so if the owner asks what it covers.
+   - **Change:** take the change in plain text. (In `dry-run` mode nothing below is saved:
+     show the dry run with the change applied in words only.) The owner may remove epics, reorder them (an
      epic never before one of its dependencies — refuse and say why), change the run budget,
-     change the end time, or change a step's model, effort or cap.
+     set an end time, turn the automatic continuing off ("always ask me") or change how many
+     times it applies, or change a step's model, effort or cap. With it off, leave the second
+     sentence out of the question when you ask again.
 
      **A step's model, effort or cap** ("build on opus", "verify effort high", "build cap 120
      minutes", "fix cap $20") is saved for this project, not for one run. The steps are
@@ -445,12 +506,16 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      "project": "<root>",
      "queue": ["<id>", "<id>"],
      "explicit": [],
-     "endBy": "<launch.config.endBy, or the ISO time the owner chose>",
-     "runBudgetUsd": <launch.config.runBudgetUsd, or the amount the owner chose>
+     "endBy": null,
+     "runBudgetUsd": <launch.config.runBudgetUsd, or the amount the owner chose>,
+     "autoContinue": 2
    }
    ```
 
-   Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
+   `endBy` is `null` — you are attending, and the run budget is the ceiling — unless the owner
+   gave an end time: then the ISO time they chose. `autoContinue` is how many technical stops
+   per epic the owner's standing answer covers: `2` when they launched on the question as
+   asked, the number they chose, or `0` when they turned it off. Never above what they agreed to. Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
    A run's `config.json` holds only what belongs to that run. A step's model, effort and caps
    live in the project's `autopilot.json` (saved through `DRIVER configure`); scope, audit and
    the like live in `<ws>/settings.json`, which this skill never writes. This is the only file
@@ -477,40 +542,104 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 3. **Check it started:** wait three seconds, then `cat "<launch.workspace>/lock"` and
    `tail -n 5 "<launch.runDir>/autopilot.log"`. A `lock` file (JSON with a `pid`) means it is running.
    If there is no lock but the log tail has a `run ended:` line, the run already finished (a
-   short queue, or a red base): say so in one line, skip item 4, and **go straight on to
-   Step 4 (Report) in this session** — present the report and ask any waiting question now,
-   rather than telling the owner to run `/peak-workflow:autopilot report`. Step 4 item 1's
-   preflight is still run: it names the run that just ended. If there
+   short queue, or a red base): say so in one line and go to Step 0. If there
    is no lock and no such line, show the log tail — it holds the reason — and stop; do not retry
    blindly.
 
-4. **Tell the user, then end.** Print:
+4. **Stay with it:** go to Step 3b. Do not end here, and do not hand the owner a command to
+   watch the run or to come back with: this session is how they watch it.
 
-   - Running: pid, workspace, run directory, queue.
-   - Stop it: `touch "<launch.workspace>/STOP"` (or `/peak-workflow:autopilot stop`). It stops at
-     the next tool call, parks the epic in flight, and still writes the report.
-   - Watch it: `tail -f "<launch.runDir>/autopilot.log"`.
-   - In the morning: `/peak-workflow:autopilot report`.
-   - "You can close Claude Code now." On a laptop: keep it on power with the lid open.
+5. **Relaunch** (from Step 0, when `relaunch` is set after the owner answered a gate or a
+   technical stop was continued in this session). The owner already confirmed this queue: ask
+   nothing again. Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`
+   (create the directory) — it holds the same queue minus what finished, what is left of the
+   run budget, and the standing answer — then start the driver with the item 2 line, using
+   `workspace`, `relaunch.run` and `relaunch.runDir` from the status output, check it started
+   (item 3) and go to Step 3b. Say one line first: "Continuing <label> where it stopped." If
+   `relaunch` is null, or `refuse` is not empty, do not improvise a launch: Steps 1–3 in full.
 
-   Do not wait for the run, poll it, or start anything else.
+## Step 3b: Attend
 
-## Step 4: Report (`/peak-workflow:autopilot report`)
+A driver is running (you launched it, or Step 0 found it). Stay with it until it ends.
 
-1. **Find the run.** `DRIVER preflight --project "<root>" --json`, and take `launch.lastRun`
-   (ignore `ok` and the refusals here). If it is null: no run has started for this project —
-   say so and stop. Below, `<ws>` is `launch.workspace` and `<run>` is `launch.lastRun.runDir`
-   (the latest run, `<ws>/runs/<name>`).
+1. **Start the watch** — one per run: if a watch you started for this run is still going, do
+   not start another (every line would arrive twice); carry on from item 3. Otherwise use the
+   Monitor tool (`timeout_ms: 1800000`, its 30-minute maximum):
 
-2. **Still running** (`status` is `running`): show each queued epic's label and `state` from
-   `<run>/state.json`, the stop command, and stop. Gates are decided after the run ends.
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" watch --workspace "<ws>" --run "<run>" --replay
+   ```
+
+   `<run>` is the run you launched (`launch.run` or `relaunch.run`) or `run` from Step 0. Each
+   line it prints arrives as a notification. It only reads; it cannot change the run. Leave
+   `--replay` out when you re-arm it or join a run you did not just launch: its first line then
+   says where the run is. When the Monitor expires while the run is still going, run Step 0
+   and, on `attend`, start it again — say nothing about the re-arm.
+
+   **Without the Monitor tool**, run the same command with `--once` in place of `--replay` as
+   a background Bash (`run_in_background`): it returns after the first thing worth saying, or
+   after ten minutes. Its last line is `(next: --after <n>)`; start it again with
+   `--once --after <n>` so nothing is missed, until it prints `RUN ENDED`.
+
+2. **Say one opening line**, then end your turn and let the lines come:
+   "Running. I'll stay here and tell you what happens. You can ask how it's going, say stop,
+   or close this window — it keeps running, and `/peak-workflow:autopilot` picks it back up."
+   On a laptop add: "Keep it on power with the lid open."
+
+3. **Relay what happens, one line each, as the watch words it.** The lines are already plain;
+   do not rephrase, expand or explain them unless asked.
+   - A milestone — a step starting or finishing, a check, the reviewer's result, a merge —
+     is relayed as it is. Several that arrive together are one short message.
+   - A `still …` heartbeat and a `TESTS passed` line are not relayed. `TESTS failed` is not
+     either: a build session fixing its own tests is routine. Say them only when asked.
+   - A `REFUSED …` line is kept for the closing screen's friction list, not relayed. One
+     exception: `REFUSED 3 times …` is relayed once, as "A rule keeps stopping the build from
+     <what, in plain words>; it is working around it."
+   - `Waiting for you: …` while the run is still going (independent epics carry on): run
+     Step 0; when it lists the question in `waiting`, ask it now (Step 4 item 5) and keep
+     attending. The answer is used when this run has ended.
+   - `Stopped: …` — relay it. What happens next is Step 0's answer once the run has ended.
+   - `RUN ENDED: …` — relay it and **go to Step 0. That is the loop.** One exception: when
+     the owner asked for the stop (Step 5), relay it and go to the closing screen instead.
+
+4. **When the owner speaks while it runs:**
+   - "How is it going?" → `DRIVER status --project "<root>"` (no `--json`) and relay its
+     first three lines.
+   - "Stop" → Step 5.
+   - Anything that is a decision about a gate, the queue or the code → it waits for the run
+     to end or for Step 4; never act on it by editing a file or answering a gate from memory.
+   - "Details" → what they ask for: the run's `autopilot.log`, the report, a session's files.
+
+5. **Call them back when it matters.** When the `PushNotification` tool exists, send one —
+   and only one each — for: a question waiting for them (the `Waiting for you` line, or
+   Step 0 saying `decide`), and the run finished with nothing left to ask. Never for a
+   milestone, a technical stop you are continuing, or a heartbeat.
+
+## Step 4: Ask the owner, and report
+
+Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, and by
+`/peak-workflow:autopilot report`.
+
+1. **Find the run.** Use the Step 0 status output (run it now if you came by the `report`
+   shortcut). If `run` is null: no run has started for this project — say so and stop. Below,
+   `<ws>` is `workspace` and `<run>` is `runDir` (the latest run, `<ws>/runs/<name>`).
+
+2. **Still running** (`running` is not null): do item 3, ask only the gates in
+   `waiting` (item 5), then go back to Step 3b. Item 4 is skipped unless the owner asked for
+   the report: then present what has happened so far. With nothing in `waiting`, relay the
+   three `say` lines and go back to Step 3b.
 
 3. **Refresh and read.** Run `DRIVER report --workspace "<ws>"`, then read `<run>/report.json`.
-   If the run ended with no report (the driver was killed), this command writes one. The
+   If the run ended with no report (the driver was killed), this command writes one, and it
+   writes the question for any epic that stopped without one. The
    report's `sync` is how the project and the clone compared when the run started; for how they
-   compare now, use `launch.sync` from item 1.
+   compare now, use `sync` from Step 0.
 
-4. **Present it**, for someone who has never seen this report and does not know the jargon.
+4. **Present it** — in full only when the owner asked for the report (the `report` shortcut,
+   or "what did autopilot do"), or was away while the run ended (you did not relay it in this
+   session). When you attended the run, they have already read what happened: say one line on
+   why it stopped and go to item 5. In full, it is for someone who has never seen this report
+   and does not know the jargon.
    Lead with what happened and what they must do; keep file paths and IDs for the detail.
 
    a. **TL;DR first.** Print `report.json`'s `tldr` lines verbatim as a short bullet list under
@@ -541,8 +670,11 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       few words saying what it means. Give the path `<run>/report.md` for the full detail and
       say that its last section explains every term.
 
-5. **Decide the parked gates.** For each entry of `report.json`'s `gates` whose `decided` is
-   null, in order:
+5. **Decide the parked gates.** For each gate in the status output's `waiting`, in order — its
+   full entry is the one in `report.json`'s `gates` with the same `file`. A gate listed under
+   `autoContinue` is not asked: the owner's standing answer covers it and Step 0 continues it.
+   Because the popup hides the chat, the question text itself must carry what stopped and
+   what an answer does:
 
    a. Show the gate's `label`, `kind`, `why`, and what there is to look at: the `artifacts`
       (paths under `<ws>`; `clone:` means inside `<ws>/clone`); when `tor` is set, that
@@ -615,59 +747,93 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       an answer that does not follow from the lines.
 
       `<file>` is the gate's `file` value. Add `--note "<their words>"` when the owner explained
-      the choice; for a `human-check` gate the note from item b is required. The command writes
+      the choice; for a `human-check` gate the note from item b is required unless `--observations` is given with every line a yes. The command writes
       `decided: {answer, by, date, scope: "next-run"}` into the gate file, with `by` taken from
       `git config user.name`, and re-renders the report. It refuses an answer that is not one of
       the gate's options; if it refuses, ask again — never substitute a different option.
 
-   d. **Say what the answer does, in one sentence**, from the command's output: "Recorded. The
-      next autopilot run continues this epic at `<enters>`." Nothing else here: no conditions,
+   d. **Say what the answer does, in one sentence**, from the command's output: "Recorded.
+      I'm continuing this epic from where it stopped." (While a run is still going: "Recorded.
+      It continues once this run has ended.") Nothing else here: no conditions,
       no commands, no alternatives. An answer that tells the session to stop (a deferral gate's
       "Stop — I'll take it from here") is replayed like any other and the epic parks or fails
       again: say that in the same sentence, and that continuing by hand is then the way forward.
 
-6. **Close with the one thing to do next.** Many owners are not developers: a list of options
-   reads as a list of chores. Print a heading "Do this next" and exactly one action, chosen in
-   this order:
+6. **Go on; do not hand over a command.**
+   - Every waiting gate was answered → **Step 0**. It will say `readiness` with `relaunch`
+     set, and Step 3 item 5 starts the next run with the same queue: the owner already
+     confirmed it, so nothing is asked again unless Step 0 reports a refusal.
+   - The owner chose `Decide later` on a gate → remember which, and never ask it again in
+     this session. If a run is still going: Step 3b. Otherwise Step 0: what they did answer
+     still continues (its `decide` row relaunches when `relaunch` is set), and when only
+     deferred questions are left the session ends on the closing screen. Say "I'm continuing
+     this epic" (item d) only for an epic that will in fact relaunch.
+   - You came by the `report` shortcut → never launch from a request to read: after the
+     report and any answers, go to Step 3b if a run is going, otherwise to Step 0 only when
+     the owner answered a gate just now, and to the closing screen when they did not.
 
-   1. Gates are still undecided and the owner chose `Decide later` → "Run
-      `/peak-workflow:autopilot report` again when you are ready to answer <n> question(s)."
-   2. A gate was decided and not yet used, or epics are still unbuilt → "Run
-      `/peak-workflow:autopilot`" with the queue to give, as IDs in order, in a code block.
-   3. Otherwise, `launch.sync.state` is `clone-ahead` → "Bring the finished work into your
-      project" with these two lines in a code block — print, do not run — and one sentence:
-      the first line shows what will come in, the second brings it in.
+## Step 5: Stop (`/peak-workflow:autopilot stop`, or the owner says stop)
 
-      ```bash
-      git fetch "<ws>/clone" <integration>:autopilot/<integration> && git log <integration>..autopilot/<integration>
-      git merge --ff-only autopilot/<integration>
-      ```
-   4. Otherwise → "Nothing. Everything autopilot built is already in `<integration>`."
+Run the Step 0 status; if `running` is null, say nothing is running and go to the closing
+screen. Otherwise run `DRIVER stop --workspace "<ws>"`. A watch that is still going will say
+`RUN ENDED: you asked it to stop`: relay it, and do not take it to Step 0. It writes the `STOP` file, waits for
+the driver to park the epic in flight and write its report, and removes the `STOP` file. Then
+the closing screen: the owner asked to stop, so do not ask now whether to continue what they
+just stopped, and do not relaunch.
 
-   Then one line, and only this line, for everything else: "Other things I can help with if
-   you ask: bring finished work into your project now, continue a stopped epic by hand, or
-   walk through the full report (`<run>/report.md`)." Do not print the fetch commands, the
-   by-hand `resume` line, the `validWhile` condition or the report's own "Do this next" list
-   unless the owner asks. When they do ask:
-   - **Bring the work in**: the two lines above. Add that the private clone is the only copy
-     of that work until it is fetched, so the workspace must not be deleted first; that a
-     resumed epic's history includes a `wip(autopilot)` commit from its park, which is
-     expected; and that decisions not yet used stay usable however the work is merged, as long
-     as the parked branch still merges cleanly into `<integration>`.
-   - **Continue by hand**: the gate's `resume` line, after fetching the branch
-     (`git fetch "<ws>/clone" <branch>:<branch>`); the epic should then not be queued for
-     autopilot again.
-   - **How long a decision holds**: while that branch is unchanged and still merges cleanly
-     into the integration line; otherwise it is void and the epic is planned again.
+## Closing screen
 
-   Then stop.
+Where every session ends: Step 0 said `fetch` or `nothing`, the owner stopped the run, or they
+chose to decide later. Run the Step 0 status once more — without `--queue`, so it also sees
+work that was not in this session's queue — and print one short screen from it.
+Leave out a part that has nothing to say.
 
-## Step 5: Stop (`/peak-workflow:autopilot stop`)
+```
+## Autopilot is done for now
 
-`DRIVER preflight --project "<root>" --json` (ignore `ok` and the refusals here); if `launch.lastRun.status` is not `running`, say
-nothing is running and stop. Otherwise run `DRIVER stop --workspace "<launch.workspace>"`. It
-writes the `STOP` file, waits for the driver to park the epic in flight and write its report,
-removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:autopilot report`.
+**Finished and merged:** <each label in `merged`>
+**Waiting for you:** <each gate in `waiting`: the epic's label and, in a few plain words, what is asked>
+**Not finished:** <each epic of `epics` that is not merged and has no waiting question, with why in plain words>
+**Spent:** $<spentUsd> of $<runBudgetUsd>
+
+**Things autopilot got in the way of:** <only when `friction` has entries>
+
+**Do this next:** <exactly one thing>
+```
+
+- **Things autopilot got in the way of** comes from `friction` (what the referee refused,
+  grouped, with a `count`): at most five lines, each in plain words a non-developer follows
+  — "It stopped the build from writing outside its own copy of the project (3 times)" — and
+  never the raw `reason`. Leave out a rule that did its job once and cost nothing. This list
+  is how the owner learns that a rule is fighting their project: say which one cost the most.
+- **Do this next** is one action, chosen in this order:
+  1. Questions still wait → "Run `/peak-workflow:autopilot` when you are ready to answer
+     <n> question(s). Nothing else runs until then."
+  2. `sync.fetch` has lines (merged work waits in autopilot's copy, whatever `next` says) → "Bring the finished work into your project" with the two lines of
+     `sync.fetch` in a code block — print, do not run — and one sentence: the first line
+     shows what will come in, the second brings it in.
+  3. `next` is `readiness` (work remains that was not in this queue, or the run reached its
+     budget) → "Run `/peak-workflow:autopilot` to carry on with <what is left>."
+  4. Otherwise → "Nothing. Everything autopilot built is already in `<integration>`."
+
+Then one line, and only this line, for everything else: "Other things I can help with if you
+ask: bring finished work into your project now, continue a stopped epic by hand, or walk
+through the full report." Do not print the fetch commands (unless they are the one next
+thing), the by-hand `resume` line or the report's own "Do this next" list unless the owner
+asks. When they do ask:
+- **Bring the work in**: the two lines of `sync.fetch`. Add that the private clone is the
+  only copy of that work until it is fetched, so the workspace must not be deleted first; that
+  a resumed epic's history includes a `wip(autopilot)` commit from its park, which is
+  expected; and that decisions not yet used stay usable however the work is merged, as long
+  as the parked branch still merges cleanly into `<integration>`.
+- **Continue by hand**: the gate's `resume` line, after fetching the branch
+  (`git fetch "<ws>/clone" <branch>:<branch>`); the epic should then not be queued for
+  autopilot again.
+- **How long a decision holds**: while that branch is unchanged and still merges cleanly
+  into the integration line; otherwise it is void and the epic is planned again.
+- **The full report**: `<run>/report.md`; its last section explains every term.
+
+Then stop.
 
 ## What autopilot leaves behind
 
@@ -679,8 +845,9 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `gates/<epic>-<n>.json` | One file per question that needs the owner, from every run |
 | `epics.json` | What a parked or failed epic carries into the next run (its plan, audits, fix round) |
 | `runs/<YYYYMMDD-HHMMSS>/` | One directory per run; `current` names the latest |
-| `runs/<run>/config.json` | That run's queue, end time and run budget, confirmed in Step 2 |
+| `runs/<run>/config.json` | That run's queue, run budget, end time (if any) and standing answer (`autoContinue`), confirmed in Step 2; a relaunch also names the run it `continues` |
 | `runs/<run>/state.json`, `preflight.json` | The driver's state machine (each epic's `state`) and the preflight it ran from |
+| `runs/<run>/events.jsonl` | One line per milestone of the run: what `driver.mjs watch` reads to say what is happening |
 | `runs/<run>/epics/<id>/…` | Every session's stream, referee log, plan, checks and audit |
 | `runs/<run>/report.md`, `report.json`, `autopilot.log` | The morning report and the driver's log |
 | `lock`, `STOP` | The single-instance lock and the kill switch, one per workspace |

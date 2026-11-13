@@ -27,7 +27,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
-| `autopilot` | Proof of concept — front door to the unattended driver: readiness (preflight, the clone's `setup`/`copy`/`readOnly`/`network` environment, its proof with the quality gates, and the sandbox probe, scope and cost review), confirm, detached launch; `report` mode presents the morning report and records the owner's answers to parked gates. Never edits project code: it writes the project's `autopilot.json` entries through `driver.mjs configure` (`setup`, `readOnly`, `network` without asking; `copy` and `budgets` on the owner's word), and makes a project fix it named itself (the `**Tests:**` or `**Build:**` line, a `.gitignore` line) only after the owner approves that exact change through `AskUserQuestion`. Never runs `start-epic` or `wrapup-epic`, answers a gate, or picks among ready epics |
+| `autopilot` | Proof of concept — front door to the unattended driver: readiness (preflight, the clone's `setup`/`copy`/`readOnly`/`network` environment, its proof with the quality gates, and the sandbox probe, scope and cost review), confirm, detached launch — then it stays with the run: one command, one session. Every pass starts at `driver.mjs status`, whose `next` (`readiness`, `attend`, `decide`, `continue`, `fetch`, `nothing`) the skill follows and never decides; it relays `driver.mjs watch` lines through the Monitor tool, asks each parked gate's question when it arises, relaunches the confirmed queue, and ends on a closing screen (merged, waiting, spend, what the referee got in the way of). A technical stop is continued by `driver.mjs continue` on the owner's standing answer from the launch question (`autoContinue`, twice per epic by default). Closing the session is safe; the same command picks the run back up. Never edits project code: it writes the project's `autopilot.json` entries through `driver.mjs configure` (`setup`, `readOnly`, `network` without asking; `copy` and `budgets` on the owner's word), and makes a project fix it named itself (the `**Tests:**` or `**Build:**` line, a `.gitignore` line) only after the owner approves that exact change through `AskUserQuestion`. Never runs `start-epic` or `wrapup-epic`, answers a gate, or picks among ready epics |
 
 ## Key Design Invariants
 
@@ -193,9 +193,11 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
   `reverified:` lines and of an append to a Complete epic's `requirements:`
 - `scripts/autopilot/` is the autopilot proof of concept: `driver.mjs` (state machine, done-ness
   checks, merge gate), `hooks/` (the referee), `policy/gates.json`, `audit/` (the auditor's prompt
-  and schema), `audit.mjs` and `report.mjs`. Node 22+, no dependencies. The `autopilot` skill only
-  talks to the user and calls `driver.mjs`; what may run unattended and what parks is decided by
-  the driver and the hooks, never by a prompt. Tests: `node --test scripts/autopilot/test/`
+  and schema), `audit.mjs`, `report.mjs` and `attend.mjs` (read-only: the plain sentence for each
+  run event, `watch`, the friction count). Node 22+, no dependencies. The `autopilot` skill only
+  talks to the user and calls `driver.mjs`; what may run unattended, what parks, what the standing
+  answer covers and what comes next (`status`) is decided by the driver and the hooks, never by a
+  prompt. Tests: `node --test scripts/autopilot/test/`
 - `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
   templates. They are **forward-only and append-only**: a shipped step is never edited; a
   correction is a new step. Each step starts with a detect check (so re-running is harmless) and
