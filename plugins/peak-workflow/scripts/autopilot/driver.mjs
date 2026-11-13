@@ -160,7 +160,7 @@ export function defaultConfig(project) {
     setup: null, // one shell command that rebuilds, in the clone, what git does not carry (a venv, node_modules); run with network
     readOnly: [], // directories outside the clone that sessions may read and never write: a dependency cache (~/.nuget/packages, ~/.cargo/registry)
     copy: [], // git-ignored files copied from the project into the clone at each run (a .env): what cannot be rebuilt
-    network: [], // host names build sessions may reach from inside the sandbox (a package registry); empty = no network at all
+    network: [], // more host names sessions may reach from inside the sandbox, on top of REGISTRIES (a private package registry)
     claudeBin: 'claude',
     allowTestDouble: false, // run-level: never inherited from settings.json by accident (a rehearsal's fake binary)
     budgets: {
@@ -454,7 +454,7 @@ export function envFacts(project, workspace, config) {
     const copied = copy.some((c) => rel === c || rel.startsWith(`${c}/`) || c.startsWith(`${rel}/`));
     return { path: p, dir: p.endsWith('/'), status: copied ? 'copied' : exists(path.join(clone, rel)) ? 'present' : 'absent' };
   });
-  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], network: cleanNetwork(config.network), problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
+  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], network: cleanNetwork(config.network), registries: REGISTRIES, problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
 }
 /** `~`-expanded, absolute, symlinks resolved where the path exists. */
 const expandHome = (p) => { const x = path.resolve(String(p).trim().replace(/^~(?=\/|$)/, os.homedir())); try { return fs.realpathSync(x); } catch { return x; } };
@@ -508,6 +508,17 @@ export function networkProblems(list) {
   }
   return out;
 }
+/**
+ * The public package registries every session may reach, whatever the project's stack: a build
+ * that adds a dependency must be able to fetch it, and working this list out per project was one
+ * more thing to get wrong. A project's `network` entries are added to it.
+ */
+export const REGISTRIES = [
+  'api.nuget.org', 'registry.npmjs.org', 'pypi.org', 'files.pythonhosted.org', 'crates.io', 'static.crates.io', 'index.crates.io',
+  'proxy.golang.org', 'sum.golang.org', 'repo.maven.apache.org', 'repo1.maven.org', 'plugins.gradle.org', 'rubygems.org',
+];
+/** Every host a session may reach: the registries, then the project's own. */
+export const sessionNetwork = (config = {}) => cleanNetwork([...REGISTRIES, ...(Array.isArray(config.network) ? config.network : [])]);
 const cleanNetwork = (list) => [...new Set((Array.isArray(list) ? list : []).filter((h) => typeof h === 'string' && h.trim()).map((h) => h.trim().toLowerCase()))];
 
 /** A shell's "command not found" (127) or "cannot execute" (126): the command never ran, which is not a failing test. */
@@ -709,8 +720,11 @@ function detectIntegration(root) {
 
 /** The referee layer written as each session's `settings.json` (plan §6.7, SPIKE.md S11). */
 export function sessionSettings(config = {}, { kind = null } = {}) {
-  // The auditor reads a bundle and needs nothing from outside; every other session may reach the project's named hosts and nothing else.
-  const allowedDomains = kind === 'audit' ? [] : cleanNetwork(config.network);
+  // The auditor reads a bundle and needs nothing from outside. Every other session may reach the package registries and the
+  // project's named hosts, and may use local sockets and ports: build tools talk to their own worker processes that way
+  // (MSBuild and `dotnet test` over named pipes, test servers on localhost), and without it they cannot run at all (seen live).
+  const open = kind !== 'audit';
+  const allowedDomains = open ? sessionNetwork(config) : [];
   const hook = (file, extra = {}) => ({ type: 'command', command: `node "$AUTOPILOT_HOOKS/${file}"`, ...extra });
   return {
     permissions: {
@@ -723,7 +737,7 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
     },
     sandbox: {
       enabled: true, allowUnsandboxedCommands: false, failIfUnavailable: true,
-      network: { allowedDomains, strictAllowlist: true },
+      network: { allowedDomains, strictAllowlist: true, ...(open ? { allowAllUnixSockets: true, allowLocalBinding: true } : {}) },
     },
     hooks: {
       PreToolUse: [{ matcher: '*', hooks: [hook('pretool.mjs', { timeout: 30 })] }],
@@ -878,7 +892,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`When an epic parks: ${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set in ${projectSettingsFile(project)}`);
   p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}`);
-  p(`Network:          ${cleanNetwork(config.network).length ? `plan, build, repair and verify sessions may reach ${cleanNetwork(config.network).join(', ')} and nothing else; the auditor has no network` : 'sessions have no network'} (WebFetch and WebSearch are always denied)`);
+  p(`Network:          plan, build, repair and verify sessions may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`);
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
 
@@ -1206,7 +1220,7 @@ class Run {
     const text = (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v));
     const tail = [text(ran?.error), text(ran?.tool_response), text(s.result?.result), s.spawnError ?? '', s.killed ? `killed: ${s.killed}` : ''].filter(Boolean).join('\n').trim().split('\n').slice(-25).join('\n');
     return {
-      ran: true, pass: exit === 0, exit, command: cfg.testCommand, model: cfg.budgets.probe.model, network: cleanNetwork(cfg.network), costUsd: s.result?.total_cost_usd ?? 0, wallMs: s.wallMs,
+      ran: true, pass: exit === 0, exit, command: cfg.testCommand, model: cfg.budgets.probe.model, network: sessionNetwork(cfg), costUsd: s.result?.total_cost_usd ?? 0, wallMs: s.wallMs,
       why: exit === 0 ? null : exit === null ? 'the command did not run to its end inside the sandbox (no exit code was written)' : `the command exited ${exit} inside the sandbox, although it passed in a plain shell`,
       denials, tail, dir: this.rel(stepDir),
     };
@@ -2116,9 +2130,9 @@ class Run {
       this.state.readOnly = resolveReadOnly(cfg.readOnly);
       const badNet = networkProblems(cfg.network);
       if (badNet.length) throw new Error(badNet.join('; '));
-      this.state.network = cleanNetwork(cfg.network);
+      this.state.network = sessionNetwork(cfg);
       this.save();
-      if (this.state.network.length) this.log(`sessions may reach (sandbox allow-list): ${this.state.network.join(', ')}`);
+      this.log(`sessions may reach (sandbox allow-list): ${this.state.network.join(', ')}; local sockets and ports are open`);
       if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
 

@@ -25,9 +25,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot continues a build that was cut short** — a build stopped by STOP, a budget or the
   wall clock resumes in a new build session told what is already committed, instead of failing
   CHECK_BUILD and spending the one repair round on a part-built branch.
-- **Autopilot network allow-list** — `network` in the project's `autopilot.json` names the package
-  registries a sandboxed session may reach, so a build can fetch a new dependency; everything else
-  stays closed, and the auditor has no network. Saved with `driver.mjs configure --network`.
+- **Autopilot sandbox network** — sessions may use local sockets and ports (MSBuild and
+  `dotnet test` cannot run without them) and reach the public package registries; `network` in the
+  project's `autopilot.json` adds a private registry. Everything else stays closed.
 - **Autopilot sandbox probe** — `driver.mjs prepare --probe` launches one cheap session, set up
   exactly as a build, that runs the test command inside the sandbox; readiness learns whether the
   toolchain works there before an epic is spent on it.

@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { REGISTRIES } from '../driver.mjs';
 import { DRIVER, E1, git, happy, makeProject, readJson } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, json: () => JSON.parse(r.stdout) }; };
@@ -177,19 +178,19 @@ test('configure --network saves host names only; a run writes them into each ses
     assert.equal(r.status, 2, bad); assert.match(r.stderr, re, bad);
   }
   assert.ok(!fs.existsSync(settingsFile(p)));
-  const ok = driver('configure', '--project', p.project, '--network', 'API.nuget.org,registry.npmjs.org');
+  const ok = driver('configure', '--project', p.project, '--network', 'PKGS.example.org,registry.npmjs.org');
   assert.equal(ok.status, 0, ok.stderr);
-  assert.deepEqual(readJson(settingsFile(p)), { network: ['api.nuget.org', 'registry.npmjs.org'] });
+  assert.deepEqual(readJson(settingsFile(p)), { network: ['pkgs.example.org', 'registry.npmjs.org'] });
   const pre = driver('preflight', '--project', p.project, '--json', '--allow-test-double').json();
-  assert.deepEqual([pre.launch.env.network, pre.launch.config.network], [['api.nuget.org', 'registry.npmjs.org'], ['api.nuget.org', 'registry.npmjs.org']]);
+  assert.deepEqual([pre.launch.env.network, pre.launch.env.registries], [['pkgs.example.org', 'registry.npmjs.org'], REGISTRIES]);
   const dry = driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout;
-  assert.match(dry, /^Network: +plan, build, repair and verify sessions may reach api\.nuget\.org, registry\.npmjs\.org and nothing else; the auditor has no network/m);
+  assert.match(dry, /^Network: +plan, build, repair and verify sessions may use local sockets and ports, and reach \d+ package registries plus pkgs\.example\.org, registry\.npmjs\.org; nothing else\. The auditor has no network/m);
 
   p.scenario(happy(E1));
   const state = await p.go();
   assert.equal(state.queue[0].state, 'MERGED');
   const net = (step) => readJson(p.dir(E1.id, step, 'settings.json')).sandbox.network;
-  for (const step of ['plan-1', 'build-1', 'verify-1']) assert.deepEqual(net(step), { allowedDomains: ['api.nuget.org', 'registry.npmjs.org'], strictAllowlist: true }, step);
+  for (const step of ['plan-1', 'build-1', 'verify-1']) assert.deepEqual(net(step), { allowedDomains: [...REGISTRIES, 'pkgs.example.org'], strictAllowlist: true, allowAllUnixSockets: true, allowLocalBinding: true }, step);
   assert.deepEqual(net('audit-1'), { allowedDomains: [], strictAllowlist: true });
 
   // A hand-edited list that is not host names refuses the launch.
@@ -216,12 +217,12 @@ test('prepare --probe: one session, launched as a build is, runs the test comman
   const ok = probe('--allow-test-double');
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   const out = ok.json();
-  assert.deepEqual([out.ok, out.failed, out.probe.ran, out.probe.pass, out.probe.exit, out.probe.costUsd, out.probe.network], [true, null, true, true, 0, 0.02, ['registry.npmjs.org']]);
+  assert.deepEqual([out.ok, out.failed, out.probe.ran, out.probe.pass, out.probe.exit, out.probe.costUsd, out.probe.network], [true, null, true, true, 0, 0.02, REGISTRIES]);
   const [call] = p.calls();
   assert.deepEqual([call.key, call.cwd, call.env.AUTOPILOT_ROLE, call.argv[call.argv.indexOf('--model') + 1]], ['probe/probe-1', p.clone, 'verifier', 'haiku']);
   assert.match(call.prompt, /run this one command exactly as written[\s\S]*node --test; echo \$\? > \.autopilot-probe-exit/);
   const step = path.join(p.state, 'probe', 'probe-1');
-  assert.deepEqual(readJson(path.join(step, 'settings.json')).sandbox.network.allowedDomains, ['registry.npmjs.org']);
+  assert.deepEqual(readJson(path.join(step, 'settings.json')).sandbox.network, { allowedDomains: REGISTRIES, strictAllowlist: true, allowAllUnixSockets: true, allowLocalBinding: true });
   assert.ok(readJson(path.join(step, 'settings.json')).hooks.PreToolUse, 'the referee is on, as in a build');
   assert.equal(git(p.clone, 'status', '--porcelain'), '', 'the probe leaves the clone clean');
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));

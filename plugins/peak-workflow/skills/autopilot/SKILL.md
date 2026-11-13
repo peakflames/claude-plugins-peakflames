@@ -22,8 +22,8 @@ work yourself.
    never beyond them:
    - **Autopilot's own settings** — the `setup`, `copy`, `readOnly`, `network` and `budgets`
      entries of `<root>/.claude/peak-workflow/autopilot.json`, always through
-     `DRIVER configure`. What a run cannot work without (`setup`, `readOnly`, `network`,
-     drafted from the project's stack) is saved without asking and reported in one line. A
+     `DRIVER configure`. What a run cannot work without (`setup`, `readOnly`, drafted from
+     the project's stack) is saved without asking and reported in one line. A
      `copy` file may hold secrets and a budget is the owner's preference: those are saved
      only on the owner's word (Step 1 item 5, Step 2 item 3).
    - **A project fix it has named itself** — the `**Tests:**` or `**Build:**` line of
@@ -145,9 +145,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    `setup`, one shell command the driver runs in the clone before each run's first test check
    (with network); `copy`, the git-ignored files it copies in from the project each run;
    `readOnly`, directories outside the clone that sessions may read and never write (a
-   dependency cache the build tools keep in the home directory); and `network`, the host names
-   a session may reach from inside its sandbox (a package registry) — with none, sessions have
-   no network at all. Skip this item when no epic is runnable.
+   dependency cache the build tools keep in the home directory); and `network`, extra host
+   names a session may reach from inside its sandbox. Sessions can always use local sockets
+   and ports and reach the public package registries (`launch.env.registries`: NuGet, npm,
+   PyPI, crates.io, Go, Maven, Gradle, RubyGems), so `network` is only for a private registry. Skip this item when no epic is runnable.
 
    a. **See what the copy starts without** — `launch.env.ignored` (each entry has `path` and
       `status`: `copied`, `present` = rebuilt in the copy, `absent` = not carried over). Use
@@ -173,13 +174,11 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         `go env GOMODCACHE`; Java → `~/.m2/repository` (Gradle: `~/.gradle/caches`). Node and
         Python projects keep their packages inside the clone and need none. Never the home
         directory, a whole folder of it, or anywhere credentials live: the driver refuses those.
-      - `network` lists the package registries of the stack, so a build that adds a dependency
-        can fetch it: .NET → `api.nuget.org`; Node → `registry.npmjs.org`; Rust → `crates.io`,
-        `static.crates.io`; Python → `pypi.org`, `files.pythonhosted.org`. Host names only: no
-        `https://`, no path, no `*`. Add a private registry only when the project's own
-        configuration names it. Nothing else: not a source host, not an API the product calls.
-        Sessions reach these hosts and no others; `WebFetch` and `WebSearch` stay off, and the
-        auditor has no network whatever is listed.
+      - `network` is empty for almost every project: the public registries are already
+        open. Add a host only when the project's own configuration names a private registry
+        (a `nuget.config` source, an `.npmrc` registry, a pip index URL). Host name only: no
+        `https://`, no path, no `*`. Never a source host or an API the product calls. Sessions
+        reach nothing else; `WebFetch` and `WebSearch` stay off, and the auditor has no network.
       - **Quality gates.** The verifier runs every quality gate `CLAUDE.md` lists (build,
         lint, format, type check, the tests), not only the tests. List each one with its
         command and say, for each, whether it can run in the copy: does it need a file git
@@ -193,10 +192,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         and what it should say, and offer the change as rule 1 allows: one named line, the
         owner's yes to exactly that, then your commit — or the owner makes it.
 
-   c. **Save what the run needs; ask only about `copy`.** Save `setup`, `readOnly` and
-      `network` without asking: autopilot cannot build without them, the lists in item b are
-      fixed per stack, and the driver refuses anything broad or private. A `network` host that
-      is not in item b's list (a private registry) is the one exception: ask about it.
+   c. **Save what the run needs; ask only about `copy`.** Save `setup` and `readOnly` without
+      asking: autopilot cannot build without them, and the driver refuses anything broad or
+      private. A `network` host (a private registry) is the one other thing to ask about, with
+      adding it recommended when the project's configuration names it.
 
       ```bash
       node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --setup '<command>' --copy <path>,<path> --read-only <dir>,<dir> --network <host>,<host>
@@ -206,16 +205,15 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       the file's other keys and refuses a path or host it cannot accept — print the refusal
       and correct the entry. Never write that file any other way, and do not commit it. What
       was saved goes on the Step 2 screen as one plain line, for example: "I set autopilot up
-      to read and download .NET packages (nothing else on your machine or the internet)."
+      to read your installed .NET packages (and nothing else on your machine)."
 
       **A `copy` file is the owner's call**, because it may hold a key. Ask only when a test
       or a quality gate cannot run without it, one `AskUserQuestion` per file: "Let autopilot's
       build sessions read your `<file>`? <the check> cannot run without it." — options
       `Yes, copy it in (Recommended)` and `No — that check may stop for me`. The first
-      option's description is the honest sentence: with no `network`, "It stays on this
-      machine: sessions have no network, and git never commits it."; with one, "Git never
-      commits it. Sessions can reach <hosts> and nowhere else, so that is the only place it
-      could be sent." Recommend "No" instead when only an optional check needs the file.
+      option's description is the honest sentence: "Git never commits it. Sessions can reach
+      only the public package registries<, and the hosts in `network`>, so those are the only
+      places it could be sent." Recommend "No" instead when only an optional check needs the file.
 
    d. **Prove it** — not in `dry-run` mode, which writes nothing: say the proof is skipped and
       carry on. Run `DRIVER prepare --project "<root>"` with a ten-minute timeout, adding one
@@ -251,7 +249,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
    e. **Probe the sandbox** — after the proof passes, and not in `dry-run` mode. The proof runs
       the tests in a plain shell. Build sessions run them inside a sandbox: no writes outside
-      the copy, no network beyond `network`. Whether `dotnet`, `cargo`, `npm` or the project's
+      the copy, no network beyond the registries and `network`. Whether `dotnet`, `cargo`, `npm` or the project's
       own tools work in there is known only by trying, and a build that finds out costs an
       epic. The probe is one short real session (the `probe` budget: haiku, capped at
       `launch.config.budgets.probe.usd` dollars, usually a few cents), launched exactly as a
@@ -270,7 +268,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         tool writes outside the copy (a cache or home directory — make `setup` or the
         `**Tests:**` line point it inside the copy, or do the write in `setup`, which runs
         outside the sandbox); a tool reads a directory that is not in `readOnly`; a tool needs
-        a host that is not in `network`. Go back to item b, save the correction, prove and
+        a host that is neither a public registry nor in `network`. Go back to item b, save the correction, prove and
         probe again — the same three rounds. **Never launch while a probe that ran fails**:
         every build would fail the same way. The session's files are under `<ws>/<probe.dir>`.
 
@@ -293,7 +291,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    are word matches and most are false alarms, so judge each one yourself: read the Scenario
    (`sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" text <TOR-ID>`) and decide whether its
    Given or Then really needs something an unattended session lacks or should not spend
-   (network beyond `network`; real keys or accounts; containers; big data; a long real wait;
+   (network beyond the package registries; real keys or accounts; containers; big data; a long real wait;
    another platform). Print nothing for a false alarm, and no count of them. A real one is
    one line under "Needs you" on the Step 2 screen: the epic's label, what it needs in plain
    words, and what will happen ("will stop and wait for you"). Recommend dropping an epic
