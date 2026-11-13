@@ -146,6 +146,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   sized XS to XL with the ceiling beside each, and no longer shows turns.
 - **Autopilot report ends with one next step** — after the owner's answers it names a single
   action; the fetch commands, the by-hand route and the conditions are given only when asked for.
+- **Autopilot run events** — the driver writes one line per milestone (a step starting or ending,
+  a check, the reviewer's result, a merge, a park) to `runs/<run>/events.jsonl`, each readable as
+  one plain sentence.
+- **Autopilot `driver.mjs watch`** — follows a run and prints one line per milestone, each
+  referee refusal once, the result of each test run, a heartbeat, and `RUN ENDED` when it is
+  over. Read-only; `--once` returns after the first line.
 
 ### Fixed
 

@@ -146,7 +146,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   assert.match(log, /run \d{8}-\d{6}: queue Lg1Csv7, Lg2Cat4/); // the driver's own first lines survive the redirect
   assert.match(log, /run ended: queue done/);
   assert.deepEqual(fs.readdirSync(p.state).sort(), ['clone', 'current', 'epics.json', 'gates', 'runs', 'settings.json']);
-  assert.deepEqual(fs.readdirSync(run1).sort(), ['autopilot.log', 'config.json', 'epics', 'preflight.json', 'report.json', 'report.md', 'state.json']);
+  assert.deepEqual(fs.readdirSync(run1).sort(), ['autopilot.log', 'config.json', 'epics', 'events.jsonl', 'preflight.json', 'report.json', 'report.md', 'state.json']);
   assert.equal(fs.readFileSync(path.join(p.state, 'settings.json'), 'utf8'), settingsBefore, 'the driver never rewrites the owner\'s settings');
   const tip1 = git(p.clone, 'rev-parse', e2.branch);
 

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, defaultConfig, effortFor, loadConfig, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -79,6 +79,42 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.equal(report.epics[0].outcome, 'MERGED');
   assert.equal(report.spentUsd, 2.01); // plan 0.40 + build 0.30 + audit 0.01 + verify 1.30
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
+});
+
+test('events: a happy run writes one line per milestone, in order, and each reads as a plain sentence', async (t) => {
+  const p = makeProject(t);
+  p.scenario(happy(E1));
+  await go(p);
+  const events = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(events.map((e) => (e.type.startsWith('step-') ? `${e.type} ${e.step}` : e.type === 'check' ? `check ${e.name}` : e.type)), [
+    'run-start', 'epic-start', 'step-start plan-1', 'step-end plan-1', 'step-start build-1', 'step-end build-1', 'check build',
+    'step-start audit-1', 'step-end audit-1', 'audit', 'step-start verify-1', 'step-end verify-1', 'check verify', 'merged', 'run-end',
+  ]);
+  for (const e of events) assert.ok(!Number.isNaN(Date.parse(e.t)), 'every event is timed');
+  const label = `${E1.id} (${E1.slug}) — CSV import`;
+  assert.deepEqual(events.filter((e) => e.epic).map((e) => [e.epic, e.label]).at(0), [E1.id, label]);
+  assert.deepEqual([events.at(-1).why, events.at(-1).spentUsd], ['queue done', 2.01]);
+  const lines = events.map(eventLine);
+  assert.deepEqual(lines.filter((l) => !/finished in/.test(l)), [
+    'Autopilot started: 1 epic queued.', `Starting ${E1.id} — CSV import`, `Planning ${E1.id} — CSV import`, `Building ${E1.id} — CSV import`,
+    "Autopilot's checks on the build passed", `Reviewing ${E1.id} — CSV import`, 'The independent reviewer found nothing', `Verifying ${E1.id} — CSV import`,
+    'Final checks after the merge passed', `Finished and merged: ${E1.id} — CSV import (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01.',
+  ]);
+  assert.match(lines[3], /^Plan finished in under a minute \(\$0\.40\)$/);
+
+  // The wording, for what a happy run never says. No phase names and no file paths reach the owner.
+  const ev = (o) => eventLine({ label, epic: E1.id, ...o });
+  assert.equal(ev({ type: 'step-end', kind: 'build', outcome: 'ok', minutes: 12.4, costUsd: 4.23 }), 'Build finished in 12 min ($4.23)');
+  assert.equal(ev({ type: 'step-end', kind: 'build', outcome: 'budget', why: 'wall clock', minutes: 90, costUsd: 9 }), 'Build stopped at its time limit after 90 min ($9.00)');
+  assert.equal(ev({ type: 'step-end', kind: 'verify', outcome: 'infra', why: 'exit 1, no result line', minutes: 2 }), 'Verification stopped on a technical error after 2 min');
+  assert.equal(ev({ type: 'epic-start', resumedAt: 'CHECK_BUILD' }), `Continuing ${E1.id} — CSV import from where it stopped`);
+  assert.equal(ev({ type: 'check', name: 'build', pass: false, failed: ['tests-green', 'clean-tree'] }), "Autopilot's checks on the build found a problem: the tests do not pass; files were left uncommitted");
+  assert.equal(ev({ type: 'parked', kind: 'human-check', gate: 'gates/x-1.json', question: 'UI epic. Does what was built look right?', reason: 'human check needed before verify' }), `Waiting for you: ${E1.id} — CSV import — UI epic. Does what was built look right?`);
+  assert.equal(ev({ type: 'parked', kind: 'resume', gate: 'gates/x-1.json', question: 'x stopped: budget: build-1 hit wall clock. Continue it in the next run?', reason: 'budget: build-1 hit wall clock' }), `Stopped: ${E1.id} — CSV import — a step reached its time limit`);
+  assert.equal(ev({ type: 'failed', reason: 'verify-2 FAIL after the fix round: no' }), `Did not pass: ${E1.id} — CSV import — it did not pass its independent check, even after the one repair`);
+  assert.equal(eventLine({ type: 'run-end', why: 'Lg1Csv7 parked (onPark: stop)', spentUsd: 4.2 }), 'RUN ENDED: an epic needs you. Spent $4.20.');
+  for (const o of [{ type: 'parked', reason: 'CHECK_BUILD: the build left uncommitted work (failed: clean-tree)' }, { type: 'parked', reason: 'run stopped (end time) before VERIFY' }, { type: 'blocked', reason: 'dependency not merged: Lg1Csv7 (PARKED)' }]) assert.ok(!/[A-Z]{2,}_[A-Z]+|VERIFY|\.json|\//.test(ev(o)), ev(o));
+  assert.equal(eventLine({ type: 'something-new' }), null);
 });
 
 test('plan lint fail parks the epic and no build session starts', async (t) => {
