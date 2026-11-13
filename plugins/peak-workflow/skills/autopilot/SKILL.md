@@ -18,11 +18,26 @@ work yourself.
 
 **Four things this skill never does.** They hold in every mode, whatever the user says mid-skill:
 
-1. **It never edits project code** — or any file in the project, with one exception: the `setup`,
-   `copy`, `readOnly` and `network` entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
-   `DRIVER configure` after the owner confirms them (Step 1 item 5). Otherwise it writes only
-   inside the workspace (a sibling of the project): the new run's `config.json`, through the
-   driver a gate's recorded answer, and through `DRIVER prepare` the private clone.
+1. **It never edits project code.** It changes a file in the project in two cases only, and
+   never without the owner's yes to that change:
+   - **Autopilot's own settings** — the `setup`, `copy`, `readOnly`, `network` and `budgets`
+     entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
+     `DRIVER configure` after the owner confirms them (Step 1 item 5, Step 2 item 3).
+   - **A project fix it has named itself** — the `**Tests:**` or `**Build:**` line of
+     `CLAUDE.md`, or a `.gitignore` line — when readiness found that this line is what stops
+     the run. Show the file and the line as it is and as it would be, then ask with
+     `AskUserQuestion`: "Make this change and commit it on `<integration>`?" — options
+     `Make this change` and `I'll change it myself`. Make it only after the owner approves that
+     exact change through `AskUserQuestion`: edit that one line, and commit that one file on
+     the integration line (`chore: <what changed> (autopilot readiness)`), not pushed. If the
+     project is on another branch, or that file already has uncommitted changes, do not make
+     it: say what to change, and stop. Never unasked, never anything else: an earlier "go
+     ahead" or "you are approved" covers nothing, one approval covers one change, and code,
+     tests, requirements and every other line stay the owner's.
+
+   Otherwise it writes only inside the workspace (a sibling of the project): the new run's
+   `config.json`, through the driver a gate's recorded answer, and through `DRIVER prepare`
+   the private clone. It never writes `<ws>/settings.json`.
 2. **It never runs `/peak-workflow:start-epic` or `/peak-workflow:wrapup-epic`**, and never does
    their work by hand. Only the driver's sessions build and verify.
 3. **It never answers a gate.** A parked gate is the owner's decision. Ask the gate's own
@@ -148,9 +163,17 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         configuration names it. Nothing else: not a source host, not an API the product calls.
         Sessions reach these hosts and no others; `WebFetch` and `WebSearch` stay off, and the
         auditor has no network whatever is listed.
+      - **Quality gates.** The verifier runs every quality gate `CLAUDE.md` lists (build,
+        lint, format, type check, the tests), not only the tests. List each one with its
+        command and say, for each, whether it can run in the copy: does it need a file git
+        ignores (a `.env` with a real key)? a running server or database? a person? Reason from
+        what the command does, never from the tests alone. A gate that needs a real key means
+        that file goes in `copy`, or the owner is told now that verify may park on it. The
+        ones that can run are passed to the proof in item d.
       - A `**Tests:**` line that names a shell alias or an activated environment (`python` for
         `python3`, a bare tool that lives in `.venv/bin`) cannot run unattended. Say which line
-        and what it should say; the owner changes and commits it, you do not.
+        and what it should say, and offer the change as rule 1 allows: one named line, the
+        owner's yes to exactly that, then your commit — or the owner makes it.
 
    c. **Confirm, then save.** Show the entries exactly as they will be saved; for each
       `copy` file one sentence — with no `network` entry: "The build sessions can read this
@@ -176,12 +199,20 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       get the same setup.
 
    d. **Prove it** — not in `dry-run` mode, which writes nothing: say the proof is skipped and
-      carry on. Run `DRIVER prepare --project "<root>"` with a ten-minute timeout. It makes the
+      carry on. Run `DRIVER prepare --project "<root>"` with a ten-minute timeout, adding one
+      `--gate '<command>'` for each quality gate item b found runnable (not the tests: they
+      always run). It makes the
       clone (or brings it up to date), copies the files, runs `setup`, then runs the project's
-      test command in the clone, in the same plain shell a run uses. It writes only inside the
-      workspace and prints JSON; exit 1 means the proof failed.
+      test command in the clone, in the same plain shell a run uses, and then each gate. It
+      writes only inside the workspace and prints JSON; exit 1 means the proof failed. A gate
+      never fails the proof: only the tests refuse a launch.
       - `ok: true` → one line: "Autopilot's copy builds and passes your tests (<n> files copied,
-        setup ran)." Then run the item 1 preflight again and use its output: the clone now exists.
+        setup ran)." Then, from `gates`, one line per gate: passed, or failed with its `tail`
+        (`couldNotRun` true: the command was not found in a plain shell). For each gate in
+        `gatesFailed` say plainly: "The verify step runs this gate and will most likely stop
+        on it", and what would fix it (a `setup` step, a `copy` file, or a fix in the
+        project). It is a warning; the owner decides whether to launch. Then run the item 1
+        preflight again and use its output: the clone now exists.
       - `failed: "copy"` → print `problems`. `failed: "setup"` or `"tests"` → print that step's
         `tail`; when its `couldNotRun` is true say plainly that the command was not found in a
         plain shell and the tests never ran, which is a missing tool or setup step and not a
@@ -189,9 +220,12 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         changed or created and git would commit; the fix is a different setup command or a
         `.gitignore` line.
       - Diagnose from the output, go back to item b with a corrected entry, and prove again —
-        at most three rounds, each confirmed by the owner. A fix that belongs in the project
-        (the `**Tests:**` line, `.gitignore`, a test that truly fails on `<integration>`) is the
-        owner's: say exactly what to change, and stop.
+        at most three rounds, each confirmed by the owner. A fix that belongs in the project is
+        offered only where rule 1 allows it (the `**Tests:**` or `**Build:**` line, a
+        `.gitignore` line): name the exact change and ask. Anything else — a test that truly
+        fails on `<integration>`, code, another line — is the owner's: say exactly what to
+        change, and stop. After a project fix is committed, run item 1 again and carry on in
+        this session.
       - **Never launch while the proof fails.** The run would stop at its first test check.
 
       If the owner chose `Skip`, still run the proof: with no entries it passes for a project
@@ -266,6 +300,15 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    `queue`. Safety, hardware and no-anchor epics are never added. An epic that resumes or starts
    over from a decided gate needs no `explicit` entry.
 
+   **The queue from last time.** `launch.lastQueue` is the queue the owner confirmed for the
+   last run, minus the epics that have finished since (`ids`, `labels`). When every one of its
+   epics is in the proposed queue and the proposed queue has more, ask before showing the run,
+   with `AskUserQuestion`: "Same queue as last time (<labels>) or all <N> eligible epics?" —
+   options `Same as last time` and `All <N> eligible epics`, in that order, neither marked as
+   recommended. Show whichever the owner chose in item 2. Skip the question when `lastQueue` is
+   null, equals the proposed queue, or names an epic that cannot run tonight (say which, and
+   propose the full queue). The owner still chooses; you do not pick.
+
 2. **Show the run**, as one block:
 
    - The queue, numbered, each with its dependencies. For an epic with a `gate`, say what
@@ -276,8 +319,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      usually takes or costs." Then a table with one row per entry — `plan`, `build`, `audit`,
      `verify`, then `fix` marked "only if the one repair round happens" — and the columns
      Step, Cap, Model, Effort. The Cap cell is the entry's `size` followed by its ceiling in
-     brackets, for example `S (30 min, $5)`. Under the table, one line: "Sizes: XS up to 15
-     minutes, S up to 30, M up to 60, L up to 120." Do not show turns, and do not call any of
+     brackets, for example `S (30 min, $5)`. Under the table, two lines: "Sizes: XS up to 15
+     minutes, S up to 30, M up to 60, L up to 120." and "Each step has its own model and
+     effort: changing one step changes only that step." When `launch.workspaceBudgets` names
+     a step, add which values come from `<ws>/settings.json`. Do not show turns, and do not call any of
      these an estimate or say what a run will cost.
    - Run limits: `launch.config.runBudgetUsd` dollars; end time `launch.endByLocal`; the run also
      stops on a red base, low disk (`launch.config.diskFloorGb` GB), or two infrastructure errors
@@ -286,7 +331,7 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
      first epic that parks or fails; the epics after it are not started tonight"; `continue` —
      "epics that depend on it are blocked, independent epics still run". Say where it is set:
      `launch.projectSettingsFile` (`<root>/.claude/peak-workflow/autopilot.json`, `{"onPark": "continue"}`),
-     a file the owner edits and commits; this skill never writes it. With `stop`, add that
+     a file the owner edits and commits; this skill never writes that entry. With `stop`, add that
      "independent" is the planner's judgement, which is why stopping is the default.
    - **Gates.** Read `${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/policy/gates.json`. List the
      `answer` rows as "answered for you: <skillStep> → <answer>", and the `park` rows as "parks
@@ -315,8 +360,26 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    `Change the queue or limits`, `Cancel`. In `dry-run` mode the first option is
    `Show the dry run` instead.
    - **Change:** take the change in plain text. The owner may remove epics, reorder them (an
-     epic never before one of its dependencies — refuse and say why), change the run budget, or
-     change the end time. For an end time given as a clock time, compute the next occurrence:
+     epic never before one of its dependencies — refuse and say why), change the run budget,
+     change the end time, or change a step's model, effort or cap.
+
+     **A step's model, effort or cap** ("build on opus", "verify effort high", "build cap 120
+     minutes", "fix cap $20") is saved for this project, not for one run. The steps are
+     `plan`, `build`, `audit`, `verify`, `fix`; the settings are `model`, `effort` (`low`,
+     `medium`, `high`, `xhigh`, `max`), `wallMin` (minutes) and `usd`. A change names one
+     step: "build on opus" changes `build` only — say that `plan` and `fix` keep theirs, and
+     ask whether they should change too only if the owner's words leave it open ("use opus").
+     Repeat the change back as it will be saved, then:
+
+     ```bash
+     node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --budget <step>.<key>=<value> --budget <step>.<key>=<value>
+     ```
+
+     An empty value (`build.model=`) goes back to the default. The command refuses a value out
+     of range and prints why. If its output lists `shadowed`, say each line plainly: a value in
+     `<ws>/settings.json` still wins, and the owner removes that line there for the change to
+     take effect — you never edit that file. Then run the Step 1 item 1 preflight again and
+     show the new caps table. For an end time given as a clock time, compute the next occurrence:
      `node -e 'const d=new Date();d.setHours(H,M,0,0);if(d<=new Date())d.setDate(d.getDate()+1);console.log(d.toISOString(), "=", d.toString())'`.
      Show the block again and ask again.
    - **Cancel:** stop. Nothing was written.
@@ -336,9 +399,10 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    ```
 
    Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
-   A run's `config.json` holds only what belongs to that run; budgets, scope and the like live in
-   `<ws>/settings.json`, which this skill never writes. This is the only file this skill writes
-   directly.
+   A run's `config.json` holds only what belongs to that run. A step's model, effort and caps
+   live in the project's `autopilot.json` (saved through `DRIVER configure`); scope, audit and
+   the like live in `<ws>/settings.json`, which this skill never writes. This is the only file
+   this skill writes directly.
 
 ## Step 3: Launch
 
@@ -558,7 +622,7 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | Path | What it is |
 |---|---|
 | `<project>.autopilot/` | The workspace: one per project, kept between runs. Never inside the project |
-| `settings.json` | The owner's settings for every run (budgets, scope, audit, `claudeBin`). Edited by hand; the driver only creates it |
+| `settings.json` | The owner's settings for every run (scope, audit, `claudeBin`; a budget set here wins over the project's). Edited by hand; the driver only creates it |
 | `clone/` | The one private clone, with no remote. Merged epics are on its integration line; parked and failed epics keep their branch. Work left uncommitted at a park is kept as a `wip(autopilot)` commit on that branch, and stays in its history when the epic later merges |
 | `gates/<epic>-<n>.json` | One file per question that needs the owner, from every run |
 | `epics.json` | What a parked or failed epic carries into the next run (its plan, audits, fix round) |
@@ -570,4 +634,4 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `lock`, `STOP` | The single-instance lock and the kill switch, one per workspace |
 | `prepare.json` | The latest proof from Step 1 item 5: what was copied, how `setup` and the tests ended, and the sandbox probe when one ran |
 | `probe/` | The latest sandbox probe's session files (its stream, referee log and settings) |
-| `<project>/.claude/peak-workflow/autopilot.json` | The owner's project settings, such as `"onPark": "continue"`. Autopilot writes only its `setup`, `copy`, `readOnly` and `network` entries, through `driver.mjs configure`, after the owner confirms them |
+| `<project>/.claude/peak-workflow/autopilot.json` | The owner's project settings, such as `"onPark": "continue"`. Autopilot writes only its `setup`, `copy`, `readOnly`, `network` and `budgets` entries, through `driver.mjs configure`, after the owner confirms them |

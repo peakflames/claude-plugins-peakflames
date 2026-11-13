@@ -245,3 +245,57 @@ test('prepare --probe: one session, launched as a build is, runs the test comman
   assert.deepEqual([none.ok, none.failed, none.probe.exit], [false, 'probe', null]);
   assert.match(none.probe.why, /no exit code was written/);
 });
+
+test('configure --budget sets a step\'s model, effort and caps without hand-editing JSON; readiness shows them; a workspace value that still wins is named', (t) => {
+  const p = makeProject(t);
+  for (const [bad, re] of [['build.turns=9', /"turns" is not a setting/], ['deploy.model=opus', /"deploy" is not a step/], ['verify.effort=huge', /must be one of low, medium, high, xhigh, max/], ['build.wallMin=2', /whole minutes from 5 to 480/], ['build.usd=free', /dollars from 0\.5 to 200/], ['opus', /is not <step>\.<key>=<value>/]]) {
+    const r = driver('configure', '--project', p.project, '--budget', bad);
+    assert.equal(r.status, 2, bad); assert.match(r.stderr, re, bad);
+  }
+  assert.ok(!fs.existsSync(settingsFile(p)), 'a refused setting writes nothing');
+
+  const ok = driver('configure', '--project', p.project, '--budget', 'build.model=opus', '--budget', 'verify.effort=high,build.wallMin=120', '--budget', 'build.usd=25');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.deepEqual(readJson(settingsFile(p)), { budgets: { build: { model: 'opus', wallMin: 120, usd: 25 }, verify: { effort: 'high' } } });
+  assert.deepEqual(ok.json().shadowed, []);
+  const caps = Object.fromEntries(driver('preflight', '--project', p.project, '--json', '--allow-test-double').json().launch.caps.map((c) => [c.session, c]));
+  assert.deepEqual([caps.build.model, caps.build.effort, caps.build.size, caps.build.minutes, caps.build.usd], ['opus', 'medium', 'L', 120, 25]); // effort follows the model's family
+  assert.deepEqual([caps.verify.model, caps.verify.effort, caps.plan.model, caps.fix.model], ['opus', 'high', 'sonnet', 'sonnet']); // each step has its own model
+  const dry = driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout;
+  assert.match(dry, /build-1 — role builder, wall clock 120 min/);
+  assert.match(dry.split('\n').find((l) => l.includes('/build-1/settings.json') && l.includes('--model')), /--max-budget-usd 25 .*--model opus --effort medium/);
+
+  // The workspace's settings.json is read after the project's file: say so instead of saving silently.
+  const ws = path.join(p.state, 'settings.json');
+  fs.writeFileSync(ws, JSON.stringify({ ...readJson(ws), budgets: { build: { model: 'sonnet' } } }));
+  const shadowed = driver('configure', '--project', p.project, '--budget', 'build.model=opus').json().shadowed;
+  assert.equal(shadowed.length, 1);
+  assert.match(shadowed[0], /budgets\.build\.model is "sonnet" in .*settings\.json, which wins/);
+  const launch = driver('preflight', '--project', p.project, '--json', '--allow-test-double').json().launch;
+  assert.deepEqual([launch.workspaceBudgets, launch.caps.find((c) => c.session === 'build').model], [{ build: { model: 'sonnet' } }, 'sonnet']);
+
+  // An empty value goes back to the default, and the file keeps nothing empty.
+  driver('configure', '--project', p.project, '--budget', 'build.model=,build.wallMin=,build.usd=,verify.effort=');
+  assert.deepEqual(readJson(settingsFile(p)), {});
+});
+
+test('prepare --gate tries the other quality gates in the clone after the tests: each is reported, and a failing one is a warning, not a refusal', (t) => {
+  const p = makeProject(t);
+  const r = driver('prepare', '--project', p.project, '--gate', 'node -e "process.exit(0)"', '--gate', 'echo "lint: 3 problems" >&2; exit 4', '--gate', 'no-such-linter-xyz .', '--gate', 'echo built > out.txt');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const out = r.json();
+  assert.deepEqual([out.ok, out.failed, out.tests.pass], [true, null, true]);
+  assert.deepEqual(out.gates.map((g) => [g.pass, g.code, g.couldNotRun]), [[true, 0, false], [false, 4, false], [false, 127, true], [true, 0, false]]);
+  assert.deepEqual(out.gatesFailed, ['echo "lint: 3 problems" >&2; exit 4', 'no-such-linter-xyz .']);
+  assert.match(out.gates[1].tail, /lint: 3 problems/);
+  assert.deepEqual(out.gates[3].leftovers, ['?? out.txt']);
+  assert.equal(git(p.clone, 'status', '--porcelain'), '', 'what a gate leaves is removed');
+  assert.equal(driver('prepare', '--project', p.project).json().gates, undefined);
+
+  // Gates are not tried on a copy whose tests do not pass: the tests stay the refusal.
+  const md = path.join(p.project, 'CLAUDE.md');
+  fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replaceAll('`node --test`', '`no-such-tool-xyz test`'));
+  git(p.project, 'commit', '-qam', 'docs: a test command this shell does not have');
+  const red = driver('prepare', '--project', p.project, '--gate', 'true').json();
+  assert.deepEqual([red.ok, red.failed, red.gates], [false, 'tests', []]);
+});

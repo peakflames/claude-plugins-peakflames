@@ -513,8 +513,36 @@ const cleanNetwork = (list) => [...new Set((Array.isArray(list) ? list : []).fil
 /** A shell's "command not found" (127) or "cannot execute" (126): the command never ran, which is not a failing test. */
 export const couldNotRun = (code) => code === 127 || code === 126;
 
-/** Writes `setup`, `copy`, `readOnly` and `network` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
-export function configureProject(project, { setup, copy, readOnly, network } = {}) {
+export const BUDGET_STEPS = ['plan', 'build', 'audit', 'verify', 'fix'];
+const BUDGET_KEYS = {
+  model: (v) => (/^[A-Za-z0-9][A-Za-z0-9._:[\]-]*$/.test(v) ? v : 'is not a model name (sonnet, opus, haiku, or a full model ID)'),
+  effort: (v) => (EFFORT_LEVELS.includes(v) ? v : `must be one of ${EFFORT_LEVELS.join(', ')}`),
+  wallMin: (v) => (/^\d+$/.test(v) && Number(v) >= 5 && Number(v) <= 480 ? Number(v) : 'must be whole minutes from 5 to 480'),
+  usd: (v) => (/^\d+(\.\d+)?$/.test(v) && Number(v) >= 0.5 && Number(v) <= 200 ? Number(v) : 'must be dollars from 0.5 to 200'),
+};
+/**
+ * `<step>.<key>=<value>` settings as `configure --budget` takes them: a step's model, effort, or
+ * its wall-clock and dollar caps. An empty value removes the entry (back to the default).
+ * Returns `[{step, key, value}]`, value `undefined` for a removal; throws on anything else.
+ */
+export function parseBudgets(specs) {
+  const bad = []; const out = [];
+  for (const spec of specs.map((x) => String(x).trim()).filter(Boolean)) {
+    const m = spec.match(/^([A-Za-z]+)\.([A-Za-z]+)=(.*)$/);
+    if (!m) { bad.push(`budget: "${spec}" is not <step>.<key>=<value> (build.model=opus)`); continue; }
+    const [, step, key, raw] = m; const value = raw.trim();
+    if (!BUDGET_STEPS.includes(step)) { bad.push(`budget: "${step}" is not a step (${BUDGET_STEPS.join(', ')})`); continue; }
+    if (!BUDGET_KEYS[key]) { bad.push(`budget: "${key}" is not a setting (${Object.keys(BUDGET_KEYS).join(', ')})`); continue; }
+    if (value === '') { out.push({ step, key, value: undefined }); continue; }
+    const v = BUDGET_KEYS[key](value);
+    if (typeof v === 'string' && v !== value) bad.push(`budget: ${step}.${key} ${v}, not "${value}"`); else out.push({ step, key, value: v });
+  }
+  if (bad.length) throw new Error(bad.join('; '));
+  return out;
+}
+
+/** Writes `setup`, `copy`, `readOnly`, `network` and per-step `budgets` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
+export function configureProject(project, { setup, copy, readOnly, network, budgets, workspace = `${project}.autopilot` } = {}) {
   const file = projectSettingsFile(project);
   let j = {};
   if (exists(file)) { try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); } }
@@ -537,9 +565,22 @@ export function configureProject(project, { setup, copy, readOnly, network } = {
     const list = cleanNetwork(network);
     if (list.length) j.network = list; else delete j.network;
   }
+  const shadowed = [];
+  if (budgets !== undefined) {
+    const over = tryJson(path.join(workspace, 'settings.json'), {})?.budgets ?? {};
+    for (const { step, key, value } of parseBudgets(budgets)) {
+      j.budgets = j.budgets && typeof j.budgets === 'object' ? j.budgets : {};
+      const b = (j.budgets[step] = j.budgets[step] && typeof j.budgets[step] === 'object' ? j.budgets[step] : {});
+      if (value === undefined) delete b[key]; else b[key] = value;
+      if (!Object.keys(b).length) delete j.budgets[step];
+      // The workspace's settings.json is read after the project's file, so a value there still wins.
+      if (value !== undefined && over[step]?.[key] !== undefined && over[step][key] !== value) shadowed.push(`budgets.${step}.${key} is ${JSON.stringify(over[step][key])} in ${path.join(workspace, 'settings.json')}, which wins over the ${JSON.stringify(value)} saved here until that line is removed`);
+    }
+    if (j.budgets && !Object.keys(j.budgets).length) delete j.budgets;
+  }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeJson(file, j);
-  return { file, settings: j };
+  return { file, settings: j, shadowed };
 }
 
 const fetchCommand = (clone, integration) => `git fetch "${clone}" ${integration}:autopilot/${integration}`;
@@ -1044,6 +1085,16 @@ class Run {
     return { pass: r.code === 0 && !r.timedOut, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), skips: skips === undefined ? null : Number(skips), ms: Date.now() - started, tail: text.trim().split('\n').slice(-15).join('\n') };
   }
 
+  /** One quality-gate command, run like the tests: in the clone, in a plain shell. Whatever it leaves that git would commit is listed and removed. */
+  runGate(command) {
+    const started = Date.now();
+    const r = sh(command, [], { cwd: this.clone, shell: true, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
+    const left = gitRun(this.clone, 'status', '--porcelain').out.split('\n').filter(Boolean);
+    if (left.length) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); }
+    const pass = r.code === 0 && !r.timedOut;
+    return { command, pass, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), ms: Date.now() - started, leftovers: left, tail: pass ? undefined : `${r.out}\n${r.err}`.trim().split('\n').slice(-15).join('\n') };
+  }
+
   // ---- the clone's environment ---------------------------------------------------------------
 
   /** Makes the private clone if there is none. Returns whether it was made. */
@@ -1092,7 +1143,7 @@ class Run {
    * Writes only inside the workspace. Whatever setup or the tests leave that git would commit is
    * reported and removed, so the run starts on a clean clone.
    */
-  async prepare({ probe = false } = {}) {
+  async prepare({ probe = false, gates = [] } = {}) {
     fs.mkdirSync(this.stateDir, { recursive: true });
     this.acquireLock();
     try {
@@ -1105,12 +1156,15 @@ class Run {
       const leftovers = gitRun(this.clone, 'status', '--porcelain').out.split('\n').filter(Boolean);
       if (leftovers.length) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); }
       const base = env.pass && !!tests?.pass && !leftovers.length;
+      // The project's other quality gates (build, lint, type check), tried in the same plain shell once the tests pass.
+      // A gate that fails here is a warning, not a refusal: the verifier runs them, and some need what the copy lacks.
+      const gateResults = base ? gates.map((g) => String(g).trim()).filter(Boolean).map((command) => this.runGate(command)) : [];
       // The probe is worth its few cents only once the plain shell passes: it answers the one question left, the sandbox.
       const probed = probe ? (base ? await this.probe(integration) : { ran: false, skipped: 'the proof failed before the probe' }) : null;
       const result = {
         ok: base && !(probed?.ran && !probed.pass), at: new Date().toISOString(), clone: this.clone, cloneMade: made, integration, tip: gitRun(this.clone, 'rev-parse', 'HEAD').out, sync: sync.state,
         failed: !env.pass ? env.step : !tests.pass ? 'tests' : leftovers.length ? 'leftovers' : probed?.ran && !probed.pass ? 'probe' : null,
-        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers, ...(probed ? { probe: probed } : {}),
+        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers, ...(gates.length ? { gates: gateResults, gatesFailed: gateResults.filter((g) => !g.pass).map((g) => g.command) } : {}), ...(probed ? { probe: probed } : {}),
         // The latest probe that ran, with what it ran against, kept across later proofs: readiness says whether it still stands.
         lastProbe: probed?.ran ? { at: new Date().toISOString(), pass: probed.pass, exit: probed.exit, against: { testCommand: this.config.testCommand ?? null, setup: this.config.setup ?? null, readOnly: this.config.readOnly ?? [], network: cleanNetwork(this.config.network) } } : tryJson(path.join(this.stateDir, 'prepare.json'))?.lastProbe ?? null,
       };
@@ -2122,7 +2176,7 @@ class Run {
 }
 
 /** What the skill needs to know before it offers a launch: read-only facts about the project and its workspace. */
-export function launchFacts(project, workspace, config) {
+export function launchFacts(project, workspace, config, { epics = null } = {}) {
   const refuse = []; const warn = [];
   const integration = detectIntegration(project);
   if (!integration) refuse.push(`${project} is not the root of a git repository with a develop, main or master branch`);
@@ -2167,11 +2221,19 @@ export function launchFacts(project, workspace, config) {
   if (sync.state === 'clone-ahead') warn.push(`autopilot has merged work the project has not fetched yet; the run builds on top of it. Waiting in the clone: ${sync.waiting.join('; ')}. Bring it in with: ${fetchCommand(clone, integration)}`);
   if (sync.state === 'project-ahead') warn.push(`${integration} moved in the project since the last run; the run fast-forwards the clone to it first; a decision on a parked branch still holds if that branch merges cleanly into the new tip`);
   if (process.platform === 'darwin') warn.push('a laptop with the lid closed on battery may still sleep, even under caffeinate: leave it on power');
+  // What the owner confirmed last time, minus what has finished since: offered beside the full queue, never chosen for them.
+  const confirmed = lastRun ? tryJson(path.join(lastRun.runDir, 'config.json'))?.queue : null;
+  const byId = new Map((epics ?? []).map((e) => [e.id, e]));
+  const left = Array.isArray(confirmed) && epics ? confirmed.filter((id) => byId.has(id) && byId.get(id).eligibility !== 'complete') : [];
+  const lastQueue = left.length ? { run: lastRun.run, ids: left, labels: left.map((id) => byId.get(id).label), finishedSince: confirmed.filter((id) => byId.get(id)?.eligibility === 'complete') } : null;
+  const wsBudgets = tryJson(path.join(workspace, 'settings.json'), {})?.budgets;
   const run = newRunName(workspace);
   return {
     ok: refuse.length === 0, refuse, warn, integration, freeGb, workspace, clone, run, runDir: runDirOf(workspace, run), settingsFileExists: exists(path.join(workspace, 'settings.json')),
     projectSettingsFile: projectSettingsFile(project), projectSettingsFileExists: exists(projectSettingsFile(project)),
-    runs, lastRun, openGates, decidedGates, sync, env, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
+    runs, lastRun, lastQueue, openGates, decidedGates, sync, env,
+    // Per-step settings in the workspace's settings.json win over the project's file: named so the confirm screen can say so.
+    workspaceBudgets: wsBudgets && typeof wsBudgets === 'object' ? Object.fromEntries(BUDGET_STEPS.filter((k) => wsBudgets[k] && typeof wsBudgets[k] === 'object').map((k) => [k, wsBudgets[k]])) : {}, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
     // The per-session safety caps, sized for the confirm screen: ceilings, never estimates.
     caps: ['plan', 'build', 'audit', 'verify', 'fix'].filter((k) => config.budgets[k]).map((k) => ({ session: k, size: capSize(config.budgets[k].wallMin), minutes: config.budgets[k].wallMin, usd: config.budgets[k].usd, model: config.budgets[k].model ?? null, effort: config.budgets[k].effort ?? null })),
   };
@@ -2259,13 +2321,13 @@ export async function run({ project, workspace, stateDir, run: runName, queue, e
 // ---------------------------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const o = { _: [] };
+  const o = { _: [], all: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) { o._.push(a); continue; }
     const key = a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
     if (['dryRun', 'resume', 'json', 'verbose', 'help', 'allowTestDouble', 'probe'].includes(key)) o[key] = true;
-    else o[key] = argv[++i];
+    else { o[key] = argv[++i]; (o.all[key] = o.all[key] ?? []).push(o[key]); } // `all`: every value of a flag given more than once (--gate, --budget)
   }
   return o;
 }
@@ -2273,7 +2335,7 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>] [--probe] [--allow-test-double]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir] [--network host,host]\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>] [--gate <command>]… [--probe] [--allow-test-double]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir] [--network host,host] [--budget <step>.<key>=<value>]…\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
   const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
@@ -2289,7 +2351,7 @@ async function main(argv) {
       gates: gateFacts(ws, integration, { integrationTip: sync.state === 'project-ahead' ? sync.projectTip : null }),
       sidecarText: sync.state === 'clone-ahead' ? (rel) => gitShow(clone, integration, rel) : null,
     });
-    pre.launch = launchFacts(root, ws, config);
+    pre.launch = launchFacts(root, ws, config, { epics: pre.epics });
     if (o.json) console.log(JSON.stringify(pre, null, 2));
     else { pre.refuse.forEach((r) => console.log(`REFUSE: ${r}`)); pre.epics.forEach((e) => console.log(`${e.label}  [${e.eligibility}${e.humanCheck ? ', human check' : ''}]  deps: ${e.deps.join(', ') || '—'}  ${e.reasons.join('; ')}`)); }
     return pre.ok ? 0 : 1;
@@ -2299,7 +2361,7 @@ async function main(argv) {
     const root = path.resolve(o.project);
     const ws = path.resolve(wsArg ?? `${root}.autopilot`);
     const config = loadConfig(ws, { project: root, overrides: o.allowTestDouble ? { allowTestDouble: true } : {} });
-    const result = await new Run({ workspace: ws, runName: '(prepare)', config, pluginDir: PLUGIN_DIR, verbose: false }).prepare({ probe: !!o.probe });
+    const result = await new Run({ workspace: ws, runName: '(prepare)', config, pluginDir: PLUGIN_DIR, verbose: false }).prepare({ probe: !!o.probe, gates: o.all.gate ?? [] });
     result.env = envFacts(root, ws, config);
     console.log(JSON.stringify(result, null, 2));
     return result.ok ? 0 : 1;
@@ -2307,8 +2369,9 @@ async function main(argv) {
   if (cmd === 'configure') {
     if (!o.project) throw new Error('configure needs --project');
     const list = (v) => (v === undefined ? undefined : String(v).split(','));
-    if ([o.setup, o.copy, o.readOnly, o.network].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only or --network (an empty value removes the entry)');
-    console.log(JSON.stringify(configureProject(path.resolve(o.project), { setup: o.setup, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network) }), null, 2));
+    if ([o.setup, o.copy, o.readOnly, o.network, o.budget].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only, --network or --budget (an empty value removes the entry)');
+    const root = path.resolve(o.project);
+    console.log(JSON.stringify(configureProject(root, { setup: o.setup, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network), budgets: o.all.budget?.flatMap((b) => b.split(',')), workspace: path.resolve(wsArg ?? `${root}.autopilot`) }), null, 2));
     return 0;
   }
   if (cmd === 'run') {
