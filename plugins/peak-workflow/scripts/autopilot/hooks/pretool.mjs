@@ -19,6 +19,7 @@ import { lintPlan, parseSidecar } from '../lib.mjs';
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
 const USER_READ = ['plugins', 'skills', 'agents', 'commands', 'rules', 'output-styles', 'CLAUDE.md'];
+const PRIVATE = ['.ssh', '.aws', '.gnupg', '.azure', '.kube', '.docker', '.netrc', '.npmrc', '.pypirc', '.git-credentials', '.config/gh', '.config/gcloud', 'Library/Keychains'];
 const WRAPPERS = new Set(['command', 'exec', 'env', 'time', 'nohup', 'xargs', 'nice', 'caffeinate', 'builtin', 'then', 'do', 'else', '!', '{', '(']);
 const CONTAINERS = /^(docker|docker-compose|podman|colima|lima|limactl|nerdctl|multipass|vagrant|qemu.*|VBoxManage|VirtualBox|virtualbox|kind|minikube|brew|sudo|doas|gh)$/;
 
@@ -54,7 +55,11 @@ function context(input, env) {
     epic: env.AUTOPILOT_EPIC ?? '',
     cwd: input.cwd ? realDeep(input.cwd) : clone,
     integration: run.integration ?? 'develop',
-    temp: [`/tmp/claude-${uid}`, `/private/tmp/claude-${uid}`, ...(input.scratchpad_dir ? [realDeep(input.scratchpad_dir)] : [])],
+    // Strict (the project turned the sandbox on): reads are jailed too, and only the sandbox's own temp directory is writable.
+    // Otherwise sessions read freely and write in the clone and the machine's temp directories.
+    strict: run.sandbox === true,
+    project: config.project ? realDeep(config.project) : null,
+    temp: [`/tmp/claude-${uid}`, `/private/tmp/claude-${uid}`, ...(input.scratchpad_dir ? [realDeep(input.scratchpad_dir)] : []), ...(run.sandbox === true ? [] : [realDeep(os.tmpdir()), '/tmp', '/private/tmp'])],
   };
 }
 
@@ -73,8 +78,10 @@ function classify(ctx, raw, { bash = false } = {}) {
     if (ctx.step && within(p, path.join(ctx.step, 'bundle'))) return 'ro';
     if (within(p, ctx.clone)) return 'ro';
   } else if (within(p, ctx.clone)) return 'rw';
-  if (ctx.temp.some((t) => within(p, t))) return ctx.role === 'auditor' ? 'ro' : 'rw';
+  // The workspace and the owner's project come before the temp directories: either may live under one.
   if (within(p, ctx.state)) return `${raw} is inside the autopilot workspace`;
+  if (!ctx.strict && ctx.role !== 'auditor' && ctx.project && within(p, ctx.project)) return 'ro'; // the owner's project: read it, never write it
+  if (ctx.temp.some((t) => within(p, t))) return ctx.role === 'auditor' ? 'ro' : 'rw';
   // The project's declared read-only directories (a dependency cache outside the clone), resolved by the driver at launch.
   if ((ctx.run.readOnly ?? []).some((d) => typeof d === 'string' && d && within(p, d))) return 'ro';
   if (within(p, path.join(ctx.home, '.claude', 'plans'))) return ctx.role === 'auditor' ? 'ro' : 'rw';
@@ -82,8 +89,14 @@ function classify(ctx, raw, { bash = false } = {}) {
   const claude = path.join(ctx.home, '.claude');
   if (USER_READ.some((d) => within(p, path.join(claude, d)))) return 'ro';
   if (within(p, path.join(claude, 'projects')) && /\/memory(\/|$)/.test(p.slice(claude.length))) return 'ro';
+  // Where Claude Code saves a tool's output when it is too long to show: the session is told to read it there (seen live: a probe could not read its own test output).
+  if (within(p, path.join(claude, 'projects')) && /\/tool-results\//.test(p.slice(claude.length))) return 'ro';
   if (bash && (p === '/' || SYSTEM_READ.some((d) => within(p, d)))) return 'ro';
-  return `${raw} is outside the private clone`;
+  if (ctx.strict || ctx.role === 'auditor') return `${raw} is outside the private clone`;
+  // Not strict: a session may read anywhere on the machine except where credentials and Claude Code's own files live.
+  if (within(p, claude) || p === path.join(ctx.home, '.claude.json')) return `${raw} is Claude Code's own data`;
+  if (PRIVATE.some((d) => within(p, path.join(ctx.home, d)))) return `${raw} is where credentials live`;
+  return 'ro';
 }
 
 function ruleR2Files(ctx) {
@@ -131,7 +144,12 @@ function ruleR2Bash(ctx, segs, command) {
     for (let i = 0; i < s.argv.length; i++) {
       const t = s.argv[i];
       const dirArg = (['cd', 'pushd'].includes(s.cmd) && i === 1 && !t.startsWith('-')) || (s.cmd === 'git' && s.argv[i - 1] === '-C');
-      if (dirArg) { const d = check(t, `${s.cmd} target`); if (d) return d; continue; }
+      if (dirArg) {
+        // Where a command goes, its relative writes follow: only the clone and the temp directories.
+        const c = classify(ctx, t, { bash: true });
+        if (c !== 'rw') return deny('R2', `path jail — ${s.cmd} target: ${c === 'ro' ? `${t} is outside the private clone` : c}`);
+        continue;
+      }
       const p = t.replace(/^-{1,2}[A-Za-z][\w-]*=/, '').replace(/^\d*&?>>?/, '');
       if (!p || p.includes('://')) continue;
       const absolute = /^(~|\$\{?HOME\}?)?\//.test(p);
@@ -143,6 +161,17 @@ function ruleR2Bash(ctx, segs, command) {
         if (first !== '/' && !fs.existsSync(first)) continue;
       }
       const d = check(p, 'path in command'); if (d) return d;
+    }
+    // With no sandbox the referee is what keeps writes inside the clone: every path a command visibly writes must be writable.
+    // Best effort — a script or an interpreter can still write where its own code says.
+    if (!ctx.strict) {
+      const a = s.argv.slice(1).filter((x) => !x.startsWith('-'));
+      const more = ['touch', 'mkdir', 'rmdir', 'ln', 'chmod', 'chown', 'rsync'].includes(s.cmd) ? (s.cmd === 'rsync' || s.cmd === 'ln' ? a.slice(-1) : a) : [];
+      for (const tgt of [...bashWriteTargets([s]), ...more]) {
+        if (!tgt || tgt.includes('://') || tgt.startsWith('/dev/')) continue;
+        const c = classify(ctx, tgt, { bash: true });
+        if (c !== 'rw') return deny('R2', `path jail — ${c === 'ro' ? `${tgt} is outside the private clone: a session writes only inside it` : c}`);
+      }
     }
     // A declared read-only directory is read by commands and never written: a redirect into it is refused here (the sandbox refuses the rest).
     for (const r of s.redirects) {

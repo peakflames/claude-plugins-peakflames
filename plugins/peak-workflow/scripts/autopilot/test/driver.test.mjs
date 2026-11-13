@@ -409,13 +409,18 @@ test('owner decision: git remote writes are denied, the read-only listing is not
   assert.ok(deny.includes('Bash(git push *)'));
 });
 
-test('sandbox network: every session but the auditor gets local sockets, the package registries and the project\'s own hosts; nothing else opens', () => {
-  const base = sessionSettings({}, { kind: 'build' }).sandbox;
+test('sandbox: off by default; when a project turns it on, every session but the auditor gets local sockets, the package registries and the project\'s own hosts; nothing else opens', () => {
+  // Off by default: the session runs commands as a terminal does. The deny list and the referee hooks stay.
+  for (const kind of ['plan', 'build', 'fix', 'verify', 'probe']) assert.deepEqual(sessionSettings({}, { kind }).sandbox, { enabled: false }, kind);
+  assert.equal(sessionSettings({}, { kind: 'audit' }).sandbox.enabled, true);
+  assert.ok(sessionSettings({}, { kind: 'build' }).hooks.PreToolUse && sessionSettings({}, { kind: 'build' }).permissions.deny.includes('Bash(git push *)'));
+  // On: what follows.
+  const base = sessionSettings({ sandbox: true }, { kind: 'build' }).sandbox;
   assert.deepEqual([base.enabled, base.allowUnsandboxedCommands, base.failIfUnavailable], [true, false, true]);
   assert.deepEqual(base.network, { allowedDomains: REGISTRIES, strictAllowlist: true, allowAllUnixSockets: true, allowLocalBinding: true });
   for (const host of ['api.nuget.org', 'registry.npmjs.org', 'pypi.org', 'files.pythonhosted.org', 'crates.io', 'static.crates.io']) assert.ok(REGISTRIES.includes(host), host);
   assert.equal(networkProblems(REGISTRIES).length, 0);
-  const cfg = { network: ['pkgs.example.org', ' Registry.NPMJS.org ', 'pkgs.example.org'] };
+  const cfg = { sandbox: true, network: ['pkgs.example.org', ' Registry.NPMJS.org ', 'pkgs.example.org'] };
   for (const kind of ['plan', 'build', 'fix', 'verify', 'probe']) assert.deepEqual(sessionSettings(cfg, { kind }).sandbox.network.allowedDomains, [...REGISTRIES, 'pkgs.example.org'], kind);
   // The auditor only reads a bundle: no hosts, no sockets.
   assert.deepEqual(sessionSettings(cfg, { kind: 'audit' }).sandbox.network, { allowedDomains: [], strictAllowlist: true });

@@ -25,9 +25,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot continues a build that was cut short** — a build stopped by STOP, a budget or the
   wall clock resumes in a new build session told what is already committed, instead of failing
   CHECK_BUILD and spending the one repair round on a part-built branch.
-- **Autopilot sandbox network** — sessions may use local sockets and ports (MSBuild and
-  `dotnet test` cannot run without them) and reach the public package registries; `network` in the
-  project's `autopilot.json` adds a private registry. Everything else stays closed.
+- **Autopilot sandbox off by default** — sessions run commands unsandboxed with open network, so
+  real toolchains (MSBuild, `dotnet test`) work; the referee keeps file writes inside the clone
+  and temp directories. `"sandbox": true` in the project's `autopilot.json` turns it back on.
+- **Autopilot referee reads freely** — with the sandbox off, a session may read anywhere except
+  credentials, Claude Code's own data and the workspace; Bash commands that visibly write outside
+  the clone are refused. Saved long tool outputs are always readable.
+- **Autopilot sandbox network** — with the sandbox on, sessions may use local sockets and ports
+  and reach the public package registries; `network` adds a private registry. Everything else
+  stays closed.
 - **Autopilot sandbox probe** — `driver.mjs prepare --probe` launches one cheap session, set up
   exactly as a build, that runs the test command inside the sandbox; readiness learns whether the
   toolchain works there before an epic is spent on it.

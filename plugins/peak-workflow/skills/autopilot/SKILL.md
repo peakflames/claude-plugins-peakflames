@@ -148,7 +148,14 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    dependency cache the build tools keep in the home directory); and `network`, extra host
    names a session may reach from inside its sandbox. Sessions can always use local sockets
    and ports and reach the public package registries (`launch.env.registries`: NuGet, npm,
-   PyPI, crates.io, Go, Maven, Gradle, RubyGems), so `network` is only for a private registry. Skip this item when no epic is runnable.
+   PyPI, crates.io, Go, Maven, Gradle, RubyGems), so `network` is only for a private registry.
+
+   **The sandbox is off by default** (`launch.env.sandbox` is false). Sessions then run
+   commands as a terminal does — any build tool works, the network is open, and they may read
+   anywhere except credentials — while the referee keeps their file writes inside the copy
+   and the temp directories, and still refuses push, containers and `sudo`. In that case
+   `readOnly`, `network` and the probe (item e) do nothing: do not draft, save or run them.
+   They matter only for a project whose `autopilot.json` says `"sandbox": true`. Skip this item when no epic is runnable.
 
    a. **See what the copy starts without** — `launch.env.ignored` (each entry has `path` and
       `status`: `copied`, `present` = rebuilt in the copy, `absent` = not carried over). Use
@@ -192,8 +199,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         and what it should say, and offer the change as rule 1 allows: one named line, the
         owner's yes to exactly that, then your commit — or the owner makes it.
 
-   c. **Save what the run needs; ask only about `copy`.** Save `setup` and `readOnly` without
-      asking: autopilot cannot build without them, and the driver refuses anything broad or
+   c. **Save what the run needs; ask only about `copy`.** Save `setup` (and, with the sandbox
+      on, `readOnly`) without asking: autopilot cannot build without them, and the driver refuses anything broad or
       private. A `network` host (a private registry) is the one other thing to ask about, with
       adding it recommended when the project's configuration names it.
 
@@ -205,15 +212,15 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
       the file's other keys and refuses a path or host it cannot accept — print the refusal
       and correct the entry. Never write that file any other way, and do not commit it. What
       was saved goes on the Step 2 screen as one plain line, for example: "I set autopilot up
-      to read your installed .NET packages (and nothing else on your machine)."
+      so its copy installs what your project needs before each run."
 
       **A `copy` file is the owner's call**, because it may hold a key. Ask only when a test
       or a quality gate cannot run without it, one `AskUserQuestion` per file: "Let autopilot's
       build sessions read your `<file>`? <the check> cannot run without it." — options
       `Yes, copy it in (Recommended)` and `No — that check may stop for me`. The first
-      option's description is the honest sentence: "Git never commits it. Sessions can reach
-      only the public package registries<, and the hosts in `network`>, so those are the only
-      places it could be sent." Recommend "No" instead when only an optional check needs the file.
+      option's description is the honest sentence: "Git never commits it. Build sessions can
+      read it, and they have network access, so treat any key in it as one the build could
+      use." (With `"sandbox": true`: "…they can reach only the package registries.") Recommend "No" instead when only an optional check needs the file.
 
    d. **Prove it** — not in `dry-run` mode, which writes nothing: say the proof is skipped and
       carry on. Run `DRIVER prepare --project "<root>"` with a ten-minute timeout, adding one
@@ -247,7 +254,8 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         this session.
       - **Never launch while the proof fails.** The run would stop at its first test check.
 
-   e. **Probe the sandbox** — after the proof passes, and not in `dry-run` mode. The proof runs
+   e. **Probe the sandbox** — only when `launch.env.sandbox` is true; otherwise skip this
+      item and say nothing. After the proof passes, and not in `dry-run` mode. The proof runs
       the tests in a plain shell. Build sessions run them inside a sandbox: no writes outside
       the copy, no network beyond the registries and `network`. Whether `dotnet`, `cargo`, `npm` or the project's
       own tools work in there is known only by trying, and a build that finds out costs an

@@ -15,12 +15,13 @@ const Q_START = `Start Epic ${E1.id} (${E1.slug}) — CSV import? Phase 1 — Co
 const START_OPTS = ['Start it', 'Show me the ready epics instead', 'Stop'];
 
 /** A workspace as the driver leaves it mid-run: private clone, a run with state.json, one step directory. */
-function referee(t, { role = 'builder', branch = E1.branch, config = {} } = {}) {
+function referee(t, { role = 'builder', branch = E1.branch, config = {}, sandbox = false } = {}) {
   const p = makeProject(t, { config });
   git(p.project, 'clone', '-q', '--no-hardlinks', '--branch', 'develop', p.project, p.clone);
   git(p.clone, 'remote', 'remove', 'origin');
   if (branch !== 'develop') git(p.clone, 'checkout', '-q', '-b', branch);
   const runDir = p.mockRun();
+  if (sandbox) fs.writeFileSync(path.join(runDir, 'state.json'), JSON.stringify({ ...readJson(path.join(runDir, 'state.json')), sandbox: true })); // strict: the read jail too
   const step = path.join(runDir, 'epics', E1.id, `${role === 'planner' ? 'plan' : role === 'verifier' ? 'verify' : 'build'}-1`);
   fs.mkdirSync(step, { recursive: true });
   const env = { ...process.env, AUTOPILOT_STATE: p.state, AUTOPILOT_RUN: runDir, AUTOPILOT_STEP: step, AUTOPILOT_ROLE: role, AUTOPILOT_EPIC: E1.id };
@@ -62,8 +63,8 @@ test('R1 kill switch: with STOP present every tool call is denied and the sessio
   denied(h.pre('Read', { file_path: path.join(h.clone, 'README.md') }), 'R1');
 });
 
-test('R2 path jail: file tools stay in the clone; state, home and system files are denied', (t) => {
-  const h = referee(t);
+test('sandbox on — R2 path jail: file tools stay in the clone; state, home and system files are denied', (t) => {
+  const h = referee(t, { sandbox: true });
   passes(h.pre('Read', { file_path: path.join(h.clone, 'README.md') }), 'read in clone');
   passes(h.pre('Read', { file_path: 'src/index.js' }), 'relative read');
   passes(h.pre('Write', { file_path: path.join(h.clone, 'src', 'new.js'), content: 'x' }), 'write in clone');
@@ -81,12 +82,13 @@ test('R2 path jail: file tools stay in the clone; state, home and system files a
   passes(h.pre('Read', { file_path: path.join(PLUGIN_DIR, 'skills', 'start-epic', 'SKILL.md') }), 'read plugin');
   denied(h.pre('Write', { file_path: path.join(PLUGIN_DIR, 'skills', 'start-epic', 'SKILL.md'), content: 'x' }), 'R2', /read-only/);
   passes(h.pre('Read', { file_path: path.join(os.homedir(), '.claude', 'projects', 'x', 'memory', 'MEMORY.md') }), 'read memory');
+  passes(h.pre('Read', { file_path: path.join(os.homedir(), '.claude', 'projects', 'x', 'abc', 'tool-results', 'b1.txt') }), 'read a saved tool output');
   passes(h.pre('Write', { file_path: path.join(os.homedir(), '.claude', 'plans', 'a-plan.md'), content: 'x' }), 'write plan file');
   passes(h.pre('Write', { file_path: `/tmp/claude-${UID}/scratch.txt`, content: 'x' }), 'write sandbox temp');
 });
 
-test('R2 path jail: a symlink out of the clone is resolved and denied', (t) => {
-  const h = referee(t);
+test('sandbox on — R2 path jail: a symlink out of the clone is resolved and denied', (t) => {
+  const h = referee(t, { sandbox: true });
   const outside = path.join(h.tmp, 'outside');
   fs.mkdirSync(outside); fs.writeFileSync(path.join(outside, 'secret.txt'), 's');
   fs.symlinkSync(outside, path.join(h.clone, 'link'));
@@ -95,8 +97,8 @@ test('R2 path jail: a symlink out of the clone is resolved and denied', (t) => {
   denied(h.bash('cat link/../../outside/secret.txt'), 'R2');
 });
 
-test('R2 path jail: Bash absolute paths, cd targets and git -C are checked (best effort)', (t) => {
-  const h = referee(t);
+test('sandbox on — R2 path jail: Bash absolute paths, cd targets and git -C are checked (best effort)', (t) => {
+  const h = referee(t, { sandbox: true });
   passes(h.bash('node --test && ls -la src'), 'plain command');
   passes(h.bash('ls /usr/bin | head -3 && cat /dev/null'), 'system paths');
   passes(h.bash("grep -E '/foo/' src/index.js"), 'a regex is not a path');
@@ -115,7 +117,7 @@ test('R2 path jail: Bash absolute paths, cd targets and git -C are checked (best
 });
 
 test('R2 declared read-only directories: Read, Grep and Bash may read them, nothing writes them, and an undeclared directory stays denied', (t) => {
-  const h = referee(t);
+  const h = referee(t, { sandbox: true });
   const cache = path.join(h.tmp, 'cache'); const other = path.join(h.tmp, 'other');
   for (const d of [cache, other]) { fs.mkdirSync(path.join(d, 'pkg'), { recursive: true }); fs.writeFileSync(path.join(d, 'pkg', 'lib.txt'), 'x'); }
   denied(h.pre('Read', { file_path: path.join(cache, 'pkg', 'lib.txt') }), 'R2', /outside the private clone/); // not declared yet
@@ -133,6 +135,51 @@ test('R2 declared read-only directories: Read, Grep and Bash may read them, noth
   // A link inside a declared directory that leads out of it is resolved first.
   fs.symlinkSync(other, path.join(cache, 'link'));
   denied(h.pre('Read', { file_path: path.join(cache, 'link', 'pkg', 'lib.txt') }), 'R2', /outside the private clone/);
+});
+
+test('R2 with the sandbox off (the default): a session reads anywhere but private places, and writes only in the clone and the temp directories', (t) => {
+  const h = referee(t);
+  const home = os.homedir();
+  // Reads: the machine is open — system files, the home directory, a dependency cache, the owner's project.
+  passes(h.pre('Read', { file_path: '/etc/hosts' }), 'system file');
+  passes(h.pre('Glob', { pattern: '*', path: home }), 'home');
+  passes(h.pre('Read', { file_path: path.join(home, '.nuget', 'packages', 'x', 'lib.xml') }), 'dependency cache, undeclared');
+  passes(h.pre('Read', { file_path: path.join(h.project, 'README.md') }), 'the project');
+  passes(h.bash('ls ~/.nuget/packages/ | head; cat /etc/hosts; ls ~/Documents'), 'bash reads');
+  // …except credentials, Claude Code's own data and the autopilot workspace.
+  denied(h.pre('Read', { file_path: path.join(home, '.ssh', 'id_rsa') }), 'R2', /credentials/);
+  denied(h.bash('cat "$HOME/.aws/credentials"'), 'R2', /credentials/);
+  denied(h.pre('Read', { file_path: path.join(home, '.claude', 'settings.json') }), 'R2', /Claude Code's own data/);
+  denied(h.pre('Read', { file_path: path.join(home, '.claude.json') }), 'R2', /Claude Code's own data/);
+  denied(h.pre('Read', { file_path: path.join(home, '.claude', 'projects', 'x', 'transcript.jsonl') }), 'R2');
+  passes(h.pre('Read', { file_path: path.join(home, '.claude', 'projects', 'x', 'memory', 'MEMORY.md') }), 'memory stays readable');
+  passes(h.pre('Read', { file_path: path.join(home, '.claude', 'projects', 'x', 'abc', 'tool-results', 'b1.txt') }), 'a long tool output saved by Claude Code');
+  passes(h.bash(`tail -15 ${home}/.claude/projects/x/abc/tool-results/b1.txt`), 'and by Bash');
+  denied(h.pre('Read', { file_path: path.join(h.runDir, 'state.json') }), 'R2', /autopilot workspace/);
+  denied(h.bash(`cat ${h.runDir}/config.json`), 'R2', /autopilot workspace/);
+  // Writes: the clone and temp.
+  passes(h.pre('Write', { file_path: path.join(h.clone, 'src', 'new.js'), content: 'x' }), 'clone');
+  passes(h.pre('Write', { file_path: path.join(os.tmpdir(), 'scratch.txt'), content: 'x' }), 'temp');
+  passes(h.bash('mkdir -p out && echo hi > out/a.txt && rm -rf out && cp src/index.js /tmp/x.js 2>/dev/null'), 'writes in the clone and /tmp');
+  passes(h.bash('cd /tmp && ls'), 'cd to temp');
+  denied(h.pre('Write', { file_path: path.join(home, 'notes.txt'), content: 'x' }), 'R2', /read-only for this session/);
+  denied(h.pre('Edit', { file_path: path.join(h.project, 'README.md'), old_string: 'a', new_string: 'b' }), 'R2', /read-only for this session/);
+  denied(h.pre('Write', { file_path: path.join(h.state, 'settings.json'), content: '{}' }), 'R2', /autopilot workspace/);
+  denied(h.pre('Edit', { file_path: path.join(h.clone, '.git', 'config'), old_string: 'a', new_string: 'b' }), 'R2', /\.git/);
+  // Bash: what a command visibly writes must be writable; where it goes, its writes follow.
+  denied(h.bash('echo hi > ~/notes.txt'), 'R2', /writes only inside it/);
+  denied(h.bash(`echo hi > ${h.project}/x.txt`), 'R2', /writes only inside it/);
+  denied(h.bash('rm -rf ~/Documents/old'), 'R2', /writes only inside it/);
+  denied(h.bash('cp src/index.js ~/Desktop/'), 'R2', /writes only inside it/);
+  denied(h.bash('mkdir -p ~/scratch && touch ~/scratch/a'), 'R2', /writes only inside it/);
+  denied(h.bash('sed -i "" s/a/b/ /etc/hosts'), 'R2', /writes only inside it/);
+  denied(h.bash('cd ~/Documents && rm -rf old'), 'R2', /cd target/);
+  denied(h.bash(`git -C ${h.project} commit -m y`), 'R2', /git target/);
+  denied(h.bash('ls "$AUTOPILOT_STATE/gates"'), 'R2', /may not name/);
+  // A link out of the clone is still seen for what it is.
+  fs.symlinkSync(home, path.join(h.clone, 'link'));
+  denied(h.pre('Write', { file_path: 'link/new.txt', content: 'x' }), 'R2', /read-only/);
+  denied(h.bash('echo x > link/new.txt'), 'R2', /writes only inside it/);
 });
 
 test('R2 auditor: reads the bundle and the clone, and nothing else is allowed', (t) => {

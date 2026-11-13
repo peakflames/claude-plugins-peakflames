@@ -151,7 +151,7 @@ test('configure --read-only accepts a narrow directory outside the project and r
 });
 
 test('a run hands the declared directories to the referee: a build session reads the cache and is denied a write to it', async (t) => {
-  const p = makeProject(t);
+  const p = makeProject(t, { config: { sandbox: true } });
   const cache = path.join(p.tmp, 'cache'); fs.mkdirSync(cache); fs.writeFileSync(path.join(cache, 'lib.txt'), 'x');
   driver('configure', '--project', p.project, '--read-only', cache);
   const s = happy(E1);
@@ -172,7 +172,7 @@ test('a run hands the declared directories to the referee: a build session reads
 });
 
 test('configure --network saves host names only; a run writes them into each session\'s sandbox settings and leaves the auditor with none', async (t) => {
-  const p = makeProject(t);
+  const p = makeProject(t, { config: { sandbox: true } });
   for (const [bad, re] of [['https://api.nuget.org', /names a scheme/], ['*.org', /whole top-level domain/], ['api.nuget.org/v3', /not a bare host name/]]) {
     const r = driver('configure', '--project', p.project, '--network', bad);
     assert.equal(r.status, 2, bad); assert.match(r.stderr, re, bad);
@@ -184,7 +184,7 @@ test('configure --network saves host names only; a run writes them into each ses
   const pre = driver('preflight', '--project', p.project, '--json', '--allow-test-double').json();
   assert.deepEqual([pre.launch.env.network, pre.launch.env.registries], [['pkgs.example.org', 'registry.npmjs.org'], REGISTRIES]);
   const dry = driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout;
-  assert.match(dry, /^Network: +plan, build, repair and verify sessions may use local sockets and ports, and reach \d+ package registries plus pkgs\.example\.org, registry\.npmjs\.org; nothing else\. The auditor has no network/m);
+  assert.match(dry, /^Sandbox: +on — sessions write only in the clone, may use local sockets and ports, and reach \d+ package registries plus pkgs\.example\.org, registry\.npmjs\.org; nothing else\. The auditor has no network/m);
 
   p.scenario(happy(E1));
   const state = await p.go();
@@ -201,7 +201,7 @@ test('configure --network saves host names only; a run writes them into each ses
 });
 
 test('prepare --probe: one session, launched as a build is, runs the test command in the sandbox; judged from the exit code the command wrote', (t) => {
-  const p = makeProject(t);
+  const p = makeProject(t, { config: { sandbox: true } });
   driver('configure', '--project', p.project, '--network', 'registry.npmjs.org');
   const probe = (...extra) => driver('prepare', '--project', p.project, '--probe', ...extra);
 
@@ -236,7 +236,7 @@ test('prepare --probe: one session, launched as a build is, runs the test comman
   assert.equal(bad.status, 1);
   const b = bad.json();
   assert.deepEqual([b.ok, b.failed, b.tests.pass, b.probe.pass, b.probe.exit], [false, 'probe', true, false, 134]);
-  assert.match(b.probe.why, /exited 134 inside the sandbox, although it passed in a plain shell/);
+  assert.match(b.probe.why, /exited 134 in a session, although it passed in a plain shell/);
   assert.match(b.probe.tail, /Operation not permitted/);
   assert.match(b.probe.denials[0], /^R2: path jail/);
 
@@ -299,4 +299,29 @@ test('prepare --gate tries the other quality gates in the clone after the tests:
   git(p.project, 'commit', '-qam', 'docs: a test command this shell does not have');
   const red = driver('prepare', '--project', p.project, '--gate', 'true').json();
   assert.deepEqual([red.ok, red.failed, red.gates], [false, 'tests', []]);
+});
+
+test('by default sessions run with the sandbox off: settings say so, the run records it for the referee, and the dry run states what still guards the machine', async (t) => {
+  const p = makeProject(t);
+  const dry = driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout;
+  assert.match(dry, /^Sandbox: +off — sessions run commands as a terminal does, with open network; the referee keeps file writes inside the clone/m);
+  assert.equal(driver('preflight', '--project', p.project, '--json', '--allow-test-double').json().launch.env.sandbox, false);
+  const s = happy(E1);
+  // A build session looks a package up in a cache nobody declared, and tries to write outside the clone.
+  s[`${E1.id}/build`].actions.unshift({ do: 'tool', tool_name: 'Bash', tool_input: { command: 'ls ~/.nuget/packages/ | head -3' } }, { do: 'tool', tool_name: 'Bash', tool_input: { command: 'echo x > ~/autopilot-should-not-write.txt' } });
+  p.scenario(s);
+  const state = await p.go();
+  assert.deepEqual([state.sandbox, state.queue[0].state], [false, 'MERGED']);
+  for (const step of ['plan-1', 'build-1', 'verify-1']) assert.deepEqual(readJson(p.dir(E1.id, step, 'settings.json')).sandbox, { enabled: false }, step);
+  assert.equal(readJson(p.dir(E1.id, 'audit-1', 'settings.json')).sandbox.enabled, true);
+  const tools = fs.readFileSync(p.dir(E1.id, 'build-1', 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(tools[0].out, null, 'the read is allowed');
+  assert.match(tools[1].out.hookSpecificOutput.permissionDecisionReason, /writes only inside it/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /sandbox off: sessions run commands unsandboxed/);
+
+  // A project may turn it back on; anything but true or false is refused at launch.
+  fs.mkdirSync(path.dirname(settingsFile(p)), { recursive: true });
+  fs.writeFileSync(settingsFile(p), JSON.stringify({ sandbox: 'yes' }));
+  p.scenario(happy(E1));
+  await assert.rejects(p.go(), /sandbox must be true or false/);
 });
