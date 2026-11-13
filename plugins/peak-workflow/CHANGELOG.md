@@ -40,6 +40,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot proves the quality gates** — `driver.mjs prepare --gate "<command>"` (repeatable)
   runs each build or lint gate in the clone after the tests and reports it; a failing gate is a
   warning, and the tests remain the only refusal.
+- **Autopilot readiness fits one screen** — the skill saves the settings a run cannot work without
+  (`setup`, `readOnly`, `network`) and runs the proof and probe without asking, then shows one
+  short screen; tables, caps and the scope review appear only on request.
 - **Autopilot plan lint accepts shorthand anchors** — a plan that writes the prefix once and then bare
   seven-character suffixes (`TOR-03-Vaata1w, nt9zDad`) names those requirements; it no longer parks.
 - **Autopilot missing-command message** — a test or setup command the shell cannot find (exit 126
