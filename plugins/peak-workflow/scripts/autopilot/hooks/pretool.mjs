@@ -201,7 +201,7 @@ function ruleR2Bash(base, segs, command) {
 // ---- R3: git ---------------------------------------------------------------------------------
 
 function ruleR3(ctx, segs, command) {
-  if (/\bgit\b[^|;&\n]*\bpush\b/.test(command)) return deny('R3', 'git push is denied; nothing leaves this machine');
+  if (/\bgit\b[^|;&\n]*(?<!\bstash\s+)\bpush\b/.test(command)) return deny('R3', 'git push is denied; nothing leaves this machine');
   const protectedNames = new Set([ctx.integration, 'main', 'master', 'develop']);
   const epicBranch = new RegExp(`^feature/epic-${ctx.epic}-[\\w.-]+$`);
   let branch = null; // the branch the next git command acts on, tracked through checkouts in the same command
@@ -325,7 +325,7 @@ function bashWriteTargets(segs) {
   const out = [];
   for (const s of segs) {
     out.push(...s.redirects);
-    const a = s.argv.slice(1); const paths = a.filter((x) => !x.startsWith('-'));
+    const a = s.argv.slice(1); const paths = a.filter((x) => x && !x.startsWith('-')); // `sed -i '' …` carries an empty word: it is not a path
     if (['rm', 'mv', 'tee', 'truncate', 'unlink', 'shred'].includes(s.cmd)) out.push(...paths);
     else if (s.cmd === 'cp' || s.cmd === 'install') out.push(...paths.slice(-1));
     else if ((s.cmd === 'sed' || s.cmd === 'gsed' || s.cmd === 'perl' || s.cmd === 'ruby') && a.some((x) => /^-[a-zA-Z]*i/.test(x) || x.startsWith('--in-place'))) out.push(...paths);
@@ -354,6 +354,21 @@ const anchors = (ctx) => {
   let text = ''; try { text = fs.readFileSync(path.join(ctx.clone, 'docs', 'implementation-plan', 'status', `epic-${ctx.epic}.md`), 'utf8'); } catch { /* no sidecar */ }
   return parseSidecar(text).requirements;
 };
+/**
+ * The option on offer that stands for a wanted answer. A session often shortens or pads a label
+ * the skill gave it word for word ("No — only automated gates" for "No — only automated gates
+ * were run"); seen live, that parked a finished epic. The same words win; otherwise the one
+ * option that the wanted answer starts with, or that starts with it, at a word boundary and at
+ * least two words long. Two options that fit, or none, is no match: autopilot never guesses.
+ */
+export function offeredLabel(labels, want) {
+  const w = norm(want);
+  const exact = labels.find((l) => norm(l) === w);
+  if (exact !== undefined) return exact;
+  const starts = (long, short) => short.split(' ').length >= 2 && long.startsWith(short) && /^\W/.test(long.slice(short.length));
+  const near = labels.filter((l) => { const n = norm(l); return starts(w, n) || starts(n, w); });
+  return near.length === 1 ? near[0] : undefined;
+}
 const rowMatches = (row, question) => (row.fragments ?? []).every((f) => norm(question).includes(norm(f))) && (!row.pattern || new RegExp(row.pattern).test(question));
 
 function ruleR8(ctx) {
@@ -366,7 +381,7 @@ function ruleR8(ctx) {
   let park = questions.length ? null : { kind: 'unmatched', question: '(AskUserQuestion with no questions)', options: [], why: 'nothing to match' };
   for (const q of questions) {
     const labels = (q.options ?? []).map((o) => (typeof o === 'string' ? o : o.label));
-    const offered = (want) => labels.find((l) => norm(l) === norm(want));
+    const offered = (want) => offeredLabel(labels, want);
     const tor = (q.question.match(/TOR-\d{2}-[A-Za-z0-9]{7}/) ?? [])[0] ?? null;
     const parkRow = policy.park.find((r) => rowMatches(r, q.question));
     const row = parkRow ? null : policy.answer.find((r) => rowMatches(r, q.question));
@@ -395,6 +410,8 @@ function ruleR8(ctx) {
       notes[q.question] = `Recorded by autopilot from the owner's decision, not typed in this session: ${look.by} looked at ${(look.artifacts ?? []).join(', ') || 'the build'} on ${look.date} (branch tip ${String(look.branchTip).slice(0, 9)}) and answered "Looks right"${look.note ? ` — "${look.note}"` : ''}. This is the description of the manual check; do not ask for another.`;
       looked = look; continue;
     }
+    // The owner looked, and no option on offer says so: never let the policy "No" stand in for their look.
+    if (look) { park = { ...base, why: 'the owner looked at this build, and none of the options offered says a manual check was done' }; break; }
     if (parkRow) { park = { ...base, why: parkRow.why }; break; }
     if (!row) {
       // A question nobody pre-approved, in a step the owner has already answered questions about. Seen live: a session

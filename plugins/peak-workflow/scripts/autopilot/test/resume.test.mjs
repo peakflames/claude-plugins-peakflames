@@ -846,16 +846,22 @@ test('an epic an earlier driver parked on that record, with no question, gets on
 test('an answered question is not asked twice: the verify session that asked is resumed; reworded, the question is met with a reminder, not a new park', async (t) => {
   const p = makeProject(t);
   const q1 = "The live check needs a real sign-in in your browser. Should I open the browser sign-in now so the live check can run?";
-  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q1, ['Yes — open sign-in', 'No — use in-process proof'])] } });
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q1, ['Yes — open sign-in', 'No — use in-process proof'])], result: { total_cost_usd: 1.5 } } });
   await p.go();
   const run1 = p.runName();
+  const asking = p.epic(E1.id).sessions.at(-1);
+  assert.deepEqual([asking.name, asking.costUsd], ['verify-1', 1.5]);
   assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind, gate(p, E1.id).session], ['PARKED', 'unmatched', 'verify-1']);
   assert.equal(decide(p, E1.id, 'Yes — open sign-in').enters, 'VERIFY');
 
   // Seen live: the session that takes the step up again words the same question differently, with other options.
   const q2 = 'The gate opens a browser to your real sign-in. Can you complete that sign-in now?';
-  p.scenario({ [`${E1.id}/verify`]: { actions: [ask(q2, ['Yes — open the browser', 'Yes — tools list only', 'No — not now']), ...wrapupActions(E1)], result: { result: 'Verdict: PASS' } } });
+  // Seen live: a resumed session's result line counts the session it continues too ($1.5 here, already in the books).
+  p.scenario({ [`${E1.id}/verify`]: { actions: [ask(q2, ['Yes — open the browser', 'Yes — tools list only', 'No — not now']), ...wrapupActions(E1)], result: { result: 'Verdict: PASS', total_cost_usd: 2.25 } } });
   const r = await again(p);
+  const resumed = p.epic(E1.id).sessions.at(-1);
+  assert.deepEqual([resumed.costUsd, resumed.reportedCostUsd, resumed.resumed], [0.75, 2.25, asking.sessionId], 'only what the resumed session added is counted');
+  assert.equal(readJson(path.join(p.runDir(), 'state.json')).spentUsd, 0.75);
 
   assert.deepEqual(r.steps, [`${E1.id}/verify-1`], 'one session, no second park');
   assert.equal(p.epic(E1.id).state, 'MERGED');

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -571,6 +571,29 @@ test('effort defaults by model family (haiku/sonnet high, opus/fable medium) and
   assert.throws(() => loadConfig(p.state, { project: p.project }), /budgets\.build\.effort must be one of/);
 });
 
+test('the owner is away: no session starts a step that waits for a person, and a step nobody came for is not tried again in that epic', async (t) => {
+  const p = makeProject(t);
+  // The build asks the owner to come and gives up; the verify session of the same epic is told.
+  const hook = (hook, id, extra = {}) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), hook, tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description: 'Needs you: sign in to Okta in the browser window that opens' }, ...extra })}\n` });
+  const scripts = happy(E1);
+  scripts[`${E1.id}/build`].actions.unshift(hook('PreToolUse', 'n1', { decision: 'pass' }), hook('PostToolUseFailure', 'n1', { error: 'OAuth callback timed out after 300.0 seconds' }));
+  p.scenario(scripts);
+  const name = '20261113-130000';
+  fs.mkdirSync(path.join(p.state, 'runs', name), { recursive: true });
+  fs.writeFileSync(path.join(p.state, 'runs', name, 'config.json'), JSON.stringify({ project: p.project, queue: [E1.id], allowTestDouble: true, attended: false }));
+  const state = await p.go({ run: name });
+  assert.equal(state.attended, false);
+  const build = fs.readFileSync(p.dir(E1.id, 'build-1', 'build-rules.md'), 'utf8'); const verify = fs.readFileSync(p.dir(E1.id, 'verify-1', 'verify-rules.md'), 'utf8');
+  for (const text of [build, verify]) assert.match(text, /# The owner is away\n\nThe project's owner has said they will not be at the computer during this run\. Do not start a\ncommand that waits for a person/);
+  assert.doesNotMatch(build, /Already tried in this epic/);
+  assert.match(verify, /Already tried in this epic, and nobody came:\n\n- sign in to Okta in the browser window that opens \(`python build\.py mcp tools --oauth`\)\n\nDo not start that again\. List it in your final report under the heading "Not proven for real"/);
+  assert.deepEqual(p.epic(E1.id).unanswered.map((u) => [u.step, u.description]), [['build-1', 'sign in to Okta in the browser window that opens']]);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /build-1 waited for the owner 1 time\(s\) and nobody came: sign in to Okta/);
+  // Said or not, a step nobody came for is not tried twice; an owner who is there gets no "away" rule.
+  assert.equal(presenceRule(true), ''); assert.equal(presenceRule(null), '');
+  assert.match(presenceRule(true, [{ description: 'plug in the device', command: 'flash.sh' }]), /^\n# Steps that wait for the owner\n\nAlready tried in this epic, and nobody came:\n\n- plug in the device \(`flash\.sh`\)/);
+});
+
 test('real money: the owner\'s answer at launch reaches every build, repair and verify session; undecided, a session is told to ask', async (t) => {
   for (const [realSpend, want, never] of [[true, /has approved spending real money on calls to outside services/, /Never skip\s+it silently/], [false, /has said not to spend real money/, /Make that call/], [undefined, /is the project's owner's decision, not\s+yours\. If a test or a check needs such a call to prove a requirement, ask with `AskUserQuestion`/, /Make that call/]]) {
     const p = makeProject(t);
@@ -584,7 +607,10 @@ test('real money: the owner\'s answer at launch reaches every build, repair and 
       const text = fs.readFileSync(file, 'utf8');
       assert.match(text, /# Calls that cost real money/);
       assert.match(text, want, file); assert.doesNotMatch(text, never, file);
-      assert.match(text, /start its Bash `description` with `Needs you:`/);
+      // Only the final check asks a person to come; a build leaves that to it.
+      if (/verify-rules/.test(file)) assert.match(text, /start its Bash `description` with `Needs you:`/);
+      else { assert.match(text, /Do not start a command that waits for the project's owner/); assert.doesNotMatch(text, /Needs you:/); }
+      assert.doesNotMatch(text, /# The owner is away/, 'not said unless the owner said so');
     }
     const [, build, , verify] = p.calls();
     assert.ok(build.argv.includes(p.dir(E1.id, 'build-1', 'build-rules.md')) && verify.argv.includes(p.dir(E1.id, 'verify-1', 'verify-rules.md')));

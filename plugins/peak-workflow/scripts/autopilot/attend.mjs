@@ -137,6 +137,18 @@ export function eventLine(ev) {
   }
 }
 
+/**
+ * Where the whole run stands, said after each epic ends: how many are merged, waiting for the
+ * owner, failed or not started, and how many are still to go. `outcomes` maps an epic to the
+ * last of `merged`, `parked`, `failed`, `blocked` said about it; `total` is the queue's length.
+ */
+export function progressLine(outcomes, total) {
+  const n = (t) => [...outcomes.values()].filter((v) => v === t).length;
+  const left = Math.max(0, total - outcomes.size);
+  const parts = [n('merged') && `${n('merged')} merged`, n('parked') && `${n('parked')} waiting for you`, n('failed') && `${n('failed')} did not pass`, n('blocked') && `${n('blocked')} not started`, `${left} still to go`].filter(Boolean);
+  return `Progress: ${parts.join(', ')} (${plural(total, 'epic')} in this run)`;
+}
+
 // ---- reading a run ----------------------------------------------------------------------------
 
 const runDirOf = (workspace, name) => path.join(workspace, 'runs', name);
@@ -237,16 +249,55 @@ export function openCommand(hooksFile) {
   return { id: h.tool_use_id, description: needs ? needs[1].trim() : description.trim(), command: oneLine(commandOf(h), 160), startedAt: h.t ?? null, minutes: h.t ? sinceMin(h.t) : 0, needsYou: !!needs };
 }
 
+/**
+ * The commands of one step that asked the owner to come (`Needs you: …`) and ended without
+ * success: `[{ description, command, minutes }]`. The driver tells later sessions of the epic.
+ */
+export function unansweredNeeds(hooksFile) {
+  const asked = new Map(); const out = [];
+  for (const h of readFrom(hooksFile, 0).rows) {
+    if (h.tool_name !== 'Bash' || !h.tool_use_id) continue;
+    if (h.hook === 'PreToolUse') {
+      const needs = (typeof h.tool_input === 'object' && h.tool_input ? String(h.tool_input.description ?? '') : '').match(/^\s*needs you\s*[:—–-]\s*(.*)$/i);
+      if (needs && !['deny', 'park', 'remind'].includes(h.decision)) asked.set(h.tool_use_id, { description: oneLine(needs[1].trim(), 200), command: oneLine(commandOf(h), 160), startedAt: h.t ?? null });
+    } else if (/^PostToolUse/.test(h.hook ?? '') && asked.has(h.tool_use_id)) {
+      const a = asked.get(h.tool_use_id); asked.delete(h.tool_use_id);
+      if (h.hook !== 'PostToolUse') out.push({ description: a.description, command: a.command, minutes: a.startedAt && h.t ? Math.max(0, Math.round((Date.parse(h.t) - Date.parse(a.startedAt)) / 60000)) : null });
+    }
+  }
+  return out;
+}
+
 /** The command a Bash hook line ran, whether the log kept the input whole or clipped it to text. */
 const commandOf = (h) => (typeof h.tool_input === 'string' ? h.tool_input : h.tool_input?.command ?? '');
 
 /**
+ * Whether a Bash command's exit says how the project's tests went: the test command is there as
+ * a command of its own (`build.py test`, not `build.py test-live`) and is the last thing run, so
+ * the exit is its own. Anything piped on or chained after it says nothing about the tests. Seen
+ * live: a command that only named `test-live` died on a shell typo and was reported as failed tests.
+ */
+export function testsOutcomeKnown(command, testCommand) {
+  const cmd = String(command ?? ''); const test = String(testCommand ?? '').trim();
+  if (!test) return false;
+  for (let at = cmd.indexOf(test); at >= 0; at = cmd.indexOf(test, at + 1)) {
+    const before = cmd.slice(0, at); const after = cmd.slice(at + test.length).replace(/\d*>>?\s*&?\s*[^\s|;&]+/g, ' ');
+    if ((before === '' || /[\s;&|(]$/.test(before)) && !/^[\w-]/.test(after) && !/[|;&\n]/.test(after.trim())) return true;
+  }
+  return false;
+}
+/** A hook line's error text, in one line (a failed Bash call carries what it printed). */
+const errorOf = (h) => oneLine(typeof h.error === 'string' ? h.error : h.error ? JSON.stringify(h.error) : '', 160);
+
+/**
  * Follows one run and prints a line per thing worth saying. Read-only and long-running.
  *   first line   where the run is now (left out with `after`: the caller already knows)
- *   then         one `eventLine` per new event; `REFUSED …` the first and the third time the
+ *   then         one `eventLine` per new event, and a `Progress: …` line after each epic ends
+ *                (runs of more than one epic); `REFUSED …` the first and the third time the
  *                referee refuses the same thing; `TESTS passed|failed` when a session runs the
  *                project's test command; `NEEDS YOU: …` when the session starts a command that
- *                waits for the owner; one line for a command open `longMin` minutes; a heartbeat
+ *                waits for the owner, and `NO LONGER NEEDS YOU: …` when that command ends (done,
+ *                or given up); one line for a command open `longMin` minutes; a heartbeat
  *                when nothing else was said for a while
  *   last line    `RUN ENDED: <why>`, once the run has ended or the driver is gone
  * `once`: return after the first thing said, or after `onceMin` minutes (a session without the
@@ -276,13 +327,18 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
   if (after === null) say(snapshotLine(state0, { running: isLive() }), { quiet: true });
   // Events already there: said again with `replay`, skipped up to `after`, otherwise taken as known (the first line covers them).
   const skip = replay ? 0 : after === null ? readFrom(eventsFile, 0).rows.length : Number(after) || 0;
+  const outcomes = new Map(); let total = 0; // how each epic of the run ended so far, for the progress line
   const events = () => {
     const r = readFrom(eventsFile, offset); offset = r.offset;
     for (const row of r.rows) {
       seen += 1;
+      if (row.type === 'run-start') total = (row.queue ?? []).length;
+      const ends = ['merged', 'parked', 'failed', 'blocked'].includes(row.type) && row.epic;
+      if (ends) outcomes.set(row.epic, row.type);
       if (seen <= skip) continue;
       const line = eventLine(row);
       if (line) say(line);
+      if (ends && total > 1) say(progressLine(outcomes, total), { quiet: true });
       if (row.type === 'run-end') ended = true;
     }
   };
@@ -292,6 +348,7 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
   if (!replay && hookFile(state0)) { try { hookOffsets.set(hookFile(state0), fs.statSync(hookFile(state0)).size); } catch { /* not written yet */ } }
   const refusals = new Map();
   const flagged = new Set(); // commands already said to be waiting
+  const waiting = new Map(); // commands said to need the owner, until they end: tool_use_id → what was said
 
   for (;;) {
     const live = isLive();
@@ -306,16 +363,28 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
           const key = `${h.rule}\n${h.reason}`; const n = (refusals.get(key) ?? 0) + 1; refusals.set(key, n);
           if (n === 1) say(`REFUSED (${RULES[h.rule] ?? h.rule ?? 'rule'}): ${oneLine(h.reason, 240)}`);
           else if (n === 3) say(`REFUSED 3 times (${RULES[h.rule] ?? h.rule ?? 'rule'}): ${oneLine(h.reason, 240)}`);
-        } else if (testCommand && h.tool_name === 'Bash' && /^PostToolUse/.test(h.hook ?? '')) {
-          const cmd = commandOf(h); const at = cmd.indexOf(testCommand);
-          // A result piped into another command (`| tail`) says nothing about the tests: stay silent rather than guess.
-          if (at >= 0 && !/^[^&;]*\|(?!\|)/.test(cmd.slice(at + testCommand.length))) say(h.hook === 'PostToolUse' ? 'TESTS passed' : 'TESTS failed');
+        } else if (h.tool_name === 'Bash' && /^PostToolUse/.test(h.hook ?? '')) {
+          // A command the owner was told to come for has ended: say how, so nobody goes looking for it.
+          const w = waiting.get(h.tool_use_id);
+          if (w) {
+            waiting.delete(h.tool_use_id);
+            const min = w.startedAt && h.t ? Math.max(0, Math.round((Date.parse(h.t) - Date.parse(w.startedAt)) / 60000)) : null;
+            const took = min === null ? '' : ` after ${min} min`;
+            if (h.hook === 'PostToolUse') say(`NO LONGER NEEDS YOU: done${took} — ${w.description}`);
+            else say(`NO LONGER NEEDS YOU: it gave up${took} without that being done — ${w.description}${errorOf(h) ? ` (${errorOf(h)})` : ''}`);
+          }
+          // Only an exit that is the test command's own says how the tests went: otherwise stay silent rather than guess.
+          if (testsOutcomeKnown(commandOf(h), testCommand)) say(h.hook === 'PostToolUse' ? 'TESTS passed' : 'TESTS failed');
         }
       }
     }
     // Inside the step: a command that waits for the owner is said at once; any command open for `longMin` minutes is said once.
     const cmd = hf && !ended ? openCommand(hf) : null;
-    if (cmd?.needsYou && !flagged.has(cmd.id)) { flagged.add(cmd.id); say(`NEEDS YOU: ${oneLine(cmd.description, 200) || 'a step is waiting for you at this computer'}`); }
+    if (cmd?.needsYou && !flagged.has(cmd.id)) {
+      const description = oneLine(cmd.description, 200) || 'a step is waiting for you at this computer';
+      flagged.add(cmd.id); waiting.set(cmd.id, { description, startedAt: cmd.startedAt });
+      say(`NEEDS YOU: ${description}`);
+    }
     else if (cmd && !flagged.has(cmd.id) && cmd.startedAt && Date.now() - Date.parse(cmd.startedAt) >= longMin * 60000) { flagged.add(cmd.id); say(`One command has been running for ${cmd.minutes} min${cmd.description ? `: "${oneLine(cmd.description, 120)}"` : ''}`); }
     if (ended) { for (let waited = 0; driverPid(workspace) && waited < 5000; waited += 100) await sleep(100); break; } // the report is written; let the driver let go
     if (!live) {

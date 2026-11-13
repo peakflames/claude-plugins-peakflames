@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, snapshotLine, unprovenLines, watch } from './attend.mjs';
+import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
 import { writeReport } from './report.mjs';
@@ -190,6 +190,7 @@ export function defaultConfig(project) {
     endBy: nextEndBy(),
     runBudgetUsd: 80,
     realSpend: null, // run-level, the owner's answer at launch: true = sessions may spend real money on an outside service when a check needs it; false = never; null = not decided, a session asks
+    attended: null, // run-level, the owner's answer at launch: true = at the computer while it runs; false = away, so no session starts anything that waits for a person; null = not asked
     autoContinue: 0, // run-level: how many technical stops per epic the owner's standing answer continues without asking (0 = always ask)
     diskFloorGb: 15,
     growthCapMb: 1024,
@@ -274,7 +275,7 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   return cfg;
 }
 /** The keys that belong to one run; everything else is a workspace setting. */
-const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues', 'realSpend'];
+const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues', 'realSpend', 'attended'];
 const TEST_DOUBLE = (bin) => `claudeBin is ${bin}, not the real \`claude\`: a test double runs only when the run's config.json says "allowTestDouble": true (or --allow-test-double)`;
 
 // ---------------------------------------------------------------------------------------------
@@ -858,9 +859,9 @@ execution script for this session.
 - Commit everything you leave behind. If you were asked to record why you changed an existing
   test, \`.autopilot/test-changes.jsonl\` is part of your work: stage it with your final commit.
   \`git status\` must be clean when you finish.
-- When a command you run waits for the project's owner (a sign-in in a browser, a device to
-  plug in), start its Bash \`description\` with \`Needs you:\` and say in a few words what they must
-  do. They are told at once. Give them time: a timeout of at least five minutes.
+- Do not start a command that waits for the project's owner (a sign-in in a browser, a device
+  to plug in). A build does the part that needs no person; the final check is where a person is
+  asked to come, once. Say in your handoff what you left for it and the exact command.
 `;
 
 export const FIX_RULES = `# Autopilot repair rules
@@ -871,10 +872,22 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
 - Do not change the epic's status, and do not merge or push.
 - Where you must ask, ask with \`AskUserQuestion\`. Never answer such a question yourself and never work around it.
 - Commit everything you leave behind, \`.autopilot/test-changes.jsonl\` included. \`git status\` must be clean when you finish.
-- When a command you run waits for the project's owner (a sign-in in a browser, a device to
-  plug in), start its Bash \`description\` with \`Needs you:\` and say in a few words what they must
-  do. They are told at once. Give them time: a timeout of at least five minutes.
+- Do not start a command that waits for the project's owner (a sign-in in a browser, a device
+  to plug in). A repair does the part that needs no person; the final check is where a person is
+  asked to come, once. Say in your handoff what you left for it and the exact command.
 `;
+
+/**
+ * What a session is told about steps only a person can do, from the owner's answer at launch (the
+ * run's `attended`) and from what earlier sessions of this epic already waited for in vain. Seen
+ * live: with the owner away, a build and then a verify each opened a browser sign-in and each
+ * waited five minutes; that was a third of the run and two calls to the owner's phone.
+ */
+export function presenceRule(attended, unanswered = []) {
+  const tried = unanswered.length ? `\nAlready tried in this epic, and nobody came:\n\n${unanswered.map((u) => `- ${u.description}${u.command ? ` (\`${u.command}\`)` : ''}`).join('\n')}\n\nDo not start ${unanswered.length === 1 ? 'that' : 'any of those'} again. List ${unanswered.length === 1 ? 'it' : 'each'} in your final report under the heading "Not proven for real", with the command the\nowner can run by hand.\n` : '';
+  if (attended === false) return `\n# The owner is away\n\nThe project's owner has said they will not be at the computer during this run. Do not start a\ncommand that waits for a person (a sign-in in a browser, a device to plug in): nobody will come.\nDo everything that needs no person. In your final report list, under the heading "Not proven for\nreal", each thing that needed them, what it was checked against instead, and the exact command\nthey can run by hand when they are back.\n${tried}`;
+  return tried ? `\n# Steps that wait for the owner\n${tried}` : '';
+}
 
 /**
  * What every session is told about spending real money on an outside service (a paid API called
@@ -1516,9 +1529,12 @@ class Run {
     const answers = (e.answers ?? []).filter((a) => a.kind === kind);
     const from = e.resumeSession?.kind === kind ? e.resumeSession : null;
     if (from) e.resumeSession = null; // one attempt: a second session of this step starts fresh
-    let resume = null;
+    let resume = null; let costBefore = 0;
     if (answers.length && from && !noResume) {
       resume = from.sessionId;
+      // A resumed session's result line counts the session it continues as well (seen live: its per-model totals were
+      // the two sessions' added up), and that session's cost is already in the books.
+      costBefore = tryJson(path.join(runDirOf(this.stateDir, from.run), 'epics', e.id, from.step, 'result.json'))?.total_cost_usd ?? 0;
       prompt = resumeMessage(answers, { branch: this.meta(e).branch });
       fs.writeFileSync(path.join(stepDir, 'resume-prompt.md'), prompt);
     } else if (answers.length) {
@@ -1613,10 +1629,14 @@ class Run {
     else s.outcome = 'infra';
     s.why = s.killed ?? s.stoppedBy ?? (s.outcome === 'ok' ? 'success' : sub ?? s.spawnError ?? `exit ${s.exitCode ?? s.signal}, no result line`);
 
-    const cost = s.result?.total_cost_usd ?? 0;
+    const reported = s.result?.total_cost_usd ?? 0;
+    const cost = resume && reported >= costBefore ? +(reported - costBefore).toFixed(6) : reported;
     this.state.spentUsd = +(this.state.spentUsd + cost).toFixed(4);
     e.costUsd = +(e.costUsd + cost).toFixed(4); e.turns += s.result?.num_turns ?? 0; e.wallMs += s.wallMs;
-    e.sessions.push({ name, sessionId, outcome: s.outcome, why: s.why, costUsd: cost, turns: s.result?.num_turns ?? 0, wallMs: s.wallMs, terminalReason: s.result?.terminal_reason ?? null, denials: s.result?.permission_denials?.length ?? 0 });
+    e.sessions.push({ name, sessionId, outcome: s.outcome, why: s.why, costUsd: cost, turns: s.result?.num_turns ?? 0, wallMs: s.wallMs, terminalReason: s.result?.terminal_reason ?? null, denials: s.result?.permission_denials?.length ?? 0, ...(resume ? { resumed: from.sessionId, ...(cost !== reported ? { reportedCostUsd: reported } : {}) } : {}) });
+    // What this session asked the owner to come for and never got: later sessions of this epic are told not to try it again.
+    const gaveUp = unansweredNeeds(path.join(stepDir, 'hooks.jsonl'));
+    if (gaveUp.length) { e.unanswered = [...(e.unanswered ?? []), ...gaveUp.map((u) => ({ ...u, step: name }))]; this.log(`${e.id}: ${name} waited for the owner ${gaveUp.length} time(s) and nobody came: ${gaveUp.map((u) => u.description).join('; ')}`); }
     e.step = null;
     this.save();
     this.log(`${e.id}: ${name} ended — ${s.outcome} (${s.why}), $${cost}, ${Math.round(s.wallMs / 1000)} s`);
@@ -1687,7 +1707,7 @@ class Run {
     const s = await this.step(e, fix ? 'fix' : 'build', (stepDir) => {
       (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir), ...(continuing ? { continues: e.continuing } : {}) }); // what the next audit reads, in this run or a later one
       fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? (continuing ? CONTINUE_LEAD : '') + fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir, { continuing }));
-      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend));
+      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered));
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
     });
     if (s) e.continuing = null; // it ended by itself: what follows is judged like any build
@@ -1969,7 +1989,7 @@ class Run {
     this.save();
     const s = await this.step(e, 'verify', (stepDir) => {
       const rules = path.join(stepDir, 'verify-rules.md');
-      fs.writeFileSync(rules, VERIFY_RULES + spendRule(this.config.realSpend));
+      fs.writeFileSync(rules, VERIFY_RULES + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered));
       if (!e.look) return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [rules] };
       // The owner already looked (a decided human-check gate). The verifier gets their recorded
       // observation up front, so wrapup Step 1.2 item 7 records it instead of asking a person who is
@@ -2351,7 +2371,7 @@ class Run {
         this.state.status = 'running'; this.state.stoppedBecause = null;
         this.log(`resuming run ${this.runName}`);
       } else {
-        this.state = { realSpend: typeof cfg.realSpend === 'boolean' ? cfg.realSpend : null, run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, sync, queue: [] };
+        this.state = { realSpend: typeof cfg.realSpend === 'boolean' ? cfg.realSpend : null, attended: typeof cfg.attended === 'boolean' ? cfg.attended : null, run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, sync, queue: [] };
       }
 
       // Preflight reads the integration line, so the clone must be on it.
@@ -2661,7 +2681,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
 
   const out = {
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
-    epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null,
+    epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null, attended: typeof lastCfg.attended === 'boolean' ? lastCfg.attended : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
     waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
@@ -2712,7 +2732,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     if (ids.some((id) => ['resume', 'fresh'].includes(byId.get(id).gate?.state)) && !limit) {
       out.relaunch = {
         run: launch.run, runDir: launch.runDir,
-        config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(typeof lastCfg.realSpend === 'boolean' ? { realSpend: lastCfg.realSpend } : {}), ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
+        config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(typeof lastCfg.realSpend === 'boolean' ? { realSpend: lastCfg.realSpend } : {}), ...(typeof lastCfg.attended === 'boolean' ? { attended: lastCfg.attended } : {}), ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
       };
     }
   }

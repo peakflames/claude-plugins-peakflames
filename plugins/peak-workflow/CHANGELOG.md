@@ -171,6 +171,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot closing screen** — lists what merged, what waits for the owner, the spend, one
   next step, and what the referee got in the way of, in plain words.
 
+- **Autopilot asks whether the owner will be there** — the launch popup's answer is the run's
+  `attended`; when away, no session starts a step that waits for a person, and each such check is
+  listed as not proven with the command to run by hand.
+- **Autopilot progress line** — in a run of more than one epic the watch prints
+  `Progress: N merged, N waiting for you, N still to go` after each epic ends.
+- **Autopilot says how a wait for the owner ended** — the watch prints `NO LONGER NEEDS YOU`
+  when a `Needs you:` command finishes or gives up, and the skill relays it.
+
 ### Changed
 
 - **Autopilot launch question** — carries the standing answer ("I'll continue a technical stop
@@ -181,6 +189,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot pre-approved answers survive a reworded option** — the referee matches an answer to
+  the one option that shortens or pads it, so a passing epic no longer parks on wording.
+- **Autopilot resumed-session cost** — a resumed session's reported cost includes the session it
+  continues; the driver now counts only what was added.
+- **Autopilot `TESTS failed` false alarm** — the watch reports a test result only when the
+  command's exit is the test command's own.
+- **Autopilot referee false alarms** — `git stash push` is no longer refused as a push, and the
+  empty word of macOS `sed -i ''` is no longer read as a change to the test directory.
+- **Autopilot builds no longer wait for a person** — build and repair sessions leave sign-ins to
+  the final check, and a step nobody came for is not tried again in that epic.
 - **Autopilot no longer asks an answered question twice** — a session that takes a step up
   again is told every answer the owner already gave; a reworded question gets one reminder
   instead of a new park, and a genuinely different question still reaches the owner.
