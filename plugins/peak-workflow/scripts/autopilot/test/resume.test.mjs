@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, ensureResumeGates, gateFacts } from '../driver.mjs';
+import { ANSWERS, ensureResumeGates, gateFacts, ownerAnswers } from '../driver.mjs';
 import { DRIVER, E1, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
@@ -45,7 +45,7 @@ const buildWithManual = (e) => ({ actions: [...buildActions(e, { commit: false }
 
 // ---- a question a session asked ----------------------------------------------------------------
 
-test('question gate (deferral, asked in build): the next run starts a fresh build session on the same branch and R8 answers that question once', async (t) => {
+test('question gate (deferral, asked in build): the next run resumes the build session that asked, with the owner\'s answer, and R8 answers that question once', async (t) => {
   const p = makeProject(t);
   const q = `${E1.tors[3]} cannot be fully met: amounts with three decimals. How to proceed?`;
   p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, ask(q, DEFERRAL)] } });
@@ -71,7 +71,17 @@ test('question gate (deferral, asked in build): the next run starts a fresh buil
   const e = p.epic(E1.id);
   assert.equal(e.state, 'MERGED');
   assert.deepEqual([e.resumed.phase, e.resumed.gate, e.resumed.branchTip, e.resumed.fromRun], ['BUILD', `gates/${E1.id}-1.json`, tip, run1]);
-  assert.equal(r.calls[0].prompt, 'Implement the following plan:\n\n' + fs.readFileSync(path.join(p.state, 'runs', run1, 'epics', E1.id, 'plan-1', 'plan.md'), 'utf8').replaceAll('${CLAUDE_PLUGIN_ROOT}', r.calls[0].argv[r.calls[0].argv.indexOf('--plugin-dir') + 1]));
+  // The session that asked is taken up again with what it knows: its transcript, a new id, and one message with the answer.
+  const asked = readJson(path.join(p.state, 'runs', run1, 'epics', E1.id, 'build-1', 'step.json')).sessionId;
+  const [build] = r.calls;
+  assert.deepEqual(build.argv.slice(build.argv.indexOf('--resume'), build.argv.indexOf('--resume') + 3), ['--resume', asked, '--fork-session']);
+  assert.notEqual(build.argv[build.argv.indexOf('--session-id') + 1], asked);
+  assert.equal(build.prompt, fs.readFileSync(p.dir(E1.id, 'build-1', 'resume-prompt.md'), 'utf8'));
+  assert.match(build.prompt, /^You were stopped while the project's owner was asked your question\. They have answered\./);
+  assert.ok(build.prompt.includes(`**Asked:** "${q}"`) && build.prompt.includes('**The owner\'s answer:** "Fix now" — Pat Owner'), build.prompt);
+  assert.match(build.prompt, /Continue from exactly where you stopped\. Do not start the step over/);
+  assert.deepEqual(readJson(p.dir(E1.id, 'build-1', 'step.json')).resumeOf, { sessionId: asked, step: 'build-1', run: run1 });
+  assert.ok(!r.calls[1].argv.includes('--resume') && !r.calls[2].argv.includes('--resume'), 'only the session that asked is resumed');
   assert.equal(Object.values(tools(p, E1.id, 'build-1')[0].hookSpecificOutput.updatedInput.answers)[0], 'Fix now');
   assert.deepEqual([gate(p, E1.id).decided.used.run, gate(p, E1.id).decided.used.session], [p.runName(), 'build-1']);
   assert.ok(merged(p, tip), 'the branch the first run left is what merged');
@@ -87,13 +97,16 @@ test('unmatched question (asked in plan): replayable — the next run plans agai
   assert.deepEqual([gate(p, E1.id).kind, gate(p, E1.id).session], ['unmatched', 'plan-1']);
   assert.equal(decide(p, E1.id, 'Weekly').enters, 'PLAN');
 
-  p.scenario({ ...happy(E1), [`${E1.id}/plan`]: { actions: [ask(q.replace('  ', ' '), ['Monthly', 'Weekly']), ask('Which colour should the bars be?', ['Red', 'Blue']), ...planScript(E1).actions] } });
+  p.scenario({ ...happy(E1), [`${E1.id}/plan`]: { actions: [ask(q.replace('  ', ' '), ['Monthly', 'Weekly']), ask('Which colour should the bars be?', ['Red', 'Blue']), ask('Which colour should the bars be?', ['Red', 'Blue']), ...planScript(E1).actions] } });
   const r = await again(p);
 
   // The recorded question is answered once with the owner's answer; a different unmatched question still parks.
-  const [first, second] = tools(p, E1.id, 'plan-1');
+  // Before it reaches the owner, the session is reminded once of what they already answered; asked again, it parks.
+  const [first, second, third] = tools(p, E1.id, 'plan-1');
   assert.equal(Object.values(first.hookSpecificOutput.updatedInput.answers)[0], 'Weekly');
-  assert.equal(second.stopReason, 'autopilot: parked at human gate');
+  assert.deepEqual([second.hookSpecificOutput.permissionDecision, second.continue, second.stopReason], ['deny', undefined, undefined]);
+  assert.match(second.hookSpecificOutput.permissionDecisionReason, /not put to the owner yet\. They have already answered 1 question\(s\) for this step: \(1\) asked "The spec names both .*" — the owner answered "Weekly"\. If what you are asking is one of those in other words, do not ask it: act on their answer now\. If it is a different decision, ask it again/);
+  assert.equal(third.stopReason, 'autopilot: parked at human gate');
   assert.deepEqual(r.steps, [`${E1.id}/plan-1`]);
   assert.equal(p.epic(E1.id).state, 'PARKED');
   assert.deepEqual([gate(p, E1.id).decided.used.session, gate(p, E1.id, 2).kind, gate(p, E1.id, 2).question], ['plan-1', 'unmatched', 'Which colour should the bars be?']);
@@ -826,4 +839,113 @@ test('an epic an earlier driver parked on that record, with no question, gets on
   const again2 = await again(p);
   assert.deepEqual(again2.steps, [`${E1.id}/audit-1`, `${E1.id}/verify-1`], 'no rebuild');
   assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+});
+
+// ---- the owner's answer reaches the session that takes the step up again --------------------------
+
+test('an answered question is not asked twice: the verify session that asked is resumed; reworded, the question is met with a reminder, not a new park', async (t) => {
+  const p = makeProject(t);
+  const q1 = "The live check needs a real sign-in in your browser. Should I open the browser sign-in now so the live check can run?";
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q1, ['Yes — open sign-in', 'No — use in-process proof'])] } });
+  await p.go();
+  const run1 = p.runName();
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind, gate(p, E1.id).session], ['PARKED', 'unmatched', 'verify-1']);
+  assert.equal(decide(p, E1.id, 'Yes — open sign-in').enters, 'VERIFY');
+
+  // Seen live: the session that takes the step up again words the same question differently, with other options.
+  const q2 = 'The gate opens a browser to your real sign-in. Can you complete that sign-in now?';
+  p.scenario({ [`${E1.id}/verify`]: { actions: [ask(q2, ['Yes — open the browser', 'Yes — tools list only', 'No — not now']), ...wrapupActions(E1)], result: { result: 'Verdict: PASS' } } });
+  const r = await again(p);
+
+  assert.deepEqual(r.steps, [`${E1.id}/verify-1`], 'one session, no second park');
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  const [verify] = r.calls;
+  const asked = readJson(path.join(p.state, 'runs', run1, 'epics', E1.id, 'verify-1', 'step.json')).sessionId;
+  assert.deepEqual(verify.argv.slice(verify.argv.indexOf('--resume'), verify.argv.indexOf('--resume') + 3), ['--resume', asked, '--fork-session']);
+  assert.ok(verify.prompt.includes(`**Asked:** "${q1}"`) && verify.prompt.includes('"Yes — open sign-in" — Pat Owner'));
+  assert.match(verify.prompt, /If the answer needs something only a person can do \(a sign-in in a browser, a look\s+at a screen\), the owner chose it knowing that: start it, give them time, and carry on\./);
+  assert.match(verify.prompt, /may have been put back to how it was when you started/);
+  const [reworded] = tools(p, E1.id, 'verify-1');
+  assert.equal(reworded.hookSpecificOutput.permissionDecision, 'deny');
+  assert.match(reworded.hookSpecificOutput.permissionDecisionReason, /They have already answered 1 question\(s\) for this step: \(1\) asked "The live check needs .*" — the owner answered "Yes — open sign-in"/);
+  assert.equal(reworded.continue, undefined, 'a reminder, not a stop');
+  assert.deepEqual(fs.readdirSync(path.join(p.state, 'gates')), [`${E1.id}-1.json`], 'the owner is not asked again');
+  // The answer is spent by the session that was told it, and the record says so.
+  assert.deepEqual([gate(p, E1.id).decided.used.run, gate(p, E1.id).decided.used.note], [p.runName(), 'the session was told this answer before it started and did not ask again']);
+  // A reminder is not a refusal: it is not counted as something the referee blocked.
+  assert.deepEqual(readJson(path.join(p.runDir(), 'report.json')).referee.blocked, []);
+  assert.equal(readJson(path.join(p.runDir(), 'events.jsonl').replace('events.jsonl', 'state.json')).queue[0].answers.length, 1);
+});
+
+test('a different question still reaches the owner, and later sessions of the step are told every answer so far', async (t) => {
+  const p = makeProject(t);
+  const q1 = 'Should I open the browser sign-in now?';
+  const q2 = 'The narration sample costs real money to synthesize. Run it?';
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q1, ['Yes', 'No'])] } });
+  await p.go();
+  decide(p, E1.id, 'Yes');
+
+  // Reminded once, the session asks again: it is a different decision, so it parks for the owner.
+  p.scenario({ [`${E1.id}/verify`]: { actions: [ask(q2, ['Run it', 'Skip it']), ask(q2, ['Run it', 'Skip it'])] } });
+  const second = await again(p);
+  assert.deepEqual(second.steps, [`${E1.id}/verify-1`]);
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id, 2).question, gate(p, E1.id, 2).decided], ['PARKED', q2, null]);
+  assert.equal(gate(p, E1.id).decided.used.run, p.runName());
+  decide(p, E1.id, 'Skip it', { n: 2 });
+
+  // The next session is resumed with both answers; asked verbatim, either is answered with the owner's own answer.
+  p.scenario({ [`${E1.id}/verify`]: { actions: [ask(q1, ['Yes', 'No']), ask(q2, ['Run it', 'Skip it']), ...wrapupActions(E1)], result: { result: 'Verdict: PASS' } } });
+  const third = await again(p);
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  const [verify] = third.calls;
+  assert.ok(verify.prompt.includes(`1. **Asked:** "${q1}"`) && verify.prompt.includes(`2. **Asked:** "${q2}"`), verify.prompt);
+  assert.deepEqual(readJson(p.dir(E1.id, 'verify-1', 'step.json')).answers.map((a) => [a.gate, a.kind, a.answer]), [[`gates/${E1.id}-1.json`, 'verify', 'Yes'], [`gates/${E1.id}-2.json`, 'verify', 'Skip it']]);
+  const [a1, a2] = tools(p, E1.id, 'verify-1');
+  assert.deepEqual([Object.values(a1.hookSpecificOutput.updatedInput.answers)[0], Object.values(a2.hookSpecificOutput.updatedInput.answers)[0]], ['Yes', 'Skip it']);
+  assert.match(a1.hookSpecificOutput.permissionDecisionReason, /answered from the owner's recorded decision: Yes/);
+  assert.deepEqual(fs.readdirSync(path.join(p.state, 'gates')).length, 2);
+});
+
+test('a session that cannot be resumed is replaced by a new one that is told the answers up front; that is not an infra error', async (t) => {
+  const p = makeProject(t);
+  const q = 'Should I open the browser sign-in now?';
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q, ['Yes', 'No'])] } });
+  await p.go();
+  decide(p, E1.id, 'Yes');
+
+  // The earlier session's transcript is gone: `--resume` ends at once with no result line.
+  p.scenario({ [`${E1.id}/verify-1`]: { result: false, exit: 1 }, [`${E1.id}/verify-2`]: wrapupScript(E1) });
+  const r = await again(p);
+  assert.deepEqual(r.steps, [`${E1.id}/verify-1`, `${E1.id}/verify-2`]);
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.equal(r.state.consecutiveInfra, 0);
+  const [resumed, fresh] = r.calls;
+  assert.ok(resumed.argv.includes('--resume') && !fresh.argv.includes('--resume'));
+  assert.equal(fresh.prompt, `/peak-workflow:wrapup-epic ${E1.id}`);
+  const told = p.dir(E1.id, 'verify-2', 'owner-answers.md');
+  assert.ok(fresh.argv.includes(told), 'the new session is told through its system prompt');
+  const text = fs.readFileSync(told, 'utf8');
+  assert.match(text, /^# Questions the owner has already answered/);
+  assert.ok(text.includes(`**Asked:** "${q}"`) && text.includes('**The owner\'s answer:** "Yes" — Pat Owner'));
+  assert.match(text, /Do not ask the same thing again in any wording/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /verify-1 could not resume the earlier session \(.*\); starting a new session for this step/);
+});
+
+test('starting over retires earlier answers: the fresh attempt is told none of them', async (t) => {
+  const p = makeProject(t);
+  const q = 'Should I open the browser sign-in now?';
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q, ['Yes', 'No'])] } });
+  await p.go();
+  decide(p, E1.id, 'Yes');
+  // Told the answer, the verify session is then cut short (a budget stop), and the owner starts the epic over.
+  p.scenario({ [`${E1.id}/verify`]: { result: { subtype: 'error_max_turns', is_error: true } } });
+  await again(p);
+  assert.equal(gate(p, E1.id, 2).kind, 'resume');
+  assert.deepEqual(ownerAnswers(p.state, E1.id).map((a) => a.answer), ['Yes'], 'kept while the same attempt goes on');
+  decide(p, E1.id, ANSWERS.startOver, { n: 2 });
+  p.scenario(happy(E1));
+  const r = await again(p);
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.deepEqual(ownerAnswers(p.state, E1.id), []);
+  assert.ok(r.calls.every((c) => !c.argv.includes('--resume') && !c.argv.some((a) => a.endsWith('owner-answers.md'))));
 });

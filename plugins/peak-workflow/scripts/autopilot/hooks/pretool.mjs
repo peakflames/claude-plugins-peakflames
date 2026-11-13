@@ -359,7 +359,10 @@ const rowMatches = (row, question) => (row.fragments ?? []).every((f) => norm(qu
 function ruleR8(ctx) {
   const policy = readJson(path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'policy', 'gates.json'), { answer: [], park: [] });
   const questions = ctx.input.tool_input?.questions ?? [];
-  const answers = {}; const used = []; const notes = {}; let looked = null;
+  const answers = {}; const used = []; const notes = {}; let looked = null; let told = 0;
+  // What the owner already answered for this step, in this run or an earlier one (the driver writes it to step.json
+  // and tells the session before it starts).
+  const earlier = ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).answers ?? [] : [];
   let park = questions.length ? null : { kind: 'unmatched', question: '(AskUserQuestion with no questions)', options: [], why: 'nothing to match' };
   for (const q of questions) {
     const labels = (q.options ?? []).map((o) => (typeof o === 'string' ? o : o.label));
@@ -380,6 +383,10 @@ function ruleR8(ctx) {
       answers[q.question] = offered(decided.g.decided.answer);
       used.push(decided); continue;
     }
+    // The same question again after its recorded answer was spent (a later session of the step asks it verbatim):
+    // the owner's answer still stands.
+    const again = earlier.find((a) => (a.gateKind ?? 'unmatched') === kind && (kind === 'unmatched' ? norm(a.question ?? '') === norm(q.question) : (a.tor ?? null) === tor) && offered(a.answer));
+    if (again) { answers[q.question] = offered(again.answer); told += 1; continue; }
     // The owner's recorded look at a human-check gate (the driver puts it in step.json for the verify
     // session it resumes): wrapup's manual-verification question is answered with it, not the policy "No".
     const look = kind === 'manual-verification' && ctx.role === 'verifier' && ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).look : null;
@@ -389,7 +396,19 @@ function ruleR8(ctx) {
       looked = look; continue;
     }
     if (parkRow) { park = { ...base, why: parkRow.why }; break; }
-    if (!row) { park = { ...base, why: 'no policy row matches this question; autopilot never chooses an answer' }; break; }
+    if (!row) {
+      // A question nobody pre-approved, in a step the owner has already answered questions about. Seen live: a session
+      // that takes the step up again words the owner's question differently, and the owner is asked twice. Autopilot
+      // does not judge whether two wordings are one question, and never picks an answer: it reminds the session once
+      // of what was answered. A session that asks again is asking something else, and that goes to the owner.
+      const memo = ctx.step ? path.join(ctx.step, 'answers-reminded.json') : null;
+      if (earlier.length && memo && !fs.existsSync(memo)) {
+        fs.writeFileSync(memo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
+        const list = earlier.map((a, i) => `(${i + 1}) asked "${a.question}" — the owner answered "${a.answer}"${a.note ? ` ("${a.note}")` : ''}`).join('; ');
+        return { rule: 'R8', decision: 'remind', reason: `not put to the owner yet. They have already answered ${earlier.length} question(s) for this step: ${list}. If what you are asking is one of those in other words, do not ask it: act on their answer now. If it is a different decision, ask it again exactly as you just did and it goes to the owner` };
+      }
+      park = { ...base, why: 'no policy row matches this question; autopilot never chooses an answer' }; break;
+    }
     if (row.roles && !row.roles.includes(ctx.role)) { park = { ...base, why: `policy answers this only in a ${row.roles.join(' or ')} session, not a ${ctx.role} one` }; break; }
     if (row.requires === 'epicId' && !new RegExp(`\\b${ctx.epic}\\b`).test(q.question)) { park = { ...base, why: `the question does not name the queued epic ${ctx.epic}` }; break; }
     if (row.requires === 'anchorTor' && !(tor && anchors(ctx).includes(tor))) { park = { ...base, why: `the question does not name one of epic ${ctx.epic}'s anchor requirements` }; break; }
@@ -405,7 +424,7 @@ function ruleR8(ctx) {
     const done = { ...g, decided: { ...g.decided, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
     fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
   }
-  const owner = used.length + (looked ? 1 : 0);
+  const owner = used.length + told + (looked ? 1 : 0);
   const source = owner === 0 ? 'policy' : owner === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
   const annotations = Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { notes: v }]));
   return { rule: 'R8', decision: 'answer', owner, reason: `answered from ${source}: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers, ...(looked ? { annotations: { ...(ctx.input.tool_input.annotations ?? {}), ...annotations } } : {}) } };

@@ -175,6 +175,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot no longer asks an answered question twice** — a session that takes a step up
+  again is told every answer the owner already gave; a reworded question gets one reminder
+  instead of a new park, and a genuinely different question still reaches the owner.
+- **Autopilot resumes the session that asked** — after the owner answers a session's question,
+  that session continues from where it stopped instead of a new one redoing the step; a session
+  that cannot be resumed is replaced by a new one told the same answers.
 - **`tor-lifecycle` in a sandbox** — with four or more feature files the helper crashed where
   process pools are denied (Claude Code's sandbox on macOS); it now parses in-process instead.
 - **Autopilot traceability check accepts a checklist** — an operator-observed requirement named
