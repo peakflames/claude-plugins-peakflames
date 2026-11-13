@@ -42,6 +42,8 @@ const KINDS = {
   probe: { prefix: 'probe', role: 'verifier', state: null }, // readiness's sandbox probe: no epic, no state
 };
 const PLAN_DIR = 'docs/implementation-plan';
+/** A project or package manifest under a test directory is not a test: adding a test dependency needs no recorded reason. */
+const MANIFEST = /\.(csproj|fsproj|vbproj|props|targets|sln)$|(^|\/)(package\.json|pyproject\.toml|requirements[^/]*\.txt|Cargo\.toml|go\.mod|pom\.xml|build\.gradle(\.kts)?)$/;
 
 // ---------------------------------------------------------------------------------------------
 // Small helpers
@@ -816,6 +818,9 @@ execution script for this session.
 - Do not enter plan mode. The plan is approved; \`EnterPlanMode\` and \`ExitPlanMode\` are denied.
 - Where the plan says to ask the user, ask with \`AskUserQuestion\` exactly as the plan words it.
   Never answer such a question yourself and never work around it.
+- Commit everything you leave behind. If you were asked to record why you changed an existing
+  test, \`.autopilot/test-changes.jsonl\` is part of your work: stage it with your final commit.
+  \`git status\` must be clean when you finish.
 `;
 
 export const FIX_RULES = `# Autopilot repair rules
@@ -825,6 +830,7 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
 - Do not enter plan mode: \`EnterPlanMode\` and \`ExitPlanMode\` are denied. Do not run \`/peak-workflow:start-epic\`.
 - Do not change the epic's status, and do not merge or push.
 - Where you must ask, ask with \`AskUserQuestion\`. Never answer such a question yourself and never work around it.
+- Commit everything you leave behind, \`.autopilot/test-changes.jsonl\` included. \`git status\` must be clean when you finish.
 `;
 
 /**
@@ -1497,13 +1503,23 @@ class Run {
     if (!tip) add('branch-and-commit', false, `branch ${b} does not exist`);
     else {
       const ahead = Number(this.g('rev-list', '--count', `${dev}..${b}`));
-      const subject = this.g('log', '-1', '--format=%s', b);
+      // The session's own last commit: the driver's commits on top of it (uncommitted work kept at a park, the referee's record) do not count.
+      const subject = this.g('log', '-20', '--format=%s', b).split('\n').find((x) => !/^(wip|chore)\(autopilot\)/.test(x)) ?? '';
       // The repair prompt asks for `fix(epic-<id>): …`, so after a fix round that subject is as good as the build's `feat`.
       add('branch-and-commit', ahead >= 1 && new RegExp(`^(feat${e.fixRounds >= 1 ? '|fix' : ''})\\(epic-${e.id}\\):`).test(subject), { branch: b, tip, commitsAhead: ahead, tipSubject: subject });
     }
     if (!tip) return { pass: false, checks, parkOnly };
 
     if (this.currentBranch() !== b && !this.dirty()) this.g('checkout', '-q', b);
+    // The referee has sessions record why they changed an existing test in `.autopilot/test-changes.jsonl`. A session
+    // that commits its work file by file leaves that record behind (seen live: a finished build parked on it). The
+    // record is autopilot's own, so the driver commits it; anything else left uncommitted is still the session's failure.
+    const left = this.g('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean);
+    if (this.currentBranch() === b && left.length && left.every((l) => l.slice(3).startsWith('.autopilot/'))) {
+      this.g('add', '--', '.autopilot');
+      this.g('commit', '--no-verify', '-q', '-m', 'chore(autopilot): record why existing tests changed');
+      this.log(`${e.id}: committed the referee's record (.autopilot/) that the build session left uncommitted`);
+    }
     const status = this.g('status', '--porcelain');
     if (!add('clean-tree', status === '' && this.currentBranch() === b, status === '' ? `on ${this.currentBranch()}` : status.split('\n').slice(0, 20))) parkOnly = 'the build left uncommitted work';
 
@@ -1554,7 +1570,7 @@ class Run {
       try { const j = JSON.parse(line); if (j.path) reasons.set(j.path, j.reason ?? ''); } catch { /* not a JSON line */ }
     }
     const touched = this.g('diff', '--name-status', '--no-renames', `${dev}...${b}`).split('\n').filter(Boolean)
-      .map((l) => l.split('\t')).filter(([st, f]) => st !== 'A' && dirs.some((d) => f.startsWith(d))).map(([, f]) => f);
+      .map((l) => l.split('\t')).filter(([st, f]) => st !== 'A' && dirs.some((d) => f.startsWith(d)) && !MANIFEST.test(f)).map(([, f]) => f);
     const unexplained = touched.filter((f) => !reasons.has(f));
     add('test-integrity', unexplained.length === 0, { existingTestsChanged: touched.map((f) => ({ path: f, reason: reasons.get(f) ?? null })) });
     e.testChanges = touched.map((f) => ({ path: f, reason: reasons.get(f) ?? null }));
@@ -1578,7 +1594,7 @@ class Run {
     const failed = r.checks.filter((c) => !c.pass);
     const names = failed.map((c) => c.name).join(', ');
     if (interrupted) return this.park(e, `interrupted: the driver was restarted mid-build and CHECK_BUILD does not pass (${names})`);
-    if (r.parkOnly) return this.park(e, `CHECK_BUILD: ${r.parkOnly} (failed: ${names})`);
+    if (r.parkOnly) return /deferral/.test(r.parkOnly) ? this.park(e, `CHECK_BUILD: ${r.parkOnly} (failed: ${names})`) : this.parkResumable(e, `CHECK_BUILD: ${r.parkOnly} (failed: ${names})`, 'CHECK_BUILD');
     if (e.fixRounds >= 1) return this.park(e, `CHECK_BUILD still fails after the fix round (${names})`);
     e.fixRounds = 1;
     this.writeFixBrief(e, 'The driver\'s done-ness checks failed after the build session:', failed.map((c) => `- **${c.name}** — ${typeof c.evidence === 'string' ? c.evidence : JSON.stringify(c.evidence)}`));
@@ -2261,6 +2277,39 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
   };
 }
 
+/**
+ * An epic that parked with nothing to answer is a dead end: the next run skips it and the owner has no question to
+ * decide. For every such epic on record (parked, its branch still there, no live gate) this writes the `resume` gate
+ * an up-to-date driver would have written, so the report can ask "continue it?" like any other park.
+ */
+export function ensureResumeGates(workspace) {
+  const clone = path.join(workspace, 'clone'); const made = [];
+  const records = tryJson(path.join(workspace, 'epics.json'), {}) ?? {};
+  const gates = readGates(workspace);
+  for (const [id, rec] of Object.entries(records)) {
+    if (rec.state !== 'PARKED' || !rec.branch || gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
+    const m = String(rec.reason ?? '').match(/^(CHECK_BUILD)\b|^interrupted: .*(CHECK_BUILD)/);
+    const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
+    const integration = detectIntegration(clone);
+    if (!m || !tip || !integration) continue;
+    const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
+    const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
+    const n = gates.filter((g) => g.epic === id).length + made.filter((x) => x.startsWith(`${id}-`)).length + 1;
+    const last = (rec.buildSteps ?? []).at(-1);
+    writeJson(path.join(workspace, 'gates', `${id}-${n}.json`), {
+      epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: last?.name ?? null, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
+      resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${id}`, decided: null,
+      kind: 'resume', skillStep: 'autopilot driver', phase: 'CHECK_BUILD',
+      question: `${q.label ?? id} stopped: ${rec.reason}. Continue it in the next run?`,
+      options: [ANSWERS.resume, ANSWERS.startOver],
+      why: `nothing was decided for you: the build finished and autopilot's own checks stopped it. "${ANSWERS.resume}" runs those checks again on the same branch, with the current driver; "${ANSWERS.startOver}" plans it again from scratch`,
+      artifacts: last ? [last.dir] : [],
+    });
+    made.push(`${id}-${n}.json`);
+  }
+  return made;
+}
+
 /** Records a person's answer in a gate file (§6.8). The driver never chooses the answer; it only writes what it is given. */
 export function decideGate(workspace, gateName, answer, { by, note, observations } = {}) {
   const file = path.join(workspace, 'gates', path.basename(gateName));
@@ -2418,6 +2467,7 @@ async function main(argv) {
   if (cmd === 'report') {
     const name = o.run ?? currentRun(ws);
     if (!name) throw new Error(`${ws} holds no run to report`);
+    if (!tryJson(path.join(ws, 'lock'))?.pid || !pidAlive(tryJson(path.join(ws, 'lock')).pid)) ensureResumeGates(ws); // never while a run is going
     const r = writeReport(runDirOf(ws, name));
     console.log(`${path.join(runDirOf(ws, name), 'report.md')} (${r.epics.length} epic(s); ${r.stoppedBecause ?? 'still running'})`);
     return 0;

@@ -317,7 +317,7 @@ function ruleR7(ctx, targets) {
       let text = ''; try { text = fs.readFileSync(path.join(ctx.clone, '.autopilot', 'test-changes.jsonl'), 'utf8'); } catch { /* none yet */ }
       for (const line of text.split('\n')) { try { const j = JSON.parse(line); if (j.path && String(j.reason ?? '').trim()) reasons.add(j.path); } catch { /* not a JSON line */ } }
     }
-    if (!reasons.has(rel)) return deny('R7', `test integrity — ${rel} is an existing test on ${ctx.integration}. Before changing it, append {"path":"${rel}","reason":"<why this change is right>"} as one line to .autopilot/test-changes.jsonl; a person reads every reason in the morning`);
+    if (!reasons.has(rel)) return deny('R7', `test integrity — ${rel} is an existing test on ${ctx.integration}. Before changing it, append {"path":"${rel}","reason":"<why this change is right>"} as one line to .autopilot/test-changes.jsonl, and commit that file with your work; a person reads every reason in the morning`);
   }
   return null;
 }
