@@ -160,6 +160,7 @@ export function defaultConfig(project) {
     setup: null, // one shell command that rebuilds, in the clone, what git does not carry (a venv, node_modules); run with network
     readOnly: [], // directories outside the clone that sessions may read and never write: a dependency cache (~/.nuget/packages, ~/.cargo/registry)
     copy: [], // git-ignored files copied from the project into the clone at each run (a .env): what cannot be rebuilt
+    sandbox: false, // false: sessions run unsandboxed (build tools work as they do in a terminal) and the referee keeps writes in the clone; true: Claude Code's sandbox, with `readOnly` and `network`
     network: [], // more host names sessions may reach from inside the sandbox, on top of REGISTRIES (a private package registry)
     claudeBin: 'claude',
     allowTestDouble: false, // run-level: never inherited from settings.json by accident (a rehearsal's fake binary)
@@ -454,7 +455,7 @@ export function envFacts(project, workspace, config) {
     const copied = copy.some((c) => rel === c || rel.startsWith(`${c}/`) || c.startsWith(`${rel}/`));
     return { path: p, dir: p.endsWith('/'), status: copied ? 'copied' : exists(path.join(clone, rel)) ? 'present' : 'absent' };
   });
-  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], network: cleanNetwork(config.network), registries: REGISTRIES, problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
+  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], sandbox: config.sandbox === true, network: cleanNetwork(config.network), registries: REGISTRIES, problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
 }
 /** `~`-expanded, absolute, symlinks resolved where the path exists. */
 const expandHome = (p) => { const x = path.resolve(String(p).trim().replace(/^~(?=\/|$)/, os.homedir())); try { return fs.realpathSync(x); } catch { return x; } };
@@ -725,6 +726,9 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
   // (MSBuild and `dotnet test` over named pipes, test servers on localhost), and without it they cannot run at all (seen live).
   const open = kind !== 'audit';
   const allowedDomains = open ? sessionNetwork(config) : [];
+  // Off by default (owner decision, 2026-11-13): the sandbox stopped real toolchains in ways no project setting could
+  // predict (MSBuild's named pipes, caches in the home directory). The referee hooks and the deny list still apply.
+  const sandboxed = config.sandbox === true || !open;
   const hook = (file, extra = {}) => ({ type: 'command', command: `node "$AUTOPILOT_HOOKS/${file}"`, ...extra });
   return {
     permissions: {
@@ -735,10 +739,10 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
         'Bash(npm publish *)', 'WebFetch', 'WebSearch',
       ],
     },
-    sandbox: {
+    sandbox: sandboxed ? {
       enabled: true, allowUnsandboxedCommands: false, failIfUnavailable: true,
       network: { allowedDomains, strictAllowlist: true, ...(open ? { allowAllUnixSockets: true, allowLocalBinding: true } : {}) },
-    },
+    } : { enabled: false },
     hooks: {
       PreToolUse: [{ matcher: '*', hooks: [hook('pretool.mjs', { timeout: 30 })] }],
       PostToolUse: [{ matcher: '*', hooks: [hook('log.mjs')] }],
@@ -892,7 +896,9 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`When an epic parks: ${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set in ${projectSettingsFile(project)}`);
   p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}`);
-  p(`Network:          plan, build, repair and verify sessions may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`);
+  p(config.sandbox === true
+    ? `Sandbox:          on — sessions write only in the clone, may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`
+    : 'Sandbox:          off — sessions run commands as a terminal does, with open network; the referee keeps file writes inside the clone and the temp directories (best effort for scripts) and still denies push, containers and sudo. The auditor stays sandboxed with no network (WebFetch and WebSearch are always denied)');
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
 
@@ -1201,7 +1207,7 @@ class Run {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(stepDir, { recursive: true });
     const sessionId = randomUUID(); const marker = '.autopilot-probe-exit';
-    writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), queue: [] }); // what the referee reads
+    writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), sandbox: cfg.sandbox === true, queue: [] }); // what the referee reads
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind: 'probe' }));
     writeJson(path.join(stepDir, 'step.json'), { name: 'probe-1', kind: 'probe', role: KINDS.probe.role, epic: 'probe', sessionId, startedAt: new Date().toISOString(), startMb: this.cloneMb() });
     const command = `${cfg.testCommand}; echo $? > ${marker}`;
@@ -1220,8 +1226,8 @@ class Run {
     const text = (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v));
     const tail = [text(ran?.error), text(ran?.tool_response), text(s.result?.result), s.spawnError ?? '', s.killed ? `killed: ${s.killed}` : ''].filter(Boolean).join('\n').trim().split('\n').slice(-25).join('\n');
     return {
-      ran: true, pass: exit === 0, exit, command: cfg.testCommand, model: cfg.budgets.probe.model, network: sessionNetwork(cfg), costUsd: s.result?.total_cost_usd ?? 0, wallMs: s.wallMs,
-      why: exit === 0 ? null : exit === null ? 'the command did not run to its end inside the sandbox (no exit code was written)' : `the command exited ${exit} inside the sandbox, although it passed in a plain shell`,
+      ran: true, pass: exit === 0, exit, command: cfg.testCommand, model: cfg.budgets.probe.model, sandbox: cfg.sandbox === true, network: sessionNetwork(cfg), costUsd: s.result?.total_cost_usd ?? 0, wallMs: s.wallMs,
+      why: exit === 0 ? null : exit === null ? 'the command did not run to its end in a session (no exit code was written)' : `the command exited ${exit} in a session, although it passed in a plain shell`,
       denials, tail, dir: this.rel(stepDir),
     };
   }
@@ -2131,8 +2137,10 @@ class Run {
       const badNet = networkProblems(cfg.network);
       if (badNet.length) throw new Error(badNet.join('; '));
       this.state.network = sessionNetwork(cfg);
+      if (typeof cfg.sandbox !== 'boolean') throw new Error(`sandbox must be true or false, not ${JSON.stringify(cfg.sandbox)}`);
+      this.state.sandbox = cfg.sandbox; // the referee reads it: off means reads are open and the referee alone jails writes
       this.save();
-      this.log(`sessions may reach (sandbox allow-list): ${this.state.network.join(', ')}; local sockets and ports are open`);
+      this.log(cfg.sandbox ? `sandbox on: sessions may reach ${this.state.network.join(', ')}; local sockets and ports are open` : 'sandbox off: sessions run commands unsandboxed with open network; the referee keeps writes inside the clone');
       if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
 

@@ -45,7 +45,7 @@ test('SKILL.md: the launch names the workspace and the run, appends to the run\'
   // Rule 1 is one rule for every project file: a fix the skill named itself, approved as that exact change, and nothing else.
   for (const rule of ['A project fix it has named itself', 'the `**Tests:**` or `**Build:**` line', 'a `.gitignore` line', 'only after the owner approves that exact change through `AskUserQuestion`', 'Never unasked, never anything else']) assert.ok(SKILL.replace(/\s+/g, ' ').includes(rule), rule);
   // One short screen, and no question about a technical setting the run cannot work without.
-  for (const rule of ['print **one short screen**', 'is saved without asking and reported in one line', 'Save `setup` and `readOnly` without asking', '**A `copy` file is the owner\'s call**', 'Run it without asking when no probe stands', '**Details, only when the owner asks**']) assert.ok(SKILL.replace(/\s+/g, ' ').includes(rule), rule);
+  for (const rule of ['print **one short screen**', 'is saved without asking and reported in one line', 'Save `setup` (and, with the sandbox on, `readOnly`) without asking', '**The sandbox is off by default**', '**A `copy` file is the owner\'s call**', 'Run it without asking when no probe stands', '**Details, only when the owner asks**']) assert.ok(SKILL.replace(/\s+/g, ' ').includes(rule), rule);
   for (const cmd of ['--budget <step>.<key>=<value>', '--gate \'<command>\'', 'prepare --project "<root>" --probe']) assert.ok(SKILL.includes(cmd), cmd);
   assert.match(SKILL, /preflight --project "<root>" --json/);
   assert.match(SKILL, /decided: \{answer, by, date, scope: "next-run"\}/);
