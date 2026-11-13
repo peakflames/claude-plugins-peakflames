@@ -13,6 +13,7 @@
   "testCommand": "node --test",
   "baseRed": null,
   "setupFailed": null,
+  "realSpend": null,
   "driverVersion": "0.2.0",
   "sync": null,
   "stoppedOnPark": null,
@@ -188,6 +189,7 @@
           "reason": "the version line now ends with the build date"
         }
       ],
+      "unproven": [],
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
@@ -363,6 +365,7 @@
         }
       ],
       "testChanges": [],
+      "unproven": [],
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
@@ -485,6 +488,7 @@
         }
       ],
       "testChanges": [],
+      "unproven": [],
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": "lint, not a person",
@@ -732,6 +736,7 @@
         }
       ],
       "testChanges": [],
+      "unproven": [],
       "rejected": [],
       "fixRounds": 1,
       "planApprovedBy": "lint, not a person",
@@ -772,6 +777,7 @@
         }
       ],
       "testChanges": [],
+      "unproven": [],
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": null,
@@ -798,6 +804,7 @@
       "elapsedMs": 0,
       "sessions": [],
       "testChanges": [],
+      "unproven": [],
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": null,
@@ -824,6 +831,7 @@
       "elapsedMs": 0,
       "sessions": [],
       "testChanges": [],
+      "unproven": [],
       "rejected": [],
       "fixRounds": 0,
       "planApprovedBy": null,

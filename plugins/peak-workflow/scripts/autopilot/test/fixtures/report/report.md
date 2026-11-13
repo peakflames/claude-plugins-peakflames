@@ -12,6 +12,7 @@ New to this report? "Words used in this report", at the end, explains every term
 ## Where things are
 Workspace: <workspace> — run 20261112-220500. Paths below are relative to the workspace.
 Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80.
+Real money on outside services: not decided at launch; a session that needs it asks you.
 
 ## Do this next
 1. Answer 2 waiting questions: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)

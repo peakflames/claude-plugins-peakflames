@@ -469,6 +469,16 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    tooling, a step reaching its own time or spending cap, or one of autopilot's own checks —
    never a question about the product, a look, or a stop the owner asked for; those are always
    asked. Say so if the owner asks what it covers.
+
+   **Real money, asked in the same popup.** When `launch.env.copy` is not empty (sessions
+   will hold the project's real keys), add a second question to this same `AskUserQuestion`
+   call: "A check may need to call a real outside service that costs money, using your keys
+   (<the copied file names>). Allow that when it is the only way to prove something works?" —
+   options `Yes — when a check needs it (Recommended)`, with the description "Otherwise that
+   part is only proven against a stand-in, and autopilot tells you so", and
+   `No — never spend`. The answer is the run's `realSpend`. Without it a session decides
+   nothing by itself: it stops and asks. Skip this question when nothing is copied in (no
+   session has a key to spend with), and in `dry-run` mode.
    - **Change:** take the change in plain text. (In `dry-run` mode nothing below is saved:
      show the dry run with the change applied in words only.) The owner may remove epics, reorder them (an
      epic never before one of its dependencies — refuse and say why), change the run budget,
@@ -508,14 +518,17 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      "explicit": [],
      "endBy": null,
      "runBudgetUsd": <launch.config.runBudgetUsd, or the amount the owner chose>,
-     "autoContinue": 2
+     "autoContinue": 2,
+     "realSpend": true
    }
    ```
 
    `endBy` is `null` — you are attending, and the run budget is the ceiling — unless the owner
    gave an end time: then the ISO time they chose. `autoContinue` is how many technical stops
    per epic the owner's standing answer covers: `2` when they launched on the question as
-   asked, the number they chose, or `0` when they turned it off. Never above what they agreed to. Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
+   asked, the number they chose, or `0` when they turned it off. Never above what they agreed to.
+   `realSpend` is the owner's answer to the real-money question: `true` or `false`, exactly as
+   they answered; leave the key out when the question was not asked. Never write `true` unasked. Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
    A run's `config.json` holds only what belongs to that run. A step's model, effort and caps
    live in the project's `autopilot.json` (saved through `DRIVER configure`); scope, audit and
    the like live in `<ws>/settings.json`, which this skill never writes. This is the only file
@@ -589,7 +602,8 @@ A driver is running (you launched it, or Step 0 found it). Stay with it until it
 3. **Relay what happens, one line each, as the watch words it.** The lines are already plain;
    do not rephrase, expand or explain them unless asked.
    - A milestone — a step starting or finishing, a check, the reviewer's result, a merge —
-     is relayed as it is. Several that arrive together are one short message.
+     is relayed as it is. A merge line that ends "N thing(s) not proven for real" keeps that
+     ending: the closing screen lists them. Several that arrive together are one short message.
    - A `still …` heartbeat and a `TESTS passed` line are not relayed. `TESTS failed` is not
      either: a build session fixing its own tests is routine. Say them only when asked.
    - A `REFUSED …` line is kept for the closing screen's friction list, not relayed. One
@@ -817,11 +831,23 @@ Leave out a part that has nothing to say.
 **Not finished:** <each epic of `epics` that is not merged and has no waiting question, with why in plain words>
 **Spent:** $<spentUsd> of $<runBudgetUsd>
 
+**Not proven for real:** <only when `unproven` has entries>
+
 **Things autopilot got in the way of:** <only when `friction` has entries>
 
 **Do this next:** <exactly one thing>
 ```
 
+- **Not proven for real** comes from `unproven`: what the independent reviewer or the
+  verifier said was never exercised against the real thing — a paid service replaced by a
+  stand-in, a call the verifier chose not to make, a check only a person can do. The epic
+  merged anyway, so this is the one place the owner learns it; a clean "merged" above it
+  would otherwise be read as "fully proven". One line each, by epic, in plain words: what was
+  not proven, and what it was checked against instead ("The cost of each clip was only tested
+  against a stand-in for OpenRouter; no real request was sent."). Never soften it, never
+  leave one out, and never fold it into a count. If there are more than five, show five and
+  say how many more the full report holds. Then one sentence on what the owner can do: prove
+  it by hand, or queue work that proves it.
 - **Things autopilot got in the way of** comes from `friction` (what the referee refused,
   grouped, with a `count`): at most five lines, each in plain words a non-developer follows
   — "It stopped the build from writing outside its own copy of the project (3 times)" — and

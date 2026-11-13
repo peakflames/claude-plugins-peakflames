@@ -162,6 +162,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot stays with the run** — `/peak-workflow:autopilot` is one command and one session:
   it launches, relays each milestone in plain words, asks each question when it arises,
   relaunches the confirmed queue, and ends on a closing screen. Closing the session is safe.
+- **Autopilot real-money answer at launch** — the launch popup asks once whether a check may
+  spend real money on an outside service; every build, repair and verify session is told the
+  answer (`realSpend`), and a session with no answer asks instead of skipping the call.
+- **Autopilot says what was not proven for real** — a reviewer finding that the work never ran
+  for real, and the verifier's own "not run" lines, are recorded per epic, flagged on the merge
+  line, listed on the closing screen and in the report, even when nothing parks.
 - **Autopilot closing screen** — lists what merged, what waits for the owner, the spend, one
   next step, and what the referee got in the way of, in plain words.
 
