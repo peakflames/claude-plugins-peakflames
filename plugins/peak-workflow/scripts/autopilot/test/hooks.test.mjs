@@ -173,6 +173,9 @@ test('R2 with the sandbox off (the default): a session reads anywhere but privat
   denied(h.bash('cp src/index.js ~/Desktop/'), 'R2', /writes only inside it/);
   denied(h.bash('mkdir -p ~/scratch && touch ~/scratch/a'), 'R2', /writes only inside it/);
   denied(h.bash('sed -i "" s/a/b/ /etc/hosts'), 'R2', /writes only inside it/);
+  passes(h.bash("f=src/index.js && sed -i '' -e 's/public sealed class A(HttpClient http)/x/' -e '/global using MsLogging/d' $f"), 'a sed script is not a path (seen live)');
+  passes(h.bash("sed -i '' -e '/^import/d' src/index.js && perl -pi -e 's/a/b/' src/index.js"), 'in-place edits inside the clone');
+  denied(h.bash(`sed -i '' -e '/x/d' ${h.project}/README.md`), 'R2', /writes only inside it/);
   denied(h.bash('cd ~/Documents && rm -rf old'), 'R2', /cd target/);
   passes(h.bash("cd ~/.nuget/packages/x/lib && ls; f=$(ls */X.xml | tail -1); grep -o 'T:X[^\"]*' $f | head 2>/dev/null"), 'cd somewhere readable only to look (seen live)');
   denied(h.bash('cd ~/Documents && echo hi > note.txt'), 'R2', /cd target/);

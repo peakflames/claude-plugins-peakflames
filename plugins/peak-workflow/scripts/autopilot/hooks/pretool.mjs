@@ -135,8 +135,14 @@ function parseBash(command) {
 }
 
 /** The paths one command segment visibly writes: redirects and the arguments of commands that create, change or delete files. */
-function visibleWrites(s) {
+function visibleWrites(s, ctx = null) {
   const a = s.argv.slice(1).filter((x) => !x.startsWith('-'));
+  // An in-place editor's arguments are its script and the files it edits. It edits only files that exist, and a script
+  // (`/pattern/d`, `s/a/b/`) is not one: seen live, `sed -i '' -e '/global using X/d' file` was refused for its script.
+  if (['sed', 'gsed', 'perl', 'ruby'].includes(s.cmd)) {
+    const real = (t) => { try { return fs.existsSync(path.resolve(ctx?.cwd ?? '.', t.replace(/^~(?=\/|$)/, ctx?.home ?? os.homedir()))); } catch { return false; } };
+    return [...s.redirects, ...bashWriteTargets([{ ...s, redirects: [] }]).filter(real)].filter((t) => t && !t.includes('://') && !t.startsWith('/dev/') && !t.startsWith('&'));
+  }
   const more = ['touch', 'mkdir', 'rmdir', 'ln', 'chmod', 'chown', 'rsync'].includes(s.cmd) ? (s.cmd === 'rsync' || s.cmd === 'ln' ? a.slice(-1) : a) : [];
   return [...bashWriteTargets([s]), ...more].filter((t) => t && !t.includes('://') && !t.startsWith('/dev/') && !t.startsWith('&'));
 }
@@ -155,7 +161,7 @@ function ruleR2Bash(ctx, segs, command) {
         // Where a command goes, its relative writes follow: only the clone and the temp directories.
         const c = classify(ctx, t, { bash: true });
         // Going somewhere readable only to look (cd into a package cache, then ls and grep) is fine; going there in a command that also writes is not.
-        const looking = c === 'ro' && !ctx.strict && s.cmd !== 'git' && !segs.some((x) => visibleWrites(x).length);
+        const looking = c === 'ro' && !ctx.strict && s.cmd !== 'git' && !segs.some((x) => visibleWrites(x, ctx).length);
         if (c !== 'rw' && !looking) return deny('R2', `path jail — ${s.cmd} target: ${c === 'ro' ? `${t} is outside the private clone` : c}`);
         continue;
       }
@@ -174,7 +180,7 @@ function ruleR2Bash(ctx, segs, command) {
     // With no sandbox the referee is what keeps writes inside the clone: every path a command visibly writes must be writable.
     // Best effort — a script or an interpreter can still write where its own code says.
     if (!ctx.strict) {
-      for (const tgt of visibleWrites(s)) {
+      for (const tgt of visibleWrites(s, ctx)) {
         const c = classify(ctx, tgt, { bash: true });
         if (c !== 'rw') return deny('R2', `path jail — ${c === 'ro' ? `${tgt} is outside the private clone: a session writes only inside it` : c}`);
       }
