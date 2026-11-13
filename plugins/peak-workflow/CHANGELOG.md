@@ -171,6 +171,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot closing screen** — lists what merged, what waits for the owner, the spend, one
   next step, and what the referee got in the way of, in plain words.
 
+- **Autopilot pictures for the owner's look** — the build of an epic with screens must leave
+  screenshots and a captioned `index.md` in `.autopilot/look/`; the look question shows them, and
+  they are never committed or merged.
+- **Autopilot verifier looks at the pictures** — the final check of an epic with screens opens
+  each screenshot and reports what it sees; its lines appear on the closing screen.
 - **Autopilot asks whether the owner will be there** — the launch popup's answer is the run's
   `attended`; when away, no session starts a step that waits for a person, and each such check is
   listed as not proven with the command to run by hand.

@@ -739,6 +739,22 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       short numbered list under "How to check it", in plain words. Never ask the owner to find
       or open a file themselves.
 
+      **Pictures of the screens.** The gate's `pictures` list holds the screenshots the build
+      took for this look, each with `path` and `shows` (the build's own caption). They are what
+      the owner judges, so put them in front of the owner before asking anything: when the
+      `SendUserFile` tool exists, send them all in one call with the captions; otherwise open
+      each with the system's opener. Then list them, one line each: "<n>. <shows>". Say that
+      the final check will look at the same pictures and report what it sees.
+
+      If the question says "UI epic" and `pictures` is empty, the build left nothing to judge
+      (a build from before pictures were required, or one that failed to take them). Say so in
+      one line and offer, with `AskUserQuestion`: `Take the pictures for me (Recommended)` —
+      you start the app from autopilot's copy the way the project's own notes say, take a
+      screenshot of each screen the requirements name with the browser tooling the project
+      has, stop what you started, and show them; `Ask me the question now`; `Decide later`.
+      Taking them reads and runs autopilot's copy; it never changes a file there or in the
+      project, and never needs a sign-in from the owner.
+
    b. **Ask the gate's own question.** Use `AskUserQuestion` with `question` verbatim and
       `options` verbatim as the option labels, plus one more option, `Decide later`. No
       "(Recommended)", no reordering, no added options. If the question's own text carries a
@@ -862,6 +878,9 @@ Leave out a part that has nothing to say.
 **Not finished:** <each epic of `epics` that is not merged and has no waiting question, with why in plain words>
 **Spent:** $<spentUsd> of $<runBudgetUsd>
 
+**What the verifier saw in the pictures:** <only when `seen` has entries>
+- <epic, short> — <each of its lines, as written>
+
 **Not proven for real:** <only when `unproven` has entries>
 
 **Things autopilot got in the way of:** <only when `friction` has entries>
@@ -869,6 +888,9 @@ Leave out a part that has nothing to say.
 **Do this next:** <exactly one thing>
 ```
 
+- **What the verifier saw in the pictures** comes from `seen`: for an epic with screens, the
+  final check opens the build's screenshots itself and says what is in each. These are its
+  words; give them as written, and never drop a line that says a picture did not match.
 - **Not proven for real** comes from `unproven`: what the independent reviewer or the
   verifier said was never exercised against the real thing — a paid service replaced by a
   stand-in, a call the verifier chose not to make, a check only a person can do. The epic
