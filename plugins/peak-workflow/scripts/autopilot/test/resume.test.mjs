@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, ensureResumeGates, gateFacts, ownerAnswers } from '../driver.mjs';
-import { DRIVER, E1, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
+import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
 const gate = (p, id, n = 1) => readJson(path.join(p.state, 'gates', `${id}-${n}.json`));
@@ -87,6 +87,49 @@ test('question gate (deferral, asked in build): the next run resumes the build s
   assert.ok(merged(p, tip), 'the branch the first run left is what merged');
   assert.deepEqual(readJson(path.join(p.state, 'epics.json')), {}, 'a merged epic carries nothing forward');
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Resumed at BUILD on `feature\/epic-Lg1Csv7-csv-import` .*Pat Owner answered "Fix now" on `gates\/Lg1Csv7-1\.json`/);
+});
+
+test('amendment gate, "Amend": the build changes the requirement in the owner\'s name, and the checks follow the amended anchors instead of failing the build for it', async (t) => {
+  const p = makeProject(t);
+  const old = E1.tors[0]; const fresh = 'TOR-01-Am3nd3d';
+  const q = `${old} — The tool shall import every row looks wrong: its Then cannot be met. Proposed: same title / Then: "rows after the header are imported". How to proceed?`;
+  const AMEND = [`Amend ${old} (owner approval)`, 'Implement as written', "Stop — I'll take it from here"];
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, ask(q, AMEND)] } });
+  await p.go();
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind, gate(p, E1.id).tor], ['PARKED', 'amendment', old]);
+  assert.match(gate(p, E1.id).why, /a requirement changes only with the owner's approval/);
+  assert.equal(decide(p, E1.id, AMEND[0]).enters, 'BUILD');
+
+  // As seen live: the old requirement is retired and a new one takes its place, in the requirement files, the
+  // sidecar and the tests; the session's last commit is a `test(…)` one on top of the build's `feat(…)`.
+  const E1a = { ...E1, tors: [fresh, ...E1.tors.slice(1)] };
+  // The change record `tor-lifecycle check` asks for when a requirement goes away, written before the swap.
+  const head = ['id = "CR-Am3nd3d"', 'date = 2026-11-13', 'kind = "supersede"', 'title = "Rows after the header"', 'reason = "The old Then cannot be met."', 'approved_via = "epic-branch"', 'approved_by = "Pat Owner"', 'refs = ["epic Lg1Csv7"]', 'keywords = ["header row"]', '', '[[changes]]', `tor = "${old}"`];
+  const record = { do: 'exec', cmd: `mkdir -p docs/requirements/changes && f=$(basename "$(grep -l "${old}" docs/requirements/*.feature.md)") && fp=$(${TL} fingerprint | awk '$1=="${old}"{print $2}') && { printf '%s\\n' ${head.map((l) => `'${l}'`).join(' ')} "feature_file = \\"$f\\"" "fingerprint = \\"$fp\\"" 'successors = ["${fresh}"]' "text = '''"; ${TL} text ${old}; printf '%s\\n' "'''"; } > docs/requirements/changes/2026-11-13-Am3nd3d.toml` };
+  const swap = { do: 'exec', cmd: `grep -rl "${old}" docs/requirements/*.feature.* docs/implementation-plan | xargs sed -i.bak "s/${old}/${fresh}/g" && find docs -name "*.bak" -delete` };
+  p.scenario({
+    [`${E1.id}/build`]: { actions: [ask(q, AMEND), { do: 'branch', name: E1.branch }, record, swap, ...buildActions(E1a).slice(1), { do: 'write', path: 'test/extra.test.js', content: `// ${fresh}\n` }, { do: 'commit', message: `test(epic-${E1.id}): cite only the live requirement ${fresh}` }] },
+    [`${E1.id}/verify`]: wrapupScript(E1a),
+  });
+  const r = await again(p);
+  const checks = Object.fromEntries(readJson(p.dir(E1.id, 'check-build-1.json')).checks.map((c) => [c.name, c]));
+  assert.deepEqual(['branch-and-commit', 'traceability', 'scope'].map((n) => checks[n].pass), [true, true, true], JSON.stringify([checks['branch-and-commit'], checks.traceability, checks.scope]));
+  assert.match(checks.traceability.evidence, new RegExp(`after the owner's approved amendment of ${old}`));
+  assert.match(checks.scope.evidence, new RegExp(`requirement files changed under the owner's approved amendment of ${old}`));
+  assert.deepEqual(r.steps, ['build-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`), 'no repair round');
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.deepEqual(p.epic(E1.id).amended, [old]);
+});
+
+test('requirement files a session changes without the owner\'s approval are still out of scope', async (t) => {
+  const p = makeProject(t);
+  const scripts = happy(E1);
+  scripts[`${E1.id}/build`].actions.splice(-1, 0, { do: 'exec', cmd: 'for f in docs/requirements/*.feature.md; do echo "" >> "$f"; done' });
+  p.scenario(scripts);
+  await p.go();
+  const scope = readJson(p.dir(E1.id, 'check-build-1.json')).checks.find((c) => c.name === 'scope');
+  assert.equal(scope.pass, false);
+  assert.match(scope.evidence.join(' '), /requirements are frozen during a run/);
 });
 
 test('unmatched question (asked in plan): replayable — the next run plans again and R8 matches the recorded question text', async (t) => {

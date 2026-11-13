@@ -195,6 +195,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   continues; the driver now counts only what was added.
 - **Autopilot `TESTS failed` false alarm** — the watch reports a test result only when the
   command's exit is the test command's own.
+- **Autopilot honours an approved requirement amendment** — after the owner answers "Amend", the
+  build's checks allow the requirement files to change and follow the amended anchors; a session's
+  last commit may be any commit of the epic.
 - **Autopilot referee false alarms** — `git stash push` is no longer refused as a push, and the
   empty word of macOS `sed -i ''` is no longer read as a change to the test directory.
 - **Autopilot builds no longer wait for a person** — build and repair sessions leave sign-ins to
