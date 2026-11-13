@@ -45,14 +45,13 @@ Outcome: one command typed, three popups answered, epic merged in the clone, pro
    Fix: build sessions do not start steps that need a person (record them as not proven);
    remember per epic that a `Needs you:` command went unanswered and tell later sessions not to
    retry it; at launch, ask whether the owner will be at the computer.
-4. **A resumed session's cost looks over-counted (to investigate).** The resumed verify reported
-   $2.44 for 19 turns, 2.22M cache-read, 27K cache-write and 9.6K output tokens; the original
-   reported $1.56 for 27 turns, 2.13M / 111K / 12.1K. At the original's rates the resumed session
-   should be about $1.15. `total_cost_usd` of a `--resume --fork-session` session appears to
-   carry part of the parent's cost, which the driver then adds a second time
-   (`driver.mjs` `state.spentUsd += total_cost_usd`). *Driver.* Fix: confirm with a small
-   experiment; if confirmed, subtract the parent session's recorded cost, or price the step from
-   its own `usage`.
+4. **A resumed session's cost is counted twice (confirmed in the afternoon run's data).** In the
+   result message of a `--resume --fork-session` session, `usage` is the session's own, but
+   `modelUsage` and `total_cost_usd` include the parent: Opus cache-read 4,348,585 = 2,130,400
+   (parent) + 2,218,185 (own); cache-write 138,482 = 111,034 + 27,448; output 21,660 = 12,083 +
+   9,577. The driver adds `total_cost_usd` to `spentUsd`, so the parent's $1.56 was counted again:
+   the epic cost about $7.97, not $9.53. *Driver (`state.spentUsd += total_cost_usd`).* Fix: for
+   a resumed step, subtract the resumed-from session's recorded cost.
 
 ### Minor
 
@@ -115,3 +114,67 @@ Outcome: one command typed, three popups answered, epic merged in the clone, pro
 - The process sweep: build and verify stopped their own servers; no "left N process(es)" line.
 - The reworded-question reminder (`remind`): no question was asked twice.
 - `autoContinue`: no technical stop occurred.
+
+## Afternoon run, same day (run `135500`, 5 epics queued, owner away)
+
+Fresh session after PeakMedia moved the real Okta check to release (`ed5eb10`). Plugin unchanged
+(`56792d7`, docs only since the morning).
+
+| Time | What |
+|---|---|
+| 13:53 | Step 0 → `readiness`, 5 epics. Launch popup with titles and which epic waits for a look. Owner: Launch; "Yes" to paid calls with a typed note: not at the computer for any browser popup |
+| 13:57 | `EYGrros` plan 4 min $1.06, build 11 min $4.71, review 65 s (3 notes), verify 5 min $2.37; manual-verification question answered by policy; MERGED, 21 min, $9.48 |
+| 14:20 | `YVOjXtI` plan 3 min, build 13 min $4.91, review 42 s (2 notes), verify 7 min $2.67; MERGED, 23 min, $9.53 |
+| 14:45 | `Ail1fOL` plan 3 min; build parks after 90 s on an amendment gate: `TOR-09-fjQhX70` cannot be met as written. Run stops, $21.09 of $80. Push, then popup |
+
+No Okta prompt, no `NEEDS YOU`, no wording-mismatch park: two epics merged with no owner input.
+
+### Issues (numbering continues)
+
+#### Major
+
+17. **The watch says `TESTS failed` when no test failed.** A verify command that only contained
+    `build.py test-live` died on a shell typo (`echo ===LIVE` in zsh) before any test ran; the
+    owner-facing line was `TESTS failed`. *`attend.mjs` `watch` (the `testCommand` check).* Fix:
+    match the test command on a word boundary (`test` must not match `test-live`); say "failed"
+    only when the test command is the whole command or its exit is reported separately; otherwise
+    stay silent, as for piped commands.
+
+#### Minor
+
+18. **Nowhere to record "I will not be at the computer".** The owner typed it into the real-money
+    answer; the run config has no field for it and no session was told. Only the PeakMedia fix
+    kept the browser sign-in away. *Skill Step 2 / run config / `BUILD_RULES`, `VERIFY_RULES`.*
+    Fix with major 3: an `attended` answer at launch that sessions receive as a rule.
+19. **Whether the manual-verification question parks is luck.** Both verify sessions quoted the
+    option verbatim this time and policy answered; the morning session shortened it and parked.
+    Same fix as major 1.
+20. **A "this test cannot fail" review note does not reach the run state.** `EYGrros` F1 (medium,
+    `cannot-fail`): the live OpenRouter test asserts cost > 0, and the epic made an unreadable
+    cost fall back to a configured price, so the test passes without the real cost being read.
+    `state.json` `unproven` is empty; only the report has it. *`attend.mjs` `UNPROVEN_CATEGORIES`
+    / closing screen.* Fix: carry medium `cannot-fail` notes with the unproven items.
+21. **A requirement that cannot be met is found in the build, not before.** The planner read
+    `TOR-09-fjQhX70` and passed the plan; the builder parked on it 90 seconds in, after the owner
+    had left. *Planner rules / launch check.* Fix: have the planner raise amendment questions, or
+    check the queue's requirements for contradictions before the launch popup.
+22. **The amendment popup is the build session's text.** Requirement IDs, "Then", bounding boxes.
+    *Skill Step 4.* Fix: restate in plain words (what the rule says, why it cannot be met, what
+    the new wording changes); keep the original as detail.
+23. **`preflight --json` is 31 KB.** A session that did not redirect it had the harness spill it
+    to a file and then parsed that by hand. *Skill Step 1 / driver.* Fix: tell sessions to write
+    it to a file, or add a short summary output.
+24. **`git merge $B --no-ff` refused again** (issue 14), by both verify sessions of the day that
+    reached a merge. It is a pattern: accept a variable that resolves to the epic branch, or have
+    the wrapup rules give the literal command.
+25. **Build sessions learn the test-edit rule by being refused.** Three refusals across two
+    builds, each relayed to the attending session. *`BUILD_RULES`.* Fix: state the rule up front.
+26. **Opening line shows one run's spend** (issue 9 again): "$2.44 of $72.91" for an epic that
+    cost $9.53 of $80 as reported.
+
+### What worked
+
+- Five-epic launch popup: titles, order, which epic waits for a look and what follows it.
+- Two epics end to end (43 epic-minutes, $19.01) with no question to the owner.
+- The amendment rule ("requirements are never amended during a run") parked cheaply ($1.17).
+- The attending session stayed quiet on routine lines and pushed once, when the run stopped.
