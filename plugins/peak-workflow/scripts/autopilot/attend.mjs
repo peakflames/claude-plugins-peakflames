@@ -195,6 +195,26 @@ export function friction(workspace, runs, { max = 10 } = {}) {
   return [...groups.values()].sort((a, b) => b.count - a.count).slice(0, max);
 }
 
+/**
+ * The Bash command a session has started and not finished, from its referee log: `{description,
+ * command, startedAt, minutes, needsYou}`, or null. `needsYou`: the session marked it as waiting
+ * for the owner (its description starts "Needs you:"). This is the only view anyone has inside a
+ * step: seen live, a browser sign-in waited five minutes on an owner who was told nothing.
+ */
+export function openCommand(hooksFile) {
+  const open = new Map();
+  for (const h of readFrom(hooksFile, 0).rows) {
+    if (h.tool_name !== 'Bash' || !h.tool_use_id) continue;
+    if (h.hook === 'PreToolUse' && h.decision !== 'deny' && h.decision !== 'park' && h.decision !== 'remind') open.set(h.tool_use_id, h);
+    else if (/^PostToolUse/.test(h.hook ?? '')) open.delete(h.tool_use_id);
+  }
+  const h = [...open.values()].at(-1);
+  if (!h) return null;
+  const description = typeof h.tool_input === 'object' && h.tool_input ? String(h.tool_input.description ?? '') : '';
+  const needs = description.match(/^\s*needs you\s*[:—–-]\s*(.*)$/i);
+  return { id: h.tool_use_id, description: needs ? needs[1].trim() : description.trim(), command: oneLine(commandOf(h), 160), startedAt: h.t ?? null, minutes: h.t ? sinceMin(h.t) : 0, needsYou: !!needs };
+}
+
 /** The command a Bash hook line ran, whether the log kept the input whole or clipped it to text. */
 const commandOf = (h) => (typeof h.tool_input === 'string' ? h.tool_input : h.tool_input?.command ?? '');
 
@@ -203,13 +223,15 @@ const commandOf = (h) => (typeof h.tool_input === 'string' ? h.tool_input : h.to
  *   first line   where the run is now (left out with `after`: the caller already knows)
  *   then         one `eventLine` per new event; `REFUSED …` the first and the third time the
  *                referee refuses the same thing; `TESTS passed|failed` when a session runs the
- *                project's test command; a heartbeat when nothing else was said for a while
+ *                project's test command; `NEEDS YOU: …` when the session starts a command that
+ *                waits for the owner; one line for a command open `longMin` minutes; a heartbeat
+ *                when nothing else was said for a while
  *   last line    `RUN ENDED: <why>`, once the run has ended or the driver is gone
  * `once`: return after the first thing said, or after `onceMin` minutes (a session without the
  * Monitor tool runs this in a loop, passing the returned `after` back in).
  * Resolves with `{ ended, after }`: whether the run ended, and how many events have been said.
  */
-export async function watch({ workspace, run = null, heartbeatMin = 10, once = false, onceMin = 10, replay = false, after = null, pollMs = 2000, graceMs = 15000, out = (line) => process.stdout.write(`${line}\n`) }) {
+export async function watch({ workspace, run = null, heartbeatMin = 10, longMin = 3, once = false, onceMin = 10, replay = false, after = null, pollMs = 2000, graceMs = 15000, out = (line) => process.stdout.write(`${line}\n`) }) {
   const started = Date.now();
   // A driver that was just launched has not made its run directory or state yet, and until it has, the latest run
   // on disk is the one before it. Wait for the driver to say which run is its own before reading anything.
@@ -247,6 +269,7 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, once = f
   const hookFile = (state) => { const q = (state?.queue ?? []).find((x) => x.step); return q ? path.join(runDir, 'epics', q.id, q.step.name, 'hooks.jsonl') : null; };
   if (!replay && hookFile(state0)) { try { hookOffsets.set(hookFile(state0), fs.statSync(hookFile(state0)).size); } catch { /* not written yet */ } }
   const refusals = new Map();
+  const flagged = new Set(); // commands already said to be waiting
 
   for (;;) {
     const live = isLive();
@@ -268,6 +291,10 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, once = f
         }
       }
     }
+    // Inside the step: a command that waits for the owner is said at once; any command open for `longMin` minutes is said once.
+    const cmd = hf && !ended ? openCommand(hf) : null;
+    if (cmd?.needsYou && !flagged.has(cmd.id)) { flagged.add(cmd.id); say(`NEEDS YOU: ${oneLine(cmd.description, 200) || 'a step is waiting for you at this computer'}`); }
+    else if (cmd && !flagged.has(cmd.id) && cmd.startedAt && Date.now() - Date.parse(cmd.startedAt) >= longMin * 60000) { flagged.add(cmd.id); say(`One command has been running for ${cmd.minutes} min${cmd.description ? `: "${oneLine(cmd.description, 120)}"` : ''}`); }
     if (ended) { for (let waited = 0; driverPid(workspace) && waited < 5000; waited += 100) await sleep(100); break; } // the report is written; let the driver let go
     if (!live) {
       const last = tryJson(stateFile);

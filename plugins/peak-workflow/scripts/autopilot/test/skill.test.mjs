@@ -243,6 +243,10 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     'The popup hides the chat: put what the owner must read inside the question text.',
     'Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`', 'ask nothing again',
     '## Closing screen', '**Things autopilot got in the way of:**', '**Do this next:** <exactly one thing>',
+    // Seen live: the owner waited on a browser with no word, and the attending session guessed.
+    '`NEEDS YOU: …`', 'Relay it at once, as "Needs you now: <what>"', 'never guess beyond them', '**Say what an option asks of the owner.**',
+    'means you must be at this computer in the next few minutes', 'That is a fact about the option, not a recommendation', '**Say what the answer does, and what the owner will see**',
+    'The session that asked picks up where it was; it does not start the step over.',
   ]) assert.ok(flat.includes(rule), rule);
   // Every answer `driver.mjs status` can give has its row in Step 0.
   for (const next of ['attend', 'decide', 'continue', 'readiness', 'fetch', 'nothing']) assert.match(SKILL, new RegExp(`^\\| \`${next}\` \\| `, 'm'), next);

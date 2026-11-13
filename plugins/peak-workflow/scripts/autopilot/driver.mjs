@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { activity, driverPid, eventLine, friction, plainReason, shortLabel, snapshotLine, watch } from './attend.mjs';
+import { activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, snapshotLine, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
 import { writeReport } from './report.mjs';
@@ -95,6 +95,35 @@ function pidAlive(pid) {
 }
 function killGroup(pid, signal) {
   try { process.kill(-pid, signal); return true; } catch { return false; }
+}
+
+/**
+ * Processes still working out of a directory: their working directory or their program is inside
+ * it. Left out: this process and its relatives, anything a `driver.mjs` command started (a status
+ * or a watch reading the clone), and git itself (the owner fetching from the clone). Read-only.
+ */
+export function strayProcesses(dir) {
+  let root; try { root = fs.realpathSync(dir); } catch { return []; }
+  const inside = (p) => !!p && (p === root || p.startsWith(root + path.sep));
+  const procs = new Map();
+  for (const line of sh('ps', ['-axo', 'pid=,ppid=,command=']).out.split('\n')) {
+    const m = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+    if (m) procs.set(Number(m[1]), { pid: Number(m[1]), ppid: Number(m[2]), command: m[3] });
+  }
+  const cwds = new Map(); let pid = null;
+  const uid = typeof process.getuid === 'function' ? ['-u', String(process.getuid())] : [];
+  for (const line of sh('lsof', ['-a', '-d', 'cwd', '-Fpn', ...uid]).out.split('\n')) {
+    if (line[0] === 'p') pid = Number(line.slice(1)); else if (line[0] === 'n' && pid) cwds.set(pid, line.slice(1));
+  }
+  const mine = (p) => { for (let x = p, hops = 0; x && hops < 64; x = procs.get(x.ppid), hops++) if (x.pid === process.pid || /(^|[\s/])driver\.mjs(\s|$)/.test(x.command)) return true; return false; };
+  const out = [];
+  for (const p of procs.values()) {
+    const argv0 = p.command.split(/\s+/)[0];
+    if (!(inside(cwds.get(p.pid)) || inside(argv0))) continue;
+    if (mine(p) || /^git(-|$)/.test(path.basename(argv0))) continue;
+    out.push(p);
+  }
+  return out;
 }
 
 const shellQuote = (s) => (/^[A-Za-z0-9_\-.,/:=@%+]+$/.test(s) ? s : `'${String(s).replace(/'/g, `'\\''`)}'`);
@@ -828,6 +857,9 @@ execution script for this session.
 - Commit everything you leave behind. If you were asked to record why you changed an existing
   test, \`.autopilot/test-changes.jsonl\` is part of your work: stage it with your final commit.
   \`git status\` must be clean when you finish.
+- When a command you run waits for the project's owner (a sign-in in a browser, a device to
+  plug in), start its Bash \`description\` with \`Needs you:\` and say in a few words what they must
+  do. They are told at once. Give them time: a timeout of at least five minutes.
 `;
 
 export const FIX_RULES = `# Autopilot repair rules
@@ -838,6 +870,19 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
 - Do not change the epic's status, and do not merge or push.
 - Where you must ask, ask with \`AskUserQuestion\`. Never answer such a question yourself and never work around it.
 - Commit everything you leave behind, \`.autopilot/test-changes.jsonl\` included. \`git status\` must be clean when you finish.
+- When a command you run waits for the project's owner (a sign-in in a browser, a device to
+  plug in), start its Bash \`description\` with \`Needs you:\` and say in a few words what they must
+  do. They are told at once. Give them time: a timeout of at least five minutes.
+`;
+
+/** Appended to every verify session: the one operational rule a verifier needs from autopilot. It says nothing about what to verify or how to judge it. */
+export const VERIFY_RULES = `# Autopilot session rules
+
+- When a command you run waits for the project's owner (a sign-in in a browser, a device to
+  plug in), start its Bash \`description\` with \`Needs you:\` and say in a few words what they must
+  do. They are told at once. Give them time: a timeout of at least five minutes.
+- Stop anything you start (a server, a watcher) before you finish. Whatever is still running
+  when the session ends is stopped for you.
 `;
 
 /**
@@ -883,7 +928,9 @@ const answerList = (answers) => answers.map((a, i) => `${i + 1}. **Asked:** "${a
 const ANSWER_RULES = `Act on each answer when you reach the point it concerns: do what the chosen option says, as if the
 owner had just picked it here. Do not ask the same thing again in any wording, and do not ask for
 confirmation. If the answer needs something only a person can do (a sign-in in a browser, a look
-at a screen), the owner chose it knowing that: start it, give them time, and carry on.
+at a screen), the owner chose it knowing that: start it, give them time, and carry on. Start the
+Bash \`description\` of the command that waits for them with \`Needs you:\` and say in a few words
+what they must do: they are told at once.
 
 Use \`AskUserQuestion\` only for a decision that is really a different one. Every other question
 the skill tells you to ask is still asked, in the skill's own words.`;
@@ -1402,6 +1449,20 @@ class Run {
     return this.park(e, reason);
   }
 
+  /** Stops every process a session left running out of the clone. Returns what it stopped, as `pid command` lines. */
+  async sweep(e, name) {
+    let left = [];
+    try {
+      left = strayProcesses(this.clone);
+      if (!left.length) return [];
+      for (const p of left) { try { process.kill(p.pid, 'SIGTERM'); } catch { /* already gone */ } }
+      for (let waited = 0; waited < this.config.timing.killGraceMs && left.some((p) => pidAlive(p.pid)); waited += 100) await sleep(100);
+      for (const p of left.filter((x) => pidAlive(x.pid))) { try { process.kill(p.pid, 'SIGKILL'); } catch { /* already gone */ } }
+      this.log(`${e.id}: ${name} left ${left.length} process(es) running in the clone; stopped: ${left.map((p) => `${p.pid} ${p.command.slice(0, 120)}`).join(' | ')}`);
+    } catch (err) { this.log(`${e.id}: could not check for processes ${name} left behind: ${err.message}`); }
+    return left.map((p) => `${p.pid} ${p.command.slice(0, 200)}`);
+  }
+
   // ---- one session -----------------------------------------------------------------------------
 
   /**
@@ -1498,6 +1559,9 @@ class Run {
     await done;
     clearTimeout(wall); clearInterval(poll); clearTimeout(graceTimer);
     if (child.pid && killGroup(child.pid, 0)) { killGroup(child.pid, 'SIGKILL'); this.log(`${e.id}: ${name} left processes behind; killed`); }
+    // What detached itself from the session (a server started with nohup or its own daemon mode) outlives the group
+    // kill. Seen live: a gateway kept its port after the run ended. Anything still working out of the clone is stopped.
+    s.strays = await this.sweep(e, name);
     await new Promise((r) => stream.end(r));
     stderr.end();
 
@@ -1868,13 +1932,15 @@ class Run {
     e.preVerify = { developSha: this.integrationSha(), branchTip: this.branchTip(m.branch), branch: m.branch };
     this.save();
     const s = await this.step(e, 'verify', (stepDir) => {
-      if (!e.look) return { prompt: `/peak-workflow:wrapup-epic ${e.id}` };
+      const rules = path.join(stepDir, 'verify-rules.md');
+      fs.writeFileSync(rules, VERIFY_RULES);
+      if (!e.look) return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [rules] };
       // The owner already looked (a decided human-check gate). The verifier gets their recorded
       // observation up front, so wrapup Step 1.2 item 7 records it instead of asking a person who is
       // not there. Seen live: without this the session asks "What do you see?" and parks.
       const file = path.join(stepDir, 'owner-look.md');
       fs.writeFileSync(file, ownerLook(e.look, m, e.caughtUp));
-      return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [file] };
+      return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [file, rules] };
     });
     if (!s) return null;
     if (this.integrationSha() !== e.preVerify.developSha) return 'CHECK_VERIFY';
@@ -2540,6 +2606,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const spentUsd = +chain.reduce((sum, name) => sum + (stateOf(name)?.spentUsd ?? 0), 0).toFixed(2);
   const runBudgetUsd = (chain.length ? cfgOf(chain[0]).runBudgetUsd ?? stateOf(chain[0])?.runBudgetUsd : null) ?? null;
   const n = standingLimit(ws, run);
+  // Inside the step in flight: the command the session has open, and whether it is waiting for the owner.
+  const active = pid ? (state?.queue ?? []).find((q) => q.step) : null;
+  const inFlight = active ? openCommand(path.join(runDir, 'epics', active.id, active.step.name, 'hooks.jsonl')) : null;
   const epics = (state?.queue ?? []).map((q) => ({ id: q.id, label: q.label ?? q.id, state: q.state, step: q.step?.name ?? null, minutes: Math.round((q.wallMs ?? 0) / 60000) + (q.step?.startedAt ? Math.max(0, Math.round((Date.now() - Date.parse(q.step.startedAt)) / 60000)) : 0), costUsd: q.costUsd ?? 0 }));
   const merged = new Map(chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').map((q) => [q.id, q.label ?? q.id])));
 
@@ -2553,6 +2622,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const out = {
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
     epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n,
+    inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
     waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
@@ -2560,7 +2630,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     out.say = [
       snapshotLine(state, { running: !!pid }),
       epics.length ? epics.map((e) => `${shortLabel(e.label)}: ${word[e.state] ?? (pid ? `in progress (${e.minutes} min so far)` : 'interrupted')}`).join('; ') : 'No epic has been queued yet.',
-      out.waiting.length ? `${out.waiting.length} question(s) wait for you.` : out.autoContinue.length ? 'It stopped for a technical reason and can continue.' : pid ? `Nothing needs you right now${activity(state) ? `: it is ${activity(state)}` : ''}.` : 'Nothing needs you right now.',
+      out.waiting.length ? `${out.waiting.length} question(s) wait for you.` : out.autoContinue.length ? 'It stopped for a technical reason and can continue.' : inFlight?.needsYou ? `It is waiting for you at this computer: ${inFlight.description || 'a step needs you'} (${inFlight.minutes} min so far).` : pid ? `Nothing needs you right now${activity(state) ? `: it is ${activity(state)}` : ''}${inFlight && inFlight.minutes >= 1 ? ` (one command running ${inFlight.minutes} min${inFlight.description ? `: "${inFlight.description}"` : ''})` : ''}.` : 'Nothing needs you right now.',
     ];
     return out;
   };
@@ -2772,7 +2842,7 @@ async function main(argv) {
   }
   if (cmd === 'watch') {
     const num = (v, d) => (v === undefined || Number.isNaN(Number(v)) ? d : Number(v));
-    await watch({ workspace: ws, run: o.run ?? null, heartbeatMin: num(o.heartbeatMin, 10), once: !!o.once, onceMin: num(o.onceMin, 10), replay: !!o.replay, after: o.after === undefined ? null : num(o.after, 0), pollMs: num(o.pollMs, 2000), graceMs: num(o.graceMs, 15000) });
+    await watch({ workspace: ws, run: o.run ?? null, heartbeatMin: num(o.heartbeatMin, 10), once: !!o.once, onceMin: num(o.onceMin, 10), longMin: num(o.longMin, 3), replay: !!o.replay, after: o.after === undefined ? null : num(o.after, 0), pollMs: num(o.pollMs, 2000), graceMs: num(o.graceMs, 15000) });
     return 0;
   }
   if (cmd === 'stop') {
