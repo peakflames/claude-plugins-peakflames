@@ -939,7 +939,7 @@ ${brief.trim()}
 Do this, in order:
 
 1. Check out \`${meta.branch}\` (it exists; never create another branch) and read the requirement text of every TOR named above in \`docs/requirements/\`.
-2. Make exactly the fixes listed, in the code and in the tests. Nothing else: no refactoring, no new features, no other epic's files, no file under \`docs/requirements/\`.
+2. Make exactly the fixes listed, in the code and in the tests. Nothing else: no refactoring, no new features, no other epic's files, no file under \`docs/requirements/\` (a requirement the owner approved amending stays as amended).
 3. Keep every test that names a TOR ID naming it, and make each test you touch able to fail: it must assert what the requirement's Then says.
 4. Run the project's test command from \`CLAUDE.md\` and the other quality gates listed there. Everything must pass.
 5. Update \`${PLAN_DIR}/session-handoffs/epic-${meta.id}-implemented.md\` wherever the repair changes what it says (what was built, spec deviations, TOR coverage). Keep its \`## Deferrals\` section and \`Count:\` line truthful. Leave the status sidecar as it is (\`status: Implemented\`).
@@ -1187,6 +1187,25 @@ class Run {
   /** A path as gate files and the report name it: relative to the workspace. */
   rel(p) { return path.relative(this.stateDir, p).split(path.sep).join('/'); }
   meta(e) { return this.metaById.get(e.id); }
+  /**
+   * The requirements the owner approved amending for this epic: their answer "Amend …" at an
+   * amendment gate. Seen live: the owner approved one, the build amended it on the epic's branch
+   * (the old requirement retired, a new one in its place), and the driver's own checks then failed
+   * the build for changing requirement files and for not testing the retired one.
+   */
+  approvedAmendments(e) {
+    return readGates(this.stateDir).filter((g) => g.epic === e.id && /^amendment/.test(g.kind ?? '') && /^amend\b/i.test(g.decided?.answer ?? '') && !g.void && !g.superseded && !g.cleared).map((g) => g.tor).filter(Boolean);
+  }
+  /**
+   * The epic's anchors as they stand where `sc` (a parsed status sidecar) was read. They are the
+   * launch check's, except after an approved amendment: an amended requirement the sidecar no
+   * longer lists is dropped, and one the sidecar lists in its place is added.
+   */
+  anchorsFor(e, sc) {
+    const anchors = this.meta(e).anchors; const amended = this.approvedAmendments(e);
+    if (!amended.length) return anchors;
+    return [...anchors.filter((t) => !amended.includes(t) || sc.requirements.includes(t)), ...sc.requirements.filter((t) => !anchors.includes(t))];
+  }
 
   // ---- lock, STOP, run-level stops -----------------------------------------------------------
 
@@ -1726,9 +1745,12 @@ class Run {
     else {
       const ahead = Number(this.g('rev-list', '--count', `${dev}..${b}`));
       // The session's own last commit: the driver's commits on top of it (uncommitted work kept at a park, the referee's record) do not count.
-      const subject = this.g('log', '-20', '--format=%s', b).split('\n').find((x) => !/^(wip|chore)\(autopilot\)/.test(x)) ?? '';
-      // The repair prompt asks for `fix(epic-<id>): …`, so after a fix round that subject is as good as the build's `feat`.
-      add('branch-and-commit', ahead >= 1 && new RegExp(`^(feat${e.fixRounds >= 1 ? '|fix' : ''})\\(epic-${e.id}\\):`).test(subject), { branch: b, tip, commitsAhead: ahead, tipSubject: subject });
+      const subjects = this.g('log', '--format=%s', `${dev}..${b}`).split('\n').filter((x) => x && !/^(wip|chore)\(autopilot\)/.test(x));
+      const subject = subjects[0] ?? '';
+      // The build's own commit is `feat(epic-<id>): …` (after a fix round `fix(…)` is as good). A session may commit
+      // again on top of it (seen live: `test(epic-<id>): …` after an amendment): any commit of this epic may be the last.
+      const built = subjects.some((x) => new RegExp(`^(feat${e.fixRounds >= 1 ? '|fix' : ''})\\(epic-${e.id}\\):`).test(x));
+      add('branch-and-commit', ahead >= 1 && built && new RegExp(`^[a-z]+\\(epic-${e.id}\\):`).test(subject), { branch: b, tip, commitsAhead: ahead, tipSubject: subject });
     }
     if (!tip) return { pass: false, checks, parkOnly };
 
@@ -1757,8 +1779,9 @@ class Run {
     // An operator-observed requirement is traced by its checklist under tests/manual/ (or tests/hil/),
     // whether or not those are on the Test directories line (wrapup-epic Step 1.2 item 2).
     const observed = new Set(m.reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]));
-    const untraced = m.anchors.filter((tor) => gitRun(this.clone, 'grep', '-l', '-F', tor, b, '--', ...dirs, ...(observed.has(tor) ? ['tests/manual', 'tests/hil'] : [])).code !== 0);
-    add('traceability', untraced.length === 0, untraced.length ? { missingFromTests: untraced, testDirs: dirs } : `${m.anchors.length} anchors found under ${dirs.join(' ')}`);
+    const amended = this.approvedAmendments(e); const anchors = this.anchorsFor(e, sc);
+    const untraced = anchors.filter((tor) => gitRun(this.clone, 'grep', '-l', '-F', tor, b, '--', ...dirs, ...(observed.has(tor) ? ['tests/manual', 'tests/hil'] : [])).code !== 0);
+    add('traceability', untraced.length === 0, untraced.length ? { missingFromTests: untraced, testDirs: dirs } : `${anchors.length} anchors found under ${dirs.join(' ')}${amended.length ? ` (after the owner's approved amendment of ${amended.join(', ')})` : ''}`);
 
     if (status === '' && this.currentBranch() === b) {
       const t = this.runTests();
@@ -1776,7 +1799,7 @@ class Run {
     for (const f of changed) {
       const otherEpic = f.match(/(?:^|\/)epic-([A-Za-z0-9]{7})[-.]/);
       if (f.startsWith(`${PLAN_DIR}/`) && otherEpic && otherEpic[1] !== e.id) out.push(`${f}: another epic's file`);
-      else if (f.startsWith('docs/requirements/')) out.push(`${f}: requirements are frozen during a run`);
+      else if (f.startsWith('docs/requirements/')) { if (!amended.length) out.push(`${f}: requirements are frozen during a run`); } // an amendment the owner approved is theirs, not the session's
       else if (f.startsWith('.claude/')) out.push(`${f}: .claude/ is off limits`);
       else if (f === 'CLAUDE.md') {
         const lines = this.g('diff', '-U0', `${dev}...${b}`, '--', 'CLAUDE.md').split('\n').filter((l) => /^[+-](?![+-])/.test(l));
@@ -1785,7 +1808,8 @@ class Run {
       else if (allow.length && !allow.some((re) => re.test(f))) out.push(`${f}: outside the allowed paths`);
       else if (Number(gitRun(this.clone, 'cat-file', '-s', `${b}:${f}`).out || 0) > 5 * 1024 * 1024) out.push(`${f}: larger than 5 MB`);
     }
-    add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope`);
+    add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under the owner's approved amendment of ${amended.join(', ')}` : ''}`);
+    if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; this.log(`${e.id}: the build changed requirement files under the owner's approved amendment of ${amended.join(', ')}`); }
 
     const reasons = new Map();
     for (const line of (gitShow(this.clone, b, '.autopilot/test-changes.jsonl') ?? '').split('\n')) {
@@ -2029,7 +2053,7 @@ class Run {
     // verifier settled it on the branch and stopped). Nothing failed and nothing needs repair: the
     // branch says Complete with every anchor verified. Park it for the owner; never call it FAIL.
     const sc = parseSidecar(gitShow(this.clone, m.branch, m.sidecar));
-    if (sc.fields.status === 'Complete' && m.anchors.length > 0 && m.anchors.every((t) => sc.verified[t])) {
+    if (sc.fields.status === 'Complete' && m.anchors.length > 0 && this.anchorsFor(e, sc).every((t) => sc.verified[t])) {
       const reason = `${s.name} verified every requirement and marked the epic Complete on ${m.branch}, but did not merge it into ${this.state.integration}`;
       this.writeGate(e, {
         kind: 'resume', skillStep: 'wrapup-epic Step 5', phase: 'VERIFY',
@@ -2101,7 +2125,7 @@ class Run {
     add('verdict', problems.length === 0, problems.length ? problems : { merge: this.integrationSha(), parents, ...(fixedFiles.length ? { fixedDuringWrapup: fixedFiles, approvedBy: ownerFix } : {}) });
 
     const sc = parseSidecar(gitShow(this.clone, dev, m.sidecar));
-    const unverified = m.anchors.filter((t) => !sc.verified[t]);
+    const unverified = this.anchorsFor(e, sc).filter((t) => !sc.verified[t]);
     add('sidecar-on-integration', sc.fields.status === 'Complete' && /^\d{4}-\d{2}-\d{2}/.test(sc.fields.completed ?? '') && unverified.length === 0, { status: sc.fields.status ?? null, completed: sc.fields.completed ?? null, anchorsWithoutVerifiedLine: unverified });
 
     // No waivers: parse the Deferrals Count: line; the words always appear, so never grep for them.

@@ -12,8 +12,8 @@
   ],
   "park": [
     { "kind": "deferral", "skillStep": "start-epic Deferral gate", "fragments": ["cannot be fully met"], "why": "deferral is an owner decision; plan approval does not pre-authorize any deferral" },
-    { "kind": "amendment", "skillStep": "start-epic Amendment gate", "fragments": ["looks wrong", "How to proceed?"], "why": "requirements are never amended during a run" },
-    { "kind": "amendment-how", "skillStep": "wrapup-epic Step 1.4b (requirement may be wrong)", "fragments": ["How should TOR-", "change?"], "why": "requirements are never amended during a run" },
+    { "kind": "amendment", "skillStep": "start-epic Amendment gate", "fragments": ["looks wrong", "How to proceed?"], "why": "a requirement changes only with the owner's approval" },
+    { "kind": "amendment-how", "skillStep": "wrapup-epic Step 1.4b (requirement may be wrong)", "fragments": ["How should TOR-", "change?"], "why": "a requirement changes only with the owner's approval" },
     { "kind": "anchor-superseded", "skillStep": "start-epic Step 1 item 6", "fragments": ["Update this epic's anchors?"], "why": "a requirements decision" },
     { "kind": "test-directories", "skillStep": "start-epic Step 1 item 4b / wrapup-epic Step 1.2 item 2", "fragments": ["Which directories hold tests?"], "why": "preflight requires the Test directories line; this should not be asked" },
     { "kind": "meaning-unchanged", "skillStep": "wrapup-epic Step 1.1 (changed requirement)", "fragments": ["Meaning unchanged"], "why": "a requirements decision" }

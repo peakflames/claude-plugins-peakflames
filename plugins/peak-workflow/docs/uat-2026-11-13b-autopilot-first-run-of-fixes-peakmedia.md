@@ -190,3 +190,20 @@ alarms, both fixed the same day:
     backup suffix of macOS `sed -i ''` was taken as a path and resolved to the working directory;
     the session was told to record a reason for `tests/PeakMediaRemoteMcpServer.Tests`, and did,
     for the whole directory. *Hook R7 (`bashWriteTargets`).*
+
+### Critical
+
+29. **[Fixed 2026-11-13] The owner's "Amend" answer is carried out and then failed by the driver.**
+    The owner approved amending `TOR-09-fjQhX70`; the resumed build retired it for
+    `TOR-09-qu5yesw` with a change record in the owner's name; CHECK_BUILD then failed the build
+    for changing requirement files ("requirements are frozen during a run"), for not testing the
+    retired ID, and because its last commit was `test(epic-…)`. The repair round was told to undo
+    it and asked the owner a second question whose every option was a loss. *Driver
+    (`checkBuild`, verify checks).* Fixed: an approved amendment unfreezes requirement files for
+    that epic, the anchors follow the branch's sidecar, and any commit of the epic may be last.
+30. **A gate with four options cannot go in the popup** (minor). The fifth, "Decide later", is one
+    more than `AskUserQuestion` takes, so the question arrived as chat text. *Skill Step 4.* Fix:
+    keep the four real options in the popup and say "close this to decide later" in the question.
+31. **The owner could not tell what the requirement was for** (minor, UX). They had to ask: what
+    is it, is it functional, what if we drop it. *Skill Step 4.* Fix: an amendment question leads
+    with one plain sentence of intent and where the rule comes from, before any ID or wording.
