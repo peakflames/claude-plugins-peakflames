@@ -25,6 +25,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot continues a build that was cut short** — a build stopped by STOP, a budget or the
   wall clock resumes in a new build session told what is already committed, instead of failing
   CHECK_BUILD and spending the one repair round on a part-built branch.
+- **Autopilot network allow-list** — `network` in the project's `autopilot.json` names the package
+  registries a sandboxed session may reach, so a build can fetch a new dependency; everything else
+  stays closed, and the auditor has no network. Saved with `driver.mjs configure --network`.
+- **Autopilot sandbox probe** — `driver.mjs prepare --probe` launches one cheap session, set up
+  exactly as a build, that runs the test command inside the sandbox; readiness learns whether the
+  toolchain works there before an epic is spent on it.
 - **Autopilot plan lint accepts shorthand anchors** — a plan that writes the prefix once and then bare
   seven-character suffixes (`TOR-03-Vaata1w, nt9zDad`) names those requirements; it no longer parks.
 - **Autopilot missing-command message** — a test or setup command the shell cannot find (exit 126

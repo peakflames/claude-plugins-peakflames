@@ -169,3 +169,79 @@ test('a run hands the declared directories to the referee: a build session reads
   const pre = driver('preflight', '--project', p.project, '--json', '--allow-test-double').json();
   assert.ok(pre.launch.refuse.some((r) => /is not an existing directory/.test(r)), JSON.stringify(pre.launch.refuse));
 });
+
+test('configure --network saves host names only; a run writes them into each session\'s sandbox settings and leaves the auditor with none', async (t) => {
+  const p = makeProject(t);
+  for (const [bad, re] of [['https://api.nuget.org', /names a scheme/], ['*.org', /whole top-level domain/], ['api.nuget.org/v3', /not a bare host name/]]) {
+    const r = driver('configure', '--project', p.project, '--network', bad);
+    assert.equal(r.status, 2, bad); assert.match(r.stderr, re, bad);
+  }
+  assert.ok(!fs.existsSync(settingsFile(p)));
+  const ok = driver('configure', '--project', p.project, '--network', 'API.nuget.org,registry.npmjs.org');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.deepEqual(readJson(settingsFile(p)), { network: ['api.nuget.org', 'registry.npmjs.org'] });
+  const pre = driver('preflight', '--project', p.project, '--json', '--allow-test-double').json();
+  assert.deepEqual([pre.launch.env.network, pre.launch.config.network], [['api.nuget.org', 'registry.npmjs.org'], ['api.nuget.org', 'registry.npmjs.org']]);
+  const dry = driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout;
+  assert.match(dry, /^Network: +plan, build, repair and verify sessions may reach api\.nuget\.org, registry\.npmjs\.org and nothing else; the auditor has no network/m);
+
+  p.scenario(happy(E1));
+  const state = await p.go();
+  assert.equal(state.queue[0].state, 'MERGED');
+  const net = (step) => readJson(p.dir(E1.id, step, 'settings.json')).sandbox.network;
+  for (const step of ['plan-1', 'build-1', 'verify-1']) assert.deepEqual(net(step), { allowedDomains: ['api.nuget.org', 'registry.npmjs.org'], strictAllowlist: true }, step);
+  assert.deepEqual(net('audit-1'), { allowedDomains: [], strictAllowlist: true });
+
+  // A hand-edited list that is not host names refuses the launch.
+  fs.writeFileSync(settingsFile(p), JSON.stringify({ network: ['*'] }));
+  assert.ok(driver('preflight', '--project', p.project, '--json', '--allow-test-double').json().launch.refuse.some((r) => /^network: "\*"/.test(r)));
+  driver('configure', '--project', p.project, '--network', '');
+  assert.deepEqual(readJson(settingsFile(p)), {});
+});
+
+test('prepare --probe: one session, launched as a build is, runs the test command in the sandbox; judged from the exit code the command wrote', (t) => {
+  const p = makeProject(t);
+  driver('configure', '--project', p.project, '--network', 'registry.npmjs.org');
+  const probe = (...extra) => driver('prepare', '--project', p.project, '--probe', ...extra);
+
+  // Under a test double nothing is probed unless the run is a declared rehearsal.
+  const skipped = probe();
+  assert.equal(skipped.status, 0, skipped.stderr);
+  assert.deepEqual([skipped.json().ok, skipped.json().probe.ran], [true, false]);
+  assert.match(skipped.json().probe.skipped, /test double/);
+  assert.deepEqual(p.calls(), []);
+  assert.equal(driver('prepare', '--project', p.project).json().probe, undefined, 'no probe unless asked');
+
+  p.scenario({ '*/probe': { actions: [{ do: 'exec', cmd: 'echo 0 > .autopilot-probe-exit' }], result: { total_cost_usd: 0.02, result: 'exit code 0' } } });
+  const ok = probe('--allow-test-double');
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  const out = ok.json();
+  assert.deepEqual([out.ok, out.failed, out.probe.ran, out.probe.pass, out.probe.exit, out.probe.costUsd, out.probe.network], [true, null, true, true, 0, 0.02, ['registry.npmjs.org']]);
+  const [call] = p.calls();
+  assert.deepEqual([call.key, call.cwd, call.env.AUTOPILOT_ROLE, call.argv[call.argv.indexOf('--model') + 1]], ['probe/probe-1', p.clone, 'verifier', 'haiku']);
+  assert.match(call.prompt, /run this one command exactly as written[\s\S]*node --test; echo \$\? > \.autopilot-probe-exit/);
+  const step = path.join(p.state, 'probe', 'probe-1');
+  assert.deepEqual(readJson(path.join(step, 'settings.json')).sandbox.network.allowedDomains, ['registry.npmjs.org']);
+  assert.ok(readJson(path.join(step, 'settings.json')).hooks.PreToolUse, 'the referee is on, as in a build');
+  assert.equal(git(p.clone, 'status', '--porcelain'), '', 'the probe leaves the clone clean');
+  assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
+  // A later proof without a probe keeps what the last probe found, and against what.
+  const kept = driver('prepare', '--project', p.project).json();
+  assert.deepEqual([kept.probe, kept.lastProbe.pass, kept.lastProbe.against], [undefined, true, { testCommand: 'node --test', setup: null, readOnly: [], network: ['registry.npmjs.org'] }]);
+
+  // The command fails inside the sandbox although it passed in the plain shell; a referee denial is shown with it.
+  p.scenario({ '*/probe': { actions: [{ do: 'tool', tool_name: 'Read', tool_input: { file_path: '/etc/hosts' } }, { do: 'exec', cmd: 'echo 134 > .autopilot-probe-exit' }], result: { result: 'dotnet: Operation not permitted' } } });
+  const bad = probe('--allow-test-double');
+  assert.equal(bad.status, 1);
+  const b = bad.json();
+  assert.deepEqual([b.ok, b.failed, b.tests.pass, b.probe.pass, b.probe.exit], [false, 'probe', true, false, 134]);
+  assert.match(b.probe.why, /exited 134 inside the sandbox, although it passed in a plain shell/);
+  assert.match(b.probe.tail, /Operation not permitted/);
+  assert.match(b.probe.denials[0], /^R2: path jail/);
+
+  // No exit code at all: the command never ran to its end (refused, killed, or the session gave up).
+  p.scenario({ '*/probe': { actions: [], result: { result: 'I could not run it' } } });
+  const none = probe('--allow-test-double').json();
+  assert.deepEqual([none.ok, none.failed, none.probe.exit], [false, 'probe', null]);
+  assert.match(none.probe.why, /no exit code was written/);
+});

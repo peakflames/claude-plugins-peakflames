@@ -19,7 +19,7 @@ work yourself.
 **Four things this skill never does.** They hold in every mode, whatever the user says mid-skill:
 
 1. **It never edits project code** — or any file in the project, with one exception: the `setup`,
-   `copy` and `readOnly` entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
+   `copy`, `readOnly` and `network` entries of `<root>/.claude/peak-workflow/autopilot.json`, written through
    `DRIVER configure` after the owner confirms them (Step 1 item 5). Otherwise it writes only
    inside the workspace (a sibling of the project): the new run's `config.json`, through the
    driver a gate's recorded answer, and through `DRIVER prepare` the private clone.
@@ -107,12 +107,13 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 5. **Make the copy able to build and test.** Autopilot works in a private copy of the project
    (the clone), and a clone holds only what git carries. Everything git ignores — installed
    dependencies, a virtual environment, a `.env`, local data — is missing from it unless the
-   project says how to get it there. Three entries in `launch.projectSettingsFile` say so:
+   project says how to get it there. Four entries in `launch.projectSettingsFile` say so:
    `setup`, one shell command the driver runs in the clone before each run's first test check
-   (with network); `copy`, the git-ignored files it copies in from the project each run; and
+   (with network); `copy`, the git-ignored files it copies in from the project each run;
    `readOnly`, directories outside the clone that sessions may read and never write (a
-   dependency cache the build tools keep in the home directory). Skip this item when no epic is
-   runnable.
+   dependency cache the build tools keep in the home directory); and `network`, the host names
+   a session may reach from inside its sandbox (a package registry) — with none, sessions have
+   no network at all. Skip this item when no epic is runnable.
 
    a. **Show what the copy starts without.** From `launch.env.ignored` (each entry has `path` and
       `status`), under "In your project, but not in autopilot's copy": one line per entry, in
@@ -140,26 +141,37 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
         `go env GOMODCACHE`; Java → `~/.m2/repository` (Gradle: `~/.gradle/caches`). Node and
         Python projects keep their packages inside the clone and need none. Never the home
         directory, a whole folder of it, or anywhere credentials live: the driver refuses those.
+      - `network` lists the package registries of the stack, so a build that adds a dependency
+        can fetch it: .NET → `api.nuget.org`; Node → `registry.npmjs.org`; Rust → `crates.io`,
+        `static.crates.io`; Python → `pypi.org`, `files.pythonhosted.org`. Host names only: no
+        `https://`, no path, no `*`. Add a private registry only when the project's own
+        configuration names it. Nothing else: not a source host, not an API the product calls.
+        Sessions reach these hosts and no others; `WebFetch` and `WebSearch` stay off, and the
+        auditor has no network whatever is listed.
       - A `**Tests:**` line that names a shell alias or an activated environment (`python` for
         `python3`, a bare tool that lives in `.venv/bin`) cannot run unattended. Say which line
         and what it should say; the owner changes and commits it, you do not.
 
    c. **Confirm, then save.** Show the entries exactly as they will be saved; for each
-      `copy` file one sentence: "The build sessions can read this file. They have no network, so
-      it cannot leave this machine, and git ignores it, so it is never committed."; and for each
-      `readOnly` directory: "The build sessions can read everything in this directory and can
-      change nothing in it." Ask with
+      `copy` file one sentence — with no `network` entry: "The build sessions can read this
+      file. They have no network, so it cannot leave this machine, and git ignores it, so it is
+      never committed."; with one: "The build sessions can read this file. Git ignores it, so it
+      is never committed. They can reach <the hosts> and nowhere else, so that is the only place
+      its contents could be sent." For each `readOnly` directory: "The build sessions can read
+      everything in this directory and can change nothing in it." For `network`: "Build sessions
+      may download from these hosts and reach nothing else." Say the last two plainly even when
+      the owner did not ask: they widen what a session can touch. Ask with
       `AskUserQuestion`: "Save these so autopilot's copy can build and test?" — options
       `Save these`, `Change them`, `Skip — leave the copy as it is`. On save:
 
       ```bash
-      node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --setup '<command>' --copy <path>,<path> --read-only <dir>,<dir>
+      node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" configure --project "<root>" --setup '<command>' --copy <path>,<path> --read-only <dir>,<dir> --network <host>,<host>
       ```
 
       Pass only the flags for entries that change; an empty value removes an entry. It keeps
       the file's other keys, refuses a `copy` path that is missing or that git does not ignore,
-      and refuses a `readOnly` directory that is missing, too broad, private, or overlaps the
-      project. Never write that file any other way, and do not commit it: the driver reads it
+      refuses a `readOnly` directory that is missing, too broad, private, or overlaps the
+      project, and refuses a `network` entry that is not a bare host name. Never write that file any other way, and do not commit it: the driver reads it
       from the project as it is. Say once that the file is the owner's to commit so teammates
       get the same setup.
 
@@ -184,6 +196,30 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
 
       If the owner chose `Skip`, still run the proof: with no entries it passes for a project
       that needs nothing git ignores.
+
+   e. **Probe the sandbox** — after the proof passes, and not in `dry-run` mode. The proof runs
+      the tests in a plain shell. Build sessions run them inside a sandbox: no writes outside
+      the copy, no network beyond `network`. Whether `dotnet`, `cargo`, `npm` or the project's
+      own tools work in there is known only by trying, and a build that finds out costs an
+      epic. The probe is one short real session (the `probe` budget: haiku, capped at
+      `launch.config.budgets.probe.usd` dollars, usually a few cents), launched exactly as a
+      build is, that runs the test command once. It costs money, so ask first with
+      `AskUserQuestion`: "Run the sandbox probe? One short session runs your tests the way a
+      build session will, for a few cents." — options `Run the probe`, `Skip it`. Say first
+      where things stand, from `launch.env.prepared.lastProbe`: none yet; the last one failed;
+      it passed but `setup`, `readOnly`, `network` or the test command differ from its
+      `against` (so it no longer stands); or it passed against exactly these (say when).
+      On `Run the probe`: `DRIVER prepare --project "<root>" --probe`, fifteen-minute timeout.
+      - `probe.ran` false → say why (`probe.skipped`) and carry on.
+      - `probe.pass` true → one line: "Your tests also pass inside the build sandbox."
+      - Otherwise print `probe.why`, every line of `probe.denials` (what the referee refused)
+        and `probe.tail`. Diagnose from them. The usual causes: a tool writes outside the copy
+        (a cache or home directory — make `setup` or the `**Tests:**` line point it inside the
+        copy, or do the write in `setup`, which runs outside the sandbox); a tool reads a
+        directory that is not in `readOnly`; a tool needs a host that is not in `network`. Go
+        back to item b, confirm the change with the owner, prove and probe again — the same
+        three rounds. **Never launch while a probe that ran fails**: every build would fail the
+        same way. The session's files are under `<ws>/<probe.dir>`.
 
 6. **Readiness table.** One row per entry of `epics`, in the order given (phase and index order —
    do not re-sort):
@@ -260,9 +296,11 @@ Python install). `report` and `stop` read only the workspace, so they skip the g
    - **The copy's environment:** the `setup` command, the `copy` files and the `readOnly`
      directories from `launch.env` (or "none needed") — for `readOnly`: "sessions may read
      these and change nothing in them" — and that the copy passed the project's tests in
-     Step 1 item 5. The
-     driver runs `setup` and the copy again at the start of the run and after each merge; a
-     session that adds a new dependency has no network to fetch it, and parks.
+     Step 1 item 5, and whether the sandbox probe passed, failed or was skipped. The
+     driver runs `setup` and the copy again at the start of the run and after each merge.
+   - **Network** (`launch.env.network`): with entries — "build sessions may download from
+     <hosts> and reach nothing else; the reviewer (auditor) has no network"; with none —
+     "sessions have no network; a build that needs a package it does not have parks".
    - Where it runs: the private clone at `<launch.clone>`, on `launch.integration`. The clone is
      kept between runs. **Nothing is pushed.** The project directory is never written. Merged
      work is fetched by hand in the morning.
@@ -530,5 +568,6 @@ removes the `STOP` file, and prints the report path. Then offer `/peak-workflow:
 | `runs/<run>/epics/<id>/…` | Every session's stream, referee log, plan, checks and audit |
 | `runs/<run>/report.md`, `report.json`, `autopilot.log` | The morning report and the driver's log |
 | `lock`, `STOP` | The single-instance lock and the kill switch, one per workspace |
-| `prepare.json` | The latest proof from Step 1 item 5: what was copied, how `setup` and the tests ended |
-| `<project>/.claude/peak-workflow/autopilot.json` | The owner's project settings, such as `"onPark": "continue"`. Autopilot writes only its `setup`, `copy` and `readOnly` entries, through `driver.mjs configure`, after the owner confirms them |
+| `prepare.json` | The latest proof from Step 1 item 5: what was copied, how `setup` and the tests ended, and the sandbox probe when one ran |
+| `probe/` | The latest sandbox probe's session files (its stream, referee log and settings) |
+| `<project>/.claude/peak-workflow/autopilot.json` | The owner's project settings, such as `"onPark": "continue"`. Autopilot writes only its `setup`, `copy`, `readOnly` and `network` entries, through `driver.mjs configure`, after the owner confirms them |
