@@ -31,6 +31,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot sandbox probe** — `driver.mjs prepare --probe` launches one cheap session, set up
   exactly as a build, that runs the test command inside the sandbox; readiness learns whether the
   toolchain works there before an epic is spent on it.
+- **Autopilot per-step settings** — `driver.mjs configure --budget <step>.<key>=<value>` saves a
+  step's model, effort, time cap or dollar cap to the project's `autopilot.json`; the skill takes
+  "build on opus" in plain words and names a workspace value that still wins.
+- **Autopilot remembers the queue** — readiness reports `lastQueue`, the last confirmed queue minus
+  finished epics; the skill asks "same queue as last time, or all eligible epics?" instead of
+  proposing the full list again.
+- **Autopilot proves the quality gates** — `driver.mjs prepare --gate "<command>"` (repeatable)
+  runs each build or lint gate in the clone after the tests and reports it; a failing gate is a
+  warning, and the tests remain the only refusal.
 - **Autopilot plan lint accepts shorthand anchors** — a plan that writes the prefix once and then bare
   seven-character suffixes (`TOR-03-Vaata1w, nt9zDad`) names those requirements; it no longer parks.
 - **Autopilot missing-command message** — a test or setup command the shell cannot find (exit 126

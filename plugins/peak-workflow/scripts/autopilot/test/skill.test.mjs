@@ -42,6 +42,9 @@ test('SKILL.md: the launch names the workspace and the run, appends to the run\'
   assert.match(line, /^\s*nohup caffeinate -i node "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/autopilot\/driver\.mjs" run --workspace "<launch\.workspace>" --run "<launch\.run>" >> "<launch\.runDir>\/autopilot\.log" 2>&1 &$/);
   assert.ok(!/[^>]> "<launch\.runDir>\/autopilot\.log"/.test(SKILL), 'never a truncating redirect');
   for (const rule of ['never edits project code', 'never runs `/peak-workflow:start-epic` or `/peak-workflow:wrapup-epic`', 'never answers a gate', 'never picks among ready epics']) assert.ok(SKILL.includes(rule), rule);
+  // Rule 1 is one rule for every project file: a fix the skill named itself, approved as that exact change, and nothing else.
+  for (const rule of ['A project fix it has named itself', 'the `**Tests:**` or `**Build:**` line', 'a `.gitignore` line', 'only after the owner approves that exact change through `AskUserQuestion`', 'Never unasked, never anything else']) assert.ok(SKILL.replace(/\s+/g, ' ').includes(rule), rule);
+  for (const cmd of ['--budget <step>.<key>=<value>', '--gate \'<command>\'', 'prepare --project "<root>" --probe']) assert.ok(SKILL.includes(cmd), cmd);
   assert.match(SKILL, /preflight --project "<root>" --json/);
   assert.match(SKILL, /decided: \{answer, by, date, scope: "next-run"\}/);
   assert.match(SKILL, /^name: autopilot$/m);
@@ -203,4 +206,25 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   assert.deepEqual(readJson(path.join(run1, 'report.json')).epics.map((e) => e.outcome), ['MERGED', 'PARKED']);
   assert.deepEqual(preflight(p, '--allow-test-double').launch.decidedGates, []);
   assert.equal(git(p.project, 'status', '--porcelain'), '', 'the project is never written by a run');
+});
+
+test('the queue is remembered: readiness offers the last confirmed queue minus what finished, beside the full list', async (t) => {
+  const p = makeProject(t);
+  const e2 = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categories', name: 'Categories', nn: '02' });
+  const e3 = addEpic(p.project, { id: 'Lg3Rep6', slug: 'report', name: 'Report', nn: '03' });
+  assert.equal(preflight(p, '--allow-test-double').launch.lastQueue, null, 'no run yet');
+
+  // The owner cut the queue to two of three; one merged, the other parked (a budget stop, with a resume gate).
+  p.scenario({ ...happy(E1), [`${e2.id}/plan`]: planScript(e2), [`${e2.id}/build`]: { actions: buildActions(e2), result: { subtype: 'error_max_turns', is_error: true } } });
+  const first = preflight(p, '--allow-test-double');
+  confirm(first.launch, p.project, [E1.id, e2.id], { allowTestDouble: true });
+  await launchAndWait(first.launch);
+  assert.deepEqual([p.epic(E1.id).state, p.epic(e2.id).state], ['MERGED', 'PARKED']);
+
+  const next = preflight(p, '--allow-test-double');
+  assert.deepEqual(next.launch.lastQueue, { run: first.launch.run, ids: [e2.id], labels: [`${e2.id} (${e2.slug}) — Categories`], finishedSince: [E1.id] });
+  // A strict subset of what could run tonight: the skill asks which; the driver proposes nothing by itself.
+  const eligible = next.epics.filter((e) => e.eligibility !== 'complete').map((e) => e.id);
+  assert.deepEqual(eligible, [e2.id, e3.id]);
+  assert.match(SKILL, /Same queue as last time \(<labels>\) or all <N> eligible epics\?/);
 });
