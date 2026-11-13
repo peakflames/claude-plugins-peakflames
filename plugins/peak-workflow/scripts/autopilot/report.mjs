@@ -4,13 +4,10 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { RULES } from './attend.mjs';
 import { gateEntry } from './lib.mjs';
 
 const TERMINAL = new Set(['MERGED', 'PARKED', 'FAILED', 'SKIPPED', 'BLOCKED']);
-const RULES = {
-  R0: 'referee error', R1: 'kill switch', R2: 'path jail', R3: 'git rule', R4: 'container, VM or global install', R5: 'disk floor or growth cap',
-  R6: 'background task', R7: 'test edit without reason', R8: 'gate policy', R9: 'plan mode',
-};
 
 const readJson = (p, fallback = null) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const readLines = (p) => {

@@ -7,6 +7,7 @@
 //   node driver.mjs stop --workspace <dir>
 //   node driver.mjs report --workspace <dir> [--run <name>]   re-render report.md and report.json
 //   node driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>]
+//   node driver.mjs watch --workspace <dir> [--run <name>] [--heartbeat-min 10] [--once [--after <n>]] [--replay]
 //
 // The workspace (`<project>.autopilot` by default) is one per project and long-lived: the private
 // clone, every gate and the owner's settings.json live there; each run gets `runs/<timestamp>/`.
@@ -22,13 +23,14 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { eventLine, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
-export { ANSWERS, gateEntry, lintPlan, parseSidecar };
+export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, watch };
 
-export const DRIVER_VERSION = '0.5.0';
+export const DRIVER_VERSION = '0.6.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PLUGIN_DIR = path.resolve(HERE, '..', '..');
 
@@ -1020,6 +1022,17 @@ class Run {
     if (!exists(this.runDir)) { this.early.push(line); return; }
     fs.appendFileSync(path.join(this.runDir, 'autopilot.log'), this.early.splice(0).join('') + line);
   }
+  /**
+   * One line in `runs/<run>/events.jsonl` per milestone, beside the log line that already marks it:
+   * what `driver.mjs watch` reads to tell an attending session what happened. Never a decision
+   * point, and never worth a failed run.
+   */
+  event(type, e = null, data = {}) {
+    try {
+      if (!exists(this.runDir)) return;
+      fs.appendFileSync(path.join(this.runDir, 'events.jsonl'), JSON.stringify({ t: new Date().toISOString(), type, ...(e ? { epic: e.id, label: e.label ?? this.metaById?.get(e.id)?.label ?? e.id } : {}), ...data }) + '\n');
+    } catch { /* best effort */ }
+  }
   save() { writeJson(this.stateFile, this.state); }
   epicDir(e) { return path.join(this.runDir, 'epics', e.id); }
   /** A path as gate files and the report name it: relative to the workspace. */
@@ -1303,6 +1316,12 @@ class Run {
       } catch (err) { this.log(`${e.id}: could not record the epic for the next run: ${err.message}`); }
     }
     this.log(`${e.id}: ${state} — ${reason}`);
+    const type = { MERGED: 'merged', PARKED: 'parked', FAILED: 'failed', BLOCKED: 'blocked' }[state];
+    if (type === 'parked') {
+      // The question the owner will be asked, when this run wrote one for the epic.
+      const name = (e.gates ?? []).at(-1); const g = name ? tryJson(this.gatePath(name)) : null;
+      this.event(type, e, { reason, ...(g && !g.decided ? { gate: `gates/${name}`, kind: g.kind ?? null, question: (g.options ?? []).length ? g.question ?? null : null } : {}) });
+    } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0 } : {}) });
     return null;
   }
   park(e, reason) { try { this.wipCommit(e); } catch (err) { this.log(`${e.id}: could not commit uncommitted work: ${err.message}`); } return this.finish(e, 'PARKED', reason); }
@@ -1343,6 +1362,7 @@ class Run {
     e.step = { name, kind, sessionId, pid: null, startedAt: new Date().toISOString() };
     this.save();
     this.log(`${e.id}: ${name} starting (${k.role}, ${cmd.wallMin} min, session ${sessionId})`);
+    this.event('step-start', e, { step: name, kind, capMin: cmd.wallMin, ...(e.continuing && (kind === 'build' || kind === 'fix') ? { continuing: true } : {}) });
 
     const startMb = this.cloneMb();
     const started = Date.now();
@@ -1424,6 +1444,7 @@ class Run {
     e.step = null;
     this.save();
     this.log(`${e.id}: ${name} ended — ${s.outcome} (${s.why}), $${cost}, ${Math.round(s.wallMs / 1000)} s`);
+    this.event('step-end', e, { step: name, kind, outcome: s.outcome, why: s.why, minutes: +(s.wallMs / 60000).toFixed(1), costUsd: cost });
     return s;
   }
 
@@ -1590,6 +1611,7 @@ class Run {
     const r = this.checkBuild(e);
     writeJson(path.join(this.epicDir(e), `check-build-${n}.json`), r);
     e.checks.push({ file: `check-build-${n}.json`, pass: r.pass, failed: r.checks.filter((c) => !c.pass).map((c) => c.name) });
+    this.event('check', e, { name: 'build', pass: r.pass, failed: e.checks.at(-1).failed });
     if (r.pass) return 'AUDIT';
     const failed = r.checks.filter((c) => !c.pass);
     const names = failed.map((c) => c.name).join(', ');
@@ -1599,6 +1621,7 @@ class Run {
     e.fixRounds = 1;
     this.writeFixBrief(e, 'The driver\'s done-ness checks failed after the build session:', failed.map((c) => `- **${c.name}** — ${typeof c.evidence === 'string' ? c.evidence : JSON.stringify(c.evidence)}`));
     this.log(`${e.id}: CHECK_BUILD failed (${names}); starting the one fix round`);
+    this.event('fix-round', e, { why: 'checks' });
     return 'FIX_BUILD';
   }
 
@@ -1641,6 +1664,7 @@ class Run {
     e.audit = { step: s.name, file, findings: judged.findings.length, parks: judged.parks.length, recommend: judged.recommend };
     this.save();
     this.log(`${e.id}: ${s.name} — ${judged.findings.length} finding(s), ${judged.parks.length} that park; the auditor recommends ${judged.recommend} (no effect)`);
+    this.event('audit', e, { step: s.name, findings: judged.findings.length, parks: judged.parks.length });
 
     if (judged.parks.length) {
       const list = judged.parks.map((f) => `${f.id} ${f.category}`).join(', ');
@@ -1811,6 +1835,7 @@ class Run {
     e.fixRounds = 1;
     this.writeFixBrief(e, 'The independent verifier returned FAIL. Its final report:', [verdict]);
     this.log(`${e.id}: ${s.name} verdict FAIL; starting the one fix round`);
+    this.event('fix-round', e, { why: 'verify' });
     return 'FIX_BUILD';
   }
 
@@ -1902,6 +1927,7 @@ class Run {
     writeJson(path.join(this.epicDir(e), `check-verify-${n}.json`), r);
     const failed = r.checks.filter((c) => !c.pass).map((c) => c.name);
     e.checks.push({ file: `check-verify-${n}.json`, pass: r.pass, failed });
+    this.event('check', e, { name: 'verify', pass: r.pass, failed });
     if (!r.pass) {
       this.rollback(e);
       return this.finish(e, 'PARKED', `merge gate failed (${failed.join(', ')}); ${this.state.integration} rolled back`);
@@ -2007,6 +2033,7 @@ class Run {
       if (entry.fix) {
         if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used; ${g.resume ?? 'continue it by hand'}`); }
         e.fixRounds = 1;
+        this.event('fix-round', e, { why: 'owner' });
         if (entry.fix === 'audit') {
           const audit = tryJson(path.join(this.stateDir, g.artifacts?.[0] ?? '-'), {});
           const parks = (audit.findings ?? []).filter((x) => x.parks);
@@ -2159,6 +2186,7 @@ class Run {
       this.log(cfg.sandbox ? `sandbox on: sessions may reach ${this.state.network.join(', ')}; local sockets and ports are open` : 'sandbox off: sessions run commands unsandboxed with open network; the referee keeps writes inside the clone');
       if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
+      this.event('run-start', null, { run: this.runName, queue: this.state.queue.map((q) => q.label ?? q.id), ...(resuming ? { resuming: true } : {}) });
 
       if (!this.pre.ok) this.stopReason = `preflight: ${this.pre.refuse.join('; ')}`;
       if (resuming && !this.stopReason) this.recover();
@@ -2191,6 +2219,7 @@ class Run {
         }
         const phase = entry ?? this.enter(e);
         this.save();
+        if (phase) this.event('epic-start', e, entry || (e.resumed && !e.resumed.fresh) ? { resumedAt: phase } : {});
         if (phase) await this.runEpic(e, phase);
         this.stopOnPark(e);
       }
@@ -2203,6 +2232,7 @@ class Run {
       if (this.stopReason === 'STOP file') fs.rmSync(path.join(this.stateDir, 'STOP'), { force: true }); // honoured; the workspace outlives the run
       writeReport(this.runDir);
       this.log(`run ended: ${this.state.stoppedBecause}; report at ${path.join(this.runDir, 'report.md')}`);
+      this.event('run-end', null, { why: this.state.stoppedBecause, status: this.state.status, spentUsd: this.state.spentUsd });
       return this.state;
     } finally {
       // A run refused before its directory existed still leaves its lines (a stale lock taken over) in the latest run's log.
@@ -2397,7 +2427,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith('--')) { o._.push(a); continue; }
     const key = a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-    if (['dryRun', 'resume', 'json', 'verbose', 'help', 'allowTestDouble', 'probe'].includes(key)) o[key] = true;
+    if (['dryRun', 'resume', 'json', 'verbose', 'help', 'allowTestDouble', 'probe', 'once', 'replay'].includes(key)) o[key] = true;
     else { o[key] = argv[++i]; (o.all[key] = o.all[key] ?? []).push(o[key]); } // `all`: every value of a flag given more than once (--gate, --budget)
   }
   return o;
@@ -2406,7 +2436,7 @@ function parseArgs(argv) {
 async function main(argv) {
   const o = parseArgs(argv);
   const cmd = o._[0];
-  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>] [--gate <command>]… [--probe] [--allow-test-double]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir] [--network host,host] [--budget <step>.<key>=<value>]…\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
+  const usage = 'usage: driver.mjs preflight --project <dir> [--workspace <dir>] [--allow-test-double] [--json]\n       driver.mjs prepare --project <dir> [--workspace <dir>] [--gate <command>]… [--probe] [--allow-test-double]\n       driver.mjs configure --project <dir> [--setup <command>] [--copy path,path] [--read-only dir,dir] [--network host,host] [--budget <step>.<key>=<value>]…\n       driver.mjs run [--project <dir>] [--workspace <dir>] [--run <name>] [--queue id,id] [--explicit id,id] [--dry-run] [--resume] [--claude-bin <path>] [--allow-test-double] [--verbose]\n       driver.mjs stop --workspace <dir>\n       driver.mjs report --workspace <dir> [--run <name>]\n       driver.mjs decide --workspace <dir> --gate <file> --answer <text> [--note <text>] [--by <name>]\n       driver.mjs watch --workspace <dir> [--run <name>] [--heartbeat-min <n>] [--once [--after <n>]] [--replay]\n       (--state is an alias of --workspace; the default workspace is <project>.autopilot)';
   if (o.help || !cmd) { console.log(usage); return 0; }
   const wsArg = o.workspace ?? o.state;
   if (cmd === 'preflight') {
@@ -2450,8 +2480,13 @@ async function main(argv) {
     const result = await run({ project: o.project, workspace: wsArg, run: o.run, queue: o.queue ? o.queue.split(',').filter(Boolean) : undefined, explicit: o.explicit ? o.explicit.split(',').filter(Boolean) : undefined, resume: !!o.resume, claudeBin: o.claudeBin, allowTestDouble: !!o.allowTestDouble, verbose: !!o.verbose || process.stdout.isTTY, dryRun: !!o.dryRun });
     return o.dryRun ? (result.pre.ok ? 0 : 1) : 0;
   }
-  if (!wsArg && ['stop', 'report', 'decide'].includes(cmd)) throw new Error(`${cmd} needs --workspace`);
+  if (!wsArg && ['stop', 'report', 'decide', 'watch'].includes(cmd)) throw new Error(`${cmd} needs --workspace`);
   const ws = path.resolve(wsArg ?? '.');
+  if (cmd === 'watch') {
+    const num = (v, d) => (v === undefined || Number.isNaN(Number(v)) ? d : Number(v));
+    await watch({ workspace: ws, run: o.run ?? null, heartbeatMin: num(o.heartbeatMin, 10), once: !!o.once, onceMin: num(o.onceMin, 10), replay: !!o.replay, after: o.after === undefined ? null : num(o.after, 0), pollMs: num(o.pollMs, 2000), graceMs: num(o.graceMs, 15000) });
+    return 0;
+  }
   if (cmd === 'stop') {
     fs.writeFileSync(path.join(ws, 'STOP'), `${new Date().toISOString()} stop requested\n`);
     console.log(`STOP written to ${ws}; waiting for the driver to finish its report…`);
