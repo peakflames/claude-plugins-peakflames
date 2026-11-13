@@ -87,6 +87,23 @@ export function unprovenLines(text) {
   return [...new Set(out)].map((t) => oneLine(t, 400));
 }
 
+/**
+ * What a verifier's final report says it saw in the pictures of an epic with screens: the bullets
+ * under a "What the pictures show" heading. Pure, and quoted to the owner as the verifier's words.
+ */
+export function pictureLines(text) {
+  const out = []; let under = false;
+  const clean = (l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\*\*/g, '').replace(/`/g, '').trim();
+  for (const raw of String(text ?? '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (/^(#+\s*|\*\*)?what the pictures show\b[^\n]{0,6}$/i.test(line.replace(/\*\*\s*$/, ''))) { under = true; continue; }
+    if (!under) continue;
+    if (/^(#+\s|\*\*[^*]+\*\*:?\s*$)/.test(line)) { under = false; continue; }
+    if (/^(?:[-*•]|\d+[.)])\s+\S/.test(line)) out.push(clean(line));
+  }
+  return [...new Set(out)].map((t) => oneLine(t, 400));
+}
+
 /** Why a run ended, in plain words. */
 export function plainEnd(why) {
   const w = String(why ?? '');

@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, ensureResumeGates, gateFacts, ownerAnswers } from '../driver.mjs';
+import { pictureLines } from '../attend.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
@@ -305,6 +306,63 @@ test('human-check gate carries an artifact; "Looks right" goes to VERIFY and R8 
   assert.ok(lookText.includes(`branch tip ${tip}`) && lookText.includes('"one bar per category, labels readable"') && lookText.includes(e5.tors[0]), lookText);
   assert.match(lookText, /do not use\s+`AskUserQuestion`/);
   assert.ok(merged(p, tip));
+});
+
+test('an epic with screens: the build must leave pictures for the look; the gate carries them, the verifier looks too, and none of it is committed', async (t) => {
+  const p = makeProject(t);
+  const ui = addEpic(p.project, { id: 'Lg6Scr1', slug: 'dashboard', name: 'Dashboard', nn: '06' });
+  fs.appendFileSync(path.join(p.project, 'docs', 'implementation-plan', 'phase-1-core', `epic-${ui.id}-${ui.slug}.md`), '\n## Screens\n\n- S-01 Home\n');
+  const claude = path.join(p.project, 'CLAUDE.md');
+  fs.writeFileSync(claude, fs.readFileSync(claude, 'utf8').replace('**Project type:** CLI tool', '**Project type:** Web app'));
+  git(p.project, 'commit', '-qam', 'docs: the dashboard has a screen');
+  const png = (name) => ({ do: 'exec', cmd: `mkdir -p .autopilot/look && printf 'PNG' > .autopilot/look/${name}` });
+  const index = { do: 'exec', cmd: "printf '%s\\n' '- home.png — the home page, signed in, with three figures — TOR-06-Lg6Scr1' '- home-narrow.png — the home page at 320 px wide — TOR-06-Lg6Scr1' > .autopilot/look/index.md" };
+
+  // The build takes no pictures: its checks send it back, and the one repair round takes them.
+  p.scenario({
+    [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: buildScript(ui),
+    [`${ui.id}/fix`]: { actions: [{ do: 'checkout', name: ui.branch }, png('home.png'), png('home-narrow.png'), index, { do: 'commit', message: `fix(epic-${ui.id}): pictures for the look` }] },
+  });
+  await p.go({ queue: [ui.id] });
+  assert.match(fs.readFileSync(p.dir(ui.id, 'build-1', 'build-rules.md'), 'utf8'), /# Pictures for the owner's look\n\nThis epic changes screens\./);
+  const first = readJson(p.dir(ui.id, 'check-build-1.json')).checks.find((c) => c.name === 'look-pictures');
+  assert.equal(first.pass, false);
+  assert.match(first.evidence, /no pictures in \.autopilot\/look\/: take a screenshot of every screen and state the requirements name/);
+  assert.match(fs.readFileSync(p.dir(ui.id, 'fix-brief.md'), 'utf8'), /\*\*look-pictures\*\*/);
+  assert.equal(readJson(p.dir(ui.id, 'check-build-2.json')).checks.find((c) => c.name === 'look-pictures').pass, true);
+
+  // Parked for the look, with the pictures on the gate by full path and with the build's captions.
+  assert.deepEqual([p.epic(ui.id).state, p.epic(ui.id).reason], ['PARKED', 'human check needed before verify']);
+  const g = gate(p, ui.id);
+  assert.deepEqual(g.artifacts.slice(0, 2), [`look/${ui.id}/home-narrow.png`, `look/${ui.id}/home.png`]); // then the project's run command output, as before
+  assert.deepEqual(g.pictures, [{ path: path.join(p.state, 'look', ui.id, 'home-narrow.png'), shows: 'the home page at 320 px wide — TOR-06-Lg6Scr1' }, { path: path.join(p.state, 'look', ui.id, 'home.png'), shows: 'the home page, signed in, with three figures — TOR-06-Lg6Scr1' }]);
+  assert.deepEqual(g.open.slice(0, 2), g.pictures.map((x) => x.path));
+  // Git never saw them: nothing to commit, nothing on the branch.
+  assert.equal(git(p.clone, 'status', '--porcelain'), '');
+  assert.equal(git(p.clone, 'ls-tree', '-r', '--name-only', ui.branch, '--', '.autopilot/look'), '');
+
+  // The verifier is given the same pictures in the clone and told to say what it sees; its words are kept.
+  assert.equal(decide(p, ui.id, ANSWERS.looksRight, { note: 'looked at both pictures: three figures, readable at 320 px' }).enters, 'VERIFY');
+  fs.rmSync(path.join(p.clone, '.autopilot', 'look'), { recursive: true, force: true }); // as after another epic's build
+  const report = 'Verdict: PASS\n\n## What the pictures show\n\n- `home.png`: a signed-in page with three figures and a Sign out button. Matches TOR-06-Lg6Scr1.\n- home-narrow.png: the same page in one column, nothing cut off. Matches.\n\n## Next\n\n- nothing';
+  p.scenario({ [`${ui.id}/verify`]: { actions: [{ do: 'exec', cmd: 'test -f .autopilot/look/home.png && test -f .autopilot/look/index.md' }, ...wrapupActions(ui)], result: { result: report } } });
+  await again(p, { queue: [ui.id] });
+  assert.match(fs.readFileSync(p.dir(ui.id, 'verify-1', 'verify-rules.md'), 'utf8'), /# The pictures of what was built[\s\S]*under the heading "What the pictures show", write one line per picture/);
+  assert.equal(p.epic(ui.id).state, 'MERGED');
+  assert.deepEqual(p.epic(ui.id).seen, ['home.png: a signed-in page with three figures and a Sign out button. Matches TOR-06-Lg6Scr1.', 'home-narrow.png: the same page in one column, nothing cut off. Matches.']);
+  assert.equal(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop', '--', '.autopilot/look'), '', 'the pictures are not in the merged code');
+  const status = JSON.parse(cli('status', '--project', p.project, '--json').stdout);
+  assert.deepEqual(status.seen.map((x) => [x.epic, x.lines.length]), [[ui.id, 2]]);
+});
+
+test('an epic without screens is told nothing about pictures and is not checked for them', async (t) => {
+  const p = makeProject(t);
+  p.scenario(happy(E1));
+  await p.go();
+  assert.doesNotMatch(fs.readFileSync(p.dir(E1.id, 'build-1', 'build-rules.md'), 'utf8'), /Pictures for the owner's look/);
+  assert.doesNotMatch(fs.readFileSync(p.dir(E1.id, 'verify-1', 'verify-rules.md'), 'utf8'), /The pictures of what was built/);
+  assert.equal(readJson(p.dir(E1.id, 'check-build-1.json')).checks.some((c) => c.name === 'look-pictures'), false);
+  assert.deepEqual(pictureLines('## What the pictures show\n- a.png: fine\n\n## Other\n- not this'), ['a.png: fine']);
 });
 
 test('a look that does not settle the requirement goes back to the owner with the verifier\'s reason; no repair session, no fix round used', async (t) => {

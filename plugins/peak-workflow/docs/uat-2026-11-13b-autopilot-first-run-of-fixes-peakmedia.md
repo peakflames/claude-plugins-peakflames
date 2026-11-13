@@ -214,10 +214,16 @@ Issues 9/26 (chain spend), 11 (routine lines wake the session), 12 and 13 (step 
 14/24 (merge with a variable), 20 (`cannot-fail` notes), 22, 30 and 31 (requirement questions,
 four-option popup) and 25 (test-edit rule up front). Still open: 5, 6, 7, 8, 10, 15, 16, 21, 23.
 
-32. **A look is asked for with nothing to look at** (major, open). `Ail1fOL` parked for the
+32. **[Fixed 2026-11-13] A look is asked for with nothing to look at** (major). `Ail1fOL` parked for the
     owner's look with `artifacts: []`: the build wrote no `tests/manual/<TOR>.md`, `CLAUDE.md`
     has no `**Run:**` command and no `humanCheck` command is set. The owner is asked "does what
     was built look right?" and must work out alone how to start and open it. *Launch check /
     `BUILD_RULES` / skill Step 1.* Fix: for a queued epic that will park for a look, the launch
     check says what is missing and the skill sets it up (a Run command, or a screenshot step)
     before launch; the build is told to write the manual checklist.
+
+    Fixed as a tool-neutral contract: a build of an epic with screens leaves screenshots and a
+    captioned `index.md` in `.autopilot/look/` (ignored by git in the clone); CHECK_BUILD fails
+    without them (`look-pictures`), the driver keeps them in `<ws>/look/<epic>/`, the gate lists
+    them (`pictures`, `open`), and the verifier is given them and reports "What the pictures
+    show". Proven against the fake session only; the first real UI epic is the proof.

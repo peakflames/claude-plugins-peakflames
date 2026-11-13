@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
+import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
 import { writeReport } from './report.mjs';
@@ -892,6 +892,55 @@ export function presenceRule(attended, unanswered = []) {
   return tried ? `\n# Steps that wait for the owner\n${tried}` : '';
 }
 
+/** Where a session leaves pictures for the owner's look, inside the clone. Git is told to ignore it: never committed, never merged. */
+export const LOOK_DIR = '.autopilot/look';
+const PICTURE = /\.(png|jpe?g|gif|webp)$/i;
+/** The pictures in a look folder, with what its `index.md` says each one shows: `[{ file, shows }]`. */
+export function lookPictures(dir) {
+  let names = []; try { names = fs.readdirSync(dir).filter((f) => PICTURE.test(f)).sort(); } catch { /* no folder */ }
+  let index = ''; try { index = fs.readFileSync(path.join(dir, 'index.md'), 'utf8'); } catch { /* no index */ }
+  const lines = index.split('\n');
+  return names.map((file) => ({ file, shows: (lines.find((l) => l.includes(file)) ?? '').replace(/^\s*[-*]\s*/, '').replace(file, '').replace(/^[`\s—–:-]+/, '').trim() }));
+}
+/**
+ * What the build of an epic with screens is told: leave pictures of what was built where
+ * autopilot collects them. Seen live: a build drove a real browser, kept two screenshots in a
+ * temp folder, and the owner was asked "does it look right?" with nothing to look at. The folder
+ * is tool-neutral: any browser tooling the project has can write there.
+ */
+export const LOOK_RULE = `
+# Pictures for the owner's look
+
+This epic changes screens. Before it is verified, the project's owner is shown what you built,
+and they judge it from pictures, not from code or test results. Leave those pictures in
+\`${LOOK_DIR}/\` (git ignores that folder: do not add or commit it):
+
+- A screenshot of every screen and every state the requirements name: each page, signed in and
+  signed out, empty and with data, each error page, light and dark when both are required, and
+  the narrowest width required. Take them from the running app, with the browser tooling this
+  project already has (its end-to-end tests, or a browser command-line tool).
+- \`index.md\`, one line per picture: \`- <file name> — what it shows — the requirement(s) it is
+  evidence for\`. Plain words: the owner reads this line as the picture's caption.
+
+Take them from the finished build, as the last thing before your final commit. A build of this
+epic with no pictures and no index is not done, and is sent back.
+`;
+/** What the verifier of an epic with screens is told: look at the pictures yourself and say what you see. */
+export const LOOK_VERIFY_RULE = `
+# The pictures of what was built
+
+The build left screenshots of this epic's screens in \`${LOOK_DIR}/\`, with \`index.md\` saying what
+each one shows. The owner has been shown the same pictures. Open every one of them yourself (the
+Read tool shows an image) before you give a verdict: the tests passing does not tell you what
+the screen looks like.
+
+In your final report, under the heading "What the pictures show", write one line per picture:
+what you actually see in it, and whether that matches the requirement its index line names. A
+picture that is blank, cut off, unreadable, or shows something other than its index line says
+does not count as evidence: say so plainly and judge that requirement accordingly. If a screen
+or state a requirement names has no picture, say which.
+`;
+
 /**
  * What every session is told about spending real money on an outside service (a paid API called
  * with the keys in the copy). It is the owner's decision, given at launch as the run's `realSpend`:
@@ -1565,6 +1614,7 @@ class Run {
       appendFiles.push(file);
     }
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind }));
+    this.ignoreLook();
     const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles, resume });
 
     // The intended step is on disk before anything is launched (crash-safe resume, §9).
@@ -1731,11 +1781,43 @@ class Run {
     const s = await this.step(e, fix ? 'fix' : 'build', (stepDir) => {
       (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir), ...(continuing ? { continues: e.continuing } : {}) }); // what the next audit reads, in this run or a later one
       fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? (continuing ? CONTINUE_LEAD : '') + fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir, { continuing }));
-      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered));
+      if (!fix && !continuing && !(e.answers ?? []).length) fs.rmSync(path.join(this.clone, LOOK_DIR), { recursive: true, force: true }); // a build from the top: no other epic's pictures, no stale ones
+      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (this.hasScreens(e) ? LOOK_RULE : ''));
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
     });
     if (s) e.continuing = null; // it ended by itself: what follows is judged like any build
     return s ? 'CHECK_BUILD' : null;
+  }
+
+  /** An epic whose screens the owner is shown: the launch check's "UI epic". */
+  hasScreens(e) { return (this.meta(e).reasons ?? []).some((r) => /UI epic/.test(r)); }
+  /** Where an epic's pictures are kept between sessions and runs, outside the clone. */
+  lookStore(e) { return path.join(this.stateDir, 'look', e.id); }
+  /**
+   * Git in the clone ignores the look folder (the clone's own exclude file, nothing committed):
+   * pictures are never in `git status`, never committed by a session, never merged.
+   */
+  ignoreLook() {
+    const file = path.join(this.clone, '.git', 'info', 'exclude');
+    let text = ''; try { text = fs.readFileSync(file, 'utf8'); } catch { /* none yet */ }
+    if (!text.split('\n').includes(`${LOOK_DIR}/`)) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, `${text}${text && !text.endsWith('\n') ? '\n' : ''}${LOOK_DIR}/\n`); }
+  }
+  /** Copies the pictures a build left in the clone to the epic's store, replacing what was there. Returns them. */
+  collectLook(e) {
+    const from = path.join(this.clone, LOOK_DIR); const to = this.lookStore(e);
+    if (!exists(from)) return lookPictures(to);
+    fs.rmSync(to, { recursive: true, force: true }); fs.mkdirSync(to, { recursive: true });
+    for (const f of fs.readdirSync(from)) { const src = path.join(from, f); if (fs.statSync(src).isFile() && fs.statSync(src).size <= 20 * 1024 * 1024) fs.copyFileSync(src, path.join(to, f)); }
+    return lookPictures(to);
+  }
+  /** Puts an epic's stored pictures back in the clone for a session that must see them (another epic may have been built since). */
+  restoreLook(e) {
+    const from = this.lookStore(e); const to = path.join(this.clone, LOOK_DIR);
+    fs.rmSync(to, { recursive: true, force: true });
+    if (!exists(from)) return [];
+    fs.mkdirSync(to, { recursive: true });
+    for (const f of fs.readdirSync(from)) fs.copyFileSync(path.join(from, f), path.join(to, f));
+    return lookPictures(to);
   }
 
   /** CHECK_BUILD (§6.5): every check is a file or a command. */
@@ -1815,6 +1897,15 @@ class Run {
     }
     add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under the owner's approved amendment of ${amended.join(', ')}` : ''}`);
     if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; this.log(`${e.id}: the build changed requirement files under the owner's approved amendment of ${amended.join(', ')}`); }
+
+    if (this.hasScreens(e)) {
+      const pictures = this.collectLook(e); const captioned = pictures.filter((p) => p.shows);
+      e.pictures = pictures.length;
+      add('look-pictures', pictures.length >= 1 && captioned.length === pictures.length,
+        pictures.length === 0 ? `no pictures in ${LOOK_DIR}/: take a screenshot of every screen and state the requirements name, from the running app, and write ${LOOK_DIR}/index.md with one line per picture (file name — what it shows — the requirement it is evidence for). Do not commit that folder`
+          : captioned.length < pictures.length ? { pictures: pictures.length, missingFromIndex: pictures.filter((p) => !p.shows).map((p) => p.file), fix: `${LOOK_DIR}/index.md needs one line per picture: file name — what it shows — the requirement it is evidence for` }
+            : `${pictures.length} picture(s) with captions in ${this.rel(this.lookStore(e))}`);
+    }
 
     const reasons = new Map();
     for (const line of (gitShow(this.clone, b, '.autopilot/test-changes.jsonl') ?? '').split('\n')) {
@@ -1947,9 +2038,11 @@ class Run {
     const m = this.meta(e);
     const done = new Set(skip.filter((o) => o.answer === 'yes').map((o) => `${o.tor}\n${o.clause}`));
     const checks = (m.observed ?? []).flatMap((o) => o.clauses.map((clause) => ({ tor: o.tor, clause }))).filter((c) => !done.has(`${c.tor}\n${c.clause}`)).map((c, i) => ({ n: i + 1, ...c }));
-    const open = artifacts.filter((a) => !a.startsWith('clone:') && /\/artifacts\/files\//.test(a)).map((a) => path.join(this.stateDir, a));
+    const open = artifacts.filter((a) => !a.startsWith('clone:') && (/\/artifacts\/files\//.test(a) || a.startsWith('look/'))).map((a) => path.join(this.stateDir, a));
+    // Each picture with its caption from the build's index, for whoever shows them to the owner.
+    const pictures = lookPictures(this.lookStore(e)).map((p) => ({ path: path.join(this.lookStore(e), p.file), shows: p.shows }));
     const checklists = artifacts.filter((a) => a.startsWith('clone:')).map((a) => ({ path: a.slice(6), text: gitShow(this.clone, m.branch, a.slice(6)) ?? '' })).filter((c) => c.text);
-    return { checks, open, checklists };
+    return { checks, open, checklists, pictures };
   }
 
   /**
@@ -1961,7 +2054,11 @@ class Run {
     const m = this.meta(e); const b = m.branch; const artifacts = []; const notes = [];
     const manual = this.g('ls-tree', '-r', '--name-only', b, '--', 'tests/manual').split('\n').filter((f) => m.anchors.some((tor) => f.includes(tor)));
     for (const f of manual) artifacts.push(`clone:${f}`);
-    if (!manual.length) notes.push('the build wrote no tests/manual/<TOR>.md file for this epic');
+    // The pictures the build left for this look, kept outside the clone.
+    const pictures = this.hasScreens(e) ? lookPictures(this.lookStore(e)) : [];
+    for (const p of pictures) artifacts.push(this.rel(path.join(this.lookStore(e), p.file)));
+    if (this.hasScreens(e) && !pictures.length) notes.push(`the build left no pictures in ${LOOK_DIR}/`);
+    if (!manual.length && !pictures.length) notes.push('the build wrote no tests/manual/<TOR>.md file for this epic');
     const cmd = this.config.humanCheck?.[e.id] ?? this.config.humanCheck?.['*'] ?? readProjectFacts(this.clone).runCommand;
     if (!cmd) { notes.push('CLAUDE.md has no **Run:** command and settings.json names no humanCheck command'); return { artifacts, notes }; }
     if (this.currentBranch() !== b) { if (this.dirty()) { notes.push('the clone has uncommitted changes, so the run command was not run'); return { artifacts, notes }; } this.g('checkout', '-q', b); }
@@ -2018,7 +2115,8 @@ class Run {
     this.save();
     const s = await this.step(e, 'verify', (stepDir) => {
       const rules = path.join(stepDir, 'verify-rules.md');
-      fs.writeFileSync(rules, VERIFY_RULES + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered));
+      const pictures = this.hasScreens(e) ? this.restoreLook(e) : [];
+      fs.writeFileSync(rules, VERIFY_RULES + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (pictures.length ? LOOK_VERIFY_RULE : ''));
       if (!e.look) return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [rules] };
       // The owner already looked (a decided human-check gate). The verifier gets their recorded
       // observation up front, so wrapup Step 1.2 item 7 records it instead of asking a person who is
@@ -2029,6 +2127,8 @@ class Run {
     });
     if (!s) return null;
     this.unproven(e, unprovenLines(s.result?.result).map((text) => ({ source: 'verifier', step: s.name, text })));
+    // What the verifier says it saw in the pictures, in its own words, for the closing screen.
+    if (this.hasScreens(e)) { e.seen = pictureLines(s.result?.result); if (e.seen.length) this.log(`${e.id}: the verifier described ${e.seen.length} picture(s)`); }
     this.save();
     if (this.integrationSha() !== e.preVerify.developSha) return 'CHECK_VERIFY';
     // No merge and no gate: the verdict was FAIL (policy answers "Stop — epic FAILs").
@@ -2699,6 +2799,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const epics = (state?.queue ?? []).map((q) => ({ id: q.id, label: q.label ?? q.id, state: q.state, step: q.step?.name ?? null, minutes: Math.round((q.wallMs ?? 0) / 60000) + (q.step?.startedAt ? Math.max(0, Math.round((Date.now() - Date.parse(q.step.startedAt)) / 60000)) : 0), costUsd: q.costUsd ?? 0 }));
   const merged = new Map(chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').map((q) => [q.id, q.label ?? q.id])));
   // What the merged work leaves not proven for real: the reviewer's findings of that kind and the verifier's own "not run" lines.
+  const seen = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && (q.seen ?? []).length).map((q) => ({ epic: q.id, label: q.label ?? q.id, lines: q.seen })));
   const unproven = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, text: u.text }))));
 
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
@@ -2712,7 +2813,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
     epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null, attended: typeof lastCfg.attended === 'boolean' ? lastCfg.attended : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
-    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, seen, friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };
