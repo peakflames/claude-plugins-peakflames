@@ -201,7 +201,7 @@ function ruleR2Bash(base, segs, command) {
 // ---- R3: git ---------------------------------------------------------------------------------
 
 function ruleR3(ctx, segs, command) {
-  if (/\bgit\b[^|;&\n]*\bpush\b/.test(command)) return deny('R3', 'git push is denied; nothing leaves this machine');
+  if (/\bgit\b[^|;&\n]*(?<!\bstash\s+)\bpush\b/.test(command)) return deny('R3', 'git push is denied; nothing leaves this machine');
   const protectedNames = new Set([ctx.integration, 'main', 'master', 'develop']);
   const epicBranch = new RegExp(`^feature/epic-${ctx.epic}-[\\w.-]+$`);
   let branch = null; // the branch the next git command acts on, tracked through checkouts in the same command
@@ -325,7 +325,7 @@ function bashWriteTargets(segs) {
   const out = [];
   for (const s of segs) {
     out.push(...s.redirects);
-    const a = s.argv.slice(1); const paths = a.filter((x) => !x.startsWith('-'));
+    const a = s.argv.slice(1); const paths = a.filter((x) => x && !x.startsWith('-')); // `sed -i '' …` carries an empty word: it is not a path
     if (['rm', 'mv', 'tee', 'truncate', 'unlink', 'shred'].includes(s.cmd)) out.push(...paths);
     else if (s.cmd === 'cp' || s.cmd === 'install') out.push(...paths.slice(-1));
     else if ((s.cmd === 'sed' || s.cmd === 'gsed' || s.cmd === 'perl' || s.cmd === 'ruby') && a.some((x) => /^-[a-zA-Z]*i/.test(x) || x.startsWith('--in-place'))) out.push(...paths);

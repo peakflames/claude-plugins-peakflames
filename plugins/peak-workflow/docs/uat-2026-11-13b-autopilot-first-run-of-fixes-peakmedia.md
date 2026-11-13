@@ -178,3 +178,15 @@ No Okta prompt, no `NEEDS YOU`, no wording-mismatch park: two epics merged with 
 - Two epics end to end (43 epic-minutes, $19.01) with no question to the owner.
 - The amendment rule ("requirements are never amended during a run") parked cheaply ($1.17).
 - The attending session stayed quiet on routine lines and pushed once, when the run stopped.
+
+## Evening continuation (run `152055`, after the amendment answer)
+
+The build session was resumed with the owner's "Amend" answer and carried on. Two referee false
+alarms, both fixed the same day:
+
+27. **[Fixed 2026-11-13] `git stash push` refused as `git push`** (minor). *Hook R3.* The push
+    check matched any `push` after `git`.
+28. **[Fixed 2026-11-13] `sed -i ''` read as a change to the test directory** (minor). The empty
+    backup suffix of macOS `sed -i ''` was taken as a path and resolved to the working directory;
+    the session was told to record a reason for `tests/PeakMediaRemoteMcpServer.Tests`, and did,
+    for the whole directory. *Hook R7 (`bashWriteTargets`).*

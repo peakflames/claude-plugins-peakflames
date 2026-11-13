@@ -207,6 +207,9 @@ test('R2 auditor: reads the bundle and the clone, and nothing else is allowed', 
 
 test('R3 git: push, remote writes, force, hard reset, branch -D, release line and tags are denied', (t) => {
   const h = referee(t);
+  // `git stash push` keeps work on this machine: it is not a push. A push after it in the same command still is.
+  passes(h.bash('git stash push -m wip'), 'git stash push');
+  denied(h.bash('git stash push -m wip && git push'), 'R3', /git push is denied/);
   for (const c of ['git push', 'git push origin develop', 'cd src && git push -u origin HEAD', 'sh -c "git push"', 'git -c alias.p=push p']) denied(h.bash(c), 'R3', null, c);
   for (const verb of ['add origin https://example.com/x.git', 'set-url origin x', 'rename origin up', 'remove origin']) denied(h.bash(`git remote ${verb}`), 'R3', /git remote/, verb);
   // Owner decision: the read-only listing both skills' Freshness Guard runs is allowed, alone or in a compound command.
@@ -305,6 +308,8 @@ test('R7 test integrity: an existing test changes only after a reason is recorde
   fs.writeFileSync(path.join(h.clone, '.autopilot', 'test-changes.jsonl'), '{"path":"test/smoke.test.js","reason":"the version string moved to package.json"}\n');
   passes(h.pre('Edit', { file_path: file, old_string: 'a', new_string: 'b' }), 'with a reason');
   passes(h.bash('rm test/smoke.test.js'), 'with a reason (Bash)');
+  // Seen live: the empty word of macOS `sed -i ''` was read as a path, the test directory itself, and a reason was asked for a directory.
+  passes(h.bash("cd test && sed -i '' 's/a/b/' smoke.test.js"), "sed -i '' on a file with a reason");
 });
 
 test('R8 start-epic Step 2.5: a question that ends "Start it?" without the words "Start Epic" is answered when it names the queued epic', (t) => {
