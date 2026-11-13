@@ -181,6 +181,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Autopilot watch is quieter** — a first refusal and `TESTS passed|failed` are printed only
+  with `watch --verbose`, so an attending session is not woken for routine lines.
+- **Autopilot step wording** — a resumed step reads "Picking … back up where it stopped", and a
+  step that parked reads "stopped to ask you something" instead of "finished".
+- **Autopilot requirement questions** — the skill explains in plain words what the requirement
+  is for and what "Amend" does before asking; a four-option gate stays in the popup.
 - **Autopilot launch question** — carries the standing answer ("I'll continue a technical stop
   automatically, up to 2 times per epic"); an attended run has no end time unless the owner
   gives one, and the run budget is the ceiling.
@@ -198,6 +204,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot honours an approved requirement amendment** — after the owner answers "Amend", the
   build's checks allow the requirement files to change and follow the amended anchors; a session's
   last commit may be any commit of the epic.
+- **Autopilot spend line** — status and the opening line show the spend and budget of every
+  run chained by `continues`, not the last run's alone.
+- **Autopilot merge with a variable** — the referee accepts `git merge $B --no-ff` when the
+  variable is set once, in the same command, to the epic's branch.
+- **Autopilot "cannot fail" review notes** — now carried with the not-proven items to the merge
+  line, the closing screen and the report.
+- **Autopilot build rules state the test-edit rule** — build sessions are told to record a
+  reason before changing an existing test, instead of learning it from a refusal.
 - **Autopilot referee false alarms** — `git stash push` is no longer refused as a push, and the
   empty word of macOS `sed -i ''` is no longer read as a change to the test directory.
 - **Autopilot builds no longer wait for a person** — build and repair sessions leave sign-ins to

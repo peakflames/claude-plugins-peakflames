@@ -207,3 +207,17 @@ alarms, both fixed the same day:
 31. **The owner could not tell what the requirement was for** (minor, UX). They had to ask: what
     is it, is it functional, what if we drop it. *Skill Step 4.* Fix: an amendment question leads
     with one plain sentence of intent and where the rule comes from, before any ID or wording.
+
+## Fixed the same evening (minors)
+
+Issues 9/26 (chain spend), 11 (routine lines wake the session), 12 and 13 (step wording),
+14/24 (merge with a variable), 20 (`cannot-fail` notes), 22, 30 and 31 (requirement questions,
+four-option popup) and 25 (test-edit rule up front). Still open: 5, 6, 7, 8, 10, 15, 16, 21, 23.
+
+32. **A look is asked for with nothing to look at** (major, open). `Ail1fOL` parked for the
+    owner's look with `artifacts: []`: the build wrote no `tests/manual/<TOR>.md`, `CLAUDE.md`
+    has no `**Run:**` command and no `humanCheck` command is set. The owner is asked "does what
+    was built look right?" and must work out alone how to start and open it. *Launch check /
+    `BUILD_RULES` / skill Step 1.* Fix: for a queued epic that will park for a look, the launch
+    check says what is missing and the skill sets it up (a Run command, or a screenshot step)
+    before launch; the build is told to write the manual checklist.
