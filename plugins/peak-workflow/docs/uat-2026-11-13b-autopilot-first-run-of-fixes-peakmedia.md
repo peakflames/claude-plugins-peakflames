@@ -312,6 +312,16 @@ no screen file (markup, styles, components, images); the verifier is told what c
     fix over the limits is asked ("allow a fix of that size?"); an earlier hold-back gets
     "run the final check again".
 
+**First live proof, runs `152435` and `163005` (2026-11-14 afternoon):** the joined instruction
+file (the verifier read the owner's look; no sign-in asked); the loosened small-fix limits
+(`G8jMzOz` MERGED with a one-file test-helper fix); the planner's contradiction line (25
+requirements read, none found); `"look": "after"` (set mid-run; the look gate `EwgA3Zf-1` was
+answered by the setting and the epic resumed at VERIFY).
+
+46. **Run feedback is "almost too minimal".** *Skill Step 3b.* Not fixed in chat: more lines
+    cost context on every run. Answer: the cockpit mod
+    (`autopilot-cockpit-mod-handoff.md`).
+
 #### Minor
 
 36. **`git branch -d $B` still refused** after the merge-with-a-variable fix. Fixed (`e48c02f`).
