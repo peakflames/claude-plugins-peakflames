@@ -194,6 +194,7 @@ export function defaultConfig(project) {
     autoContinue: 0, // run-level: how many technical stops per epic the owner's standing answer continues without asking (0 = always ask)
     diskFloorGb: 15,
     growthCapMb: 1024,
+    look: 'before', // 'before': an epic with screens parks for the owner's look before the final check; 'after': it does not, the verifier judges the pictures and the screens are listed for the owner afterwards. A requirement a person must observe always parks
     onPark: 'stop', // 'stop': the first epic that parks or fails ends the run; 'continue': independent epics still run
     setup: null, // one shell command that rebuilds, in the clone, what git does not carry (a venv, node_modules); run with network
     readOnly: [], // directories outside the clone that sessions may read and never write: a dependency cache (~/.nuget/packages, ~/.cargo/registry)
@@ -267,6 +268,7 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   const root = path.resolve(given);
   const cfg = merge(merge(merge(merge(defaultConfig(root), projectSettings(root)), settings), runCfg), overrides);
   cfg.project = root;
+  if (!['before', 'after'].includes(cfg.look)) throw new Error(`look must be "before" or "after", not ${JSON.stringify(cfg.look)} (${projectSettingsFile(root)})`);
   if (!['stop', 'continue'].includes(cfg.onPark)) throw new Error(`onPark must be "stop" or "continue", not ${JSON.stringify(cfg.onPark)} (${projectSettingsFile(root)})`);
   for (const [kind, b] of Object.entries(cfg.budgets)) {
     if (b && typeof b === 'object' && b.effort !== undefined && !EFFORT_LEVELS.includes(b.effort)) throw new Error(`budgets.${kind}.effort must be one of ${EFFORT_LEVELS.join(', ')}, not ${JSON.stringify(b.effort)}`);
@@ -592,11 +594,17 @@ export function parseBudgets(specs) {
 }
 
 /** Writes `setup`, `copy`, `readOnly`, `network` and per-step `budgets` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
-export function configureProject(project, { setup, copy, readOnly, network, budgets, workspace = `${project}.autopilot` } = {}) {
+export function configureProject(project, { setup, copy, readOnly, network, budgets, look, workspace = `${project}.autopilot` } = {}) {
   const file = projectSettingsFile(project);
-  let j = {};
+  let j = {}; let lookChanged = false;
   if (exists(file)) { try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); } }
   if (setup !== undefined) { if (String(setup).trim()) j.setup = String(setup).trim(); else delete j.setup; }
+  if (look !== undefined) {
+    const v = String(look).trim();
+    if (v && !['before', 'after'].includes(v)) throw new Error(`look is "before" or "after", not ${JSON.stringify(look)}`);
+    if (v === 'after') j.look = 'after'; else delete j.look; // "before" is the default: no entry
+    lookChanged = true;
+  }
   if (copy !== undefined) {
     const list = [...new Set(copy.map((c) => path.posix.normalize(noSlash(String(c).trim()))).filter((c) => c && c !== '.'))];
     const bad = copyProblems(project, list);
@@ -630,7 +638,10 @@ export function configureProject(project, { setup, copy, readOnly, network, budg
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeJson(file, j);
-  return { file, settings: j, shadowed };
+  // Turning "look": "after" on answers a look at screens that is already waiting (never while a run is going: the next status or report does it).
+  let answered = [];
+  if (lookChanged && j.look === 'after' && exists(path.join(workspace, 'gates')) && !driverPid(workspace)) answered = ensureResumeGates(workspace);
+  return { file, settings: j, shadowed, ...(answered.length ? { answered } : {}) };
 }
 
 const fetchCommand = (clone, integration) => `git fetch "${clone}" ${integration}:autopilot/${integration}`;
@@ -2056,6 +2067,14 @@ class Run {
   humanCheck(e) {
     const m = this.meta(e);
     if (!m.humanCheck) return false;
+    // The owner chose to look afterwards ("look": "after"): an epic that parks only because it has screens goes on
+    // to the final check, where the verifier judges the pictures. What a person must observe is still theirs alone.
+    if (this.config.look === 'after' && !(m.observed ?? []).length) {
+      e.unlooked = { pictures: lookPictures(this.lookStore(e)).map((p) => path.join(this.lookStore(e), p.file)) };
+      this.log(`${e.id}: not parked for a look ("look": "after"); ${e.unlooked.pictures.length} picture(s) kept for the owner to review afterwards`);
+      this.save();
+      return false;
+    }
     const tip = this.branchTip(m.branch);
     const stands = this.standingLook(e, tip); // the owner already looked at exactly this tip, or at these screens before a repair that changed none
     if (stands) { if (stands.kept && e.look?.kept?.to !== tip) this.log(`${e.id}: the repair changed no screen file (${stands.kept.files.join(', ') || 'no files'}); ${stands.by}'s look at ${String(stands.branchTip).slice(0, 9)} is kept`); e.look = stands; this.save(); return false; }
@@ -2473,6 +2492,7 @@ class Run {
       this.supersedeGates(e, f.gate);
       const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
       if (entry.approve) { e.plan = g.artifacts?.[0] ?? null; e.planApprovedBy = g.decided.by; e.planStep = g.session ?? null; }
+      if (g.lookAfter) e.unlooked = { pictures: lookPictures(this.lookStore(e)).map((p) => path.join(this.lookStore(e), p.file)) };
       if (entry.look) e.look = { gate: f.gate, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, observations: g.decided.observations ?? [], branchTip: g.branchTip, artifacts: g.artifacts ?? [] };
       if (entry.fix) {
         if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used; ${g.resume ?? 'continue it by hand'}`); }
@@ -2822,10 +2842,27 @@ function redoneCheck(workspace, gates, id) {
 function missingResumeGates(workspace) {
   const clone = path.join(workspace, 'clone'); const made = [];
   const records = tryJson(path.join(workspace, 'epics.json'), {}) ?? {};
+  const last = currentRun(workspace); const project = last ? tryJson(path.join(runDirOf(workspace, last), 'config.json'))?.project : null;
+  let lookAfter = false; try { lookAfter = !!project && projectSettings(project).look === 'after'; } catch { /* an unreadable settings file is reported at launch */ }
   const gates = readGates(workspace);
   for (const [id, rec] of Object.entries(records)) {
     if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch) continue;
     const redo = rec.state === 'PARKED' ? redoneCheck(workspace, gates, id) : null;
+    // The project says "look": "after", and this epic waits only for a look at its screens (asked before the setting,
+    // or by a driver that started before it): the owner's setting is the answer. A line a person must observe still waits.
+    const liveNow = gates.filter((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight');
+    const look = !redo && lookAfter && rec.state === 'PARKED' && liveNow.length === 1 && liveNow[0].kind === 'human-check' && !liveNow[0].decided && !(liveNow[0].checks ?? []).length ? liveNow[0] : null;
+    if (look) {
+      const tipNow = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
+      if (tipNow && tipNow === look.branchTip) made.push({ name: `${id}-${gates.filter((g) => g.epic === id).length + 1}.json`, replaces: look.file, gate: {
+        epic: id, epicName: look.epicName ?? id, run: rec.run ?? null, session: look.session ?? null, branch: rec.branch, branchTip: tipNow, base: look.base ?? null, resume: look.resume ?? null,
+        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', lookAfter: true, reason: 'the project is set to "look": "after": its screens are reviewed after the final check, not before',
+        question: `${look.epicName ?? id}: go on to the final check without a look at the screens first?`, options: [ANSWERS.resume, ANSWERS.startOver],
+        why: 'answered by the project setting "look": "after"; the pictures are listed for review once it has merged',
+        artifacts: look.artifacts ?? [], decided: { answer: ANSWERS.resume, by: '"look": "after" (project setting)', date: new Date().toISOString().slice(0, 10), scope: 'next-run' },
+      } });
+      continue;
+    }
     if (!redo && gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
     const reason = String(rec.reason ?? '');
     // An earlier driver called a verify that recorded no verdicts a FAIL (seen live: the owner had put a sign-in off).
@@ -2998,6 +3035,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   // Small fixes the final check made on the owner's standing answer, for the closing screen: what was asked and what changed.
   const fixes = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && q.fixedAtWrapup?.standing).map((q) => ({ epic: q.id, label: q.label ?? q.id, files: q.fixedAtWrapup.files, asked: q.fixedAtWrapup.standing.map((x) => x.question) })));
 
+  // Screens merged without the owner's look ("look": "after"), with where the pictures are, for the closing screen.
+  const unlooked = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && q.unlooked).map((q) => ({ epic: q.id, label: q.label ?? q.id, pictures: q.unlooked.pictures ?? [] })));
+
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
   const toWrite = pid ? [] : missingResumeGates(ws);
   const gates = [...readGates(ws).filter((g) => !toWrite.some((m) => m.replaces === g.file)), ...toWrite.map((m) => ({ file: `gates/${m.name}`, ...m.gate }))];
@@ -3010,7 +3050,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
     epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null, attended: typeof lastCfg.attended === 'boolean' ? lastCfg.attended : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
-    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, seen, fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, seen, unlooked, look: (() => { try { return projectSettings(root).look === 'after' ? 'after' : 'before'; } catch { return 'before'; } })(), fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };
@@ -3210,9 +3250,9 @@ async function main(argv) {
   if (cmd === 'configure') {
     if (!o.project) throw new Error('configure needs --project');
     const list = (v) => (v === undefined ? undefined : String(v).split(','));
-    if ([o.setup, o.copy, o.readOnly, o.network, o.budget].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only, --network or --budget (an empty value removes the entry)');
+    if ([o.setup, o.copy, o.readOnly, o.network, o.budget, o.look].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only, --network, --budget or --look (an empty value removes the entry)');
     const root = path.resolve(o.project);
-    console.log(JSON.stringify(configureProject(root, { setup: o.setup, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network), budgets: o.all.budget?.flatMap((b) => b.split(',')), workspace: path.resolve(wsArg ?? `${root}.autopilot`) }), null, 2));
+    console.log(JSON.stringify(configureProject(root, { setup: o.setup, look: o.look, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network), budgets: o.all.budget?.flatMap((b) => b.split(',')), workspace: path.resolve(wsArg ?? `${root}.autopilot`) }), null, 2));
     return 0;
   }
   if (cmd === 'run') {

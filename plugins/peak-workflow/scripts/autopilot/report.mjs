@@ -90,7 +90,7 @@ export function collectReport(runDir) {
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
       resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
       // What the closing screen says and this report used to leave out: approved amendments, the verifier's words on the pictures, sign-ins nobody answered.
-      amended: q.amended ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [],
+      amended: q.amended ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [], unlooked: q.unlooked ?? null,
     };
   });
 
@@ -258,6 +258,7 @@ export function renderReport(r) {
       L.push('', `Human check: ${e.look.by} looked on ${e.look.date} and answered "Looks right" (\`${e.look.gate}\`)${pics ? `, with ${pics} picture(s) of the screens` : ''}${live ? `; ${live} line(s) seen for real, on the running build` : ''}; wrapup's manual-verification question was answered with that.${e.look.kept ? ` The look was kept across a repair that changed no screen file (${e.look.kept.files.join(', ') || 'no files'}).` : ''}`);
       for (const o of e.look.observations ?? []) L.push(`- ${o.tor}: "${o.clause}" — ${o.answer}${o.how ? ` (${o.how === 'live' ? 'seen for real' : 'from pictures'})` : ''}`);
     }
+    if (e.unlooked) L.push('', `Merged without your look ("look": "after"): ${e.unlooked.pictures.length} picture(s) of its screens are kept in \`look/${e.id}/\` for you to review. The verifier judged them; its words are below.`);
     if (e.amended.length) L.push('', `Requirement amended with your approval: ${e.amended.join(', ')}. The build rewrote it in your name and the checks followed the amended text.`);
     if (e.seen.length) L.push('', 'What the verifier saw in the pictures (its own words):', ...e.seen.map((x) => `- ${x}`));
     if (e.unanswered.length) L.push('', 'Waited for you and nobody came:', ...e.unanswered.map((u) => `- ${u.step ? `${u.step}: ` : ''}${u.description}${u.command ? ` — by hand: \`${u.command}\`` : ''}`));

@@ -226,7 +226,8 @@
           "description": "Needs you: sign in in the browser that just opened",
           "command": "node bin/ledger.js login"
         }
-      ]
+      ],
+      "unlooked": null
     },
     {
       "id": "Lg4Fx2q",
@@ -405,7 +406,8 @@
       "fixedAtWrapup": null,
       "amended": [],
       "seen": [],
-      "unanswered": []
+      "unanswered": [],
+      "unlooked": null
     },
     {
       "id": "Lg5Chr8",
@@ -531,7 +533,8 @@
       "fixedAtWrapup": null,
       "amended": [],
       "seen": [],
-      "unanswered": []
+      "unanswered": [],
+      "unlooked": null
     },
     {
       "id": "Lg3Sum9",
@@ -782,7 +785,8 @@
       "fixedAtWrapup": null,
       "amended": [],
       "seen": [],
-      "unanswered": []
+      "unanswered": [],
+      "unlooked": null
     },
     {
       "id": "Lg6Bud2",
@@ -826,7 +830,8 @@
       "fixedAtWrapup": null,
       "amended": [],
       "seen": [],
-      "unanswered": []
+      "unanswered": [],
+      "unlooked": null
     },
     {
       "id": "Lg7Exp5",
@@ -856,7 +861,8 @@
       "fixedAtWrapup": null,
       "amended": [],
       "seen": [],
-      "unanswered": []
+      "unanswered": [],
+      "unlooked": null
     },
     {
       "id": "Lg8Hw01",
@@ -886,7 +892,8 @@
       "fixedAtWrapup": null,
       "amended": [],
       "seen": [],
-      "unanswered": []
+      "unanswered": [],
+      "unlooked": null
     }
   ],
   "gates": [

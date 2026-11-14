@@ -1369,3 +1369,54 @@ test('a contradiction the planner finds is asked before any plan or build: an am
   assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind, gate(p, E1.id).tor, gate(p, E1.id).session], ['PARKED', 'amendment', tor, 'plan-1']);
   assert.equal(decide(p, E1.id, AMEND[0]).enters, 'PLAN');
 });
+
+// ---- "look": "after" — a screens-only epic does not stop for the owner ---------------------------
+
+test('with "look": "after", an epic that only has screens goes straight to the final check and is listed as merged without the owner\'s look', async (t) => {
+  const p = makeProject(t, { config: { look: 'after' } });
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build, [`${ui.id}/verify`]: wrapupScript(ui) });
+  await p.go({ queue: [ui.id] });
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${ui.id}/${s}`), 'no stop for a look');
+  const e = p.epic(ui.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual(e.unlooked.pictures.map((x) => path.basename(x)), ['home.png']);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Merged without your look \("look": "after"\): 1 picture\(s\) of its screens are kept in /);
+  const s = JSON.parse(cli('status', '--project', p.project, '--workspace', p.state, '--json').stdout);
+  assert.deepEqual(s.unlooked.map((u) => [u.epic, u.pictures.length]), [[ui.id, 1]]);
+});
+
+test('`configure --look after` writes the project setting; `before` removes it; anything else is refused', (t) => {
+  const p = makeProject(t);
+  const file = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
+  assert.equal(cli('configure', '--project', p.project, '--look', 'after').status, 0);
+  assert.equal(readJson(file).look, 'after');
+  assert.match(cli('configure', '--project', p.project, '--look', 'never').stderr, /look is "before" or "after"/);
+  assert.equal(cli('configure', '--project', p.project, '--look', 'before').status, 0);
+  assert.equal(readJson(file).look, undefined);
+});
+
+test('turning "look": "after" on answers a look at screens that is already waiting: the next run goes to the final check', async (t) => {
+  const p = makeProject(t);
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build });
+  await p.go({ queue: [ui.id] });
+  assert.equal(p.epic(ui.id).reason, 'human check needed before verify');
+  const out = JSON.parse(cli('configure', '--project', p.project, '--workspace', p.state, '--look', 'after').stdout);
+  assert.deepEqual(out.answered, [`${ui.id}-2.json`]);
+  const g2 = gate(p, ui.id, 2);
+  assert.deepEqual([g2.kind, g2.phase, g2.lookAfter, g2.decided.answer, g2.decided.by, gate(p, ui.id, 1).superseded.by], ['resume', 'VERIFY', true, ANSWERS.resume, '"look": "after" (project setting)', `gates/${ui.id}-2.json`]);
+  p.scenario({ [`${ui.id}/verify`]: wrapupScript(ui) });
+  const r = await again(p, { queue: [ui.id] });
+  assert.deepEqual(r.steps, [`${ui.id}/verify-1`]);
+  assert.equal(p.epic(ui.id).state, 'MERGED', p.epic(ui.id).reason);
+  assert.equal(p.epic(ui.id).unlooked.pictures.length, 1);
+});
+
+test('"look": "after" never skips a requirement a person must observe', async (t) => {
+  const p = makeProject(t, { config: { look: 'after' } });
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  assert.deepEqual([p.epic(e5.id).state, p.epic(e5.id).reason], ['PARKED', 'human check needed before verify']);
+});
