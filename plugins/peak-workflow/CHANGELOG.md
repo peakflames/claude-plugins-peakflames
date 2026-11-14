@@ -200,6 +200,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot asks the launch questions it skipped** — a relaunch names (`relaunch.ask`) whether
+  the owner was never asked if they are at the computer or about real money; the skill asks
+  once and every later relaunch carries the answer.
 - **Autopilot: a check the owner puts off is not a FAIL** — a verify that ends without a verdict
   parks the epic to run the final check again (no repair round), and an earlier false FAIL gets
   that question too. The owner's look on the same build is kept.

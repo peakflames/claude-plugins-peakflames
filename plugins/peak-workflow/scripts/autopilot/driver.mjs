@@ -2898,8 +2898,11 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     const left = runBudgetUsd == null ? null : +(runBudgetUsd - spentUsd).toFixed(2);
     const limit = ['end time', 'run budget'].includes(state.stoppedBecause) ? state.stoppedBecause : left !== null && left <= 0 ? 'run budget' : null;
     if (ids.some((id) => ['resume', 'fresh'].includes(byId.get(id).gate?.state)) && !limit) {
+      // Launch questions this chain never put to the owner (seen live: a chain started before the question existed ran
+      // on with `attended` unset). Asked once: the answer goes into the config and every later relaunch carries it.
+      const ask = [...(typeof lastCfg.realSpend !== 'boolean' && (launch.env?.copy ?? []).length ? ['realSpend'] : []), ...(typeof lastCfg.attended !== 'boolean' ? ['attended'] : [])];
       out.relaunch = {
-        run: launch.run, runDir: launch.runDir,
+        run: launch.run, runDir: launch.runDir, ask,
         config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(typeof lastCfg.realSpend === 'boolean' ? { realSpend: lastCfg.realSpend } : {}), ...(typeof lastCfg.attended === 'boolean' ? { attended: lastCfg.attended } : {}), ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
       };
     }

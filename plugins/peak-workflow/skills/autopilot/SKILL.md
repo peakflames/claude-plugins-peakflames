@@ -577,7 +577,12 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 
 5. **Relaunch** (from Step 0, when `relaunch` is set after the owner answered a gate or a
    technical stop was continued in this session). The owner already confirmed this queue: ask
-   nothing again. Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`
+   nothing again — except what `relaunch.ask` names. It lists the launch questions this chain
+   of runs never put to the owner: `attended` (whether they will be at the computer) and
+   `realSpend` (real money). When it is not empty, ask exactly those, in one `AskUserQuestion`
+   call, in the item 1 wording, and add each answer to the config under that key (`true` or
+   `false`) before writing it; every later relaunch then carries it. When it is empty, ask
+   nothing. Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`
    (create the directory) — it holds the same queue minus what finished, what is left of the
    run budget, and the standing answer — then start the driver with the item 2 line, using
    `workspace`, `relaunch.run` and `relaunch.runDir` from the status output, check it started
