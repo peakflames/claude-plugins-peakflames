@@ -291,7 +291,8 @@ no screen file (markup, styles, components, images); the verifier is told what c
     owner's words "Real Okta sign-in … done, signed in and it works!" and the rule not to ask;
     the verifier asked anyway and the run parked. *Referee (R8): a rule in a prompt is not a
     stop.* Fixed: the first question that names a requirement the owner's look covers is refused
-    with the record; a second one goes to the owner.
+    with the record; a second one goes to the owner. The waiting question (`G8jMzOz-5`) is
+    replaced by a resume gate at VERIFY, so the owner does not sign in again.
 
 #### Minor
 

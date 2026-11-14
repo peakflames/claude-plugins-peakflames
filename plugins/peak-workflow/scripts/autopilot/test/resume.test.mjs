@@ -1231,4 +1231,30 @@ test('a verifier that asks for the recorded check a second time is asking someth
   p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes', 'Not now']), ask(q, ['Yes', 'Not now'])] } });
   await again(p, { queue: [e5.id] });
   assert.deepEqual([p.epic(e5.id).state, gate(p, e5.id, 2).kind, gate(p, e5.id, 2).question], ['PARKED', 'unmatched', q]);
+  assert.deepEqual(ensureResumeGates(p.state), [], 'a question that got past the refusal is the owner\'s to answer');
+});
+
+test('a redo question an earlier driver let through is replaced by "run the final check again"; the owner does not do the check twice', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'real sign-in done, it works' });
+  const q = signIn(e5.tors[0]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes', 'Not now']), ask(q, ['Yes', 'Not now'])] } });
+  await again(p, { queue: [e5.id] });
+  fs.rmSync(p.dir(e5.id, 'verify-1', 'look-reminded.json')); // as the earlier driver left it: asked once, never refused
+
+  assert.deepEqual(ensureResumeGates(p.state), [`${e5.id}-3.json`]);
+  const g3 = gate(p, e5.id, 3);
+  assert.deepEqual([g3.kind, g3.phase, g3.options, gate(p, e5.id, 2).superseded.by], ['resume', 'VERIFY', [ANSWERS.resume, ANSWERS.startOver], `gates/${e5.id}-3.json`]);
+  assert.match(g3.question, /a check for TOR-\S+ again that you had already done and recorded/);
+  assert.deepEqual(ensureResumeGates(p.state), [], 'written once');
+  assert.equal(decide(p, e5.id, ANSWERS.resume, { n: 3 }).enters, 'VERIFY');
+
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes', 'Not now']), ...wrapupActions(e5)], result: { result: 'Verdict: PASS' } } });
+  const last = await again(p, { queue: [e5.id] });
+  assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
+  assert.match(tools(p, e5.id, 'verify-1')[0].hookSpecificOutput.permissionDecisionReason, /Do not ask them to do it again/);
+  assert.match(appended(last.calls[0]), /real sign-in done, it works/);
 });

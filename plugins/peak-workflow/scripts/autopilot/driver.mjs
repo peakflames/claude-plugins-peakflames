@@ -2706,8 +2706,27 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
  */
 export function ensureResumeGates(workspace, { write = true } = {}) {
   const missing = missingResumeGates(workspace);
-  if (write) for (const m of missing) writeJson(path.join(workspace, 'gates', m.name), m.gate);
+  if (write) for (const m of missing) {
+    // The question the new gate replaces stops counting: the owner answers one thing, not two.
+    if (m.replaces) { const f = path.join(workspace, m.replaces); writeJson(f, { ...readJson(f), superseded: { date: new Date().toISOString(), by: `gates/${m.name}`, why: m.gate.reason } }); }
+    writeJson(path.join(workspace, 'gates', m.name), m.gate);
+  }
   return missing.map((m) => m.name);
+}
+/**
+ * A verifier's open question that asks the owner to redo a check their look on this very build
+ * already covers, asked under a driver whose referee did not yet refuse that (the asking step has
+ * no `look-reminded.json`). Seen live: the owner had signed in for real and was asked again.
+ */
+function redoneCheck(workspace, gates, id) {
+  const live = gates.filter((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight');
+  const [q] = live;
+  if (live.length !== 1 || q.decided || q.kind !== 'unmatched' || !/^verify-\d+$/.test(q.session ?? '') || !q.tor || !q.run) return null;
+  if (exists(path.join(runDirOf(workspace, q.run), 'epics', id, q.session, 'look-reminded.json'))) return null;
+  const look = gates.filter((g) => g.epic === id && g.kind === 'human-check' && !g.void && !g.superseded).at(-1);
+  if (look?.decided?.answer !== ANSWERS.looksRight || !look.branchTip || look.branchTip !== q.branchTip) return null;
+  const obs = look.decided.observations ?? [];
+  return obs.length && !obs.some((o) => o.tor === q.tor && o.answer === 'yes') ? null : q;
 }
 /** The gates `ensureResumeGates` would write, as `[{name, gate}]`. Reads only. */
 function missingResumeGates(workspace) {
@@ -2715,18 +2734,32 @@ function missingResumeGates(workspace) {
   const records = tryJson(path.join(workspace, 'epics.json'), {}) ?? {};
   const gates = readGates(workspace);
   for (const [id, rec] of Object.entries(records)) {
-    if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch || gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
+    if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch) continue;
+    const redo = rec.state === 'PARKED' ? redoneCheck(workspace, gates, id) : null;
+    if (!redo && gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
     const reason = String(rec.reason ?? '');
     // An earlier driver called a verify that recorded no verdicts a FAIL (seen live: the owner had put a sign-in off).
     const verify = rec.state === 'FAILED' && (reason.match(/^(verify-\d+) FAIL after the fix round: /) ?? [])[1];
     const m = rec.state === 'PARKED' && reason.match(/^(CHECK_BUILD)\b|^interrupted: .*(CHECK_BUILD)/);
     const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
     const integration = detectIntegration(clone);
-    if (!(m || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
+    if (!(m || redo || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
     const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
     const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
     const n = gates.filter((g) => g.epic === id).length + 1;
     const last = (rec.buildSteps ?? []).at(-1);
+    if (redo) {
+      made.push({ name: `${id}-${n}.json`, replaces: redo.file, gate: {
+        epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: redo.session, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
+        resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${id}`, decided: null,
+        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', reason: `${redo.session} asked for a check of ${redo.tor} that you had already done and recorded`,
+        question: `${q.label ?? id}: the final check asked you to do a check for ${redo.tor} again that you had already done and recorded. Autopilot now refuses that question. Run the final check again in the next run?`,
+        options: [ANSWERS.resume, ANSWERS.startOver],
+        why: `you are not asked to do the check again: the verifier is held to what you recorded. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt and your recorded look still stands. "${ANSWERS.startOver}" plans the epic again from scratch`,
+        artifacts: [redo.file],
+      } });
+      continue;
+    }
     if (verify) {
       const dir = `runs/${rec.run}/epics/${id}/${verify}`;
       made.push({ name: `${id}-${n}.json`, gate: {
@@ -2862,7 +2895,8 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const unproven = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, text: u.text }))));
 
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
-  const gates = [...readGates(ws), ...(pid ? [] : missingResumeGates(ws).map((m) => ({ file: `gates/${m.name}`, ...m.gate })))];
+  const toWrite = pid ? [] : missingResumeGates(ws);
+  const gates = [...readGates(ws).filter((g) => !toWrite.some((m) => m.replaces === g.file)), ...toWrite.map((m) => ({ file: `gates/${m.name}`, ...m.gate }))];
   const open = openGates(gates); // while a driver runs these are the questions already asked; they can be answered now and are used by the next run
   const brief = (g) => ({ file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: g.question ?? null, ...(g.kind === 'resume' ? { why: plainReason(gateReason(g)) } : {}) });
   const covered = open.filter((g) => standingCovers(g, gates, n));
