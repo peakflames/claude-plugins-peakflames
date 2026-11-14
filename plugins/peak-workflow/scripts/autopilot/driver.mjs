@@ -712,8 +712,8 @@ Before this session started, the project's owner looked at what was built and re
 observation for this epic. It was made by a person; it is not your inference and you must not add to it.
 
 - **Who and when:** ${look.by}, ${look.date}
-- **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, ${caughtUp && caughtUp.from === look.branchTip ? `this epic's own work. Since then autopilot merged the integration line into the branch (other epics' merged work only), so the tip you are verifying is ${caughtUp.to}` : 'the commit you are verifying'}
-- **Their answer:** "Looks right"${look.observations?.length ? `\n- **What they confirmed, one Then at a time** (each is the owner's own yes to that line, shown to them in the requirement's words):\n${look.observations.map((o) => `  - ${o.tor}: "${o.clause}" — ${o.answer === 'yes' ? 'yes, I saw this' : o.answer}${o.note ? ` (${o.note})` : ''}`).join('\n')}` : ''}
+- **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, ${caughtUp && caughtUp.from === look.branchTip ? `this epic's own work. Since then autopilot merged the integration line into the branch (other epics' merged work only), so the tip you are verifying is ${caughtUp.to}` : look.kept ? `the build before its repair. Since then a repair changed only ${look.kept.files.join(', ') || 'nothing'}, no file a screen is built from, so the owner was not asked to look again: their look stands for the screens, and the tip you are verifying is ${look.kept.to}` : 'the commit you are verifying'}
+- **Their answer:** "Looks right"${look.observations?.length ? `\n- **What they confirmed, one Then at a time** (each is the owner's own yes to that line, shown to them in the requirement's words):\n${look.observations.map((o) => `  - ${o.tor}: "${o.clause}" — ${o.answer === 'yes' ? `yes, I saw this${o.how === 'live' ? ' (for real, on the running build: not in a picture)' : ''}` : o.answer}${o.note ? ` (${o.note})` : ''}`).join('\n')}` : ''}
 - **Their words:** ${look.note ? `"${look.note}"` : '(none beyond the answer)'}
 ${observed.length ? `- **Operator-observed requirements it covers:** ${observed.join(', ')}\n` : ''}
 "Looks right" is the owner's answer to the whole requirement: they were shown its Then lines and
@@ -1000,6 +1000,9 @@ Do this, in order:
 If a listed fix cannot be made as asked, or making it would leave a requirement unmet, stop and ask with \`AskUserQuestion\` — say which fix, why, and offer the options a person would need. Do not work around it.
 `;
 }
+
+/** A file a screen is built from: markup, styles, components, images. A change to one needs a new look. */
+const SCREEN_FILE = /\.(html?|css|s[ac]ss|less|[jt]sx|vue|svelte|razor|cshtml|xaml|svg|png|jpe?g|gif|webp|ico)$/i;
 
 // ---- the owner's answers, handed to the session that takes a step up again ---------------------
 
@@ -2015,7 +2018,8 @@ class Run {
     const m = this.meta(e);
     if (!m.humanCheck) return false;
     const tip = this.branchTip(m.branch);
-    if (e.look?.branchTip === tip) return false; // the owner already looked at exactly this tip
+    const stands = this.standingLook(e, tip); // the owner already looked at exactly this tip, or at these screens before a repair that changed none
+    if (stands) { if (stands.kept && e.look?.kept?.to !== tip) this.log(`${e.id}: the repair changed no screen file (${stands.kept.files.join(', ') || 'no files'}); ${stands.by}'s look at ${String(stands.branchTip).slice(0, 9)} is kept`); e.look = stands; this.save(); return false; }
     e.look = null;
     const made = this.produceArtifacts(e);
     this.writeGate(e, {
@@ -2031,6 +2035,23 @@ class Run {
   }
 
   /**
+   * The owner's "Looks right" that still holds for `tip`: given on that very tip, or (an epic with
+   * screens) given before commits that touch no file a screen is built from (seen live: a repair
+   * added a database column and the owner was sent back to the same eighteen screens). Read from
+   * this run's `e.look`, else from the epic's latest look gate. Null when a new look is needed.
+   */
+  standingLook(e, tip) {
+    const g = readGates(this.stateDir).filter((x) => x.epic === e.id && x.kind === 'human-check' && !x.void && !x.superseded).at(-1);
+    const look = e.look ?? (g?.decided?.answer === ANSWERS.looksRight && g.branchTip ? { gate: g.file, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, observations: g.decided.observations ?? [], branchTip: g.branchTip, artifacts: g.artifacts ?? [] } : null);
+    if (!look?.branchTip || !tip) return null;
+    if (look.branchTip === tip || look.kept?.to === tip) return look;
+    if (!this.hasScreens(e) || !gitOk(this.clone, 'merge-base', '--is-ancestor', look.branchTip, tip)) return null;
+    // This epic's own commits since the look: the integration line merged in (catch-up) is other epics' work.
+    const files = [...new Set(this.g('log', '--first-parent', '--no-merges', '--name-only', '--format=', `${look.branchTip}..${tip}`).split('\n').filter(Boolean))];
+    return files.some((f) => SCREEN_FILE.test(f)) ? null : { ...look, kept: { from: look.branchTip, to: tip, files } };
+  }
+
+  /**
    * What makes a look easy for someone who is not a developer: the files to open, by full path;
    * the build's checklist, as text; and the requirement's own Then lines to confirm one at a time
    * (`checks`). `skip` leaves out the lines an earlier look already confirmed.
@@ -2043,7 +2064,10 @@ class Run {
     // Each picture with its caption from the build's index, for whoever shows them to the owner.
     const pictures = lookPictures(this.lookStore(e)).map((p) => ({ path: path.join(this.lookStore(e), p.file), shows: p.shows }));
     const checklists = artifacts.filter((a) => a.startsWith('clone:')).map((a) => ({ path: a.slice(6), text: gitShow(this.clone, m.branch, a.slice(6)) ?? '' })).filter((c) => c.text);
-    return { checks, open, checklists, pictures };
+    // An operator-observed requirement is seen for real (the checklist says how), never judged from a picture:
+    // seen live, the verifier refused a yes given from pictures taken with a stand-in, and the owner was asked twice.
+    const live = [...new Set(checks.map((c) => c.tor))].map((tor) => ({ tor, checklist: checklists.find((c) => c.path.includes(tor))?.path ?? null }));
+    return { checks, open, checklists, pictures, ...(live.length ? { live } : {}) };
   }
 
   /**
@@ -2403,10 +2427,7 @@ class Run {
       e.answers = ownerAnswers(this.stateDir, e.id, { keep: f.gate });
       // The owner's look on this very build still stands when verify is entered from another gate
       // (a question, a run that ended without a verdict): the verifier is handed it, not asked again.
-      if (phase === 'VERIFY' && !e.look) {
-        const l = readGates(this.stateDir).filter((x) => x.epic === e.id && x.kind === 'human-check' && x.decided?.answer === ANSWERS.looksRight && !x.void && !x.superseded && x.branchTip && x.branchTip === g.branchTip).at(-1);
-        if (l) e.look = { gate: l.file, by: l.decided.by, date: l.decided.date, note: l.decided.note ?? null, observations: l.decided.observations ?? [], branchTip: l.branchTip, artifacts: l.artifacts ?? [] };
-      }
+      if (phase === 'VERIFY' && !e.look) e.look = this.standingLook(e, g.branchTip);
       if (entry.question && g.session && g.run) {
         // The session that asked is resumed with the answer, when it can be: same step, its record still on disk.
         const prev = tryJson(path.join(runDirOf(this.stateDir, g.run), 'epics', e.id, g.session, 'step.json'));
@@ -2944,7 +2965,10 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
       const a = (given ?? []).find((x) => Number(x.n) === c.n);
       const v = String(a?.answer ?? '').trim().toLowerCase();
       if (v !== 'yes' && v !== 'no') throw new Error(`line ${c.n} ("${c.clause}") needs a yes or a no; "could not tell" is not an answer to record — look again, or decide later`);
-      return { n: c.n, tor: c.tor, clause: c.clause, answer: v, ...(String(a.note ?? '').trim() ? { note: String(a.note).trim() } : {}) };
+      const how = String(a.how ?? '').trim().toLowerCase();
+      if (how && how !== 'live' && how !== 'pictures') throw new Error(`line ${c.n}: how it was seen is "live" or "pictures", not "${a.how}"`);
+      if (v === 'yes' && how === 'pictures' && (gate.live ?? []).some((l) => l.tor === c.tor)) throw new Error(`line ${c.n} ("${c.clause}") was seen only in pictures: that is not the owner's observation of ${c.tor}, which must be seen for real — check it for real, or decide later`);
+      return { n: c.n, tor: c.tor, clause: c.clause, answer: v, ...(how ? { how } : {}), ...(String(a.note ?? '').trim() ? { note: String(a.note).trim() } : {}) };
     });
     const anyNo = obs.some((o) => o.answer === 'no');
     if (anyNo && label !== ANSWERS.notRight) throw new Error(`a "no" on a line means the answer is "${ANSWERS.notRight}", not "${label}"`);

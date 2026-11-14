@@ -1131,3 +1131,70 @@ test('an epic an earlier driver FAILED for a verify with no verdicts gets a resu
   assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
   assert.match(appended(last.calls[0]), /six bars, labels readable/);
 });
+
+// ---- the look: seen for real, and kept across a repair that changes no screen (UAT issues 34, 35) --
+
+test('the look says what must be seen for real: a yes from pictures is refused for an operator-observed line; a live yes is told to the verifier as such', async (t) => {
+  const p = makeProject(t, { config: { humanCheck: { Lg5Chr8: "echo '<svg/>' > chart.html" } } });
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  const g = gate(p, e5.id);
+  assert.deepEqual(g.live, [{ tor: e5.tors[0], checklist: `tests/manual/${e5.tors[0]}.md` }], 'the operator-observed requirement and the checklist that says how to see it for real');
+
+  const dec = (obs) => cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-1.json`, '--answer', ANSWERS.looksRight, '--by', 'Pat Owner', '--observations', JSON.stringify(obs));
+  const all = (how) => g.checks.map((c) => ({ n: c.n, answer: 'yes', how }));
+  assert.match(dec(all('pictures')).stderr, /seen only in pictures.*is not the owner's observation.*check it for real, or decide later/s);
+  assert.match(dec(all('a guess')).stderr, /how .* was seen is "live" or "pictures"/);
+  assert.equal(gate(p, e5.id).decided, null);
+  const ok = dec(all('live'));
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.ok(gate(p, e5.id).decided.observations.every((o) => o.how === 'live'));
+
+  p.scenario({ [`${e5.id}/verify`]: wrapupScript(e5) });
+  const r = await again(p, { queue: [e5.id] });
+  assert.equal(p.epic(e5.id).state, 'MERGED');
+  assert.match(appended(r.calls[0]), /yes, I saw this \(for real, on the running build: not in a picture\)/);
+});
+
+function addScreenEpic(p) {
+  const ui = addEpic(p.project, { id: 'Lg6Scr1', slug: 'dashboard', name: 'Dashboard', nn: '06' });
+  fs.appendFileSync(path.join(p.project, 'docs', 'implementation-plan', 'phase-1-core', `epic-${ui.id}-${ui.slug}.md`), '\n## Screens\n\n- S-01 Home\n');
+  const claude = path.join(p.project, 'CLAUDE.md');
+  fs.writeFileSync(claude, fs.readFileSync(claude, 'utf8').replace('**Project type:** CLI tool', '**Project type:** Web app'));
+  git(p.project, 'commit', '-qam', 'docs: the dashboard has a screen');
+  const pictures = [{ do: 'exec', cmd: "mkdir -p .autopilot/look && printf 'PNG' > .autopilot/look/home.png" }, { do: 'exec', cmd: "printf '%s\\n' '- home.png — the home page — TOR-06-Lg6Scr1' > .autopilot/look/index.md" }];
+  return { ui, build: { actions: [...buildActions(ui), ...pictures] } };
+}
+const repair = (ui, file) => ({ actions: [{ do: 'checkout', name: ui.branch }, { do: 'write', path: file, content: '/* repaired */\n' }, { do: 'commit', message: `fix(epic-${ui.id}): repair ${file}` }] });
+
+test('a repair that changes no screen file keeps the owner\'s look: no second look, and the verifier is told what changed since', async (t) => {
+  const p = makeProject(t);
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build });
+  await p.go({ queue: [ui.id] });
+  assert.equal(p.epic(ui.id).reason, 'human check needed before verify');
+  const looked = git(p.clone, 'rev-parse', ui.branch);
+  decide(p, ui.id, ANSWERS.looksRight, { note: 'the home page shows three figures' });
+
+  p.scenario({ [`${ui.id}/verify-1`]: { actions: [], result: { result: '## Verdict: FAIL\nthe total is rounded wrong' } }, [`${ui.id}/fix`]: repair(ui, 'src/rounding.js'), [`${ui.id}/verify-2`]: wrapupScript(ui) });
+  const r = await again(p, { queue: [ui.id] });
+  assert.deepEqual(r.steps, ['verify-1', 'fix-1', 'audit-1', 'verify-2'].map((s) => `${ui.id}/${s}`), 'no park for a second look');
+  assert.equal(p.epic(ui.id).state, 'MERGED', p.epic(ui.id).reason);
+  const told = appended(r.calls.at(-1));
+  assert.match(told, /the home page shows three figures/);
+  assert.ok(told.includes(`branch tip ${looked}`) && /Since then a repair changed only src\/rounding\.js, no file a screen is built from/.test(told), told);
+  assert.deepEqual(fs.readdirSync(path.join(p.state, 'gates')), [`${ui.id}-1.json`]);
+});
+
+test('a repair that changes a screen file still parks for a new look', async (t) => {
+  const p = makeProject(t);
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build });
+  await p.go({ queue: [ui.id] });
+  decide(p, ui.id, ANSWERS.looksRight, { note: 'the home page shows three figures' });
+  p.scenario({ [`${ui.id}/verify-1`]: { actions: [], result: { result: '## Verdict: FAIL\nthe heading overlaps' } }, [`${ui.id}/fix`]: repair(ui, 'src/home.css') });
+  const r = await again(p, { queue: [ui.id] });
+  assert.deepEqual(r.steps, ['verify-1', 'fix-1', 'audit-1'].map((s) => `${ui.id}/${s}`));
+  assert.deepEqual([p.epic(ui.id).state, p.epic(ui.id).reason, gate(p, ui.id, 2).kind], ['PARKED', 'human check needed before verify', 'human-check']);
+});

@@ -200,6 +200,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot look: seen for real** — a look gate names (`live`) the requirements that must be
+  seen on the running build; the skill offers to start it, "Not now" waits, and a yes given
+  from pictures alone is refused.
+- **Autopilot keeps a look across a repair that changes no screen** — the owner is not sent
+  back to the same screens; the verifier is told which files changed since.
 - **Autopilot asks the launch questions it skipped** — a relaunch names (`relaunch.ask`) whether
   the owner was never asked if they are at the computer or about real money; the skill asks
   once and every later relaunch carries the answer.

@@ -760,6 +760,25 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       Taking them reads and runs autopilot's copy; it never changes a file there or in the
       project, and never needs a sign-in from the owner.
 
+      **What must be seen for real.** When the gate has `live`, each entry names a requirement
+      (`tor`) that only counts when the owner sees it on the running build, the way its
+      checklist (`checklist`, printed above under "How to check it") says: a real sign-in, a
+      real device, the real service. A picture does not count for it: the pictures were taken
+      with a stand-in, and the final check refuses a yes given from them. Say that in one line
+      before the form, then offer, with `AskUserQuestion`: "<what the checklist needs, in plain
+      words> can only be checked for real. Check it now?" — options
+      `Start it so I can check for real (Recommended)`, with the description "I start the app
+      from autopilot's copy; you do <the one thing only you can do>, about <n> minutes at this
+      computer", and `Not now`, with the description "This epic waits for you; nothing is
+      rebuilt and nothing fails. Everything else carries on".
+      - **Start it:** start the app from autopilot's copy the way the checklist's Given says
+        (the same rules as taking pictures: read and run, never change a file), tell the owner
+        exactly what to do, wait for them, ask the form (item b), then stop what you started.
+      - **Not now:** treat the gate as `Decide later`. Do not ask the form for these lines and
+        never record a yes for them from the pictures.
+      When the checklist needs nothing started (it only says to open a file you have already
+      opened), skip the offer: looking at that file is the real thing.
+
    b. **Ask the gate's own question.** Use `AskUserQuestion` with `question` verbatim and
       `options` verbatim as the option labels, plus one more option, `Decide later`. No
       "(Recommended)", no reordering, no added options. If the question's own text carries a
@@ -825,8 +844,11 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       ```
 
       For a `human-check` form, add `--observations '<json>'`: an array with one
-      `{"n": <the check's n>, "answer": "yes" | "no"}` per entry of `checks` (and `--note` for
-      the words that go with a "no"). The driver refuses a missing line, a "couldn't tell", and
+      `{"n": <the check's n>, "answer": "yes" | "no", "how": "live" | "pictures"}` per entry of
+      `checks` (and `--note` for the words that go with a "no"). `how` is how the owner saw
+      that line: `live` on the running build or in the opened file, `pictures` from the
+      screenshots alone. The driver refuses a yes from `pictures` for a requirement the gate
+      lists in `live`. The driver refuses a missing line, a "couldn't tell", and
       an answer that does not follow from the lines.
 
       `<file>` is the gate's `file` value. Add `--note "<their words>"` when the owner explained

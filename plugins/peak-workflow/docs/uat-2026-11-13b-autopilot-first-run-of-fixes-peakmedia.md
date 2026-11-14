@@ -278,7 +278,12 @@ four-option popup) and 25 (test-edit rule up front). Still open: 5, 6, 7, 8, 10,
 **Fixed (33 and 42):** a postponing answer is told only to the session that asked; a verify that
 ends without a verdict parks with a "run the final check again" gate (no FAIL, no repair round);
 an epic an earlier driver failed that way gets the same gate; and a VERIFY resume is handed the
-owner's look on the same build. 34 and 35 stay open (the five-item plan, item 5).
+owner's look on the same build.
+
+**Fixed (34 and 35):** a look gate lists in `live` the requirements that must be seen on the
+running build; the skill offers "Start it so I can check for real", "Not now" waits, and the
+driver refuses a yes given from pictures. A look is kept across a repair whose own commits touch
+no screen file (markup, styles, components, images); the verifier is told what changed.
 
 #### Minor
 
