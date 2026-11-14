@@ -14,6 +14,7 @@
   "baseRed": null,
   "setupFailed": null,
   "realSpend": null,
+  "attended": false,
   "driverVersion": "0.2.0",
   "sync": null,
   "stoppedOnPark": null,
@@ -199,7 +200,33 @@
       "superseded": [],
       "auditOverruled": null,
       "look": null,
-      "fixedAtWrapup": null
+      "fixedAtWrapup": {
+        "count": 1,
+        "files": [
+          "src/usage.js"
+        ],
+        "approvedBy": "the standing answer for small fixes",
+        "standing": [
+          {
+            "question": "Console error: 404 for /favicon.ico. Recommendation: Fix now. How to proceed?",
+            "tor": null
+          }
+        ]
+      },
+      "amended": [
+        "TOR-01-Lg1Csv7"
+      ],
+      "seen": [
+        "home.png — the home page with three figures, as captioned",
+        "home-narrow.png — NOT as captioned: the menu covers the heading"
+      ],
+      "unanswered": [
+        {
+          "step": "verify-1",
+          "description": "Needs you: sign in in the browser that just opened",
+          "command": "node bin/ledger.js login"
+        }
+      ]
     },
     {
       "id": "Lg4Fx2q",
@@ -375,7 +402,10 @@
       "superseded": [],
       "auditOverruled": null,
       "look": null,
-      "fixedAtWrapup": null
+      "fixedAtWrapup": null,
+      "amended": [],
+      "seen": [],
+      "unanswered": []
     },
     {
       "id": "Lg5Chr8",
@@ -498,7 +528,10 @@
       "superseded": [],
       "auditOverruled": null,
       "look": null,
-      "fixedAtWrapup": null
+      "fixedAtWrapup": null,
+      "amended": [],
+      "seen": [],
+      "unanswered": []
     },
     {
       "id": "Lg3Sum9",
@@ -746,7 +779,10 @@
       "superseded": [],
       "auditOverruled": null,
       "look": null,
-      "fixedAtWrapup": null
+      "fixedAtWrapup": null,
+      "amended": [],
+      "seen": [],
+      "unanswered": []
     },
     {
       "id": "Lg6Bud2",
@@ -787,7 +823,10 @@
       "superseded": [],
       "auditOverruled": null,
       "look": null,
-      "fixedAtWrapup": null
+      "fixedAtWrapup": null,
+      "amended": [],
+      "seen": [],
+      "unanswered": []
     },
     {
       "id": "Lg7Exp5",
@@ -814,7 +853,10 @@
       "superseded": [],
       "auditOverruled": null,
       "look": null,
-      "fixedAtWrapup": null
+      "fixedAtWrapup": null,
+      "amended": [],
+      "seen": [],
+      "unanswered": []
     },
     {
       "id": "Lg8Hw01",
@@ -841,7 +883,10 @@
       "superseded": [],
       "auditOverruled": null,
       "look": null,
-      "fixedAtWrapup": null
+      "fixedAtWrapup": null,
+      "amended": [],
+      "seen": [],
+      "unanswered": []
     }
   ],
   "gates": [
