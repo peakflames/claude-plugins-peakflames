@@ -303,6 +303,15 @@ no screen file (markup, styles, components, images); the verifier is told what c
     *Driver (session launch).* Fixed: several files are joined into one `system-append.md`;
     the tests now read only the last flag, as `claude` does.
 
+45. **The small-fix limits rejected the first real small fix.** Run `145132` (attended): the
+    referee refused the repeated Okta question and the verifier used the recorded check (first
+    live proof); the standing answer took a test-race fix (first live proof); 12/12 PASS. The
+    merge gate then failed it: 4 files (limit 3) and "removes lines from a test" (any changed
+    test line counted). Rolled back, the fix discarded, parked with nothing to answer.
+    *Driver `checkVerify`.* Fixed: 5 files; a test may change but not lose checking lines; a
+    fix over the limits is asked ("allow a fix of that size?"); an earlier hold-back gets
+    "run the final check again".
+
 #### Minor
 
 36. **`git branch -d $B` still refused** after the merge-with-a-variable fix. Fixed (`e48c02f`).

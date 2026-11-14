@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, NO_VERDICT, SMALL_FIX_FILE, gateEntry, lintPlan, parseSidecar, postpones, smallFixLimits } from './lib.mjs';
+import { ANSWERS, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, gateEntry, lintPlan, parseSidecar, postpones, smallFixLimits } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, unprovenLines, watch };
@@ -2283,7 +2283,7 @@ class Run {
     // The verifier may repair what it found only when the owner said so: this verify session was
     // resumed from a gate the owner answered "Fix now" (as wrapup-epic allows with a person
     // present). Unattended, policy answers "Stop — epic FAILs" and a separate session repairs.
-    const ownerFix = e.resumed?.phase === 'VERIFY' && /^fix now\b/i.test(e.resumed.answer ?? '') ? e.resumed.gate : null;
+    const ownerFix = e.resumed?.phase === 'VERIFY' && (/^fix now\b/i.test(e.resumed.answer ?? '') || e.resumed.approvesFix) ? e.resumed.gate : null;
     // Or on the owner's standing answer for small fixes: the referee answered "Fix now" to what the verifier
     // recommended (listed in the step's directory), and the repair is held to the limits here.
     const limits = smallFixLimits(this.config);
@@ -2313,12 +2313,17 @@ class Run {
           // The standing answer is for small fixes only: a bigger one is the owner's to approve.
           const stat = this.g('diff', '--numstat', `${pre.branchTip}..${p2}`, '--', ...stray).split('\n').filter(Boolean).map((l) => l.split('\t'));
           const lines = stat.reduce((n, [a, d]) => n + (Number(a) || 0) + (Number(d) || 0), 0);
-          const tests = stat.filter(([, d, f]) => Number(d) > 0 && (this.config.testDirs ?? []).some((dir) => f.startsWith(`${String(dir).replace(/\/+$/, '')}/`))).map(([, , f]) => f);
+          // A test may be changed (seen live: a race fixed by waiting before a click), never made to check less:
+          // it may not lose more checking lines (assertions, test declarations) than it gains.
+          const tests = stat.map(([, , f]) => f).filter((f) => (this.config.testDirs ?? []).some((dir) => f.startsWith(`${String(dir).replace(/\/+$/, '')}/`))).filter((f) => {
+            const d = this.g('diff', '-U0', `${pre.branchTip}..${p2}`, '--', f).split('\n').filter((l) => /^[+-](?![+-])/.test(l) && TEST_CHECK_LINE.test(l.slice(1)));
+            return d.filter((l) => l[0] === '-').length > d.filter((l) => l[0] === '+').length;
+          });
           const reqs = own.filter((f) => f.startsWith('docs/requirements/'));
-          if (stray.length > limits.files) problems.push(`the fix made on the standing answer changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
-          if (lines > limits.lines) problems.push(`the fix made on the standing answer changes ${lines} lines (the limit is ${limits.lines})`);
-          if (tests.length) problems.push(`the fix made on the standing answer removes lines from a test (${tests.join(', ')})`);
-          if (reqs.length) problems.push(`the fix made on the standing answer changes a requirement file (${reqs.join(', ')})`);
+          if (stray.length > limits.files) problems.push(`${SMALL_FIX_PROBLEM}changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
+          if (lines > limits.lines) problems.push(`${SMALL_FIX_PROBLEM}changes ${lines} lines (the limit is ${limits.lines})`);
+          if (tests.length) problems.push(`${SMALL_FIX_PROBLEM}removes checks from a test (${tests.join(', ')})`);
+          if (reqs.length) problems.push(`${SMALL_FIX_PROBLEM}changes a requirement file (${reqs.join(', ')})`);
         }
         if (gitOk(this.clone, 'merge-base', '--is-ancestor', pre.developSha, p2) && this.g('rev-parse', `${dev}^{tree}`) !== this.g('rev-parse', `${p2}^{tree}`)) problems.push('the merge commit itself changes files');
       }
@@ -2365,7 +2370,11 @@ class Run {
     this.event('check', e, { name: 'verify', pass: r.pass, failed });
     if (!r.pass) {
       this.rollback(e);
-      return this.finish(e, 'PARKED', `merge gate failed (${failed.join(', ')}); ${this.state.integration} rolled back`);
+      const reason = `merge gate failed (${failed.join(', ')}); ${this.state.integration} rolled back`;
+      // Everything passed except the size of a fix made on the standing answer: that fix is the owner's to approve.
+      const fix = fixLimitGate(this.meta(e).label, r, smallFixLimits(this.config));
+      if (fix) this.writeGate(e, { ...fix, reason, artifacts: [this.rel(path.join(this.epicDir(e), `check-verify-${n}.json`))], resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}` });
+      return this.finish(e, 'PARKED', reason);
     }
     gitRun(this.clone, 'config', '--remove-section', `branch.${e.preVerify.branch}`); // stale entry left by the sandboxed `git branch -d`
     return this.finish(e, 'MERGED', 'verify PASS, merge gate green');
@@ -2460,7 +2469,7 @@ class Run {
       if (to !== phase && (to === 'BUILD' ? rec.plan && exists(path.join(this.stateDir, rec.plan)) : fixBrief)) { phase = to; e.continuing = (rec.buildSteps ?? []).at(-1)?.name ?? 'an earlier session'; }
       Object.assign(e, { fixRounds: rec.fixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [], unproven: (rec.unproven ?? []).filter((u) => u.source !== 'verifier') }); // a verifier's "not run" is of that verify session; the next one says its own
       if (rec.fixBrief) fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'), rec.fixBrief);
-      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null };
+      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}) };
       this.supersedeGates(e, f.gate);
       const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
       if (entry.approve) { e.plan = g.artifacts?.[0] ?? null; e.planApprovedBy = g.decided.by; e.planStep = g.session ?? null; }
@@ -2770,6 +2779,31 @@ export function ensureResumeGates(workspace, { write = true } = {}) {
   return missing.map((m) => m.name);
 }
 /**
+ * The gate for a merge check that failed only because a fix made on the standing answer was held
+ * back (`check` is the check-verify record). Judged against today's limits: a fix they now allow
+ * (an earlier driver refused any changed test line, seen live on a four-file test-race fix) is
+ * simply run again; a bigger one is the owner's to approve. Null when anything else failed, or the
+ * fix touched a requirement or weakened a test.
+ */
+export function fixLimitGate(label, check, limits) {
+  const failed = (check?.checks ?? []).filter((c) => !c.pass);
+  const problems = failed.length === 1 && failed[0].name === 'verdict' && Array.isArray(failed[0].evidence) ? failed[0].evidence : [];
+  if (!limits || !problems.length || !problems.every((p) => String(p).startsWith(SMALL_FIX_PROBLEM))) return null;
+  if (problems.some((p) => /requirement file|removes checks from a test/.test(p))) return null;
+  const n = (re) => Number((problems.map((p) => p.match(re)).find(Boolean) ?? [])[1] ?? 0);
+  const files = n(/changes (\d+) files/); const lines = n(/changes (\d+) lines/);
+  const over = [...(files > limits.files ? [`${files} files (your limit is ${limits.files})`] : []), ...(lines > limits.lines ? [`${lines} changed lines (your limit is ${limits.lines})`] : [])];
+  const head = label ? `${label}: ` : '';
+  return over.length
+    ? { kind: 'resume', phase: 'VERIFY', approvesFix: true, options: [ANSWERS.resume, ANSWERS.startOver],
+      question: `${head}the final check passed everything, but the fix it made was bigger than your standing answer for small fixes allows: ${over.join(', ')}. It was not merged. Allow a fix of that size for this epic and run the final check again?`,
+      why: `nothing else failed. "${ANSWERS.resume}" runs the final check again and lets it make this fix, in your name; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` }
+    : { kind: 'resume', phase: 'VERIFY', options: [ANSWERS.resume, ANSWERS.startOver],
+      question: `${head}the final check passed everything, and an earlier autopilot held back the small fix it made under a rule that has since been loosened. Run the final check again?`,
+      why: `nothing else failed, and the fix is within your standing answer for small fixes as it is now. "${ANSWERS.resume}" runs the final check again; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` };
+}
+
+/**
  * A verifier's open question that asks the owner to redo a check their look on this very build
  * already covers, asked under a driver whose referee did not yet refuse that (the asking step has
  * no `look-reminded.json`). Seen live: the owner had signed in for real and was asked again.
@@ -2797,13 +2831,24 @@ function missingResumeGates(workspace) {
     // An earlier driver called a verify that recorded no verdicts a FAIL (seen live: the owner had put a sign-in off).
     const verify = rec.state === 'FAILED' && (reason.match(/^(verify-\d+) FAIL after the fix round: /) ?? [])[1];
     const m = rec.state === 'PARKED' && reason.match(/^(CHECK_BUILD)\b|^interrupted: .*(CHECK_BUILD)/);
+    // A merge gate that failed only on the size of a fix made on the standing answer, parked with nothing to answer.
+    const checkFile = rec.state === 'PARKED' && /^merge gate failed \(verdict\)/.test(reason) ? fs.readdirSync(path.join(runDirOf(workspace, rec.run ?? ''), 'epics', id)).filter((f) => /^check-verify-\d+\.json$/.test(f)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).at(-1) : null;
+    const fix = checkFile ? fixLimitGate(null, tryJson(path.join(runDirOf(workspace, rec.run), 'epics', id, checkFile), {}), smallFixLimits({ smallFixes: tryJson(path.join(workspace, 'settings.json'), {})?.smallFixes })) : null;
     const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
     const integration = detectIntegration(clone);
-    if (!(m || redo || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
+    if (!(m || redo || fix || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
     const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
     const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
     const n = gates.filter((g) => g.epic === id).length + 1;
     const last = (rec.buildSteps ?? []).at(-1);
+    if (fix) {
+      made.push({ name: `${id}-${n}.json`, gate: {
+        epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: null, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
+        resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${id}`, decided: null, skillStep: 'autopilot driver', reason,
+        ...fix, question: `${q.label ?? id}: ${fix.question}`, artifacts: [`runs/${rec.run}/epics/${id}/${checkFile}`],
+      } });
+      continue;
+    }
     if (redo) {
       made.push({ name: `${id}-${n}.json`, replaces: redo.file, gate: {
         epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: redo.session, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
