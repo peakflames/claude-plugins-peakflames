@@ -35,6 +35,8 @@ export function lintPlan(plan, anchors) {
     ['Commit', /^[\s>#*\-\d.)]*\**Commit\b/m],
     ['Deferral gate', /Deferral gate/i],
     ['Amendment gate', /Amendment gate/i],
+    // The planner read the requirements against each other before planning (the driver's plan rules ask for this line).
+    ['Requirements checked for contradictions', /Requirements checked for contradictions/i],
   ];
   for (const [name, re] of headings) if (!re.test(plan)) problems.push(`missing "${name}"`);
   const banned = [['git push', /\bgit\s+push\b/], ['sudo', /\bsudo\s+\S/], ['a container or VM command', /\b(docker|podman|colima|limactl|multipass|vagrant)\s+\S/]];

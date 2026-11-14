@@ -10,6 +10,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Autopilot planner checks requirements for contradictions** — before planning, each epic's
+  requirements are read against each other; one that cannot be met or contradicts another is
+  asked as an amendment then, not mid-build. Plan lint requires the "checked" line.
 - **Autopilot `report.md` catches up with the closing screen** — whether the owner was there,
   pictures and lines seen for real at the look, the verifier's words on the pictures, approved
   amendments, small fixes made without asking, and sign-ins nobody answered.
