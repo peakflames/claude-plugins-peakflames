@@ -227,3 +227,54 @@ four-option popup) and 25 (test-edit rule up front). Still open: 5, 6, 7, 8, 10,
     without them (`look-pictures`), the driver keeps them in `<ws>/look/<epic>/`, the gate lists
     them (`pictures`, `open`), and the verifier is given them and reports "What the pictures
     show". Proven against the fake session only; the first real UI epic is the proof.
+
+## Night session (runs `200835` to `213551`, fresh session on `9b9678b` and later)
+
+| Time | What |
+|---|---|
+| 20:02 | Fresh session. Opening line "Spent $30.89 of $80" (the chain). `Ail1fOL` has no pictures (built before the rule): the skill offers "Take the pictures for me"; 7 screenshots sent; owner: Looks right |
+| 20:08 | `Ail1fOL` verify stops to ask: console error, `404 /favicon.ico`; owner: Fix now; resumed, fixed, MERGED |
+| 20:30 | `G8jMzOz` plan, build 24 min $7.87 with the picture rule: 18 captioned screenshots in `.autopilot/look/`, `look-pictures` passes, nothing committed. Parks for the look; 18 pictures sent; owner confirms both observed lines from the pictures |
+| 21:18 | Verify (10 min): will not accept the owner's yes for `TOR-08-nLHs0pq`, which says a real Okta sign-in, because the pictures used the test sign-in. Asks whether the owner can do it now. Owner: "Not now — end the session" |
+| 21:36 | Resumed verify ends with no verdicts, as chosen. The driver reads that as FAIL and runs the repair round; the repair applies a finding the verifier had only noted (owner column on `cache_evictions`); the branch moves; the epic parks for a second look |
+
+### What worked (first live proof)
+
+- Chain spend on the opening line; "picked … back up where it stopped"; "stopped to ask you something".
+- Pictures: rule in the build's rules, 18 captioned screenshots, the check, the gate's `pictures`,
+  `SendUserFile` before the question, git ignoring the folder.
+- The verifier's look: rule in its rules, pictures restored to the clone, log "the verifier
+  described 19 picture(s)".
+- The approved amendment through verify and the merge gate (`Ail1fOL` MERGED on the amended anchors).
+- Resumed-session costs subtracted ($0.06, $1.49, $0.17 steps).
+
+### Issues (numbering continues)
+
+#### Major
+
+33. **"Not now" to a live check is treated as a failed verification.** The owner declined a real
+    Okta sign-in; the verifier ended without verdicts as told; the driver read "no PASS" as FAIL,
+    spent the one repair round, and the repair session acted on a finding the verifier had only
+    noted for later. *Driver (verify verdict handling).* Fix: a verify that ends because the
+    owner declined or deferred a check parks the epic as "waiting for your live check"; no FAIL,
+    no repair round; independent epics carry on.
+34. **The same observation is asked twice, and the first answer is thrown away.** The look
+    question took the owner's "yes" from pictures made with a stand-in; the verifier then refused
+    it and asked for the real thing. *Driver `lookAids` / skill Step 4 / wrapup.* Fix: for an
+    operator-observed requirement the look step says what must be seen live and offers to start
+    it then; only an answer given that way is recorded as observed, and pictures alone are
+    recorded as "seen in pictures, not live".
+35. **A repair that changes no screen voids the owner's look.** After the repair moved the branch
+    the epic parked for a second look at the same screens. *Driver `humanCheck` (`look.branchTip`).*
+    Fix: keep the look when the commits since it touch no file a screen is built from, or show
+    only what changed.
+
+#### Minor
+
+36. **`git branch -d $B` still refused** after the merge-with-a-variable fix. Fixed (`e48c02f`).
+37. **A one-line fix the verifier recommends still stops the run** (the favicon). Planned: a
+    standing answer for small fixes.
+38. **The build missed a console error the verifier found.** Both ran a browser pass.
+39. **`attended` is never asked on a relaunch chain**; this chain ran with it unset.
+40. **Gate answers are dated in UTC**: the owner's answer on the evening of the 13th reads the 14th.
+41. **The look question for a UI epic that has no pictures is asked in chat**, not the popup.
