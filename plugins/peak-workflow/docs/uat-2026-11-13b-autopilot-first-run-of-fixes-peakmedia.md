@@ -298,7 +298,7 @@ no screen file (markup, styles, components, images); the verifier is told what c
 
 36. **`git branch -d $B` still refused** after the merge-with-a-variable fix. Fixed (`e48c02f`).
 37. **A one-line fix the verifier recommends still stops the run** (the favicon). Planned: a
-    standing answer for small fixes.
+    standing answer for small fixes. Built (2 per epic, 3 files, 40 lines; on by default).
 38. **The build missed a console error the verifier found.** Both ran a browser pass.
 39. **`attended` is never asked on a relaunch chain**; this chain ran with it unset.
 40. **Gate answers are dated in UTC**: the owner's answer on the evening of the 13th reads the 14th.

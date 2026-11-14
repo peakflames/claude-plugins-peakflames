@@ -241,6 +241,7 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     "If it stops for a technical reason I'll continue it automatically (up to 2 times per epic).", '`DRIVER continue --workspace "<ws>" --json`', 'It stopped for a technical reason (<the entry\'s `why`>); continuing, as you asked.',
     'Only `DRIVER continue` applies it', 'you never record "resume" on a gate yourself', '"autoContinue": 2', '"endBy": null',
     'The popup hides the chat: put what the owner must read inside the question text.',
+    '**Small fixes, said in the same question.**', '`"smallFixes": false`', '**Fixed during the final check, without asking:**',
     '**What must be seen for real.**', '`Start it so I can check for real (Recommended)`', 'never record a yes for them from the pictures', '"how": "live" | "pictures"',
     'Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`', 'ask nothing again', 'except what `relaunch.ask` names', 'add each answer to the config under that key',
     '## Closing screen', '**Things autopilot got in the way of:**', '**Do this next:** <exactly one thing>',

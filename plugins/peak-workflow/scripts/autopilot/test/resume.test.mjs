@@ -236,7 +236,7 @@ test('unattended, a verifier that repairs code on its own and merges is rolled b
 });
 
 test('owner-approved "Fix now" in verify: the inline repair merges and the report names it', async (t) => {
-  const p = makeProject(t);
+  const p = makeProject(t, { config: { smallFixes: false } }) /* the standing answer off: every fix is asked */;
   const q = 'Code-review finding in Epic Lg1Csv7: the usage text omits a command. Recommendation: Fix now. How to proceed?';
   const options = ['Fix now (Recommended)', 'Leave as is', 'Stop — epic FAILs'];
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q, options)] } });
@@ -256,7 +256,7 @@ test('owner-approved "Fix now" in verify: the inline repair merges and the repor
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fixed during verification, on your "Fix now" \(`gates\/Lg1Csv7-1\.json`\): src\/usage\.js\. The verifier checked its own fix/);
 
   // The same approval does not cover a waiver or an undisclosed deferral.
-  const p2 = makeProject(t);
+  const p2 = makeProject(t, { config: { smallFixes: false } });
   p2.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(q, options)] } });
   await p2.go();
   decide(p2, E1.id, 'Fix now (Recommended)');
@@ -1257,4 +1257,51 @@ test('a redo question an earlier driver let through is replaced by "run the fina
   assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
   assert.match(tools(p, e5.id, 'verify-1')[0].hookSpecificOutput.permissionDecisionReason, /Do not ask them to do it again/);
   assert.match(appended(last.calls[0]), /real sign-in done, it works/);
+});
+
+// ---- the standing answer for small fixes the verifier recommends (UAT issue 37) -------------------
+
+const FIXQ = 'Console error on the home page: 404 for /favicon.ico. Recommendation: Fix now — a one-line link tag. How to proceed?';
+const FIXOPTS = ['Fix now (Recommended)', 'Leave as is', 'Stop — epic FAILs'];
+const smallFix = (files) => [{ do: 'checkout', name: E1.branch }, ...files.map((f) => ({ do: 'write', path: f, content: 'export const fixed = 1;\n' })), { do: 'commit', message: `fix(epic-${E1.id}): what the verifier found` }];
+
+test('a small fix the verifier recommends is made on the standing answer: no stop, within the limits, and listed afterwards', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(FIXQ, FIXOPTS), ...smallFix(['src/favicon.js']), ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  const [answer] = tools(p, E1.id, 'verify-1');
+  assert.deepEqual(Object.values(answer.hookSpecificOutput.updatedInput.answers), ['Fix now (Recommended)']);
+  assert.match(answer.hookSpecificOutput.permissionDecisionReason, /the owner's standing answer for small fixes/);
+  assert.deepEqual([e.fixedAtWrapup.count, e.fixedAtWrapup.files, e.fixedAtWrapup.approvedBy, e.fixedAtWrapup.standing.map((x) => x.question)], [1, ['src/favicon.js'], 'the standing answer for small fixes', [FIXQ]]);
+  assert.ok(!fs.existsSync(path.join(p.state, 'gates', `${E1.id}-1.json`)), 'the owner is not asked');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fixed during verification, on your standing answer for small fixes: src\/favicon\.js\. What the verifier asked: "Console error on the home page: 404 for \/favicon\.ico\./);
+});
+
+test('a fix bigger than the standing answer allows is not merged: rolled back, and the reason names the limit', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(FIXQ, FIXOPTS), ...smallFix(['src/a.js', 'src/b.js', 'src/c.js', 'src/d.js']), ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).reason], ['PARKED', 'merge gate failed (verdict); develop rolled back']);
+  const verdict = readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'verdict');
+  assert.match(verdict.evidence.join(' | '), /the fix made on the standing answer changes 4 files \(the limit is 3\)/);
+});
+
+test('the standing answer never covers a requirement file or a weakened test, and stops after its count', async (t) => {
+  const p = makeProject(t);
+  const weaken = [{ do: 'checkout', name: E1.branch }, { do: 'exec', cmd: `f=$(ls test/*.test.js | head -1); sed -i.bak '$d' "$f"; rm -f "$f.bak"; git add -A test` }, { do: 'write', path: 'docs/requirements/note.md', content: 'changed\n' }, { do: 'commit', message: `fix(epic-${E1.id}): quieter` }];
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(FIXQ, FIXOPTS), ...weaken, ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  const evidence = readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'verdict').evidence.join(' | ');
+  assert.match(evidence, /removes lines from a test \(test\/[^)]*\)/);
+  assert.match(evidence, /changes a requirement file \(docs\/requirements\/note\.md\)/);
+
+  // Two per final check: the third recommended fix is the owner's to decide.
+  const p2 = makeProject(t);
+  const third = FIXQ.replace('favicon.ico', 'robots.txt');
+  p2.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(FIXQ, FIXOPTS), ask(FIXQ.replace('favicon.ico', 'logo.png'), FIXOPTS), ask(third, FIXOPTS)] } });
+  await p2.go();
+  assert.deepEqual([p2.epic(E1.id).state, gate(p2, E1.id).question], ['PARKED', third]);
 });

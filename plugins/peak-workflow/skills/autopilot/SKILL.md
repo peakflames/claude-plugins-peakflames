@@ -470,6 +470,16 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    never a question about the product, a look, or a stop the owner asked for; those are always
    asked. Say so if the owner asks what it covers.
 
+   **Small fixes, said in the same question.** The final check may find something small and
+   recommend fixing it on the spot (a missing icon, a typo in a message). By default it does:
+   up to 2 such fixes per epic, at most 3 files and 40 changed lines together, never a
+   requirement and never a weakened test; anything bigger stops and asks, and a requirement
+   the final check judges not met is never repaired this way. Add one sentence
+   to the question text: "Small fixes the final check recommends are made without asking (up
+   to 2 per epic) and listed at the end." The owner turns it off with a Change ("ask me
+   about every fix"): write `"smallFixes": false` into `config.json`. Leave the key out
+   otherwise; the limits are the driver's.
+
    **Real money, asked in the same popup.** When `launch.env.copy` is not empty (sessions
    will hold the project's real keys), add a second question to this same `AskUserQuestion`
    call: "A check may need to call a real outside service that costs money, using your keys
@@ -910,6 +920,9 @@ Leave out a part that has nothing to say.
 
 **Not proven for real:** <only when `unproven` has entries>
 
+**Fixed during the final check, without asking:** <only when `fixes` has entries>
+- <epic, short> — <what the verifier asked, in a few plain words> (<files>)
+
 **Things autopilot got in the way of:** <only when `friction` has entries>
 
 **Do this next:** <exactly one thing>
@@ -918,6 +931,10 @@ Leave out a part that has nothing to say.
 - **What the verifier saw in the pictures** comes from `seen`: for an epic with screens, the
   final check opens the build's screenshots itself and says what is in each. These are its
   words; give them as written, and never drop a line that says a picture did not match.
+- **Fixed during the final check, without asking** comes from `fixes`: small repairs the
+  verifier recommended and made on the owner's standing answer. One line each: what it found
+  (`asked`, in plain words) and the files it changed. The verifier checked its own fix; say
+  so once under the list.
 - **Not proven for real** comes from `unproven`: what the independent reviewer or the
   verifier said was never exercised against the real thing — a paid service replaced by a
   stand-in, a call the verifier chose not to make, a check only a person can do. The epic
