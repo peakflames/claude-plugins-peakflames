@@ -300,7 +300,10 @@ test('human-check gate carries an artifact; "Looks right" goes to VERIFY and R8 
   assert.equal(readJson(p.dir(e5.id, 'verify-1', 'step.json')).look.branchTip, tip);
   // The verifier is handed the owner's observation up front, so wrapup Step 1.2 item 7 does not ask for it.
   const lookFile = r.calls[0].argv[r.calls[0].argv.indexOf('--append-system-prompt-file') + 1];
-  assert.equal(lookFile, p.dir(e5.id, 'verify-1', 'owner-look.md'));
+  // One file, holding the look and the rules: `claude` keeps only the last such flag, so two files would lose the look.
+  assert.equal(r.calls[0].argv.filter((a) => a === '--append-system-prompt-file').length, 1);
+  assert.equal(lookFile, p.dir(e5.id, 'verify-1', 'system-append.md'));
+  assert.ok(fs.readFileSync(lookFile, 'utf8').includes(fs.readFileSync(p.dir(e5.id, 'verify-1', 'owner-look.md'), 'utf8').trimEnd()) && /# Autopilot session rules/.test(fs.readFileSync(lookFile, 'utf8')));
   const lookText = fs.readFileSync(lookFile, 'utf8');
   assert.match(lookText, /Pat Owner, \d{4}-\d{2}-\d{2}/);
   assert.ok(lookText.includes(`branch tip ${tip}`) && lookText.includes('"one bar per category, labels readable"') && lookText.includes(e5.tors[0]), lookText);
@@ -1030,7 +1033,7 @@ test('a session that cannot be resumed is replaced by a new one that is told the
   assert.ok(resumed.argv.includes('--resume') && !fresh.argv.includes('--resume'));
   assert.equal(fresh.prompt, `/peak-workflow:wrapup-epic ${E1.id}`);
   const told = p.dir(E1.id, 'verify-2', 'owner-answers.md');
-  assert.ok(fresh.argv.includes(told), 'the new session is told through its system prompt');
+  assert.ok(appended(fresh).includes(fs.readFileSync(told, 'utf8').trimEnd()), 'the new session is told through its system prompt, in the one file `claude` reads');
   const text = fs.readFileSync(told, 'utf8');
   assert.match(text, /^# Questions the owner has already answered/);
   assert.ok(text.includes(`**Asked:** "${q}"`) && text.includes('**The owner\'s answer:** "Yes" — Pat Owner'));
@@ -1062,7 +1065,8 @@ test('starting over retires earlier answers: the fresh attempt is told none of t
 const LATER = 'Not now — end the session';
 const NONE = 'The wrapup ended without recording any verdicts, as you chose. The epic stays **Implemented** and nothing was written or committed.';
 const signIn = (tor) => `${tor} is operator-observed. Can you do the real sign-in now? If you can't, the session ends with no verdicts and you re-run wrapup later.`;
-const appended = (call) => call.argv.flatMap((a, i) => (a === '--append-system-prompt-file' ? [fs.readFileSync(call.argv[i + 1], 'utf8')] : [])).join('\n');
+// What the session is really given: `claude` keeps only the last `--append-system-prompt-file`.
+const appended = (call) => { const i = call.argv.lastIndexOf('--append-system-prompt-file'); return i < 0 ? '' : fs.readFileSync(call.argv[i + 1], 'utf8'); };
 
 test('a check the owner puts off ends the verify without a verdict: parked to run the check again, no FAIL, no fix round; the later session is not told "Not now" and keeps the look', async (t) => {
   const p = makeProject(t);

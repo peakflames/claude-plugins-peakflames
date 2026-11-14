@@ -841,7 +841,13 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
   if (effort) args.push('--effort', effort);
   // A session stopped at its own question is taken up again with what it knows, under a new id (the old transcript stays as it was).
   if (resume) args.push('--resume', resume, '--fork-session');
-  for (const f of appendFiles) args.push('--append-system-prompt-file', f);
+  // `claude` keeps only the last `--append-system-prompt-file` (proven live: of two files, the session saw the second
+  // only, so a verifier given the owner's look and then its rules never read the look). Several files go in as one.
+  if (appendFiles.length > 1) {
+    const all = path.join(path.dirname(appendFiles.at(-1)), 'system-append.md');
+    fs.writeFileSync(all, appendFiles.map((f) => read(f).trimEnd()).join('\n\n') + '\n');
+    args.push('--append-system-prompt-file', all);
+  } else for (const f of appendFiles) args.push('--append-system-prompt-file', f);
   return { bin: config.claudeBin, args, env, cwd: clone, wallMin: b.wallMin, host: true };
 }
 

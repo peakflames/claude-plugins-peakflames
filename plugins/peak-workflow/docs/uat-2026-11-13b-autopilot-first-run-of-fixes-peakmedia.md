@@ -294,6 +294,15 @@ no screen file (markup, styles, components, images); the verifier is told what c
     with the record; a second one goes to the owner. The waiting question (`G8jMzOz-5`) is
     replaced by a resume gate at VERIFY, so the owner does not sign in again.
 
+44. **Critical: the owner's look and earlier answers never reached the session.** Run `144158`
+    (away): the verifier ended with "the real Okta observation is still missing" without asking.
+    `claude` keeps only the last `--append-system-prompt-file`; the driver passed
+    `owner-look.md` (or `owner-answers.md`) and then the rules file, so only the rules arrived
+    (probe: two files, the session saw the second). This is the cause behind 34, 43 and the
+    repeated sign-in requests since the 13th; the fake `claude` in the tests read every file.
+    *Driver (session launch).* Fixed: several files are joined into one `system-append.md`;
+    the tests now read only the last flag, as `claude` does.
+
 #### Minor
 
 36. **`git branch -d $B` still refused** after the merge-with-a-variable fix. Fixed (`e48c02f`).

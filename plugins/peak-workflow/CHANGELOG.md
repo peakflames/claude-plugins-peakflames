@@ -210,6 +210,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot sessions get every instruction file** — `claude` keeps only the last appended
+  prompt file, so the owner's recorded look and earlier answers never reached a session that
+  also got rules. Several files now go in as one.
 - **Autopilot verifier may not ask for a check the owner already did** — the referee refuses
   the first such question and points the verifier at the owner's recorded observation; asked
   again, it goes to the owner. A redo question an earlier driver let through becomes "run the
