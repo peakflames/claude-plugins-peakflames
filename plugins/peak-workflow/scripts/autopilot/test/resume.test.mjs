@@ -300,7 +300,10 @@ test('human-check gate carries an artifact; "Looks right" goes to VERIFY and R8 
   assert.equal(readJson(p.dir(e5.id, 'verify-1', 'step.json')).look.branchTip, tip);
   // The verifier is handed the owner's observation up front, so wrapup Step 1.2 item 7 does not ask for it.
   const lookFile = r.calls[0].argv[r.calls[0].argv.indexOf('--append-system-prompt-file') + 1];
-  assert.equal(lookFile, p.dir(e5.id, 'verify-1', 'owner-look.md'));
+  // One file, holding the look and the rules: `claude` keeps only the last such flag, so two files would lose the look.
+  assert.equal(r.calls[0].argv.filter((a) => a === '--append-system-prompt-file').length, 1);
+  assert.equal(lookFile, p.dir(e5.id, 'verify-1', 'system-append.md'));
+  assert.ok(fs.readFileSync(lookFile, 'utf8').includes(fs.readFileSync(p.dir(e5.id, 'verify-1', 'owner-look.md'), 'utf8').trimEnd()) && /# Autopilot session rules/.test(fs.readFileSync(lookFile, 'utf8')));
   const lookText = fs.readFileSync(lookFile, 'utf8');
   assert.match(lookText, /Pat Owner, \d{4}-\d{2}-\d{2}/);
   assert.ok(lookText.includes(`branch tip ${tip}`) && lookText.includes('"one bar per category, labels readable"') && lookText.includes(e5.tors[0]), lookText);
@@ -1030,7 +1033,7 @@ test('a session that cannot be resumed is replaced by a new one that is told the
   assert.ok(resumed.argv.includes('--resume') && !fresh.argv.includes('--resume'));
   assert.equal(fresh.prompt, `/peak-workflow:wrapup-epic ${E1.id}`);
   const told = p.dir(E1.id, 'verify-2', 'owner-answers.md');
-  assert.ok(fresh.argv.includes(told), 'the new session is told through its system prompt');
+  assert.ok(appended(fresh).includes(fs.readFileSync(told, 'utf8').trimEnd()), 'the new session is told through its system prompt, in the one file `claude` reads');
   const text = fs.readFileSync(told, 'utf8');
   assert.match(text, /^# Questions the owner has already answered/);
   assert.ok(text.includes(`**Asked:** "${q}"`) && text.includes('**The owner\'s answer:** "Yes" — Pat Owner'));
@@ -1062,7 +1065,8 @@ test('starting over retires earlier answers: the fresh attempt is told none of t
 const LATER = 'Not now — end the session';
 const NONE = 'The wrapup ended without recording any verdicts, as you chose. The epic stays **Implemented** and nothing was written or committed.';
 const signIn = (tor) => `${tor} is operator-observed. Can you do the real sign-in now? If you can't, the session ends with no verdicts and you re-run wrapup later.`;
-const appended = (call) => call.argv.flatMap((a, i) => (a === '--append-system-prompt-file' ? [fs.readFileSync(call.argv[i + 1], 'utf8')] : [])).join('\n');
+// What the session is really given: `claude` keeps only the last `--append-system-prompt-file`.
+const appended = (call) => { const i = call.argv.lastIndexOf('--append-system-prompt-file'); return i < 0 ? '' : fs.readFileSync(call.argv[i + 1], 'utf8'); };
 
 test('a check the owner puts off ends the verify without a verdict: parked to run the check again, no FAIL, no fix round; the later session is not told "Not now" and keeps the look', async (t) => {
   const p = makeProject(t);
@@ -1279,23 +1283,59 @@ test('a small fix the verifier recommends is made on the standing answer: no sto
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fixed during verification, on your standing answer for small fixes: src\/favicon\.js\. What the verifier asked: "Console error on the home page: 404 for \/favicon\.ico\./);
 });
 
-test('a fix bigger than the standing answer allows is not merged: rolled back, and the reason names the limit', async (t) => {
+test('a fix bigger than the standing answer allows is not merged: rolled back, and the owner is asked to allow it; allowed, the final check makes it and merges', async (t) => {
   const p = makeProject(t);
-  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(FIXQ, FIXOPTS), ...smallFix(['src/a.js', 'src/b.js', 'src/c.js', 'src/d.js']), ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  const big = { actions: [ask(FIXQ, FIXOPTS), ...smallFix(['src/a.js', 'src/b.js', 'src/c.js', 'src/d.js', 'src/e.js', 'src/f.js']), ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } };
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: big });
   await p.go();
   assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).reason], ['PARKED', 'merge gate failed (verdict); develop rolled back']);
   const verdict = readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'verdict');
-  assert.match(verdict.evidence.join(' | '), /the fix made on the standing answer changes 4 files \(the limit is 3\)/);
+  assert.match(verdict.evidence.join(' | '), /the fix made on the standing answer changes 6 files \(the limit is 5\)/);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.phase, g.approvesFix, g.options], ['resume', 'VERIFY', true, [ANSWERS.resume, ANSWERS.startOver]]);
+  assert.match(g.question, /bigger than your standing answer for small fixes allows: 6 files \(your limit is 5\)\. It was not merged\. Allow a fix of that size/);
+
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'VERIFY');
+  p.scenario({ [`${E1.id}/verify`]: big });
+  await again(p);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual([e.fixedAtWrapup.files.length, e.fixedAtWrapup.approvedBy], [6, `gates/${E1.id}-1.json`]);
+});
+
+test('a fix an earlier autopilot held back under the old rule (any changed test line) gets "run the final check again", and then merges', async (t) => {
+  const p = makeProject(t);
+  const fix = [{ do: 'checkout', name: E1.branch }, { do: 'exec', cmd: `f=$(ls test/*.test.js | head -1); printf '// waits for the page before clicking\\n' >> "$f"; git add -A test` }, ...smallFix(['src/wait.js']).slice(1)];
+  const script = { actions: [ask(FIXQ, FIXOPTS), ...fix, ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } };
+  // As the earlier driver left it: the merge gate refused the fix, rolled back, and parked with nothing to answer.
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [...smallFix(['src/wait.js']), ...wrapupActions(E1)], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  assert.equal(p.epic(E1.id).reason, 'merge gate failed (verdict); develop rolled back');
+  const file = p.dir(E1.id, 'check-verify-1.json'); const check = readJson(file);
+  check.checks.find((c) => c.name === 'verdict').evidence = ['the fix made on the standing answer changes 4 files (the limit is 3): tests/a.cs, tests/b.cs, tests/c.cs, tests/d.cs', 'the fix made on the standing answer removes lines from a test (tests/a.cs, tests/b.cs)'];
+  fs.writeFileSync(file, JSON.stringify(check, null, 2));
+
+  assert.deepEqual(ensureResumeGates(p.state), [`${E1.id}-1.json`]);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.phase, g.approvesFix ?? false], ['resume', 'VERIFY', false]);
+  assert.match(g.question, /held back the small fix it made under a rule that has since been loosened\. Run the final check again\?/);
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'VERIFY');
+  p.scenario({ [`${E1.id}/verify`]: script });
+  await again(p);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.equal(e.fixedAtWrapup.approvedBy, 'the standing answer for small fixes');
 });
 
 test('the standing answer never covers a requirement file or a weakened test, and stops after its count', async (t) => {
   const p = makeProject(t);
-  const weaken = [{ do: 'checkout', name: E1.branch }, { do: 'exec', cmd: `f=$(ls test/*.test.js | head -1); sed -i.bak '$d' "$f"; rm -f "$f.bak"; git add -A test` }, { do: 'write', path: 'docs/requirements/note.md', content: 'changed\n' }, { do: 'commit', message: `fix(epic-${E1.id}): quieter` }];
+  const weaken = [{ do: 'checkout', name: E1.branch }, { do: 'exec', cmd: `f=$(grep -l assert test/*.test.js | head -1); sed -i.bak '/assert\\./d' "$f"; rm -f "$f.bak"; git add -A test` }, { do: 'write', path: 'docs/requirements/note.md', content: 'changed\n' }, { do: 'commit', message: `fix(epic-${E1.id}): quieter` }];
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(FIXQ, FIXOPTS), ...weaken, ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } } });
   await p.go();
   assert.equal(p.epic(E1.id).state, 'PARKED');
   const evidence = readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'verdict').evidence.join(' | ');
-  assert.match(evidence, /removes lines from a test \(test\/[^)]*\)/);
+  assert.match(evidence, /removes checks from a test \(test\/[^)]*\)/);
+  assert.ok(!fs.existsSync(path.join(p.state, 'gates', `${E1.id}-1.json`)), 'never offered for approval');
   assert.match(evidence, /changes a requirement file \(docs\/requirements\/note\.md\)/);
 
   // Two per final check: the third recommended fix is the owner's to decide.

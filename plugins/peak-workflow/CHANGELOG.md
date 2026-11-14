@@ -20,8 +20,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   pictures and lines seen for real at the look, the verifier's words on the pictures, approved
   amendments, small fixes made without asking, and sign-ins nobody answered.
 - **Autopilot standing answer for small fixes** — a fix the verifier recommends is made without
-  stopping: up to 2 per epic, 3 files and 40 changed lines, never a requirement file or a
-  weakened test. Bigger fixes are rolled back and asked. Listed in the report and closing
+  stopping: up to 2 per epic, 5 files and 40 changed lines, never a requirement file or a
+  test made to check less. A bigger fix is rolled back and put to the owner to approve. Listed in the report and closing
   screen; `"smallFixes": false` turns it off.
 - **Autopilot clone environment** — `setup` (a command) and `copy` (git-ignored files) in
   `.claude/peak-workflow/autopilot.json` give the private clone what git does not carry; the driver
@@ -213,6 +213,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot sessions get every instruction file** — `claude` keeps only the last appended
+  prompt file, so the owner's recorded look and earlier answers never reached a session that
+  also got rules. Several files now go in as one.
 - **Autopilot verifier may not ask for a check the owner already did** — the referee refuses
   the first such question and points the verifier at the owner's recorded observation; asked
   again, it goes to the owner. A redo question an earlier driver let through becomes "run the
