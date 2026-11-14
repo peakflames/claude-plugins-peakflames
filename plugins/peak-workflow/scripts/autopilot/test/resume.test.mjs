@@ -1396,6 +1396,23 @@ test('`configure --look after` writes the project setting; `before` removes it; 
   assert.equal(readJson(file).look, undefined);
 });
 
+test('turning "look": "after" on answers a look at screens that is already waiting: the next run goes to the final check', async (t) => {
+  const p = makeProject(t);
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build });
+  await p.go({ queue: [ui.id] });
+  assert.equal(p.epic(ui.id).reason, 'human check needed before verify');
+  const out = JSON.parse(cli('configure', '--project', p.project, '--workspace', p.state, '--look', 'after').stdout);
+  assert.deepEqual(out.answered, [`${ui.id}-2.json`]);
+  const g2 = gate(p, ui.id, 2);
+  assert.deepEqual([g2.kind, g2.phase, g2.lookAfter, g2.decided.answer, g2.decided.by, gate(p, ui.id, 1).superseded.by], ['resume', 'VERIFY', true, ANSWERS.resume, '"look": "after" (project setting)', `gates/${ui.id}-2.json`]);
+  p.scenario({ [`${ui.id}/verify`]: wrapupScript(ui) });
+  const r = await again(p, { queue: [ui.id] });
+  assert.deepEqual(r.steps, [`${ui.id}/verify-1`]);
+  assert.equal(p.epic(ui.id).state, 'MERGED', p.epic(ui.id).reason);
+  assert.equal(p.epic(ui.id).unlooked.pictures.length, 1);
+});
+
 test('"look": "after" never skips a requirement a person must observe', async (t) => {
   const p = makeProject(t, { config: { look: 'after' } });
   const e5 = addLookEpic(p);

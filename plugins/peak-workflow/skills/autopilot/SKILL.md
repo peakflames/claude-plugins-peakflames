@@ -941,6 +941,11 @@ Leave out a part that has nothing to say.
   `/peak-workflow:quick-fix` or `/peak-workflow:triage` away. To turn it on or off the owner
   says so in plain words ("don't stop to show me screens"): run
   `DRIVER configure --project "<root>" --look after` (or `before`); never set it unasked.
+  Turning it on also answers a look at screens that is already waiting (the output's
+  `answered`): go to Step 0, which relaunches. It never answers a line a person must observe.
+  If status says `look` is `after` and a `human-check` gate with no `checks` still waits (it
+  was asked by a run that started before the setting), do not ask it: run the same
+  `configure --look after` again, which answers it, and go to Step 0.
 - **Fixed during the final check, without asking** comes from `fixes`: small repairs the
   verifier recommended and made on the owner's standing answer. One line each: what it found
   (`asked`, in plain words) and the files it changed. The verifier checked its own fix; say
