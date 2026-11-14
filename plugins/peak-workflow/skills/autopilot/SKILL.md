@@ -920,6 +920,9 @@ Leave out a part that has nothing to say.
 
 **Not proven for real:** <only when `unproven` has entries>
 
+**Screens merged without your look:** <only when `unlooked` has entries>
+- <epic, short> — <n> pictures, sent now for you to review
+
 **Fixed during the final check, without asking:** <only when `fixes` has entries>
 - <epic, short> — <what the verifier asked, in a few plain words> (<files>)
 
@@ -931,6 +934,13 @@ Leave out a part that has nothing to say.
 - **What the verifier saw in the pictures** comes from `seen`: for an epic with screens, the
   final check opens the build's screenshots itself and says what is in each. These are its
   words; give them as written, and never drop a line that says a picture did not match.
+- **Screens merged without your look** comes from `unlooked`: the project's `autopilot.json`
+  has `"look": "after"`, so an epic that only has screens did not stop for the owner; the final
+  check judged the pictures. Send each epic's `pictures` with `SendUserFile` when that tool
+  exists (otherwise give the folder), and say that anything wrong is a
+  `/peak-workflow:quick-fix` or `/peak-workflow:triage` away. To turn it on or off the owner
+  says so in plain words ("don't stop to show me screens"): run
+  `DRIVER configure --project "<root>" --look after` (or `before`); never set it unasked.
 - **Fixed during the final check, without asking** comes from `fixes`: small repairs the
   verifier recommended and made on the owner's standing answer. One line each: what it found
   (`asked`, in plain words) and the files it changed. The verifier checked its own fix; say

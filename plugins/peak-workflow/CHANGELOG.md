@@ -10,6 +10,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
+  final check without stopping for the owner; its pictures are listed for review afterwards.
+  A requirement a person must observe still stops.
 - **Autopilot planner checks requirements for contradictions** — before planning, each epic's
   requirements are read against each other; one that cannot be met or contradicts another is
   asked as an amendment then, not mid-build. Plan lint requires the "checked" line.
