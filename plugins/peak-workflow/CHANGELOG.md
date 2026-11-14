@@ -10,6 +10,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Autopilot run announcer** — chat lines now say which epic of how many is starting, what
+  comes next after each step, and "n of m done (%)" over the confirmed queue across relaunches;
+  the ten-minute "still working" line is relayed. One spend figure: chain total of the budget.
 - **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
   final check without stopping for the owner; its pictures are listed for review afterwards.
   A requirement a person must observe still stops.
@@ -20,7 +23,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   pictures and lines seen for real at the look, the verifier's words on the pictures, approved
   amendments, small fixes made without asking, and sign-ins nobody answered.
 - **Autopilot standing answer for small fixes** — a fix the verifier recommends is made without
-  stopping: up to 2 per epic, 5 files and 40 changed lines, never a requirement file or a
+  stopping: up to 2 per epic, 5 files and 80 changed lines, never a requirement file or a
   test made to check less. A bigger fix is rolled back and put to the owner to approve. Listed in the report and closing
   screen; `"smallFixes": false` turns it off.
 - **Autopilot clone environment** — `setup` (a command) and `copy` (git-ignored files) in
@@ -199,6 +202,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Autopilot default run budget is $250** (was $80), counted over the whole chain of runs; a
+  project sets its own with `configure --run-budget`, which also raises a chain in progress.
 - **Autopilot watch is quieter** — a first refusal and `TESTS passed|failed` are printed only
   with `watch --verbose`, so an attending session is not woken for routine lines.
 - **Autopilot step wording** — a resumed step reads "Picking … back up where it stopped", and a

@@ -66,7 +66,7 @@ export const NO_VERDICT = /\b(without|no)\s+(recording\s+)?(any\s+)?verdicts?\b|
  * config or the workspace's settings; `false` turns it off): how many per final check, and how big
  * the whole repair may be. Null when off.
  */
-export const SMALL_FIXES = { perEpic: 2, files: 5, lines: 40 }; // first live fix: a test race, 4 files and 20 lines
+export const SMALL_FIXES = { perEpic: 2, files: 5, lines: 80 }; // seen live: a test race (4 files, 20 lines), a layout fix with its test (2 files, 48 lines)
 /** Every problem the merge gate reports about a fix made on the standing answer starts with this. */
 export const SMALL_FIX_PROBLEM = 'the fix made on the standing answer ';
 /** A line that checks something or declares a test: a fix may change how a test waits, never how much it checks. */

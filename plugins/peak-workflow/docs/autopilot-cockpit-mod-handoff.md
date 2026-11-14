@@ -1,5 +1,13 @@
 # Handoff — build the autopilot cockpit mod (written 2026-11-14)
 
+> **Deferred by the owner, 2026-11-14 (later the same day).** The chat is the one display every
+> device has, mobile included, and no mod reaches mobile. So the run now announces itself in
+> chat instead: which epic of how many, what comes next after each step, "n of m done (%)" over
+> the confirmed queue across relaunches, one spend figure, and a ten-minute "still working"
+> line. Start this work only when the owner asks; the band remains a sound idea for desktop,
+> and what the announcer now says (`chainOf`, `queueLine` in `attend.mjs`) is the data a band
+> would draw.
+
 For a fresh session, possibly on another laptop. Everything you need is in this repository on
 `feature/peak-workflow-autopilot-poc`; nothing here depends on the machine that wrote it.
 
@@ -33,8 +41,8 @@ in outline; nothing is built.
   `driver.mjs status --json --view` computes in a pure `cockpitView()` in `attend.mjs`. It
   computes nothing itself, so the cockpit and the chat cannot disagree.
 - **The chat shrinks to conversation:** questions, stops, `NEEDS YOU`, the closing screen.
-- **Why now (2026-11-14):** the owner found run feedback "almost too minimal", and chose this
-  over relaying more chat lines. A chat-feedback change was written and dropped for that reason.
+- **History (2026-11-14):** the owner found run feedback "almost too minimal", first chose this
+  mod over more chat lines, then chose the chat announcer (see the note at the top).
 
 ## Do these first: the spike (about half a day)
 
