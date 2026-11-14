@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, NO_VERDICT, gateEntry, lintPlan, parseSidecar, postpones } from './lib.mjs';
+import { ANSWERS, NO_VERDICT, SMALL_FIX_FILE, gateEntry, lintPlan, parseSidecar, postpones, smallFixLimits } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, unprovenLines, watch };
@@ -275,7 +275,7 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   return cfg;
 }
 /** The keys that belong to one run; everything else is a workspace setting. */
-const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues', 'realSpend', 'attended'];
+const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues', 'realSpend', 'attended', 'smallFixes'];
 const TEST_DOUBLE = (bin) => `claudeBin is ${bin}, not the real \`claude\`: a test double runs only when the run's config.json says "allowTestDouble": true (or --allow-test-double)`;
 
 // ---------------------------------------------------------------------------------------------
@@ -2245,6 +2245,11 @@ class Run {
     // resumed from a gate the owner answered "Fix now" (as wrapup-epic allows with a person
     // present). Unattended, policy answers "Stop — epic FAILs" and a separate session repairs.
     const ownerFix = e.resumed?.phase === 'VERIFY' && /^fix now\b/i.test(e.resumed.answer ?? '') ? e.resumed.gate : null;
+    // Or on the owner's standing answer for small fixes: the referee answered "Fix now" to what the verifier
+    // recommended (listed in the step's directory), and the repair is held to the limits here.
+    const limits = smallFixLimits(this.config);
+    const standing = !ownerFix && limits && e.lastStep ? tryJson(path.join(this.epicDir(e), e.lastStep, SMALL_FIX_FILE), []) ?? [] : [];
+    const approval = ownerFix ?? (standing.length ? 'the standing answer for small fixes' : null);
     const fixedFiles = [];
 
     const firstParent = this.g('rev-list', '--first-parent', `${pre.developSha}..${dev}`).split('\n').filter(Boolean);
@@ -2261,13 +2266,25 @@ class Run {
         // that line into it first (seen live). A file that arrives exactly as the integration line
         // has it is another epic's merged work, not something this verify session wrote.
         const blob = (rev, f) => { const r = gitRun(this.clone, 'rev-parse', '-q', '--verify', `${rev}:${f}`); return r.code === 0 ? r.out : ''; };
-        const stray = this.g('diff', '--name-only', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && !f.startsWith('docs/') && f !== m.sidecar && blob(p2, f) !== blob(pre.developSha, f));
-        if (stray.length && ownerFix) fixedFiles.push(...stray);
+        const own = this.g('diff', '--name-only', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && blob(p2, f) !== blob(pre.developSha, f));
+        const stray = own.filter((f) => !f.startsWith('docs/') && f !== m.sidecar);
+        if (stray.length && approval) fixedFiles.push(...stray);
         else if (stray.length) problems.push(`commits added during verify touch files outside docs/: ${stray.join(', ')}`);
+        if (stray.length && standing.length) {
+          // The standing answer is for small fixes only: a bigger one is the owner's to approve.
+          const stat = this.g('diff', '--numstat', `${pre.branchTip}..${p2}`, '--', ...stray).split('\n').filter(Boolean).map((l) => l.split('\t'));
+          const lines = stat.reduce((n, [a, d]) => n + (Number(a) || 0) + (Number(d) || 0), 0);
+          const tests = stat.filter(([, d, f]) => Number(d) > 0 && (this.config.testDirs ?? []).some((dir) => f.startsWith(`${String(dir).replace(/\/+$/, '')}/`))).map(([, , f]) => f);
+          const reqs = own.filter((f) => f.startsWith('docs/requirements/'));
+          if (stray.length > limits.files) problems.push(`the fix made on the standing answer changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
+          if (lines > limits.lines) problems.push(`the fix made on the standing answer changes ${lines} lines (the limit is ${limits.lines})`);
+          if (tests.length) problems.push(`the fix made on the standing answer removes lines from a test (${tests.join(', ')})`);
+          if (reqs.length) problems.push(`the fix made on the standing answer changes a requirement file (${reqs.join(', ')})`);
+        }
         if (gitOk(this.clone, 'merge-base', '--is-ancestor', pre.developSha, p2) && this.g('rev-parse', `${dev}^{tree}`) !== this.g('rev-parse', `${p2}^{tree}`)) problems.push('the merge commit itself changes files');
       }
     }
-    add('verdict', problems.length === 0, problems.length ? problems : { merge: this.integrationSha(), parents, ...(fixedFiles.length ? { fixedDuringWrapup: fixedFiles, approvedBy: ownerFix } : {}) });
+    add('verdict', problems.length === 0, problems.length ? problems : { merge: this.integrationSha(), parents, ...(fixedFiles.length ? { fixedDuringWrapup: fixedFiles, approvedBy: approval } : {}) });
 
     const sc = parseSidecar(gitShow(this.clone, dev, m.sidecar));
     const unverified = this.anchorsFor(e, sc).filter((t) => !sc.verified[t]);
@@ -2283,9 +2300,9 @@ class Run {
     const fixed = Number((countLine?.match(/fixed at wrapup:\s*(\d+)/i) ?? [])[1] ?? 0);
     const others = countLine ? [...countLine.matchAll(/([a-z][a-z ]*):\s*(\d+)/gi)].filter(([, k]) => !/^fixed at wrapup$/i.test(k.trim()) && !/^count$/i.test(k.trim())).map(([, , n]) => Number(n)) : [];
     const total = Number(numbers[0] ?? NaN);
-    const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (ownerFix ? total === fixed : numbers.every((x) => Number(x) === 0));
+    const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && (ownerFix || fixed <= standing.length) : numbers.every((x) => Number(x) === 0));
     add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: waivedLine, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}) });
-    if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: ownerFix };
+    if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: approval, ...(standing.length && !ownerFix ? { standing: standing.map((x) => ({ question: x.question, tor: x.tor ?? null })) } : {}) };
 
     if (this.currentBranch() !== dev && !this.dirty()) this.g('checkout', '-q', dev);
     if (this.currentBranch() === dev && !this.dirty()) {
@@ -2894,6 +2911,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const seen = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && (q.seen ?? []).length).map((q) => ({ epic: q.id, label: q.label ?? q.id, lines: q.seen })));
   const unproven = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, text: u.text }))));
 
+  // Small fixes the final check made on the owner's standing answer, for the closing screen: what was asked and what changed.
+  const fixes = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && q.fixedAtWrapup?.standing).map((q) => ({ epic: q.id, label: q.label ?? q.id, files: q.fixedAtWrapup.files, asked: q.fixedAtWrapup.standing.map((x) => x.question) })));
+
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
   const toWrite = pid ? [] : missingResumeGates(ws);
   const gates = [...readGates(ws).filter((g) => !toWrite.some((m) => m.replaces === g.file)), ...toWrite.map((m) => ({ file: `gates/${m.name}`, ...m.gate }))];
@@ -2906,7 +2926,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
     epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null, attended: typeof lastCfg.attended === 'boolean' ? lastCfg.attended : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
-    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, seen, friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, seen, fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };
@@ -2958,7 +2978,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
       const ask = [...(typeof lastCfg.realSpend !== 'boolean' && (launch.env?.copy ?? []).length ? ['realSpend'] : []), ...(typeof lastCfg.attended !== 'boolean' ? ['attended'] : [])];
       out.relaunch = {
         run: launch.run, runDir: launch.runDir, ask,
-        config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(typeof lastCfg.realSpend === 'boolean' ? { realSpend: lastCfg.realSpend } : {}), ...(typeof lastCfg.attended === 'boolean' ? { attended: lastCfg.attended } : {}), ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
+        config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(typeof lastCfg.realSpend === 'boolean' ? { realSpend: lastCfg.realSpend } : {}), ...(typeof lastCfg.attended === 'boolean' ? { attended: lastCfg.attended } : {}), ...(lastCfg.smallFixes !== undefined ? { smallFixes: lastCfg.smallFixes } : {}), ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
       };
     }
   }

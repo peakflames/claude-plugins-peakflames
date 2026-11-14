@@ -59,6 +59,21 @@ export const postpones = (answer) => /^\W*(not now|not yet|not today|later\b|dec
 /** A verify session's last words when it ended without judging anything (the owner put a check off, or it could not start). */
 export const NO_VERDICT = /\b(without|no)\s+(recording\s+)?(any\s+)?verdicts?\b|\bno\s+verdicts?\s+(was|were)\s+recorded\b/i;
 
+/**
+ * The owner's standing answer for small fixes the verifier recommends (`smallFixes` in the run's
+ * config or the workspace's settings; `false` turns it off): how many per final check, and how big
+ * the whole repair may be. Null when off.
+ */
+export const SMALL_FIXES = { perEpic: 2, files: 3, lines: 40 };
+export function smallFixLimits(config) {
+  const v = config?.smallFixes;
+  if (v === false || v === 0) return null;
+  const l = { ...SMALL_FIXES, ...(v && typeof v === 'object' ? v : {}) };
+  return Number(l.perEpic) > 0 ? l : null;
+}
+/** The file in a verify step's directory that lists the questions the standing answer answered "Fix now". */
+export const SMALL_FIX_FILE = 'small-fixes.json';
+
 const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_BUILD', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
 const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
 

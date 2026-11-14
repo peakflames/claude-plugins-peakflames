@@ -346,7 +346,9 @@ test('R8 wrapup-epic: each pre-approved question gets its one answer', (t) => {
   const cases = [
     [`${E1.tors[2]} is FAIL: the description is trimmed. Recommendation: Stop — the builder should fix it. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
     [`${E1.tors[0]} is CANNOT VERIFY: no test exercises the When. Recommendation: Fix now — small. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
-    ['Tests failed: node --test: 2 failing. Recommendation: Fix now — one assertion. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
+    // A failing gate the verifier recommends fixing is fixed on the owner's standing answer for small fixes (a failed requirement, above, never is).
+    ['Tests failed: node --test: 2 failing. Recommendation: Fix now — one assertion. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Fix now'],
+    ['Lint failed: 1 error. Recommendation: Stop — it needs a design change. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
     ['Verdict PASS. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop'], 'Proceed'],
     // Run A: the verifier put the epic and the counts into the question; it is still Step 1.5.
     ['Epic Lg3Sum9 (monthly summary) verdict is PASS: 5/5 requirements pass and all 20 tests pass. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop'], 'Proceed'],
@@ -356,7 +358,7 @@ test('R8 wrapup-epic: each pre-approved question gets its one answer', (t) => {
   for (const [q, opts, want] of cases) answered(h.ask(q, opts), q, want);
   // A label typed with a plain hyphen still matches, and the answer is the label as offered.
   const q = 'Verdict PASS. Proceed to Phase 2 (complete and ship)?';
-  answered(h.ask(cases[2][0], ['Fix now', 'Stop - epic FAILs']), cases[2][0], 'Stop - epic FAILs');
+  answered(h.ask(cases[3][0], ['Fix now', 'Stop - epic FAILs']), cases[3][0], 'Stop - epic FAILs');
   assert.equal(fs.existsSync(path.join(h.state, 'gates')), false);
   // A TOR that is not one of this epic's anchors is not this policy's to answer.
   parked(h.ask('TOR-09-Zzzzzz9 is FAIL: x. Recommendation: Stop. How to proceed?', ['Fix now', 'Stop — epic FAILs']));

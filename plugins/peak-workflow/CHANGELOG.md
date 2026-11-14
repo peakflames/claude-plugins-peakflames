@@ -10,6 +10,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Autopilot standing answer for small fixes** — a fix the verifier recommends is made without
+  stopping: up to 2 per epic, 3 files and 40 changed lines, never a requirement file or a
+  weakened test. Bigger fixes are rolled back and asked. Listed in the report and closing
+  screen; `"smallFixes": false` turns it off.
 - **Autopilot clone environment** — `setup` (a command) and `copy` (git-ignored files) in
   `.claude/peak-workflow/autopilot.json` give the private clone what git does not carry; the driver
   applies them at run start and after each merge.

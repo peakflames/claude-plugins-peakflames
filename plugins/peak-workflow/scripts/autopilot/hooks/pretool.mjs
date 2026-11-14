@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lintPlan, parseSidecar } from '../lib.mjs';
+import { SMALL_FIX_FILE, lintPlan, parseSidecar, smallFixLimits } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -379,7 +379,7 @@ const rowMatches = (row, question) => (row.fragments ?? []).every((f) => norm(qu
 function ruleR8(ctx) {
   const policy = readJson(path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'policy', 'gates.json'), { answer: [], park: [] });
   const questions = ctx.input.tool_input?.questions ?? [];
-  const answers = {}; const used = []; const notes = {}; let looked = null; let told = 0;
+  const answers = {}; const used = []; const notes = {}; let looked = null; let told = 0; const standing = [];
   // What the owner already answered for this step, in this run or an earlier one (the driver writes it to step.json
   // and tells the session before it starts).
   const earlier = ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).answers ?? [] : [];
@@ -418,6 +418,17 @@ function ruleR8(ctx) {
     // The owner looked, and no option on offer says so: never let the policy "No" stand in for their look.
     if (look) { park = { ...base, why: 'the owner looked at this build, and none of the options offered says a manual check was done' }; break; }
     if (parkRow) { park = { ...base, why: parkRow.why }; break; }
+    // The owner's standing answer for small fixes: the verifier itself recommends "Fix now", that option is on
+    // offer, and fewer than the allowed number were answered this way in this final check. How big the fix may be
+    // is judged afterwards, at the merge gate, from what was actually changed; a requirement is never part of it.
+    const limits = ctx.role === 'verifier' && ctx.step ? smallFixLimits(ctx.config) : null;
+    // A requirement the verifier judged FAIL or CANNOT VERIFY is never repaired by the verifier itself: policy stops, and a separate session repairs.
+    if (limits && kind !== 'tor-fail' && /\bRecommendation:\s*\**Fix now\b/i.test(q.question) && offered('Fix now')) {
+      const file = path.join(ctx.step, SMALL_FIX_FILE);
+      const made = readJson(file, []);
+      if (made.length + standing.length < limits.perEpic) { answers[q.question] = offered('Fix now'); standing.push({ at: new Date().toISOString(), question: q.question, tor }); continue; }
+      park = { ...base, why: `the standing answer for small fixes covers ${limits.perEpic} per final check, and this is one more` }; break;
+    }
     if (!row) {
       // A question nobody pre-approved, in a step the owner has already answered questions about. Seen live: a session
       // that takes the step up again words the owner's question differently, and the owner is asked twice. Autopilot
@@ -458,7 +469,9 @@ function ruleR8(ctx) {
     const done = { ...g, decided: { ...g.decided, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
     fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
   }
-  const owner = used.length + told + (looked ? 1 : 0);
+  if (standing.length) { const file = path.join(ctx.step, SMALL_FIX_FILE); fs.writeFileSync(file, JSON.stringify([...readJson(file, []), ...standing], null, 2) + '\n'); }
+  if (standing.length === Object.keys(answers).length) return { rule: 'R8', decision: 'answer', owner: standing.length, reason: `answered from the owner's standing answer for small fixes: ${Object.values(answers).join(' | ')}. Keep the fix small: it is checked at the merge against the owner's limits, never touches a requirement file and never removes a line from a test`, updatedInput: { ...ctx.input.tool_input, answers } };
+  const owner = used.length + told + (looked ? 1 : 0) + standing.length;
   const source = owner === 0 ? 'policy' : owner === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
   const annotations = Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { notes: v }]));
   return { rule: 'R8', decision: 'answer', owner, reason: `answered from ${source}: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers, ...(looked ? { annotations: { ...(ctx.input.tool_input.annotations ?? {}), ...annotations } } : {}) } };
