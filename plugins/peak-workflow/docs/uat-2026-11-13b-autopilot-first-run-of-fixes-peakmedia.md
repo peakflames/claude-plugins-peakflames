@@ -327,6 +327,10 @@ answered by the setting and the epic resumed at VERIFY).
 48. **The $80 run budget was nearly spent by one chain** ($77 after 13 runs). Default raised to
     $250; a project sets its own (`configure --run-budget`), which raises a chain in progress.
 
+49. **The closing screen handed the owner git commands** ("bring the finished work in": two
+    lines to run). Owner: assume a non-technical user and run commands on their behalf. Fixed in
+    the skill: "Do it for them" — offer, run on a yes, say what happened; never push.
+
 #### Minor
 
 36. **`git branch -d $B` still refused** after the merge-with-a-variable fix. Fixed (`e48c02f`).

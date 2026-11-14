@@ -163,9 +163,14 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 
    **Diverged** (`launch.sync.state` is `diverged`): the project and the autopilot clone each
    have commits the other lacks — the owner committed by day without first bringing in the work
-   autopilot merged. Print both tips and the fetch command from the refusal, and say: fetch,
-   merge `autopilot/<integration>` into `<integration>` in the project, then run this again.
-   Do not run the fetch or the merge yourself.
+   autopilot merged. Say so in plain words (how many commits each side has), then offer, with
+   `AskUserQuestion`: "Your project and autopilot's copy have each moved on. Combine them now?"
+   — options `Combine them for me (Recommended)`, with the description "I bring autopilot's
+   finished work in and merge it with yours. If the two changed the same lines I stop, undo
+   it, and tell you which files; nothing is pushed", and `Not now`. On yes, in the project:
+   the fetch command from the refusal, then `git merge --no-ff autopilot/<integration>`. If
+   the merge reports conflicts, run `git merge --abort`, name the files in plain words and
+   stop: resolving them is a decision, not a chore. Then run this again.
 
    **A test double.** If a refusal says `claudeBin` is not the real `claude`, `<ws>/settings.json`
    names a stand-in binary. If that is the only refusal and no epic is runnable, skip the
@@ -980,19 +985,33 @@ Leave out a part that has nothing to say.
 - **Do this next** is one action, chosen in this order:
   1. Questions still wait → "Run `/peak-workflow:autopilot` when you are ready to answer
      <n> question(s). Nothing else runs until then."
-  2. `sync.fetch` has lines (merged work waits in autopilot's copy, whatever `next` says) → "Bring the finished work into your project" with the two lines of
-     `sync.fetch` in a code block — print, do not run — and one sentence: the first line
-     shows what will come in, the second brings it in.
+  2. `sync.fetch` has lines (merged work waits in autopilot's copy, whatever `next` says) →
+     do it for them (see "Do it for them" below). Offer, with `AskUserQuestion`: "The
+     finished work is in autopilot's private copy. Bring it into your project now?" —
+     options `Bring it in for me (Recommended)`, with the description "I add it on top of
+     your `<integration>`. Nothing of yours is changed or overwritten, and nothing is
+     pushed", and `Not now`. On yes, run the two lines of `sync.fetch` in the project (the
+     first shows what comes in, the second brings it in), then say in two lines what came
+     in (which epics) and that it has not been pushed. If the second line refuses (the
+     project has moved on, or a file is in the way), change nothing, say why in plain
+     words, and go to **Diverged** in Step 1. On `Not now`, say one line: the work stays
+     safe in autopilot's copy, and `/peak-workflow:autopilot` offers this again.
   3. `next` is `readiness` (work remains that was not in this queue, or the run reached its
      budget) → "Run `/peak-workflow:autopilot` to carry on with <what is left>."
   4. Otherwise → "Nothing. Everything autopilot built is already in `<integration>`."
 
+**Do it for them.** Assume the owner is not a developer. Never hand them a terminal command
+you can run yourself: say in plain words what you are about to do and what it changes, ask
+once with `AskUserQuestion` when it changes their project, run it, and say what happened.
+Show a command only when they ask what you ran, or when only they can do the step (a
+sign-in, a push to a protected branch they must approve). You still never push, never edit
+their code, and never answer a gate for them.
+
 Then one line, and only this line, for everything else: "Other things I can help with if you
-ask: bring finished work into your project now, continue a stopped epic by hand, or walk
-through the full report." Do not print the fetch commands (unless they are the one next
-thing), the by-hand `resume` line or the report's own "Do this next" list unless the owner
-asks. When they do ask:
-- **Bring the work in**: the two lines of `sync.fetch`. Add that the private clone is the
+ask: continue a stopped epic by hand, or walk through the full report." Do not print the
+by-hand `resume` line or the report's own "Do this next" list unless the owner asks. When
+they do ask:
+- **Bring the work in** (asked later): the same offer as item 2. Add that the private clone is the
   only copy of that work until it is fetched, so the workspace must not be deleted first; that
   a resumed epic's history includes a `wip(autopilot)` commit from its park, which is
   expected; and that decisions not yet used stay usable however the work is merged, as long
