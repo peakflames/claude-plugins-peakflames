@@ -130,6 +130,7 @@ export function planText(e, { omit = [] } = {}) {
     status: '2. **Update status to "In Progress"** — edit the sidecar',
     deferral: '**Deferral gate.** If a TOR cannot be fully met, stop and use `AskUserQuestion`. Plan approval does not pre-authorize any deferral.',
     amendment: '**Amendment gate.** The helper is `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle"`. Stop implementation and use `AskUserQuestion`.',
+    checked: `Requirements checked for contradictions: none found (${e.tors.length} requirements read).`,
     tors: e.tors.map((t, i) => `${i + 3}. Implement and test ${t}`).join('\n'),
     assess: '- **Implementer self-assessment** — each TOR Given/When/Then',
     reconcile: '- **Reconcile spec** — re-read the Requirements Anchors table',

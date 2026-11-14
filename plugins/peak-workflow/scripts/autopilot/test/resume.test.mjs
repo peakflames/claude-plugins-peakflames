@@ -1305,3 +1305,27 @@ test('the standing answer never covers a requirement file or a weakened test, an
   await p2.go();
   assert.deepEqual([p2.epic(E1.id).state, gate(p2, E1.id).question], ['PARKED', third]);
 });
+
+// ---- requirements are read against each other at planning time -----------------------------------
+
+test('the planning session is told to check the requirements first; a plan without the "checked" line fails plan lint', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1, { omit: ['checked'] }) });
+  await p.go();
+  const call = p.calls()[0];
+  assert.match(appended(call), /# Autopilot planning rule: check the requirements first[\s\S]*Do any two contradict each other\?[\s\S]*Requirements checked for contradictions: none found/);
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind], ['PARKED', 'plan-lint']);
+  assert.match(gate(p, E1.id).why, /missing "Requirements checked for contradictions"/);
+});
+
+test('a contradiction the planner finds is asked before any plan or build: an amendment question, answered, and the plan session picks up', async (t) => {
+  const p = makeProject(t);
+  const tor = E1.tors[0];
+  const q = `${tor} — The tool shall import every row looks wrong: its Then contradicts ${E1.tors[1] ?? 'the header rule'}. Proposed: same title / Then: "rows after the header are imported". How to proceed?`;
+  const AMEND = [`Amend ${tor} (owner approval)`, 'Implement as written', "Stop — I'll take it from here"];
+  p.scenario({ [`${E1.id}/plan`]: { actions: [ask(q, AMEND)] } });
+  await p.go();
+  assert.deepEqual(p.steps(), [`${E1.id}/plan-1`], 'asked at planning: nothing was built');
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind, gate(p, E1.id).tor, gate(p, E1.id).session], ['PARKED', 'amendment', tor, 'plan-1']);
+  assert.equal(decide(p, E1.id, AMEND[0]).enters, 'PLAN');
+});

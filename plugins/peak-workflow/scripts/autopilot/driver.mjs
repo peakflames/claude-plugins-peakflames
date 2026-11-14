@@ -847,6 +847,35 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
 
 const userLine = (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] } });
 
+/**
+ * Appended to the planning session. Seen live: a requirement that could not be met as written was
+ * found by the build, an hour and several dollars in; the owner's amendment answer then waited
+ * for a second run. Read against each other before any plan exists, the same question costs a
+ * few minutes. One check per epic, at planning; the plan lint looks for the line.
+ */
+export const PLAN_RULES = `# Autopilot planning rule: check the requirements first
+
+Before you write the plan, read the full text of every requirement this epic anchors
+(\`docs/requirements/\`) and check two things:
+
+1. **Can each one be met as written?** A Then that names a screen, a field, a limit or a
+   behaviour the project's own documents rule out, or that nothing in this project could do,
+   cannot be met by building harder.
+2. **Do any two contradict each other?** Compare this epic's requirements with each other, and
+   with the requirements of finished epics whose code this epic changes. Two Thens that cannot
+   both be true are a contradiction.
+
+If you find one, stop before planning and ask the owner now, with the skill's own Amendment
+gate question (\`AskUserQuestion\`, in the skill's wording, naming the requirement and what is
+wrong with it). Do not plan around it and do not pick a reading yourself.
+
+If you find none, say so in the plan, on a line of its own, exactly in this form:
+
+\`Requirements checked for contradictions: none found (<n> requirements read).\`
+
+The plan is not accepted without that line.
+`;
+
 export const BUILD_RULES = `# Autopilot build rules
 
 You are implementing an already-approved plan, unattended. The plan in your prompt is the complete
@@ -1764,7 +1793,11 @@ class Run {
 
   async doPlan(e) {
     const m = this.meta(e);
-    const s = await this.step(e, 'plan', () => ({ prompt: `/peak-workflow:start-epic ${e.id}` }));
+    const s = await this.step(e, 'plan', (stepDir) => {
+      const rules = path.join(stepDir, 'plan-rules.md');
+      fs.writeFileSync(rules, PLAN_RULES);
+      return { prompt: `/peak-workflow:start-epic ${e.id}`, appendFiles: [rules] };
+    });
     if (!s) return null;
     const planFile = path.join(s.stepDir, 'plan.md');
     if (!exists(planFile)) return this.park(e, `${s.name} ended without a captured plan`);
