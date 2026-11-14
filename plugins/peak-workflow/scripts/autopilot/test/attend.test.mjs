@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, ensureResumeGates, gateReason, newRunName, standingCovers, strayProcesses } from '../driver.mjs';
-import { progressLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
+import { chainOf, eventLine, progressLine, queueLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, lines: () => r.stdout.trim().split('\n'), json: () => JSON.parse(r.stdout) }; };
@@ -29,17 +29,17 @@ test('watch on a finished run: one line on where it ended, then RUN ENDED, exit 
 
   const r = driver('watch', '--workspace', p.state);
   assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(r.lines(), ['The last autopilot run has ended: 1 finished and merged. Spent $2.01 of $80.', 'RUN ENDED: everything queued was worked through. Spent $2.01.']);
+  assert.deepEqual(r.lines(), ['The last autopilot run has ended: 1 finished and merged. Spent $2.01 of $250.', 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.']);
 
   // --replay says the whole run again, from its first event; --once --after picks up where a caller left off.
   const replay = driver('watch', '--workspace', p.state, '--replay').lines();
-  assert.deepEqual([replay[1], replay[2], replay.at(-2), replay.at(-1)], ['Autopilot started: 1 epic queued.', `Starting ${NAME}`, `Finished and merged: ${NAME} (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01.']);
+  assert.deepEqual([replay[1], replay[2], replay.at(-2), replay.at(-1)], ['Autopilot started: 1 epic queued.', `Starting ${NAME}`, `Finished and merged: ${NAME} (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.']);
   assert.equal(replay.filter((l) => /^RUN ENDED/.test(l)).length, 1);
-  assert.deepEqual(driver('watch', '--workspace', p.state, '--once', '--after', '13').lines(), [`Finished and merged: ${NAME} (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01.']);
+  assert.deepEqual(driver('watch', '--workspace', p.state, '--once', '--after', '13').lines(), [`Finished and merged: ${NAME} (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.']);
 
   // A run from before events existed is still read from its state; a workspace with no run says so.
   fs.rmSync(path.join(p.runDir(), 'events.jsonl'));
-  assert.equal(driver('watch', '--workspace', p.state).lines().at(-1), 'RUN ENDED: everything queued was worked through. Spent $2.01.');
+  assert.equal(driver('watch', '--workspace', p.state).lines().at(-1), 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.');
   fs.rmSync(path.join(p.state, 'runs'), { recursive: true }); fs.rmSync(path.join(p.state, 'current'));
   assert.deepEqual(driver('watch', '--workspace', p.state, '--grace-ms', '0').lines(), ['No autopilot run has started here yet.', 'RUN ENDED: no run to watch.']);
   assert.equal(spawnSync(process.execPath, [DRIVER, 'watch'], { encoding: 'utf8' }).status, 2, 'watch needs --workspace');
@@ -75,7 +75,7 @@ test('watch on a live run: step lines as they happen, a repeated refusal said on
   const late = startWatch(p);
   t.after(() => late.child.kill('SIGKILL'));
   await waitFor(() => late.lines().length >= 1);
-  assert.match(late.lines()[0], new RegExp(`^Autopilot is running: now building ${NAME}, \\d+ min\\. Spent \\$0\\.40 of \\$80\\.$`));
+  assert.match(late.lines()[0], new RegExp(`^Autopilot is running: now building ${NAME}, \\d+ min\\. Spent \\$0\\.40 of \\$250\\.$`));
 
   fs.writeFileSync(path.join(p.state, 'STOP'), 'stop\n');
   assert.equal(await w.done, 0);
@@ -83,7 +83,7 @@ test('watch on a live run: step lines as they happen, a repeated refusal said on
   await waitFor(() => !alive(run.pid));
   const end = w.lines().slice(mid.length);
   assert.match(end[0], /^Build stopped, as you asked, after under a minute$/);
-  assert.deepEqual(end.slice(1), [`Stopped: ${NAME} — you asked it to stop`, 'RUN ENDED: you asked it to stop. Spent $0.40.']);
+  assert.deepEqual(end.slice(1), [`Stopped: ${NAME} — you asked it to stop`, 'RUN ENDED: you asked it to stop. Spent $0.40 of $250.']);
   assert.deepEqual(late.lines().slice(1), end, 'the late watch says what happened after it joined, and nothing from before');
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')), 'the watch ends once the driver has let go');
 });
@@ -398,4 +398,28 @@ test('a process a session leaves running out of the clone is stopped when the se
   assert.deepEqual(strayProcesses(p.clone), []);
   // A status or a watch reading the clone, and this test, are never swept.
   assert.equal(st(p, '--queue', E1.id).next, 'fetch');
+});
+
+test('the run budget: $250 by default, the project may set its own, and a higher one raises a chain in progress', async (t) => {
+  const p = makeProject(t);
+  p.scenario(happy(E1));
+  await p.go();
+  const st1 = st(p);
+  assert.equal(st1.runBudgetUsd, 250);
+  const file = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
+  assert.match(driver('configure', '--project', p.project, '--run-budget', 'lots').stderr, /run budget is a dollar amount above 0/);
+  assert.equal(driver('configure', '--project', p.project, '--run-budget', '400').status, 0);
+  assert.equal(readJson(file).runBudgetUsd, 400);
+  assert.equal(st(p).runBudgetUsd, 400, 'the chain in progress is raised');
+  assert.equal(chainOf(p.state, p.runName()).runBudgetUsd, 400, 'and the watch says the same figure');
+  assert.equal(driver('configure', '--project', p.project, '--run-budget', '').status, 0);
+  assert.equal(readJson(file).runBudgetUsd, undefined);
+});
+
+test('the queue line counts over the confirmed queue: done, percent, waiting, still to go', () => {
+  assert.equal(queueLine(new Map([['a', 'MERGED'], ['b', 'PARKED'], ['c', 'QUEUED'], ['d', 'QUEUED']])), 'Progress: 1 of 4 done (25%); 1 waiting for you; 2 still to go');
+  assert.equal(queueLine(new Map([['a', 'MERGED'], ['b', 'MERGED']])), 'Progress: 2 of 2 done (100%)');
+  assert.equal(queueLine(new Map([['a', 'FAILED'], ['b', 'BLOCKED'], ['c', 'BUILD']])), 'Progress: 0 of 3 done (0%); 1 did not pass; 1 not started; 1 still to go');
+  assert.equal(eventLine({ type: 'epic-start', epic: 'b', label: 'b (x) — Second', pos: 2, of: 4 }), 'Starting 2 of 4: b — Second');
+  assert.equal(eventLine({ type: 'step-end', kind: 'build', outcome: 'ok', minutes: 12, costUsd: 4.2 }), "Build finished in 12 min ($4.20). Next: autopilot's own checks, then an independent review");
 });

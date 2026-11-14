@@ -188,7 +188,7 @@ export function defaultConfig(project) {
     testCommand: facts.testCommand,
     testDirs: facts.testDirs,
     endBy: nextEndBy(),
-    runBudgetUsd: 80,
+    runBudgetUsd: 250, // the whole chain of runs; the project's autopilot.json may set its own (`configure --run-budget`)
     realSpend: null, // run-level, the owner's answer at launch: true = sessions may spend real money on an outside service when a check needs it; false = never; null = not decided, a session asks
     attended: null, // run-level, the owner's answer at launch: true = at the computer while it runs; false = away, so no session starts anything that waits for a person; null = not asked
     autoContinue: 0, // run-level: how many technical stops per epic the owner's standing answer continues without asking (0 = always ask)
@@ -250,7 +250,8 @@ function projectSettings(project) {
   if (!exists(file)) return {};
   let j; try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); }
   // A project file sets policy and limits; it never names the run, the project path or a session binary.
-  for (const k of [...RUN_KEYS, 'claudeBin']) delete j[k];
+  // Two limits are the project's to set as its default: the run budget and the standing answer for small fixes.
+  for (const k of [...RUN_KEYS.filter((x) => !['runBudgetUsd', 'smallFixes'].includes(x)), 'claudeBin']) delete j[k];
   return j;
 }
 
@@ -594,11 +595,16 @@ export function parseBudgets(specs) {
 }
 
 /** Writes `setup`, `copy`, `readOnly`, `network` and per-step `budgets` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
-export function configureProject(project, { setup, copy, readOnly, network, budgets, look, workspace = `${project}.autopilot` } = {}) {
+export function configureProject(project, { setup, copy, readOnly, network, budgets, look, runBudget, workspace = `${project}.autopilot` } = {}) {
   const file = projectSettingsFile(project);
   let j = {}; let lookChanged = false;
   if (exists(file)) { try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); } }
   if (setup !== undefined) { if (String(setup).trim()) j.setup = String(setup).trim(); else delete j.setup; }
+  if (runBudget !== undefined) {
+    const v = String(runBudget).trim();
+    if (v && !(Number(v) > 0)) throw new Error(`run budget is a dollar amount above 0, not ${JSON.stringify(runBudget)}`);
+    if (v) j.runBudgetUsd = Number(v); else delete j.runBudgetUsd; // empty: back to the default
+  }
   if (look !== undefined) {
     const v = String(look).trim();
     if (v && !['before', 'after'].includes(v)) throw new Error(`look is "before" or "after", not ${JSON.stringify(look)}`);
@@ -3021,7 +3027,10 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const state = run ? stateOf(run) : null; const lastCfg = run ? cfgOf(run) : {};
   const chain = runChain(ws, run);
   const spentUsd = +chain.reduce((sum, name) => sum + (stateOf(name)?.spentUsd ?? 0), 0).toFixed(2);
-  const runBudgetUsd = (chain.length ? cfgOf(chain[0]).runBudgetUsd ?? stateOf(chain[0])?.runBudgetUsd : null) ?? null;
+  // The budget the owner set when the chain began; raised mid-chain when they have since set a higher one for the project.
+  const firstBudget = (chain.length ? cfgOf(chain[0]).runBudgetUsd ?? stateOf(chain[0])?.runBudgetUsd : null) ?? null;
+  let projectBudget = null; try { projectBudget = projectSettings(root).runBudgetUsd ?? null; } catch { /* reported at launch */ }
+  const runBudgetUsd = firstBudget == null ? null : Math.max(firstBudget, Number(projectBudget) || 0);
   const n = standingLimit(ws, run);
   // Inside the step in flight: the command the session has open, and whether it is waiting for the owner.
   const active = pid ? (state?.queue ?? []).find((q) => q.step) : null;
@@ -3250,9 +3259,9 @@ async function main(argv) {
   if (cmd === 'configure') {
     if (!o.project) throw new Error('configure needs --project');
     const list = (v) => (v === undefined ? undefined : String(v).split(','));
-    if ([o.setup, o.copy, o.readOnly, o.network, o.budget, o.look].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only, --network, --budget or --look (an empty value removes the entry)');
+    if ([o.setup, o.copy, o.readOnly, o.network, o.budget, o.look, o.runBudget].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only, --network, --budget, --run-budget or --look (an empty value removes the entry)');
     const root = path.resolve(o.project);
-    console.log(JSON.stringify(configureProject(root, { setup: o.setup, look: o.look, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network), budgets: o.all.budget?.flatMap((b) => b.split(',')), workspace: path.resolve(wsArg ?? `${root}.autopilot`) }), null, 2));
+    console.log(JSON.stringify(configureProject(root, { setup: o.setup, look: o.look, runBudget: o.runBudget, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network), budgets: o.all.budget?.flatMap((b) => b.split(',')), workspace: path.resolve(wsArg ?? `${root}.autopilot`) }), null, 2));
     return 0;
   }
   if (cmd === 'run') {

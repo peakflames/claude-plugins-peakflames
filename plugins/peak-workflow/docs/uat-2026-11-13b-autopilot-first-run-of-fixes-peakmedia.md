@@ -318,9 +318,14 @@ file (the verifier read the owner's look; no sign-in asked); the loosened small-
 requirements read, none found); `"look": "after"` (set mid-run; the look gate `EwgA3Zf-1` was
 answered by the setting and the epic resumed at VERIFY).
 
-46. **Run feedback is "almost too minimal".** *Skill Step 3b.* Not fixed in chat: more lines
-    cost context on every run. Answer: the cockpit mod
-    (`autopilot-cockpit-mod-handoff.md`).
+46. **Run feedback is "almost too minimal".** *Skill Step 3b, `watch`.* Fixed in chat, the one
+    display every device has: epic n of m at the start, "Next: …" after each step, "n of m done
+    (%)" over the confirmed queue across relaunches, the ten-minute heartbeat relayed, one spend
+    figure (chain total of the budget). The cockpit mod is deferred.
+47. **The small-fix line limit (40) stopped a 48-line layout fix** (`EwgA3Zf`, run `163005`); the
+    new "allow a fix of that size?" question was asked (first live proof). Default raised to 80.
+48. **The $80 run budget was nearly spent by one chain** ($77 after 13 runs). Default raised to
+    $250; a project sets its own (`configure --run-budget`), which raises a chain in progress.
 
 #### Minor
 

@@ -472,7 +472,7 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 
    **Small fixes, said in the same question.** The final check may find something small and
    recommend fixing it on the spot (a missing icon, a typo in a message). By default it does:
-   up to 2 such fixes per epic, at most 5 files and 40 changed lines together, never a
+   up to 2 such fixes per epic, at most 5 files and 80 changed lines together, never a
    requirement and never a test made to check less; anything bigger stops and asks, and a requirement
    the final check judges not met is never repaired this way. Add one sentence
    to the question text: "Small fixes the final check recommends are made without asking (up
@@ -632,10 +632,18 @@ A driver is running (you launched it, or Step 0 found it). Stay with it until it
    - A milestone — a step starting or finishing, a check, the reviewer's result, a merge —
      is relayed as it is. A merge line that ends "N thing(s) not proven for real" keeps that
      ending: the closing screen lists them. Several that arrive together are one short message.
-   - `Progress: …` — where the whole run stands (merged, waiting for you, still to go). It
-     comes after each epic ends in a run of more than one; relay it with that epic's line.
-   - A `still …` heartbeat and a `TESTS passed` line are not relayed. `TESTS failed` is not
-     either: a build session fixing its own tests is routine. Say them only when asked.
+   - `Progress: …` — where the whole queue stands, counted over the queue the owner
+     confirmed and across every relaunch ("2 of 4 done (50%); 1 waiting for you; 1 still to
+     go"). It comes after each epic ends; relay it with that epic's line.
+   - A `still …` heartbeat is relayed as it is: it comes only after ten quiet minutes, and
+     it is how an owner checking in from a phone knows a long step is alive. One line; add
+     nothing to it.
+   - **You are the announcer, not the commentator.** The chat is the one display every
+     device has, so each line the watch gives is said once, as worded: which epic of how
+     many, what finished and what comes next, the spend. Add no line of your own between
+     them.
+   - A `TESTS passed` line is not relayed. `TESTS failed` is not either: a build session
+     fixing its own tests is routine. Say them only when asked.
    - A `REFUSED …` line is kept for the closing screen's friction list, not relayed. One
      exception: `REFUSED 3 times …` is relayed once, as "A rule keeps stopping the build from
      <what, in plain words>; it is working around it."
@@ -941,6 +949,10 @@ Leave out a part that has nothing to say.
   `/peak-workflow:quick-fix` or `/peak-workflow:triage` away. To turn it on or off the owner
   says so in plain words ("don't stop to show me screens"): run
   `DRIVER configure --project "<root>" --look after` (or `before`); never set it unasked.
+  **The run budget** works the same way: the default is $250 for the whole chain of runs,
+  and "make the budget $<n>" for the project is
+  `DRIVER configure --project "<root>" --run-budget <n>`. A higher project budget also
+  raises the budget of the chain in progress, so a run that stopped at its budget can go on.
   Turning it on also answers a look at screens that is already waiting (the output's
   `answered`): go to Step 0, which relaunches. It never answers a line a person must observe.
   If status says `look` is `after` and a `human-check` gate with no `checks` still waits (it

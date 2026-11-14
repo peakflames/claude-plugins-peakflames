@@ -22,6 +22,8 @@ const STEP_WORDS = {
   plan: ['Planning', 'Plan'], build: ['Building', 'Build'], fix: ['Repairing', 'Repair'],
   audit: ['Reviewing', 'Review'], verify: ['Verifying', 'Verification'],
 };
+/** What follows a step that finished, so every line says where the run goes from here. The chat is the one display every device has. */
+const NEXT = { plan: 'the build', build: "autopilot's own checks, then an independent review", fix: "autopilot's own checks, then an independent review", verify: 'checks on the merged result' };
 /** A driver check, as what is wrong when it fails. */
 const CHECK_WORDS = {
   'branch-and-commit': 'the work was not committed as expected', 'clean-tree': 'files were left uncommitted',
@@ -127,12 +129,12 @@ export function eventLine(ev) {
   const [doing, done] = STEP_WORDS[ev.kind] ?? ['Working on', 'Step'];
   switch (ev.type) {
     case 'run-start': return ev.resuming ? 'Autopilot picked the run back up.' : `Autopilot started: ${plural((ev.queue ?? []).length, 'epic')} queued.`;
-    case 'epic-start': return ev.resumedAt ? `Continuing ${who} from where it stopped` : `Starting ${who}`;
+    case 'epic-start': { const at = ev.pos && ev.of > 1 ? `${ev.pos} of ${ev.of}: ` : ''; return ev.resumedAt ? `Continuing ${at}${who} from where it stopped` : `Starting ${at}${who}`; }
     case 'step-start': return ev.continuing ? `Picking ${who} back up where it stopped (${doing.toLowerCase()}); nothing is started over` : `${doing} ${who}`;
     case 'step-end': {
       const cost = ev.costUsd ? ` (${usd(ev.costUsd)})` : '';
       if (ev.outcome === 'ok' && ev.asked) return `${done} stopped to ask you something after ${took(ev.minutes)}${cost}`;
-      if (ev.outcome === 'ok') return `${done} finished in ${took(ev.minutes)}${cost}`;
+      if (ev.outcome === 'ok') return `${done} finished in ${took(ev.minutes)}${cost}${NEXT[ev.kind] ? `. Next: ${NEXT[ev.kind]}` : ''}`;
       if (ev.outcome === 'stopped') return `${done} stopped, as you asked, after ${took(ev.minutes)}${cost}`;
       if (ev.outcome === 'budget') return `${done} stopped at its ${/wall clock/.test(ev.why ?? '') ? 'time' : /disk|growth/.test(ev.why ?? '') ? 'disk' : 'spending'} limit after ${took(ev.minutes)}${cost}`;
       return `${done} stopped on a technical error after ${took(ev.minutes)}${cost}`;
@@ -165,6 +167,42 @@ export function progressLine(outcomes, total) {
   const left = Math.max(0, total - outcomes.size);
   const parts = [n('merged') && `${n('merged')} merged`, n('parked') && `${n('parked')} waiting for you`, n('failed') && `${n('failed')} did not pass`, n('blocked') && `${n('blocked')} not started`, `${left} still to go`].filter(Boolean);
   return `Progress: ${parts.join(', ')} (${plural(total, 'epic')} in this run)`;
+}
+
+/**
+ * The piece of work a run belongs to: the runs chained by `continues` (a relaunch after a stop or an
+ * answer), the queue the owner confirmed when the first of them was launched, the budget they set
+ * then, and what the earlier runs spent. Reads only.
+ */
+export function chainOf(workspace, run) {
+  const dir = (name) => path.join(workspace, 'runs', name);
+  const runs = [];
+  for (let name = run; name && !runs.includes(name) && runs.length < 50; name = tryJson(path.join(dir(name), 'config.json'))?.continues ?? null) {
+    if (!fs.existsSync(dir(name))) break;
+    runs.unshift(name);
+  }
+  const state = (name) => tryJson(path.join(dir(name), 'state.json')) ?? {};
+  const first = runs[0] ? state(runs[0]) : {}; const cfg = runs[0] ? tryJson(path.join(dir(runs[0]), 'config.json')) ?? {} : {};
+  const queue = Array.isArray(cfg.queue) && cfg.queue.length ? cfg.queue : (first.queue ?? []).map((q) => q.id);
+  const spentBefore = +runs.slice(0, -1).reduce((sum, name) => sum + (state(name).spentUsd ?? 0), 0).toFixed(4);
+  /** Each queued epic's latest state anywhere in the chain (a later run's word wins). */
+  const states = () => { const m = new Map(queue.map((id) => [id, 'QUEUED'])); for (const name of runs) for (const q of state(name).queue ?? []) if (m.has(q.id)) m.set(q.id, q.state); return m; };
+  // The budget set when the chain began; a higher one the owner has since set for the project replaces it (as `status` does).
+  const begun = cfg.runBudgetUsd ?? first.runBudgetUsd ?? null;
+  const project = cfg.project ? Number(tryJson(path.join(cfg.project, '.claude', 'peak-workflow', 'autopilot.json'))?.runBudgetUsd) || 0 : 0;
+  return { runs, queue, runBudgetUsd: begun == null ? null : Math.max(begun, project), spentBefore, states };
+}
+
+/**
+ * Where the whole queue stands, counted over the queue the owner confirmed and across every
+ * relaunch: "Progress: 2 of 4 done (50%); 1 waiting for you; 1 still to go". The percentage counts
+ * epics, not effort.
+ */
+export function queueLine(states) {
+  const all = [...states.values()]; const n = (s) => all.filter((v) => v === s).length;
+  const done = n('MERGED'); const left = all.length - done - n('PARKED') - n('FAILED') - n('BLOCKED') - n('SKIPPED');
+  const parts = [`${done} of ${all.length} done (${Math.round((done / all.length) * 100)}%)`, n('PARKED') && `${n('PARKED')} waiting for you`, n('FAILED') && `${n('FAILED')} did not pass`, (n('BLOCKED') + n('SKIPPED')) && `${n('BLOCKED') + n('SKIPPED')} not started`, left > 0 && `${left} still to go`].filter(Boolean);
+  return `Progress: ${parts.join('; ')}`;
 }
 
 // ---- reading a run ----------------------------------------------------------------------------
@@ -343,7 +381,10 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
   let said = 0; let lastSaid = Date.now(); let seen = 0; let offset = 0; let ended = false;
   const say = (line, { quiet = false } = {}) => { out(line); lastSaid = Date.now(); if (!quiet) said += 1; };
   const state0 = tryJson(stateFile);
-  if (after === null) say(snapshotLine(state0, { running: isLive() }), { quiet: true });
+  // One piece of work, however many relaunches: the queue the owner confirmed, their budget, and one spend figure.
+  const chain = chainOf(workspace, name);
+  const spent = (runUsd) => `${usd(chain.spentBefore + (runUsd ?? 0))}${chain.runBudgetUsd == null ? '' : ` of $${chain.runBudgetUsd}`}`;
+  if (after === null) say(snapshotLine(state0, { running: isLive(), ...(state0 ? { spentUsd: chain.spentBefore + (state0.spentUsd ?? 0), runBudgetUsd: chain.runBudgetUsd } : {}) }), { quiet: true });
   // Events already there: said again with `replay`, skipped up to `after`, otherwise taken as known (the first line covers them).
   const skip = replay ? 0 : after === null ? readFrom(eventsFile, 0).rows.length : Number(after) || 0;
   const outcomes = new Map(); let total = 0; // how each epic of the run ended so far, for the progress line
@@ -355,9 +396,11 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
       const ends = ['merged', 'parked', 'failed', 'blocked'].includes(row.type) && row.epic;
       if (ends) outcomes.set(row.epic, row.type);
       if (seen <= skip) continue;
-      const line = eventLine(row);
+      const pos = row.type === 'epic-start' ? chain.queue.indexOf(row.epic) + 1 : 0;
+      const line = row.type === 'run-end' ? `RUN ENDED: ${plainEnd(row.why)}. Spent ${spent(row.spentUsd)}.` : eventLine(pos ? { ...row, pos, of: chain.queue.length } : row);
       if (line) say(line);
-      if (ends && total > 1) say(progressLine(outcomes, total), { quiet: true });
+      if (ends && chain.queue.length > 1) say(queueLine(chain.states()), { quiet: true });
+      else if (ends && total > 1) say(progressLine(outcomes, total), { quiet: true });
       if (row.type === 'run-end') ended = true;
     }
   };
@@ -412,7 +455,7 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
       if (!last && Date.now() - started < graceMs) { await sleep(Math.min(pollMs, 250)); continue; }
       // One more read: the driver may have written its last events between the two looks above.
       events();
-      if (!ended) say(last && last.status !== 'running' ? `RUN ENDED: ${plainEnd(last.stoppedBecause)}. Spent ${usd(last.spentUsd)}.` : 'RUN ENDED: the driver is no longer running and left the run unfinished.');
+      if (!ended) say(last && last.status !== 'running' ? `RUN ENDED: ${plainEnd(last.stoppedBecause)}. Spent ${spent(last.spentUsd)}.` : 'RUN ENDED: the driver is no longer running and left the run unfinished.');
       ended = true; break;
     }
     if (once && (said > 0 || Date.now() - started >= onceMin * 60000)) break;

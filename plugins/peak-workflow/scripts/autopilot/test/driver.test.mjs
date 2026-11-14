@@ -100,11 +100,11 @@ test('events: a happy run writes one line per milestone, in order, and each read
     "Autopilot's checks on the build passed", `Reviewing ${E1.id} — CSV import`, 'The independent reviewer found nothing', `Verifying ${E1.id} — CSV import`,
     'Final checks after the merge passed', `Finished and merged: ${E1.id} — CSV import (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01.',
   ]);
-  assert.match(lines[3], /^Plan finished in under a minute \(\$0\.40\)$/);
+  assert.match(lines[3], /^Plan finished in under a minute \(\$0\.40\)\. Next: the build$/);
 
   // The wording, for what a happy run never says. No phase names and no file paths reach the owner.
   const ev = (o) => eventLine({ label, epic: E1.id, ...o });
-  assert.equal(ev({ type: 'step-end', kind: 'build', outcome: 'ok', minutes: 12.4, costUsd: 4.23 }), 'Build finished in 12 min ($4.23)');
+  assert.equal(ev({ type: 'step-end', kind: 'build', outcome: 'ok', minutes: 12.4, costUsd: 4.23 }), "Build finished in 12 min ($4.23). Next: autopilot's own checks, then an independent review");
   assert.equal(ev({ type: 'step-end', kind: 'build', outcome: 'budget', why: 'wall clock', minutes: 90, costUsd: 9 }), 'Build stopped at its time limit after 90 min ($9.00)');
   assert.equal(ev({ type: 'step-end', kind: 'verify', outcome: 'infra', why: 'exit 1, no result line', minutes: 2 }), 'Verification stopped on a technical error after 2 min');
   assert.equal(ev({ type: 'epic-start', resumedAt: 'CHECK_BUILD' }), `Continuing ${E1.id} — CSV import from where it stopped`);
