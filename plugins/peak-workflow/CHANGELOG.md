@@ -200,6 +200,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot verifier may not ask for a check the owner already did** — the referee refuses
+  the first such question and points the verifier at the owner's recorded observation; asked
+  again, it goes to the owner.
 - **Autopilot look: seen for real** — a look gate names (`live`) the requirements that must be
   seen on the running build; the skill offers to start it, "Not now" waits, and a yes given
   from pictures alone is refused.

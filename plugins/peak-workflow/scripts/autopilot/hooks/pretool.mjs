@@ -423,6 +423,18 @@ function ruleR8(ctx) {
       // that takes the step up again words the owner's question differently, and the owner is asked twice. Autopilot
       // does not judge whether two wordings are one question, and never picks an answer: it reminds the session once
       // of what was answered. A session that asks again is asking something else, and that goes to the owner.
+      // The verifier asks the owner to do a check they already did and recorded (seen live: handed the owner's real
+      // sign-in in their own words, the verifier asked them to sign in again). Refused once, with the record; a
+      // verifier that cannot judge from it says so through the skill's CANNOT VERIFY question, which carries its
+      // reason back to the owner. Asked a second time it is a different question, and it goes to the owner.
+      const seen = ctx.role === 'verifier' && ctx.step && tor ? readJson(path.join(ctx.step, 'step.json'), {}).look : null;
+      const lookMemo = ctx.step ? path.join(ctx.step, 'look-reminded.json') : null;
+      const covers = seen && ((seen.observations ?? []).length ? seen.observations.some((o) => o.tor === tor && o.answer === 'yes') : true);
+      if (covers && !fs.existsSync(lookMemo)) {
+        fs.writeFileSync(lookMemo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
+        const lines = (seen.observations ?? []).filter((o) => o.tor === tor && o.answer === 'yes').map((o) => `"${o.clause}" — yes${o.how === 'live' ? ', seen for real' : ''}`).join('; ');
+        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: ${seen.by} already did this check for ${tor} on ${seen.date} and recorded what they saw${lines ? ` (${lines})` : ''}${seen.note ? `; their words: "${seen.note}"` : ''}. It is in the file "The operator's observation is already recorded" you were given. Do not ask them to do it again: record it as operator-observed in their words and judge the Then from it. If their record contradicts a Then or says a line was not checked, give CANNOT VERIFY and ask the skill's own question for that, with your reason` };
+      }
       const memo = ctx.step ? path.join(ctx.step, 'answers-reminded.json') : null;
       if (earlier.length && memo && !fs.existsSync(memo)) {
         fs.writeFileSync(memo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');

@@ -1072,8 +1072,9 @@ test('a check the owner puts off ends the verify without a verdict: parked to ru
   decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
   const tip = git(p.clone, 'rev-parse', e5.branch);
 
-  // The verifier asks for a check only a person can do; the owner is away.
-  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(signIn(e5.tors[0]), ['Yes — start it, I\'ll sign in', LATER])] } });
+  // The verifier asks for a check only a person can do (twice: the first is met with the owner's record); the owner is away.
+  const live = ask(signIn(e5.tors[0]), ['Yes — start it, I\'ll sign in', LATER]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [live, live] } });
   await again(p, { queue: [e5.id] });
   assert.deepEqual([p.epic(e5.id).state, gate(p, e5.id, 2).kind], ['PARKED', 'unmatched']);
   assert.equal(decide(p, e5.id, LATER, { n: 2 }).enters, 'VERIFY');
@@ -1197,4 +1198,37 @@ test('a repair that changes a screen file still parks for a new look', async (t)
   const r = await again(p, { queue: [ui.id] });
   assert.deepEqual(r.steps, ['verify-1', 'fix-1', 'audit-1'].map((s) => `${ui.id}/${s}`));
   assert.deepEqual([p.epic(ui.id).state, p.epic(ui.id).reason, gate(p, ui.id, 2).kind], ['PARKED', 'human check needed before verify', 'human-check']);
+});
+
+test('a verifier that asks the owner to redo a check they already recorded is refused once and pointed at the record; asking again still reaches the owner', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  const obs = gate(p, e5.id).checks.map((c) => ({ n: c.n, answer: 'yes', how: 'live' }));
+  assert.equal(cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-1.json`, '--answer', ANSWERS.looksRight, '--by', 'Pat Owner', '--observations', JSON.stringify(obs), '--note', 'real sign-in done, it works').status, 0);
+
+  // Seen live: handed the owner's recorded sign-in, the verifier asked them to sign in again.
+  const q = signIn(e5.tors[0]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes — start it, I\'ll sign in', 'Not now']), ...wrapupActions(e5)], result: { result: 'Verdict: PASS' } } });
+  const r = await again(p, { queue: [e5.id] });
+  assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
+  const [refused] = tools(p, e5.id, 'verify-1');
+  assert.equal(refused.hookSpecificOutput.permissionDecision, 'deny');
+  assert.match(refused.hookSpecificOutput.permissionDecisionReason, new RegExp(`not put to the owner: Pat Owner already did this check for ${e5.tors[0]} .* real sign-in done, it works.*Do not ask them to do it again`, 's'));
+  assert.equal(refused.continue, undefined, 'a reminder, not a stop');
+  assert.deepEqual(fs.readdirSync(path.join(p.state, 'gates')), [`${e5.id}-1.json`]);
+  assert.deepEqual(r.steps, [`${e5.id}/verify-1`]);
+});
+
+test('a verifier that asks for the recorded check a second time is asking something else: it goes to the owner', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
+  const q = signIn(e5.tors[0]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes', 'Not now']), ask(q, ['Yes', 'Not now'])] } });
+  await again(p, { queue: [e5.id] });
+  assert.deepEqual([p.epic(e5.id).state, gate(p, e5.id, 2).kind, gate(p, e5.id, 2).question], ['PARKED', 'unmatched', q]);
 });
