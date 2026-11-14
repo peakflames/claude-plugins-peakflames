@@ -992,7 +992,20 @@ Leave out a part that has nothing to say.
      your `<integration>`. Nothing of yours is changed or overwritten, and nothing is
      pushed", and `Not now`. On yes, run the two lines of `sync.fetch` in the project (the
      first shows what comes in, the second brings it in), then say in two lines what came
-     in (which epics) and that it has not been pushed. If the second line refuses (the
+     in (which epics) and that it has not been pushed. Then tidy up, without leaving either
+     to the owner:
+     - Delete the temporary branch the fetch made, `git branch -D autopilot/<integration>`,
+       once the second line has succeeded. It is autopilot's own, and the work is now in
+       `<integration>`: no question, no line about it.
+     - If `git status --porcelain -- .claude/peak-workflow/autopilot.json` shows the
+       project's autopilot settings changed or new, offer, with `AskUserQuestion`:
+       "Autopilot's settings for this project (<what changed, in plain words: the setup
+       command, 'look at screens after', the budget>) are not saved in git yet. Save them
+       with a commit?" — options `Commit it for me (Recommended)`, with the description
+       "Only that one file, so other computers and teammates get the same setup. Nothing is
+       pushed", and `Not now`. On yes:
+       `git add .claude/peak-workflow/autopilot.json && git commit -m "chore(autopilot): project settings" -- .claude/peak-workflow/autopilot.json`.
+       Never stage anything else. If the second line refuses (the
      project has moved on, or a file is in the way), change nothing, say why in plain
      words, and go to **Diverged** in Step 1. On `Not now`, say one line: the work stays
      safe in autopilot's copy, and `/peak-workflow:autopilot` offers this again.
