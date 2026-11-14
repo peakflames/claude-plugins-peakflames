@@ -10,6 +10,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Autopilot `report.md` catches up with the closing screen** — whether the owner was there,
+  pictures and lines seen for real at the look, the verifier's words on the pictures, approved
+  amendments, small fixes made without asking, and sign-ins nobody answered.
 - **Autopilot standing answer for small fixes** — a fix the verifier recommends is made without
   stopping: up to 2 per epic, 3 files and 40 changed lines, never a requirement file or a
   weakened test. Bigger fixes are rolled back and asked. Listed in the report and closing

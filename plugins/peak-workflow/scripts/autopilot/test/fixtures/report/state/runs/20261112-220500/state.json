@@ -16,7 +16,7 @@
     {
       "id": "Lg1Csv7",
       "name": "CSV import",
-      "label": "Lg1Csv7 (csv-import) — CSV import",
+      "label": "Lg1Csv7 (csv-import) \u2014 CSV import",
       "attempts": {},
       "fixRounds": 0,
       "costUsd": 9.1,
@@ -108,12 +108,39 @@
           "path": "test/smoke.test.js",
           "reason": "the version line now ends with the build date"
         }
-      ]
+      ],
+      "amended": [
+        "TOR-01-Lg1Csv7"
+      ],
+      "seen": [
+        "home.png \u2014 the home page with three figures, as captioned",
+        "home-narrow.png \u2014 NOT as captioned: the menu covers the heading"
+      ],
+      "unanswered": [
+        {
+          "step": "verify-1",
+          "description": "Needs you: sign in in the browser that just opened",
+          "command": "node bin/ledger.js login"
+        }
+      ],
+      "fixedAtWrapup": {
+        "count": 1,
+        "files": [
+          "src/usage.js"
+        ],
+        "approvedBy": "the standing answer for small fixes",
+        "standing": [
+          {
+            "question": "Console error: 404 for /favicon.ico. Recommendation: Fix now. How to proceed?",
+            "tor": null
+          }
+        ]
+      }
     },
     {
       "id": "Lg4Fx2q",
       "name": "Currency conversion",
-      "label": "Lg4Fx2q (currency) — Currency conversion",
+      "label": "Lg4Fx2q (currency) \u2014 Currency conversion",
       "attempts": {},
       "fixRounds": 0,
       "costUsd": 11.3,
@@ -193,7 +220,7 @@
     {
       "id": "Lg5Chr8",
       "name": "Spending chart",
-      "label": "Lg5Chr8 (spending-chart) — Spending chart",
+      "label": "Lg5Chr8 (spending-chart) \u2014 Spending chart",
       "attempts": {},
       "fixRounds": 0,
       "costUsd": 7.8,
@@ -270,7 +297,7 @@
     {
       "id": "Lg3Sum9",
       "name": "Monthly summary",
-      "label": "Lg3Sum9 (monthly-summary) — Monthly summary",
+      "label": "Lg3Sum9 (monthly-summary) \u2014 Monthly summary",
       "attempts": {},
       "fixRounds": 1,
       "costUsd": 13,
@@ -418,7 +445,7 @@
     {
       "id": "Lg6Bud2",
       "name": "Category budgets",
-      "label": "Lg6Bud2 (budgets) — Category budgets",
+      "label": "Lg6Bud2 (budgets) \u2014 Category budgets",
       "attempts": {},
       "fixRounds": 0,
       "costUsd": 0,
@@ -452,7 +479,7 @@
     {
       "id": "Lg7Exp5",
       "name": "Export to CSV",
-      "label": "Lg7Exp5 (export) — Export to CSV",
+      "label": "Lg7Exp5 (export) \u2014 Export to CSV",
       "attempts": {},
       "fixRounds": 0,
       "costUsd": 0,
@@ -471,7 +498,7 @@
     {
       "id": "Lg8Hw01",
       "name": "Receipt printer",
-      "label": "Lg8Hw01 (receipt-printer) — Receipt printer",
+      "label": "Lg8Hw01 (receipt-printer) \u2014 Receipt printer",
       "attempts": {},
       "fixRounds": 0,
       "costUsd": 0,
@@ -487,5 +514,6 @@
       "reason": "TOR-08-Ab1Cd2E is a Safety requirement (hardware-in-the-loop)",
       "endedAt": "2026-11-13T10:19:00.000Z"
     }
-  ]
+  ],
+  "attended": false
 }

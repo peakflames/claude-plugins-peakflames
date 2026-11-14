@@ -13,6 +13,9 @@ New to this report? "Words used in this report", at the end, explains every term
 Workspace: <workspace> — run 20261112-220500. Paths below are relative to the workspace.
 Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80.
 Real money on outside services: not decided at launch; a session that needs it asks you.
+Whether you were there: you said you would be away; no session started anything that waits for a person.
+Small fixes made without asking, on your standing answer: Lg1Csv7 (src/usage.js) — what was asked is under each epic below.
+Waited for you and nobody came: Lg1Csv7 ×1 — each is under its epic below, with the command to run by hand.
 
 ## Do this next
 1. Answer 2 waiting questions: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)
@@ -50,6 +53,17 @@ The detail behind each row of Results: what ran, what was checked, and anything 
 ### Lg1Csv7 (csv-import) — CSV import — MERGED
 
 verify PASS, merge gate green
+
+Fixed during verification, on your standing answer for small fixes: src/usage.js. What the verifier asked: "Console error: 404 for /favicon.ico. Recommendation: Fix now. How to proceed?". The verifier checked its own fix; no separate audit ran on it.
+
+Requirement amended with your approval: TOR-01-Lg1Csv7. The build rewrote it in your name and the checks followed the amended text.
+
+What the verifier saw in the pictures (its own words):
+- home.png — the home page with three figures, as captioned
+- home-narrow.png — NOT as captioned: the menu covers the heading
+
+Waited for you and nobody came:
+- verify-1: Needs you: sign in in the browser that just opened — by hand: `node bin/ledger.js login`
 
 Plan: `runs/20261112-220500/epics/Lg1Csv7/plan-1/plan.md` — approved by lint, not by a person.
 

@@ -89,6 +89,8 @@ export function collectReport(runDir) {
       testChanges: q.testChanges ?? [], unproven: q.unproven ?? [], rejected: q.rejected ?? [], fixRounds: q.fixRounds ?? 0,
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
       resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
+      // What the closing screen says and this report used to leave out: approved amendments, the verifier's words on the pictures, sign-ins nobody answered.
+      amended: q.amended ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [],
     };
   });
 
@@ -105,7 +107,7 @@ export function collectReport(runDir) {
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, setupFailed: s.setupFailed ?? null,
-    realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
+    realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
   // Is the clone's integration tip already in the project? (null: cannot tell — no project, no clone.) Read-only.
   const git = (cwd, ...args) => { try { return spawnSync('git', args, { cwd, encoding: 'utf8' }); } catch { return { status: 1, stdout: '' }; } };
@@ -213,6 +215,12 @@ export function renderReport(r) {
 
   L.push(`Real money on outside services: ${r.realSpend === true ? 'you allowed it when a check needs it' : r.realSpend === false ? 'you said not to spend any; what that left unproven is in each verify report under "Not proven for real"' : 'not decided at launch; a session that needs it asks you'}.`);
 
+  L.push(`Whether you were there: ${r.attended === true ? 'you said you would be at the computer; a step that needed you told you and waited' : r.attended === false ? 'you said you would be away; no session started anything that waits for a person' : 'not asked at launch'}.`);
+  const fixed = r.epics.filter((e) => e.fixedAtWrapup?.standing);
+  if (fixed.length) L.push(`Small fixes made without asking, on your standing answer: ${fixed.map((e) => `${e.id} (${e.fixedAtWrapup.files.join(', ') || 'no code file'})`).join('; ')} — what was asked is under each epic below.`);
+  const nobody = r.epics.filter((e) => e.unanswered.length);
+  if (nobody.length) L.push(`Waited for you and nobody came: ${nobody.map((e) => `${e.id} ×${e.unanswered.length}`).join(', ')} — each is under its epic below, with the command to run by hand.`);
+
   L.push('', '## Do this next');
   if (r.next.length) r.next.forEach((n, i) => L.push(`${i + 1}. ${n}`)); else L.push('Nothing to do.');
 
@@ -244,7 +252,15 @@ export function renderReport(r) {
     if (e.fixedAtWrapup?.standing) L.push('', `Fixed during verification, on your standing answer for small fixes: ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. What the verifier asked: ${e.fixedAtWrapup.standing.map((x) => `"${x.question}"`).join('; ')}. The verifier checked its own fix; no separate audit ran on it.`);
     else if (e.fixedAtWrapup?.approvedBy) L.push('', `Fixed during verification, on your "Fix now" (\`${e.fixedAtWrapup.approvedBy}\`): ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. The verifier checked its own fix; no separate audit ran on it.`);
     if (e.auditOverruled) L.push('', `Verified as built: ${e.auditOverruled.by} judged the auditor's findings not real (\`${e.auditOverruled.gate}\`).`);
-    if (e.look) L.push('', `Human check: ${e.look.by} looked on ${e.look.date} and answered "Looks right" (\`${e.look.gate}\`); wrapup's manual-verification question was answered with that.`);
+    if (e.look) {
+      const pics = (e.look.artifacts ?? []).filter((a) => a.startsWith('look/')).length;
+      const live = (e.look.observations ?? []).filter((o) => o.how === 'live').length;
+      L.push('', `Human check: ${e.look.by} looked on ${e.look.date} and answered "Looks right" (\`${e.look.gate}\`)${pics ? `, with ${pics} picture(s) of the screens` : ''}${live ? `; ${live} line(s) seen for real, on the running build` : ''}; wrapup's manual-verification question was answered with that.${e.look.kept ? ` The look was kept across a repair that changed no screen file (${e.look.kept.files.join(', ') || 'no files'}).` : ''}`);
+      for (const o of e.look.observations ?? []) L.push(`- ${o.tor}: "${o.clause}" — ${o.answer}${o.how ? ` (${o.how === 'live' ? 'seen for real' : 'from pictures'})` : ''}`);
+    }
+    if (e.amended.length) L.push('', `Requirement amended with your approval: ${e.amended.join(', ')}. The build rewrote it in your name and the checks followed the amended text.`);
+    if (e.seen.length) L.push('', 'What the verifier saw in the pictures (its own words):', ...e.seen.map((x) => `- ${x}`));
+    if (e.unanswered.length) L.push('', 'Waited for you and nobody came:', ...e.unanswered.map((u) => `- ${u.step ? `${u.step}: ` : ''}${u.description}${u.command ? ` — by hand: \`${u.command}\`` : ''}`));
     if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);
     if (e.sessions.length) {
       L.push('', '| Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |', '|---|---|---|---|---|---|');
