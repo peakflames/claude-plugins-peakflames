@@ -269,6 +269,17 @@ four-option popup) and 25 (test-edit rule up front). Still open: 5, 6, 7, 8, 10,
     Fix: keep the look when the commits since it touch no file a screen is built from, or show
     only what changed.
 
+42. **The stale "Not now" ended the next verify too.** Morning run `083321`: the owner had done
+    the real Okta sign-in and answered the look "Looks right" on `b98f88a`, but the new verify
+    session was also told last night's "Not now — end the session" (`ownerAnswers()` keeps used
+    answers) and obeyed it: no verdicts, `FAIL after the fix round`, FAILED.
+    *Driver `ownerAnswers`.*
+
+**Fixed (33 and 42):** a postponing answer is told only to the session that asked; a verify that
+ends without a verdict parks with a "run the final check again" gate (no FAIL, no repair round);
+an epic an earlier driver failed that way gets the same gate; and a VERIFY resume is handed the
+owner's look on the same build. 34 and 35 stay open (the five-item plan, item 5).
+
 #### Minor
 
 36. **`git branch -d $B` still refused** after the merge-with-a-variable fix. Fixed (`e48c02f`).

@@ -50,6 +50,15 @@ export const ANSWERS = {
   approvePlan: 'Approve this plan', replan: 'Re-plan',
   resume: 'Resume from where it stopped', startOver: 'Start over',
 };
+/**
+ * An answer that puts a decision off ("Not now — end the session", "Decide later"). It answers the
+ * session that asked, once; it is not a decision, so no later session is told it (seen live: a
+ * verify session told an old "Not now" ended again with no verdicts after the owner had done the check).
+ */
+export const postpones = (answer) => /^\W*(not now|not yet|not today|later\b|decide later|ask (me )?(again )?later|skip (it |this )?for now|another time|end the session)/i.test(String(answer ?? ''));
+/** A verify session's last words when it ended without judging anything (the owner put a check off, or it could not start). */
+export const NO_VERDICT = /\b(without|no)\s+(recording\s+)?(any\s+)?verdicts?\b|\bno\s+verdicts?\s+(was|were)\s+recorded\b/i;
+
 const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_BUILD', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
 const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
 

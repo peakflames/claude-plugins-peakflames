@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, gateEntry, lintPlan, parseSidecar } from './lib.mjs';
+import { ANSWERS, NO_VERDICT, gateEntry, lintPlan, parseSidecar, postpones } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, unprovenLines, watch };
@@ -1010,10 +1010,11 @@ const stepKindOf = (session) => String(session ?? '').replace(/-\d+$/, '');
  * up again is told them before it does anything: seen live, a fresh session words the same
  * question differently, the recorded answer matches nothing, and the owner is asked again.
  * Answers already used stay on the list (the next session did not hear them); a start from
- * scratch retires them.
+ * scratch retires them. An answer that puts the question off ("Not now") is told only to the
+ * session resuming from that gate (`keep`): later sessions ask again.
  */
-export function ownerAnswers(workspace, epicId) {
-  return readGates(workspace).filter((g) => g.epic === epicId && g.decided?.answer && !g.void && !g.superseded && !g.cleared && gateEntry(g)?.question)
+export function ownerAnswers(workspace, epicId, { keep = null } = {}) {
+  return readGates(workspace).filter((g) => g.epic === epicId && g.decided?.answer && !g.void && !g.superseded && !g.cleared && gateEntry(g)?.question && (g.file === keep || !postpones(g.decided.answer)))
     .map((g) => ({ gate: g.file, kind: stepKindOf(g.session), gateKind: g.kind ?? 'unmatched', tor: g.tor ?? null, question: g.question ?? '', options: g.options ?? [], answer: g.decided.answer, by: g.decided.by ?? null, date: g.decided.date ?? null, ...(g.decided.note ? { note: g.decided.note } : {}) }));
 }
 const answerList = (answers) => answers.map((a, i) => `${i + 1}. **Asked:** "${a.question}"\n   **Options offered:** ${a.options.map((o) => `"${o}"`).join(', ') || '(none)'}\n   **The owner's answer:** "${a.answer}" — ${a.by ?? 'the owner'}, ${a.date ?? 'earlier'}${a.note ? `\n   **Their words:** "${a.note}"` : ''}`).join('\n');
@@ -2133,6 +2134,7 @@ class Run {
     if (this.integrationSha() !== e.preVerify.developSha) return 'CHECK_VERIFY';
     // No merge and no gate: the verdict was FAIL (policy answers "Stop — epic FAILs").
     const verdict = (s.result?.result ?? '').trim() || '(the verify session gave no result text)';
+    const untouched = this.branchTip(m.branch) === e.preVerify.branchTip;
     this.wipCommit(e);
     // The verifier could not judge an operator-observed requirement from the owner's recorded look
     // (seen live: the note covered the labels and said nothing of the bar heights). No code is
@@ -2167,6 +2169,20 @@ class Run {
         why: `nothing failed: the verifier's report is attached. "${ANSWERS.resume}" runs the verify step again on the same branch; or merge it by hand: git merge --no-ff ${m.branch}`,
         artifacts: [this.rel(path.join(s.stepDir, 'result.json'))],
         resume: `in the fetched repo: git checkout ${this.state.integration} && git merge --no-ff ${m.branch}`,
+      });
+      return this.park(e, reason);
+    }
+    // Ended without judging anything (seen live: the owner put a sign-in off, the session stopped as
+    // told). Nothing failed and no code is wrong: the check is run again later, not repaired now.
+    if (untouched && NO_VERDICT.test(verdict) && !/\bverdict\W{0,4}\s*FAIL\b/i.test(verdict)) {
+      const reason = `${s.name} ended without a verdict: nothing was recorded or committed`;
+      this.writeGate(e, {
+        kind: 'resume', skillStep: 'wrapup-epic', phase: 'VERIFY', reason,
+        question: `${m.label}: the final check ended without a verdict ("${verdict.split('\n')[0].slice(0, 200)}"). Run it again in the next run?`,
+        options: [ANSWERS.resume, ANSWERS.startOver],
+        why: `nothing failed and nothing is repaired. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt${e.look ? ' and your recorded look still stands' : ''}. A check you put off is asked again then. "${ANSWERS.startOver}" plans the epic again from scratch`,
+        artifacts: [this.rel(path.join(s.stepDir, 'result.json'))],
+        resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
       });
       return this.park(e, reason);
     }
@@ -2384,7 +2400,13 @@ class Run {
       // Phases that run a captured plan need it; without one the epic is planned again.
       if (phase === 'BUILD' && !(e.plan && exists(path.join(this.stateDir, e.plan)))) { phase = 'PLAN'; e.resumed.phase = phase; }
       // What the owner answered for this epic's sessions so far: every session of that step in this run is told.
-      e.answers = ownerAnswers(this.stateDir, e.id);
+      e.answers = ownerAnswers(this.stateDir, e.id, { keep: f.gate });
+      // The owner's look on this very build still stands when verify is entered from another gate
+      // (a question, a run that ended without a verdict): the verifier is handed it, not asked again.
+      if (phase === 'VERIFY' && !e.look) {
+        const l = readGates(this.stateDir).filter((x) => x.epic === e.id && x.kind === 'human-check' && x.decided?.answer === ANSWERS.looksRight && !x.void && !x.superseded && x.branchTip && x.branchTip === g.branchTip).at(-1);
+        if (l) e.look = { gate: l.file, by: l.decided.by, date: l.decided.date, note: l.decided.note ?? null, observations: l.decided.observations ?? [], branchTip: l.branchTip, artifacts: l.artifacts ?? [] };
+      }
       if (entry.question && g.session && g.run) {
         // The session that asked is resumed with the answer, when it can be: same step, its record still on disk.
         const prev = tryJson(path.join(runDirOf(this.stateDir, g.run), 'epics', e.id, g.session, 'step.json'));
@@ -2672,15 +2694,31 @@ function missingResumeGates(workspace) {
   const records = tryJson(path.join(workspace, 'epics.json'), {}) ?? {};
   const gates = readGates(workspace);
   for (const [id, rec] of Object.entries(records)) {
-    if (rec.state !== 'PARKED' || !rec.branch || gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
-    const m = String(rec.reason ?? '').match(/^(CHECK_BUILD)\b|^interrupted: .*(CHECK_BUILD)/);
+    if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch || gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
+    const reason = String(rec.reason ?? '');
+    // An earlier driver called a verify that recorded no verdicts a FAIL (seen live: the owner had put a sign-in off).
+    const verify = rec.state === 'FAILED' && (reason.match(/^(verify-\d+) FAIL after the fix round: /) ?? [])[1];
+    const m = rec.state === 'PARKED' && reason.match(/^(CHECK_BUILD)\b|^interrupted: .*(CHECK_BUILD)/);
     const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
     const integration = detectIntegration(clone);
-    if (!m || !tip || !integration) continue;
+    if (!(m || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
     const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
     const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
     const n = gates.filter((g) => g.epic === id).length + 1;
     const last = (rec.buildSteps ?? []).at(-1);
+    if (verify) {
+      const dir = `runs/${rec.run}/epics/${id}/${verify}`;
+      made.push({ name: `${id}-${n}.json`, gate: {
+        epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: verify, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
+        resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${id}`, decided: null,
+        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', reason: `${verify} ended without a verdict: nothing was recorded or committed`,
+        question: `${q.label ?? id}: the final check ended without a verdict, and an earlier autopilot called that a FAIL. Run the final check again in the next run?`,
+        options: [ANSWERS.resume, ANSWERS.startOver],
+        why: `nothing failed and nothing is repaired. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt, and a look you recorded on this build still stands. A check you put off is asked again then. "${ANSWERS.startOver}" plans the epic again from scratch`,
+        artifacts: exists(path.join(workspace, dir)) ? [dir] : [],
+      } });
+      continue;
+    }
     made.push({ name: `${id}-${n}.json`, gate: {
       epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: last?.name ?? null, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
       resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${id}`, decided: null,
