@@ -278,7 +278,21 @@ four-option popup) and 25 (test-edit rule up front). Still open: 5, 6, 7, 8, 10,
 **Fixed (33 and 42):** a postponing answer is told only to the session that asked; a verify that
 ends without a verdict parks with a "run the final check again" gate (no FAIL, no repair round);
 an epic an earlier driver failed that way gets the same gate; and a VERIFY resume is handed the
-owner's look on the same build. 34 and 35 stay open (the five-item plan, item 5).
+owner's look on the same build.
+
+**Fixed (34 and 35):** a look gate lists in `live` the requirements that must be seen on the
+running build; the skill offers "Start it so I can check for real", "Not now" waits, and the
+driver refuses a yes given from pictures. A look is kept across a repair whose own commits touch
+no screen file (markup, styles, components, images); the verifier is told what changed.
+
+43. **The verifier asked for the real Okta sign-in a third time, with the owner's record in hand.**
+    Run `085207` (the fix for 33/42 live: resumed at VERIFY, no stale answer, the look from
+    `b98f88a` handed over, 11 of 12 requirements PASS in 5 min, $2.47). `owner-look.md` held the
+    owner's words "Real Okta sign-in … done, signed in and it works!" and the rule not to ask;
+    the verifier asked anyway and the run parked. *Referee (R8): a rule in a prompt is not a
+    stop.* Fixed: the first question that names a requirement the owner's look covers is refused
+    with the record; a second one goes to the owner. The waiting question (`G8jMzOz-5`) is
+    replaced by a resume gate at VERIFY, so the owner does not sign in again.
 
 #### Minor
 

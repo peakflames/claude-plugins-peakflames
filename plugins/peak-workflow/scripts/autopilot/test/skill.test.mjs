@@ -241,7 +241,8 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     "If it stops for a technical reason I'll continue it automatically (up to 2 times per epic).", '`DRIVER continue --workspace "<ws>" --json`', 'It stopped for a technical reason (<the entry\'s `why`>); continuing, as you asked.',
     'Only `DRIVER continue` applies it', 'you never record "resume" on a gate yourself', '"autoContinue": 2', '"endBy": null',
     'The popup hides the chat: put what the owner must read inside the question text.',
-    'Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`', 'ask nothing again',
+    '**What must be seen for real.**', '`Start it so I can check for real (Recommended)`', 'never record a yes for them from the pictures', '"how": "live" | "pictures"',
+    'Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`', 'ask nothing again', 'except what `relaunch.ask` names', 'add each answer to the config under that key',
     '## Closing screen', '**Things autopilot got in the way of:**', '**Do this next:** <exactly one thing>',
     // Seen live: the owner waited on a browser with no word, and the attending session guessed.
     '`NEEDS YOU: …`', 'Relay it at once, as "Needs you now: <what>"', 'never guess beyond them', '**Say what an option asks of the owner.**',
@@ -288,6 +289,7 @@ test('the loop, end to end: launch, a technical stop, status says continue, the 
   assert.deepEqual(readJson(path.join(p.state, 'gates', `${E1.id}-1.json`)).decided, { answer: 'Resume from where it stopped', by: 'Todd Schavey', date: new Date().toISOString().slice(0, 10), scope: 'next-run', standing: true });
   const s2 = status('--queue', E1.id);
   assert.equal(s2.next, 'readiness');
+  assert.deepEqual(s2.relaunch.ask, ['attended'], 'real money was answered at launch; whether the owner is there never was, so it is asked once');
   assert.deepEqual([s2.relaunch.config.queue, s2.relaunch.config.continues, s2.relaunch.config.autoContinue, s2.relaunch.config.endBy, s2.relaunch.config.realSpend, s2.realSpend], [[E1.id], pre.launch.run, 2, null, true, true]);
 
   // Step 3 item 5: relaunch.config written as given, the same launch line with the names status gave.

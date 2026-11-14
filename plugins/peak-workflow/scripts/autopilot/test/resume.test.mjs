@@ -1072,8 +1072,9 @@ test('a check the owner puts off ends the verify without a verdict: parked to ru
   decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
   const tip = git(p.clone, 'rev-parse', e5.branch);
 
-  // The verifier asks for a check only a person can do; the owner is away.
-  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(signIn(e5.tors[0]), ['Yes — start it, I\'ll sign in', LATER])] } });
+  // The verifier asks for a check only a person can do (twice: the first is met with the owner's record); the owner is away.
+  const live = ask(signIn(e5.tors[0]), ['Yes — start it, I\'ll sign in', LATER]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [live, live] } });
   await again(p, { queue: [e5.id] });
   assert.deepEqual([p.epic(e5.id).state, gate(p, e5.id, 2).kind], ['PARKED', 'unmatched']);
   assert.equal(decide(p, e5.id, LATER, { n: 2 }).enters, 'VERIFY');
@@ -1130,4 +1131,130 @@ test('an epic an earlier driver FAILED for a verify with no verdicts gets a resu
   assert.deepEqual(last.steps, [`${e5.id}/verify-1`], 'nothing is rebuilt');
   assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
   assert.match(appended(last.calls[0]), /six bars, labels readable/);
+});
+
+// ---- the look: seen for real, and kept across a repair that changes no screen (UAT issues 34, 35) --
+
+test('the look says what must be seen for real: a yes from pictures is refused for an operator-observed line; a live yes is told to the verifier as such', async (t) => {
+  const p = makeProject(t, { config: { humanCheck: { Lg5Chr8: "echo '<svg/>' > chart.html" } } });
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  const g = gate(p, e5.id);
+  assert.deepEqual(g.live, [{ tor: e5.tors[0], checklist: `tests/manual/${e5.tors[0]}.md` }], 'the operator-observed requirement and the checklist that says how to see it for real');
+
+  const dec = (obs) => cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-1.json`, '--answer', ANSWERS.looksRight, '--by', 'Pat Owner', '--observations', JSON.stringify(obs));
+  const all = (how) => g.checks.map((c) => ({ n: c.n, answer: 'yes', how }));
+  assert.match(dec(all('pictures')).stderr, /seen only in pictures.*is not the owner's observation.*check it for real, or decide later/s);
+  assert.match(dec(all('a guess')).stderr, /how .* was seen is "live" or "pictures"/);
+  assert.equal(gate(p, e5.id).decided, null);
+  const ok = dec(all('live'));
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.ok(gate(p, e5.id).decided.observations.every((o) => o.how === 'live'));
+
+  p.scenario({ [`${e5.id}/verify`]: wrapupScript(e5) });
+  const r = await again(p, { queue: [e5.id] });
+  assert.equal(p.epic(e5.id).state, 'MERGED');
+  assert.match(appended(r.calls[0]), /yes, I saw this \(for real, on the running build: not in a picture\)/);
+});
+
+function addScreenEpic(p) {
+  const ui = addEpic(p.project, { id: 'Lg6Scr1', slug: 'dashboard', name: 'Dashboard', nn: '06' });
+  fs.appendFileSync(path.join(p.project, 'docs', 'implementation-plan', 'phase-1-core', `epic-${ui.id}-${ui.slug}.md`), '\n## Screens\n\n- S-01 Home\n');
+  const claude = path.join(p.project, 'CLAUDE.md');
+  fs.writeFileSync(claude, fs.readFileSync(claude, 'utf8').replace('**Project type:** CLI tool', '**Project type:** Web app'));
+  git(p.project, 'commit', '-qam', 'docs: the dashboard has a screen');
+  const pictures = [{ do: 'exec', cmd: "mkdir -p .autopilot/look && printf 'PNG' > .autopilot/look/home.png" }, { do: 'exec', cmd: "printf '%s\\n' '- home.png — the home page — TOR-06-Lg6Scr1' > .autopilot/look/index.md" }];
+  return { ui, build: { actions: [...buildActions(ui), ...pictures] } };
+}
+const repair = (ui, file) => ({ actions: [{ do: 'checkout', name: ui.branch }, { do: 'write', path: file, content: '/* repaired */\n' }, { do: 'commit', message: `fix(epic-${ui.id}): repair ${file}` }] });
+
+test('a repair that changes no screen file keeps the owner\'s look: no second look, and the verifier is told what changed since', async (t) => {
+  const p = makeProject(t);
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build });
+  await p.go({ queue: [ui.id] });
+  assert.equal(p.epic(ui.id).reason, 'human check needed before verify');
+  const looked = git(p.clone, 'rev-parse', ui.branch);
+  decide(p, ui.id, ANSWERS.looksRight, { note: 'the home page shows three figures' });
+
+  p.scenario({ [`${ui.id}/verify-1`]: { actions: [], result: { result: '## Verdict: FAIL\nthe total is rounded wrong' } }, [`${ui.id}/fix`]: repair(ui, 'src/rounding.js'), [`${ui.id}/verify-2`]: wrapupScript(ui) });
+  const r = await again(p, { queue: [ui.id] });
+  assert.deepEqual(r.steps, ['verify-1', 'fix-1', 'audit-1', 'verify-2'].map((s) => `${ui.id}/${s}`), 'no park for a second look');
+  assert.equal(p.epic(ui.id).state, 'MERGED', p.epic(ui.id).reason);
+  const told = appended(r.calls.at(-1));
+  assert.match(told, /the home page shows three figures/);
+  assert.ok(told.includes(`branch tip ${looked}`) && /Since then a repair changed only src\/rounding\.js, no file a screen is built from/.test(told), told);
+  assert.deepEqual(fs.readdirSync(path.join(p.state, 'gates')), [`${ui.id}-1.json`]);
+});
+
+test('a repair that changes a screen file still parks for a new look', async (t) => {
+  const p = makeProject(t);
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build });
+  await p.go({ queue: [ui.id] });
+  decide(p, ui.id, ANSWERS.looksRight, { note: 'the home page shows three figures' });
+  p.scenario({ [`${ui.id}/verify-1`]: { actions: [], result: { result: '## Verdict: FAIL\nthe heading overlaps' } }, [`${ui.id}/fix`]: repair(ui, 'src/home.css') });
+  const r = await again(p, { queue: [ui.id] });
+  assert.deepEqual(r.steps, ['verify-1', 'fix-1', 'audit-1'].map((s) => `${ui.id}/${s}`));
+  assert.deepEqual([p.epic(ui.id).state, p.epic(ui.id).reason, gate(p, ui.id, 2).kind], ['PARKED', 'human check needed before verify', 'human-check']);
+});
+
+test('a verifier that asks the owner to redo a check they already recorded is refused once and pointed at the record; asking again still reaches the owner', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  const obs = gate(p, e5.id).checks.map((c) => ({ n: c.n, answer: 'yes', how: 'live' }));
+  assert.equal(cli('decide', '--workspace', p.state, '--gate', `gates/${e5.id}-1.json`, '--answer', ANSWERS.looksRight, '--by', 'Pat Owner', '--observations', JSON.stringify(obs), '--note', 'real sign-in done, it works').status, 0);
+
+  // Seen live: handed the owner's recorded sign-in, the verifier asked them to sign in again.
+  const q = signIn(e5.tors[0]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes — start it, I\'ll sign in', 'Not now']), ...wrapupActions(e5)], result: { result: 'Verdict: PASS' } } });
+  const r = await again(p, { queue: [e5.id] });
+  assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
+  const [refused] = tools(p, e5.id, 'verify-1');
+  assert.equal(refused.hookSpecificOutput.permissionDecision, 'deny');
+  assert.match(refused.hookSpecificOutput.permissionDecisionReason, new RegExp(`not put to the owner: Pat Owner already did this check for ${e5.tors[0]} .* real sign-in done, it works.*Do not ask them to do it again`, 's'));
+  assert.equal(refused.continue, undefined, 'a reminder, not a stop');
+  assert.deepEqual(fs.readdirSync(path.join(p.state, 'gates')), [`${e5.id}-1.json`]);
+  assert.deepEqual(r.steps, [`${e5.id}/verify-1`]);
+});
+
+test('a verifier that asks for the recorded check a second time is asking something else: it goes to the owner', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
+  const q = signIn(e5.tors[0]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes', 'Not now']), ask(q, ['Yes', 'Not now'])] } });
+  await again(p, { queue: [e5.id] });
+  assert.deepEqual([p.epic(e5.id).state, gate(p, e5.id, 2).kind, gate(p, e5.id, 2).question], ['PARKED', 'unmatched', q]);
+  assert.deepEqual(ensureResumeGates(p.state), [], 'a question that got past the refusal is the owner\'s to answer');
+});
+
+test('a redo question an earlier driver let through is replaced by "run the final check again"; the owner does not do the check twice', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'real sign-in done, it works' });
+  const q = signIn(e5.tors[0]);
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes', 'Not now']), ask(q, ['Yes', 'Not now'])] } });
+  await again(p, { queue: [e5.id] });
+  fs.rmSync(p.dir(e5.id, 'verify-1', 'look-reminded.json')); // as the earlier driver left it: asked once, never refused
+
+  assert.deepEqual(ensureResumeGates(p.state), [`${e5.id}-3.json`]);
+  const g3 = gate(p, e5.id, 3);
+  assert.deepEqual([g3.kind, g3.phase, g3.options, gate(p, e5.id, 2).superseded.by], ['resume', 'VERIFY', [ANSWERS.resume, ANSWERS.startOver], `gates/${e5.id}-3.json`]);
+  assert.match(g3.question, /a check for TOR-\S+ again that you had already done and recorded/);
+  assert.deepEqual(ensureResumeGates(p.state), [], 'written once');
+  assert.equal(decide(p, e5.id, ANSWERS.resume, { n: 3 }).enters, 'VERIFY');
+
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(q, ['Yes', 'Not now']), ...wrapupActions(e5)], result: { result: 'Verdict: PASS' } } });
+  const last = await again(p, { queue: [e5.id] });
+  assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
+  assert.match(tools(p, e5.id, 'verify-1')[0].hookSpecificOutput.permissionDecisionReason, /Do not ask them to do it again/);
+  assert.match(appended(last.calls[0]), /real sign-in done, it works/);
 });

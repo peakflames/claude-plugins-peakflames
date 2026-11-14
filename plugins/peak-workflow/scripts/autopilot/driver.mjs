@@ -712,8 +712,8 @@ Before this session started, the project's owner looked at what was built and re
 observation for this epic. It was made by a person; it is not your inference and you must not add to it.
 
 - **Who and when:** ${look.by}, ${look.date}
-- **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, ${caughtUp && caughtUp.from === look.branchTip ? `this epic's own work. Since then autopilot merged the integration line into the branch (other epics' merged work only), so the tip you are verifying is ${caughtUp.to}` : 'the commit you are verifying'}
-- **Their answer:** "Looks right"${look.observations?.length ? `\n- **What they confirmed, one Then at a time** (each is the owner's own yes to that line, shown to them in the requirement's words):\n${look.observations.map((o) => `  - ${o.tor}: "${o.clause}" — ${o.answer === 'yes' ? 'yes, I saw this' : o.answer}${o.note ? ` (${o.note})` : ''}`).join('\n')}` : ''}
+- **What they looked at:** ${(look.artifacts ?? []).join(', ') || 'the build'} — branch tip ${look.branchTip}, ${caughtUp && caughtUp.from === look.branchTip ? `this epic's own work. Since then autopilot merged the integration line into the branch (other epics' merged work only), so the tip you are verifying is ${caughtUp.to}` : look.kept ? `the build before its repair. Since then a repair changed only ${look.kept.files.join(', ') || 'nothing'}, no file a screen is built from, so the owner was not asked to look again: their look stands for the screens, and the tip you are verifying is ${look.kept.to}` : 'the commit you are verifying'}
+- **Their answer:** "Looks right"${look.observations?.length ? `\n- **What they confirmed, one Then at a time** (each is the owner's own yes to that line, shown to them in the requirement's words):\n${look.observations.map((o) => `  - ${o.tor}: "${o.clause}" — ${o.answer === 'yes' ? `yes, I saw this${o.how === 'live' ? ' (for real, on the running build: not in a picture)' : ''}` : o.answer}${o.note ? ` (${o.note})` : ''}`).join('\n')}` : ''}
 - **Their words:** ${look.note ? `"${look.note}"` : '(none beyond the answer)'}
 ${observed.length ? `- **Operator-observed requirements it covers:** ${observed.join(', ')}\n` : ''}
 "Looks right" is the owner's answer to the whole requirement: they were shown its Then lines and
@@ -1000,6 +1000,9 @@ Do this, in order:
 If a listed fix cannot be made as asked, or making it would leave a requirement unmet, stop and ask with \`AskUserQuestion\` — say which fix, why, and offer the options a person would need. Do not work around it.
 `;
 }
+
+/** A file a screen is built from: markup, styles, components, images. A change to one needs a new look. */
+const SCREEN_FILE = /\.(html?|css|s[ac]ss|less|[jt]sx|vue|svelte|razor|cshtml|xaml|svg|png|jpe?g|gif|webp|ico)$/i;
 
 // ---- the owner's answers, handed to the session that takes a step up again ---------------------
 
@@ -2015,7 +2018,8 @@ class Run {
     const m = this.meta(e);
     if (!m.humanCheck) return false;
     const tip = this.branchTip(m.branch);
-    if (e.look?.branchTip === tip) return false; // the owner already looked at exactly this tip
+    const stands = this.standingLook(e, tip); // the owner already looked at exactly this tip, or at these screens before a repair that changed none
+    if (stands) { if (stands.kept && e.look?.kept?.to !== tip) this.log(`${e.id}: the repair changed no screen file (${stands.kept.files.join(', ') || 'no files'}); ${stands.by}'s look at ${String(stands.branchTip).slice(0, 9)} is kept`); e.look = stands; this.save(); return false; }
     e.look = null;
     const made = this.produceArtifacts(e);
     this.writeGate(e, {
@@ -2031,6 +2035,23 @@ class Run {
   }
 
   /**
+   * The owner's "Looks right" that still holds for `tip`: given on that very tip, or (an epic with
+   * screens) given before commits that touch no file a screen is built from (seen live: a repair
+   * added a database column and the owner was sent back to the same eighteen screens). Read from
+   * this run's `e.look`, else from the epic's latest look gate. Null when a new look is needed.
+   */
+  standingLook(e, tip) {
+    const g = readGates(this.stateDir).filter((x) => x.epic === e.id && x.kind === 'human-check' && !x.void && !x.superseded).at(-1);
+    const look = e.look ?? (g?.decided?.answer === ANSWERS.looksRight && g.branchTip ? { gate: g.file, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, observations: g.decided.observations ?? [], branchTip: g.branchTip, artifacts: g.artifacts ?? [] } : null);
+    if (!look?.branchTip || !tip) return null;
+    if (look.branchTip === tip || look.kept?.to === tip) return look;
+    if (!this.hasScreens(e) || !gitOk(this.clone, 'merge-base', '--is-ancestor', look.branchTip, tip)) return null;
+    // This epic's own commits since the look: the integration line merged in (catch-up) is other epics' work.
+    const files = [...new Set(this.g('log', '--first-parent', '--no-merges', '--name-only', '--format=', `${look.branchTip}..${tip}`).split('\n').filter(Boolean))];
+    return files.some((f) => SCREEN_FILE.test(f)) ? null : { ...look, kept: { from: look.branchTip, to: tip, files } };
+  }
+
+  /**
    * What makes a look easy for someone who is not a developer: the files to open, by full path;
    * the build's checklist, as text; and the requirement's own Then lines to confirm one at a time
    * (`checks`). `skip` leaves out the lines an earlier look already confirmed.
@@ -2043,7 +2064,10 @@ class Run {
     // Each picture with its caption from the build's index, for whoever shows them to the owner.
     const pictures = lookPictures(this.lookStore(e)).map((p) => ({ path: path.join(this.lookStore(e), p.file), shows: p.shows }));
     const checklists = artifacts.filter((a) => a.startsWith('clone:')).map((a) => ({ path: a.slice(6), text: gitShow(this.clone, m.branch, a.slice(6)) ?? '' })).filter((c) => c.text);
-    return { checks, open, checklists, pictures };
+    // An operator-observed requirement is seen for real (the checklist says how), never judged from a picture:
+    // seen live, the verifier refused a yes given from pictures taken with a stand-in, and the owner was asked twice.
+    const live = [...new Set(checks.map((c) => c.tor))].map((tor) => ({ tor, checklist: checklists.find((c) => c.path.includes(tor))?.path ?? null }));
+    return { checks, open, checklists, pictures, ...(live.length ? { live } : {}) };
   }
 
   /**
@@ -2403,10 +2427,7 @@ class Run {
       e.answers = ownerAnswers(this.stateDir, e.id, { keep: f.gate });
       // The owner's look on this very build still stands when verify is entered from another gate
       // (a question, a run that ended without a verdict): the verifier is handed it, not asked again.
-      if (phase === 'VERIFY' && !e.look) {
-        const l = readGates(this.stateDir).filter((x) => x.epic === e.id && x.kind === 'human-check' && x.decided?.answer === ANSWERS.looksRight && !x.void && !x.superseded && x.branchTip && x.branchTip === g.branchTip).at(-1);
-        if (l) e.look = { gate: l.file, by: l.decided.by, date: l.decided.date, note: l.decided.note ?? null, observations: l.decided.observations ?? [], branchTip: l.branchTip, artifacts: l.artifacts ?? [] };
-      }
+      if (phase === 'VERIFY' && !e.look) e.look = this.standingLook(e, g.branchTip);
       if (entry.question && g.session && g.run) {
         // The session that asked is resumed with the answer, when it can be: same step, its record still on disk.
         const prev = tryJson(path.join(runDirOf(this.stateDir, g.run), 'epics', e.id, g.session, 'step.json'));
@@ -2685,8 +2706,27 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
  */
 export function ensureResumeGates(workspace, { write = true } = {}) {
   const missing = missingResumeGates(workspace);
-  if (write) for (const m of missing) writeJson(path.join(workspace, 'gates', m.name), m.gate);
+  if (write) for (const m of missing) {
+    // The question the new gate replaces stops counting: the owner answers one thing, not two.
+    if (m.replaces) { const f = path.join(workspace, m.replaces); writeJson(f, { ...readJson(f), superseded: { date: new Date().toISOString(), by: `gates/${m.name}`, why: m.gate.reason } }); }
+    writeJson(path.join(workspace, 'gates', m.name), m.gate);
+  }
   return missing.map((m) => m.name);
+}
+/**
+ * A verifier's open question that asks the owner to redo a check their look on this very build
+ * already covers, asked under a driver whose referee did not yet refuse that (the asking step has
+ * no `look-reminded.json`). Seen live: the owner had signed in for real and was asked again.
+ */
+function redoneCheck(workspace, gates, id) {
+  const live = gates.filter((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight');
+  const [q] = live;
+  if (live.length !== 1 || q.decided || q.kind !== 'unmatched' || !/^verify-\d+$/.test(q.session ?? '') || !q.tor || !q.run) return null;
+  if (exists(path.join(runDirOf(workspace, q.run), 'epics', id, q.session, 'look-reminded.json'))) return null;
+  const look = gates.filter((g) => g.epic === id && g.kind === 'human-check' && !g.void && !g.superseded).at(-1);
+  if (look?.decided?.answer !== ANSWERS.looksRight || !look.branchTip || look.branchTip !== q.branchTip) return null;
+  const obs = look.decided.observations ?? [];
+  return obs.length && !obs.some((o) => o.tor === q.tor && o.answer === 'yes') ? null : q;
 }
 /** The gates `ensureResumeGates` would write, as `[{name, gate}]`. Reads only. */
 function missingResumeGates(workspace) {
@@ -2694,18 +2734,32 @@ function missingResumeGates(workspace) {
   const records = tryJson(path.join(workspace, 'epics.json'), {}) ?? {};
   const gates = readGates(workspace);
   for (const [id, rec] of Object.entries(records)) {
-    if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch || gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
+    if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch) continue;
+    const redo = rec.state === 'PARKED' ? redoneCheck(workspace, gates, id) : null;
+    if (!redo && gates.some((g) => g.epic === id && gateLive(g) && g.kind !== 'preflight')) continue;
     const reason = String(rec.reason ?? '');
     // An earlier driver called a verify that recorded no verdicts a FAIL (seen live: the owner had put a sign-in off).
     const verify = rec.state === 'FAILED' && (reason.match(/^(verify-\d+) FAIL after the fix round: /) ?? [])[1];
     const m = rec.state === 'PARKED' && reason.match(/^(CHECK_BUILD)\b|^interrupted: .*(CHECK_BUILD)/);
     const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
     const integration = detectIntegration(clone);
-    if (!(m || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
+    if (!(m || redo || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
     const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
     const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
     const n = gates.filter((g) => g.epic === id).length + 1;
     const last = (rec.buildSteps ?? []).at(-1);
+    if (redo) {
+      made.push({ name: `${id}-${n}.json`, replaces: redo.file, gate: {
+        epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: redo.session, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
+        resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${id}`, decided: null,
+        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', reason: `${redo.session} asked for a check of ${redo.tor} that you had already done and recorded`,
+        question: `${q.label ?? id}: the final check asked you to do a check for ${redo.tor} again that you had already done and recorded. Autopilot now refuses that question. Run the final check again in the next run?`,
+        options: [ANSWERS.resume, ANSWERS.startOver],
+        why: `you are not asked to do the check again: the verifier is held to what you recorded. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt and your recorded look still stands. "${ANSWERS.startOver}" plans the epic again from scratch`,
+        artifacts: [redo.file],
+      } });
+      continue;
+    }
     if (verify) {
       const dir = `runs/${rec.run}/epics/${id}/${verify}`;
       made.push({ name: `${id}-${n}.json`, gate: {
@@ -2841,7 +2895,8 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const unproven = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, text: u.text }))));
 
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
-  const gates = [...readGates(ws), ...(pid ? [] : missingResumeGates(ws).map((m) => ({ file: `gates/${m.name}`, ...m.gate })))];
+  const toWrite = pid ? [] : missingResumeGates(ws);
+  const gates = [...readGates(ws).filter((g) => !toWrite.some((m) => m.replaces === g.file)), ...toWrite.map((m) => ({ file: `gates/${m.name}`, ...m.gate }))];
   const open = openGates(gates); // while a driver runs these are the questions already asked; they can be answered now and are used by the next run
   const brief = (g) => ({ file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: g.question ?? null, ...(g.kind === 'resume' ? { why: plainReason(gateReason(g)) } : {}) });
   const covered = open.filter((g) => standingCovers(g, gates, n));
@@ -2898,8 +2953,11 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     const left = runBudgetUsd == null ? null : +(runBudgetUsd - spentUsd).toFixed(2);
     const limit = ['end time', 'run budget'].includes(state.stoppedBecause) ? state.stoppedBecause : left !== null && left <= 0 ? 'run budget' : null;
     if (ids.some((id) => ['resume', 'fresh'].includes(byId.get(id).gate?.state)) && !limit) {
+      // Launch questions this chain never put to the owner (seen live: a chain started before the question existed ran
+      // on with `attended` unset). Asked once: the answer goes into the config and every later relaunch carries it.
+      const ask = [...(typeof lastCfg.realSpend !== 'boolean' && (launch.env?.copy ?? []).length ? ['realSpend'] : []), ...(typeof lastCfg.attended !== 'boolean' ? ['attended'] : [])];
       out.relaunch = {
-        run: launch.run, runDir: launch.runDir,
+        run: launch.run, runDir: launch.runDir, ask,
         config: { project: root, queue: ids, explicit: (lastCfg.explicit ?? []).filter((id) => ids.includes(id)), endBy: lastCfg.endBy && Date.parse(lastCfg.endBy) > Date.now() ? lastCfg.endBy : null, runBudgetUsd: left ?? launch.config.runBudgetUsd, autoContinue: n, continues: run, ...(typeof lastCfg.realSpend === 'boolean' ? { realSpend: lastCfg.realSpend } : {}), ...(typeof lastCfg.attended === 'boolean' ? { attended: lastCfg.attended } : {}), ...(lastCfg.allowTestDouble ? { allowTestDouble: true } : {}) },
       };
     }
@@ -2941,7 +2999,10 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
       const a = (given ?? []).find((x) => Number(x.n) === c.n);
       const v = String(a?.answer ?? '').trim().toLowerCase();
       if (v !== 'yes' && v !== 'no') throw new Error(`line ${c.n} ("${c.clause}") needs a yes or a no; "could not tell" is not an answer to record — look again, or decide later`);
-      return { n: c.n, tor: c.tor, clause: c.clause, answer: v, ...(String(a.note ?? '').trim() ? { note: String(a.note).trim() } : {}) };
+      const how = String(a.how ?? '').trim().toLowerCase();
+      if (how && how !== 'live' && how !== 'pictures') throw new Error(`line ${c.n}: how it was seen is "live" or "pictures", not "${a.how}"`);
+      if (v === 'yes' && how === 'pictures' && (gate.live ?? []).some((l) => l.tor === c.tor)) throw new Error(`line ${c.n} ("${c.clause}") was seen only in pictures: that is not the owner's observation of ${c.tor}, which must be seen for real — check it for real, or decide later`);
+      return { n: c.n, tor: c.tor, clause: c.clause, answer: v, ...(how ? { how } : {}), ...(String(a.note ?? '').trim() ? { note: String(a.note).trim() } : {}) };
     });
     const anyNo = obs.some((o) => o.answer === 'no');
     if (anyNo && label !== ANSWERS.notRight) throw new Error(`a "no" on a line means the answer is "${ANSWERS.notRight}", not "${label}"`);
