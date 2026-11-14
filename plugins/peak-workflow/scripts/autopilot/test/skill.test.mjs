@@ -241,7 +241,7 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     "If it stops for a technical reason I'll continue it automatically (up to 2 times per epic).", '`DRIVER continue --workspace "<ws>" --json`', 'It stopped for a technical reason (<the entry\'s `why`>); continuing, as you asked.',
     'Only `DRIVER continue` applies it', 'you never record "resume" on a gate yourself', '"autoContinue": 2', '"endBy": null',
     'The popup hides the chat: put what the owner must read inside the question text.',
-    'A `still …` heartbeat is relayed as it is', '**You are the announcer, not the commentator.**', '`DRIVER configure --project "<root>" --run-budget <n>`', '**Do it for them.**', 'Never hand them a terminal command', '`Bring it in for me (Recommended)`', '`Combine them for me (Recommended)`', 'run `git merge --abort`',
+    'A `still …` heartbeat is relayed as it is', '**You are the announcer, not the commentator.**', '`DRIVER configure --project "<root>" --run-budget <n>`', '**Do it for them.**', '`git branch -D autopilot/<integration>`', '`Commit it for me (Recommended)`', 'Never stage anything else.', 'Never hand them a terminal command', '`Bring it in for me (Recommended)`', '`Combine them for me (Recommended)`', 'run `git merge --abort`',
     '**Screens merged without your look:**', '`DRIVER configure --project "<root>" --look after`', 'never set it unasked',
     '**Small fixes, said in the same question.**', '`"smallFixes": false`', '**Fixed during the final check, without asking:**',
     '**What must be seen for real.**', '`Start it so I can check for real (Recommended)`', 'never record a yes for them from the pictures', '"how": "live" | "pictures"',

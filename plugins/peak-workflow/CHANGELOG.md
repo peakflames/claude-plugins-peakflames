@@ -204,7 +204,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Autopilot does it for the owner** — the skill no longer hands over terminal commands: it
   offers to bring finished work into the project (fast-forward, nothing pushed) or to combine a
-  diverged project, runs it on a yes, and says what happened.
+  diverged project, runs it on a yes, and says what happened. It then removes its temporary
+  `autopilot/<integration>` branch and offers to commit the project's `autopilot.json`.
 - **Autopilot default run budget is $250** (was $80), counted over the whole chain of runs; a
   project sets its own with `configure --run-budget`, which also raises a chain in progress.
 - **Autopilot watch is quieter** — a first refusal and `TESTS passed|failed` are printed only

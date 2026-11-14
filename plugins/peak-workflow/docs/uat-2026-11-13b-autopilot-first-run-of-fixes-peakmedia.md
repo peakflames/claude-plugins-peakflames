@@ -329,7 +329,9 @@ answered by the setting and the epic resumed at VERIFY).
 
 49. **The closing screen handed the owner git commands** ("bring the finished work in": two
     lines to run). Owner: assume a non-technical user and run commands on their behalf. Fixed in
-    the skill: "Do it for them" — offer, run on a yes, say what happened; never push.
+    the skill: "Do it for them" — offer, run on a yes, say what happened; never push. After the
+    fetch it deletes the temporary `autopilot/<integration>` branch and offers to commit the
+    project's `autopilot.json` (both were left to the owner).
 
 #### Minor
 
