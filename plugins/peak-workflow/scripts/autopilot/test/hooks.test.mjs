@@ -257,6 +257,8 @@ test('R3 git: the verifier may merge --no-ff this epic\'s branch into develop an
   // Seen live, twice: the branch held in a variable set in the same command.
   passes(h.bash(`B=${E1.branch} && git checkout -q develop && git merge $B --no-ff -q -m "epic: merge $B"`), 'the branch in a variable');
   passes(h.bash(`B=${E1.branch}; git merge --no-ff "\${B}"`), 'braces and quotes');
+  passes(h.bash(`B=${E1.branch} && git checkout -q develop && git merge $B --no-ff -m "epic: merge $B" && git branch -d $B && git log --oneline -3`), 'merge and delete, as a verifier writes it');
+  denied(h.bash('B=feature/epic-Lg2Cat4-categorize && git branch -d $B'), 'R3', /only for this epic's branch/);
   denied(h.bash('B=feature/epic-Lg2Cat4-categorize && git merge --no-ff $B'), 'R3', /one branch, named in the command, with --no-ff/, 'another epic, variable or not');
   denied(h.bash(`B=${E1.branch}; B=main; git merge --no-ff $B`), 'R3', null, 'a name set twice stands for nothing');
   denied(h.bash('git merge --no-ff $B'), 'R3', null, 'a name set nowhere');
