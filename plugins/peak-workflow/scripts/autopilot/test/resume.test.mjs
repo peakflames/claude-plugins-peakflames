@@ -1056,3 +1056,78 @@ test('starting over retires earlier answers: the fresh attempt is told none of t
   assert.deepEqual(ownerAnswers(p.state, E1.id), []);
   assert.ok(r.calls.every((c) => !c.argv.includes('--resume') && !c.argv.some((a) => a.endsWith('owner-answers.md'))));
 });
+
+// ---- a check the owner puts off is not a verdict (UAT 2026-11-14, G8jMzOz) -----------------------
+
+const LATER = 'Not now — end the session';
+const NONE = 'The wrapup ended without recording any verdicts, as you chose. The epic stays **Implemented** and nothing was written or committed.';
+const signIn = (tor) => `${tor} is operator-observed. Can you do the real sign-in now? If you can't, the session ends with no verdicts and you re-run wrapup later.`;
+const appended = (call) => call.argv.flatMap((a, i) => (a === '--append-system-prompt-file' ? [fs.readFileSync(call.argv[i + 1], 'utf8')] : [])).join('\n');
+
+test('a check the owner puts off ends the verify without a verdict: parked to run the check again, no FAIL, no fix round; the later session is not told "Not now" and keeps the look', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
+  const tip = git(p.clone, 'rev-parse', e5.branch);
+
+  // The verifier asks for a check only a person can do; the owner is away.
+  p.scenario({ [`${e5.id}/verify`]: { actions: [ask(signIn(e5.tors[0]), ['Yes — start it, I\'ll sign in', LATER])] } });
+  await again(p, { queue: [e5.id] });
+  assert.deepEqual([p.epic(e5.id).state, gate(p, e5.id, 2).kind], ['PARKED', 'unmatched']);
+  assert.equal(decide(p, e5.id, LATER, { n: 2 }).enters, 'VERIFY');
+
+  // The session that asked hears "Not now" and ends with no verdict: that is not a FAIL.
+  p.scenario({ [`${e5.id}/verify`]: { actions: [], result: { result: NONE } } });
+  const r = await again(p, { queue: [e5.id] });
+  assert.ok(r.calls[0].prompt.includes(LATER), 'the session that asked is told the answer to its own question');
+  assert.deepEqual(r.steps, [`${e5.id}/verify-1`], 'no repair session');
+  const e = p.epic(e5.id);
+  assert.deepEqual([e.state, e.fixRounds ?? 0], ['PARKED', 0], e.reason);
+  assert.equal(e.reason, 'verify-1 ended without a verdict: nothing was recorded or committed');
+  const g3 = gate(p, e5.id, 3);
+  assert.deepEqual([g3.kind, g3.phase, g3.options, g3.decided, g3.branchTip], ['resume', 'VERIFY', [ANSWERS.resume, ANSWERS.startOver], null, tip]);
+  assert.match(g3.why, /nothing is rebuilt/);
+
+  // Resumed: a new verify session, told nothing about "Not now", handed the owner's look; it merges.
+  assert.equal(decide(p, e5.id, ANSWERS.resume, { n: 3 }).enters, 'VERIFY');
+  p.scenario({ [`${e5.id}/verify`]: wrapupScript(e5) });
+  const last = await again(p, { queue: [e5.id] });
+  assert.deepEqual(last.steps, [`${e5.id}/verify-1`]);
+  assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
+  const told = last.calls[0].prompt + appended(last.calls[0]);
+  assert.ok(!told.includes(LATER), 'a postponement is not a decision to carry forward');
+  assert.match(told, /six bars, labels readable/, 'the owner\'s look on this tip still stands');
+  assert.deepEqual(readJson(p.dir(e5.id, 'verify-1', 'step.json')).answers ?? [], []);
+  assert.ok(merged(p, tip));
+});
+
+test('an epic an earlier driver FAILED for a verify with no verdicts gets a resume gate at VERIFY, and finishes with the owner\'s look', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: buildWithManual(e5) });
+  await p.go({ queue: [e5.id] });
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'six bars, labels readable' });
+  p.scenario({ [`${e5.id}/verify`]: { actions: [], result: { result: NONE } } });
+  await again(p, { queue: [e5.id] });
+  const tip = git(p.clone, 'rev-parse', e5.branch);
+  // As the earlier driver left it: FAILED after the fix round, and no gate to answer.
+  fs.rmSync(path.join(p.state, 'gates', `${e5.id}-2.json`));
+  const file = path.join(p.state, 'epics.json'); const recs = readJson(file);
+  Object.assign(recs[e5.id], { state: 'FAILED', fixRounds: 1, reason: `verify-1 FAIL after the fix round: ${NONE}` });
+  fs.writeFileSync(file, JSON.stringify(recs, null, 2));
+
+  assert.deepEqual(ensureResumeGates(p.state), [`${e5.id}-2.json`]);
+  const g = gate(p, e5.id, 2);
+  assert.deepEqual([g.kind, g.phase, g.options, g.branchTip], ['resume', 'VERIFY', [ANSWERS.resume, ANSWERS.startOver], tip]);
+  assert.match(g.question, /final check ended without a verdict/);
+  assert.deepEqual(ensureResumeGates(p.state), [], 'written once');
+  assert.equal(decide(p, e5.id, ANSWERS.resume, { n: 2 }).enters, 'VERIFY');
+
+  p.scenario({ [`${e5.id}/verify`]: wrapupScript(e5) });
+  const last = await again(p, { queue: [e5.id] });
+  assert.deepEqual(last.steps, [`${e5.id}/verify-1`], 'nothing is rebuilt');
+  assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
+  assert.match(appended(last.calls[0]), /six bars, labels readable/);
+});

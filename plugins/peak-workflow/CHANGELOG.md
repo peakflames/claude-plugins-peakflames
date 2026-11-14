@@ -200,6 +200,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot: a check the owner puts off is not a FAIL** — a verify that ends without a verdict
+  parks the epic to run the final check again (no repair round), and an earlier false FAIL gets
+  that question too. The owner's look on the same build is kept.
+- **Autopilot forgets "Not now"** — a postponing answer is told only to the session that asked;
+  later sessions ask again instead of ending with no verdict.
 - **Autopilot pre-approved answers survive a reworded option** — the referee matches an answer to
   the one option that shortens or pads it, so a passing epic no longer parks on wording.
 - **Autopilot resumed-session cost** — a resumed session's reported cost includes the session it
