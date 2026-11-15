@@ -44,6 +44,10 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 ## Open issues, most costly first
 
+Tracked on GitHub (peakflames/claude-plugins-peakflames): **#35** items 1–2, **#36** item 3,
+**#37** item 4, **#38** item 5, **#39** item 6 (live-proof checklist), **#40** items 7–18.
+Plan each with `/triage <issue>`.
+
 ### Core behaviour — do these next
 
 1. **A failed merge check throws away the verifier's work.** `rollback()` resets the integration
