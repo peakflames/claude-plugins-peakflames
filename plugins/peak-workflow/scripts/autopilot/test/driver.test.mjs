@@ -315,7 +315,7 @@ test('base red stops the run before any session', async (t) => {
   assert.equal(p.epic(E1.id).state, 'QUEUED');
   assert.deepEqual(p.calls(), []);
   assert.equal(readJson(path.join(p.runDir(), 'report.json')).epics[0].outcome, 'NOT STARTED');
-  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fix the failing tests on `develop`/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /your project's own tests were already failing on `develop` before autopilot started\. Autopilot cannot repair this itself yet; it needs someone who maintains the code\./);
 });
 
 test('STOP mid-step kills the session, parks the epic and stops the run', async (t) => {

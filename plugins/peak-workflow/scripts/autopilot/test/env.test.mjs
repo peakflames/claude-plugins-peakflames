@@ -108,7 +108,7 @@ test('a run copies and sets up before the base check; a failing setup stops it b
   assert.deepEqual(q.calls(), []);
   const report = readJson(path.join(q.runDir(), 'report.json'));
   assert.match(report.tldr.join('\n'), /could not get its private copy of your project ready: the setup command .* failed \(no network\)/);
-  assert.match(report.next[0], /Fix what stopped the private copy/);
+  assert.match(report.next[0], /autopilot could not get its private copy of your project ready .*If it still cannot: Autopilot cannot repair this itself yet; it needs someone who maintains the code\./);
 });
 
 test('base red from a missing command: the report says the tests never ran', async (t) => {
