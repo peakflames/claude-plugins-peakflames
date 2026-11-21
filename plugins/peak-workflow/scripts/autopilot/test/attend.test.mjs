@@ -488,7 +488,7 @@ test('a reviewer\'s finding is repaired without asking; a paid service never rea
   assert.deepEqual(await relaunch(p), ['fix-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`));
   assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
   const brief = fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8');
-  assert.match(brief, /treated as real on the owner's standing answer/);
+  assert.match(brief, /treated as real on the owner's standing answer; nobody judged them/);
   assert.ok(!/confirmed they are real/.test(brief), 'nobody confirmed anything');
   // The closing screen says what was decided in the owner's name.
   assert.deepEqual(st(p, '--queue', E1.id).decidedForYou.map((d) => [d.label, d.did, d.why]), [[LABEL, 'had what the reviewer found repaired', 'the independent reviewer found a serious problem']]);
@@ -535,6 +535,31 @@ test('the final check\'s own product fix is allowed without asking, and listed; 
   assert.match(evidence, /changes a requirement file \(docs\/requirements\/note\.md\)/);
   assert.match(evidence, /removes checks from a test \(test\/csv-import\.test\.js\)/);
   assert.equal(git(q.clone, 'rev-parse', 'develop'), git(q.project, 'rev-parse', 'develop'), 'nothing merged');
+
+  // "Try again" is not "allow whatever the fix is": the owner was never shown that question, so the same refusals hold.
+  const weak = [{ do: 'exec', cmd: `sed -i.bak '/is met/d' test/${E1.slug}.test.js; rm -f test/${E1.slug}.test.js.bak` }];
+  const r = makeProject(t);
+  r.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
+  await r.go({ run: confirmRun(r, { autoContinue: 0 }) });
+  assert.equal(driver('decide', '--workspace', r.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Try again', '--by', 'Pat Owner').status, 0);
+  r.scenario({ [`${E1.id}/verify`]: fix(weak) });
+  await relaunch(r);
+  assert.equal(r.epic(E1.id).state, 'PARKED', r.epic(E1.id).reason);
+  assert.match(readJson(r.dir(E1.id, 'check-verify-1.json')).checks.find((x) => x.name === 'verdict').evidence.join(' | '), /removes checks from a test/);
+
+  // A re-run that changes only a requirement file, and one that claims more undisclosed deferrals fixed than it was asked about.
+  const only = { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'docs/requirements/note.md', content: 'changed\n' }, { do: 'commit', message: 'docs: a requirement note' }, ...wrapupScript(E1).actions], result: { result: 'Verdict: PASS' } };
+  const many = { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/patch.js', content: 'export const patched = 2;\n' }, { do: 'commit', message: 'fix: more' }, ...wrapupScript(E1, { counts: [3, 3, 0, 3, 0, 0] }).actions], result: { result: 'Verdict: PASS' } };
+  for (const [script, failed] of [[only, 'verdict'], [many, 'no-waivers']]) {
+    const x = makeProject(t);
+    x.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
+    await x.go({ run: confirmRun(x, { autoContinue: 2 }) });
+    assert.equal(cont(x).status, 0);
+    x.scenario({ [`${E1.id}/verify`]: script });
+    await relaunch(x);
+    assert.equal(x.epic(E1.id).state, 'PARKED', failed);
+    assert.deepEqual(readJson(x.dir(E1.id, 'check-verify-1.json')).checks.filter((c) => !c.pass).map((c) => c.name), [failed]);
+  }
 });
 
 test('at the limit the owner gets one plain question: "Try again" records the technical answer as theirs, "Leave it for now" records nothing', async (t) => {
@@ -570,9 +595,20 @@ test('at the limit the owner gets one plain question: "Try again" records the te
   await r.go({ run: confirmRun(r, { autoContinue: 2 }) });
   const s3 = st(r);
   assert.deepEqual([s3.next, s3.waiting.map((g) => g.options)], ['decide', [TRY]]);
+  assert.match(s3.waiting[0].question, /Its one repair is used, so trying again means planning and building it again from the start, which costs the most\. Try again, or leave it for now\?$/);
   const over = driver('decide', '--workspace', r.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'try again', '--by', 'Pat Owner');
   assert.equal(over.status, 0, over.stderr);
   assert.deepEqual([over.json().enters, gateFile(r, E1.id).decided.answer], ['PLAN (from scratch, on a fresh branch)', ANSWERS.startOver]);
+
+  // "Try again" on a reviewer's finding repairs it, and the repair is not told the owner confirmed anything.
+  const a = makeProject(t);
+  a.scenario({ ...happy(E1), [`${E1.id}/audit`]: canned('stand-in') });
+  await a.go({ run: confirmRun(a, { autoContinue: 0 }) });
+  assert.equal(driver('decide', '--workspace', a.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Try again', '--by', 'Pat Owner').status, 0);
+  a.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/live.js', content: 'export const live = true;\n' }, { do: 'commit', message: `feat(epic-${E1.id}): exercise the live path` }] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  await relaunch(a);
+  assert.equal(a.epic(E1.id).state, 'MERGED', a.epic(E1.id).reason);
+  assert.match(fs.readFileSync(a.dir(E1.id, 'fix-brief.md'), 'utf8'), /treated as real because the owner asked autopilot to try again; nobody judged them/);
 });
 
 test('a final check that still fails after its repair is repaired once more without asking, then asked at the limit', async (t) => {

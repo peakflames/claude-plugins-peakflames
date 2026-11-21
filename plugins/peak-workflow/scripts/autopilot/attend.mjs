@@ -5,7 +5,7 @@
 // the driver alone decides what runs, and nothing in this file changes a run.
 import fs from 'node:fs';
 import path from 'node:path';
-import { LEAVE_IT, TRY_AGAIN, atLimit, gateReason } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, TRY_AGAIN, atLimit, gateReason } from './lib.mjs';
 
 const tryJson = (p, fallback = null) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -78,7 +78,7 @@ export function plainReason(reason) {
 export function atLimitAsk(gate, gates, n, label) {
   const lim = atLimit(gate, gates, n);
   if (!lim) return null;
-  return { question: `${label ?? gate.epic} has stopped ${lim.stops} time${lim.stops === 1 ? '' : 's'} for technical reasons (${plainReason(gateReason(gate))}). Try again, which costs more, or leave it for now?`, options: [TRY_AGAIN, LEAVE_IT], ...lim };
+  return { question: `${label ?? gate.epic} has stopped ${lim.stops} time${lim.stops === 1 ? '' : 's'} for technical reasons (${plainReason(gateReason(gate))}). ${lim.answer === ANSWERS.startOver ? 'Its one repair is used, so trying again means planning and building it again from the start, which costs the most. Try again, or leave it for now?' : 'Try again, which costs more, or leave it for now?'}`, options: [TRY_AGAIN, LEAVE_IT], ...lim };
 }
 
 /** Reviewer findings that say the work was not exercised for real, whatever their severity. */

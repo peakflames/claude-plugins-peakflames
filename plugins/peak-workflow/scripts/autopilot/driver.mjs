@@ -2347,9 +2347,11 @@ class Run {
     const limits = smallFixLimits(this.config);
     const standing = !ownerFix && limits && e.lastStep ? tryJson(path.join(this.epicDir(e), e.lastStep, SMALL_FIX_FILE), []) ?? [] : [];
     const approval = ownerFix ?? (standing.length ? 'the standing answer for small fixes' : null);
-    // The gate was answered by autopilot itself (the standing answer for technical stops), not by the owner: the fix may be
-    // product code and any size, but it still may not change a requirement or make a test check less.
-    const autoFix = ownerFix && e.resumed.standing ? ownerFix : null;
+    // The gate's own question ("allow that fix?") was never put to the owner: autopilot answered it on the standing answer for
+    // technical stops, or they said "Try again". The fix may be product code and any size, but it still may not change a
+    // requirement or make a test check less, and it forgives an undisclosed deferral only as a small fix does.
+    const autoFix = ownerFix && e.resumed.unasked ? ownerFix : null;
+    const asked = autoFix && limits && e.lastStep ? tryJson(path.join(this.epicDir(e), e.lastStep, SMALL_FIX_FILE), []) ?? [] : standing;
     const fixedFiles = [];
 
     const firstParent = this.g('rev-list', '--first-parent', `${pre.developSha}..${dev}`).split('\n').filter(Boolean);
@@ -2368,6 +2370,8 @@ class Run {
         const blob = (rev, f) => { const r = gitRun(this.clone, 'rev-parse', '-q', '--verify', `${rev}:${f}`); return r.code === 0 ? r.out : ''; };
         const own = this.g('diff', '--name-only', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && blob(p2, f) !== blob(pre.developSha, f));
         const stray = own.filter((f) => !f.startsWith('docs/') && f !== m.sidecar);
+        // Held even when the fix touches nothing else (`stray` leaves docs/ out).
+        if (autoFix && !stray.length) { const r = own.filter((f) => f.startsWith('docs/requirements/')); if (r.length) problems.push(`${SMALL_FIX_PROBLEM}changes a requirement file (${r.join(', ')})`); }
         if (stray.length && approval) fixedFiles.push(...stray);
         else if (stray.length) problems.push(`commits added during verify touch files outside docs/: ${stray.join(', ')}`);
         if (stray.length && (standing.length || autoFix)) {
@@ -2413,10 +2417,10 @@ class Run {
     // An undisclosed deferral keeps its mark for good, fixed or not (wrapup-epic Step 1.4b): it is forgiven only as
     // far as fixes cover it — the owner's own "Fix now", or tests added on the standing answer.
     const undisclosed = Number((countLine?.match(/undisclosed:\s*(\d+)/i) ?? [])[1] ?? 0);
-    const forgiven = ownerFix ? fixed : Math.min(fixed, standing.filter((x) => x.testOnly).length);
+    const forgiven = ownerFix && !autoFix ? fixed : Math.min(fixed, asked.filter((x) => x.testOnly).length);
     const others = countLine ? [...countLine.matchAll(/([a-z][a-z ]*):\s*(\d+)/gi)].filter(([, k]) => !/^(fixed at wrapup|undisclosed)$/i.test(k.trim()) && !/^count$/i.test(k.trim())).map(([, , n]) => Number(n)) : [];
     const total = Number(numbers[0] ?? NaN);
-    const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && undisclosed <= forgiven && (ownerFix || fixed <= standing.length) : numbers.every((x) => Number(x) === 0));
+    const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && undisclosed <= forgiven && ((ownerFix && !autoFix) || fixed <= asked.length) : numbers.every((x) => Number(x) === 0));
     add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: waivedLine, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}) });
     if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: approval, ...(autoFix ? { auto: { question: tryJson(this.gatePath(autoFix))?.question ?? null } } : {}), ...(standing.length && !ownerFix ? { standing: standing.map((x) => ({ question: x.question, tor: x.tor ?? null, ...(x.testOnly ? { testOnly: true } : {}) })) } : {}) };
 
@@ -2548,7 +2552,7 @@ class Run {
         const report = g.briefFrom ? tryJson(path.join(this.stateDir, g.briefFrom, 'result.json'))?.result : null;
         if (report) this.writeFixBrief(e, 'The independent verifier returned FAIL again, after the repair that followed its first report. Its final report:', [report], 'a further repair, which the owner asked for after the final check');
       }
-      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}), ...(g.decided.standing ? { standing: true } : {}) };
+      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}), ...(g.decided.standing ? { standing: true } : {}), ...(g.decided.standing || g.decided.asked ? { unasked: g.decided.standing ? 'standing' : g.decided.asked } : {}) }; // `unasked`: the gate's own question was never put to the owner (autopilot answered it, or they said "Try again")
       this.supersedeGates(e, f.gate);
       const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
       if (entry.approve) { e.plan = g.artifacts?.[0] ?? null; e.planApprovedBy = g.decided.by; e.planStep = g.session ?? null; }
@@ -2557,11 +2561,11 @@ class Run {
       if (entry.fix) {
         if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used; ${g.resume ?? 'continue it by hand'}`); }
         e.fixRounds = 1;
-        this.event('fix-round', e, { why: g.decided.standing ? 'standing' : 'owner' });
+        this.event('fix-round', e, { why: e.resumed.unasked ? 'standing' : 'owner' });
         if (entry.fix === 'audit') {
           const audit = tryJson(path.join(this.stateDir, g.artifacts?.[0] ?? '-'), {});
           const parks = (audit.findings ?? []).filter((x) => x.parks);
-          this.writeFixBrief(e, g.decided.standing ? 'The auditor reported these high findings. They are treated as real on the owner\'s standing answer; nobody was asked:' : `The auditor reported these high findings and the owner (${g.decided.by}) confirmed they are real:`, [...parks.map((x) => `- **${x.id} ${x.category}** — ${x.explanation} (evidence: ${x.evidence})`), ...(g.decided.note ? ['', `The owner's note: ${g.decided.note}`] : [])]);
+          this.writeFixBrief(e, e.resumed.unasked ? `The auditor reported these high findings. They are treated as real ${g.decided.standing ? 'on the owner\'s standing answer' : 'because the owner asked autopilot to try again'}; nobody judged them:` : `The auditor reported these high findings and the owner (${g.decided.by}) confirmed they are real:`, [...parks.map((x) => `- **${x.id} ${x.category}** — ${x.explanation} (evidence: ${x.evidence})`), ...(g.decided.note ? ['', `The owner's note: ${g.decided.note}`] : [])]);
         } else {
           this.writeFixBrief(e, `The owner (${g.decided.by}) looked at what was built and answered "${f.answer}":`, [g.decided.note ? `> ${g.decided.note}` : '(no note was recorded: re-read the requirement and what the gate showed)', '', `They looked at: ${(g.artifacts ?? []).join(', ') || '(nothing could be produced)'}`]);
         }
