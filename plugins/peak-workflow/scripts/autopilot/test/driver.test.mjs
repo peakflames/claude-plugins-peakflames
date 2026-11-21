@@ -654,3 +654,40 @@ test('not proven for real: a reviewer finding that never parks and the verifier\
   assert.deepEqual(unprovenLines('All good.\n- Not run - the soak test\n### Not proven for real\n1. Windows paths\n\n## Next\n- Not this\n'), ['the soak test', 'Windows paths']);
   assert.deepEqual(unprovenLines('Verdict: PASS. Everything ran.'), []);
 });
+
+// ---- the run's own config.json (issue #41 B4) -----------------------------------------------------
+
+test('a run config.json that cannot be read stops the launch and is left as it is', async (t) => {
+  const p = makeProject(t);
+  const file = path.join(p.state, 'runs', 'r1', 'config.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  // As a session wrote it on Windows: single backslashes, which JSON does not allow.
+  const bad = `{"project": "C:\\Users\\pat\\app", "queue": ["${E1.id}"], "autoContinue": 2}`;
+  fs.writeFileSync(file, bad);
+  await assert.rejects(p.go({ run: 'r1' }), /the run's config\.json cannot be read \(.*r1.config\.json\): .*forward slashes/s);
+  // Naming the project on the command line does not turn an unreadable file into an empty one.
+  await assert.rejects(p.go({ run: 'r1', project: p.project }), /cannot be read/);
+  assert.equal(fs.readFileSync(file, 'utf8'), bad);
+  assert.ok(!fs.existsSync(path.join(p.state, 'current')), 'no run was started');
+});
+
+test('a first launch names the project on the command line, runs on the confirmed queue and limits, and logs them', async (t) => {
+  const p = makeProject(t);
+  const settings = path.join(p.state, 'settings.json');
+  const { project, ...rest } = readJson(settings); // a workspace before its first run: nothing names the project yet
+  fs.writeFileSync(settings, JSON.stringify(rest));
+  const file = path.join(p.state, 'runs', 'r1', 'config.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ queue: [E1.id], runBudgetUsd: 40, autoContinue: 2, endBy: null }));
+  await assert.rejects(p.go({ run: 'r1' }), /no project/);
+  assert.deepEqual(readJson(file), { queue: [E1.id], runBudgetUsd: 40, autoContinue: 2, endBy: null }, 'a refused launch writes nothing');
+
+  p.scenario(happy(E1));
+  await p.go({ run: 'r1', project });
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  const saved = readJson(file);
+  assert.deepEqual([saved.project, saved.queue, saved.runBudgetUsd, saved.autoContinue, saved.endBy], [project, [E1.id], 40, 2, null]);
+  const log = fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8');
+  assert.match(log, new RegExp(`run r1: queue ${E1.id}; integration line develop`));
+  assert.match(log, /run r1: limits: run budget \$40; end by no end time; technical stops continued 2 per epic; when an epic parks: continue/);
+});

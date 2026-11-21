@@ -221,6 +221,19 @@ export function defaultConfig(project) {
 const tryParse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const tryJson = (p, fallback = null) => { try { return readJson(p); } catch { return fallback; } };
 export const runDirOf = (workspace, name) => path.join(workspace, 'runs', name);
+/**
+ * A run's own config.json: `{}` when there is none, and an error when there is one that cannot be
+ * read. Seen live: a hand-written file that did not parse (a Windows path with single backslashes)
+ * was taken for empty, the run started on defaults, and the defaults were saved over what the
+ * owner had confirmed.
+ */
+export function runConfig(workspace, name) {
+  const file = path.join(runDirOf(workspace, name), 'config.json');
+  if (!exists(file)) return {};
+  try { const cfg = readJson(file); if (cfg && typeof cfg === 'object' && !Array.isArray(cfg)) return cfg; throw new Error('it is not a JSON object'); } catch (err) {
+    throw new Error(`the run's config.json cannot be read (${file}): ${err.message}. Nothing was started and the file was left as it is. Write it again as valid JSON; in a path use forward slashes (C:/Users/…), never single backslashes`);
+  }
+}
 export function listRuns(workspace) {
   const dir = path.join(workspace, 'runs');
   return exists(dir) ? fs.readdirSync(dir).filter((n) => fs.statSync(path.join(dir, n)).isDirectory()).sort() : [];
@@ -260,7 +273,7 @@ function projectSettings(project) {
  */
 export function loadConfig(workspace, { project, run: runName, overrides = {} } = {}) {
   const settings = tryJson(path.join(workspace, 'settings.json'), {});
-  const runCfg = runName ? tryJson(path.join(runDirOf(workspace, runName), 'config.json'), {}) : {};
+  const runCfg = runName ? runConfig(workspace, runName) : {};
   const given = project ?? runCfg.project ?? settings.project;
   if (!given) throw new Error('no project: pass --project, or a --workspace whose settings.json names it');
   const root = path.resolve(given);
@@ -2656,7 +2669,7 @@ class Run {
       // From here the run exists on disk: its directory, its config, and the workspace's pointer to it.
       fs.mkdirSync(this.runDir, { recursive: true });
       const cfgFile = path.join(this.runDir, 'config.json');
-      const saved = tryJson(cfgFile, {});
+      const saved = runConfig(this.stateDir, this.runName); // what the owner confirmed is kept; a key it lacks is filled in
       writeJson(cfgFile, { ...Object.fromEntries(RUN_KEYS.filter((k) => cfg[k] !== undefined).map((k) => [k, cfg[k]])), ...saved, project: cfg.project });
       if (!exists(path.join(this.stateDir, 'settings.json'))) writeJson(path.join(this.stateDir, 'settings.json'), { project: cfg.project });
       writeAtomic(path.join(this.stateDir, 'current'), `${this.runName}\n`);
@@ -2701,7 +2714,10 @@ class Run {
       this.log(cfg.sandbox ? `sandbox on: sessions may reach ${this.state.network.join(', ')}; local sockets and ports are open` : 'sandbox off: sessions run commands unsandboxed with open network; the referee keeps writes inside the clone');
       if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
-      this.event('run-start', null, { run: this.runName, queue: this.state.queue.map((q) => q.label ?? q.id), ...(resuming ? { resuming: true } : {}) });
+      // The limits this run really has, for whoever launched it to hold against what the owner confirmed.
+      const limits = { runBudgetUsd: cfg.runBudgetUsd ?? null, endBy: cfg.endBy ?? null, autoContinue: cfg.autoContinue ?? 0, onPark: cfg.onPark };
+      this.log(`run ${this.runName}: limits: run budget ${limits.runBudgetUsd == null ? 'none' : `$${limits.runBudgetUsd}`}; end by ${limits.endBy ?? 'no end time'}; technical stops continued ${limits.autoContinue} per epic; when an epic parks: ${limits.onPark}`);
+      this.event('run-start', null, { run: this.runName, queue: this.state.queue.map((q) => q.label ?? q.id), ...limits, ...(resuming ? { resuming: true } : {}) });
 
       if (!this.pre.ok) this.stopReason = `preflight: ${this.pre.refuse.join('; ')}`;
       if (resuming && !this.stopReason) this.recover();
@@ -3160,7 +3176,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   // A decided gate waits to be used: the run that continues the last one, exactly as the owner confirmed it.
   if (pre && launch && state && !interrupted && !out.refuse.length) {
     const byId = new Map(pre.epics.map((e) => [e.id, e]));
-    const before = Array.isArray(lastCfg.queue) ? lastCfg.queue : (state.queue ?? []).map((q) => q.id);
+    // The order the owner confirmed: this run's, or (a run that started without one) the nearest earlier run's in the chain.
+    const confirmed = runChain(ws, run).reverse().map(cfgOf).find((c) => Array.isArray(c.queue))?.queue;
+    const before = confirmed ?? (state.queue ?? []).map((q) => q.id);
     const ids = before.filter((id) => byId.get(id)?.eligibility === 'eligible' && !held.has(id));
     const left = runBudgetUsd == null ? null : +(runBudgetUsd - spentUsd).toFixed(2);
     const limit = ['end time', 'run budget'].includes(state.stoppedBecause) ? state.stoppedBecause : left !== null && left <= 0 ? 'run budget' : null;
