@@ -416,9 +416,11 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      never a phase name: "continues where it stopped", not "resumes at BUILD".
    - "It stops": an attended run has no end time unless the owner gives one — the run budget
      is the ceiling. When they did give one, the line starts "by <end time, as a clock time>
-     or at $<run budget>, whichever comes first". With `launch.config.onPark` `continue`, the
-     clause about the first epic is "an epic that needs you is set aside and independent ones
-     carry on".
+     or at $<run budget>, whichever comes first". The clause about the first epic follows `launch.config.onPark`:
+     `null` (the usual case: it follows the owner's answer to "Will you be at this computer")
+     — "and at the first epic that needs you while you are here. If you are away, the epics
+     that do not depend on it keep building"; `stop` — as in the shape above; `continue` —
+     "an epic that needs you is set aside and independent ones carry on".
    - "Needs you" holds: a real scope risk (Step 1 item 7); a quality gate that does not pass
      in the copy; modified tracked files that will not be part of the run; an end time too
      near (when the time left is less than the `plan` + `build` + `verify` caps of one epic,
@@ -443,12 +445,14 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    - Run limits: `launch.config.runBudgetUsd` dollars; an end time only if the owner gave one; the run also
      stops on a red base, low disk (`launch.config.diskFloorGb` GB), or two infrastructure errors
      in a row.
-   - **When an epic parks or fails** (`launch.config.onPark`): `stop` — "the run stops at the
-     first epic that parks or fails; the epics after it are not started tonight"; `continue` —
-     "epics that depend on it are blocked, independent epics still run". Say where it is set:
-     `launch.projectSettingsFile` (`<root>/.claude/peak-workflow/autopilot.json`, `{"onPark": "continue"}`),
-     a file the owner edits and commits; this skill never writes that entry. With `stop`, add that
-     "independent" is the planner's judgement, which is why stopping is the default.
+   - **When an epic parks or fails** (`launch.config.onPark`): `null` — "it follows your
+     answer: while you are here the run stops at the first epic that needs you, so you can
+     answer before more is built; if you are away, epics that depend on it wait and the
+     others keep building"; `stop` — "this project is set to stop at the first epic that
+     parks or fails; the epics after it are not started tonight"; `continue` — "this project
+     is set to keep going: epics that depend on it wait, independent epics still run". A
+     value other than `null` comes from the project's settings and wins over the owner's
+     answer; this skill never writes that entry.
    - **Gates.** Read `${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/policy/gates.json`. List the
      `answer` rows as "answered for you: <skillStep> → <answer>", and the `park` rows as "parks
      for you: <skillStep> — <why>". Add: every other question parks; the plan is approved by a
@@ -501,7 +505,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    same `AskUserQuestion` call: "Will you be at this computer while it runs? Some checks can
    only be finished by a person, such as a sign-in in a browser." — options
    `No — I'll be away`, with the description "Nothing waits for you. Those checks are listed
-   at the end as not proven for real, each with the command to run by hand", and
+   at the end as not proven for real, each with the command to run by hand. If one epic needs
+   you, the others that do not depend on it keep building", and
    `Yes — I'm here`, with the description "A step that needs you tells you, and waits about
    five minutes". The answer is the run's `attended`. When the owner says in any answer that
    they will be away, that is `false`, whatever was picked. Skip this question in `dry-run`
