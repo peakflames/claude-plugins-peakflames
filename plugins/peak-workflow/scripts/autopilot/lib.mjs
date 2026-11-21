@@ -120,7 +120,7 @@ export function gateEntry(g) {
   if (!a) return null;
   if (g.kind === 'preflight') return null; // the fix is in the project; it clears when preflight passes
   if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
-  if (g.kind === 'audit') return a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_BUILD', fix: 'audit' } : null;
+  if (g.kind === 'audit') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_BUILD', fix: 'audit' } : null;
   if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_BUILD', fix: 'look' } : null;
   if (g.kind === 'plan-lint') {
     const fix = asked === 'plan-fix';
@@ -128,4 +128,66 @@ export function gateEntry(g) {
   }
   // A question a session asked: the same kind of session again; hook R8 answers that one question once.
   return STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
+}
+
+// ---- the standing answer for technical stops: what autopilot answers itself --------------------
+
+export const gateLive = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
+/**
+ * A stop that is nobody's decision and that running again can cure: an infra error, a step's own
+ * time, turn or dollar cap, autopilot's own check on a finished build, an auditor that could not
+ * run. Listed, not inferred. A gate the driver itself knows to be technical says so
+ * (`technical: true`). The owner's own stop (the STOP file), a run limit (end time, run budget,
+ * disk), a branch that no longer merges and anything else stay questions for the owner.
+ */
+const TECHNICAL_STOP = [
+  /^infra error during /, /^budget: \S+ hit (wall clock|error_max_turns|error_max_budget_usd)\b/,
+  /^CHECK_BUILD\b(?!.*deferral)/, /^interrupted: .*CHECK_BUILD/, /^auditor: .*(could not start|returned no usable result)/,
+];
+/** Why a gate was written: its `reason`, or (a gate from an earlier driver) the reason inside its question, or what its kind says. */
+export const gateReason = (g) => g.reason ?? (String(g.question ?? '').match(/ stopped: ([\s\S]*)\. Continue it in the next run\?$/) ?? [])[1]
+  ?? (g.kind === 'plan-lint' ? 'plan lint failed' : g.kind === 'audit' ? 'auditor: high findings' : '');
+/** What the owner is offered once autopilot has used up its own answers for an epic. */
+export const TRY_AGAIN = 'Try again';
+export const LEAVE_IT = 'Leave it for now';
+/**
+ * The answer that takes a technical stop forward, whoever gives it; null when the gate is a
+ * question only the owner answers. Pure: it reads the gate alone.
+ *   resume gate, technical      → "Resume from where it stopped"
+ *   plan-lint                   → "Re-plan"
+ *   audit, findings treated as real (owner decision 2026-11-21), unless one says a paid service
+ *   was never really called     → "Real — fix before verify"; "Start over" once the one repair is spent
+ */
+export function technicalAnswer(gate) {
+  if (!gate || gate.decided || !gateLive(gate)) return null;
+  const options = gate.options ?? [];
+  if (gate.kind === 'resume') return gate.phase && options.includes(ANSWERS.resume) && (gate.technical === true || TECHNICAL_STOP.some((re) => re.test(gateReason(gate)))) ? ANSWERS.resume : null;
+  if (gate.kind === 'plan-lint') return options.includes(ANSWERS.replan) ? ANSWERS.replan : null;
+  if (gate.kind === 'audit') {
+    const c = gate.categories;
+    if (!Array.isArray(c) || !c.length || c.includes('never-ran-real') || !options.includes(ANSWERS.auditReal)) return null;
+    return (gate.fixRounds ?? 0) < 1 ? ANSWERS.auditReal : ANSWERS.startOver;
+  }
+  return null;
+}
+const standingUsed = (gate, gates) => gates.filter((g) => g.epic === gate.epic && g.decided?.standing).length;
+/**
+ * The answer autopilot records for this gate without asking ("decide a technical stop yourself, up
+ * to `n` times per epic": the owner's standing answer from launch), or null. One count per epic
+ * for every kind of technical stop. Starting an epic over is never done without asking.
+ */
+export function standingAnswer(gate, gates, n) {
+  const a = technicalAnswer(gate);
+  if (!a || a === ANSWERS.startOver || !(Number(n) > 0)) return null;
+  return standingUsed(gate, gates) < Number(n) ? a : null;
+}
+/**
+ * A technical stop autopilot may not answer itself any more (the count is used up, there is no
+ * standing answer, or the only way on is to start over): `{answer, stops}`, where `answer` is what
+ * "Try again" records and `stops` counts this stop and the ones autopilot already answered. Null
+ * for a gate autopilot answers, and for one that is the owner's own question.
+ */
+export function atLimit(gate, gates, n) {
+  const answer = technicalAnswer(gate);
+  return answer && !standingAnswer(gate, gates, n) ? { answer, stops: standingUsed(gate, gates) + 1 } : null;
 }

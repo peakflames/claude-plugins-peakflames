@@ -50,7 +50,10 @@ run, what stops, and what comes next (`DRIVER status`) are the driver's answers,
    option, mark one as the default, or infer the answer from anything said earlier. One answer
    is given ahead of time, and it is the owner's own: the standing answer for technical stops,
    agreed in the launch question (Step 2 item 3). Only `DRIVER continue` applies it, to the
-   stops the driver says it covers; you never record "resume" on a gate yourself.
+   stops the driver says it covers, and the driver picks the answer (continue, repair, plan
+   again, run the final check again); you never record "resume" on a gate yourself. When
+   that answer is used up, the driver's own question takes the gate's place: `Try again` or
+   `Leave it for now` (Step 4 item 5b).
 4. **It never picks among ready epics.** The proposed queue is every eligible epic in phase and
    index order. The owner removes or reorders; you do not choose a subset or a "best first" epic.
 
@@ -113,7 +116,7 @@ do not:
 |---|---|
 | `attend` | A driver is running. Go to Step 3b |
 | `decide` | A question needs the owner (`waiting`). Go to Step 4. If every gate in `waiting` is one the owner chose `Decide later` on in this session, do not ask again: relaunch when `relaunch` is set (Step 3 item 5), otherwise closing screen |
-| `continue` | Only technical stops are open, and the owner's standing answer covers them (`autoContinue`). Run `DRIVER continue --workspace "<ws>" --json`, say one line — "It stopped for a technical reason (<the entry's `why`>); continuing, as you asked." — and come back to Step 0 |
+| `continue` | Only technical stops are open, and the owner's standing answer covers them (`autoContinue`). Run `DRIVER continue --workspace "<ws>" --json`, say one line for each entry of `continued` — "<label> stopped for a technical reason (<the entry's `why`>), so autopilot <the entry's `did`>, as you asked." — and come back to Step 0 |
 | `readiness` | There is work that can run. If `relaunch` is set **and** you came here from Step 4 or from `continue` in this session, relaunch (Step 3 item 5). Otherwise Steps 1–3 |
 | `fetch` | Everything queued is merged and waits in autopilot's copy. Closing screen |
 | `nothing` | Nothing is left to run. Closing screen |
@@ -470,14 +473,22 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    - The scope review in full (Step 1 item 7), false alarms included.
 
 3. **Ask** with `AskUserQuestion`: "Launch autopilot on these <N> epics? If it stops for a
-   technical reason I'll continue it automatically (up to 2 times per epic)." ("on this 1
+   technical reason I'll decide how to carry on and continue it automatically (up to 2 times
+   per epic)." ("on this 1
    epic?" for one) — options `Launch`,
    `Change the queue or limits`, `Cancel`. In `dry-run` mode the first option is
    `Show the dry run` instead. The second sentence is the owner's **standing answer**: it is
    inside the question because the popup hides the chat. A technical reason is an error in the
-   tooling, a step reaching its own time or spending cap, or one of autopilot's own checks —
-   never a question about the product, a look, or a stop the owner asked for; those are always
-   asked. Say so if the owner asks what it covers.
+   tooling, a step reaching its own time or spending cap, one of autopilot's own checks, a
+   plan missing a required part, a final check that needs a repair or another run, a fix the
+   final check made itself to the product or bigger than a small fix, or a finding of the
+   independent reviewer (treated as real, and repaired). Autopilot then picks the technical
+   way on: continue, repair, plan again, run the final check again, or allow that fix. Always
+   asked, never covered: a question about the product or a requirement, a look, a finding
+   that a paid service was never really called, a fix that changes a requirement or makes a
+   test check less, and a stop the owner asked for. Say so if the owner asks what it covers,
+   and add that a fix the final check makes itself is checked only by that same final check;
+   the closing screen lists every one.
 
    **Small fixes, said in the same question.** The final check may find something small and
    recommend fixing it on the spot (a missing icon, a typo in a message). By default it does:
@@ -815,7 +826,15 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       When the checklist needs nothing started (it only says to open a file you have already
       opened), skip the offer: looking at that file is the real thing.
 
-   b. **Ask the gate's own question.** Use `AskUserQuestion` with `question` verbatim and
+   b. **A technical stop at its limit.** When the `waiting` entry itself has `options`
+      (`Try again`, `Leave it for now`), autopilot has already answered this epic's
+      technical stops as often as the owner agreed. Ask the entry's `question` and those two
+      options with `AskUserQuestion`, exactly as given: the gate's own question and options in
+      `report.json` are not shown, and `Leave it for now` is this question's `Decide later`.
+      `Try again` is recorded in item c with `--answer "Try again"`; the driver picks how
+      to try. Every other gate:
+
+      **Ask the gate's own question.** Use `AskUserQuestion` with `question` verbatim and
       `options` verbatim as the option labels, plus one more option, `Decide later`. No
       "(Recommended)", no reordering, no added options. If the question's own text carries a
       recommendation (a build session's deferral question does), say before asking that it is
@@ -873,7 +892,7 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       instead?" The note is `<what they did>. <what they saw, verbatim>`; never write it for
       them. The driver refuses a look with neither a note nor the form's answers.
 
-   c. **Record what the owner chose**, exactly, unless it was `Decide later`:
+   c. **Record what the owner chose**, exactly, unless it was `Decide later` or `Leave it for now`:
 
       ```bash
       node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" decide --workspace "<ws>" --gate "<file>" --answer "<the chosen option label>"
@@ -946,6 +965,9 @@ Leave out a part that has nothing to say.
 
 **Not proven for real:** <only when `unproven` has entries>
 
+**Decided for you:** <only when `decidedForYou` has entries>
+- <epic, short> — <why>, so autopilot <did>
+
 **Screens merged without your look:** <only when `unlooked` has entries>
 - <epic, short> — <n> pictures, sent now for you to review
 
@@ -979,7 +1001,11 @@ Leave out a part that has nothing to say.
 - **Fixed during the final check, without asking** comes from `fixes`: small repairs the
   verifier recommended and made on the owner's standing answer. One line each: what it found
   (`asked`, in plain words) and the files it changed. The verifier checked its own fix; say
-  so once under the list.
+  so once under the list. An entry with `auto` is a fix to the product itself, or a bigger
+  one, that autopilot allowed on the standing answer for technical stops: mark its line
+  "changed the product; checked only by the final check" and never leave one out.
+- **Decided for you** comes from `decidedForYou`: the technical stops autopilot answered
+  itself. One line each, by epic: "<label>: <why>, so autopilot <did>."
 - **Not proven for real** comes from `unproven`: what the independent reviewer or the
   verifier said was never exercised against the real thing — a paid service replaced by a
   stand-in, a call the verifier chose not to make, a check only a person can do. The epic

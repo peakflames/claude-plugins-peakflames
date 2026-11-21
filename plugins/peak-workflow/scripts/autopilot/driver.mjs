@@ -25,12 +25,12 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
+import { UNPROVEN_CATEGORIES, activity, atLimitAsk, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, gateEntry, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, smallFixLimits, testNamedDirs } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
-export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, unprovenLines, watch };
+export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
 
 export const DRIVER_VERSION = '0.6.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -385,7 +385,6 @@ export function readGates(workspace) {
     .map((f) => ({ file: `gates/${f}`, ...tryJson(path.join(dir, f), {}) })).filter((g) => g.epic);
 }
 /** A gate that still matters: not used, not void, not superseded by a fresh start, not a cleared preflight note. */
-export const gateLive = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
 
 /**
  * Per epic, what its latest live gate means for the next run. A decision is valid only while the
@@ -1848,7 +1847,7 @@ class Run {
     const lint = lintPlan(read(planFile), m.anchors);
     writeJson(path.join(s.stepDir, 'plan-lint.json'), lint);
     if (!lint.pass) {
-      this.writeGate(e, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: `The captured plan failed plan lint (${lint.problems.join('; ')}). Approve it as it is, or have it planned again?`, options: [ANSWERS.approvePlan, ANSWERS.replan], why: lint.problems.join('; '), artifacts: [this.rel(planFile)] });
+      this.writeGate(e, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', reason: `plan lint failed: ${lint.problems.join('; ')}`, question: `The captured plan failed plan lint (${lint.problems.join('; ')}). Approve it as it is, or have it planned again?`, options: [ANSWERS.approvePlan, ANSWERS.replan], why: lint.problems.join('; '), artifacts: [this.rel(planFile)] });
       return this.park(e, `plan lint failed: ${lint.problems.join('; ')}`);
     }
     e.planStep = s.name; e.plan = this.rel(planFile); e.planApprovedBy = 'lint';
@@ -2076,7 +2075,9 @@ class Run {
     if (judged.parks.length) {
       const list = judged.parks.map((f) => `${f.id} ${f.category}`).join(', ');
       this.writeGate(e, {
-        kind: 'audit', skillStep: 'autopilot AUDIT (before wrapup-epic)', session: s.name,
+        kind: 'audit', skillStep: 'autopilot AUDIT (before wrapup-epic)', session: s.name, reason: `auditor: ${list} (${s.name})`,
+        // What the standing answer reads (`technicalAnswer`): the findings' categories, and whether the one repair is still there.
+        categories: [...new Set(judged.parks.map((f) => f.category))], fixRounds: e.fixRounds ?? 0,
         question: `The auditor reported ${judged.parks.length} high finding(s) on ${m.label}: ${judged.parks.map((f) => `${f.id} ${f.category} — ${f.explanation}`).join(' | ')}. Are they real?`,
         options: [ANSWERS.auditReal, ANSWERS.auditNotReal],
         why: `a high finding in a park category (${this.config.audit.parkOn.join(', ')}); the auditor only advises, so a person judges it`,
@@ -2274,7 +2275,7 @@ class Run {
     if (sc.fields.status === 'Complete' && m.anchors.length > 0 && this.anchorsFor(e, sc).every((t) => sc.verified[t])) {
       const reason = `${s.name} verified every requirement and marked the epic Complete on ${m.branch}, but did not merge it into ${this.state.integration}`;
       this.writeGate(e, {
-        kind: 'resume', skillStep: 'wrapup-epic Step 5', phase: 'VERIFY',
+        kind: 'resume', skillStep: 'wrapup-epic Step 5', phase: 'VERIFY', reason, technical: true,
         question: `${m.label}: ${reason}. Continue it in the next run?`,
         options: [ANSWERS.resume, ANSWERS.startOver],
         why: `nothing failed: the verifier's report is attached. "${ANSWERS.resume}" runs the verify step again on the same branch; or merge it by hand: git merge --no-ff ${m.branch}`,
@@ -2288,7 +2289,7 @@ class Run {
     if (untouched && NO_VERDICT.test(verdict) && !/\bverdict\W{0,4}\s*FAIL\b/i.test(verdict)) {
       const reason = `${s.name} ended without a verdict: nothing was recorded or committed`;
       this.writeGate(e, {
-        kind: 'resume', skillStep: 'wrapup-epic', phase: 'VERIFY', reason,
+        kind: 'resume', skillStep: 'wrapup-epic', phase: 'VERIFY', reason, technical: true,
         question: `${m.label}: the final check ended without a verdict ("${verdict.split('\n')[0].slice(0, 200)}"). Run it again in the next run?`,
         options: [ANSWERS.resume, ANSWERS.startOver],
         why: `nothing failed and nothing is repaired. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt${e.look ? ' and your recorded look still stands' : ''}. A check you put off is asked again then. "${ANSWERS.startOver}" plans the epic again from scratch`,
@@ -2346,6 +2347,9 @@ class Run {
     const limits = smallFixLimits(this.config);
     const standing = !ownerFix && limits && e.lastStep ? tryJson(path.join(this.epicDir(e), e.lastStep, SMALL_FIX_FILE), []) ?? [] : [];
     const approval = ownerFix ?? (standing.length ? 'the standing answer for small fixes' : null);
+    // The gate was answered by autopilot itself (the standing answer for technical stops), not by the owner: the fix may be
+    // product code and any size, but it still may not change a requirement or make a test check less.
+    const autoFix = ownerFix && e.resumed.standing ? ownerFix : null;
     const fixedFiles = [];
 
     const firstParent = this.g('rev-list', '--first-parent', `${pre.developSha}..${dev}`).split('\n').filter(Boolean);
@@ -2366,7 +2370,7 @@ class Run {
         const stray = own.filter((f) => !f.startsWith('docs/') && f !== m.sidecar);
         if (stray.length && approval) fixedFiles.push(...stray);
         else if (stray.length) problems.push(`commits added during verify touch files outside docs/: ${stray.join(', ')}`);
-        if (stray.length && standing.length) {
+        if (stray.length && (standing.length || autoFix)) {
           // The standing answer is for small fixes only: a bigger one is the owner's to approve.
           const stat = this.g('diff', '--numstat', `${pre.branchTip}..${p2}`, '--', ...stray).split('\n').filter(Boolean).map((l) => l.split('\t'));
           const lines = stat.reduce((n, [a, d]) => n + (Number(a) || 0) + (Number(d) || 0), 0);
@@ -2384,8 +2388,8 @@ class Run {
           // the owner is asked then too. The referee's own record of a changed test is neither.
           const notTests = standing.some((x) => x.testOnly) ? stray.filter((f) => !f.startsWith('.autopilot/') && !isTestPath(f, testDirs, named)) : [];
           if (notTests.length) problems.push(`${SMALL_FIX_PROBLEM}changes a file that is not a test (${notTests.join(', ')}), where only a missing test was to be added`);
-          if (stray.length > limits.files) problems.push(`${SMALL_FIX_PROBLEM}changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
-          if (lines > limits.lines) problems.push(`${SMALL_FIX_PROBLEM}changes ${lines} lines (the limit is ${limits.lines})`);
+          if (standing.length && stray.length > limits.files) problems.push(`${SMALL_FIX_PROBLEM}changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
+          if (standing.length && lines > limits.lines) problems.push(`${SMALL_FIX_PROBLEM}changes ${lines} lines (the limit is ${limits.lines})`);
           if (tests.length) problems.push(`${SMALL_FIX_PROBLEM}removes checks from a test (${tests.join(', ')})`);
           if (reqs.length) problems.push(`${SMALL_FIX_PROBLEM}changes a requirement file (${reqs.join(', ')})`);
         }
@@ -2414,7 +2418,7 @@ class Run {
     const total = Number(numbers[0] ?? NaN);
     const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && undisclosed <= forgiven && (ownerFix || fixed <= standing.length) : numbers.every((x) => Number(x) === 0));
     add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: waivedLine, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}) });
-    if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: approval, ...(standing.length && !ownerFix ? { standing: standing.map((x) => ({ question: x.question, tor: x.tor ?? null, ...(x.testOnly ? { testOnly: true } : {}) })) } : {}) };
+    if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: approval, ...(autoFix ? { auto: { question: tryJson(this.gatePath(autoFix))?.question ?? null } } : {}), ...(standing.length && !ownerFix ? { standing: standing.map((x) => ({ question: x.question, tor: x.tor ?? null, ...(x.testOnly ? { testOnly: true } : {}) })) } : {}) };
 
     if (this.currentBranch() !== dev && !this.dirty()) this.g('checkout', '-q', dev);
     if (this.currentBranch() === dev && !this.dirty()) {
@@ -2544,7 +2548,7 @@ class Run {
         const report = g.briefFrom ? tryJson(path.join(this.stateDir, g.briefFrom, 'result.json'))?.result : null;
         if (report) this.writeFixBrief(e, 'The independent verifier returned FAIL again, after the repair that followed its first report. Its final report:', [report], 'a further repair, which the owner asked for after the final check');
       }
-      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}) };
+      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}), ...(g.decided.standing ? { standing: true } : {}) };
       this.supersedeGates(e, f.gate);
       const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
       if (entry.approve) { e.plan = g.artifacts?.[0] ?? null; e.planApprovedBy = g.decided.by; e.planStep = g.session ?? null; }
@@ -2553,11 +2557,11 @@ class Run {
       if (entry.fix) {
         if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used; ${g.resume ?? 'continue it by hand'}`); }
         e.fixRounds = 1;
-        this.event('fix-round', e, { why: 'owner' });
+        this.event('fix-round', e, { why: g.decided.standing ? 'standing' : 'owner' });
         if (entry.fix === 'audit') {
           const audit = tryJson(path.join(this.stateDir, g.artifacts?.[0] ?? '-'), {});
           const parks = (audit.findings ?? []).filter((x) => x.parks);
-          this.writeFixBrief(e, `The auditor reported these high findings and the owner (${g.decided.by}) confirmed they are real:`, [...parks.map((x) => `- **${x.id} ${x.category}** — ${x.explanation} (evidence: ${x.evidence})`), ...(g.decided.note ? ['', `The owner's note: ${g.decided.note}`] : [])]);
+          this.writeFixBrief(e, g.decided.standing ? 'The auditor reported these high findings. They are treated as real on the owner\'s standing answer; nobody was asked:' : `The auditor reported these high findings and the owner (${g.decided.by}) confirmed they are real:`, [...parks.map((x) => `- **${x.id} ${x.category}** — ${x.explanation} (evidence: ${x.evidence})`), ...(g.decided.note ? ['', `The owner's note: ${g.decided.note}`] : [])]);
         } else {
           this.writeFixBrief(e, `The owner (${g.decided.by}) looked at what was built and answered "${f.answer}":`, [g.decided.note ? `> ${g.decided.note}` : '(no note was recorded: re-read the requirement and what the gate showed)', '', `They looked at: ${(g.artifacts ?? []).join(', ') || '(nothing could be produced)'}`]);
         }
@@ -2881,7 +2885,7 @@ export function ensureResumeGates(workspace, { write = true } = {}) {
  */
 export function verifyFailGate(label, reason, { artifacts = [] } = {}) {
   return {
-    kind: 'resume', skillStep: 'wrapup-epic', phase: 'FIX_BUILD', reason, options: [ANSWERS.resume, ANSWERS.startOver], artifacts,
+    kind: 'resume', skillStep: 'wrapup-epic', phase: 'FIX_BUILD', reason, technical: true, options: [ANSWERS.resume, ANSWERS.startOver], artifacts,
     question: `${label}: the final check still finds a requirement not met, after one repair ("${reason.replace(/^\S+ FAIL after the fix round: /, '')}"). Repair it once more?`,
     why: `what was built is kept. "${ANSWERS.resume}" runs one more repair from the final check's report, then the checks and the final check again; nothing is planned or built again. "${ANSWERS.startOver}" plans the epic again from scratch`,
   };
@@ -2895,17 +2899,17 @@ export function fixLimitGate(label, check, limits) {
   const head = label ? `${label}: ` : '';
   // A missing test was to be added, and the fix changed product code as well: the owner's to allow.
   const code = (problems.map((p) => p.match(/changes a file that is not a test \(([^)]*)\)/)).find(Boolean) ?? [])[1];
-  if (code) return { kind: 'resume', phase: 'VERIFY', approvesFix: true, options: [ANSWERS.resume, ANSWERS.startOver],
+  if (code) return { kind: 'resume', phase: 'VERIFY', approvesFix: true, technical: true, options: [ANSWERS.resume, ANSWERS.startOver],
     question: `${head}the final check passed everything, but to meet a requirement it changed the product itself (${code}), where your standing answer covers only adding a missing test. It was not merged. Allow that change for this epic and run the final check again?`,
     why: `nothing else failed. "${ANSWERS.resume}" runs the final check again and lets it make this fix, in your name; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` };
   const n = (re) => Number((problems.map((p) => p.match(re)).find(Boolean) ?? [])[1] ?? 0);
   const files = n(/changes (\d+) files/); const lines = n(/changes (\d+) lines/);
   const over = [...(files > limits.files ? [`${files} files (your limit is ${limits.files})`] : []), ...(lines > limits.lines ? [`${lines} changed lines (your limit is ${limits.lines})`] : [])];
   return over.length
-    ? { kind: 'resume', phase: 'VERIFY', approvesFix: true, options: [ANSWERS.resume, ANSWERS.startOver],
+    ? { kind: 'resume', phase: 'VERIFY', approvesFix: true, technical: true, options: [ANSWERS.resume, ANSWERS.startOver],
       question: `${head}the final check passed everything, but the fix it made was bigger than your standing answer for small fixes allows: ${over.join(', ')}. It was not merged. Allow a fix of that size for this epic and run the final check again?`,
       why: `nothing else failed. "${ANSWERS.resume}" runs the final check again and lets it make this fix, in your name; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` }
-    : { kind: 'resume', phase: 'VERIFY', options: [ANSWERS.resume, ANSWERS.startOver],
+    : { kind: 'resume', phase: 'VERIFY', technical: true, options: [ANSWERS.resume, ANSWERS.startOver],
       question: `${head}the final check passed everything, and an earlier autopilot held back the small fix it made under a rule that has since been loosened. Run the final check again?`,
       why: `nothing else failed, and the fix is within your standing answer for small fixes as it is now. "${ANSWERS.resume}" runs the final check again; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` };
 }
@@ -2977,7 +2981,7 @@ function missingResumeGates(workspace) {
       made.push({ name: `${id}-${n}.json`, replaces: redo.file, gate: {
         epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: redo.session, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
         resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${id}`, decided: null,
-        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', reason: `${redo.session} asked for a check of ${redo.tor} that you had already done and recorded`,
+        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', technical: true, reason: `${redo.session} asked for a check of ${redo.tor} that you had already done and recorded`,
         question: `${q.label ?? id}: the final check asked you to do a check for ${redo.tor} again that you had already done and recorded. Autopilot now refuses that question. Run the final check again in the next run?`,
         options: [ANSWERS.resume, ANSWERS.startOver],
         why: `you are not asked to do the check again: the verifier is held to what you recorded. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt and your recorded look still stands. "${ANSWERS.startOver}" plans the epic again from scratch`,
@@ -3000,7 +3004,7 @@ function missingResumeGates(workspace) {
       made.push({ name: `${id}-${n}.json`, gate: {
         epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: verify, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
         resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${id}`, decided: null,
-        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', reason: `${verify} ended without a verdict: nothing was recorded or committed`,
+        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', technical: true, reason: `${verify} ended without a verdict: nothing was recorded or committed`,
         question: `${q.label ?? id}: the final check ended without a verdict, and an earlier autopilot called that a FAIL. Run the final check again in the next run?`,
         options: [ANSWERS.resume, ANSWERS.startOver],
         why: `nothing failed and nothing is repaired. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt, and a look you recorded on this build still stands. A check you put off is asked again then. "${ANSWERS.startOver}" plans the epic again from scratch`,
@@ -3024,27 +3028,18 @@ function missingResumeGates(workspace) {
 // ---- the standing answer for technical stops ---------------------------------------------------
 
 /**
- * A stop that is nobody's decision and that running again can cure: an infra error, a step's own
- * time, turn or dollar cap, autopilot's own check on a finished build, an auditor that could not
- * run. Listed, not inferred: the owner's own stop (the STOP file), a run limit (end time, run
- * budget, disk), a branch that no longer merges and anything else stay questions for the owner.
+ * Whether autopilot answers this gate itself, on the owner's standing answer from launch. The rule
+ * is `standingAnswer` in lib.mjs (which gates, which answer, one count of `n` per epic).
  */
-const TECHNICAL_STOP = [
-  /^infra error during /, /^budget: \S+ hit (wall clock|error_max_turns|error_max_budget_usd)\b/,
-  /^CHECK_BUILD\b(?!.*deferral)/, /^interrupted: .*CHECK_BUILD/, /^auditor: .*(could not start|returned no usable result)/,
-];
-/** Why a `resume` gate was written: its `reason`, or (a gate from an earlier driver) the reason inside its question. */
-export const gateReason = (g) => g.reason ?? (String(g.question ?? '').match(/ stopped: ([\s\S]*)\. Continue it in the next run\?$/) ?? [])[1] ?? '';
-/**
- * Whether the owner's standing answer ("continue a technical stop, up to `n` times per epic")
- * covers this gate. Pure. Only an undecided `resume` gate for a technical stop, and only while the
- * epic has had fewer than `n` standing answers; every other gate is the owner's to answer.
- */
-export function standingCovers(gate, gates, n) {
-  if (!(Number(n) > 0) || gate.kind !== 'resume' || gate.decided || !gateLive(gate)) return false;
-  if (!gate.phase || !(gate.options ?? []).includes(ANSWERS.resume)) return false;
-  if (!TECHNICAL_STOP.some((re) => re.test(gateReason(gate)))) return false;
-  return gates.filter((g) => g.epic === gate.epic && g.decided?.standing).length < Number(n);
+export const standingCovers = (gate, gates, n) => !!standingAnswer(gate, gates, n);
+/** What autopilot did when it answered a technical stop itself, in the owner's words: for the `continue` line and the closing screen. */
+function standingDid(gate, answer) {
+  if (answer === ANSWERS.replan) return 'had it planned again';
+  if (answer === ANSWERS.auditReal) return 'had what the reviewer found repaired';
+  if (gate.approvesFix) return 'let the final check make its own fix and ran it again';
+  if (gate.phase === 'FIX_BUILD' && /FAIL after the fix round/.test(gate.reason ?? '')) return 'had it repaired once more';
+  if (gate.phase === 'VERIFY') return 'ran the final check again';
+  return 'continued it from where it stopped';
 }
 /** Per epic, its latest live gate when that gate still needs an answer (the one `gateFacts` would call `waiting`). */
 function openGates(gates) {
@@ -3062,9 +3057,9 @@ function labelOf(workspace, id) {
 const standingLimit = (workspace, run) => Number((run ? tryJson(path.join(runDirOf(workspace, run), 'config.json')) : null)?.autoContinue ?? 0) || 0;
 
 /**
- * `driver.mjs continue`: records "Resume from where it stopped" on every gate the standing answer
- * covers, in the owner's name and marked `standing`, and returns what it did. It never touches
- * another kind of gate, and never runs while a driver does.
+ * `driver.mjs continue`: records autopilot's own answer (`standingAnswer`) on every gate the standing
+ * answer covers, in the owner's name and marked `standing`, and returns what it did. It never
+ * touches a gate that is the owner's to answer, and never runs while a driver does.
  */
 export function continueRun(workspace, { by } = {}) {
   const ws = path.resolve(workspace);
@@ -3076,12 +3071,14 @@ export function continueRun(workspace, { by } = {}) {
   for (const g of openGates(readGates(ws))) {
     const gates = readGates(ws);
     const had = gates.filter((x) => x.epic === g.epic && x.decided?.standing).length;
-    if (!standingCovers(g, gates, n)) {
-      left.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, why: n <= 0 ? 'no standing answer was given for this run' : g.kind !== 'resume' ? `a question only the owner answers (${g.kind})` : had >= n ? `this epic was already continued ${had} time(s); the standing answer covers ${n}` : `not a technical stop: ${plainReason(gateReason(g))}` });
+    const answer = standingAnswer(g, gates, n);
+    if (!answer) {
+      const kind = technicalAnswer(g);
+      left.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, why: n <= 0 ? 'no standing answer was given for this run' : !kind ? (g.kind === 'resume' ? `not a technical stop: ${plainReason(gateReason(g))}` : `a question only the owner answers (${g.kind})`) : had >= n ? `this epic was already continued ${had} time(s); the standing answer covers ${n}` : 'the only way on is to start the epic over, which is asked first' });
       continue;
     }
-    const d = decideGate(ws, g.file, ANSWERS.resume, { by, standing: true });
-    continued.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), why: plainReason(gateReason(g)), enters: d.enters, standingAnswers: had + 1, of: n });
+    const d = decideGate(ws, g.file, answer, { by, standing: true });
+    continued.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), why: plainReason(gateReason(g)), answer, did: standingDid(g, answer), enters: d.enters, standingAnswers: had + 1, of: n });
   }
   return { autoContinue: n, continued, left };
 }
@@ -3133,7 +3130,8 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const unproven = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, text: u.text }))));
 
   // Small fixes the final check made on the owner's standing answer, for the closing screen: what was asked and what changed.
-  const fixes = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && q.fixedAtWrapup?.standing).map((q) => ({ epic: q.id, label: q.label ?? q.id, files: q.fixedAtWrapup.files, asked: q.fixedAtWrapup.standing.map((x) => x.question) })));
+  // `auto`: a fix autopilot itself allowed on the standing answer for technical stops (product code, or over the small-fix size). Only the verifier judged it.
+  const fixes = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && (q.fixedAtWrapup?.standing || q.fixedAtWrapup?.auto)).map((q) => ({ epic: q.id, label: q.label ?? q.id, files: q.fixedAtWrapup.files, asked: q.fixedAtWrapup.standing ? q.fixedAtWrapup.standing.map((x) => x.question) : [q.fixedAtWrapup.auto.question].filter(Boolean), ...(q.fixedAtWrapup.auto ? { auto: true } : {}) })));
 
   // Screens merged without the owner's look ("look": "after"), with where the pictures are, for the closing screen.
   const unlooked = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && q.unlooked).map((q) => ({ epic: q.id, label: q.label ?? q.id, pictures: q.unlooked.pictures ?? [] })));
@@ -3142,15 +3140,18 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const toWrite = pid ? [] : missingResumeGates(ws);
   const gates = [...readGates(ws).filter((g) => !toWrite.some((m) => m.replaces === g.file)), ...toWrite.map((m) => ({ file: `gates/${m.name}`, ...m.gate }))];
   const open = openGates(gates); // while a driver runs these are the questions already asked; they can be answered now and are used by the next run
-  const brief = (g) => ({ file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: g.question ?? null, ...(g.kind === 'resume' ? { why: plainReason(gateReason(g)) } : {}) });
+  // A technical stop autopilot may not answer itself any more is put to the owner as one plain question, in place of the gate's own.
+  const brief = (g) => { const lim = atLimitAsk(g, gates, n, labelOf(ws, g.epic)); return { file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: lim?.question ?? g.question ?? null, ...(lim ? { options: lim.options, atLimit: { stops: lim.stops } } : {}), ...(g.kind === 'resume' || technicalAnswer(g) ? { why: plainReason(gateReason(g)) } : {}) }; };
   const covered = open.filter((g) => standingCovers(g, gates, n));
   const waiting = open.filter((g) => !covered.includes(g));
+  // What autopilot decided in the owner's name in this chain of runs, for the closing screen.
+  const decidedForYou = gates.filter((g) => g.decided?.standing && chain.includes(g.run)).map((g) => ({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), did: standingDid(g, g.decided.answer), why: plainReason(gateReason(g)) }));
 
   const out = {
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
     epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null, attended: typeof lastCfg.attended === 'boolean' ? lastCfg.attended : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
-    waiting: waiting.map(brief), autoContinue: covered.map(brief), merged: [...merged.values()], unproven, seen, unlooked, look: (() => { try { return projectSettings(root).look === 'after' ? 'after' : 'before'; } catch { return 'before'; } })(), fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), decidedForYou, merged: [...merged.values()], unproven, seen, unlooked, look: (() => { try { return projectSettings(root).look === 'after' ? 'after' : 'before'; } catch { return 'before'; } })(), fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };
@@ -3226,7 +3227,15 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   const gate = readJson(file);
   if (gate.decided?.used) throw new Error(`${path.basename(file)} was already decided and used (${gate.decided.used.date})`);
   if (gate.void || gate.superseded || gate.cleared) throw new Error(`${path.basename(file)} no longer applies: the epic was entered again since (${gate.void ? `void: ${gate.void.why}` : gate.superseded ? 'superseded' : 'cleared'})`);
-  const options = gate.options ?? [];
+  // The at-limit question for a technical stop (`atLimitAsk`): "Try again" is the owner's, and records the answer that
+  // takes this stop forward; autopilot picks which. "Leave it for now" decides nothing.
+  let asked = null;
+  if (!standing && technicalAnswer(gate)) {
+    const said = String(answer ?? '').trim().toLowerCase();
+    if (said === LEAVE_IT.toLowerCase()) return { gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: null, effect: 'none', enters: null };
+    if (said === TRY_AGAIN.toLowerCase()) { asked = TRY_AGAIN; answer = technicalAnswer(gate); }
+  }
+  const options = asked ? [answer] : gate.options ?? [];
   if (!options.length) throw new Error(`${path.basename(file)} (${gate.kind}) has no answer to record: ${gate.kind === 'preflight' ? 'the fix is in the project, and the gate clears when preflight passes' : gate.resume ?? 'continue by hand'}`);
   const label = options.find((o) => o.trim().toLowerCase() === String(answer).trim().toLowerCase());
   if (options.length && !label) throw new Error(`"${answer}" is not one of this gate's options: ${options.map((o) => `"${o}"`).join(', ')}`);
@@ -3269,7 +3278,7 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   const project = tryJson(path.join(workspace, 'settings.json'))?.project ?? (run ? tryJson(path.join(runDirOf(workspace, run), 'config.json'))?.project : null) ?? null;
   const who = by ?? (project ? sh('git', ['config', 'user.name'], { cwd: project }).out : '') ?? '';
   if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
-  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}), ...(obs?.length ? { observations: obs } : {}), ...(standing ? { standing: true } : {}) }; // `standing`: the owner's answer given once at launch, applied by `continue`
+  gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}), ...(obs?.length ? { observations: obs } : {}), ...(standing ? { standing: true } : {}), ...(asked ? { asked } : {}) }; // `asked`: what the owner was offered when it was not the gate's own option. `standing`: the owner's answer given once at launch, applied by `continue`
   writeJson(file, gate);
   if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
   // Every decided gate resumes its epic in the next run; the by-hand command stays as the fallback.
@@ -3372,7 +3381,7 @@ async function main(argv) {
   const ws = path.resolve(wsArg ?? '.');
   if (cmd === 'continue') {
     const r = continueRun(ws, { by: o.by });
-    console.log(o.json ? JSON.stringify(r, null, 2) : [...r.continued.map((c) => `continued ${c.label}: ${c.why} (${c.standingAnswers} of ${c.of})`), ...r.left.map((l) => `left for the owner ${l.label}: ${l.why}`)].join('\n') || 'nothing to continue');
+    console.log(o.json ? JSON.stringify(r, null, 2) : [...r.continued.map((c) => `decided for the owner, ${c.label}: ${c.why}, so autopilot ${c.did} (${c.standingAnswers} of ${c.of})`), ...r.left.map((l) => `left for the owner ${l.label}: ${l.why}`)].join('\n') || 'nothing to continue');
     return r.continued.length ? 0 : 1;
   }
   if (cmd === 'watch') {

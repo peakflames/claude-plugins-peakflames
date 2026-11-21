@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { RULES } from './attend.mjs';
+import { RULES, atLimitAsk } from './attend.mjs';
 import { gateEntry } from './lib.mjs';
 
 const TERMINAL = new Set(['MERGED', 'PARKED', 'FAILED', 'SKIPPED', 'BLOCKED']);
@@ -39,12 +39,16 @@ export function collectReport(runDir) {
   // This run's gates: the ones it wrote, the ones from an earlier run it used or voided, and any
   // still waiting on the owner for an epic in this run's queue.
   const gateDir = path.join(workspace, 'gates');
-  const gates = (fs.existsSync(gateDir) ? fs.readdirSync(gateDir).filter((f) => f.endsWith('.json')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [])
-    .map((file) => ({ file, g: readJson(path.join(gateDir, file)) })).filter(({ g }) => g && ((g.run ?? runName) === runName || g.decided?.used?.run === runName || g.void?.run === runName || (queued.has(g.epic) && live(g) && g.kind !== 'preflight')))
+  const everyGate = (fs.existsSync(gateDir) ? fs.readdirSync(gateDir).filter((f) => f.endsWith('.json')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [])
+    .map((file) => ({ file, g: readJson(path.join(gateDir, file)) }));
+  const labelOf = (id) => (s.queue ?? []).find((q) => q.id === id)?.label ?? id;
+  const gates = everyGate.filter(({ g }) => g && ((g.run ?? runName) === runName || g.decided?.used?.run === runName || g.void?.run === runName || (queued.has(g.epic) && live(g) && g.kind !== 'preflight')))
     .map(({ file, g }) => ({
-      file: `gates/${file}`, epic: g.epic, label: (s.queue ?? []).find((q) => q.id === g.epic)?.label ?? g.epic, kind: g.kind, session: g.session ?? null, skillStep: g.skillStep ?? null, question: g.question ?? null, options: g.options ?? [],
+      file: `gates/${file}`, epic: g.epic, label: labelOf(g.epic), kind: g.kind, session: g.session ?? null, skillStep: g.skillStep ?? null, question: g.question ?? null, options: g.options ?? [],
       tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], open: g.open ?? [], checks: g.checks ?? [], checklists: g.checklists ?? [], earlier: g.earlier ?? null, asks: g.asks ?? [], branch: g.branch ?? null, branchTip: g.branchTip ?? null, phase: g.phase ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
       run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, void: g.void ?? null, superseded: !!g.superseded, cleared: !!g.cleared,
+      // A technical stop autopilot may not answer itself any more: the one plain question the owner gets in place of the gate's own.
+      ask: (() => { const a = atLimitAsk(g, everyGate.map((x) => x.g).filter(Boolean), Number(config.autoContinue) || 0, labelOf(g.epic)); return a ? { question: a.question, options: a.options } : null; })(),
       // Every gate with options resumes its epic in the next run once decided; `resume` is the by-hand fallback.
       effect: (g.options ?? []).length ? 'resume' : 'none',
       // Where a decided gate re-enters its epic in the next run (null until decided, or when it cannot).
@@ -218,6 +222,10 @@ export function renderReport(r) {
   L.push(`Whether you were there: ${r.attended === true ? 'you said you would be at the computer; a step that needed you told you and waited' : r.attended === false ? 'you said you would be away; no session started anything that waits for a person' : 'not asked at launch'}.`);
   const fixed = r.epics.filter((e) => e.fixedAtWrapup?.standing);
   if (fixed.length) L.push(`Small fixes made without asking, on your standing answer: ${fixed.map((e) => `${e.id} (${e.fixedAtWrapup.files.join(', ') || 'no code file'})`).join('; ')} — what was asked is under each epic below.`);
+  const auto = r.epics.filter((e) => e.fixedAtWrapup?.auto);
+  if (auto.length) L.push(`Fixes the final check made to its own findings without asking, checked only by the verifier: ${auto.map((e) => `${e.id} (${e.fixedAtWrapup.files.join(', ') || 'no code file'})`).join('; ')}.`);
+  const decided = r.gates.filter((g) => g.decided?.standing);
+  if (decided.length) L.push(`Decided by autopilot for you, on your standing answer for technical stops: ${decided.map((g) => `${g.epic} — "${g.decided.answer}" (\`${g.file}\`)`).join('; ')}.`);
   const nobody = r.epics.filter((e) => e.unanswered.length);
   if (nobody.length) L.push(`Waited for you and nobody came: ${nobody.map((e) => `${e.id} ×${e.unanswered.length}`).join(', ')} — each is under its epic below, with the command to run by hand.`);
 
@@ -250,6 +258,7 @@ export function renderReport(r) {
     if (e.voided) L.push('', `Your decision "${e.voided.answer}" on \`${e.voided.gate}\` was void — ${e.voided.why}. The epic was planned again from scratch.`);
     for (const ref of e.superseded) L.push('', `The earlier branch is kept in the clone at \`${ref}\`.`);
     if (e.fixedAtWrapup?.standing) L.push('', `Fixed during verification, on your standing answer for small fixes: ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. What the verifier asked: ${e.fixedAtWrapup.standing.map((x) => `"${x.question}"`).join('; ')}.${e.fixedAtWrapup.standing.some((x) => x.testOnly) ? ` A test was added for a requirement the build left untested: ${e.fixedAtWrapup.standing.filter((x) => x.testOnly).map((x) => x.tor).join(', ')}.` : ''} The verifier checked its own fix; no separate audit ran on it.`);
+    else if (e.fixedAtWrapup?.auto) L.push('', `Fixed during the final check without asking you, on your standing answer for technical stops (\`${e.fixedAtWrapup.approvedBy}\`): ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. Only the verifier checked this fix; no second reviewer judged it.`);
     else if (e.fixedAtWrapup?.approvedBy) L.push('', `Fixed during verification, on your "Fix now" (\`${e.fixedAtWrapup.approvedBy}\`): ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. The verifier checked its own fix; no separate audit ran on it.`);
     if (e.auditOverruled) L.push('', `Verified as built: ${e.auditOverruled.by} judged the auditor's findings not real (\`${e.auditOverruled.gate}\`).`);
     if (e.look) {
@@ -284,9 +293,9 @@ export function renderReport(r) {
       L.push('', 'Gates:');
       for (const g of mine) {
         const fate = g.void ? ` — VOID: ${g.void.why}` : g.decided?.used ? ` (used by run ${g.decided.used.run ?? '?'})` : g.superseded ? ' (superseded: the epic started over)' : g.cleared ? ' (cleared)' : g.decided ? ' — resumes the epic in the next run' : '';
-        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.standing ? ' (their standing answer for technical stops, given at launch; nobody was asked again)' : ''}${fate}${g.enters && !g.void ? ` at ${g.enters}` : ''}` : g.effect === 'none' ? `nothing to answer: fix it in the project${fate}` : `NOT DECIDED${fate}`;
-        L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.question)} — ${d}`);
-        if (g.options.length && !g.decided) L.push(`  Options: ${g.options.map((o) => `"${o}"`).join(', ')}`);
+        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.standing ? ' (decided by autopilot on their standing answer for technical stops, given at launch; nobody was asked again)' : g.decided.asked ? ` (they were asked "${g.decided.asked}" and said yes)` : ''}${fate}${g.enters && !g.void ? ` at ${g.enters}` : ''}` : g.effect === 'none' ? `nothing to answer: fix it in the project${fate}` : `NOT DECIDED${fate}`;
+        L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.decided ? g.question : g.ask?.question ?? g.question)} — ${d}`);
+        if (g.options.length && !g.decided) L.push(`  Options: ${(g.ask?.options ?? g.options).map((o) => `"${o}"`).join(', ')}`);
         if (g.artifacts.length) L.push(`  Look at: ${g.artifacts.map((a) => `\`${a}\``).join(', ')}`);
         if (!g.decided && g.open?.length) L.push(`  Open: ${g.open.map((a) => `\`${a}\``).join(', ')}`);
         if (!g.decided && g.checks?.length) { L.push('  To confirm, one yes or no each:'); for (const c of g.checks) L.push(`  ${c.n}. ${c.clause} (${c.tor})`); }

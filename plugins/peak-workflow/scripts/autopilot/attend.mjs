@@ -5,6 +5,7 @@
 // the driver alone decides what runs, and nothing in this file changes a run.
 import fs from 'node:fs';
 import path from 'node:path';
+import { LEAVE_IT, TRY_AGAIN, atLimit, gateReason } from './lib.mjs';
 
 const tryJson = (p, fallback = null) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -55,6 +56,8 @@ export function plainReason(reason) {
     [/merge gate failed/, 'the final checks failed, so the merge was undone'],
     [/did not merge it/, 'it was verified but not merged'],
     [/does not merge cleanly|could not be brought up to date/, 'its work no longer fits on top of the other finished work'],
+    [/ended without a verdict/, 'the final check ended before it judged anything'],
+    [/already done and recorded/, 'the final check asked for a check you had already done'],
     [/recorded look did not settle/, 'the check needs one more look from you'],
     [/human check needed/, 'it is built and needs you to look at it'],
     [/plan lint failed|without a captured plan/, 'its plan is missing a required part'],
@@ -65,6 +68,17 @@ export function plainReason(reason) {
     [/TBD|Not decided yet|requirements decision/, 'the project has a decision to make first'],
   ];
   return table.find(([re]) => re.test(r))?.[1] ?? 'it needs you';
+}
+
+/**
+ * The one plain question for a technical stop autopilot may not answer itself any more (`atLimit`
+ * in lib.mjs), asked in place of the gate's own: try again, or leave it. Null for any other gate.
+ * Autopilot picks how to try again; the owner is not asked a technical question.
+ */
+export function atLimitAsk(gate, gates, n, label) {
+  const lim = atLimit(gate, gates, n);
+  if (!lim) return null;
+  return { question: `${label ?? gate.epic} has stopped ${lim.stops} time${lim.stops === 1 ? '' : 's'} for technical reasons (${plainReason(gateReason(gate))}). Try again, which costs more, or leave it for now?`, options: [TRY_AGAIN, LEAVE_IT], ...lim };
 }
 
 /** Reviewer findings that say the work was not exercised for real, whatever their severity. */

@@ -7,7 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, ensureResumeGates, gateReason, newRunName, standingCovers, strayProcesses } from '../driver.mjs';
+import { ANSWERS, atLimit, ensureResumeGates, gateReason, newRunName, standingAnswer, standingCovers, strayProcesses } from '../driver.mjs';
 import { chainOf, eventLine, progressLine, queueLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
@@ -177,14 +177,14 @@ test('status.next: readiness with no run, attend while a driver runs, decide for
   assert.equal(gateFile(p, E1.id).decided, null);
 });
 
-test('status.next: decide for a gate only the owner answers (a look, an audit finding); continue never touches one', async (t) => {
+test('status.next: decide for a gate only the owner answers (a look, a finding that a paid service was never really called); continue never touches one', async (t) => {
   const p = makeProject(t);
   const e5 = addEpic(p.project, { id: 'Lg5Chr8', slug: 'chart', name: 'Spending chart', nn: '05' });
   const feature = path.join(p.project, 'docs', 'requirements', '05-chart.feature.md');
   fs.writeFileSync(feature, fs.readFileSync(feature, 'utf8').replace(/^(Scenario: .*)$/m, '$1\n    # Verification: operator-observed'));
   git(p.project, 'commit', '-qam', 'docs: the chart is checked by a person');
   const manual = { actions: [...buildActions(e5, { commit: false }), { do: 'write', path: `test/${e5.slug}.test.js`, content: "import test from 'node:test';\ntest('the chart command exists', () => {});\n" }, { do: 'write', path: `tests/manual/${e5.tors[0]}.md`, content: `# Manual check — ${e5.tors[0]}\n\n1. Open chart.html\n` }, { do: 'commit', message: `feat(epic-${e5.id}): implement ${e5.slug}` }] };
-  const finding = { category: 'stand-in', severity: 'high', evidence: 'test/x.test.js:1', explanation: 'a stand-in' };
+  const finding = { category: 'never-ran-real', severity: 'high', evidence: 'test/x.test.js:1', explanation: 'the rates service was never called' };
   p.scenario({ ...happy(E1), [`${E1.id}/audit`]: { result: { structured_output: { findings: [finding], recommend: 'park', summary: 'canned' } } }, [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: manual });
   await p.go({ run: confirmRun(p, { queue: [E1.id, e5.id], autoContinue: 2 }) });
   assert.deepEqual([p.epic(E1.id).state, p.epic(e5.id).state], ['PARKED', 'PARKED']);
@@ -232,7 +232,7 @@ test('continue: a budget stop is resumed on the standing answer, twice per epic;
   assert.deepEqual(s1.autoContinue.map((g) => [g.file, g.kind, g.why]), [[`gates/${E1.id}-1.json`, 'resume', 'a step reached its limit']]);
   const c1 = driver('continue', '--workspace', p.state, '--json', '--by', 'Pat Owner');
   assert.equal(c1.status, 0, c1.stderr);
-  assert.deepEqual(c1.json(), { autoContinue: 2, continued: [{ gate: `gates/${E1.id}-1.json`, epic: E1.id, label: LABEL, why: 'a step reached its limit', enters: 'BUILD', standingAnswers: 1, of: 2 }], left: [] });
+  assert.deepEqual(c1.json(), { autoContinue: 2, continued: [{ gate: `gates/${E1.id}-1.json`, epic: E1.id, label: LABEL, why: 'a step reached its limit', answer: ANSWERS.resume, did: 'continued it from where it stopped', enters: 'BUILD', standingAnswers: 1, of: 2 }], left: [] });
   assert.deepEqual(gateFile(p, E1.id).decided, { answer: ANSWERS.resume, by: 'Pat Owner', date: new Date().toISOString().slice(0, 10), scope: 'next-run', standing: true });
 
   // The run that continues it: named by status, with the same queue and what is left of the budget.
@@ -242,7 +242,7 @@ test('continue: a budget stop is resumed on the standing answer, twice per epic;
   const relaunch = async (s) => { confirmRun(p, s.relaunch.config, s.relaunch.run); const before = p.calls().length; await p.go({ run: s.relaunch.run }); return p.steps().slice(before); };
   assert.deepEqual(await relaunch(s2), [`${E1.id}/build-1`], 'the build is continued; nothing is planned again');
   assert.equal(readJson(path.join(p.runDir(), 'config.json')).continues, run1);
-  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /decided "Resume from where it stopped" by Pat Owner on \d{4}-\d{2}-\d{2} \(their standing answer for technical stops, given at launch; nobody was asked again\)/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /decided "Resume from where it stopped" by Pat Owner on \d{4}-\d{2}-\d{2} \(decided by autopilot on their standing answer for technical stops, given at launch; nobody was asked again\)/);
 
   // Stopped the same way again: the second and last standing answer.
   const s3 = st(p);
@@ -252,7 +252,7 @@ test('continue: a budget stop is resumed on the standing answer, twice per epic;
 
   // A third time: the owner is asked.
   const s4 = st(p);
-  assert.deepEqual([s4.next, s4.autoContinue, s4.waiting.map((g) => g.file)], ['decide', [], [`gates/${E1.id}-3.json`]]);
+  assert.deepEqual([s4.next, s4.autoContinue, s4.waiting.map((g) => [g.file, g.options, g.atLimit])], ['decide', [], [[`gates/${E1.id}-3.json`, ['Try again', 'Leave it for now'], { stops: 3 }]]]);
   const c3 = driver('continue', '--workspace', p.state, '--json', '--by', 'Pat Owner');
   assert.equal(c3.status, 1);
   assert.deepEqual(c3.json().left.map((l) => l.why), ['this epic was already continued 2 time(s); the standing answer covers 2']);
@@ -422,4 +422,173 @@ test('the queue line counts over the confirmed queue: done, percent, waiting, st
   assert.equal(queueLine(new Map([['a', 'FAILED'], ['b', 'BLOCKED'], ['c', 'BUILD']])), 'Progress: 0 of 3 done (0%); 1 did not pass; 1 not started; 1 still to go');
   assert.equal(eventLine({ type: 'epic-start', epic: 'b', label: 'b (x) — Second', pos: 2, of: 4 }), 'Starting 2 of 4: b — Second');
   assert.equal(eventLine({ type: 'step-end', kind: 'build', outcome: 'ok', minutes: 12, costUsd: 4.2 }), "Build finished in 12 min ($4.20). Next: autopilot's own checks, then an independent review");
+});
+
+// ---- autopilot answers a technical stop itself (issue #41, I6) -------------------------------------
+
+const TRY = ['Try again', 'Leave it for now'];
+const canned = (...categories) => ({ result: { total_cost_usd: 0.5, structured_output: { findings: categories.map((category) => ({ category, severity: 'high', evidence: 'test/rates.test.js:12', explanation: `the ${category} problem` })), recommend: 'park', summary: 'canned' } } });
+const askTool = (question, options) => ({ do: 'tool', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question, header: 'Gate', multiSelect: false, options: options.map((label) => ({ label, description: '' })) }] } });
+const cont = (p) => driver('continue', '--workspace', p.state, '--json', '--by', 'Pat Owner');
+async function relaunch(p) {
+  const s = st(p);
+  assert.ok(s.relaunch, `nothing to relaunch: ${s.next} (${s.why})`);
+  confirmRun(p, s.relaunch.config, s.relaunch.run);
+  const before = p.calls().length;
+  await p.go({ run: s.relaunch.run });
+  return p.steps().slice(before);
+}
+
+test('standingAnswer: which answer autopilot gives a technical stop, one count per epic for every kind', () => {
+  const base = { file: 'gates/a-9.json', epic: 'a', decided: null };
+  const resume = (extra = {}) => ({ ...base, kind: 'resume', phase: 'VERIFY', options: [ANSWERS.resume, ANSWERS.startOver], reason: 'verify-2 FAIL after the fix round: Verdict: FAIL', ...extra });
+  const lint = { ...base, kind: 'plan-lint', options: [ANSWERS.approvePlan, ANSWERS.replan] };
+  const review = (categories, fixRounds = 0) => ({ ...base, kind: 'audit', options: [ANSWERS.auditReal, ANSWERS.auditNotReal], categories, fixRounds });
+
+  assert.equal(standingAnswer(resume(), [], 2), null, 'a stop the driver did not mark technical stays a question');
+  assert.equal(standingAnswer(resume({ technical: true }), [], 2), ANSWERS.resume);
+  assert.equal(standingAnswer(resume({ reason: 'budget: build-1 hit wall clock' }), [], 2), ANSWERS.resume, 'the listed reasons, as before');
+  assert.equal(standingAnswer(lint, [], 2), ANSWERS.replan);
+  assert.equal(standingAnswer(review(['stand-in', 'cannot-fail']), [], 2), ANSWERS.auditReal, 'a reviewer\'s finding is treated as real');
+  assert.equal(standingAnswer(review(['stand-in', 'never-ran-real']), [], 2), null, 'a paid service never really called is the owner\'s');
+  assert.equal(standingAnswer(review(['stand-in'], 1), [], 2), null, 'the one repair is spent: nothing to do without asking');
+  assert.equal(standingAnswer({ ...review(['stand-in']), categories: undefined }, [], 2), null, 'a gate from an earlier driver names no categories');
+  for (const kind of ['human-check', 'deferral', 'amendment', 'unmatched', 'preflight']) assert.equal(standingAnswer({ ...base, kind, technical: true, phase: 'VERIFY', options: [ANSWERS.resume, 'x'] }, [], 2), null, kind);
+  assert.equal(standingCovers(lint, [], 2), true);
+
+  // One count for the epic, whatever was answered.
+  const earlier = (answer) => ({ epic: 'a', kind: 'x', decided: { answer, standing: true, used: { run: 'r' } } });
+  const two = [earlier(ANSWERS.resume), earlier(ANSWERS.auditReal)];
+  for (const g of [resume({ technical: true }), lint, review(['stand-in'])]) assert.equal(standingAnswer(g, two, 2), null, g.kind);
+  assert.equal(standingAnswer(lint, [two[0]], 2), ANSWERS.replan);
+
+  // At the limit (or with no standing answer) the owner gets one plain question; a gate that is theirs anyway does not.
+  assert.deepEqual(atLimit(lint, two, 2), { answer: ANSWERS.replan, stops: 3 });
+  assert.deepEqual(atLimit(resume({ technical: true }), [], 0), { answer: ANSWERS.resume, stops: 1 });
+  assert.deepEqual(atLimit(review(['stand-in'], 1), [], 2), { answer: ANSWERS.startOver, stops: 1 }, 'the repair is spent: trying again means starting over');
+  assert.equal(atLimit(lint, [], 2), null, 'within the count nothing is asked');
+  assert.equal(atLimit(review(['never-ran-real']), two, 2), null);
+  assert.equal(atLimit(resume({ reason: 'stopped by the STOP file during build-1' }), two, 2), null);
+});
+
+test('a reviewer\'s finding is repaired without asking; a paid service never really called still asks', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: canned('stand-in') });
+  await p.go({ run: confirmRun(p, { autoContinue: 2 }) });
+  assert.deepEqual([gateFile(p, E1.id).kind, gateFile(p, E1.id).categories, gateFile(p, E1.id).fixRounds], ['audit', ['stand-in'], 0]);
+
+  const s = st(p);
+  assert.deepEqual([s.next, s.waiting, s.autoContinue.map((g) => [g.file, g.kind, g.why])], ['continue', [], [[`gates/${E1.id}-1.json`, 'audit', 'the independent reviewer found a serious problem']]]);
+  const c = cont(p);
+  assert.equal(c.status, 0, c.stderr);
+  assert.deepEqual(c.json().continued.map((x) => [x.answer, x.did, x.enters, x.standingAnswers]), [[ANSWERS.auditReal, 'had what the reviewer found repaired', 'FIX_BUILD', 1]]);
+  assert.deepEqual([gateFile(p, E1.id).decided.answer, gateFile(p, E1.id).decided.standing], [ANSWERS.auditReal, true]);
+
+  p.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/live.js', content: 'export const live = true;\n' }, { do: 'commit', message: `feat(epic-${E1.id}): exercise the live path` }] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  assert.deepEqual(await relaunch(p), ['fix-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`));
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  const brief = fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8');
+  assert.match(brief, /treated as real on the owner's standing answer/);
+  assert.ok(!/confirmed they are real/.test(brief), 'nobody confirmed anything');
+  // The closing screen says what was decided in the owner's name.
+  assert.deepEqual(st(p, '--queue', E1.id).decidedForYou.map((d) => [d.label, d.did, d.why]), [[LABEL, 'had what the reviewer found repaired', 'the independent reviewer found a serious problem']]);
+
+  const q = makeProject(t);
+  q.scenario({ ...happy(E1), [`${E1.id}/audit`]: canned('stand-in', 'never-ran-real') });
+  await q.go({ run: confirmRun(q, { autoContinue: 2 }) });
+  const s2 = st(q);
+  assert.deepEqual([s2.next, s2.autoContinue, s2.waiting.map((g) => [g.kind, g.options ?? null])], ['decide', [], [['audit', null]]], 'their own question, as the gate asks it');
+  assert.match(s2.waiting[0].question, /Are they real\?$/);
+  assert.equal(cont(q).status, 1);
+  assert.equal(gateFile(q, E1.id).decided, null);
+});
+
+test('the final check\'s own product fix is allowed without asking, and listed; a weakened test or a changed requirement in it is still refused', async (t) => {
+  const TORQ = `${E1.tors[0]} is FAIL: no test mirrors the Then; the code itself looks right. Recommendation: Fix now — one small test. How to proceed?`;
+  const TOROPTS = ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'];
+  const fix = (extra = []) => ({ actions: [askTool(TORQ, TOROPTS), { do: 'checkout', name: E1.branch }, { do: 'write', path: 'test/then.test.js', content: "import test from 'node:test';\ntest('the Then holds', () => {});\n" }, { do: 'write', path: 'src/patch.js', content: 'export const patched = 1;\n' }, ...extra, { do: 'commit', message: `test(epic-${E1.id}): the test the requirement lacked` }, ...wrapupScript(E1, { counts: [1, 1, 0, 1, 0, 0] }).actions], result: { result: 'Verdict: PASS' } });
+
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
+  await p.go({ run: confirmRun(p, { autoContinue: 2 }) });
+  assert.deepEqual([p.epic(E1.id).state, gateFile(p, E1.id).approvesFix, gateFile(p, E1.id).technical], ['PARKED', true, true]);
+  assert.equal(st(p).next, 'continue');
+  assert.deepEqual(cont(p).json().continued.map((x) => [x.answer, x.did]), [[ANSWERS.resume, 'let the final check make its own fix and ran it again']]);
+  p.scenario({ [`${E1.id}/verify`]: fix() });
+  await relaunch(p);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual([e.fixedAtWrapup.files.sort(), e.fixedAtWrapup.approvedBy, !!e.fixedAtWrapup.auto], [['src/patch.js', 'test/then.test.js'], `gates/${E1.id}-1.json`, true]);
+  // Nobody but the verifier judged this change: the owner is told which files.
+  assert.deepEqual(st(p, '--queue', E1.id).fixes.map((f) => [f.label, f.files.sort(), f.auto]), [[LABEL, ['src/patch.js', 'test/then.test.js'], true]]);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fixed during the final check without asking you, on your standing answer for technical stops \(`gates\/Lg1Csv7-1\.json`\): src\/patch\.js, test\/then\.test\.js\. Only the verifier checked this fix/);
+
+  // The same stop, but the second final check also changes a requirement file and takes the checks out of a test.
+  const q = makeProject(t);
+  q.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
+  await q.go({ run: confirmRun(q, { autoContinue: 2 }) });
+  assert.equal(cont(q).status, 0);
+  q.scenario({ [`${E1.id}/verify`]: fix([{ do: 'write', path: 'docs/requirements/note.md', content: 'changed\n' }, { do: 'exec', cmd: `sed -i.bak '/is met/d' test/${E1.slug}.test.js; rm -f test/${E1.slug}.test.js.bak` }]) });
+  await relaunch(q);
+  assert.equal(q.epic(E1.id).state, 'PARKED', q.epic(E1.id).reason);
+  const evidence = readJson(q.dir(E1.id, 'check-verify-1.json')).checks.find((x) => x.name === 'verdict').evidence.join(' | ');
+  assert.match(evidence, /changes a requirement file \(docs\/requirements\/note\.md\)/);
+  assert.match(evidence, /removes checks from a test \(test\/csv-import\.test\.js\)/);
+  assert.equal(git(q.clone, 'rev-parse', 'develop'), git(q.project, 'rev-parse', 'develop'), 'nothing merged');
+});
+
+test('at the limit the owner gets one plain question: "Try again" records the technical answer as theirs, "Leave it for now" records nothing', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: overBudget(E1) });
+  await p.go({ run: confirmRun(p, { autoContinue: 0 }) });
+
+  const s = st(p);
+  assert.deepEqual([s.next, s.autoContinue], ['decide', []]);
+  assert.deepEqual(s.waiting.map((g) => [g.file, g.question, g.options]), [[`gates/${E1.id}-1.json`, `${LABEL} has stopped 1 time for technical reasons (a step reached its limit). Try again, which costs more, or leave it for now?`, TRY]]);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /has stopped 1 time for technical reasons \(a step reached its limit\)\. Try again, which costs more, or leave it for now\? — NOT DECIDED\n  Options: "Try again", "Leave it for now"/);
+
+  const leave = driver('decide', '--workspace', p.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Leave it for now', '--by', 'Pat Owner');
+  assert.equal(leave.status, 0, leave.stderr);
+  assert.deepEqual([leave.json().effect, gateFile(p, E1.id).decided], ['none', null]);
+
+  const again = driver('decide', '--workspace', p.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Try again', '--by', 'Pat Owner');
+  assert.equal(again.status, 0, again.stderr);
+  assert.deepEqual([again.json().enters, gateFile(p, E1.id).decided.answer, gateFile(p, E1.id).decided.asked, gateFile(p, E1.id).decided.standing], ['BUILD', ANSWERS.resume, 'Try again', undefined]);
+
+  // A question that is the owner's own never takes "Try again".
+  const q = makeProject(t);
+  q.scenario({ ...happy(E1), [`${E1.id}/audit`]: canned('never-ran-real') });
+  await q.go({ run: confirmRun(q, { autoContinue: 0 }) });
+  const no = driver('decide', '--workspace', q.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Try again', '--by', 'Pat Owner');
+  assert.notEqual(no.status, 0);
+  assert.match(no.stderr, /is not one of this gate's options/);
+
+  // A reviewer's finding when the one repair is spent: trying again is starting over, and the owner is asked first.
+  const r = makeProject(t);
+  const red = { actions: buildActions(E1, { testBody: " throw new Error('red'); " }), result: { total_cost_usd: 0.3 } };
+  r.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: red, [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: [{ do: 'write', path: `test/${E1.slug}.test.js`, content: `import test from 'node:test';\n${E1.tors.map((x) => `test('${x} is met', () => {});`).join('\n')}\n` }, { do: 'commit', message: `fix(epic-${E1.id}): green` }] }, [`${E1.id}/audit`]: canned('cannot-fail') });
+  await r.go({ run: confirmRun(r, { autoContinue: 2 }) });
+  const s3 = st(r);
+  assert.deepEqual([s3.next, s3.waiting.map((g) => g.options)], ['decide', [TRY]]);
+  const over = driver('decide', '--workspace', r.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'try again', '--by', 'Pat Owner');
+  assert.equal(over.status, 0, over.stderr);
+  assert.deepEqual([over.json().enters, gateFile(r, E1.id).decided.answer], ['PLAN (from scratch, on a fresh branch)', ANSWERS.startOver]);
+});
+
+test('a final check that still fails after its repair is repaired once more without asking, then asked at the limit', async (t) => {
+  const p = makeProject(t);
+  const fail = (words) => ({ actions: [], result: { result: `Verdict: FAIL\n${E1.tors[2]}: ${words}` } });
+  const repair = (n) => ({ actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/fix.js', content: `export const fixed = ${n};\n` }, { do: 'commit', message: `fix(epic-${E1.id}): try ${n}` }] });
+  p.scenario({ ...happy(E1), [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/verify-1`]: fail('trimmed'), [`${E1.id}/fix`]: repair(1), [`${E1.id}/verify-2`]: fail('still trimmed') });
+  await p.go({ run: confirmRun(p, { autoContinue: 1 }) });
+  assert.deepEqual([p.epic(E1.id).state, gateFile(p, E1.id).technical], ['PARKED', true]);
+  assert.deepEqual(cont(p).json().continued.map((x) => [x.did, x.why, x.enters]), [['had it repaired once more', 'it did not pass its independent check, even after the one repair', 'FIX_BUILD']]);
+  p.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: repair(2), [`${E1.id}/verify`]: fail('trimmed even now') });
+  await relaunch(p);
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+
+  const s = st(p);
+  assert.deepEqual([s.next, s.waiting.map((g) => [g.file, g.options])], ['decide', [[`gates/${E1.id}-2.json`, TRY]]]);
+  assert.match(s.waiting[0].question, /has stopped 2 times for technical reasons \(it did not pass its independent check, even after the one repair\)\. Try again, which costs more, or leave it for now\?$/);
+  assert.equal(cont(p).status, 1);
 });
