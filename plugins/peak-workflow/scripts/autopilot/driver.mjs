@@ -780,7 +780,9 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
   const allowedDomains = open ? sessionNetwork(config) : [];
   // Off by default (owner decision, 2026-11-13): the sandbox stopped real toolchains in ways no project setting could
   // predict (MSBuild's named pipes, caches in the home directory). The referee hooks and the deny list still apply.
-  const sandboxed = config.sandbox === true || !open;
+  // The auditor follows the same setting (seen live: forced into a sandbox on a machine that has none, every audit
+  // ended in seconds and the run with it). It has Read, Grep and Glob only, and the referee keeps it to the bundle and the clone.
+  const sandboxed = config.sandbox === true;
   const hook = (file, extra = {}) => ({ type: 'command', command: `node "$AUTOPILOT_HOOKS/${file}"`, ...extra });
   return {
     permissions: {
@@ -1163,7 +1165,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}`);
   p(config.sandbox === true
     ? `Sandbox:          on — sessions write only in the clone, may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`
-    : 'Sandbox:          off — sessions run commands as a terminal does, with open network; the referee keeps file writes inside the clone and the temp directories (best effort for scripts) and still denies push, containers and sudo. The auditor stays sandboxed with no network (WebFetch and WebSearch are always denied)');
+    : 'Sandbox:          off — sessions run commands as a terminal does, with open network; the referee keeps file writes inside the clone and the temp directories (best effort for scripts) and still denies push, containers and sudo. The auditor only reads (WebFetch and WebSearch are always denied)');
   p(`Run limits:       $${config.runBudgetUsd}, end by ${config.endBy ?? '(no end time)'}, disk floor ${config.diskFloorGb} GB, growth cap ${config.growthCapMb} MB`);
   if (!pre.ok) { p(); p('PREFLIGHT REFUSES THIS RUN:'); pre.refuse.forEach((r) => p(`  - ${r}`)); }
 

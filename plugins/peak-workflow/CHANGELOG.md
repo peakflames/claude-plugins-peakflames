@@ -228,6 +228,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot final check has its own fix round** — a repair spent on the build's checks no
   longer leaves a failed final check with none. A final check that still fails after its repair
   parks with "repair it once more?" instead of FAILED with nothing to answer.
+- **Autopilot auditor follows the sandbox setting** — the auditor was sandboxed even with the
+  sandbox off, so on a machine with no sandbox (Windows) every audit failed in seconds and the
+  run ended. It still has read-only tools and no web access.
 - **Autopilot tells tests from code by name** — where a listed test directory also holds
   production code (`src/` with tests beside it), only test-named files need a recorded reason;
   production files no longer fail the build check or spend the repair round. The build check

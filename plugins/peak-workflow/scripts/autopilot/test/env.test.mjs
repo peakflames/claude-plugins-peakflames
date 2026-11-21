@@ -312,8 +312,7 @@ test('by default sessions run with the sandbox off: settings say so, the run rec
   p.scenario(s);
   const state = await p.go();
   assert.deepEqual([state.sandbox, state.queue[0].state], [false, 'MERGED']);
-  for (const step of ['plan-1', 'build-1', 'verify-1']) assert.deepEqual(readJson(p.dir(E1.id, step, 'settings.json')).sandbox, { enabled: false }, step);
-  assert.equal(readJson(p.dir(E1.id, 'audit-1', 'settings.json')).sandbox.enabled, true);
+  for (const step of ['plan-1', 'build-1', 'audit-1', 'verify-1']) assert.deepEqual(readJson(p.dir(E1.id, step, 'settings.json')).sandbox, { enabled: false }, step);
   const tools = fs.readFileSync(p.dir(E1.id, 'build-1', 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   assert.equal(tools[0].out, null, 'the read is allowed');
   assert.match(tools[1].out.hookSpecificOutput.permissionDecisionReason, /writes only inside it/);

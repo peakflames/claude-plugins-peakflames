@@ -451,8 +451,9 @@ test('owner decision: git remote writes are denied, the read-only listing is not
 
 test('sandbox: off by default; when a project turns it on, every session but the auditor gets local sockets, the package registries and the project\'s own hosts; nothing else opens', () => {
   // Off by default: the session runs commands as a terminal does. The deny list and the referee hooks stay.
-  for (const kind of ['plan', 'build', 'fix', 'verify', 'probe']) assert.deepEqual(sessionSettings({}, { kind }).sandbox, { enabled: false }, kind);
-  assert.equal(sessionSettings({}, { kind: 'audit' }).sandbox.enabled, true);
+  // The auditor too (issue #41 B1): a machine with no sandbox must still be able to audit. Its tools and the web deny stay.
+  for (const kind of ['plan', 'build', 'fix', 'verify', 'probe', 'audit']) assert.deepEqual(sessionSettings({}, { kind }).sandbox, { enabled: false }, kind);
+  for (const tool of ['WebFetch', 'WebSearch']) assert.ok(sessionSettings({}, { kind: 'audit' }).permissions.deny.includes(tool), tool);
   assert.ok(sessionSettings({}, { kind: 'build' }).hooks.PreToolUse && sessionSettings({}, { kind: 'build' }).permissions.deny.includes('Bash(git push *)'));
   // On: what follows.
   const base = sessionSettings({ sandbox: true }, { kind: 'build' }).sandbox;
