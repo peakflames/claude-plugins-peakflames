@@ -16,7 +16,7 @@ const audit = (category) => ({ result: { structured_output: { findings: [{ categ
 const E2 = { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02' };
 /** The owner brings the clone's merged work into the project with the report's own fetch command, fast-forward. */
 function ownerFetches(p) {
-  const fetch = readJson(path.join(p.runDir(), 'report.json')).next.find((n) => n.includes('git fetch')).split('\n')[1].trim();
+  const fetch = readJson(path.join(p.runDir(), 'report.json')).fetch;
   assert.equal(spawnSync('sh', ['-c', fetch], { cwd: p.project }).status, 0);
   git(p.project, 'merge', '-q', '--ff-only', 'autopilot/develop');
 }
@@ -32,7 +32,7 @@ test('sync, P == C: nothing moves; the clone is reused as it is', async (t) => {
   assert.equal(cli('report', '--workspace', p.state).status, 0);
   const after = readJson(path.join(p.runDir(), 'report.json'));
   assert.equal(after.workInProject, true);
-  assert.ok(!after.next.some((n) => n.includes('git fetch')), after.next.join('\n'));
+  assert.ok(!after.next.some((n) => /brings it into your project/.test(n)), after.next.join('\n'));
   assert.match(after.next.join('\n'), /The merged work \(Lg1Csv7\) is already in your project's `develop`: nothing to bring in\./);
   assert.match(after.tldr.join('\n'), /The finished work is already in your project/);
   const c = tip(p.clone);
@@ -54,7 +54,7 @@ test('sync, P ahead of C: the clone is fast-forwarded and the new work is built 
   assert.equal(cli('decide', '--workspace', p.state, '--gate', `${e2.id}-1.json`, '--answer', ANSWERS.auditNotReal, '--by', 'Pat Owner').status, 0);
 
   // The owner brings the night's work in with a merge commit (this repository's convention), then plans a new epic by day.
-  const fetch = readJson(path.join(p.runDir(), 'report.json')).next.find((n) => n.includes('git fetch')).split('\n')[1].trim();
+  const fetch = readJson(path.join(p.runDir(), 'report.json')).fetch;
   assert.equal(spawnSync('sh', ['-c', fetch], { cwd: p.project }).status, 0);
   git(p.project, 'merge', '-q', '--no-ff', '-m', 'Merge autopilot/develop', 'autopilot/develop');
   const e6 = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
@@ -98,7 +98,7 @@ test('sync, C ahead of P: the run builds on the clone; readiness reads the clone
   assert.deepEqual([s.sync.state, s.queue.map((q) => [q.id, q.state])], ['clone-ahead', [[e2.id, 'MERGED']]]);
   assert.deepEqual(p.steps().slice(4).map((k) => k.split('/')[0]), [e2.id, e2.id, e2.id, e2.id], 'E1 is not built again');
   const report = readJson(path.join(p.runDir(), 'report.json'));
-  assert.match(report.next.join('\n'), /bring in the merged work \(Lg2Cat4, and 1 commit from earlier runs still waiting in the clone\):\n {3}git fetch /);
+  assert.match(report.next.join('\n'), /bring in the merged work \(Lg2Cat4, and 1 commit from earlier runs still waiting in the clone\)\. Run `\/peak-workflow:autopilot`/);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /this run built on top of it: [0-9a-f]+ Merge branch 'feature\/epic-Lg1Csv7-csv-import' into develop\./);
   assert.equal(tip(p.project), P, 'the project is never written');
   // One fetch brings both runs' work in.
@@ -152,7 +152,7 @@ test('preflight gate: not resumable — nothing to answer; it clears when the fi
   const refused = cli('decide', '--workspace', p.state, '--gate', `${E1.id}-1.json`, '--answer', 'ok', '--by', 'Pat Owner');
   assert.equal(refused.status, 2);
   assert.match(refused.stderr, /has no answer to record: the fix is in the project/);
-  assert.match(readJson(path.join(p.runDir(), 'report.json')).next.join('\n'), /Fix in the project what stopped 1 epic before it started \(Lg1Csv7\)/);
+  assert.match(readJson(path.join(p.runDir(), 'report.json')).next.join('\n'), /Something in the project stopped 1 epic before it started \(Lg1Csv7\); there is nothing to answer, and the reason is under "Per epic"\. Autopilot cannot repair this itself yet; it needs someone who maintains the code\./);
   assert.deepEqual(preflight(p).launch.openGates, [], 'not a gate that waits for an answer');
 
   // Still unfixed: it parks again, with a new note. Fixed in the project: the sync brings the fix in and the epic runs.

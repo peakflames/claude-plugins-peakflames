@@ -49,7 +49,7 @@ export function collectReport(runDir) {
       run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, void: g.void ?? null, superseded: !!g.superseded, cleared: !!g.cleared,
       // A technical stop autopilot may not answer itself any more: the one plain question the owner gets in place of the gate's own.
       ask: (() => { const a = atLimitAsk(g, everyGate.map((x) => x.g).filter(Boolean), Number(config.autoContinue) || 0, labelOf(g.epic)); return a ? { question: a.question, options: a.options } : null; })(),
-      // Every gate with options resumes its epic in the next run once decided; `resume` is the by-hand fallback.
+      // Every gate with options resumes its epic in the next run once decided. `resume` stays in report.json as a record; it is never printed for the owner.
       effect: (g.options ?? []).length ? 'resume' : 'none',
       // Where a decided gate re-enters its epic in the next run (null until decided, or when it cannot).
       enters: g.decided && !g.decided.used ? (gateEntry(g)?.fresh ? 'PLAN (from scratch, on a fresh branch)' : gateEntry(g)?.phase ?? null) : null,
@@ -117,6 +117,8 @@ export function collectReport(runDir) {
   const git = (cwd, ...args) => { try { return spawnSync('git', args, { cwd, encoding: 'utf8' }); } catch { return { status: 1, stdout: '' }; } };
   const cloneTip = fs.existsSync(clone) ? (git(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${s.integration}`).stdout ?? '').trim() : '';
   report.workInProject = cloneTip && config.project && fs.existsSync(config.project) ? git(config.project, 'merge-base', '--is-ancestor', cloneTip, s.integration).status === 0 : null;
+  // The command that brings the merged work into the project: a record for whoever runs it for the owner (the skill does). Never printed in report.md.
+  report.fetch = `git fetch "${clone}" ${s.integration}:autopilot/${s.integration} && git log ${s.integration}..autopilot/${s.integration}`;
   report.next = nextSteps(report);
   report.tldr = tldr(report);
   return report;
@@ -139,7 +141,7 @@ function tldr(r) {
   T.push(merged
     ? (r.workInProject === true
       ? `The finished work is already in your project: you brought it in from autopilot's private copy.`
-      : `The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; you bring the work in yourself with one command (under "Do this next").`)
+      : `The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; run \`/peak-workflow:autopilot\` and it brings the work in for you, after asking.`)
     : 'Nothing in your project has changed. Autopilot works in its own private copy and never writes to your project.');
   if (open) T.push(`${plural(open, 'question')} only you can answer ${open === 1 ? 'is' : 'are'} waiting. Run \`/peak-workflow:autopilot report\` and it asks you each one; the work then continues from where it stopped in the next run.`);
   if (r.setupFailed) T.push(`Nothing was built, because autopilot could not get its private copy of your project ready: ${setupWhy(r.setupFailed)}.`);
@@ -170,15 +172,22 @@ const GLOSSARY = [
   ['Plan approved by lint', 'a script checked that the plan has every required part. No person read it.'],
 ];
 
-/** "Do this next": what the owner does in the morning, most blocking first. */
+/** What autopilot says when only a person who maintains the code can act: it names the problem and offers nothing to type. */
+const NEEDS_MAINTAINER = 'Autopilot cannot repair this itself yet; it needs someone who maintains the code.';
+
+/**
+ * "Do this next": what the owner does in the morning, most blocking first. The owner is not a
+ * developer: no git command and no slash command except `/peak-workflow:autopilot`, which does the
+ * routine steps for them.
+ */
 function nextSteps(r) {
   const next = [];
   const ids = (list) => list.map((e) => e.id).join(', ');
   const by = (o) => r.epics.filter((e) => e.outcome === o);
-  if (r.setupFailed) next.push(`Fix what stopped the private copy from being made ready (${setupWhy(r.setupFailed)}), then run \`/peak-workflow:autopilot\` again: it checks this before it launches.`);
-  else if (r.baseRed?.couldNotRun) next.push(`Make \`${r.testCommand}\` runnable in autopilot's private copy, then run \`/peak-workflow:autopilot\` again: it lists what the copy is missing and tries the command before it launches. Nothing was built.`);
-  else if (r.baseRed) next.push(`Fix the failing tests on \`${r.integration}\` (\`${r.testCommand}\`), then run autopilot again. Nothing was built on a red base.`);
-  if (/^preflight:/.test(r.stoppedBecause ?? '')) next.push(`Fix what preflight refused (${r.stoppedBecause.replace(/^preflight:\s*/, '')}), then run autopilot again.`);
+  if (r.setupFailed) next.push(`Nothing was built: autopilot could not get its private copy of your project ready (${setupWhy(r.setupFailed)}). Run \`/peak-workflow:autopilot\` again: it checks this before it launches and sets up what it can. If it still cannot: ${NEEDS_MAINTAINER}`);
+  else if (r.baseRed?.couldNotRun) next.push(`Nothing was built: the test command (\`${r.testCommand}\`) could not be run in autopilot's private copy. Run \`/peak-workflow:autopilot\` again: it lists what the copy is missing and sets up what it can. If it still cannot: ${NEEDS_MAINTAINER}`);
+  else if (r.baseRed) next.push(`Nothing was built: your project's own tests were already failing on \`${r.integration}\` before autopilot started. ${NEEDS_MAINTAINER} Once the tests pass, run \`/peak-workflow:autopilot\` again.`);
+  if (/^preflight:/.test(r.stoppedBecause ?? '')) next.push(`Autopilot refused to start: ${r.stoppedBecause.replace(/^preflight:\s*/, '')}. ${NEEDS_MAINTAINER}`);
   const parked = by('PARKED');
   const liveGate = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
   const epicsOf = (list) => [...new Set(list.map((g) => g.epic))].join(', ');
@@ -186,17 +195,17 @@ function nextSteps(r) {
   const noGate = parked.filter((e) => !r.gates.some((g) => g.epic === e.id && e.gates.includes(path.basename(g.file))));
   const projectFix = r.gates.filter((g) => g.kind === 'preflight' && liveGate(g) && parked.some((e) => e.id === g.epic));
   if (open.length) next.push(`Answer ${plural(open.length, 'waiting question')}: \`/peak-workflow:autopilot report\` (${epicsOf(open)})`);
-  if (projectFix.length) next.push(`Fix in the project what stopped ${plural(projectFix.length, 'epic')} before it started (${epicsOf(projectFix)}); nothing to answer — the reason is under "Per epic".`);
-  if (noGate.length) next.push(`Look at ${plural(noGate.length, 'parked epic')} with no question to answer (${ids(noGate)}): the reason and the branch are under "Per epic". Queued again, such an epic starts over.`);
+  if (projectFix.length) next.push(`Something in the project stopped ${plural(projectFix.length, 'epic')} before it started (${epicsOf(projectFix)}); there is nothing to answer, and the reason is under "Per epic". ${NEEDS_MAINTAINER}`);
+  if (noGate.length) next.push(`${plural(noGate.length, 'parked epic')} stopped with no question to answer (${ids(noGate)}): the reason is under "Per epic". ${NEEDS_MAINTAINER} Queued again, such an epic starts over.`);
   const decided = r.gates.filter((g) => g.decided && liveGate(g));
   const voided = r.epics.filter((e) => e.voided);
   if (voided.length) next.push(`${plural(voided.length, 'decision')} could not be used and the epic was planned again from scratch (${ids(voided)}): the reason is under "Per epic".`);
-  if (by('FAILED').length) next.push(`Read why ${plural(by('FAILED').length, 'epic')} failed verification (${ids(by('FAILED'))}); its branch is kept in the clone.`);
+  if (by('FAILED').length) next.push(`${plural(by('FAILED').length, 'epic')} did not pass the final check (${ids(by('FAILED'))}): why is under "Per epic", and the work is kept. Run \`/peak-workflow:autopilot\` to queue it again; it then starts over.`);
   const waiting = r.sync?.state === 'clone-ahead' ? r.sync.waiting : [];
-  const fetch = `git fetch "${r.clone}" ${r.integration}:autopilot/${r.integration} && git log ${r.integration}..autopilot/${r.integration}`;
+  const bring = 'Run `/peak-workflow:autopilot`: it shows you what is new and brings it into your project for you, after asking.';
   if (r.workInProject === true) { if (by('MERGED').length) next.push(`The merged work (${ids(by('MERGED'))}) is already in your project's \`${r.integration}\`: nothing to bring in.`); }
-  else if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}${waiting.length ? `, and ${plural(waiting.length, 'commit')} from earlier runs still waiting in the clone` : ''}):\n   ${fetch}`);
-  else if (waiting.length) next.push(`Bring in the work earlier runs merged, still waiting in the clone (${plural(waiting.length, 'commit')}):\n   ${fetch}`);
+  else if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}${waiting.length ? `, and ${plural(waiting.length, 'commit')} from earlier runs still waiting in the clone` : ''}). ${bring}`);
+  else if (waiting.length) next.push(`Bring in the work earlier runs merged, still waiting in the clone (${plural(waiting.length, 'commit')}). ${bring}`);
   if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into \`${r.integration}\`.`);
   if (r.referee.testChanges.length) next.push(`Read the recorded reason for ${plural(r.referee.testChanges.length, 'changed existing test')} (under "Per epic").`);
   const notStarted = by('NOT STARTED');
@@ -227,7 +236,7 @@ export function renderReport(r) {
   const decided = r.gates.filter((g) => g.decided?.standing);
   if (decided.length) L.push(`Decided by autopilot for you, on your standing answer for technical stops: ${decided.map((g) => `${g.epic} — "${g.decided.answer}" (\`${g.file}\`)`).join('; ')}.`);
   const nobody = r.epics.filter((e) => e.unanswered.length);
-  if (nobody.length) L.push(`Waited for you and nobody came: ${nobody.map((e) => `${e.id} ×${e.unanswered.length}`).join(', ')} — each is under its epic below, with the command to run by hand.`);
+  if (nobody.length) L.push(`Waited for you and nobody came: ${nobody.map((e) => `${e.id} ×${e.unanswered.length}`).join(', ')} — each is under its epic below. Run autopilot when you are at the computer and it will take you through them.`);
 
   L.push('', '## Do this next');
   if (r.next.length) r.next.forEach((n, i) => L.push(`${i + 1}. ${n}`)); else L.push('Nothing to do.');
@@ -270,7 +279,7 @@ export function renderReport(r) {
     if (e.unlooked) L.push('', `Merged without your look ("look": "after"): ${e.unlooked.pictures.length} picture(s) of its screens are kept in \`look/${e.id}/\` for you to review. The verifier judged them; its words are below.`);
     if (e.amended.length) L.push('', `Requirement amended with your approval: ${e.amended.join(', ')}. The build rewrote it in your name and the checks followed the amended text.`);
     if (e.seen.length) L.push('', 'What the verifier saw in the pictures (its own words):', ...e.seen.map((x) => `- ${x}`));
-    if (e.unanswered.length) L.push('', 'Waited for you and nobody came:', ...e.unanswered.map((u) => `- ${u.step ? `${u.step}: ` : ''}${u.description}${u.command ? ` — by hand: \`${u.command}\`` : ''}`));
+    if (e.unanswered.length) L.push('', 'Waited for you and nobody came:', ...e.unanswered.map((u) => `- ${u.step ? `${u.step}: ` : ''}${u.description}`), 'Run autopilot when you are at the computer and it will take you through them.');
     if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);
     if (e.sessions.length) {
       L.push('', '| Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |', '|---|---|---|---|---|---|');
@@ -293,14 +302,13 @@ export function renderReport(r) {
       L.push('', 'Gates:');
       for (const g of mine) {
         const fate = g.void ? ` — VOID: ${g.void.why}` : g.decided?.used ? ` (used by run ${g.decided.used.run ?? '?'})` : g.superseded ? ' (superseded: the epic started over)' : g.cleared ? ' (cleared)' : g.decided ? ' — resumes the epic in the next run' : '';
-        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.standing ? ' (decided by autopilot on their standing answer for technical stops, given at launch; nobody was asked again)' : g.decided.asked ? ` (they were asked "${g.decided.asked}" and said yes)` : ''}${fate}${g.enters && !g.void ? ` at ${g.enters}` : ''}` : g.effect === 'none' ? `nothing to answer: fix it in the project${fate}` : `NOT DECIDED${fate}`;
+        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.standing ? ' (decided by autopilot on their standing answer for technical stops, given at launch; nobody was asked again)' : g.decided.asked ? ` (they were asked "${g.decided.asked}" and said yes)` : ''}${fate}${g.enters && !g.void ? ` at ${g.enters}` : ''}` : g.effect === 'none' ? `nothing to answer: it needs a change in the project${fate}` : `NOT DECIDED${fate}`;
         L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.decided ? g.question : g.ask?.question ?? g.question)} — ${d}`);
         if (g.options.length && !g.decided) L.push(`  Options: ${(g.ask?.options ?? g.options).map((o) => `"${o}"`).join(', ')}`);
         if (g.artifacts.length) L.push(`  Look at: ${g.artifacts.map((a) => `\`${a}\``).join(', ')}`);
         if (!g.decided && g.open?.length) L.push(`  Open: ${g.open.map((a) => `\`${a}\``).join(', ')}`);
         if (!g.decided && g.checks?.length) { L.push('  To confirm, one yes or no each:'); for (const c of g.checks) L.push(`  ${c.n}. ${c.clause} (${c.tor})`); }
         if (g.decided?.observations?.length) L.push(`  Confirmed line by line: ${g.decided.observations.map((o) => `${o.answer} — ${o.clause}`).join('; ')}`);
-        if (!g.decided?.used && !g.superseded && !g.cleared && g.resume) L.push(`  By hand instead: ${g.resume}`);
       }
     }
     if (e.unproven.length) {

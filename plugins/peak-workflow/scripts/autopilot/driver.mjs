@@ -700,7 +700,7 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
     else if (gate?.state === 'resume') reasons.push(`resumes at ${gate.enters} on ${gate.branch}: you answered "${gate.answer}" on ${gate.gate}${gate.checkedAtRunStart ? ' (whether the branch still merges cleanly is checked when the run starts)' : ''}`);
     else if (gate?.state === 'fresh') reasons.push(`starts over: you answered "${gate.answer}" on ${gate.gate}`);
     else if (gate?.state === 'void') reasons.push(`your decision on ${gate.gate} is void (${gate.why}): the epic is planned again from scratch`);
-    if (e.status !== 'Not Started' && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) set('skip', `status is ${e.status}; resume it by hand or queue it explicitly`);
+    if (e.status !== 'Not Started' && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) set('skip', `status is ${e.status}: someone is part-way through it; queue it explicitly to have autopilot take it over`);
     if (!e.anchors.length) set('skip', 'no Requirements Anchors');
     if (embedded) set('skip', 'hardware project: never unattended');
     for (const who of [e.owner, e.plannedBy]) {
@@ -2211,7 +2211,7 @@ class Run {
     if (r.code !== 0) {
       const files = gitRun(this.clone, 'diff', '--name-only', '--diff-filter=U').out.split('\n').filter(Boolean);
       gitRun(this.clone, 'merge', '--abort');
-      return `${b} does not merge cleanly with ${dev} (${files.join(', ') || r.err.split('\n')[0]}): merge ${dev} into the branch by hand, then resume`;
+      return `${b} does not merge cleanly with ${dev} (${files.join(', ') || r.err.split('\n')[0]}): both changed the same lines, and autopilot cannot settle that itself yet`;
     }
     e.caughtUp = { from, to: this.branchTip(b), integration: this.integrationSha() };
     this.log(`${e.id}: ${b} brought up to date with ${dev} before verify (${from.slice(0, 9)} → ${e.caughtUp.to.slice(0, 9)})`);
@@ -2278,7 +2278,7 @@ class Run {
         kind: 'resume', skillStep: 'wrapup-epic Step 5', phase: 'VERIFY', reason, technical: true,
         question: `${m.label}: ${reason}. Continue it in the next run?`,
         options: [ANSWERS.resume, ANSWERS.startOver],
-        why: `nothing failed: the verifier's report is attached. "${ANSWERS.resume}" runs the verify step again on the same branch; or merge it by hand: git merge --no-ff ${m.branch}`,
+        why: `nothing failed: the verifier's report is attached. "${ANSWERS.resume}" runs the final check again on the same branch, which then merges it; nothing is rebuilt`,
         artifacts: [this.rel(path.join(s.stepDir, 'result.json'))],
         resume: `in the fetched repo: git checkout ${this.state.integration} && git merge --no-ff ${m.branch}`,
       });
@@ -2559,7 +2559,7 @@ class Run {
       if (g.lookAfter) e.unlooked = { pictures: lookPictures(this.lookStore(e)).map((p) => path.join(this.lookStore(e), p.file)) };
       if (entry.look) e.look = { gate: f.gate, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, observations: g.decided.observations ?? [], branchTip: g.branchTip, artifacts: g.artifacts ?? [] };
       if (entry.fix) {
-        if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used; ${g.resume ?? 'continue it by hand'}`); }
+        if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used, so it cannot be repaired again: it can only be started over`); }
         e.fixRounds = 1;
         this.event('fix-round', e, { why: e.resumed.unasked ? 'standing' : 'owner' });
         if (entry.fix === 'audit') {
@@ -3240,7 +3240,7 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
     if (said === TRY_AGAIN.toLowerCase()) { asked = TRY_AGAIN; answer = technicalAnswer(gate); }
   }
   const options = asked ? [answer] : gate.options ?? [];
-  if (!options.length) throw new Error(`${path.basename(file)} (${gate.kind}) has no answer to record: ${gate.kind === 'preflight' ? 'the fix is in the project, and the gate clears when preflight passes' : gate.resume ?? 'continue by hand'}`);
+  if (!options.length) throw new Error(`${path.basename(file)} (${gate.kind}) has no answer to record: ${gate.kind === 'preflight' ? 'the fix is in the project, and the gate clears when preflight passes' : 'it offers no options, so nothing is decided here'}`);
   const label = options.find((o) => o.trim().toLowerCase() === String(answer).trim().toLowerCase());
   if (options.length && !label) throw new Error(`"${answer}" is not one of this gate's options: ${options.map((o) => `"${o}"`).join(', ')}`);
   if (!String(answer ?? '').trim()) throw new Error('an answer is required');
@@ -3285,7 +3285,7 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}), ...(obs?.length ? { observations: obs } : {}), ...(standing ? { standing: true } : {}), ...(asked ? { asked } : {}) }; // `asked`: what the owner was offered when it was not the gate's own option. `standing`: the owner's answer given once at launch, applied by `continue`
   writeJson(file, gate);
   if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
-  // Every decided gate resumes its epic in the next run; the by-hand command stays as the fallback.
+  // Every decided gate resumes its epic in the next run; the gate's `resume` command stays in the file as a record.
   const entry = gateEntry(gate);
   return {
     gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect: 'resume',

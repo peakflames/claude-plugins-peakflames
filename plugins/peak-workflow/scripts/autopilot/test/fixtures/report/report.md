@@ -2,7 +2,7 @@
 
 ## TL;DR
 - Autopilot worked through 7 epics (an epic is one planned piece of work): 1 finished and passed every check, 3 stopped part-way and need you, 1 failed its independent check, 2 did not start.
-- The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; you bring the work in yourself with one command (under "Do this next").
+- The finished work is in autopilot's own private copy of your project, not in your project yet. Nothing in your project has changed; run `/peak-workflow:autopilot` and it brings the work in for you, after asking.
 - 2 questions only you can answer are waiting. Run `/peak-workflow:autopilot report` and it asks you each one; the work then continues from where it stopped in the next run.
 - It ran from 2026-11-13 06:05 to 2026-11-13 12:41 and spent $41.20 of a $80 limit.
 - What to do: follow "Do this next" below, from the top. It has 6 steps.
@@ -15,13 +15,12 @@ Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80
 Real money on outside services: not decided at launch; a session that needs it asks you.
 Whether you were there: you said you would be away; no session started anything that waits for a person.
 Small fixes made without asking, on your standing answer: Lg1Csv7 (src/usage.js) — what was asked is under each epic below.
-Waited for you and nobody came: Lg1Csv7 ×1 — each is under its epic below, with the command to run by hand.
+Waited for you and nobody came: Lg1Csv7 ×1 — each is under its epic below. Run autopilot when you are at the computer and it will take you through them.
 
 ## Do this next
 1. Answer 2 waiting questions: `/peak-workflow:autopilot report` (Lg4Fx2q, Lg6Bud2)
-2. Read why 1 epic failed verification (Lg3Sum9); its branch is kept in the clone.
-3. Review and bring in the merged work (Lg1Csv7):
-   git fetch "<workspace>/clone" develop:autopilot/develop && git log develop..autopilot/develop
+2. 1 epic did not pass the final check (Lg3Sum9): why is under "Per epic", and the work is kept. Run `/peak-workflow:autopilot` to queue it again; it then starts over.
+3. Review and bring in the merged work (Lg1Csv7). Run `/peak-workflow:autopilot`: it shows you what is new and brings it into your project for you, after asking.
 4. Run `/peak-workflow:autopilot` again: 1 decided gate (Lg5Chr8) resumes its epic on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into `develop`.
 5. Read the recorded reason for 1 changed existing test (under "Per epic").
 6. 1 epic never started because a dependency did not merge (Lg7Exp5); queue them again once it has.
@@ -63,7 +62,8 @@ What the verifier saw in the pictures (its own words):
 - home-narrow.png — NOT as captioned: the menu covers the heading
 
 Waited for you and nobody came:
-- verify-1: Needs you: sign in in the browser that just opened — by hand: `node bin/ledger.js login`
+- verify-1: Needs you: sign in in the browser that just opened
+Run autopilot when you are at the computer and it will take you through them.
 
 Plan: `runs/20261112-220500/epics/Lg1Csv7/plan-1/plan.md` — approved by lint, not by a person.
 
@@ -116,7 +116,6 @@ Gates:
 - `gates/Lg4Fx2q-1.json` (audit) — The auditor reported 2 high finding(s) on Lg4Fx2q (currency) — Currency conversion: F1 stand-in — every test replaces the fetch with fakeRates() \| F2 test-weakened — the rounding assertion was loosened. Are they real? — NOT DECIDED
   Options: "Real — fix before verify", "Not real — verify as built"
   Look at: `runs/20261112-220500/epics/Lg4Fx2q/audit-1/audit.json`, `runs/20261112-220500/epics/Lg4Fx2q/audit-1/bundle/diff.patch`
-  By hand instead: open a new session in the fetched repo: /peak-workflow:start-epic Lg4Fx2q to fix it, or /peak-workflow:wrapup-epic Lg4Fx2q to verify it as built
 
 ### Lg5Chr8 (spending-chart) — Spending chart — PARKED
 
@@ -138,7 +137,6 @@ Auditor audit-1 (the whole epic diff): recommends proceed — Nothing found. (`r
 
 Gates:
 - `gates/Lg5Chr8-1.json` (human-check) — TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify — decided "Looks right" by Todd Schavey on 2026-11-13 — resumes the epic in the next run at VERIFY
-  By hand instead: open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8
 
 ### Lg3Sum9 (monthly-summary) — Monthly summary — FAILED
 
@@ -181,7 +179,6 @@ parked at a human gate (Lg6Bud2-1.json)
 Gates:
 - `gates/Lg6Bud2-1.json` (unmatched) — The spec names both a monthly and a weekly budget period. Which should this epic build? — NOT DECIDED
   Options: "Monthly", "Weekly", "Both"
-  By hand instead: open a new session in the fetched repo: /peak-workflow:start-epic Lg6Bud2
 
 ### Lg7Exp5 (export) — Export to CSV — BLOCKED
 

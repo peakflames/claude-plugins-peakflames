@@ -222,6 +222,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot no longer hands the owner technical work** — the report, gate text and skill offer no "by hand" command, no other skill to run and no git line; autopilot brings merged work in itself. What it cannot repair yet is said plainly: it needs someone who maintains the code.
 - **Autopilot decides technical stops itself** — the standing answer now also covers a failed plan check, a final check needing a repair or re-run, its own product fix, and reviewer findings (not "paid service never called"). One count per epic; past it the owner is asked "Try again" or "Leave it for now".
 - **Autopilot keeps building while the owner is away** — with "I'll be away" at launch, an epic
   that needs the owner is set aside and the epics that do not depend on it are still built. With

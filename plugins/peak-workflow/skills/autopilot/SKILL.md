@@ -32,11 +32,11 @@ run, what stops, and what comes next (`DRIVER status`) are the driver's answers,
      `CLAUDE.md`, or a `.gitignore` line — when readiness found that this line is what stops
      the run. Show the file and the line as it is and as it would be, then ask with
      `AskUserQuestion`: "Make this change and commit it on `<integration>`?" — options
-     `Make this change` and `I'll change it myself`. Make it only after the owner approves that
+     `Make this change` and `Not now`. Make it only after the owner approves that
      exact change through `AskUserQuestion`: edit that one line, and commit that one file on
      the integration line (`chore: <what changed> (autopilot readiness)`), not pushed. If the
      project is on another branch, or that file already has uncommitted changes, do not make
-     it: say what to change, and stop. Never unasked, never anything else: an earlier "go
+     it: say what is in the way, and stop. Never unasked, never anything else: an earlier "go
      ahead" or "you are approved" covers nothing, one approval covers one change, and code,
      tests, requirements and every other line stay the owner's.
 
@@ -44,7 +44,7 @@ run, what stops, and what comes next (`DRIVER status`) are the driver's answers,
    `config.json`, through the driver a gate's recorded answer, and through `DRIVER prepare`
    the private clone. It never writes `<ws>/settings.json`.
 2. **It never runs `/peak-workflow:start-epic` or `/peak-workflow:wrapup-epic`**, and never does
-   their work by hand. Only the driver's sessions build and verify.
+   their work itself. Only the driver's sessions build and verify.
 3. **It never answers a gate.** A parked gate is the owner's decision. Ask the gate's own
    question, with its own options, and record exactly what the owner chose. Do not recommend an
    option, mark one as the default, or infer the answer from anything said earlier. One answer
@@ -466,7 +466,7 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      (Step 1 item 5a), each quality gate and whether it passed in the copy, and the probe's
      result. The settings file is the owner's to commit so teammates get the same setup.
    - Where it runs: the private clone at `<launch.clone>`, on `launch.integration`. The clone is
-     kept between runs. Merged work is fetched by hand once the run is done.
+     kept between runs. Merged work is brought into the project once the run is done, on the owner's yes.
    - Anything else in `launch.config` the owner would not expect: any entry in
      `scope.allow` or `scope.lockfiles`, a `diskFloorGb` under 15, or a `timing` or `audit` key
      in `<ws>/settings.json`, which applies to every run until the owner edits it.
@@ -516,7 +516,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    same `AskUserQuestion` call: "Will you be at this computer while it runs? Some checks can
    only be finished by a person, such as a sign-in in a browser." — options
    `No — I'll be away`, with the description "Nothing waits for you. Those checks are listed
-   at the end as not proven for real, each with the command to run by hand. If one epic needs
+   at the end as not proven for real; run autopilot when you are back and it takes you
+   through them. If one epic needs
    you, the others that do not depend on it keep building", and
    `Yes — I'm here`, with the description "A step that needs you tells you, and waits about
    five minutes". The answer is the run's `attended`. When the owner says in any answer that
@@ -921,7 +922,8 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       run anything; I'll tell you when it is waiting for you and when it is done." Nothing
       else here: no conditions, no commands, no alternatives. An answer that tells the session to stop (a deferral gate's
       "Stop — I'll take it from here") is replayed like any other and the epic parks or fails
-      again: say that in the same sentence, and that continuing by hand is then the way forward.
+      again: say that in the same sentence, and that the epic then waits for someone who
+      maintains the code.
 
 6. **Go on; do not hand over a command.**
    - Every waiting gate was answered → **Step 0**. It will say `readiness` with `relaunch`
@@ -1014,8 +1016,9 @@ Leave out a part that has nothing to say.
   not proven, and what it was checked against instead ("The cost of each clip was only tested
   against a stand-in for OpenRouter; no real request was sent."). Never soften it, never
   leave one out, and never fold it into a count. If there are more than five, show five and
-  say how many more the full report holds. Then one sentence on what the owner can do: prove
-  it by hand, or queue work that proves it.
+  say how many more the full report holds. Then one sentence on what the owner can do: run
+  autopilot while they are at the computer, so a check that needs a person is done for real,
+  or queue work that proves it.
 - **Things autopilot got in the way of** comes from `friction` (what the referee refused,
   grouped, with a `count`): at most five lines, each in plain words a non-developer follows
   — "It stopped the build from writing outside its own copy of the project (3 times)" — and
@@ -1059,18 +1062,20 @@ Show a command only when they ask what you ran, or when only they can do the ste
 sign-in, a push to a protected branch they must approve). You still never push, never edit
 their code, and never answer a gate for them.
 
-Then one line, and only this line, for everything else: "Other things I can help with if you
-ask: continue a stopped epic by hand, or walk through the full report." Do not print the
-by-hand `resume` line or the report's own "Do this next" list unless the owner asks. When
-they do ask:
+**When only a maintainer can act.** Some stops no session can repair yet: the project's own
+tests failing before the run, a preflight refusal, a parked epic with no question, work that
+no longer fits on top of the other finished work. Say what is wrong in plain words, that
+autopilot cannot repair it itself yet, and that it needs someone who maintains the code.
+Offer nothing to type: no command, no gate `resume` line, no other skill to run.
+
+Then one line, and only this line, for everything else: "I can also walk you through the
+full report if you ask." Show the report's own "Do this next" list only when the owner
+asks. When they do ask:
 - **Bring the work in** (asked later): the same offer as item 2. Add that the private clone is the
   only copy of that work until it is fetched, so the workspace must not be deleted first; that
   a resumed epic's history includes a `wip(autopilot)` commit from its park, which is
   expected; and that decisions not yet used stay usable however the work is merged, as long
   as the parked branch still merges cleanly into `<integration>`.
-- **Continue by hand**: the gate's `resume` line, after fetching the branch
-  (`git fetch "<ws>/clone" <branch>:<branch>`); the epic should then not be queued for
-  autopilot again.
 - **How long a decision holds**: while that branch is unchanged and still merges cleanly
   into the integration line; otherwise it is void and the epic is planned again.
 - **The full report**: `<run>/report.md`; its last section explains every term.
@@ -1082,7 +1087,7 @@ Then stop.
 | Path | What it is |
 |---|---|
 | `<project>.autopilot/` | The workspace: one per project, kept between runs. Never inside the project |
-| `settings.json` | The owner's settings for every run (scope, audit, `claudeBin`; a budget set here wins over the project's). Edited by hand; the driver only creates it |
+| `settings.json` | The owner's settings for every run (scope, audit, `claudeBin`; a budget set here wins over the project's). Its owner edits it directly; the driver only creates it |
 | `clone/` | The one private clone, with no remote. Merged epics are on its integration line; parked and failed epics keep their branch. Work left uncommitted at a park is kept as a `wip(autopilot)` commit on that branch, and stays in its history when the epic later merges |
 | `gates/<epic>-<n>.json` | One file per question that needs the owner, from every run |
 | `epics.json` | What a parked or failed epic carries into the next run (its plan, audits, fix round) |

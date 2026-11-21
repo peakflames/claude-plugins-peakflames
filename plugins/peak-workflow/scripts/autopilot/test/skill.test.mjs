@@ -38,6 +38,18 @@ function confirm(launch, project, queue, extra = {}) {
 }
 const preflight = (p, ...more) => driver('preflight', '--project', p.project, '--json', ...more).json();
 
+// Issue 41, I6: the owner is not a developer. Nothing they read offers a by-hand path or another skill to run.
+test('SKILL.md and a rendered report offer the owner no by-hand path', () => {
+  assert.ok(!/by hand/i.test(SKILL), SKILL.split('\n').filter((l) => /by hand/i.test(l)).join('\n'));
+  assert.ok(!SKILL.includes("I'll change it myself"));
+  // The two epic skills are named only where the skill says it never runs them, and where readiness says what a session will run.
+  const named = SKILL.split('\n').filter((l) => /start-epic|wrapup-epic/.test(l));
+  assert.ok(named.every((l) => /It never runs|will run\)/.test(l)), named.join('\n'));
+  for (const rule of ['**When only a maintainer can act.**', 'Offer nothing to type', '**Do it for them.**']) assert.ok(SKILL.includes(rule), rule);
+  const md = fs.readFileSync(path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'test', 'fixtures', 'report', 'report.md'), 'utf8');
+  assert.ok(!/by hand|start-epic|wrapup-epic|\bgit (fetch|merge|checkout|log)\b/i.test(md), md.split('\n').filter((l) => /by hand|start-epic|wrapup-epic|\bgit (fetch|merge|checkout|log)\b/i.test(l)).join('\n'));
+});
+
 test('SKILL.md: the launch names the workspace and the run, appends to the run\'s autopilot.log, and the hard rules are stated', () => {
   const line = SKILL.split('\n').find((l) => l.trim().startsWith('nohup '));
   assert.match(line, /^\s*nohup caffeinate -i node "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/autopilot\/driver\.mjs" run --project "<root>" --workspace "<launch\.workspace>" --run "<launch\.run>" >> "<launch\.runDir>\/autopilot\.log" 2>&1 &$/);
@@ -172,7 +184,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   assert.deepEqual(readJson(path.join(p.state, gate.file)).decided, { answer: 'Fix now', by: 'Pat Owner', date: new Date().toISOString().slice(0, 10), scope: 'next-run' });
 
   // Step 4.6 — the fetch command from the report brings the merged work into the owner's repository.
-  const fetch = readJson(path.join(run1, 'report.json')).next.find((n) => n.includes('git fetch')).split('\n')[1].trim();
+  const fetch = readJson(path.join(run1, 'report.json')).fetch;
   assert.equal(spawnSync('sh', ['-c', fetch], { cwd: p.project, encoding: 'utf8' }).status, 0);
   git(p.project, 'merge', '-q', '--ff-only', 'autopilot/develop');
 

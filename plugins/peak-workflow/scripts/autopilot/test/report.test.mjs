@@ -45,7 +45,10 @@ test('report data: outcomes, evidence, referee counts and next steps come from f
   for (const k of ['run', 'stoppedBecause', 'spentUsd', 'epics', 'referee']) assert.ok(k in r, k);
   for (const k of ['id', 'outcome', 'reason', 'checks', 'audit', 'gates', 'costUsd', 'turns', 'wallMs', 'sessions']) assert.ok(k in r.epics[0], k);
   assert.match(r.next[0], /Answer 2 waiting questions: `\/peak-workflow:autopilot report` \(Lg4Fx2q, Lg6Bud2\)/);
-  assert.ok(r.next.some((n) => n.includes(`git fetch "${STATE}/clone" develop:autopilot/develop && git log develop..autopilot/develop`)));
+  // The command that brings the work in is kept as a record for the skill, which runs it for the owner; the owner is never handed it.
+  assert.equal(r.fetch, `git fetch "${STATE}/clone" develop:autopilot/develop && git log develop..autopilot/develop`);
+  assert.ok(!r.next.some((n) => /\bgit \w|start-epic|wrapup-epic|by hand/i.test(n)), r.next.join('\n'));
+  assert.ok(r.next.some((n) => n.includes('Run `/peak-workflow:autopilot`: it shows you what is new and brings it into your project for you, after asking.')), r.next.join('\n'));
 });
 
 test('a session that loaded a different plugin copy is flagged in the Referee section', (t) => {
@@ -88,7 +91,8 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   assert.equal(decided.scope, 'next-run');
   const md = fs.readFileSync(path.join(runDir(tmp), 'report.md'), 'utf8');
   assert.match(md, /Answer 1 waiting question: `\/peak-workflow:autopilot report` \(Lg6Bud2\)/);
-  assert.match(md, /decided "Real — fix before verify" by Pat Owner on \d{4}-\d{2}-\d{2} — resumes the epic in the next run at FIX_BUILD\n {2}Look at: .*\n {2}By hand instead: /);
+  assert.match(md, /decided "Real — fix before verify" by Pat Owner on \d{4}-\d{2}-\d{2} — resumes the epic in the next run at FIX_BUILD\n {2}Look at: .*\n/);
+  assert.ok(!/by hand|start-epic|wrapup-epic/i.test(md), 'the owner is offered no by-hand path');
   assert.match(md, /2 decided gates \(Lg4Fx2q, Lg5Chr8\) resume their epics on the branch this run left/);
 
   // A gate with no options has no answer to record.
