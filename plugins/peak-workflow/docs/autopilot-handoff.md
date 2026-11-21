@@ -54,7 +54,7 @@ Still open from #41: B3 (preflight text ignores `look`), B6 (no retry for a flak
 B7 (numbering by phase index), B8 (36 driver tests fail on Windows before any change), I1,
 I3–I5, I7, and I6c: autopilot cannot yet repair a red base, a preflight refusal or a merge
 conflict itself. Only the wording changed ("it needs someone who maintains the code"); the
-repair is its own issue, with #40 item 9. Add I2 and the wider standing answer to the
+repair is its own issue, **#42**, with #40 item 9. I2 and the wider standing answer are on the
 live-proof checklist (#39).
 Ask the reporter to confirm B1 and B4 on their machine; their local commit `4dcf789` is
 superseded by the B1 change here.
