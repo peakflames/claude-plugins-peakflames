@@ -64,7 +64,7 @@ function context(input, env) {
 }
 
 function git(cwd, ...args) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return { ok: r.status === 0, out: (r.stdout ?? '').trim() };
 }
 
@@ -316,7 +316,7 @@ function ruleR7(ctx, targets) {
     if (rel.startsWith('..') || rel === '.autopilot/test-changes.jsonl') continue;
     if (!dirs.some((d) => rel.startsWith(d))) continue;
     if (!git(ctx.clone, 'cat-file', '-e', `${ctx.integration}:${rel}`).ok) continue; // new in this epic: free to change
-    named ??= testNamedDirs(git(ctx.clone, 'ls-tree', '-r', '--name-only', ctx.integration).out.split('\n'), dirs);
+    named ??= testNamedDirs([...git(ctx.clone, 'ls-tree', '-r', '--name-only', ctx.integration, '--', ...dirs).out.split('\n'), ...git(ctx.clone, 'ls-files', '-co', '--exclude-standard', '--', ...dirs).out.split('\n')], dirs);
     if (!isTestPath(rel, dirs, named)) continue; // production code beside the tests, or a manifest
     if (reasons === null) {
       reasons = new Set();
@@ -426,8 +426,9 @@ function ruleR8(ctx) {
     // A requirement the verifier judged FAIL or CANNOT VERIFY, for one of this epic's anchors: the standing answer
     // covers adding the test it lacks and nothing else (seen live: two epics in four rebuilt, each for one missing
     // test on code that worked). The merge gate holds the fix to test files; code that is wrong is still a Stop.
+    // CANNOT VERIFY is a requirement nobody could judge (a look the owner has not given): that stays a Stop.
     const testOnly = kind === 'tor-fail';
-    if (limits && (!testOnly || (tor && anchors(ctx).includes(tor))) && /\bRecommendation:\s*\**Fix now\b/i.test(q.question) && offered('Fix now')) {
+    if (limits && (!testOnly || (tor && anchors(ctx).includes(tor) && /^\W*TOR-\S+ is FAIL: /.test(q.question))) && /\bRecommendation:\s*\**Fix now\b/i.test(q.question) && offered('Fix now')) {
       const file = path.join(ctx.step, SMALL_FIX_FILE);
       const made = readJson(file, []);
       if (made.length + standing.length < limits.perEpic) { answers[q.question] = offered('Fix now'); standing.push({ at: new Date().toISOString(), question: q.question, tor, ...(testOnly ? { testOnly: true } : {}) }); continue; }

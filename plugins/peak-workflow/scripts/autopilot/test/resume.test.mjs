@@ -1397,6 +1397,24 @@ test('"add the missing test" that also changes the product is not merged: the ow
   assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
 });
 
+test('a missing test and an ordinary small fix in one final check: product code changed is the owner\'s to allow, the referee\'s record is not counted', async (t) => {
+  const p = makeProject(t);
+  fs.writeFileSync(path.join(p.project, 'test', 'old.test.js'), "import test from 'node:test';\ntest('passes', () => {});\n");
+  git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'test: an existing test');
+  // The missing test goes into an existing test file, with the reason the referee asks for: tests only, so it merges.
+  const intoExisting = [{ do: 'checkout', name: E1.branch }, { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/old.test.js","reason":"the Then had no test"}\n' },
+    { do: 'exec', cmd: "printf \"test('the Then holds', () => {});\\n\" >> test/old.test.js" }, { do: 'commit', message: 'test(epic-' + E1.id + '): the test the requirement lacked' }];
+  p.scenario({ ...happy(E1), [E1.id + '/verify']: { actions: [ask(TORQ, TOROPTS), ...intoExisting, ...wrapupActions(E1, UNDISCLOSED_FIXED)], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+
+  const p2 = makeProject(t);
+  p2.scenario({ ...happy(E1), [E1.id + '/verify']: { actions: [ask(FIXQ, FIXOPTS), ask(TORQ, TOROPTS), ...addTest(['test/then.test.js', 'src/favicon.js']), ...wrapupActions(E1, { counts: [2, 1, 0, 2, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  await p2.go();
+  assert.equal(p2.epic(E1.id).state, 'PARKED');
+  assert.match(gate(p2, E1.id).question, /it changed the product itself \(src\/favicon\.js\)/);
+});
+
 test('without a fix on the standing answer, an undisclosed deferral still fails the merge gate', async (t) => {
   const p = makeProject(t);
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: wrapupActions(E1, { counts: [1, 1, 0, 0, 0, 0] }), result: { result: 'Verdict: PASS' } } });

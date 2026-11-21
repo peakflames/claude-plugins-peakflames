@@ -57,13 +57,14 @@ export const MANIFEST = /\.(csproj|fsproj|vbproj|props|targets|sln)$|(^|\/)(pack
  * A path whose own name, or a folder above it, says it is a test (`x.test.ts`, `x_test.go`,
  * `test_x.py`, `FooTests.cs`, `__tests__/`, `tests/`, `App.Tests/`).
  */
-const TEST_FOLDER = /(^|\/)(__tests__|__snapshots__|tests?|specs?|e2e|[^/]*[._-]tests?)\//i;
-const TEST_FILE = /(^|\/)([^/]*[._-](test|spec|e2e)s?\.[^/.]+|test_[^/]*\.py|conftest\.py|[^/]*\.feature)$/i;
-const TEST_CLASS = /(^|\/)[^/]*(Tests?|Specs?)\.(cs|fs|vb|java|kt|kts|scala|swift)$/;
+const TEST_FOLDER = /(^|\/)(__tests__|__snapshots__|tests?|specs?|e2e|cypress|[^/]*[._-]tests|[^/]*\.Tests?)\//i;
+// Data files named for a specification (openapi-spec.yaml) are not tests; a snapshot beside its test is.
+const TEST_FILE = /(^|\/)([^/]*[._-](test|spec|e2e|cy)s?\.(?!ya?ml$|json$|md$|txt$|toml$|xml$)[^/.]+|tests?\.[^/.]+|test_[^/]*\.py|conftest\.py|[^/]*\.feature|[^/]*\.snap)$/i;
+const TEST_CLASS = /(^|\/)([^/]*Tests?\.(cs|fs|vb|java|kt|kts|scala|swift|php|groovy|dart|ts|tsx|js|jsx)|[^/]*Specs?\.(kt|kts|scala|groovy|ts|tsx|js|jsx)|Test[A-Z][^/]*\.(java|kt|cs)|[^/]*[a-z0-9]IT\.(java|kt))$/;
 export const testNamed = (rel) => TEST_FOLDER.test(rel) || TEST_FILE.test(rel) || TEST_CLASS.test(rel);
 /**
- * The listed test directories that hold at least one test-named file, given every file on the
- * integration line. In those, only test-named files are tests (seen live: `src/` listed because
+ * The listed test directories that hold at least one test-named file, given the files on the
+ * integration line and in the epic's own work (its first tests count at once). In those, only test-named files are tests (seen live: `src/` listed because
  * tests sit beside the code, and every production file there was held to the rule for tests). A
  * listed directory with no such file keeps the plain rule: everything in it is a test.
  */

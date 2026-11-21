@@ -1296,7 +1296,7 @@ class Run {
   rel(p) { return path.relative(this.stateDir, p).split(path.sep).join('/'); }
   meta(e) { return this.metaById.get(e.id); }
   /** The listed test directories where only test-named files are tests, judged from the tree at `rev` (see `testNamedDirs` in lib.mjs). */
-  testNamedDirs(rev, dirs) { return testNamedDirs(gitRun(this.clone, 'ls-tree', '-r', '--name-only', rev).out.split('\n'), dirs); }
+  testNamedDirs(revs, dirs) { return testNamedDirs(revs.flatMap((rev) => gitRun(this.clone, 'ls-tree', '-r', '--name-only', rev, '--', ...dirs).out.split('\n')), dirs); }
   /**
    * The requirements the owner approved amending for this epic: their answer "Amend …" at an
    * amendment gate. Seen live: the owner approved one, the build amended it on the epic's branch
@@ -1973,7 +1973,7 @@ class Run {
     for (const line of (gitShow(this.clone, b, '.autopilot/test-changes.jsonl') ?? '').split('\n')) {
       try { const j = JSON.parse(line); if (j.path && String(j.reason ?? '').trim()) reasons.set(j.path, j.reason); } catch { /* not a JSON line */ }
     }
-    const named = this.testNamedDirs(dev, dirs);
+    const named = this.testNamedDirs([dev, b], dirs);
     const touched = this.g('diff', '--name-status', '--no-renames', `${dev}...${b}`).split('\n').filter(Boolean)
       .map((l) => l.split('\t')).filter(([st, f]) => st !== 'A' && isTestPath(f, dirs, named)).map(([, f]) => f);
     const unexplained = touched.filter((f) => !reasons.has(f));
@@ -2353,16 +2353,17 @@ class Run {
           const lines = stat.reduce((n, [a, d]) => n + (Number(a) || 0) + (Number(d) || 0), 0);
           // A test may be changed (seen live: a race fixed by waiting before a click), never made to check less:
           // it may not lose more checking lines (assertions, test declarations) than it gains.
-          const testDirs = (this.config.testDirs ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
-          const named = this.testNamedDirs(pre.developSha, testDirs);
+          const testDirs = (this.pre?.testDirs?.length ? this.pre.testDirs : this.config.testDirs ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
+          const named = this.testNamedDirs([pre.developSha, p2], testDirs);
           const tests = stat.map(([, , f]) => f).filter((f) => isTestPath(f, testDirs, named)).filter((f) => {
             const d = this.g('diff', '-U0', `${pre.branchTip}..${p2}`, '--', f).split('\n').filter((l) => /^[+-](?![+-])/.test(l) && TEST_CHECK_LINE.test(l.slice(1)));
             return d.filter((l) => l[0] === '-').length > d.filter((l) => l[0] === '+').length;
           });
           const reqs = own.filter((f) => f.startsWith('docs/requirements/'));
-          // Every fix was "add the test this requirement lacks": anything that is not a test is product code changed
-          // by the session that then judges it, which the standing answer never covers.
-          const notTests = standing.every((x) => x.testOnly) ? stray.filter((f) => !isTestPath(f, testDirs, named)) : [];
+          // A fix was "add the test this requirement lacks": anything that is not a test is product code changed by
+          // the session that then judges it. With an ordinary small fix beside it the two cannot be told apart, so
+          // the owner is asked then too. The referee's own record of a changed test is neither.
+          const notTests = standing.some((x) => x.testOnly) ? stray.filter((f) => !f.startsWith('.autopilot/') && !isTestPath(f, testDirs, named)) : [];
           if (notTests.length) problems.push(`${SMALL_FIX_PROBLEM}changes a file that is not a test (${notTests.join(', ')}), where only a missing test was to be added`);
           if (stray.length > limits.files) problems.push(`${SMALL_FIX_PROBLEM}changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
           if (lines > limits.lines) problems.push(`${SMALL_FIX_PROBLEM}changes ${lines} lines (the limit is ${limits.lines})`);
@@ -2517,6 +2518,12 @@ class Run {
       if (to !== phase && (to === 'BUILD' ? rec.plan && exists(path.join(this.stateDir, rec.plan)) : fixBrief)) { phase = to; e.continuing = (rec.buildSteps ?? []).at(-1)?.name ?? 'an earlier session'; }
       Object.assign(e, { fixRounds: rec.fixRounds ?? 0, verifyFixRounds: rec.verifyFixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [], unproven: (rec.unproven ?? []).filter((u) => u.source !== 'verifier') }); // a verifier's "not run" is of that verify session; the next one says its own
       if (rec.fixBrief) fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'), rec.fixBrief);
+      if (/^verify-\d+ FAIL after the fix round: /.test(g.reason ?? '')) {
+        e.verifyFixRounds = 1; // a record from before the final check had a round of its own
+        // A gate written for an epic an earlier driver left FAILED: its brief is from the round already spent.
+        const report = g.briefFrom ? tryJson(path.join(this.stateDir, g.briefFrom, 'result.json'))?.result : null;
+        if (report) this.writeFixBrief(e, 'The independent verifier returned FAIL again, after the repair that followed its first report. Its final report:', [report], 'a further repair, which the owner asked for after the final check');
+      }
       e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}) };
       this.supersedeGates(e, f.gate);
       const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
@@ -2950,7 +2957,7 @@ function missingResumeGates(workspace) {
       made.push({ name: `${id}-${n}.json`, gate: {
         epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: verify, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
         resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${id}`, decided: null,
-        ...verifyFailGate(q.label ?? id, reason, { artifacts: exists(path.join(workspace, dir)) ? [dir] : [] }),
+        ...verifyFailGate(q.label ?? id, reason, { artifacts: exists(path.join(workspace, dir)) ? [dir] : [] }), briefFrom: dir,
       } });
       continue;
     }
