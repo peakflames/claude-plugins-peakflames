@@ -1514,6 +1514,36 @@ test('a contradiction the planner finds is asked before any plan or build: an am
   assert.equal(decide(p, E1.id, AMEND[0]).enters, 'PLAN');
 });
 
+test('an approved amendment outlives a start from scratch: the new plan session is told it and the owner is not asked again (issue #41 B9)', async (t) => {
+  const p = makeProject(t);
+  const tor = E1.tors[0];
+  const q = tor + ' — The tool shall import every row looks wrong: its Then contradicts the header rule. Proposed: same title / Then: "rows after the header are imported". How to proceed?';
+  const AMEND = ['Amend ' + tor + ' (owner approval)', 'Implement as written', "Stop — I'll take it from here"];
+  const asking = { actions: [ask(q, AMEND), ...planScript(E1).actions] };
+  const cut = { actions: buildActions(E1, { commit: false }), result: { subtype: 'error_max_turns', is_error: true } };
+  p.scenario({ [E1.id + '/plan']: { actions: [ask(q, AMEND)] } });
+  await p.go();
+  decide(p, E1.id, AMEND[0]);
+  // Approved; the plan is made, and the build is then cut short. The owner starts the epic over.
+  p.scenario({ [E1.id + '/plan']: asking, [E1.id + '/build']: cut });
+  await again(p);
+  assert.equal(gate(p, E1.id, 2).kind, 'resume');
+  decide(p, E1.id, ANSWERS.startOver, { n: 2 });
+
+  p.scenario({ [E1.id + '/plan']: asking, [E1.id + '/build']: cut });
+  const r = await again(p);
+  assert.deepEqual(r.steps, [E1.id + '/plan-1', E1.id + '/build-1'], 'planned again from scratch');
+  assert.ok(!r.calls[0].argv.includes('--resume'), 'a new plan session');
+  // The same question, asked again by the new planner, is answered from the owner's earlier approval.
+  assert.deepEqual(Object.values(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.updatedInput.answers), [AMEND[0]]);
+  assert.match(fs.readFileSync(p.dir(E1.id, 'plan-1', 'owner-answers.md'), 'utf8'), new RegExp('Amend ' + tor));
+  assert.match(fs.readFileSync(p.dir(E1.id, 'build-1', 'owner-answers.md'), 'utf8'), new RegExp('Amend ' + tor));
+  const gates = fs.readdirSync(path.join(p.state, 'gates')).map((f) => readJson(path.join(p.state, 'gates', f)));
+  assert.deepEqual(gates.map((g) => g.kind), ['amendment', 'resume', 'resume'], 'no second amendment question');
+  assert.ok(!gates[0].superseded && !gates[0].void, 'the amendment stands');
+  assert.deepEqual(ownerAnswers(p.state, E1.id).map((a) => [a.gateKind, a.answer]), [['amendment', AMEND[0]]]);
+});
+
 // ---- "look": "after" — a screens-only epic does not stop for the owner ---------------------------
 
 test('with "look": "after", an epic that only has screens goes straight to the final check and is listed as merged without the owner\'s look', async (t) => {

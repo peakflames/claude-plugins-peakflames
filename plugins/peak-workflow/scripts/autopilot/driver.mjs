@@ -2584,10 +2584,18 @@ class Run {
       e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase: 'PLAN', fresh: true };
       this.log(`${e.id}: starting over: ${f.by} answered "${f.answer}" on ${f.gate}`);
     }
+    // An amendment the owner approved is a decision about the requirement, not about the attempt: it outlives a
+    // start from scratch (seen live: approved, the epic failed and was rebuilt, and the owner was asked again).
+    const amendment = (x) => /^amendment/.test(x.kind ?? '') && /^amend\b/i.test(x.decided?.answer ?? '') && !x.void && !x.superseded && !x.cleared;
+    for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && amendment(x) && !x.decided.used)) this.markGate(g.file, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase: 'PLAN', date: now(), carried: true } } }));
     this.supersedeGates(e, null);
-    // From scratch: answers given about the earlier attempt are not handed to the new one.
-    for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && x.decided?.used && !x.superseded && !x.void && gateEntry(x)?.question)) this.markGate(g.file, { superseded: { run: this.runName, date: now() } });
-    e.answers = []; e.resumeSession = null;
+    // From scratch: every other answer given about the earlier attempt is not handed to the new one.
+    for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && x.decided?.used && !x.superseded && !x.void && gateEntry(x)?.question && !amendment(x))) this.markGate(g.file, { superseded: { run: this.runName, date: now() } });
+    // The planner meets the same requirement first, the builder writes the change: both are told.
+    const carried = ownerAnswers(this.stateDir, e.id).filter((a) => /^amendment/.test(a.gateKind) && /^amend\b/i.test(a.answer));
+    e.answers = carried.flatMap((a) => ['plan', 'build'].map((kind) => ({ ...a, kind })));
+    if (carried.length) this.log(`${e.id}: the owner's approved amendment of ${carried.map((a) => a.tor).filter(Boolean).join(', ') || 'a requirement'} is carried into the new attempt`);
+    e.resumeSession = null;
     this.supersedeBranch(e);
     this.forget(e);
     return 'PLAN';
