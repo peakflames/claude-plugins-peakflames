@@ -301,8 +301,10 @@ test('R6 background tasks are denied for Bash and Agent', (t) => {
 });
 
 test('which files are tests: by name where tests sit beside the code, the whole directory where none is test-named', () => {
-  for (const f of ['src/a.test.ts', 'src/a.spec.tsx', 'pkg/a_test.go', 'tests/unit/helper.py', 'app/test_a.py', 'src/__tests__/a.js', 'App.Tests/Foo.cs', 'src/FooTests.cs', 'e2e/login.ts', 'features/a.feature']) assert.ok(testNamed(f), f);
-  for (const f of ['src/App.tsx', 'src/api/smartsheet.ts', 'packages/core/summarizeRoadmap.ts', 'src/latest.ts', 'src/contest.py', 'src/Attests.md']) assert.ok(!testNamed(f), f);
+  for (const f of ['src/a.test.ts', 'src/a.spec.tsx', 'pkg/a_test.go', 'tests/unit/helper.py', 'app/test_a.py', 'src/__tests__/a.js', 'App.Tests/Foo.cs', 'src/FooTests.cs', 'e2e/login.ts', 'features/a.feature',
+    'app/tests.py', 'test.js', 'src/FooTest.php', 'src/TestFoo.java', 'src/FooIT.java', 'src/login.cy.ts', 'src/FooTests.ts', 'src/foo.test.js.snap', 'spec/a_spec.rb', 'src/FooSpec.kt', 'my_tests/a.py']) assert.ok(testNamed(f), f);
+  for (const f of ['src/App.tsx', 'src/api/smartsheet.ts', 'packages/core/summarizeRoadmap.ts', 'src/latest.ts', 'src/contest.py', 'src/Attests.md',
+    'src/PodSpec.java', 'src/CustomerSpec.cs', 'docs/openapi-spec.yaml', 'src/ab-test/variant.ts', 'src/Testing.java', 'src/protest.js', 'src/AUDIT.java']) assert.ok(!testNamed(f), f);
   const dirs = ['src/', 'test/', 'Checks/'];
   const named = testNamedDirs(['src/App.tsx', 'src/App.test.tsx', 'test/smoke.js', 'test/helpers.js', 'Checks/Ledger.cs', 'Checks/Checks.csproj'], dirs);
   assert.deepEqual([...named], ['src/', 'test/']);
@@ -326,6 +328,17 @@ test('R7 test integrity: where tests sit beside the code, only the tests need a 
   denied(h.pre('Edit', { file_path: 'src/index.test.js', old_string: 'a', new_string: 'b' }), 'R7', /src\/index\.test\.js is an existing test/);
   denied(h.pre('Edit', { file_path: 'test/smoke.test.js', old_string: 'a', new_string: 'b' }), 'R7');
   passes(h.pre('Write', { file_path: 'test/package.json', content: '{}' }), 'a manifest under a test directory');
+});
+
+test('R7 test integrity: the epic that brings the first test beside the code is held to the same rule at once', (t) => {
+  const h = referee(t, { seed: (project) => {
+    const md = path.join(project, 'CLAUDE.md');
+    fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replace('**Test directories:** test/', '**Test directories:** src/'));
+  } });
+  // Nothing under src/ is test-named yet: the whole directory counts, as before.
+  denied(h.pre('Edit', { file_path: 'src/index.js', old_string: 'a', new_string: 'b' }), 'R7');
+  fs.writeFileSync(path.join(h.clone, 'src', 'index.test.js'), "import test from 'node:test';\ntest('passes', () => {});\n");
+  passes(h.pre('Edit', { file_path: 'src/index.js', old_string: 'a', new_string: 'b' }), 'once the epic has a test there, production code is production code');
 });
 
 test('R7 test integrity: an existing test changes only after a reason is recorded', (t) => {
@@ -375,8 +388,8 @@ test('R8 wrapup-epic: each pre-approved question gets its one answer', (t) => {
   const h = referee(t, { role: 'verifier' });
   const cases = [
     [`${E1.tors[2]} is FAIL: the description is trimmed. Recommendation: Stop — the builder should fix it. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
-    [`${E1.tors[0]} is CANNOT VERIFY: no test exercises the When. Recommendation: Fix now — small. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
-    // A failing gate the verifier recommends fixing is fixed on the owner's standing answer for small fixes (a failed requirement, above, never is).
+    [`${E1.tors[0]} is CANNOT VERIFY: no test exercises the When. Recommendation: Fix now — small. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'Stop — epic FAILs'], 'Stop — epic FAILs'], // a requirement nobody could judge is never settled by the verifier's own test
+    // A failing gate the verifier recommends fixing is fixed on the owner's standing answer for small fixes.
     ['Tests failed: node --test: 2 failing. Recommendation: Fix now — one assertion. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Fix now'],
     ['Lint failed: 1 error. Recommendation: Stop — it needs a design change. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
     ['Verdict PASS. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop'], 'Proceed'],
@@ -384,8 +397,13 @@ test('R8 wrapup-epic: each pre-approved question gets its one answer', (t) => {
     ['Epic Lg3Sum9 (monthly summary) verdict is PASS: 5/5 requirements pass and all 20 tests pass. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop'], 'Proceed'],
     ['Did you perform any manual verification beyond the automated gates I ran?', ['Yes — I performed manual verification', 'No — only automated gates were run'], 'No — only automated gates were run'],
     ['Ship mode — solo (merge locally to the base branch) or team (push the branch and open a pull request)?', ['Team — push and open PR', 'Solo — local merge only'], 'Solo — local merge only'],
+    // The test a requirement lacks is added on the same standing answer (issue #41 B5); where the code is wrong (the first line) it stops.
+    [E1.tors[1] + ' is FAIL: no test mirrors the Then; the code looks right. Recommendation: Fix now — one small test. How to proceed?', ['Fix now', 'Defer — depends on a later epic', 'Stop — epic FAILs'], 'Fix now'],
   ];
   for (const [q, opts, want] of cases) answered(h.ask(q, opts), q, want);
+  // The fix for a requirement is marked as a test and nothing else; the merge gate holds it to that.
+  assert.deepEqual(readJson(path.join(h.step, 'small-fixes.json')).map((x) => [x.tor, x.testOnly ?? false]), [[null, false], [E1.tors[1], true]]);
+  parked(referee(t, { role: 'verifier' }).ask('TOR-09-Zzzzzz9 is FAIL: no test. Recommendation: Fix now. How to proceed?', ['Fix now', 'Stop — epic FAILs'])); // not this epic's requirement
   // A label typed with a plain hyphen still matches, and the answer is the label as offered.
   const q = 'Verdict PASS. Proceed to Phase 2 (complete and ship)?';
   answered(h.ask(cases[3][0], ['Fix now', 'Stop - epic FAILs']), cases[3][0], 'Stop - epic FAILs');

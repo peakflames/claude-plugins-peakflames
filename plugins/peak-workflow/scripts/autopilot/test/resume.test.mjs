@@ -30,6 +30,11 @@ const ask = (question, options) => ({ do: 'tool', tool_name: 'AskUserQuestion', 
 const tools = (p, id, step) => fs.readFileSync(p.dir(id, step, 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).out);
 const finding = (category, severity = 'high') => ({ category, severity, evidence: 'test/rates.test.js:12', explanation: `the ${category} problem` });
 const audit = (findings) => ({ result: { total_cost_usd: 0.5, structured_output: { findings, recommend: findings.length ? 'park' : 'proceed', summary: 'canned' } } });
+/** A build whose tests are red and the repair that turns them green: the fix round before the final check is spent. */
+const roundSpent = (e) => ({
+  [`${e.id}/plan`]: planScript(e), [`${e.id}/build`]: buildScript(e, { testBody: " throw new Error('red'); " }), [`${e.id}/plan-fix`]: planScript(e),
+  [`${e.id}/fix`]: { actions: [{ do: 'write', path: `test/${e.slug}.test.js`, content: `import test from 'node:test';\n${e.tors.map((x) => `test('${x} is met', () => {});`).join('\n')}\n` }, { do: 'commit', message: `fix(epic-${e.id}): green` }] },
+});
 const merged = (p, tip) => spawnSync('git', ['merge-base', '--is-ancestor', tip, 'develop'], { cwd: p.clone }).status === 0;
 const DEFERRAL = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
 
@@ -206,11 +211,7 @@ test('audit gate, "Real — fix before verify": the fix round runs with the park
 
 test('audit gate, "Real", when the one fix round is already used: FAILED without a session', async (t) => {
   const p = makeProject(t);
-  p.scenario({
-    ...happy(E1), [`${E1.id}/verify-1`]: { actions: [], result: { result: 'Verdict: FAIL' } },
-    [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'x\n' }, { do: 'commit', message: `feat(epic-${E1.id}): fix` }] },
-    [`${E1.id}/audit-2`]: audit([finding('cannot-fail')]),
-  });
+  p.scenario({ ...roundSpent(E1), [`${E1.id}/audit`]: audit([finding('cannot-fail')]) });
   await p.go();
   assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).fixRounds, readJson(path.join(p.state, 'epics.json'))[E1.id].fixRounds], ['PARKED', 1, 1]);
   decide(p, E1.id, ANSWERS.auditReal);
@@ -851,8 +852,7 @@ test('P3.5 exit: one run parks an epic at each resumable gate kind; decided thro
     [`${eh.id}/plan`]: planScript(eh), [`${eh.id}/build`]: buildScript(eh),
     [`${el.id}/plan`]: planScript(el, { omit: ['amendment'] }),
     [`${er.id}/plan`]: planScript(er), [`${er.id}/build`]: { actions: buildActions(er), result: { subtype: 'error_max_turns', is_error: true } },
-    ...happy(ef), [`${ef.id}/verify-1`]: { actions: [], result: { result: 'Verdict: FAIL' } }, [`${ef.id}/plan-fix`]: planScript(ef),
-    [`${ef.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'x\n' }, { do: 'commit', message: `feat(epic-${ef.id}): fix` }] }, [`${ef.id}/audit-2`]: audit([finding('test-weakened')]),
+    ...roundSpent(ef), [`${ef.id}/audit`]: audit([finding('test-weakened')]),
   });
 
   const s1 = await p.go();
@@ -1357,6 +1357,118 @@ test('a fix an earlier autopilot held back under the old rule (any changed test 
   const e = p.epic(E1.id);
   assert.equal(e.state, 'MERGED', e.reason);
   assert.equal(e.fixedAtWrapup.approvedBy, 'the standing answer for small fixes');
+});
+
+// ---- a requirement that only lacks its test, and the final check's own repair (issue #41 B5) ------
+
+const TORQ = `${E1.tors[0]} is FAIL: no test mirrors the Then; the code itself looks right. Recommendation: Fix now — one small test. How to proceed?`;
+const TOROPTS = ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'];
+const addTest = (files) => [{ do: 'checkout', name: E1.branch }, ...files.map((f) => ({ do: 'write', path: f, content: "import test from 'node:test';\ntest('the Then holds', () => {});\n" })), { do: 'commit', message: `test(epic-${E1.id}): the test the requirement lacked` }];
+// One undisclosed deferral, fixed at the final check: its mark stays in the count (wrapup-epic Step 1.4b).
+const UNDISCLOSED_FIXED = { counts: [1, 1, 0, 1, 0, 0] };
+
+test('a requirement that only lacks its test: the final check adds the test on the standing answer and the epic merges', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(TORQ, TOROPTS), ...addTest(['test/then.test.js']), ...wrapupActions(E1, UNDISCLOSED_FIXED)], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  const [answer] = tools(p, E1.id, 'verify-1');
+  assert.deepEqual(Object.values(answer.hookSpecificOutput.updatedInput.answers), ['Fix now']);
+  assert.match(answer.hookSpecificOutput.permissionDecisionReason, new RegExp(`For ${E1.tors[0]} the fix is the missing test alone, in a test file`));
+  assert.deepEqual([e.fixedAtWrapup.files, e.fixedAtWrapup.standing], [['test/then.test.js'], [{ question: TORQ, tor: E1.tors[0], testOnly: true }]]);
+  assert.ok(!fs.existsSync(path.join(p.state, 'gates', `${E1.id}-1.json`)), 'the owner is not asked');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), new RegExp(`A test was added for a requirement the build left untested: ${E1.tors[0]}\\.`));
+});
+
+test('"add the missing test" that also changes the product is not merged: the owner is asked to allow it, and then it merges', async (t) => {
+  const p = makeProject(t);
+  const script = { actions: [ask(TORQ, TOROPTS), ...addTest(['test/then.test.js', 'src/patch.js']), ...wrapupActions(E1, UNDISCLOSED_FIXED)], result: { result: 'Verdict: PASS' } };
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: script });
+  await p.go();
+  assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).reason], ['PARKED', 'merge gate failed (verdict); develop rolled back']);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.phase, g.approvesFix], ['resume', 'VERIFY', true]);
+  assert.match(g.question, /it changed the product itself \(src\/patch\.js\), where your standing answer covers only adding a missing test\. It was not merged\./);
+
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'VERIFY');
+  p.scenario({ [`${E1.id}/verify`]: script });
+  await again(p);
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+});
+
+test('a missing test and an ordinary small fix in one final check: product code changed is the owner\'s to allow, the referee\'s record is not counted', async (t) => {
+  const p = makeProject(t);
+  fs.writeFileSync(path.join(p.project, 'test', 'old.test.js'), "import test from 'node:test';\ntest('passes', () => {});\n");
+  git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'test: an existing test');
+  // The missing test goes into an existing test file, with the reason the referee asks for: tests only, so it merges.
+  const intoExisting = [{ do: 'checkout', name: E1.branch }, { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/old.test.js","reason":"the Then had no test"}\n' },
+    { do: 'exec', cmd: "printf \"test('the Then holds', () => {});\\n\" >> test/old.test.js" }, { do: 'commit', message: 'test(epic-' + E1.id + '): the test the requirement lacked' }];
+  p.scenario({ ...happy(E1), [E1.id + '/verify']: { actions: [ask(TORQ, TOROPTS), ...intoExisting, ...wrapupActions(E1, UNDISCLOSED_FIXED)], result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+
+  const p2 = makeProject(t);
+  p2.scenario({ ...happy(E1), [E1.id + '/verify']: { actions: [ask(FIXQ, FIXOPTS), ask(TORQ, TOROPTS), ...addTest(['test/then.test.js', 'src/favicon.js']), ...wrapupActions(E1, { counts: [2, 1, 0, 2, 0, 0] })], result: { result: 'Verdict: PASS' } } });
+  await p2.go();
+  assert.equal(p2.epic(E1.id).state, 'PARKED');
+  assert.match(gate(p2, E1.id).question, /it changed the product itself \(src\/favicon\.js\)/);
+});
+
+test('without a fix on the standing answer, an undisclosed deferral still fails the merge gate', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: wrapupActions(E1, { counts: [1, 1, 0, 0, 0, 0] }), result: { result: 'Verdict: PASS' } } });
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  assert.deepEqual(readJson(p.dir(E1.id, 'check-verify-1.json')).checks.filter((c) => !c.pass).map((c) => c.name), ['no-waivers']);
+});
+
+test('the final check keeps its own fix round when the build\'s checks spent theirs', async (t) => {
+  const p = makeProject(t);
+  p.scenario({
+    ...roundSpent(E1), [`${E1.id}/verify-1`]: { actions: [], result: { result: `Verdict: FAIL\n${E1.tors[2]}: the description is trimmed` } },
+    [`${E1.id}/fix-2`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'export const fixed = true;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): keep the description verbatim` }] },
+    [`${E1.id}/verify`]: wrapupScript(E1),
+  });
+  await p.go();
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual([e.fixRounds, e.verifyFixRounds], [1, 1]);
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'fix-1', 'audit-1', 'verify-1', 'fix-2', 'audit-2', 'verify-2'].map((s) => `${E1.id}/${s}`));
+});
+
+test('a final check that fails again after its fix round asks the owner, keeps the branch, and repairs once more on their answer', async (t) => {
+  const p = makeProject(t);
+  const still = `Verdict: FAIL\n${E1.tors[2]}: the description is still trimmed`;
+  p.scenario({
+    ...happy(E1), [`${E1.id}/plan-fix`]: planScript(E1),
+    [`${E1.id}/verify-1`]: { actions: [], result: { result: `Verdict: FAIL\n${E1.tors[2]}: the description is trimmed` } },
+    [`${E1.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'export const fixed = 1;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): first try` }] },
+    [`${E1.id}/verify-2`]: { actions: [], result: { result: still } },
+  });
+  await p.go();
+  const e = p.epic(E1.id);
+  assert.deepEqual([e.state, e.reason], ['PARKED', 'verify-2 FAIL after the fix round: Verdict: FAIL']);
+  const tip = git(p.clone, 'rev-parse', E1.branch);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.phase, g.options, g.branchTip], ['resume', 'FIX_BUILD', [ANSWERS.resume, ANSWERS.startOver], tip]);
+  assert.match(g.question, /the final check still finds a requirement not met, after one repair \("Verdict: FAIL"\)\. Repair it once more\?/);
+
+  // An epic an earlier driver left FAILED there, with nothing to answer, gets the same question.
+  fs.rmSync(path.join(p.state, 'gates', `${E1.id}-1.json`));
+  const file = path.join(p.state, 'epics.json'); const recs = readJson(file);
+  recs[E1.id].state = 'FAILED';
+  fs.writeFileSync(file, JSON.stringify(recs, null, 2));
+  assert.deepEqual(ensureResumeGates(p.state), [`${E1.id}-1.json`]);
+  assert.deepEqual([gate(p, E1.id).kind, gate(p, E1.id).phase, gate(p, E1.id).question], [g.kind, g.phase, g.question]);
+
+  assert.equal(decide(p, E1.id, ANSWERS.resume).enters, 'FIX_BUILD');
+  p.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/fix.js', content: 'export const fixed = 2;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): second try` }] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+  assert.deepEqual(r.steps, ['fix-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`), 'nothing is planned or built again');
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  assert.match(fs.readFileSync(p.dir(E1.id, 'fix-1', 'prompt.md'), 'utf8'), /the description is still trimmed/);
+  assert.ok(merged(p, tip), 'on the branch the first run left');
 });
 
 test('the standing answer never covers a requirement file or a weakened test, and stops after its count', async (t) => {

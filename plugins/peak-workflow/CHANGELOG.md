@@ -222,6 +222,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot final check adds a missing test** — a requirement that fails only because no test
+  covers it gets that test on the standing answer for small fixes, test files only; the epic is
+  no longer rebuilt. Product code changed that way is rolled back and put to the owner.
+- **Autopilot final check has its own fix round** — a repair spent on the build's checks no
+  longer leaves a failed final check with none. A final check that still fails after its repair
+  parks with "repair it once more?" instead of FAILED with nothing to answer.
 - **Autopilot tells tests from code by name** — where a listed test directory also holds
   production code (`src/` with tests beside it), only test-named files need a recorded reason;
   production files no longer fail the build check or spend the repair round. The build check
