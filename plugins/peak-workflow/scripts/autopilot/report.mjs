@@ -141,7 +141,7 @@ function tldr(r) {
   if (r.setupFailed) T.push(`Nothing was built, because autopilot could not get its private copy of your project ready: ${setupWhy(r.setupFailed)}.`);
   else if (r.baseRed?.couldNotRun) T.push(`Nothing was built, because the test command could not be run in autopilot's private copy (\`${r.testCommand}\`: ${lastLine(r.baseRed.tail) || `exit ${r.baseRed.exit}`}). The tests never ran; this is a missing tool or setup step, not a failing test.`);
   else if (r.baseRed) T.push(`Nothing was built, because your project's own tests were already failing before autopilot started.`);
-  else if (r.stoppedOnPark) T.push('The run ended early on purpose: by default it stops at the first epic that needs you, so nothing else is built on a guess.');
+  else if (r.stoppedOnPark) T.push(r.stoppedOnPark.from === 'project' ? 'The run ended early on purpose: this project is set to stop at the first epic that needs you.' : 'The run ended early on purpose: while you are there to answer it stops at the first epic that needs you, so nothing else is built on a guess.');
   else if (r.stoppedBecause && !['queue done', 'nothing runnable'].includes(r.stoppedBecause)) T.push(`The run ended early: ${r.stoppedBecause}.`);
   T.push(`It ran from ${stamp(r.run)} to ${r.ended ? stamp(r.ended) : '(still running)'} and spent ${usd(r.spentUsd)}${r.budgetUsd == null ? '' : ` of a $${r.budgetUsd} limit`}.`);
   T.push(r.next.length ? `What to do: follow "Do this next" below, from the top. It has ${plural(r.next.length, 'step')}.` : 'Nothing needs you.');
@@ -196,7 +196,7 @@ function nextSteps(r) {
   if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into \`${r.integration}\`.`);
   if (r.referee.testChanges.length) next.push(`Read the recorded reason for ${plural(r.referee.testChanges.length, 'changed existing test')} (under "Per epic").`);
   const notStarted = by('NOT STARTED');
-  if (r.stoppedOnPark && notStarted.length) next.push(`${plural(notStarted.length, 'epic')} did not start (${ids(notStarted)}): the run stops at the first epic that parks or fails. To keep building independent epics after a park, put \`{"onPark": "continue"}\` in \`${r.stoppedOnPark.settingsFile}\`.`);
+  if (r.stoppedOnPark && notStarted.length) next.push(`${plural(notStarted.length, 'epic')} did not start (${ids(notStarted)}): ${r.stoppedOnPark.from === 'project' ? 'this project is set to stop at the first epic that needs you' : 'the run stops at the first epic that needs you while you are there to answer. When you say at launch that you will be away, the epics that do not depend on it keep building'}. They are built in the next run.`);
   if (by('BLOCKED').length) next.push(`${plural(by('BLOCKED').length, 'epic')} never started because a dependency did not merge (${ids(by('BLOCKED'))}); queue them again once it has.`);
   return next;
 }

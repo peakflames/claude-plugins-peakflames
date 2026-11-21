@@ -779,7 +779,7 @@ test('void decision: the parked branch no longer merges cleanly into the integra
 
 // ---- onPark ------------------------------------------------------------------------------------
 
-test('onPark defaults to "stop": the first epic that parks ends the run, and the report says how to change that', async (t) => {
+test('onPark, not set and nobody said they are away: the first epic that parks ends the run, and the report says why without naming a file to edit', async (t) => {
   const p = makeProject(t);
   const settings = readJson(path.join(p.state, 'settings.json'));
   delete settings.onPark; // the default, as a real workspace has it
@@ -795,9 +795,10 @@ test('onPark defaults to "stop": the first epic that parks ends the run, and the
   const file = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
   const report = readJson(path.join(p.runDir(), 'report.json'));
   assert.deepEqual(report.epics.map((e) => e.outcome), ['PARKED', 'NOT STARTED']);
-  assert.ok(report.next.some((n) => n.includes('1 epic did not start (Lg6Cfg3): the run stops at the first epic that parks or fails') && n.includes(`\`{"onPark": "continue"}\` in \`${file}\``)), report.next.join('\n'));
+  assert.ok(report.next.some((n) => n.includes('1 epic did not start (Lg6Cfg3): the run stops at the first epic that needs you while you are there to answer')), report.next.join('\n'));
+  assert.ok(!/onPark|autopilot\.json/.test(report.next.join('\n') + report.tldr.join('\n')), 'the owner is not told to edit a settings file');
   const pre = JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
-  assert.deepEqual([pre.launch.config.onPark, pre.launch.projectSettingsFile, pre.launch.projectSettingsFileExists], ['stop', file, false]);
+  assert.deepEqual([pre.launch.config.onPark, pre.launch.projectSettingsFile, pre.launch.projectSettingsFileExists], [null, file, false], 'not set by the project: it follows the owner\'s answer at launch, which preflight does not have yet');
 
   // The setting lives with the project: .claude/peak-workflow/autopilot.json. With "continue", the independent epic runs after the park.
   decide(p, E1.id, ANSWERS.auditNotReal);
@@ -814,6 +815,62 @@ test('onPark defaults to "stop": the first epic that parks ends the run, and the
 
   fs.writeFileSync(file, JSON.stringify({ onPark: 'sometimes' }));
   await assert.rejects(p.go(), /onPark must be "stop" or "continue", not "sometimes"/);
+});
+
+// I2 (issue 41): a park while the owner is away must not idle the night.
+/** One epic that parks, one independent of it, one that depends on it; `onPark` not set in the workspace. */
+function parkAndTwoMore(t) {
+  const p = makeProject(t);
+  const settings = readJson(path.join(p.state, 'settings.json'));
+  delete settings.onPark;
+  fs.writeFileSync(path.join(p.state, 'settings.json'), JSON.stringify(settings));
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  const dep = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02', deps: [E1.id] });
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d), ...happy(dep) });
+  p.launch = (cfg) => {
+    const name = '20261121-010101';
+    fs.mkdirSync(path.join(p.state, 'runs', name), { recursive: true });
+    fs.writeFileSync(path.join(p.state, 'runs', name, 'config.json'), JSON.stringify({ project: p.project, allowTestDouble: true, ...cfg }));
+    return p.go({ run: name });
+  };
+  return { p, d, dep };
+}
+
+test('onPark follows the launch answer: with the owner away, a parked epic is set aside, the independent one is built and the dependent one is blocked', async (t) => {
+  const { p, d, dep } = parkAndTwoMore(t);
+
+  const s = await p.launch({ attended: false });
+
+  assert.deepEqual(Object.fromEntries(s.queue.map((q) => [q.id, q.state])), { [E1.id]: 'PARKED', [d.id]: 'MERGED', [dep.id]: 'BLOCKED' });
+  assert.equal(s.stoppedBecause, 'queue done'); // a BLOCKED epic is settled for this run: nothing is left to try
+  assert.ok(!s.stoppedOnPark);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /when an epic parks: continue \(you said you would be away\)/);
+});
+
+test('onPark follows the launch answer: with the owner there, the first park ends the run', async (t) => {
+  const { p, d, dep } = parkAndTwoMore(t);
+
+  const s = await p.launch({ attended: true });
+
+  assert.deepEqual(Object.fromEntries(s.queue.map((q) => [q.id, q.state])), { [E1.id]: 'PARKED', [d.id]: 'QUEUED', [dep.id]: 'QUEUED' });
+  assert.deepEqual([s.status, s.stoppedBecause], ['STOPPED', `${E1.id} parked (onPark: stop)`]);
+});
+
+test('onPark set by the project wins over the launch answer: "stop" stops the run although the owner is away', async (t) => {
+  const { p, d } = parkAndTwoMore(t);
+  const file = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ onPark: 'stop' }));
+  git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'chore: autopilot stops at the first park');
+  const pre = JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
+  assert.equal(pre.launch.config.onPark, 'stop');
+
+  const s = await p.launch({ attended: false });
+
+  assert.equal(s.stoppedBecause, `${E1.id} parked (onPark: stop)`);
+  assert.equal(s.queue.find((q) => q.id === d.id).state, 'QUEUED');
+  const report = readJson(path.join(p.runDir(), 'report.json'));
+  assert.ok(report.next.some((n) => n.includes('this project is set to stop at the first epic that needs you')), report.next.join('\n'));
 });
 
 test('an undecided gate keeps its epic out of the next run: nothing is rebuilt while the owner has not answered', async (t) => {

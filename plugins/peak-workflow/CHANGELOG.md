@@ -222,6 +222,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot keeps building while the owner is away** — with "I'll be away" at launch, an epic
+  that needs the owner is set aside and the epics that do not depend on it are still built. With
+  the owner there, the run stops at the first one. An `onPark` in the project file wins.
 - **Autopilot keeps the confirmed run config** — a run `config.json` that cannot be read stops
   the launch with the reason instead of running on defaults and saving them over it. The launch
   passes `--project`, the log states the run's real queue and limits, and a relaunch keeps the

@@ -192,7 +192,7 @@ export function defaultConfig(project) {
     diskFloorGb: 15,
     growthCapMb: 1024,
     look: 'before', // 'before': an epic with screens parks for the owner's look before the final check; 'after': it does not, the verifier judges the pictures and the screens are listed for the owner afterwards. A requirement a person must observe always parks
-    onPark: 'stop', // 'stop': the first epic that parks or fails ends the run; 'continue': independent epics still run
+    onPark: null, // 'stop': the first epic that parks or fails ends the run; 'continue': independent epics still run. null = it follows the owner's launch answer (`attended`): away → 'continue', here or not asked → 'stop'. `loadConfig` resolves it
     setup: null, // one shell command that rebuilds, in the clone, what git does not carry (a venv, node_modules); run with network
     readOnly: [], // directories outside the clone that sessions may read and never write: a dependency cache (~/.nuget/packages, ~/.cargo/registry)
     copy: [], // git-ignored files copied from the project into the clone at each run (a .env): what cannot be rebuilt
@@ -280,6 +280,10 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   const cfg = merge(merge(merge(merge(defaultConfig(root), projectSettings(root)), settings), runCfg), overrides);
   cfg.project = root;
   if (!['before', 'after'].includes(cfg.look)) throw new Error(`look must be "before" or "after", not ${JSON.stringify(cfg.look)} (${projectSettingsFile(root)})`);
+  // An explicit `onPark` wins. Otherwise a park while the owner is away must not idle the night (issue 41, I2):
+  // the epics that do not depend on the parked one keep building, and its dependents are BLOCKED by `next()`.
+  cfg.onParkFrom = cfg.onPark != null ? 'project' : cfg.attended === false ? 'attended' : 'default';
+  cfg.onPark ??= cfg.attended === false ? 'continue' : 'stop';
   if (!['stop', 'continue'].includes(cfg.onPark)) throw new Error(`onPark must be "stop" or "continue", not ${JSON.stringify(cfg.onPark)} (${projectSettingsFile(root)})`);
   for (const [kind, b] of Object.entries(cfg.budgets)) {
     if (b && typeof b === 'object' && b.effort !== undefined && !EFFORT_LEVELS.includes(b.effort)) throw new Error(`budgets.${kind}.effort must be one of ${EFFORT_LEVELS.join(', ')}, not ${JSON.stringify(b.effort)}`);
@@ -1174,7 +1178,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   p(`Sessions:         ${config.claudeBin === 'claude' ? 'claude (real Claude Code sessions)' : `${config.claudeBin} — A TEST DOUBLE, not Claude Code: a rehearsal`}`);
   if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
-  p(`When an epic parks: ${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set in ${projectSettingsFile(project)}`);
+  p(`When an epic parks: ${config.onParkFrom === 'project' ? `${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set by the project` : config.onParkFrom === 'attended' ? 'independent epics still run (the owner is away)' : 'follows the owner\'s answer at launch: away, independent epics still run; here, the run stops'}`);
   p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}`);
   p(config.sandbox === true
     ? `Sandbox:          on — sessions write only in the clone, may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`
@@ -2463,14 +2467,15 @@ class Run {
   }
 
   /**
-   * `onPark: "stop"` (the default): an epic that parked or failed ends the run. Which epics are
-   * independent of it is the planner's judgement, so nothing more is built until the owner has looked.
+   * `onPark: "stop"` (the owner is there, or the project says so): an epic that parked or failed ends the
+   * run. Which epics are independent of it is the planner's judgement, so nothing more is built until the
+   * owner has looked. With the owner away it is "continue" unless the project set it (`loadConfig`).
    */
   stopOnPark(e) {
     if (this.config.onPark !== 'stop' || this.stopReason || !['PARKED', 'FAILED'].includes(e.state)) return;
     this.stopReason = `${e.id} ${e.state === 'PARKED' ? 'parked' : 'failed'} (onPark: stop)`;
-    this.state.stoppedOnPark = { epic: e.id, state: e.state, settingsFile: projectSettingsFile(this.config.project) };
-    this.log(`${e.id} ${e.state}: stopping the run (onPark is "stop"; set "onPark": "continue" in ${projectSettingsFile(this.config.project)} to keep building independent epics)`);
+    this.state.stoppedOnPark = { epic: e.id, state: e.state, from: this.config.onParkFrom ?? 'default' };
+    this.log(`${e.id} ${e.state}: stopping the run (${this.config.onParkFrom === 'project' ? 'the project\'s settings say onPark "stop"' : 'the owner did not say they would be away, so they are there to answer'})`);
   }
 
   // ---- sync with the project at run start (P3.5 Part 3) ---------------------------------------
@@ -2723,8 +2728,9 @@ class Run {
       if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
       // The limits this run really has, for whoever launched it to hold against what the owner confirmed.
-      const limits = { runBudgetUsd: cfg.runBudgetUsd ?? null, endBy: cfg.endBy ?? null, autoContinue: cfg.autoContinue ?? 0, onPark: cfg.onPark };
-      this.log(`run ${this.runName}: limits: run budget ${limits.runBudgetUsd == null ? 'none' : `$${limits.runBudgetUsd}`}; end by ${limits.endBy ?? 'no end time'}; technical stops continued ${limits.autoContinue} per epic; when an epic parks: ${limits.onPark}`);
+      const limits = { runBudgetUsd: cfg.runBudgetUsd ?? null, endBy: cfg.endBy ?? null, autoContinue: cfg.autoContinue ?? 0, onPark: cfg.onPark, onParkFrom: cfg.onParkFrom ?? 'default' };
+      const parkWhy = { project: 'set by the project', attended: 'you said you would be away', default: 'you did not say you would be away' }[limits.onParkFrom];
+      this.log(`run ${this.runName}: limits: run budget ${limits.runBudgetUsd == null ? 'none' : `$${limits.runBudgetUsd}`}; end by ${limits.endBy ?? 'no end time'}; technical stops continued ${limits.autoContinue} per epic; when an epic parks: ${limits.onPark} (${parkWhy})`);
       this.event('run-start', null, { run: this.runName, queue: this.state.queue.map((q) => q.label ?? q.id), ...limits, ...(resuming ? { resuming: true } : {}) });
 
       if (!this.pre.ok) this.stopReason = `preflight: ${this.pre.refuse.join('; ')}`;
@@ -2840,7 +2846,9 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
     projectSettingsFile: projectSettingsFile(project), projectSettingsFileExists: exists(projectSettingsFile(project)),
     runs, lastRun, lastQueue, openGates, decidedGates, sync, env,
     // Per-step settings in the workspace's settings.json win over the project's file: named so the confirm screen can say so.
-    workspaceBudgets: wsBudgets && typeof wsBudgets === 'object' ? Object.fromEntries(BUDGET_STEPS.filter((k) => wsBudgets[k] && typeof wsBudgets[k] === 'object').map((k) => [k, wsBudgets[k]])) : {}, endByLocal: config.endBy ? new Date(config.endBy).toString() : null, config,
+    workspaceBudgets: wsBudgets && typeof wsBudgets === 'object' ? Object.fromEntries(BUDGET_STEPS.filter((k) => wsBudgets[k] && typeof wsBudgets[k] === 'object').map((k) => [k, wsBudgets[k]])) : {}, endByLocal: config.endBy ? new Date(config.endBy).toString() : null,
+    // `onPark` is null here unless the project set it: before launch nobody has said whether they will be there, and it follows that answer.
+    config: { ...config, onPark: config.onParkFrom === 'default' ? null : config.onPark },
     // The per-session safety caps, sized for the confirm screen: ceilings, never estimates.
     caps: ['plan', 'build', 'audit', 'verify', 'fix'].filter((k) => config.budgets[k]).map((k) => ({ session: k, size: capSize(config.budgets[k].wallMin), minutes: config.budgets[k].wallMin, usd: config.budgets[k].usd, model: config.budgets[k].model ?? null, effort: config.budgets[k].effort ?? null })),
   };
