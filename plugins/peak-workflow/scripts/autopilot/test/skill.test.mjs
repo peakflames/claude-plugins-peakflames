@@ -17,8 +17,9 @@ const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...
 function launchLine(launch) {
   const line = SKILL.split('\n').find((l) => l.trim().startsWith('nohup '));
   assert.ok(line, 'SKILL.md has a nohup launch line');
-  let cmd = line.trim().replaceAll('${CLAUDE_PLUGIN_ROOT}', PLUGIN_DIR).replaceAll('<launch.workspace>', launch.workspace).replaceAll('<launch.runDir>', launch.runDir).replaceAll('<launch.run>', launch.run);
-  assert.ok(!/<launch\./.test(cmd), cmd);
+  let cmd = line.trim().replaceAll('${CLAUDE_PLUGIN_ROOT}', PLUGIN_DIR).replaceAll('<launch.workspace>', launch.workspace).replaceAll('<launch.runDir>', launch.runDir).replaceAll('<launch.run>', launch.run)
+    .replaceAll('<root>', launch.workspace.replace(/\.autopilot$/, '')); // the project the skill is run in; its workspace sits beside it
+  assert.ok(!/<launch\.|<root>/.test(cmd), cmd);
   if (process.platform !== 'darwin') cmd = cmd.replace('caffeinate -i ', ''); // as SKILL.md says for Linux and Windows
   return cmd;
 }
@@ -39,7 +40,7 @@ const preflight = (p, ...more) => driver('preflight', '--project', p.project, '-
 
 test('SKILL.md: the launch names the workspace and the run, appends to the run\'s autopilot.log, and the hard rules are stated', () => {
   const line = SKILL.split('\n').find((l) => l.trim().startsWith('nohup '));
-  assert.match(line, /^\s*nohup caffeinate -i node "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/autopilot\/driver\.mjs" run --workspace "<launch\.workspace>" --run "<launch\.run>" >> "<launch\.runDir>\/autopilot\.log" 2>&1 &$/);
+  assert.match(line, /^\s*nohup caffeinate -i node "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/autopilot\/driver\.mjs" run --project "<root>" --workspace "<launch\.workspace>" --run "<launch\.run>" >> "<launch\.runDir>\/autopilot\.log" 2>&1 &$/);
   assert.ok(!/[^>]> "<launch\.runDir>\/autopilot\.log"/.test(SKILL), 'never a truncating redirect');
   for (const rule of ['never edits project code', 'never runs `/peak-workflow:start-epic` or `/peak-workflow:wrapup-epic`', 'never answers a gate', 'never picks among ready epics']) assert.ok(SKILL.includes(rule), rule);
   // Rule 1 is one rule for every project file: a fix the skill named itself, approved as that exact change, and nothing else.

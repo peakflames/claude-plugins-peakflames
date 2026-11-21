@@ -559,6 +559,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    they answered; leave the key out when the question was not asked. Never write `true` unasked.
    `attended` is the owner's answer to whether they will be at the computer: `false` when
    they will be away, `true` when they are here. Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
+   Write the file with the Write tool, as JSON. Write every path with forward slashes, on
+   Windows too (`"C:/Users/pat/app"`): a single backslash makes the file unreadable and the
+   driver refuses to start.
    A run's `config.json` holds only what belongs to that run. A step's model, effort and caps
    live in the project's `autopilot.json` (saved through `DRIVER configure`); scope, audit and
    the like live in `<ws>/settings.json`, which this skill never writes. This is the only file
@@ -576,7 +579,7 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 2. **Start the driver detached**, so it outlives this session. On macOS:
 
    ```bash
-   nohup caffeinate -i node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" run --workspace "<launch.workspace>" --run "<launch.run>" >> "<launch.runDir>/autopilot.log" 2>&1 &
+   nohup caffeinate -i node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" run --project "<root>" --workspace "<launch.workspace>" --run "<launch.run>" >> "<launch.runDir>/autopilot.log" 2>&1 &
    ```
 
    On Linux or Windows (Git Bash, WSL), drop `caffeinate -i`. The redirect is `>>`, never `>`:
@@ -584,6 +587,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 
 3. **Check it started:** wait three seconds, then `cat "<launch.workspace>/lock"` and
    `tail -n 5 "<launch.runDir>/autopilot.log"`. A `lock` file (JSON with a `pid`) means it is running.
+   The log's two `run <name>:` lines state the queue, in order, and the limits the run
+   really has. Hold them against what the owner confirmed. When they differ, stop the run
+   (Step 5) and tell the owner what differs; relaunch only once the cause is found.
    If there is no lock but the log tail has a `run ended:` line, the run already finished (a
    short queue, or a red base): say so in one line and go to Step 0. If there
    is no lock and no such line, show the log tail — it holds the reason — and stop; do not retry
