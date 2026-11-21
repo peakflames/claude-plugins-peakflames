@@ -1,4 +1,4 @@
-# Handoff — peak-workflow autopilot (written 2026-11-14, evening)
+# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-20)
 
 For a fresh session, on any machine. Everything is on `feature/peak-workflow-autopilot-poc`
 (pushed). This file replaces the earlier handoffs kept outside the repository.
@@ -7,11 +7,31 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 172 pass, 11 skipped (the skipped
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 186 pass, 11 skipped (the skipped
   ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
 - **The cockpit mod is deferred** (`autopilot-cockpit-mod-handoff.md`, note at its top): the run
   announces itself in chat instead, because chat is the one display every device has.
+
+## Alpha feedback, issue #41 (2026-11-20)
+
+A second owner ran the alpha on Windows 11 (project Wayframe) and filed #41: 9 bugs, 7
+improvements. Five are fixed on this branch, each with tests against the fake `claude`; none has
+been seen in a real run yet, and nothing here was run on Windows.
+
+| Item | What changed |
+|---|---|
+| B2 | Tests are told from code by file name (`lib.mjs`: `testNamed`, `testNamedDirs`, `isTestPath`), one rule for the referee and the driver. A listed directory with no test-named file keeps the whole-directory rule |
+| B5 | The final check has its own fix round (`verifyFixRounds`); a requirement that only lacks a test gets it on the standing answer for small fixes (`testOnly`); a FAIL after the repair parks with a `resume` gate at `FIX_BUILD` (`verifyFailGate`) |
+| B1 | The auditor follows `sandbox`; it was always sandboxed |
+| B4 | An unreadable run `config.json` stops the launch (`runConfig`); the launch line passes `--project`; the log states the run's limits |
+| B9 | An approved amendment is carried into an epic that is started over (`enter`, the from-scratch path) |
+
+Still open from #41: B3 (preflight text ignores `look`), B6 (no retry for a flaky base check),
+B7 (numbering by phase index), B8 (36 driver tests fail on Windows before any change), I1–I7.
+I2 (`onPark: "stop"` idles a night) and I6 (never offer "fix it by hand") are the costly ones.
+Ask the reporter to confirm B1 and B4 on their machine; their local commit `4dcf789` is
+superseded by the B1 change here.
 
 ## How to work with the owner
 
@@ -34,7 +54,10 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
   workspace's `lock` file pid instead (`kill -0 <pid>`). A change that touches no referee hook
   and no skill a running session uses is safe mid-run; when unsure, wait.
 - Both suites before each code merge: `node --test plugins/peak-workflow/scripts/autopilot/test/`
-  (about 5 minutes) and `node --test scripts/autopilot-lab/test/`. Do not edit files in a
+  (about 5 minutes) and `node --test scripts/autopilot-lab/test/`. Run them under
+  `caffeinate -i`: a laptop that sleeps mid-suite fails a test by timeout. They need Python 3.11+
+  first on `PATH` (`tor-lifecycle` probes `python3`); with an older one every driver test stops
+  at the format guard and fails with a null reason. Do not edit files in a
   worktree while a suite runs there. Golden report files:
   `UPDATE_GOLDEN=1 node --test plugins/peak-workflow/scripts/autopilot/test/report.test.mjs`.
 - Shell heredocs that embed Python or JavaScript may be blocked: write a patch script to a temp
