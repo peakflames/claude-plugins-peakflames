@@ -222,6 +222,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot keeps an approved amendment across a rebuild** — when an epic is started over, the
+  owner's approval to amend a requirement is handed to the new plan and build sessions; the same
+  contradiction is no longer asked again.
 - **Autopilot final check adds a missing test** — a requirement that fails only because no test
   covers it gets that test on the standing answer for small fixes, test files only; the epic is
   no longer rebuilt. Product code changed that way is rolled back and put to the owner.
