@@ -8,6 +8,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR } from '../driver.mjs';
 import { offeredLabel } from '../hooks/pretool.mjs';
+import { isTestPath, testNamed, testNamedDirs } from '../lib.mjs';
 import { E1, git, makeProject, planText, readJson } from './helpers.mjs';
 
 const HOOKS = path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'hooks');
@@ -16,8 +17,9 @@ const Q_START = `Start Epic ${E1.id} (${E1.slug}) — CSV import? Phase 1 — Co
 const START_OPTS = ['Start it', 'Show me the ready epics instead', 'Stop'];
 
 /** A workspace as the driver leaves it mid-run: private clone, a run with state.json, one step directory. */
-function referee(t, { role = 'builder', branch = E1.branch, config = {}, sandbox = false } = {}) {
+function referee(t, { role = 'builder', branch = E1.branch, config = {}, sandbox = false, seed = null } = {}) {
   const p = makeProject(t, { config });
+  if (seed) { seed(p.project); git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'test: seed'); }
   git(p.project, 'clone', '-q', '--no-hardlinks', '--branch', 'develop', p.project, p.clone);
   git(p.clone, 'remote', 'remove', 'origin');
   if (branch !== 'develop') git(p.clone, 'checkout', '-q', '-b', branch);
@@ -296,6 +298,34 @@ test('R6 background tasks are denied for Bash and Agent', (t) => {
   denied(h.pre('Bash', { command: 'npm run dev', run_in_background: true }), 'R6', /background/);
   denied(h.pre('Agent', { description: 'x', prompt: 'y', run_in_background: true }), 'R6');
   passes(h.pre('Agent', { description: 'x', prompt: 'y' }), 'foreground agent');
+});
+
+test('which files are tests: by name where tests sit beside the code, the whole directory where none is test-named', () => {
+  for (const f of ['src/a.test.ts', 'src/a.spec.tsx', 'pkg/a_test.go', 'tests/unit/helper.py', 'app/test_a.py', 'src/__tests__/a.js', 'App.Tests/Foo.cs', 'src/FooTests.cs', 'e2e/login.ts', 'features/a.feature']) assert.ok(testNamed(f), f);
+  for (const f of ['src/App.tsx', 'src/api/smartsheet.ts', 'packages/core/summarizeRoadmap.ts', 'src/latest.ts', 'src/contest.py', 'src/Attests.md']) assert.ok(!testNamed(f), f);
+  const dirs = ['src/', 'test/', 'Checks/'];
+  const named = testNamedDirs(['src/App.tsx', 'src/App.test.tsx', 'test/smoke.js', 'test/helpers.js', 'Checks/Ledger.cs', 'Checks/Checks.csproj'], dirs);
+  assert.deepEqual([...named], ['src/', 'test/']);
+  assert.equal(isTestPath('src/App.tsx', dirs, named), false, 'production code beside the tests');
+  assert.equal(isTestPath('src/App.test.tsx', dirs, named), true);
+  assert.equal(isTestPath('test/helpers.js', dirs, named), true, 'everything under a directory named for tests');
+  assert.equal(isTestPath('Checks/Ledger.cs', dirs, named), true, 'no test-named file there: the whole directory counts');
+  assert.equal(isTestPath('Checks/Checks.csproj', dirs, named), false, 'a manifest');
+  assert.equal(isTestPath('lib/a.test.js', dirs, named), false, 'outside the listed directories');
+});
+
+test('R7 test integrity: where tests sit beside the code, only the tests need a reason (issue #41 B2)', (t) => {
+  const h = referee(t, { seed: (project) => {
+    const md = path.join(project, 'CLAUDE.md');
+    fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replace('**Test directories:** test/', '**Test directories:** test/, src/'));
+    fs.writeFileSync(path.join(project, 'src', 'index.test.js'), "import test from 'node:test';\ntest('passes', () => {});\n");
+    fs.writeFileSync(path.join(project, 'test', 'package.json'), '{"type":"module"}\n');
+  } });
+  passes(h.pre('Edit', { file_path: path.join(h.clone, 'src', 'index.js'), old_string: 'a', new_string: 'b' }), 'production code in a listed directory');
+  passes(h.bash('rm src/index.js'), 'production code in a listed directory (Bash)');
+  denied(h.pre('Edit', { file_path: 'src/index.test.js', old_string: 'a', new_string: 'b' }), 'R7', /src\/index\.test\.js is an existing test/);
+  denied(h.pre('Edit', { file_path: 'test/smoke.test.js', old_string: 'a', new_string: 'b' }), 'R7');
+  passes(h.pre('Write', { file_path: 'test/package.json', content: '{}' }), 'a manifest under a test directory');
 });
 
 test('R7 test integrity: an existing test changes only after a reason is recorded', (t) => {

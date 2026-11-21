@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, gateEntry, lintPlan, parseSidecar, postpones, smallFixLimits } from './lib.mjs';
+import { ANSWERS, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, gateEntry, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, smallFixLimits, testNamedDirs } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, eventLine, gateEntry, lintPlan, parseSidecar, unprovenLines, watch };
@@ -46,8 +46,6 @@ const KINDS = {
   probe: { prefix: 'probe', role: 'verifier', state: null }, // readiness's sandbox probe: no epic, no state
 };
 const PLAN_DIR = 'docs/implementation-plan';
-/** A project or package manifest under a test directory is not a test: adding a test dependency needs no recorded reason. */
-const MANIFEST = /\.(csproj|fsproj|vbproj|props|targets|sln)$|(^|\/)(package\.json|pyproject\.toml|requirements[^/]*\.txt|Cargo\.toml|go\.mod|pom\.xml|build\.gradle(\.kts)?)$/;
 
 // ---------------------------------------------------------------------------------------------
 // Small helpers
@@ -158,14 +156,13 @@ export function readProjectFacts(root) {
   const file = path.join(root, 'CLAUDE.md');
   const text = exists(file) ? read(file) : '';
   const tests = text.match(/\*\*Tests:\*\*\s*`([^`]+)`/);
-  const dirs = text.match(/\*\*Test directories:\*\*\s*(.+)/);
   const type = text.match(/\*\*Project type:\*\*\s*(.+)/);
   const runCmd = text.match(/\*\*Run:\*\*\s*`([^`]+)`/);
   return {
     claudeMd: text,
     runCommand: runCmd ? runCmd[1].replace(/\s*<[^>]+>/g, '').trim() || null : null, // `<command>` placeholders dropped
     testCommand: tests ? tests[1].trim() : null,
-    testDirs: dirs ? dirs[1].replace(/`/g, '').split(/[,\s]+/).filter(Boolean).map((d) => (d.endsWith('/') ? d : d + '/')) : [],
+    testDirs: parseTestDirs(text),
     projectType: type ? type[1].trim() : null,
   };
 }
@@ -1295,6 +1292,8 @@ class Run {
   /** A path as gate files and the report name it: relative to the workspace. */
   rel(p) { return path.relative(this.stateDir, p).split(path.sep).join('/'); }
   meta(e) { return this.metaById.get(e.id); }
+  /** The listed test directories where only test-named files are tests, judged from the tree at `rev` (see `testNamedDirs` in lib.mjs). */
+  testNamedDirs(rev, dirs) { return testNamedDirs(gitRun(this.clone, 'ls-tree', '-r', '--name-only', rev).out.split('\n'), dirs); }
   /**
    * The requirements the owner approved amending for this epic: their answer "Amend …" at an
    * amendment gate. Seen live: the owner approved one, the build amended it on the epic's branch
@@ -1969,10 +1968,11 @@ class Run {
 
     const reasons = new Map();
     for (const line of (gitShow(this.clone, b, '.autopilot/test-changes.jsonl') ?? '').split('\n')) {
-      try { const j = JSON.parse(line); if (j.path) reasons.set(j.path, j.reason ?? ''); } catch { /* not a JSON line */ }
+      try { const j = JSON.parse(line); if (j.path && String(j.reason ?? '').trim()) reasons.set(j.path, j.reason); } catch { /* not a JSON line */ }
     }
+    const named = this.testNamedDirs(dev, dirs);
     const touched = this.g('diff', '--name-status', '--no-renames', `${dev}...${b}`).split('\n').filter(Boolean)
-      .map((l) => l.split('\t')).filter(([st, f]) => st !== 'A' && dirs.some((d) => f.startsWith(d)) && !MANIFEST.test(f)).map(([, f]) => f);
+      .map((l) => l.split('\t')).filter(([st, f]) => st !== 'A' && isTestPath(f, dirs, named)).map(([, f]) => f);
     const unexplained = touched.filter((f) => !reasons.has(f));
     add('test-integrity', unexplained.length === 0, { existingTestsChanged: touched.map((f) => ({ path: f, reason: reasons.get(f) ?? null })) });
     e.testChanges = touched.map((f) => ({ path: f, reason: reasons.get(f) ?? null }));
@@ -2340,7 +2340,9 @@ class Run {
           const lines = stat.reduce((n, [a, d]) => n + (Number(a) || 0) + (Number(d) || 0), 0);
           // A test may be changed (seen live: a race fixed by waiting before a click), never made to check less:
           // it may not lose more checking lines (assertions, test declarations) than it gains.
-          const tests = stat.map(([, , f]) => f).filter((f) => (this.config.testDirs ?? []).some((dir) => f.startsWith(`${String(dir).replace(/\/+$/, '')}/`))).filter((f) => {
+          const testDirs = (this.config.testDirs ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
+          const named = this.testNamedDirs(pre.developSha, testDirs);
+          const tests = stat.map(([, , f]) => f).filter((f) => isTestPath(f, testDirs, named)).filter((f) => {
             const d = this.g('diff', '-U0', `${pre.branchTip}..${p2}`, '--', f).split('\n').filter((l) => /^[+-](?![+-])/.test(l) && TEST_CHECK_LINE.test(l.slice(1)));
             return d.filter((l) => l[0] === '-').length > d.filter((l) => l[0] === '+').length;
           });

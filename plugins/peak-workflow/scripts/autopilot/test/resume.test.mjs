@@ -920,6 +920,38 @@ test('a build that leaves only the referee\'s record uncommitted is not parked: 
   assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /committed the referee's record \(\.autopilot\/\)/);
 });
 
+test('tests beside the code: a build that changes production files in a listed directory keeps its repair round (issue #41 B2)', async (t) => {
+  const p = makeProject(t);
+  const md = path.join(p.project, 'CLAUDE.md');
+  fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replace('**Test directories:** test/', '**Test directories:** test/, src/'));
+  fs.writeFileSync(path.join(p.project, 'src', 'index.test.js'), "import test from 'node:test';\ntest('passes', () => {});\n");
+  fs.writeFileSync(path.join(p.project, 'src', 'format.js'), 'export const format = (n) => String(n);\n');
+  git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'test: tests beside the code');
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [
+    ...buildActions(E1, { commit: false }),
+    { do: 'write', path: 'src/format.js', content: 'export const format = (n) => n.toFixed(2);\n' },
+    { do: 'exec', cmd: `git add src test docs && git commit -q -m "feat(epic-${E1.id}): implement ${E1.slug}"` },
+  ] } });
+  await p.go();
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.equal(e.fixRounds, 0, 'no repair round was spent');
+  assert.deepEqual(readJson(p.dir(E1.id, 'check-build-1.json')).checks.find((c) => c.name === 'test-integrity').evidence.existingTestsChanged, []);
+});
+
+test('the build check takes an empty reason for no reason, as the referee does', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [
+    ...buildActions(E1, { commit: false }),
+    { do: 'exec', cmd: 'echo "// changed" >> test/smoke.test.js' },
+    { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/smoke.test.js","reason":" "}\n' },
+    { do: 'exec', cmd: `git add -A && git commit -q -m "feat(epic-${E1.id}): implement ${E1.slug}"` },
+  ] } });
+  await p.go();
+  const check = readJson(p.dir(E1.id, 'check-build-1.json'));
+  assert.deepEqual(check.checks.find((c) => c.name === 'test-integrity'), { name: 'test-integrity', pass: false, evidence: { existingTestsChanged: [{ path: 'test/smoke.test.js', reason: null }] } });
+});
+
 test('an epic an earlier driver parked on that record, with no question, gets one from `driver.mjs report` and then finishes from CHECK_BUILD', async (t) => {
   const p = makeProject(t);
   p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: buildScript(E1) });
