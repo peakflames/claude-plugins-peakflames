@@ -375,8 +375,8 @@ test('R8 wrapup-epic: each pre-approved question gets its one answer', (t) => {
   const h = referee(t, { role: 'verifier' });
   const cases = [
     [`${E1.tors[2]} is FAIL: the description is trimmed. Recommendation: Stop — the builder should fix it. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
-    [`${E1.tors[0]} is CANNOT VERIFY: no test exercises the When. Recommendation: Fix now — small. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
-    // A failing gate the verifier recommends fixing is fixed on the owner's standing answer for small fixes (a failed requirement, above, never is).
+    [`${E1.tors[0]} is CANNOT VERIFY: no test exercises the When. Recommendation: Fix now — small. How to proceed?`, ['Fix now', 'Defer — depends on a later epic', 'Stop — epic FAILs'], 'Fix now'], // the test a requirement lacks is added on the standing answer (issue #41 B5); the line above, where the code is wrong, stops
+    // A failing gate the verifier recommends fixing is fixed on the owner's standing answer for small fixes.
     ['Tests failed: node --test: 2 failing. Recommendation: Fix now — one assertion. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Fix now'],
     ['Lint failed: 1 error. Recommendation: Stop — it needs a design change. How to proceed?', ['Fix now', 'Stop — epic FAILs'], 'Stop — epic FAILs'],
     ['Verdict PASS. Proceed to Phase 2 (complete and ship)?', ['Proceed', 'Stop'], 'Proceed'],
@@ -386,6 +386,9 @@ test('R8 wrapup-epic: each pre-approved question gets its one answer', (t) => {
     ['Ship mode — solo (merge locally to the base branch) or team (push the branch and open a pull request)?', ['Team — push and open PR', 'Solo — local merge only'], 'Solo — local merge only'],
   ];
   for (const [q, opts, want] of cases) answered(h.ask(q, opts), q, want);
+  // The fix for a requirement is marked as a test and nothing else; the merge gate holds it to that.
+  assert.deepEqual(readJson(path.join(h.step, 'small-fixes.json')).map((x) => [x.tor, x.testOnly ?? false]), [[E1.tors[0], true], [null, false]]);
+  parked(referee(t, { role: 'verifier' }).ask('TOR-09-Zzzzzz9 is FAIL: no test. Recommendation: Fix now. How to proceed?', ['Fix now', 'Stop — epic FAILs'])); // not this epic's requirement
   // A label typed with a plain hyphen still matches, and the answer is the label as offered.
   const q = 'Verdict PASS. Proceed to Phase 2 (complete and ship)?';
   answered(h.ask(cases[3][0], ['Fix now', 'Stop - epic FAILs']), cases[3][0], 'Stop - epic FAILs');

@@ -1022,6 +1022,9 @@ export const VERIFY_RULES = `# Autopilot session rules
 - When a command you run waits for the project's owner (a sign-in in a browser, a device to
   plug in), start its Bash \`description\` with \`Needs you:\` and say in a few words what they must
   do. They are told at once. Give them time: a timeout of at least five minutes.
+- Answers to your \`AskUserQuestion\` questions come from autopilot's standing rules or the
+  owner's recorded decisions. Report each one that way ("autopilot answered Stop"); "you chose"
+  is for a choice a person made in this session.
 - Stop anything you start (a server, a watcher) before you finish. Whatever is still running
   when the session ends is stopped for you.
 `;
@@ -1571,7 +1574,7 @@ class Run {
     if (e.state === 'MERGED') delete all[e.id];
     else {
       const brief = path.join(this.epicDir(e), 'fix-brief.md');
-      all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], unproven: e.unproven ?? [], fixBrief: exists(brief) ? read(brief) : null };
+      all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, verifyFixRounds: e.verifyFixRounds ?? 0, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], unproven: e.unproven ?? [], fixBrief: exists(brief) ? read(brief) : null };
     }
     writeJson(path.join(this.stateDir, 'epics.json'), all);
   }
@@ -1895,7 +1898,7 @@ class Run {
       const subject = subjects[0] ?? '';
       // The build's own commit is `feat(epic-<id>): …` (after a fix round `fix(…)` is as good). A session may commit
       // again on top of it (seen live: `test(epic-<id>): …` after an amendment): any commit of this epic may be the last.
-      const built = subjects.some((x) => new RegExp(`^(feat${e.fixRounds >= 1 ? '|fix' : ''})\\(epic-${e.id}\\):`).test(x));
+      const built = subjects.some((x) => new RegExp(`^(feat${e.fixRounds >= 1 || e.verifyFixRounds >= 1 ? '|fix' : ''})\\(epic-${e.id}\\):`).test(x));
       add('branch-and-commit', ahead >= 1 && built && new RegExp(`^[a-z]+\\(epic-${e.id}\\):`).test(subject), { branch: b, tip, commitsAhead: ahead, tipSubject: subject });
     }
     if (!tip) return { pass: false, checks, parkOnly };
@@ -1980,10 +1983,11 @@ class Run {
     return { pass: checks.every((c) => c.pass), checks, parkOnly };
   }
 
-  writeFixBrief(e, title, lines) {
+  /** `round` says which repair this is: the build's checks and the final check each get one (`fixRounds`, `verifyFixRounds`). */
+  writeFixBrief(e, title, lines, round = 'the one fix round before the final check') {
     const m = this.meta(e);
     fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'),
-      `# Autopilot fix brief — ${m.label}\n\nThis is the one fix round for this epic. ${title}\nFix exactly these and nothing else; the same checks run again afterwards.\n\n${lines.join('\n')}\n`);
+      `# Autopilot fix brief — ${m.label}\n\nThis is ${round}. ${title}\nFix exactly these and nothing else; the same checks run again afterwards.\n\n${lines.join('\n')}\n`);
   }
 
   doCheckBuild(e, { interrupted = false } = {}) {
@@ -2274,10 +2278,18 @@ class Run {
       });
       return this.park(e, reason);
     }
-    if (e.fixRounds >= 1) return this.finish(e, 'FAILED', `${s.name} FAIL after the fix round: ${verdict.split('\n')[0].slice(0, 200)}`);
-    e.fixRounds = 1;
-    this.writeFixBrief(e, 'The independent verifier returned FAIL. Its final report:', [verdict]);
-    this.log(`${e.id}: ${s.name} verdict FAIL; starting the one fix round`);
+    // The final check has a repair of its own: one the build's checks spent is not taken from it (seen live: a
+    // false alarm in the build check used the round, and the next missing test meant building the epic again).
+    if ((e.verifyFixRounds ?? 0) >= 1) {
+      // Still not met after its repair: the owner is asked, and the branch and the verifier's report are kept.
+      const reason = `${s.name} FAIL after the fix round: ${verdict.split('\n')[0].slice(0, 200)}`;
+      this.writeFixBrief(e, 'The independent verifier returned FAIL again, after the repair that followed its first report. Its final report:', [verdict], 'a further repair, which the owner asked for after the final check');
+      this.writeGate(e, verifyFailGate(m.label, reason, { artifacts: [this.rel(path.join(s.stepDir, 'result.json'))] }));
+      return this.park(e, reason);
+    }
+    e.verifyFixRounds = 1;
+    this.writeFixBrief(e, 'The independent verifier returned FAIL. Its final report:', [verdict], 'the one fix round after the final check');
+    this.log(`${e.id}: ${s.name} verdict FAIL; starting the final check's one fix round`);
     this.event('fix-round', e, { why: 'verify' });
     return 'FIX_BUILD';
   }
@@ -2307,7 +2319,8 @@ class Run {
     const add = (name, pass, evidence) => checks.push({ name, pass: !!pass, evidence });
     // The verifier may repair what it found only when the owner said so: this verify session was
     // resumed from a gate the owner answered "Fix now" (as wrapup-epic allows with a person
-    // present). Unattended, policy answers "Stop — epic FAILs" and a separate session repairs.
+    // present). Unattended, policy answers "Stop — epic FAILs" and a separate session repairs,
+    // unless the fix is the standing answer's: a small fix, or the test a requirement lacks.
     const ownerFix = e.resumed?.phase === 'VERIFY' && (/^fix now\b/i.test(e.resumed.answer ?? '') || e.resumed.approvesFix) ? e.resumed.gate : null;
     // Or on the owner's standing answer for small fixes: the referee answered "Fix now" to what the verifier
     // recommended (listed in the step's directory), and the repair is held to the limits here.
@@ -2347,6 +2360,10 @@ class Run {
             return d.filter((l) => l[0] === '-').length > d.filter((l) => l[0] === '+').length;
           });
           const reqs = own.filter((f) => f.startsWith('docs/requirements/'));
+          // Every fix was "add the test this requirement lacks": anything that is not a test is product code changed
+          // by the session that then judges it, which the standing answer never covers.
+          const notTests = standing.every((x) => x.testOnly) ? stray.filter((f) => !isTestPath(f, testDirs, named)) : [];
+          if (notTests.length) problems.push(`${SMALL_FIX_PROBLEM}changes a file that is not a test (${notTests.join(', ')}), where only a missing test was to be added`);
           if (stray.length > limits.files) problems.push(`${SMALL_FIX_PROBLEM}changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
           if (lines > limits.lines) problems.push(`${SMALL_FIX_PROBLEM}changes ${lines} lines (the limit is ${limits.lines})`);
           if (tests.length) problems.push(`${SMALL_FIX_PROBLEM}removes checks from a test (${tests.join(', ')})`);
@@ -2369,11 +2386,15 @@ class Run {
     const waivedLine = 'waived' in sc.fields;
     // "fixed at wrapup" may be above zero only for an owner-approved Fix now; every other count stays zero.
     const fixed = Number((countLine?.match(/fixed at wrapup:\s*(\d+)/i) ?? [])[1] ?? 0);
-    const others = countLine ? [...countLine.matchAll(/([a-z][a-z ]*):\s*(\d+)/gi)].filter(([, k]) => !/^fixed at wrapup$/i.test(k.trim()) && !/^count$/i.test(k.trim())).map(([, , n]) => Number(n)) : [];
+    // An undisclosed deferral keeps its mark for good, fixed or not (wrapup-epic Step 1.4b): it is forgiven only as
+    // far as fixes cover it — the owner's own "Fix now", or tests added on the standing answer.
+    const undisclosed = Number((countLine?.match(/undisclosed:\s*(\d+)/i) ?? [])[1] ?? 0);
+    const forgiven = ownerFix ? fixed : Math.min(fixed, standing.filter((x) => x.testOnly).length);
+    const others = countLine ? [...countLine.matchAll(/([a-z][a-z ]*):\s*(\d+)/gi)].filter(([, k]) => !/^(fixed at wrapup|undisclosed)$/i.test(k.trim()) && !/^count$/i.test(k.trim())).map(([, , n]) => Number(n)) : [];
     const total = Number(numbers[0] ?? NaN);
-    const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && (ownerFix || fixed <= standing.length) : numbers.every((x) => Number(x) === 0));
+    const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && undisclosed <= forgiven && (ownerFix || fixed <= standing.length) : numbers.every((x) => Number(x) === 0));
     add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: waivedLine, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}) });
-    if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: approval, ...(standing.length && !ownerFix ? { standing: standing.map((x) => ({ question: x.question, tor: x.tor ?? null })) } : {}) };
+    if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: approval, ...(standing.length && !ownerFix ? { standing: standing.map((x) => ({ question: x.question, tor: x.tor ?? null, ...(x.testOnly ? { testOnly: true } : {}) })) } : {}) };
 
     if (this.currentBranch() !== dev && !this.dirty()) this.g('checkout', '-q', dev);
     if (this.currentBranch() === dev && !this.dirty()) {
@@ -2494,7 +2515,7 @@ class Run {
       const to = resumePhase(this.stateDir, g, phase);
       const fixBrief = rec.fixBrief ?? null;
       if (to !== phase && (to === 'BUILD' ? rec.plan && exists(path.join(this.stateDir, rec.plan)) : fixBrief)) { phase = to; e.continuing = (rec.buildSteps ?? []).at(-1)?.name ?? 'an earlier session'; }
-      Object.assign(e, { fixRounds: rec.fixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [], unproven: (rec.unproven ?? []).filter((u) => u.source !== 'verifier') }); // a verifier's "not run" is of that verify session; the next one says its own
+      Object.assign(e, { fixRounds: rec.fixRounds ?? 0, verifyFixRounds: rec.verifyFixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [], unproven: (rec.unproven ?? []).filter((u) => u.source !== 'verifier') }); // a verifier's "not run" is of that verify session; the next one says its own
       if (rec.fixBrief) fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'), rec.fixBrief);
       e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}) };
       this.supersedeGates(e, f.gate);
@@ -2651,7 +2672,7 @@ class Run {
       this.pre.epics = this.pre.epics.map((p) => ({ ...p }));
       this.metaById = new Map(this.pre.epics.map((p) => [p.id, p]));
       if (!resuming) {
-        this.state.queue = buildQueue(this.pre, cfg).map((m) => ({ id: m.id, name: m.name, label: m.label, state: 'QUEUED', reason: null, attempts: {}, fixRounds: 0, costUsd: 0, turns: 0, wallMs: 0, sessions: [], gates: [], checks: [], planStep: null, preVerify: null, step: null }));
+        this.state.queue = buildQueue(this.pre, cfg).map((m) => ({ id: m.id, name: m.name, label: m.label, state: 'QUEUED', reason: null, attempts: {}, fixRounds: 0, verifyFixRounds: 0, costUsd: 0, turns: 0, wallMs: 0, sessions: [], gates: [], checks: [], planStep: null, preVerify: null, step: null }));
         writeJson(path.join(this.runDir, 'preflight.json'), this.pre);
         this.state.testCommand = this.pre.testCommand;
       } else {
@@ -2813,15 +2834,32 @@ export function ensureResumeGates(workspace, { write = true } = {}) {
  * simply run again; a bigger one is the owner's to approve. Null when anything else failed, or the
  * fix touched a requirement or weakened a test.
  */
+/**
+ * The question for a final check that still returns FAIL after its own repair. Before, the epic
+ * was FAILED with nothing to answer and was planned and built again (issue #41 B5).
+ */
+export function verifyFailGate(label, reason, { artifacts = [] } = {}) {
+  return {
+    kind: 'resume', skillStep: 'wrapup-epic', phase: 'FIX_BUILD', reason, options: [ANSWERS.resume, ANSWERS.startOver], artifacts,
+    question: `${label}: the final check still finds a requirement not met, after one repair ("${reason.replace(/^\S+ FAIL after the fix round: /, '')}"). Repair it once more?`,
+    why: `what was built is kept. "${ANSWERS.resume}" runs one more repair from the final check's report, then the checks and the final check again; nothing is planned or built again. "${ANSWERS.startOver}" plans the epic again from scratch`,
+  };
+}
+
 export function fixLimitGate(label, check, limits) {
   const failed = (check?.checks ?? []).filter((c) => !c.pass);
   const problems = failed.length === 1 && failed[0].name === 'verdict' && Array.isArray(failed[0].evidence) ? failed[0].evidence : [];
   if (!limits || !problems.length || !problems.every((p) => String(p).startsWith(SMALL_FIX_PROBLEM))) return null;
   if (problems.some((p) => /requirement file|removes checks from a test/.test(p))) return null;
+  const head = label ? `${label}: ` : '';
+  // A missing test was to be added, and the fix changed product code as well: the owner's to allow.
+  const code = (problems.map((p) => p.match(/changes a file that is not a test \(([^)]*)\)/)).find(Boolean) ?? [])[1];
+  if (code) return { kind: 'resume', phase: 'VERIFY', approvesFix: true, options: [ANSWERS.resume, ANSWERS.startOver],
+    question: `${head}the final check passed everything, but to meet a requirement it changed the product itself (${code}), where your standing answer covers only adding a missing test. It was not merged. Allow that change for this epic and run the final check again?`,
+    why: `nothing else failed. "${ANSWERS.resume}" runs the final check again and lets it make this fix, in your name; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` };
   const n = (re) => Number((problems.map((p) => p.match(re)).find(Boolean) ?? [])[1] ?? 0);
   const files = n(/changes (\d+) files/); const lines = n(/changes (\d+) lines/);
   const over = [...(files > limits.files ? [`${files} files (your limit is ${limits.files})`] : []), ...(lines > limits.lines ? [`${lines} changed lines (your limit is ${limits.lines})`] : [])];
-  const head = label ? `${label}: ` : '';
   return over.length
     ? { kind: 'resume', phase: 'VERIFY', approvesFix: true, options: [ANSWERS.resume, ANSWERS.startOver],
       question: `${head}the final check passed everything, but the fix it made was bigger than your standing answer for small fixes allows: ${over.join(', ')}. It was not merged. Allow a fix of that size for this epic and run the final check again?`,
@@ -2881,7 +2919,7 @@ function missingResumeGates(workspace) {
     const fix = checkFile ? fixLimitGate(null, tryJson(path.join(runDirOf(workspace, rec.run), 'epics', id, checkFile), {}), smallFixLimits({ smallFixes: tryJson(path.join(workspace, 'settings.json'), {})?.smallFixes })) : null;
     const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
     const integration = detectIntegration(clone);
-    if (!(m || redo || fix || (verify && NO_VERDICT.test(reason))) || !tip || !integration) continue;
+    if (!(m || redo || fix || (verify && (NO_VERDICT.test(reason) || rec.fixBrief))) || !tip || !integration) continue;
     const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
     const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
     const n = gates.filter((g) => g.epic === id).length + 1;
@@ -2903,6 +2941,16 @@ function missingResumeGates(workspace) {
         options: [ANSWERS.resume, ANSWERS.startOver],
         why: `you are not asked to do the check again: the verifier is held to what you recorded. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt and your recorded look still stands. "${ANSWERS.startOver}" plans the epic again from scratch`,
         artifacts: [redo.file],
+      } });
+      continue;
+    }
+    if (verify && !NO_VERDICT.test(reason)) {
+      // An earlier driver ended a real FAIL after the repair with nothing to answer: the same question as now.
+      const dir = `runs/${rec.run}/epics/${id}/${verify}`;
+      made.push({ name: `${id}-${n}.json`, gate: {
+        epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: verify, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
+        resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${id}`, decided: null,
+        ...verifyFailGate(q.label ?? id, reason, { artifacts: exists(path.join(workspace, dir)) ? [dir] : [] }),
       } });
       continue;
     }

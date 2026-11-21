@@ -478,8 +478,10 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    **Small fixes, said in the same question.** The final check may find something small and
    recommend fixing it on the spot (a missing icon, a typo in a message). By default it does:
    up to 2 such fixes per epic, at most 5 files and 80 changed lines together, never a
-   requirement and never a test made to check less; anything bigger stops and asks, and a requirement
-   the final check judges not met is never repaired this way. Add one sentence
+   requirement and never a test made to check less; anything bigger stops and asks. For a
+   requirement the final check judges not met, the same answer covers one thing: adding the test
+   it lacks when the code already does what it says. Code that is wrong goes to a repair session:
+   the final check has one of its own, and after it the owner is asked. Add one sentence
    to the question text: "Small fixes the final check recommends are made without asking (up
    to 2 per epic) and listed at the end." The owner turns it off with a Change ("ask me
    about every fix"): write `"smallFixes": false` into `config.json`. Leave the key out

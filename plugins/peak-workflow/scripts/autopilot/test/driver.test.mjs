@@ -200,7 +200,8 @@ test('verify FAIL, one fix round, verify PASS: MERGED', async (t) => {
 
   const e = p.epic(E1.id);
   assert.equal(e.state, 'MERGED');
-  assert.equal(e.fixRounds, 1);
+  assert.deepEqual([e.fixRounds, e.verifyFixRounds], [0, 1], 'the final check has a fix round of its own');
+  assert.match(fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8'), /This is the one fix round after the final check\./);
   assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'verify-1', 'fix-1', 'audit-2', 'verify-2'].map((s) => `${E1.id}/${s}`));
   assert.match(fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8'), /TOR-01-Hd3Yc8L: the description is trimmed/);
   assert.ok(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('src/fix.js'));

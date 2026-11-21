@@ -423,11 +423,14 @@ function ruleR8(ctx) {
     // offer, and fewer than the allowed number were answered this way in this final check. How big the fix may be
     // is judged afterwards, at the merge gate, from what was actually changed; a requirement is never part of it.
     const limits = ctx.role === 'verifier' && ctx.step ? smallFixLimits(ctx.config) : null;
-    // A requirement the verifier judged FAIL or CANNOT VERIFY is never repaired by the verifier itself: policy stops, and a separate session repairs.
-    if (limits && kind !== 'tor-fail' && /\bRecommendation:\s*\**Fix now\b/i.test(q.question) && offered('Fix now')) {
+    // A requirement the verifier judged FAIL or CANNOT VERIFY, for one of this epic's anchors: the standing answer
+    // covers adding the test it lacks and nothing else (seen live: two epics in four rebuilt, each for one missing
+    // test on code that worked). The merge gate holds the fix to test files; code that is wrong is still a Stop.
+    const testOnly = kind === 'tor-fail';
+    if (limits && (!testOnly || (tor && anchors(ctx).includes(tor))) && /\bRecommendation:\s*\**Fix now\b/i.test(q.question) && offered('Fix now')) {
       const file = path.join(ctx.step, SMALL_FIX_FILE);
       const made = readJson(file, []);
-      if (made.length + standing.length < limits.perEpic) { answers[q.question] = offered('Fix now'); standing.push({ at: new Date().toISOString(), question: q.question, tor }); continue; }
+      if (made.length + standing.length < limits.perEpic) { answers[q.question] = offered('Fix now'); standing.push({ at: new Date().toISOString(), question: q.question, tor, ...(testOnly ? { testOnly: true } : {}) }); continue; }
       park = { ...base, why: `the standing answer for small fixes covers ${limits.perEpic} per final check, and this is one more` }; break;
     }
     if (!row) {
@@ -471,7 +474,7 @@ function ruleR8(ctx) {
     fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
   }
   if (standing.length) { const file = path.join(ctx.step, SMALL_FIX_FILE); fs.writeFileSync(file, JSON.stringify([...readJson(file, []), ...standing], null, 2) + '\n'); }
-  if (standing.length === Object.keys(answers).length) return { rule: 'R8', decision: 'answer', owner: standing.length, reason: `answered from the owner's standing answer for small fixes: ${Object.values(answers).join(' | ')}. Keep the fix small: it is checked at the merge against the owner's limits, never touches a requirement file and never removes a line from a test`, updatedInput: { ...ctx.input.tool_input, answers } };
+  if (standing.length === Object.keys(answers).length) return { rule: 'R8', decision: 'answer', owner: standing.length, reason: `answered from the owner's standing answer for small fixes: ${Object.values(answers).join(' | ')}. Keep the fix small: it is checked at the merge against the owner's limits, never touches a requirement file and never removes a line from a test${standing.some((x) => x.testOnly) ? `. For ${standing.filter((x) => x.testOnly).map((x) => x.tor).join(' and ')} the fix is the missing test alone, in a test file: when that test passes against the code as built, the requirement is met; when it fails, the code is wrong, so ask the question again without "Fix now"` : ''}`, updatedInput: { ...ctx.input.tool_input, answers } };
   const owner = used.length + told + (looked ? 1 : 0) + standing.length;
   const source = owner === 0 ? 'policy' : owner === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
   const annotations = Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { notes: v }]));
