@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SMALL_FIX_FILE, lintPlan, parseSidecar, smallFixLimits } from '../lib.mjs';
+import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -306,17 +306,18 @@ function ruleR5(ctx) {
 function testDirs(ctx) {
   if (ctx.config.testDirs?.length) return ctx.config.testDirs;
   let text = ''; try { text = fs.readFileSync(path.join(ctx.clone, 'CLAUDE.md'), 'utf8'); } catch { /* none */ }
-  const m = text.match(/\*\*Test directories:\*\*\s*(.+)/);
-  return m ? m[1].replace(/`/g, '').split(/[,\s]+/).filter(Boolean).map((d) => (d.endsWith('/') ? d : d + '/')) : [];
+  return parseTestDirs(text);
 }
 function ruleR7(ctx, targets) {
   const dirs = testDirs(ctx);
-  let reasons = null;
+  let reasons = null; let named = null;
   for (const raw of targets) {
     const rel = path.relative(ctx.clone, realDeep(path.resolve(ctx.cwd, raw))).split(path.sep).join('/');
     if (rel.startsWith('..') || rel === '.autopilot/test-changes.jsonl') continue;
     if (!dirs.some((d) => rel.startsWith(d))) continue;
     if (!git(ctx.clone, 'cat-file', '-e', `${ctx.integration}:${rel}`).ok) continue; // new in this epic: free to change
+    named ??= testNamedDirs(git(ctx.clone, 'ls-tree', '-r', '--name-only', ctx.integration).out.split('\n'), dirs);
+    if (!isTestPath(rel, dirs, named)) continue; // production code beside the tests, or a manifest
     if (reasons === null) {
       reasons = new Set();
       let text = ''; try { text = fs.readFileSync(path.join(ctx.clone, '.autopilot', 'test-changes.jsonl'), 'utf8'); } catch { /* none yet */ }

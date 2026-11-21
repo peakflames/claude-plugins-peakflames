@@ -44,6 +44,33 @@ export function lintPlan(plan, anchors) {
   return { pass: problems.length === 0, problems, anchors, checkedAt: new Date().toISOString() };
 }
 
+// ---- tests: which files under the project's test directories are tests -------------------------
+
+/** The directories on the `**Test directories:**` line of a project's CLAUDE.md, each ending in `/`. */
+export function parseTestDirs(text) {
+  const m = String(text ?? '').match(/\*\*Test directories:\*\*\s*(.+)/);
+  return m ? m[1].replace(/`/g, '').split(/[,\s]+/).filter(Boolean).map((d) => (d.endsWith('/') ? d : d + '/')) : [];
+}
+/** A project or package manifest under a test directory is not a test: adding a test dependency needs no recorded reason. */
+export const MANIFEST = /\.(csproj|fsproj|vbproj|props|targets|sln)$|(^|\/)(package\.json|pyproject\.toml|requirements[^/]*\.txt|Cargo\.toml|go\.mod|pom\.xml|build\.gradle(\.kts)?)$/;
+/**
+ * A path whose own name, or a folder above it, says it is a test (`x.test.ts`, `x_test.go`,
+ * `test_x.py`, `FooTests.cs`, `__tests__/`, `tests/`, `App.Tests/`).
+ */
+const TEST_FOLDER = /(^|\/)(__tests__|__snapshots__|tests?|specs?|e2e|[^/]*[._-]tests?)\//i;
+const TEST_FILE = /(^|\/)([^/]*[._-](test|spec|e2e)s?\.[^/.]+|test_[^/]*\.py|conftest\.py|[^/]*\.feature)$/i;
+const TEST_CLASS = /(^|\/)[^/]*(Tests?|Specs?)\.(cs|fs|vb|java|kt|kts|scala|swift)$/;
+export const testNamed = (rel) => TEST_FOLDER.test(rel) || TEST_FILE.test(rel) || TEST_CLASS.test(rel);
+/**
+ * The listed test directories that hold at least one test-named file, given every file on the
+ * integration line. In those, only test-named files are tests (seen live: `src/` listed because
+ * tests sit beside the code, and every production file there was held to the rule for tests). A
+ * listed directory with no such file keeps the plain rule: everything in it is a test.
+ */
+export const testNamedDirs = (files, dirs) => new Set(dirs.filter((d) => files.some((f) => f.startsWith(d) && testNamed(f))));
+/** Whether `rel` (repo-relative, forward slashes) is a test: the one rule the referee and the driver share. */
+export const isTestPath = (rel, dirs, named) => !MANIFEST.test(rel) && dirs.some((d) => rel.startsWith(d) && (!named.has(d) || testNamed(rel)));
+
 // ---- gates: the owner's answers and where each re-enters an epic (plan P3.5 Part 2) -----------
 
 export const ANSWERS = {
