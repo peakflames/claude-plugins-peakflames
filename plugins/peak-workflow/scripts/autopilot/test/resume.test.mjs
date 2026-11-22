@@ -1651,3 +1651,91 @@ test('"look": "after" never skips a requirement a person must observe', async (t
   await p.go({ queue: [e5.id] });
   assert.deepEqual([p.epic(e5.id).state, p.epic(e5.id).reason], ['PARKED', 'human check needed before verify']);
 });
+
+// ---- files a session left behind (issue #41 B15) and the branch a resumed epic starts on (B14) ----
+
+const leftoverRefs = (p) => git(p.clone, 'for-each-ref', '--format=%(refname)', 'refs/autopilot/leftover/').split('\n').filter(Boolean);
+/** Every file a set-aside ref holds: the changed tracked ones, and the untracked ones git keeps in the stash's third parent. */
+const heldBy = (p, ref) => [
+  ...git(p.clone, 'diff', '--name-only', `${ref}^1`, ref).split('\n'),
+  ...git(p.clone, 'ls-tree', '-r', '--name-only', `${ref}^3`).split('\n'),
+].filter(Boolean).sort();
+
+test('files left in the clone do not stop a launch: they are set aside under refs/autopilot/leftover/, nothing is deleted, and the log and the report say so', async (t) => {
+  const p = makeProject(t);
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d) });
+  const s1 = await p.go();
+  assert.deepEqual(s1.queue.map((q) => q.state), ['PARKED', 'MERGED']);
+  assert.equal(git(p.clone, 'branch', '--show-current'), 'develop');
+  // What the reporter found: a scratch folder nobody committed, and a tracked file changed and left.
+  fs.mkdirSync(path.join(p.clone, 'tmp_playwright'));
+  fs.writeFileSync(path.join(p.clone, 'tmp_playwright', 'shot.txt'), 'a session left this\n');
+  fs.appendFileSync(path.join(p.clone, 'README.md'), '\nleft half-edited\n');
+  decide(p, E1.id, ANSWERS.auditNotReal);
+
+  p.scenario({ [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.equal(git(p.clone, 'status', '--porcelain'), '');
+  const refs = leftoverRefs(p);
+  assert.equal(refs.length, 1);
+  assert.match(refs[0], /^refs\/autopilot\/leftover\/develop-\d+$/);
+  assert.deepEqual(heldBy(p, refs[0]), ['README.md', 'tmp_playwright/shot.txt']);
+  assert.equal(git(p.clone, 'show', `${refs[0]}^3:tmp_playwright/shot.txt`), 'a session left this');
+  assert.match(git(p.clone, 'show', `${refs[0]}:README.md`), /left half-edited/);
+  assert.equal(git(p.clone, 'stash', 'list'), '', 'the stash list is not where it is kept');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`set aside 2 file\\(s\\) left uncommitted on develop \\(README\\.md, tmp_playwright/shot\\.txt\\); nothing is lost: they are kept at ${refs[0]}`));
+  const report = readJson(path.join(p.runDir(), 'report.json'));
+  assert.deepEqual(report.leftovers.map((l) => [l.branch, l.ref, l.files]), [['develop', refs[0], ['README.md', 'tmp_playwright/shot.txt']]]);
+  assert.ok(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8').includes('Autopilot set aside 2 file(s) an earlier session left behind. Nothing is lost.'));
+  assert.equal(r.state.stoppedBecause, 'queue done');
+});
+
+test('an epic that stops away from its own branch with files left uncommitted does not stop the queue: they are set aside and the next epic runs', async (t) => {
+  const p = makeProject(t);
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  // The build wanders onto a branch of its own, leaves a scratch file there and asks: nothing commits it at the park.
+  p.scenario({
+    [`${E1.id}/plan`]: planScript(E1),
+    [`${E1.id}/build`]: { actions: [...buildActions(E1), { do: 'branch', name: 'spike/try-it' }, { do: 'write', path: 'tmp_playwright/shot.txt', content: 'a session left this\n' }, ask('Which rounding?', ['Half up', 'Half even'])] },
+    ...happy(d),
+  });
+
+  const s = await p.go();
+
+  assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[E1.id, 'PARKED'], [d.id, 'MERGED']]);
+  assert.equal(s.stoppedBecause, 'queue done');
+  const refs = leftoverRefs(p);
+  assert.equal(refs.length, 1);
+  assert.ok(refs[0].startsWith('refs/autopilot/leftover/spike/try-it-'), refs[0]);
+  assert.equal(git(p.clone, 'show', `${refs[0]}^3:tmp_playwright/shot.txt`), 'a session left this');
+  assert.deepEqual(s.leftovers.map((l) => [l.branch, l.files, l.why]), [['spike/try-it', ['tmp_playwright/shot.txt'], `before ${d.id} started`]]);
+});
+
+test('a resumed epic is put on its branch by the driver: a session that does not switch branches itself still commits to the epic branch (issue #41 B14)', async (t) => {
+  const p = makeProject(t);
+  const q = `${E1.tors[3]} cannot be fully met: amounts with three decimals. How to proceed?`;
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, ask(q, DEFERRAL)] } });
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  decide(p, E1.id, 'Fix now');
+  const developBefore = git(p.clone, 'rev-parse', 'develop');
+
+  // The resumed session works where it is started: it never checks the epic branch out.
+  const feat = `feat(epic-${E1.id}): implement ${E1.slug}`;
+  p.scenario({ [`${E1.id}/build`]: { actions: [ask(q, DEFERRAL), { do: 'exec', cmd: 'git branch --show-current > "{{step}}/started-on.txt"' }, ...buildActions(E1, { message: feat }).filter((a) => a.do !== 'branch')] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+
+  assert.equal(fs.readFileSync(p.dir(E1.id, 'build-1', 'started-on.txt'), 'utf8').trim(), E1.branch);
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  // The build's commit reached develop through the epic's merge, not as a commit made on develop itself.
+  const onDevelopItself = git(p.clone, 'log', '--first-parent', '--format=%s', `${developBefore}..develop`).split('\n');
+  assert.ok(!onDevelopItself.includes(feat), onDevelopItself.join(' | '));
+  assert.ok(git(p.clone, 'log', '--format=%s', `${developBefore}..develop`).split('\n').includes(feat));
+  assert.equal(git(p.clone, 'status', '--porcelain'), '');
+  assert.deepEqual(leftoverRefs(p), []);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`${E1.id}: checked out ${E1.branch} for its build session \\(the clone was on develop\\)`));
+  assert.equal(r.state.stoppedBecause, 'queue done');
+});

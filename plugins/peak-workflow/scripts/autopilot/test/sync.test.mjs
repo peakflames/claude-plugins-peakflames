@@ -145,8 +145,8 @@ test('a "Not decided yet" line that says none is the all-clear; one that lists a
     fs.writeFileSync(md, `${original}\n${line}\n`);
     return preflight(p).epics.find((e) => e.id === E1.id).eligibility;
   };
-  for (const clear of ['**Not decided yet:** none', '**Not decided yet:** None.', '**Not decided yet:** nothing', '**Not decided yet:** n/a', '**Not decided yet:** —', '**Not decided yet:**']) assert.equal(eligibility(clear), 'eligible', clear);
-  for (const open of ['**Not decided yet:** database (default SQLite), CI', '**Not decided yet:** none of the hosting options', '**Hosting:** TBD — set by the walking-skeleton epic']) assert.equal(eligibility(open), 'park', open);
+  for (const clear of ['**Not decided yet:** none', '**Not decided yet:** None.', '**Not decided yet:** nothing', '**Not decided yet:** n/a', '**Not decided yet:** —', '**Not decided yet:**', '**Not decided yet:** none — CI, database, and auth are all already decided and shipped', '**Not decided yet:** None: everything is chosen.', '**Not decided yet:** n/a - nothing left']) assert.equal(eligibility(clear), 'eligible', clear);
+  for (const open of ['**Not decided yet:** database (default SQLite), CI', '**Not decided yet:** none of the hosting options', '**Not decided yet:** - database', '**Not decided yet:** nothing but the database', '**Hosting:** TBD — set by the walking-skeleton epic']) assert.equal(eligibility(open), 'park', open);
 });
 
 test('preflight gate: not resumable — nothing to answer; it clears when the fix reaches the clone and preflight passes', async (t) => {

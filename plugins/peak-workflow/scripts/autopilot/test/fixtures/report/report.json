@@ -17,6 +17,7 @@
   "attended": false,
   "driverVersion": "0.2.0",
   "sync": null,
+  "leftovers": [],
   "stoppedOnPark": null,
   "epics": [
     {
