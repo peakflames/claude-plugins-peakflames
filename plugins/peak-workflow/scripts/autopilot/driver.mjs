@@ -509,7 +509,7 @@ export function envFacts(project, workspace, config) {
     const copied = copy.some((c) => rel === c || rel.startsWith(`${c}/`) || c.startsWith(`${rel}/`));
     return { path: p, dir: p.endsWith('/'), status: copied ? 'copied' : exists(path.join(clone, rel)) ? 'present' : 'absent' };
   });
-  const named = claudeMdReads(readProjectFacts(project).claudeMd, { project, workspace });
+  const named = namedReads(project, workspace);
   return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], readFiles: named.files, readRefused: named.refused, sandbox: config.sandbox === true, network: cleanNetwork(config.network), registries: REGISTRIES, problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
 }
 /** `~`-expanded, absolute, symlinks resolved where the path exists. */
@@ -539,14 +539,19 @@ export function readOnlyProblems(list, { project = null, workspace = null } = {}
   }
   return out;
 }
-/** Folders of ~/.claude no session reads, whatever a project's CLAUDE.md names: transcripts, history and Claude Code's own state. Its top-level files (sign-in data, settings) are closed too. */
-const CLAUDE_PRIVATE = ['projects', 'todos', 'shell-snapshots', 'file-history', 'sessions', 'session-env', 'statsig', 'debug', 'ide', 'backups', 'paste-cache', 'telemetry', 'logs', 'cache'];
+/** The folders of ~/.claude where a file a project's CLAUDE.md names may be read: the owner's own scripts. Everything else there (sign-in data, settings, history, transcripts, whatever a later Claude Code adds) stays closed. */
+const CLAUDE_NAMED = ['scripts', 'bin', 'tools'];
+/** macOS and Windows file systems ignore case: `~/.SSH` is `~/.ssh`. */
+const foldCase = (p) => (process.platform === 'darwin' || process.platform === 'win32' ? p.toLowerCase() : p);
 /**
  * The files outside the project that its CLAUDE.md names in backticks or in a fenced block, by an
  * absolute path or one that starts with `~/`. A project that tells its sessions to use such a file
  * (seen live: `node ~/.claude/scripts/tethered.mjs` to start a dev server) must be able to read it.
- * One existing file at a time, never a directory; never where credentials live, and in ~/.claude
- * only below a folder that holds no sign-in data, settings, history or transcripts.
+ * One existing file at a time, never a directory. Never where credentials live, never a hidden
+ * file or a file below a hidden folder (`~/.zsh_history`, `~/.gitconfig`, a `.env`), and in
+ * ~/.claude only below the owner's script folders (`CLAUDE_NAMED`).
+ * CLAUDE.md is a file sessions edit and merge, so this list can grow without the owner typing
+ * it: it is shown at every launch, and the rules here are what holds if nobody reads that.
  * Returns `{ files, refused: [{ path, why }] }`; a path that is not a file on this machine is left out.
  */
 export function claudeMdReads(text, { project = null, workspace = null } = {}) {
@@ -562,15 +567,20 @@ export function claudeMdReads(text, { project = null, workspace = null } = {}) {
       let file = false; try { file = fs.statSync(p).isFile(); } catch { /* not on this machine */ }
       if (!file) continue;
       if ([project, workspace].some((dir) => dir && insideOrSame(p, expandHome(dir)))) continue; // the clone carries the project; the workspace is never a session's
-      const inClaude = insideOrSame(p, claude);
-      const parts = inClaude ? path.relative(claude, p).split(path.sep) : [];
-      if (p === path.join(home, '.claude.json') || (inClaude && (parts.length < 2 || CLAUDE_PRIVATE.includes(parts[0])))) refused.push({ path: raw, why: "it is Claude Code's own sign-in data, settings, history or transcripts" });
-      else if (!inClaude && NEVER_READ.some((d) => insideOrSame(p, path.join(home, d)))) refused.push({ path: raw, why: 'it is where credentials or private settings live' });
+      const q = foldCase(p);
+      const inClaude = insideOrSame(q, foldCase(claude));
+      const parts = inClaude ? path.relative(foldCase(claude), q).split(path.sep) : [];
+      const below = insideOrSame(q, foldCase(home)) ? path.relative(foldCase(home), q).split(path.sep) : q.split(path.sep);
+      if (inClaude) { if (parts.length >= 2 && CLAUDE_NAMED.includes(parts[0]) && !parts.slice(1).some((x) => x.startsWith('.'))) files.push(p); else refused.push({ path: raw, why: `in ~/.claude only a file below ${CLAUDE_NAMED.join('/, ')}/ may be named; the rest is Claude Code's own sign-in data, settings, history or transcripts` }); }
+      else if (NEVER_READ.some((d) => insideOrSame(q, foldCase(path.join(home, d))))) refused.push({ path: raw, why: 'it is where credentials or private settings live' });
+      else if (below.some((x) => x.startsWith('.'))) refused.push({ path: raw, why: 'it is a hidden file or in a hidden folder, where credentials and private settings are kept' });
       else files.push(p);
     }
   }
   return { files, refused };
 }
+/** `claudeMdReads` for a project as it is now. */
+export const namedReads = (project, workspace) => claudeMdReads(readProjectFacts(project).claudeMd, { project, workspace });
 /** The `readOnly` list as the referee uses it: resolved absolute paths. */
 export const resolveReadOnly = (list) => (Array.isArray(list) ? list : []).filter((e) => typeof e === 'string' && e.trim()).map(expandHome);
 
@@ -1236,7 +1246,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`When an epic parks: ${config.onParkFrom === 'project' ? `${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set by the project` : config.onParkFrom === 'attended' ? 'independent epics still run (the owner is away)' : 'follows the owner\'s answer at launch: away, independent epics still run; here, the run stops'}`);
-  p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}; files CLAUDE.md names outside the project: ${claudeMdReads(readProjectFacts(project).claudeMd, { project, workspace }).files.join(' ') || '(none)'}`);
+  p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}; files CLAUDE.md names outside the project: ${namedReads(project, workspace).files.join(' ') || '(none)'}`);
   p(config.sandbox === true
     ? `Sandbox:          on — sessions write only in the clone, may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`
     : 'Sandbox:          off — sessions run commands as a terminal does, with open network; the referee keeps file writes inside the clone and the temp directories (best effort for scripts) and still denies push, containers and sudo. The auditor only reads (WebFetch and WebSearch are always denied)');
@@ -1272,6 +1282,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
       p(`    env:   ${Object.entries(c.env).map(([k, v]) => `${k}=${shellQuote(v)}`).join(' ')}`);
       p(`    $ ${[c.bin, ...c.args].map(shellQuote).join(' ')} > ${shellQuote(path.join(stepDir, 'stream.jsonl'))} 2> ${shellQuote(path.join(stepDir, 'stderr.log'))}`);
       p(`    stdin: ${userLine(prompt)}`);
+      p(`    also appended: scratch-rule.md (temporary files go in ${scratchDir(stepDir)}); a real run joins a step's appended files into system-append.md`);
       if (kind === 'build') {
         const auditDir = path.join(runDir, 'epics', e.id, 'audit-1');
         const a = sessionCommand(config, { kind: 'audit', epicId: e.id, workspace, runDir, stepDir: auditDir, pluginDir, sessionId: '<uuid>', prompt: '<audit/prompt.md>', schema: '<audit/schema.json>' });
@@ -1289,7 +1300,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   }
 
   p(); p('Settings JSON (written as each step\'s settings.json; the auditor\'s has an empty allowedDomains):');
-  p(JSON.stringify(sessionSettings(config), null, 2));
+  p(JSON.stringify(sessionSettings(config, { scratch: '<step directory>/scratch' }), null, 2));
   p(); p('Gate policy:');
   const policy = path.join(pluginDir, 'scripts', 'autopilot', 'policy', 'gates.json');
   p(exists(policy) ? read(policy) : '  policy/gates.json is not built yet (P2). Until then every AskUserQuestion parks.');
@@ -1626,7 +1637,7 @@ class Run {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(stepDir, { recursive: true });
     const sessionId = randomUUID(); const marker = '.autopilot-probe-exit';
-    writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), readFiles: claudeMdReads(readProjectFacts(cfg.project).claudeMd, { project: cfg.project, workspace: this.stateDir }).files, sandbox: cfg.sandbox === true, queue: [] }); // what the referee reads
+    writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), readFiles: namedReads(cfg.project, this.stateDir).files, sandbox: cfg.sandbox === true, queue: [] }); // what the referee reads
     fs.mkdirSync(scratchDir(stepDir), { recursive: true });
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind: 'probe', scratch: scratchDir(stepDir) }));
     writeJson(path.join(stepDir, 'step.json'), { name: 'probe-1', kind: 'probe', role: KINDS.probe.role, epic: 'probe', sessionId, startedAt: new Date().toISOString(), startMb: this.cloneMb() });
@@ -2843,7 +2854,7 @@ class Run {
       const badRead = readOnlyProblems(cfg.readOnly, { project: cfg.project, workspace: this.stateDir });
       if (badRead.length) throw new Error(badRead.join('; '));
       this.state.readOnly = resolveReadOnly(cfg.readOnly);
-      const named = claudeMdReads(readProjectFacts(cfg.project).claudeMd, { project: cfg.project, workspace: this.stateDir });
+      const named = namedReads(cfg.project, this.stateDir);
       this.state.readFiles = named.files;
       const badNet = networkProblems(cfg.network);
       if (badNet.length) throw new Error(badNet.join('; '));

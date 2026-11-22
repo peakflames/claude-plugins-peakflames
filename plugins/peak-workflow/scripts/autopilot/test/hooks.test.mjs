@@ -104,6 +104,9 @@ test('R2 scratch folder: a session writes temporary files in its step\'s scratch
     denied(h.pre('Read', { file_path: path.join(h.step, 'step.json') }), 'R2', /autopilot workspace/);
     denied(h.bash('cat "$AUTOPILOT_SCRATCH/../step.json"'), 'R2', /autopilot workspace/);
     denied(h.bash('echo x > "${AUTOPILOT_SCRATCH}/../../../../state.json"'), 'R2', /autopilot workspace/);
+    denied(h.bash('cat "${AUTOPILOT_SCRATCH%/scratch}/step.json"'), 'R2', /as it is/);
+    denied(h.bash('S=$AUTOPILOT_SCRATCH; cat $S/../step.json'), 'R2', /as it is/);
+    denied(h.bash('D="${AUTOPILOT_SCRATCH}/.." && ls $D'), 'R2', /as it is/);
     // A link out of the scratch folder is judged by where it leads.
     fs.symlinkSync(h.state, path.join(h.scratch, 'ws'));
     denied(h.pre('Write', { file_path: path.join(h.scratch, 'ws', 'STOP'), content: '' }), 'R2', /autopilot workspace/);

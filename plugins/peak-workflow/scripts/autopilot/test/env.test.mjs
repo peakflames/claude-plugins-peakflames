@@ -307,20 +307,22 @@ test('files CLAUDE.md names outside the project: single existing files in backti
   process.env.HOME = home; t.after(() => { process.env.HOME = old; });
   const mk = (rel, link = null) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); if (link) fs.symlinkSync(path.join(home, link), f); else fs.writeFileSync(f, 'x'); return f; };
   const tether = mk('.claude/scripts/tethered.mjs'); const tool = mk('tools/lint.sh'); const fenced = mk('tools/fenced.sh');
-  for (const f of ['.claude/.credentials.json', '.claude/settings.json', '.claude/projects/x/t.jsonl', '.claude.json', '.ssh/config', '.claude/scripts/unnamed.mjs']) mk(f);
+  for (const f of ['.claude/.credentials.json', '.claude/settings.json', '.claude/projects/x/t.jsonl', '.claude/state/x.json', '.claude.json', '.ssh/config', '.zsh_history', 'work/other/.env', '.claude/scripts/unnamed.mjs']) mk(f);
   mk('.claude/history.jsonl'); mk('.claude/scripts/link.mjs', '.claude/history.jsonl');
   const md = [
     'Start dev servers with `node ~/.claude/scripts/tethered.mjs start -- npm run dev`, never directly.',
     `Lint with \`${tool}\`. The sources are in \`${path.join(p.project, 'src', 'index.js')}\` and \`src/index.js\`.`,
     'A path without backticks does not count: ~/.claude/scripts/unnamed.mjs',
     'Not files: `~/.claude/scripts`, `~/tools/missing.sh`, `~/tools/*.sh`, `/peak-workflow:autopilot`.',
-    'Closed: `~/.claude/.credentials.json` `~/.claude/settings.json` `~/.claude/projects/x/t.jsonl` `~/.claude.json` `~/.ssh/config` `~/.claude/scripts/link.mjs`',
+    'Closed: `~/.claude/.credentials.json` `~/.claude/settings.json` `~/.claude/projects/x/t.jsonl` `~/.claude/state/x.json` `~/.claude.json` `~/.ssh/config` `~/.zsh_history` `~/work/other/.env` `~/.claude/scripts/link.mjs`',
     '```sh', 'sh $HOME/tools/fenced.sh --fix', '```',
   ].join('\n');
   const r = claudeMdReads(md, { project: p.project, workspace: p.state });
   assert.deepEqual(r.files, [tether, tool, fenced].map((f) => fs.realpathSync(f)));
-  assert.deepEqual(r.refused.map((x) => x.path), ['~/.claude/.credentials.json', '~/.claude/settings.json', '~/.claude/projects/x/t.jsonl', '~/.claude.json', '~/.ssh/config', '~/.claude/scripts/link.mjs']);
+  assert.deepEqual(r.refused.map((x) => x.path), ['~/.claude/.credentials.json', '~/.claude/settings.json', '~/.claude/projects/x/t.jsonl', '~/.claude/state/x.json', '~/.claude.json', '~/.ssh/config', '~/.zsh_history', '~/work/other/.env', '~/.claude/scripts/link.mjs']);
   assert.ok(r.refused.every((x) => /credentials|sign-in/.test(x.why)));
+  // macOS and Windows ignore case in file names: a path spelled in capitals is the same private place.
+  if (process.platform === 'darwin') assert.deepEqual(claudeMdReads('`~/.SSH/config` `~/.CLAUDE/settings.json`', {}).files, []);
   assert.deepEqual(claudeMdReads('', {}), { files: [], refused: [] });
 });
 

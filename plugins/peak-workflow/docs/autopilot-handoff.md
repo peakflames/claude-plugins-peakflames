@@ -154,8 +154,10 @@ Why this order:
   - **The fake goes through the referee.** Every scripted action a real session would need a
     tool call for (`write`, `rm`, `sidecar`, `commit`, `merge`, `branch`, `checkout`, `exec`)
     is put to the session's real `PreToolUse` hook first; a refused action is skipped and listed
-    in `permission_denials`. `unchecked: "<why>"` skips the hook and must give its reason
-    (`fake-claude.mjs`, header). Switching it on failed 13 of 200 tests and one lab test. None
+    in `permission_denials`. `unchecked: "<why>"` skips the hook and must give its reason. A
+    script marks the actions it expects to be refused with `refused: true`; a refusal it did
+    not expect, or an expected one that did not come, fails the test (`fake-claude.mjs`,
+    header). Switching it on failed 13 of 200 tests and one lab test. None
     was a fault in the referee or the driver: 9 were test bookkeeping written into the
     workspace, 3 did on purpose what the referee refuses, to test the driver's check behind
     it, and 2 edited an existing test before recording the reason. The suite takes about 6.5
@@ -174,7 +176,7 @@ Why this order:
   | Containers, background commands (R4, R6) | Keep | Nothing |
   | `git push` (R3) | Keep | Nothing |
   | Writes outside the clone (R2) | Keep; add a scratch folder | Each working session gets `<step>/scratch/` in the workspace (`scratchDir`, `scratchRule`, `AUTOPILOT_SCRATCH`); a refused write names it. `/tmp` is left as it was |
-  | Reads outside the clone (R2) | Loosen for what `CLAUDE.md` points to | A single existing file `CLAUDE.md` names in backticks is readable (`claudeMdReads`, the run's `readFiles`), under `~/.claude` too, never its sign-in data, settings, history or transcripts |
+  | Reads outside the clone (R2) | Loosen for what `CLAUDE.md` points to | A single existing file `CLAUDE.md` names in backticks is readable (`claudeMdReads`, the run's `readFiles`). In `~/.claude` only below `scripts/`, `bin/` or `tools/`; never a hidden file or folder, never where credentials live |
   | Test edits without a recorded reason (R7) | No change | Nothing |
 
   What the code showed, against what was assumed: with the sandbox off, `/tmp` is writable
@@ -184,7 +186,14 @@ Why this order:
   refusals was not made:** the PeakMedia run logs are on another machine. Tested against the
   fake and by three live rule checks on macOS (a real session used its scratch folder without
   being refused first). Not seen on Windows; the reporter is asked to confirm on #41. Left:
-  the scratch folders are never emptied, and their size is not counted by the growth cap.
+  - The scratch folders are never emptied, and their size is not counted by the growth cap.
+  - `CLAUDE.md` is a file sessions edit and merge, so the list of readable files can grow
+    without the owner typing it. It is shown at every launch; nothing asks him to confirm it.
+  - The referee's own credential checks compare names by case (`cat ~/.SSH/id_rsa` passes
+    with the sandbox off on macOS). Old behaviour, found by the review; belongs to step 4.
+  - A command can still reach the workspace through a variable it builds itself (`D=$PWD/..`).
+    Old behaviour: the Bash check is best effort. The scratch folder's own name is refused in
+    any form but `$AUTOPILOT_SCRATCH`.
 
 ### Step 3 — No stop that can only be started over (C2)
 

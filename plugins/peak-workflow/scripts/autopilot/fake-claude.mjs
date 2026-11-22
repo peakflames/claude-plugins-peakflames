@@ -21,6 +21,9 @@
 // would run, write and sidecar as `Write` or `Edit` on the file. A refused action is skipped,
 // recorded in permission_denials, and the script goes on, as a session does after a refusal;
 // `continue: false` ends the session. Each call's outcome is a line in <step>/fake-tools.jsonl.
+// A script says which of its actions it expects to be refused, with `refused: true`: a refusal
+// it did not expect, or an expected one that did not come, ends the fake with an error (exit 70,
+// the reason in stderr.log), so a test never passes on work that silently did not happen.
 // `unchecked: "<why>"` on an action skips the referee. It is for what no tool call of the session
 // produces: a file the hooks or the driver write, something the owner or the test does, a
 // command's own side effect. The reason is required.
@@ -74,6 +77,7 @@ function fill(v) {
 const denials = [];
 let hookStopped = false;
 let toolCalls = 0;
+let lastReason = '';
 const lines = readline.createInterface({ input: process.stdin })[Symbol.asyncIterator]();
 const stdinClosed = new Promise((r) => process.stdin.on('end', r).on('close', r));
 
@@ -92,7 +96,7 @@ function referee(tool_name, tool_input = {}) {
   let out = null; try { out = r.stdout ? JSON.parse(r.stdout) : null; } catch { /* not JSON: no decision, as Claude Code reads it */ }
   fs.appendFileSync(path.join(stepDir, 'fake-tools.jsonl'), JSON.stringify({ tool_name, exit: r.status, out }) + '\n');
   const deny = out?.hookSpecificOutput?.permissionDecision === 'deny';
-  if (deny) denials.push({ tool_name, tool_input });
+  if (deny) { denials.push({ tool_name, tool_input }); lastReason = out.hookSpecificOutput.permissionDecisionReason; }
   if (out?.continue === false) hookStopped = true;
   return !deny && !hookStopped;
 }
@@ -119,7 +123,13 @@ async function act(a) {
   // skipped and the script goes on, as a session does after a refusal.
   if ('unchecked' in a && !(typeof a.unchecked === 'string' && a.unchecked.trim())) throw new Error(`fake-claude: \`unchecked\` on a ${a.do} action must be the reason, in words`);
   const call = a.unchecked ? null : toolCall(a);
-  if (call && !referee(...call)) return;
+  if (call) {
+    const before = denials.length;
+    const allowed = referee(...call);
+    const denied = denials.length > before;
+    if (denied !== !!a.refused) throw new Error(`fake-claude: the referee ${denied ? 'refused' : 'allowed'} a ${a.do} action the script ${a.refused ? 'marks \`refused\`' : 'does not mark \`refused: true\`'}: ${JSON.stringify(call[1]).slice(0, 300)}${denied ? ` — ${lastReason}` : ''}`);
+    if (!allowed) return;
+  }
   switch (a.do) {
     case 'branch':
       try { git('checkout', '-q', '-b', a.name); } catch { git('checkout', '-q', a.name); }

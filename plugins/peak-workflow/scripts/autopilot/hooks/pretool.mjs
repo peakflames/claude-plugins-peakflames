@@ -160,6 +160,8 @@ function visibleWrites(s, ctx = null) {
 
 function ruleR2Bash(base, segs, command) {
   if (/\$\{?AUTOPILOT_(STATE|RUN|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot workspace');
+  // The scratch folder is inside the workspace: its name is used as it is, never cut down (`${AUTOPILOT_SCRATCH%/scratch}`) or copied into another name, which would lead back into the workspace unseen.
+  if (/\$\{[#!]?AUTOPILOT_SCRATCH[^}]/.test(command) || /[A-Za-z_]\w*=["']?[^\s;&|]*\$\{?AUTOPILOT_SCRATCH\b/.test(command)) return deny('R2', 'path jail — use "$AUTOPILOT_SCRATCH" as it is: a command may not cut it down or copy it into another variable');
   // The directory follows each `cd` through the command, so a later relative path (`cd tests/a/b && … ; cd ../../..`) is
   // judged from where the command then is, not from where it started (seen live: a way back to the clone root was refused).
   let ctx = base;

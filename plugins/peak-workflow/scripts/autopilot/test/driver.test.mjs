@@ -539,11 +539,13 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
 
 test('the fake puts scripted work to the referee as the real CLI does: a refused action is skipped and listed, an allowed one is applied, `unchecked` needs its reason', async (t) => {
   const p = makeProject(t);
+  const outside = path.join(os.homedir(), `autopilot-fake-${process.pid}-should-not-exist.txt`);
+  t.after(() => fs.rmSync(outside, { force: true }));
   const s = happy(E1);
   s[`${E1.id}/build`].actions.splice(1, 0,
-    { do: 'write', path: '{{state}}/settings.json', content: '{}' }, // the workspace: refused
-    { do: 'exec', cmd: 'echo x > ~/autopilot-fake-should-not-write.txt' }, // outside the clone: refused
-    { do: 'write', path: 'test/smoke.test.js', content: '// gutted\n' }, // an existing test, no reason: refused
+    { do: 'write', path: '{{state}}/settings.json', content: '{}', refused: true }, // the workspace
+    { do: 'exec', cmd: `echo x > ${outside}`, refused: true }, // outside the clone
+    { do: 'write', path: 'test/smoke.test.js', content: '// gutted\n', refused: true }, // an existing test, no reason
     { do: 'write', path: 'src/allowed.js', content: '// allowed\n' },
     { do: 'write', path: '{{step}}/by-the-test.txt', content: 'x', unchecked: 'written by this test, not by a tool call' });
   p.scenario(s);
@@ -552,9 +554,9 @@ test('the fake puts scripted work to the referee as the real CLI does: a refused
   assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
   const result = readJson(p.dir(E1.id, 'build-1', 'result.json'));
   assert.deepEqual(result.permission_denials.map((d) => [d.tool_name, d.tool_input.file_path ?? d.tool_input.command]), [
-    ['Write', path.join(p.state, 'settings.json')], ['Bash', 'echo x > ~/autopilot-fake-should-not-write.txt'], ['Write', path.join(p.clone, 'test', 'smoke.test.js')]]);
+    ['Write', path.join(p.state, 'settings.json')], ['Bash', `echo x > ${outside}`], ['Write', path.join(p.clone, 'test', 'smoke.test.js')]]);
   assert.equal(fs.readFileSync(path.join(p.state, 'settings.json'), 'utf8'), settingsBefore);
-  assert.equal(fs.existsSync(path.join(os.homedir(), 'autopilot-fake-should-not-write.txt')), false);
+  assert.equal(fs.existsSync(outside), false);
   assert.doesNotMatch(git(p.clone, 'show', 'develop:test/smoke.test.js'), /gutted/);
   assert.equal(git(p.clone, 'show', 'develop:src/allowed.js'), '// allowed');
   assert.equal(fs.readFileSync(p.dir(E1.id, 'build-1', 'by-the-test.txt'), 'utf8'), 'x');
@@ -568,6 +570,15 @@ test('the fake puts scripted work to the referee as the real CLI does: a refused
   q.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [{ do: 'write', path: 'src/x.js', content: 'x', unchecked: true }] } });
   await go(q);
   assert.match(fs.readFileSync(q.dir(E1.id, 'build-1', 'stderr.log'), 'utf8'), /`unchecked` on a write action must be the reason/);
+
+  // A refusal the script did not expect, or an expected one that did not come, ends the fake with the reason.
+  for (const [action, re] of [[{ do: 'write', path: '{{state}}/STOP', content: '' }, /the referee refused a write action the script does not mark `refused: true`.*autopilot R2/s], [{ do: 'write', path: 'src/x.js', content: 'x', refused: true }, /the referee allowed a write action the script marks `refused`/]]) {
+    const r = makeProject(t);
+    r.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, action] } });
+    await go(r);
+    assert.match(fs.readFileSync(r.dir(E1.id, 'build-1', 'stderr.log'), 'utf8'), re);
+    assert.notEqual(r.epic(E1.id).state, 'MERGED');
+  }
 });
 
 test('driver + real hooks: a deferral question in the build session parks the epic with the hook\'s gate file', async (t) => {

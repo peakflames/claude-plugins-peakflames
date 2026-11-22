@@ -40,8 +40,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   or off. A refused write outside the clone says where it is.
 - **Autopilot reads the files `CLAUDE.md` names** — a single existing file outside the project
   that `CLAUDE.md` names in backticks (a script under `~/.claude/scripts`) can be read and run
-  by sessions, never written, and is listed at launch. Credentials, settings, history and
-  transcripts stay closed.
+  by sessions, never written, and is listed at launch. Hidden files and folders, credentials,
+  and the rest of `~/.claude` stay closed.
 - **Autopilot read-only directories** — `readOnly` in the project's `autopilot.json` names
   directories outside the clone (a dependency cache such as `~/.nuget/packages`) that sessions may
   read and never write; `driver.mjs configure --read-only` saves it and refuses broad or private paths.
