@@ -225,7 +225,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **A resumed epic starts on its own branch** — the driver checks the epic's branch out before every session instead of leaving that to the session, so resumed work is no longer built and left uncommitted on the integration branch.
 - **Files a session left in autopilot's clone no longer block a run** — uncommitted and untracked files are set aside under `refs/autopilot/leftover/` instead of refusing the launch or stopping the queue. Nothing is deleted; the log and the report say how many.
 - **`tor-lifecycle` on a backslash path** — the launcher finds `tor_lifecycle.py` when Windows passes its own path with backslashes.
-- **Autopilot preflight and `**Not decided yet:** none`** — a line that names nothing (none, n/a, a dash, empty) no longer parks every epic; a line that lists a layer still does.
+- **Autopilot preflight and `**Not decided yet:** none`** — a line that names nothing (none, n/a, a dash, empty, or `none — ` and a reason) no longer parks every epic; a line that lists a layer still does.
 - **Autopilot no longer hands the owner technical work** — the report, gate text and skill offer no "by hand" command, no other skill to run and no git line; autopilot brings merged work in itself. What it cannot repair yet is said plainly: it needs someone who maintains the code.
 - **Autopilot decides technical stops itself** — the standing answer now also covers a failed plan check, a final check needing a repair or re-run, its own product fix, and reviewer findings (not "paid service never called"). One count per epic; past it the owner is asked "Try again" or "Leave it for now".
 - **Autopilot keeps building while the owner is away** — with "I'll be away" at launch, an epic

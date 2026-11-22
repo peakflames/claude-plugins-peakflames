@@ -130,7 +130,9 @@ Why this order:
   Left: `wrapup-epic`'s deferred-value grep still fails a skeleton epic on any such line, and
   whether `/peak-workflow:setup` writes the `none` form itself is not checked. The reporter's
   patch (#41, 2026-11-22) was compared and ours kept: ours still parks `none of the …` and
-  `- database`, which his pattern lets through.
+  `- database`, which his pattern lets through. He then found on Windows (#41, 2026-11-22) that
+  `none — <a reason>` still parked every epic; fixed 2026-11-21 with his suggested rule: `none`,
+  `nothing` or `n/a` followed by a dash or colon and text is also the all-clear.
 - [x] **`tor-lifecycle` cannot find its folder from a backslash path** (#41 comment). Fixed
   2026-11-21: either separator ends the folder. Tested on macOS with a stand-in path; not run
   on Windows. The reporter's patch (#41, 2026-11-22) is the same fix; ours also handles a path

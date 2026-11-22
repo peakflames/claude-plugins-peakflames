@@ -678,9 +678,10 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
   if (!facts.testDirs.length) refuse.push('CLAUDE.md has no **Test directories:** line');
   if (!(config.testCommand ?? facts.testCommand)) refuse.push('CLAUDE.md has no **Tests:** command');
 
-  // A "Not decided yet" line that names nothing ("none", "n/a", a dash, empty) is the all-clear, not a value to decide.
+  // A "Not decided yet" line that names nothing ("none", "n/a", a dash, empty) is the all-clear, not a value to decide;
+  // so is one of those words followed by a dash or colon and a reason ("none — all decided and shipped").
   const tbd = /TBD — set by the walking-skeleton epic/.test(facts.claudeMd)
-    || [...facts.claudeMd.matchAll(/\*\*Not decided yet:\*\*(.*)/g)].some((m) => !/^(none|nothing|n\/a|[-–—])?$/i.test(m[1].trim().replace(/\.$/, '')));
+    || [...facts.claudeMd.matchAll(/\*\*Not decided yet:\*\*(.*)/g)].some((m) => !/^((none|nothing|n\/a)(\s*[-–—:]\s.*)?|[-–—])?$/i.test(m[1].trim().replace(/\.$/, '')));
   const embedded = /embedded/i.test(facts.projectType ?? '');
   const ui = /web app|desktop app|hybrid/i.test(facts.projectType ?? '');
   const me = sh('git', ['config', 'user.name'], { cwd: root }).out.toLowerCase();
