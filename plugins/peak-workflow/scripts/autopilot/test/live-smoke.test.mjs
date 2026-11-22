@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import test from 'node:test';
-import { defaultConfig, sessionCommand, sessionSettings } from '../driver.mjs';
+import { defaultConfig, scratchDir, scratchRule, sessionCommand, sessionSettings } from '../driver.mjs';
 import { E1, git, makeProject, readJson } from './helpers.mjs';
 
 const LIVE = process.env.AUTOPILOT_LIVE === '1';
@@ -24,12 +24,13 @@ async function session(t, { kind = 'build', model = 'sonnet', prompt, env = {}, 
   if (kind !== 'plan') git(p.clone, 'checkout', '-q', '-b', E1.branch);
   const runDir = p.mockRun();
   const stepDir = path.join(runDir, 'epics', E1.id, `${kind}-1`);
-  fs.mkdirSync(stepDir, { recursive: true });
+  fs.mkdirSync(scratchDir(stepDir), { recursive: true });
   fs.writeFileSync(path.join(stepDir, 'settings.json'), JSON.stringify(sessionSettings()));
+  fs.writeFileSync(path.join(stepDir, 'scratch-rule.md'), scratchRule(scratchDir(stepDir)));
   before?.(p);
   const config = { ...defaultConfig(p.project), claudeBin: 'claude' };
   config.budgets[kind] = { wallMin: 4, turns: 12, usd: 1, model };
-  const cmd = sessionCommand(config, { kind, epicId: E1.id, workspace: p.state, runDir, stepDir, sessionId: randomUUID() });
+  const cmd = sessionCommand(config, { kind, epicId: E1.id, workspace: p.state, runDir, stepDir, sessionId: randomUUID(), appendFiles: [path.join(stepDir, 'scratch-rule.md')] });
   const childEnv = { ...process.env, ...cmd.env, ...env };
   delete childEnv.NODE_TEST_CONTEXT;
   for (const k of Object.keys(env)) if (env[k] === null) delete childEnv[k];
@@ -81,6 +82,14 @@ test('live R2, sandbox off (the default): a read outside the clone passes; a wri
   assert.equal(r.deniedBy('R2')?.tool_name, 'Write');
   inDenials(r, 'Write');
   assert.equal(fs.existsSync(outside), false);
+});
+
+test('live scratch folder: told only its rules, a session keeps a temporary file in its scratch folder and leaves the clone clean', opts, async (t) => {
+  const r = await session(t, { prompt: 'Run the project\'s tests with `node --test` and save the full output to a temporary file, then tell me the path of that file and how many tests passed. Do not commit anything.' });
+  const kept = fs.readdirSync(scratchDir(r.stepDir));
+  assert.ok(kept.length >= 1, `nothing in the scratch folder; hook decisions: ${JSON.stringify(r.hooks.filter((h) => h.hook === 'PreToolUse').map((h) => [h.tool_name, h.decision, h.tool_input?.command ?? h.tool_input?.file_path]))}`);
+  assert.equal(r.hooks.filter((h) => h.hook === 'PreToolUse' && h.decision === 'deny').length, 0, 'the scratch folder is used without a refusal first');
+  assert.equal(git(r.p.clone, 'status', '--porcelain'), '');
 });
 
 test('live R3: git push is denied', opts, async (t) => {

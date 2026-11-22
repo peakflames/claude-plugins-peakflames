@@ -26,8 +26,9 @@ function referee(t, { role = 'builder', branch = E1.branch, config = {}, sandbox
   const runDir = p.mockRun();
   if (sandbox) fs.writeFileSync(path.join(runDir, 'state.json'), JSON.stringify({ ...readJson(path.join(runDir, 'state.json')), sandbox: true })); // strict: the read jail too
   const step = path.join(runDir, 'epics', E1.id, `${role === 'planner' ? 'plan' : role === 'verifier' ? 'verify' : 'build'}-1`);
-  fs.mkdirSync(step, { recursive: true });
-  const env = { ...process.env, AUTOPILOT_STATE: p.state, AUTOPILOT_RUN: runDir, AUTOPILOT_STEP: step, AUTOPILOT_ROLE: role, AUTOPILOT_EPIC: E1.id };
+  const scratch = path.join(step, 'scratch');
+  fs.mkdirSync(scratch, { recursive: true });
+  const env = { ...process.env, AUTOPILOT_STATE: p.state, AUTOPILOT_RUN: runDir, AUTOPILOT_STEP: step, AUTOPILOT_ROLE: role, AUTOPILOT_EPIC: E1.id, AUTOPILOT_SCRATCH: scratch };
   const run = (hook, input, extraEnv = {}) => {
     const r = spawnSync(process.execPath, [path.join(HOOKS, hook)], { input: typeof input === 'string' ? input : JSON.stringify({ session_id: 's', cwd: p.clone, permission_mode: 'acceptEdits', ...input }), encoding: 'utf8', env: { ...env, ...extraEnv } });
     return { code: r.status, out: r.stdout ? JSON.parse(r.stdout) : null, stderr: r.stderr };
@@ -36,7 +37,7 @@ function referee(t, { role = 'builder', branch = E1.branch, config = {}, sandbox
   const bash = (command, extraEnv) => pre('Bash', { command }, extraEnv);
   const ask = (question, options, extraEnv) => pre('AskUserQuestion', { questions: [{ question, header: 'Gate', multiSelect: false, options: options.map((label) => ({ label, description: '' })) }] }, extraEnv);
   const hooksLog = () => fs.readFileSync(path.join(step, 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-  return { ...p, runDir, step, run, pre, bash, ask, hooksLog, gate: (n) => readJson(path.join(p.state, 'gates', `${E1.id}-${n}.json`)) };
+  return { ...p, runDir, step, scratch, run, pre, bash, ask, hooksLog, gate: (n) => readJson(path.join(p.state, 'gates', `${E1.id}-${n}.json`)) };
 }
 
 const passes = (r, msg) => { assert.equal(r.code, 0, msg); assert.equal(r.out, null, `${msg}: expected no opinion, got ${JSON.stringify(r.out)}`); };
@@ -88,6 +89,36 @@ test('sandbox on — R2 path jail: file tools stay in the clone; state, home and
   passes(h.pre('Read', { file_path: path.join(os.homedir(), '.claude', 'projects', 'x', 'abc', 'tool-results', 'b1.txt') }), 'read a saved tool output');
   passes(h.pre('Write', { file_path: path.join(os.homedir(), '.claude', 'plans', 'a-plan.md'), content: 'x' }), 'write plan file');
   passes(h.pre('Write', { file_path: `/tmp/claude-${UID}/scratch.txt`, content: 'x' }), 'write sandbox temp');
+});
+
+test('R2 scratch folder: a session writes temporary files in its step\'s scratch folder, with the sandbox on or off; the rest of the workspace stays closed', (t) => {
+  for (const sandbox of [false, true]) {
+    const h = referee(t, { sandbox });
+    passes(h.pre('Write', { file_path: path.join(h.scratch, 'chk.json'), content: '{}' }), `write, sandbox ${sandbox}`);
+    passes(h.pre('Read', { file_path: path.join(h.scratch, 'chk.json') }), 'read');
+    passes(h.bash('node --test > "$AUTOPILOT_SCRATCH/out.txt" 2>&1'), 'redirect by name');
+    passes(h.bash(`mkdir -p ${h.scratch}/probe && cp src/index.js ${h.scratch}/probe/`), 'absolute path');
+    passes(h.bash('cd "$AUTOPILOT_SCRATCH" && ls'), 'cd');
+    // Nothing else in the workspace opens with it, by name or by climbing out.
+    denied(h.pre('Write', { file_path: path.join(h.step, 'hooks.jsonl'), content: 'x' }), 'R2', /autopilot workspace/);
+    denied(h.pre('Read', { file_path: path.join(h.step, 'step.json') }), 'R2', /autopilot workspace/);
+    denied(h.bash('cat "$AUTOPILOT_SCRATCH/../step.json"'), 'R2', /autopilot workspace/);
+    denied(h.bash('echo x > "${AUTOPILOT_SCRATCH}/../../../../state.json"'), 'R2', /autopilot workspace/);
+    // A link out of the scratch folder is judged by where it leads.
+    fs.symlinkSync(h.state, path.join(h.scratch, 'ws'));
+    denied(h.pre('Write', { file_path: path.join(h.scratch, 'ws', 'STOP'), content: '' }), 'R2', /autopilot workspace/);
+  }
+  // A refused write says where temporary files go.
+  const h = referee(t, { sandbox: true });
+  denied(h.pre('Write', { file_path: '/tmp/chk.json', content: '{}' }), 'R2', /Write temporary files in .*scratch.*\$AUTOPILOT_SCRATCH/);
+  denied(h.bash('echo x > ~/chk.json'), 'R2');
+  const off = referee(t);
+  denied(off.bash('echo x > ~/chk.json'), 'R2', /Write temporary files in .*scratch/);
+  denied(off.pre('Write', { file_path: path.join(os.homedir(), 'chk.json'), content: '{}' }), 'R2', /Write temporary files in .*scratch/);
+  // The auditor only reads: it has no scratch folder.
+  const a = referee(t, { role: 'auditor' });
+  denied(a.pre('Write', { file_path: path.join(a.scratch, 'x.txt'), content: 'x' }), 'R2');
+  denied(a.pre('Read', { file_path: path.join(a.scratch, 'x.txt') }), 'R2');
 });
 
 test('sandbox on — R2 path jail: a symlink out of the clone is resolved and denied', (t) => {

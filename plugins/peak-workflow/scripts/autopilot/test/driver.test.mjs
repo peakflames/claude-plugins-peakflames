@@ -56,7 +56,9 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.ok(prompt.includes(`sh "${PLUGIN_DIR}/scripts/tor-lifecycle"`));
   assert.ok(!prompt.includes('${CLAUDE_PLUGIN_ROOT}'));
   assert.ok(fs.readFileSync(path.join(dir, 'plan-1', 'plan.md'), 'utf8').includes('${CLAUDE_PLUGIN_ROOT}'));
-  assert.equal(build.argv[build.argv.indexOf('--append-system-prompt-file') + 1], path.join(dir, 'build-1', 'build-rules.md'));
+  // One file reaches the session: its rules and the scratch-folder rule, joined (`claude` keeps only the last such flag).
+  assert.equal(build.argv[build.argv.indexOf('--append-system-prompt-file') + 1], path.join(dir, 'build-1', 'system-append.md'));
+  assert.ok(fs.readFileSync(path.join(dir, 'build-1', 'system-append.md'), 'utf8').startsWith(fs.readFileSync(path.join(dir, 'build-1', 'build-rules.md'), 'utf8').trimEnd()));
 
   // The host approves nothing: a permission prompt that reaches it is denied and logged.
   const answer = readJson(path.join(dir, 'build-1', 'fake-control-response.json'));
@@ -183,7 +185,7 @@ test('check failure: exactly one repair session, then park', async (t) => {
   assert.equal(fix.env?.AUTOPILOT_ROLE ?? 'builder', 'builder');
   const rules = fs.readFileSync(path.join(dir, 'fix-1', 'build-rules.md'), 'utf8');
   assert.match(rules, /# Autopilot repair rules/);
-  assert.ok(fix.argv.includes(path.join(dir, 'fix-1', 'build-rules.md')));
+  assert.ok(fix.argv.includes(path.join(dir, 'fix-1', 'system-append.md')) && fs.readFileSync(path.join(dir, 'fix-1', 'system-append.md'), 'utf8').includes(rules.trimEnd()));
   assert.equal(fix.argv[fix.argv.indexOf('--max-turns') + 1], '150');
 });
 
@@ -576,6 +578,31 @@ test('effort defaults by model family (haiku/sonnet high, opus/fable medium) and
   assert.throws(() => loadConfig(p.state, { project: p.project }), /budgets\.build\.effort must be one of/);
 });
 
+test('every working session gets a scratch folder: made before launch, named in its environment and its rules, writable in the sandbox; the auditor gets none', async (t) => {
+  const p = makeProject(t);
+  const s = happy(E1);
+  s[`${E1.id}/build`].actions.unshift({ do: 'write', path: '{{step}}/scratch/probe.json', content: '{}' }, { do: 'exec', cmd: 'echo x > "$AUTOPILOT_SCRATCH/out.txt"' });
+  p.scenario(s);
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  for (const step of ['plan-1', 'build-1', 'verify-1']) {
+    const call = p.calls().find((c) => c.step === step);
+    const scratch = p.dir(E1.id, step, 'scratch');
+    assert.equal(call.env.AUTOPILOT_SCRATCH, scratch, step);
+    assert.ok(fs.statSync(scratch).isDirectory(), step);
+    const rules = fs.readFileSync(call.argv[call.argv.indexOf('--append-system-prompt-file') + 1], 'utf8');
+    assert.ok(rules.includes(scratch) && rules.includes('$AUTOPILOT_SCRATCH'), `${step}: ${rules}`);
+  }
+  assert.deepEqual(fs.readdirSync(p.dir(E1.id, 'build-1', 'scratch')).sort(), ['out.txt', 'probe.json']);
+  assert.deepEqual(readJson(p.dir(E1.id, 'build-1', 'result.json')).permission_denials, []);
+  const audit = p.calls().find((c) => c.step === 'audit-1');
+  assert.equal(audit.env.AUTOPILOT_SCRATCH, undefined);
+  assert.equal(fs.existsSync(p.dir(E1.id, 'audit-1', 'scratch')), false);
+  // With the sandbox on, the scratch folder is the one place outside the clone a command may write.
+  assert.deepEqual(sessionSettings({ sandbox: true }, { kind: 'build', scratch: '/ws/step/scratch' }).sandbox.filesystem, { allowWrite: ['/ws/step/scratch'] });
+  assert.equal(sessionSettings({ sandbox: true }, { kind: 'audit' }).sandbox.filesystem, undefined);
+});
+
 test('the owner is away: no session starts a step that waits for a person, and a step nobody came for is not tried again in that epic', async (t) => {
   const p = makeProject(t);
   // The build asks the owner to come and gives up; the verify session of the same epic is told.
@@ -618,7 +645,7 @@ test('real money: the owner\'s answer at launch reaches every build, repair and 
       assert.doesNotMatch(text, /# The owner is away/, 'not said unless the owner said so');
     }
     const [, build, , verify] = p.calls();
-    assert.ok(build.argv.includes(p.dir(E1.id, 'build-1', 'build-rules.md')) && verify.argv.includes(p.dir(E1.id, 'verify-1', 'verify-rules.md')));
+    for (const [call, step, file] of [[build, 'build-1', 'build-rules.md'], [verify, 'verify-1', 'verify-rules.md']]) assert.ok(call.argv.includes(p.dir(E1.id, step, 'system-append.md')) && fs.readFileSync(p.dir(E1.id, step, 'system-append.md'), 'utf8').includes(fs.readFileSync(p.dir(E1.id, step, file), 'utf8').trimEnd()), step);
     assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), realSpend === true ? /Real money on outside services: you allowed it when a check needs it\./ : realSpend === false ? /Real money on outside services: you said not to spend any/ : /Real money on outside services: not decided at launch/);
     assert.equal(readJson(path.join(p.runDir(), 'config.json')).realSpend ?? null, realSpend ?? null);
   }

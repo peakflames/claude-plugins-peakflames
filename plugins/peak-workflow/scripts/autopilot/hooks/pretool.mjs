@@ -8,7 +8,8 @@
 //
 // Environment (set by driver.mjs): AUTOPILOT_STATE (the workspace: clone/, gates/, STOP),
 // AUTOPILOT_RUN (this run's directory: state.json, config.json), AUTOPILOT_STEP, AUTOPILOT_ROLE
-// (planner | builder | verifier | auditor), AUTOPILOT_EPIC.
+// (planner | builder | verifier | auditor), AUTOPILOT_EPIC, AUTOPILOT_SCRATCH (the session's scratch
+// folder, <step>/scratch: the referee finds it from AUTOPILOT_STEP, the session by this name).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -48,10 +49,13 @@ function context(input, env) {
   const home = realDeep(os.homedir());
   const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
   const clone = path.join(state, 'clone');
+  const step = env.AUTOPILOT_STEP ? realDeep(env.AUTOPILOT_STEP) : null;
+  const role = env.AUTOPILOT_ROLE ?? 'builder';
   return {
     input, env, state, clone, run, runDir, runName: path.basename(runDir), config, home,
-    step: env.AUTOPILOT_STEP ? realDeep(env.AUTOPILOT_STEP) : null,
-    role: env.AUTOPILOT_ROLE ?? 'builder',
+    step, role,
+    // Where this session keeps temporary files: the one folder of the workspace it may write. The auditor only reads and has none.
+    scratch: step && role !== 'auditor' ? path.join(step, 'scratch') : null,
     epic: env.AUTOPILOT_EPIC ?? '',
     cwd: input.cwd ? realDeep(input.cwd) : clone,
     integration: run.integration ?? 'develop',
@@ -73,7 +77,9 @@ function git(cwd, ...args) {
 /** 'rw', 'ro' or a denial reason for one path. `bash` adds the system directories a command may name. */
 function classify(ctx, raw, { bash = false } = {}) {
   let p = raw.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home);
+  if (ctx.scratch) p = p.replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch);
   p = realDeep(path.resolve(ctx.cwd, p));
+  if (ctx.scratch && within(p, ctx.scratch)) return 'rw';
   if (ctx.role === 'auditor') {
     if (ctx.step && within(p, path.join(ctx.step, 'bundle'))) return 'ro';
     if (within(p, ctx.clone)) return 'ro';
@@ -99,6 +105,9 @@ function classify(ctx, raw, { bash = false } = {}) {
   return 'ro';
 }
 
+/** Added to a refused write: where a session's temporary files go. */
+const scratchHint = (ctx) => (ctx.scratch ? ` Write temporary files in ${ctx.scratch} (in a command: "$AUTOPILOT_SCRATCH")` : '');
+
 function ruleR2Files(ctx) {
   const { tool_name: tool, tool_input: ti = {} } = ctx.input;
   const write = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool);
@@ -106,8 +115,8 @@ function ruleR2Files(ctx) {
   const target = ti.file_path ?? ti.notebook_path ?? ti.path;
   if (target === undefined) return null; // Glob and Grep default to the session's cwd, the clone
   const c = classify(ctx, String(target));
-  if (c !== 'rw' && c !== 'ro') return deny('R2', `path jail — ${c}`);
-  if (write && c === 'ro') return deny('R2', `path jail — ${target} is read-only for this session`);
+  if (c !== 'rw' && c !== 'ro') return deny('R2', `path jail — ${c}.${write ? scratchHint(ctx) : ''}`);
+  if (write && c === 'ro') return deny('R2', `path jail — ${target} is read-only for this session.${scratchHint(ctx)}`);
   if (write && within(realDeep(path.resolve(ctx.cwd, String(target))), path.join(ctx.clone, '.git'))) return deny('R2', 'path jail — .git/ is not edited by hand');
   return null;
 }
@@ -166,12 +175,12 @@ function ruleR2Bash(base, segs, command) {
         // Going somewhere readable only to look (cd into a package cache, then ls and grep) is fine; going there in a command that also writes is not.
         const looking = c === 'ro' && !ctx.strict && s.cmd !== 'git' && !segs.some((x) => visibleWrites(x, ctx).length);
         if (c !== 'rw' && !looking) return deny('R2', `path jail — ${s.cmd} target: ${c === 'ro' ? `${t} is outside the private clone` : c}`);
-        if (s.cmd !== 'git') ctx = { ...ctx, cwd: realDeep(path.resolve(ctx.cwd, t.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home))) };
+        if (s.cmd !== 'git') ctx = { ...ctx, cwd: realDeep(path.resolve(ctx.cwd, t.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home).replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch ?? '$AUTOPILOT_SCRATCH'))) };
         continue;
       }
       const p = t.replace(/^-{1,2}[A-Za-z][\w-]*=/, '').replace(/^\d*&?>>?/, '');
       if (!p || p.includes('://')) continue;
-      const absolute = /^(~|\$\{?HOME\}?)?\//.test(p);
+      const absolute = /^(~|\$\{?HOME\}?|\$\{?AUTOPILOT_SCRATCH\}?)?\//.test(p);
       const climbs = p.split('/').includes('..');
       if (!absolute && !climbs) continue;
       if (absolute && p.startsWith('/')) {
@@ -186,7 +195,7 @@ function ruleR2Bash(base, segs, command) {
     if (!ctx.strict) {
       for (const tgt of visibleWrites(s, ctx)) {
         const c = classify(ctx, tgt, { bash: true });
-        if (c !== 'rw') return deny('R2', `path jail — ${c === 'ro' ? `${tgt} is outside the private clone: a session writes only inside it` : c}`);
+        if (c !== 'rw') return deny('R2', `path jail — ${c === 'ro' ? `${tgt} is outside the private clone: a session writes only inside it` : c}.${scratchHint(ctx)}`);
       }
     }
     // A declared read-only directory is read by commands and never written: a redirect into it is refused here (the sandbox refuses the rest).

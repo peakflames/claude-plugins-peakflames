@@ -791,7 +791,7 @@ function detectIntegration(root) {
 // ---------------------------------------------------------------------------------------------
 
 /** The referee layer written as each session's `settings.json` (plan §6.7, SPIKE.md S11). */
-export function sessionSettings(config = {}, { kind = null } = {}) {
+export function sessionSettings(config = {}, { kind = null, scratch = null } = {}) {
   // The auditor reads a bundle and needs nothing from outside. Every other session may reach the package registries and the
   // project's named hosts, and may use local sockets and ports: build tools talk to their own worker processes that way
   // (MSBuild and `dotnet test` over named pipes, test servers on localhost), and without it they cannot run at all (seen live).
@@ -815,6 +815,8 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
     sandbox: sandboxed ? {
       enabled: true, allowUnsandboxedCommands: false, failIfUnavailable: true,
       network: { allowedDomains, strictAllowlist: true, ...(open ? { allowAllUnixSockets: true, allowLocalBinding: true } : {}) },
+      // The session's scratch folder is outside the clone: the one other place a sandboxed command may write.
+      ...(open && scratch ? { filesystem: { allowWrite: [scratch] } } : {}),
     } : { enabled: false },
     hooks: {
       PreToolUse: [{ matcher: '*', hooks: [hook('pretool.mjs', { timeout: 30 })] }],
@@ -826,6 +828,25 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
     },
   };
 }
+
+/** A session's scratch folder: in its step directory, so outside the clone. Nothing in it can be committed or left in the clone for the next run to trip on. */
+export const scratchDir = (stepDir) => path.join(stepDir, 'scratch');
+/**
+ * What every working session is told about temporary files. Seen live: a session refused `/tmp`
+ * left its scratch files in the clone, and the next launch stopped on a dirty clone.
+ */
+export const scratchRule = (dir) => `# Temporary files
+
+Put every file you need only while you work (a probe script, captured command output, a
+downloaded sample) in this folder:
+
+\`${dir}\`
+
+In a shell command it is \`"$AUTOPILOT_SCRATCH"\`. It is outside the repository, so nothing there is
+committed, and nothing there is part of what you deliver. Do not put such files in the
+repository: an untracked file left there fails the clean-tree check. Other places outside the
+repository, \`/tmp\` included, may be refused.
+`;
 
 /**
  * The exact command for one step: host mode for plan, build and verify (SPIKE.md "Host mode"),
@@ -847,6 +868,7 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
     BASH_DEFAULT_TIMEOUT_MS: '300000',
     CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '60000',
   };
+  if (kind !== 'audit') env.AUTOPILOT_SCRATCH = scratchDir(stepDir); // where the session keeps temporary files; the auditor only reads
   if (kind === 'audit') {
     // The auditor needs no gate tools, so it stays on plain `-p` (SPIKE.md correction 1): read-only
     // tools, the bundle as its working directory, the clone readable through --add-dir.
@@ -1572,7 +1594,8 @@ class Run {
     fs.mkdirSync(stepDir, { recursive: true });
     const sessionId = randomUUID(); const marker = '.autopilot-probe-exit';
     writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), sandbox: cfg.sandbox === true, queue: [] }); // what the referee reads
-    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind: 'probe' }));
+    fs.mkdirSync(scratchDir(stepDir), { recursive: true });
+    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind: 'probe', scratch: scratchDir(stepDir) }));
     writeJson(path.join(stepDir, 'step.json'), { name: 'probe-1', kind: 'probe', role: KINDS.probe.role, epic: 'probe', sessionId, startedAt: new Date().toISOString(), startMb: this.cloneMb() });
     const command = `${cfg.testCommand}; echo $? > ${marker}`;
     const ms = Math.min(cfg.budgets.testRunMin * 60000, 900000);
@@ -1738,7 +1761,13 @@ class Run {
       fs.writeFileSync(file, ownerAnswersText(answers));
       appendFiles.push(file);
     }
-    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind }));
+    const scratch = kind === 'audit' ? null : scratchDir(stepDir);
+    if (scratch) {
+      fs.mkdirSync(scratch, { recursive: true });
+      fs.writeFileSync(path.join(stepDir, 'scratch-rule.md'), scratchRule(scratch));
+      appendFiles.push(path.join(stepDir, 'scratch-rule.md'));
+    }
+    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind, scratch }));
     this.ignoreLook();
     const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles, resume });
 
