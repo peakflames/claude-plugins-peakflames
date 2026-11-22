@@ -7,7 +7,7 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 210 pass, 13 skipped (the skipped
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 215 pass, 13 skipped (the skipped
   ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13 passed on 2026-11-21), lab suite 10
   pass.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
@@ -221,6 +221,18 @@ Why this order:
   *`checkVerify`, `autoFix`.*
 - [ ] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change.
   Unexamined.
+
+- [x] **The scope check made the walking skeleton worse** (*no issue*; Pilot Light, run
+  `20261122-025513`; owner's decisions of 2026-11-22). It refused the new `bun.lock` and the
+  setup and run commands the skeleton wrote into `CLAUDE.md`; the one repair round deleted the
+  lockfile, git-ignored it and reverted `CLAUDE.md`, and the check passed. Now: a lockfile is
+  in scope when its manifest changed in the same epic (`MANIFEST_OF`); the first epic of the
+  plan, if it has no dependencies, may change `CLAUDE.md` in `SKELETON_SECTIONS`, and then
+  always parks for a look with the changed lines in the gate (`claudeMd`), whatever `look`
+  says. Also fixed: the `CLAUDE.md` rule skipped every changed line that began `+-` or `--`
+  (any list item). Tested against the fake (`test/scope.test.mjs`); not seen in a real run.
+  Left: the same `(?![+-])` pattern is in the test-weakening count (`driver.mjs`, the
+  `TEST_CHECK_LINE` filter), where it skips a removed line whose own text starts with `-`.
 
 ### Step 5 — Keep the attending session current (C2)
 
