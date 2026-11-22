@@ -94,7 +94,9 @@ export function collectReport(runDir) {
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
       resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
       // What the closing screen says and this report used to leave out: approved amendments, the verifier's words on the pictures, sign-ins nobody answered.
-      amended: q.amended ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [], unlooked: q.unlooked ?? null,
+      amended: q.amended ?? [], amendedUnseen: q.amendedUnseen ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [], unlooked: q.unlooked ?? null,
+      // A prototype run: the questions it answered with a session's own recommendation, and what nobody observed.
+      prototype: q.prototype ?? [], unobserved: (q.unobserved ?? []).map((u) => ({ ...u, check: `/peak-workflow:wrapup-epic ${q.id} reverify ${u.tor}` })), deferred: q.deferred ?? [],
     };
   });
 
@@ -111,7 +113,7 @@ export function collectReport(runDir) {
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, setupFailed: s.setupFailed ?? null,
-    realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, leftovers: s.leftovers ?? [], stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
+    realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, mode: s.mode === 'prototype' ? 'prototype' : 'full', driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, leftovers: s.leftovers ?? [], stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
   // Is the clone's integration tip already in the project? (null: cannot tell — no project, no clone.) Read-only.
   const git = (cwd, ...args) => { try { return spawnSync('git', args, { cwd, encoding: 'utf8' }); } catch { return { status: 1, stdout: '' }; } };
@@ -214,6 +216,56 @@ function nextSteps(r) {
   return next;
 }
 
+/**
+ * "Decided for you in this prototype run": everything a prototype run did where a full run would
+ * have stopped and asked, for the owner to review. Empty for a full run with nothing of the kind.
+ */
+export function prototypeSection(r) {
+  const took = r.epics.flatMap((e) => (e.prototype ?? []).map((x) => ({ ...x, epic: e })));
+  const unobserved = r.epics.flatMap((e) => (e.unobserved ?? []).map((x) => ({ ...x, epic: e })));
+  const unlooked = r.epics.filter((e) => e.unlooked?.prototype);
+  if (r.mode !== 'prototype' && !took.length && !unobserved.length && !unlooked.length) return [];
+  const L = ['', '## Decided for you in this prototype run'];
+  if (!took.length && !unobserved.length && !unlooked.length) { L.push('Nothing: no session asked a question this run answered for you, and no epic needed your look.'); return L; }
+  L.push('Where a full run would have stopped and asked you, this run went on. Each item is yours to review. If one is wrong, say so when you run autopilot again: work built on it may need to change.');
+  const state = (e) => (e.outcome === 'MERGED' ? 'merged' : `not merged: ${String(e.outcome).toLowerCase()}`);
+  const amended = took.filter((x) => x.kind === 'amendment');
+  if (amended.length) {
+    L.push('', '**Requirements changed on a session\'s proposal**');
+    for (const x of amended) {
+      L.push(`- ${x.tor ?? 'a requirement'} (${x.epic.label}; ${state(x.epic)}) — \`${x.gate}\``);
+      if (x.was) L.push('  As it read:', ...x.was.split('\n').map((l) => `  > ${l}`));
+      L.push(`  Proposed: ${cell(x.proposed ?? x.question)}`);
+    }
+  }
+  const deferred = took.filter((x) => x.kind === 'deferral' && /^\W*defer\b/i.test(x.answer));
+  if (deferred.length) {
+    L.push('', '**Requirements left for a later epic, on the builder\'s recommendation**');
+    for (const x of deferred) L.push(`- ${x.tor} (${x.epic.label}; ${state(x.epic)}) — ${cell(x.question)} — \`${x.gate}\``);
+  }
+  const fixed = took.filter((x) => x.kind === 'deferral' && !/^\W*defer\b/i.test(x.answer));
+  if (fixed.length) {
+    L.push('', '**Fixed in the same build, on the builder\'s recommendation**');
+    for (const x of fixed) L.push(`- ${x.tor} (${x.epic.label}; ${state(x.epic)}) — ${cell(x.question)} — \`${x.gate}\``);
+  }
+  if (unobserved.length) {
+    L.push('', '**Requirements nobody observed** (recorded as not verified in the epic\'s status file, never as verified)');
+    for (const x of unobserved) {
+      L.push(`- ${x.tor} (${x.epic.label}; ${state(x.epic)}). A person must still see:`, ...(x.clauses ?? []).map((c) => `  - ${c}`));
+      L.push(`  To check it later, with the work in the project: \`${x.check}\``);
+    }
+  }
+  if (unlooked.length) {
+    L.push('', '**Looks that were skipped**');
+    for (const e of unlooked) {
+      L.push(`- ${e.label} (${state(e)}): ${e.unlooked.pictures.length ? `${plural(e.unlooked.pictures.length, 'picture')} of its screens in \`look/${e.id}/\`` : 'no pictures'}${e.unlooked.claudeMd ? `; it changed the project's instructions file (CLAUDE.md) in ${e.unlooked.claudeMd.sections.join(', ')}, which every later session follows:` : ''}`);
+      for (const l of e.unlooked.claudeMd?.lines ?? []) L.push(`  \`${l}\``);
+      if (e.unlooked.claudeMd?.more) L.push(`  … and ${e.unlooked.claudeMd.more} more changed line(s)`);
+    }
+  }
+  return L;
+}
+
 export function renderReport(r) {
   const L = [];
   L.push(`# Autopilot — ${stamp(r.run)} → ${r.ended ? stamp(r.ended) : 'still running'} (stopped: ${r.stoppedBecause ?? 'not yet'})`);
@@ -235,13 +287,16 @@ export function renderReport(r) {
   if (fixed.length) L.push(`Small fixes made without asking, on your standing answer: ${fixed.map((e) => `${e.id} (${e.fixedAtWrapup.files.join(', ') || 'no code file'})`).join('; ')} — what was asked is under each epic below.`);
   const auto = r.epics.filter((e) => e.fixedAtWrapup?.auto);
   if (auto.length) L.push(`Fixes the final check made to its own findings without asking, checked only by the verifier: ${auto.map((e) => `${e.id} (${e.fixedAtWrapup.files.join(', ') || 'no code file'})`).join('; ')}.`);
-  const decided = r.gates.filter((g) => g.decided?.standing);
+  L.push(`How careful this run was: ${r.mode === 'prototype' ? 'a prototype run, as you chose at launch. It kept building: it took a session\'s own recommendation where a full run would have asked you, and did not stop for your looks. Every one of those is under "Decided for you in this prototype run"' : 'a full run: it stopped and asked whenever a requirement, a deferral or a look needed you'}.`);
+  const decided = r.gates.filter((g) => g.decided?.standing && !g.decided.prototype);
   if (decided.length) L.push(`Decided by autopilot for you, on your standing answer for technical stops: ${decided.map((g) => `${g.epic} — "${g.decided.answer}" (\`${g.file}\`)`).join('; ')}.`);
   const nobody = r.epics.filter((e) => e.unanswered.length);
   if (nobody.length) L.push(`Waited for you and nobody came: ${nobody.map((e) => `${e.id} ×${e.unanswered.length}`).join(', ')} — each is under its epic below. Run autopilot when you are at the computer and it will take you through them.`);
 
   L.push('', '## Do this next');
   if (r.next.length) r.next.forEach((n, i) => L.push(`${i + 1}. ${n}`)); else L.push('Nothing to do.');
+
+  L.push(...prototypeSection(r));
 
   L.push('', '## Results', 'One row per epic, in the order they were queued.', '', '| Epic | Outcome | Why | Evidence | Cost | Time |', '|---|---|---|---|---|---|');
   for (const e of r.epics) L.push(`| ${cell(e.label)} | ${e.outcome} | ${cell(e.reason)} | ${cell(e.evidence)} | ${usd(e.costUsd)} | ${mins(e.elapsedMs)} |`);
@@ -278,8 +333,11 @@ export function renderReport(r) {
       L.push('', `Human check: ${e.look.by} looked on ${e.look.date} and answered "Looks right" (\`${e.look.gate}\`)${pics ? `, with ${pics} picture(s) of the screens` : ''}${live ? `; ${live} line(s) seen for real, on the running build` : ''}; wrapup's manual-verification question was answered with that.${e.look.kept ? ` The look was kept across a repair that changed no screen file (${e.look.kept.files.join(', ') || 'no files'}).` : ''}`);
       for (const o of e.look.observations ?? []) L.push(`- ${o.tor}: "${o.clause}" — ${o.answer}${o.how ? ` (${o.how === 'live' ? 'seen for real' : 'from pictures'})` : ''}`);
     }
-    if (e.unlooked) L.push('', `Merged without your look ("look": "after"): ${e.unlooked.pictures.length} picture(s) of its screens are kept in \`look/${e.id}/\` for you to review. The verifier judged them; its words are below.`);
-    if (e.amended.length) L.push('', `Requirement amended with your approval: ${e.amended.join(', ')}. The build rewrote it in your name and the checks followed the amended text.`);
+    if (e.unlooked?.prototype) L.push('', `Not stopped for your look (prototype run): ${e.unlooked.pictures.length} picture(s) of its screens are kept in \`look/${e.id}/\`${e.unlooked.claudeMd ? `, and it changed the project's instructions file (CLAUDE.md) in ${e.unlooked.claudeMd.sections.join(', ')}` : ''}. See "Decided for you in this prototype run".`);
+    else if (e.unlooked) L.push('', `Merged without your look ("look": "after"): ${e.unlooked.pictures.length} picture(s) of its screens are kept in \`look/${e.id}/\` for you to review. The verifier judged them; its words are below.`);
+    const yours = e.amended.filter((t) => !(e.amendedUnseen ?? []).includes(t));
+    if (yours.length) L.push('', `Requirement amended with your approval: ${yours.join(', ')}. The build rewrote it in your name and the checks followed the amended text.`);
+    if ((e.amendedUnseen ?? []).length) L.push('', `Requirement amended without your approval, on a session's proposal (prototype run): ${e.amendedUnseen.join(', ')}. The checks followed the amended text. See "Decided for you in this prototype run".`);
     if (e.seen.length) L.push('', 'What the verifier saw in the pictures (its own words):', ...e.seen.map((x) => `- ${x}`));
     if (e.unanswered.length) L.push('', 'Waited for you and nobody came:', ...e.unanswered.map((u) => `- ${u.step ? `${u.step}: ` : ''}${u.description}`), 'Run autopilot when you are at the computer and it will take you through them.');
     if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);
@@ -304,7 +362,7 @@ export function renderReport(r) {
       L.push('', 'Gates:');
       for (const g of mine) {
         const fate = g.void ? ` — VOID: ${g.void.why}` : g.decided?.used ? ` (used by run ${g.decided.used.run ?? '?'})` : g.superseded ? ' (superseded: the epic started over)' : g.cleared ? ' (cleared)' : g.decided ? ' — resumes the epic in the next run' : '';
-        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.standing ? ' (decided by autopilot on their standing answer for technical stops, given at launch; nobody was asked again)' : g.decided.asked ? ` (they were asked "${g.decided.asked}" and said yes)` : ''}${fate}${g.enters && !g.void ? ` at ${g.enters}` : ''}` : g.effect === 'none' ? `nothing to answer: it needs a change in the project${fate}` : `NOT DECIDED${fate}`;
+        const d = g.decided ? `decided "${g.decided.answer}" by ${g.decided.by} on ${g.decided.date}${g.decided.prototype ? ' (answered by autopilot with the session\'s own recommendation, because this was a prototype run; nobody was asked)' : g.decided.standing ? ' (decided by autopilot on their standing answer for technical stops, given at launch; nobody was asked again)' : g.decided.asked ? ` (they were asked "${g.decided.asked}" and said yes)` : ''}${fate}${g.enters && !g.void ? ` at ${g.enters}` : ''}` : g.effect === 'none' ? `nothing to answer: it needs a change in the project${fate}` : `NOT DECIDED${fate}`;
         L.push(`- \`${g.file}\` (${g.kind}${g.fromEarlierRun ? `, from run ${g.run}` : ''}) — ${cell(g.decided ? g.question : g.ask?.question ?? g.question)} — ${d}`);
         if (g.options.length && !g.decided) L.push(`  Options: ${(g.ask?.options ?? g.options).map((o) => `"${o}"`).join(', ')}`);
         if (g.artifacts.length) L.push(`  Look at: ${g.artifacts.map((a) => `\`${a}\``).join(', ')}`);

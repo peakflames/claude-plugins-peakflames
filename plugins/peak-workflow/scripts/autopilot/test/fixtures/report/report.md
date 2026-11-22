@@ -15,6 +15,7 @@ Integration line: develop in <workspace>/clone (not pushed). Spent $41.20 of $80
 Real money on outside services: not decided at launch; a session that needs it asks you.
 Whether you were there: you said you would be away; no session started anything that waits for a person.
 Small fixes made without asking, on your standing answer: Lg1Csv7 (src/usage.js) — what was asked is under each epic below.
+How careful this run was: a full run: it stopped and asked whenever a requirement, a deferral or a look needed you.
 Waited for you and nobody came: Lg1Csv7 ×1 — each is under its epic below. Run autopilot when you are at the computer and it will take you through them.
 
 ## Do this next

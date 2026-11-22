@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs } from '../lib.mjs';
+import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROTOTYPE_BY, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -388,15 +388,35 @@ export function offeredLabel(labels, want) {
   const near = labels.filter((l) => { const n = norm(l); return starts(w, n) || starts(n, w); });
   return near.length === 1 ? near[0] : undefined;
 }
+/** Whether a requirement sits under a `# Safety` banner in the clone's feature files (as the driver's `readRequirements` reads them). One that cannot be found counts as Safety. */
+function isSafety(clone, tor) {
+  try {
+    const dir = path.join(clone, 'docs', 'requirements'); let found = false;
+    for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.feature.md'))) {
+      let safety = false;
+      for (const line of fs.readFileSync(path.join(dir, f), 'utf8').split(/\r?\n/)) {
+        if (/^#\s+\S/.test(line) && !/^#\s*-+\s*$/.test(line) && !/^#\s*Verification:/.test(line.trim())) safety = /^#\s+Safety\b/.test(line);
+        if (/^Scenario:\s*\[/.test(line) && line.includes(`[${tor}]`)) { if (safety) return true; found = true; }
+      }
+    }
+    return !found;
+  } catch { return true; }
+}
 const rowMatches = (row, question) => (row.fragments ?? []).every((f) => norm(question).includes(norm(f))) && (!row.pattern || new RegExp(row.pattern).test(question));
 
 function ruleR8(ctx) {
   const policy = readJson(path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'policy', 'gates.json'), { answer: [], park: [] });
   const questions = ctx.input.tool_input?.questions ?? [];
-  const answers = {}; const used = []; const notes = {}; let looked = null; let told = 0; const standing = [];
+  const answers = {}; const used = []; const notes = {}; let looked = null; let told = 0; const standing = []; let protoAgain = 0;
   // What the owner already answered for this step, in this run or an earlier one (the driver writes it to step.json
   // and tells the session before it starts).
   const earlier = ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).answers ?? [] : [];
+  // A prototype run (the owner's choice at launch, the run's `mode`): a session's own recommendation is taken where
+  // a full run would stop and ask, recorded as a gate that is already decided, and listed for the owner at the end.
+  const proto = ctx.config.mode === 'prototype';
+  const gatesNow = () => { const dir = path.join(ctx.state, 'gates'); return (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => f.endsWith('.json')).map((f) => readJson(path.join(dir, f), {})); };
+  const protoTaken = proto ? prototypeGates(gatesNow(), ctx.epic) : [];
+  const protoNow = [];
   let park = questions.length ? null : { kind: 'unmatched', question: '(AskUserQuestion with no questions)', options: [], why: 'nothing to match' };
   for (const q of questions) {
     const labels = (q.options ?? []).map((o) => (typeof o === 'string' ? o : o.label));
@@ -431,7 +451,34 @@ function ruleR8(ctx) {
     }
     // The owner looked, and no option on offer says so: never let the policy "No" stand in for their look.
     if (look) { park = { ...base, why: 'the owner looked at this build, and none of the options offered says a manual check was done' }; break; }
+    if (parkRow && proto) {
+      // The same question again from a later session of the epic (the planner asked, now the builder does): the same answer, not a second one.
+      // A session that now recommends something else (it tried the fix and wants to stop) is asking a new question: the owner's.
+      // So is a different correction to a requirement already amended: only the proposal that was taken is taken again.
+      const proposal = (text) => norm((String(text ?? '').match(/\bProposed:\s*([\s\S]*?)\s*How to proceed\?\s*$/) ?? [])[1] ?? String(text ?? ''));
+      const before = protoTaken.find((g) => g.kind === kind && (g.tor ?? null) === tor && offered(g.decided.answer) && (kind === 'deferral' ? recommended(q.question) === g.recommendation : proposal(q.question) === proposal(g.question)));
+      // A Safety requirement is never amended or deferred by anyone but the owner, whatever a session offers.
+      if (!before && tor && anchors(ctx).includes(tor) && isSafety(ctx.clone, tor)) { park = { ...base, why: `${parkRow.why}; ${tor} is a Safety requirement, which a prototype run never decides` }; break; }
+      if (before) { answers[q.question] = offered(before.decided.answer); protoAgain += 1; continue; }
+      const p = prototypeAnswer({ kind, question: q.question, labels, tor, anchors: anchors(ctx), taken: [...protoTaken, ...protoNow] });
+      if (p?.answer) { answers[q.question] = p.answer; protoNow.push({ ...base, why: parkRow.why, answer: p.answer, ...(kind === 'deferral' ? { recommendation: recommended(q.question) } : {}) }); continue; }
+      if (p?.why) { park = { ...base, why: `${parkRow.why}; ${p.why}` }; break; }
+    }
     if (parkRow) { park = { ...base, why: parkRow.why }; break; }
+    if (proto && ctx.role === 'verifier' && kind === 'tor-fail' && tor) {
+      // A deferral the builder recommended and this run took: the final check meets the same unmet requirement, and
+      // when it too recommends deferring, the same decision stands. It is not a new one, so it is not counted again.
+      const label = labels.filter((l) => /^\W*defer\b/i.test(l));
+      if (prototypeDeferred(protoTaken, ctx.epic).includes(tor) && recommended(q.question) === 'Defer' && label.length === 1) { answers[q.question] = label[0]; protoAgain += 1; continue; }
+      // A requirement only a person can observe, in a run where nobody will: the verifier was told to record it as
+      // not observed and not to ask. Reminded once; asked again, the question is answered as in a full run.
+      const unobserved = ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).unobserved ?? [] : [];
+      const memo = ctx.step ? path.join(ctx.step, `not-observed-reminded-${tor}.json`) : null;
+      if (memo && unobserved.some((u) => u.tor === tor) && /is CANNOT VERIFY: /.test(q.question) && !fs.existsSync(memo)) {
+        fs.writeFileSync(memo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
+        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: this is a prototype run and nobody will observe ${tor}. Do not ask about it. Follow the file "Requirements nobody will observe in this run" you were given: no PASS for it, no Deferrals row, record it with \`tor-lifecycle mark\` as \`--fail ${tor} "${NOT_OBSERVED} — prototype run: <what a person must still do>"\`, list it under "Not proven for real", and judge the epic on its other requirements` };
+      }
+    }
     // The owner's standing answer for small fixes: the verifier itself recommends "Fix now", that option is on
     // offer, and fewer than the allowed number were answered this way in this final check. How big the fix may be
     // is judged afterwards, at the merge gate, from what was actually changed; a requirement is never part of it.
@@ -464,6 +511,13 @@ function ruleR8(ctx) {
         const lines = (seen.observations ?? []).filter((o) => o.tor === tor && o.answer === 'yes').map((o) => `"${o.clause}" — yes${o.how === 'live' ? ', seen for real' : ''}`).join('; ');
         return { rule: 'R8', decision: 'remind', reason: `not put to the owner: ${seen.by} already did this check for ${tor} on ${seen.date} and recorded what they saw${lines ? ` (${lines})` : ''}${seen.note ? `; their words: "${seen.note}"` : ''}. It is in the file "The operator's observation is already recorded" you were given. Do not ask them to do it again: record it as operator-observed in their words and judge the Then from it. If their record contradicts a Then or says a line was not checked, give CANNOT VERIFY and ask the skill's own question for that, with your reason` };
       }
+      // After a deferral this run took, the skill asks which later epic builds the missing part. Nobody is there to
+      // say, and autopilot never names one: the session is told once to use the epic it (or the builder) already named.
+      const succMemo = ctx.step ? path.join(ctx.step, 'successor-reminded.json') : null;
+      if (proto && succMemo && /which later epic creates the code/i.test(q.question) && prototypeDeferred(protoTaken, ctx.epic).length && !fs.existsSync(succMemo)) {
+        fs.writeFileSync(succMemo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
+        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: this is a prototype run, and the deferral was taken on your own recommendation. The later epic is the one ${ctx.role === 'verifier' ? "the implementer's Deferrals row names as the successor" : 'your recommendation named'}: use it, run the skill's successor check with it and carry on. If no such epic's spec exists, Defer is not available: ask the first question again, recommending Fix now or Stop` };
+      }
       const memo = ctx.step ? path.join(ctx.step, 'answers-reminded.json') : null;
       if (earlier.length && memo && !fs.existsSync(memo)) {
         fs.writeFileSync(memo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
@@ -487,12 +541,21 @@ function ruleR8(ctx) {
     const done = { ...g, decided: { ...g.decided, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
     fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
   }
+  // Each answer taken on the prototype setting is a gate file like any other, already decided and already used:
+  // the one record the driver's checks, the report and the closing screen read.
+  const taken = protoNow.map(({ answer, ...g }) => {
+    const date = new Date().toISOString();
+    return { kind: g.kind, tor: g.tor, answer, gate: writeGate(ctx, { ...g, artifacts: [], decided: { answer, by: PROTOTYPE_BY, date, standing: true, prototype: true, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date } } }) };
+  });
   if (standing.length) { const file = path.join(ctx.step, SMALL_FIX_FILE); fs.writeFileSync(file, JSON.stringify([...readJson(file, []), ...standing], null, 2) + '\n'); }
   if (standing.length === Object.keys(answers).length) return { rule: 'R8', decision: 'answer', owner: standing.length, reason: `answered from the owner's standing answer for small fixes: ${Object.values(answers).join(' | ')}. Keep the fix small: it is checked at the merge against the owner's limits, never touches a requirement file and never removes a line from a test${standing.some((x) => x.testOnly) ? `. For ${standing.filter((x) => x.testOnly).map((x) => x.tor).join(' and ')} the fix is the missing test alone, in a test file: when that test passes against the code as built, the requirement is met; when it fails, the code is wrong, so ask the question again without "Fix now"` : ''}`, updatedInput: { ...ctx.input.tool_input, answers } };
   const owner = used.length + told + (looked ? 1 : 0) + standing.length;
-  const source = owner === 0 ? 'policy' : owner === Object.keys(answers).length ? "the owner's recorded decision" : "policy and the owner's recorded decision";
+  const byProto = taken.length + protoAgain; const all = Object.keys(answers).length;
+  const source = [owner + byProto < all ? 'policy' : null, owner ? "the owner's recorded decision" : null, byProto ? "the owner's prototype setting for this run" : null].filter(Boolean).join(' and ');
   const annotations = Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { notes: v }]));
-  return { rule: 'R8', decision: 'answer', owner, reason: `answered from ${source}: ${Object.values(answers).join(' | ')}`, updatedInput: { ...ctx.input.tool_input, answers, ...(looked ? { annotations: { ...(ctx.input.tool_input.annotations ?? {}), ...annotations } } : {}) } };
+  // What the session is told with a prototype answer: nobody picked it just now, and what the option still asks of it.
+  const how = !byProto ? '' : `. No person picked this just now: the owner chose a prototype run, which takes your own recommendation and shows it to them afterwards. Act on it as their decision and say in your report that autopilot answered it${Object.values(answers).some((a) => /^\W*amend\b/i.test(a)) ? '. Amend: write the change as the skill says; the approval its record cites is this setting' : ''}${Object.values(answers).some((a) => /^\W*defer\b/i.test(a)) ? ". Defer: do not ask which later epic builds the missing part; it is the one already named (in your recommendation, or in the implementer's Deferrals row). If no such epic's spec exists, Defer is not available: ask again, recommending Fix now or Stop" : ''}`;
+  return { rule: 'R8', decision: 'answer', owner, ...(taken.length ? { prototype: taken } : {}), reason: `answered from ${source}: ${Object.values(answers).join(' | ')}${how}`, updatedInput: { ...ctx.input.tool_input, answers, ...(looked ? { annotations: { ...(ctx.input.tool_input.annotations ?? {}), ...annotations } } : {}) } };
 }
 
 // ---- R9: plan capture and lint -----------------------------------------------------------------
@@ -562,7 +625,7 @@ function main() {
     const brief = JSON.stringify(input.tool_input ?? null);
     try {
       fs.appendFileSync(path.join(step, 'hooks.jsonl'), JSON.stringify({
-        t: new Date().toISOString(), hook: 'PreToolUse', tool_name: input.tool_name, rule: d?.rule ?? null, decision: d?.decision ?? 'pass', reason: d?.reason ?? null, gate: d?.gate ?? undefined,
+        t: new Date().toISOString(), hook: 'PreToolUse', tool_name: input.tool_name, rule: d?.rule ?? null, decision: d?.decision ?? 'pass', reason: d?.reason ?? null, gate: d?.gate ?? undefined, prototype: d?.prototype ?? undefined,
         agent_id: input.agent_id, agent_type: input.agent_type, tool_use_id: input.tool_use_id, tool_input: brief && brief.length > 4000 ? brief.slice(0, 4000) + '…' : input.tool_input ?? null,
       }) + '\n');
     } catch { /* logging never changes a decision */ }

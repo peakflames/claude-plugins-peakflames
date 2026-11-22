@@ -15,6 +15,7 @@
   "setupFailed": null,
   "realSpend": null,
   "attended": false,
+  "mode": "full",
   "driverVersion": "0.2.0",
   "sync": null,
   "leftovers": [],
@@ -217,6 +218,7 @@
       "amended": [
         "TOR-01-Lg1Csv7"
       ],
+      "amendedUnseen": [],
       "seen": [
         "home.png — the home page with three figures, as captioned",
         "home-narrow.png — NOT as captioned: the menu covers the heading"
@@ -228,7 +230,10 @@
           "command": "node bin/ledger.js login"
         }
       ],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg4Fx2q",
@@ -406,9 +411,13 @@
       "look": null,
       "fixedAtWrapup": null,
       "amended": [],
+      "amendedUnseen": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg5Chr8",
@@ -533,9 +542,13 @@
       "look": null,
       "fixedAtWrapup": null,
       "amended": [],
+      "amendedUnseen": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg3Sum9",
@@ -785,9 +798,13 @@
       "look": null,
       "fixedAtWrapup": null,
       "amended": [],
+      "amendedUnseen": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg6Bud2",
@@ -830,9 +847,13 @@
       "look": null,
       "fixedAtWrapup": null,
       "amended": [],
+      "amendedUnseen": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg7Exp5",
@@ -861,9 +882,13 @@
       "look": null,
       "fixedAtWrapup": null,
       "amended": [],
+      "amendedUnseen": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg8Hw01",
@@ -892,9 +917,13 @@
       "look": null,
       "fixedAtWrapup": null,
       "amended": [],
+      "amendedUnseen": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     }
   ],
   "gates": [

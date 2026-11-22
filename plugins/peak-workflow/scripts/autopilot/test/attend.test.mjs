@@ -238,7 +238,7 @@ test('continue: a budget stop is resumed on the standing answer, twice per epic;
   // The run that continues it: named by status, with the same queue and what is left of the budget.
   const s2 = st(p);
   assert.deepEqual([s2.next, s2.why, s2.waiting, s2.autoContinue], ['readiness', 'a decided gate waits to be used', [], []]);
-  assert.deepEqual(s2.relaunch.config, { project: p.project, queue: [E1.id], explicit: [], endBy: null, runBudgetUsd: 78.6, autoContinue: 2, continues: run1, allowTestDouble: true });
+  assert.deepEqual(s2.relaunch.config, { project: p.project, queue: [E1.id], explicit: [], endBy: null, runBudgetUsd: 78.6, autoContinue: 2, continues: run1, mode: 'full', allowTestDouble: true });
   const relaunch = async (s) => { confirmRun(p, s.relaunch.config, s.relaunch.run); const before = p.calls().length; await p.go({ run: s.relaunch.run }); return p.steps().slice(before); };
   assert.deepEqual(await relaunch(s2), [`${E1.id}/build-1`], 'the build is continued; nothing is planned again');
   assert.equal(readJson(path.join(p.runDir(), 'config.json')).continues, run1);
