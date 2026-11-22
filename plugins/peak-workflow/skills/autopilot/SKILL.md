@@ -462,7 +462,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      lint, not by a person; an auditor reads each build and a high finding in
      `launch.config.audit.parkOn` parks it.
    - **The copy's environment:** the `setup` command, the `copy` files, the `readOnly`
-     directories and the `network` hosts from `launch.env`, what the copy starts without
+     directories and the `network` hosts from `launch.env`, the files outside the project
+     that `CLAUDE.md` names and sessions may therefore read (`launch.env.readFiles`; say for
+     each entry of `launch.env.readRefused` that sessions may not read it, and its `why`), what the copy starts without
      (Step 1 item 5a), each quality gate and whether it passed in the copy, and the probe's
      result. The settings file is the owner's to commit so teammates get the same setup.
    - Where it runs: the private clone at `<launch.clone>`, on `launch.integration`. The clone is

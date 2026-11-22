@@ -121,6 +121,27 @@ test('R2 scratch folder: a session writes temporary files in its step\'s scratch
   denied(a.pre('Read', { file_path: path.join(a.scratch, 'x.txt') }), 'R2');
 });
 
+test('R2 files CLAUDE.md names: a listed file outside the clone is read and run, never written; its neighbours stay closed', (t) => {
+  for (const sandbox of [false, true]) {
+    const h = referee(t, { sandbox });
+    const home = path.join(h.tmp, 'home'); const HOME = { HOME: home, TMPDIR: path.join(h.tmp, 'tmp') }; // the fake home must not count as a temp directory
+    fs.mkdirSync(path.join(home, '.claude', 'scripts'), { recursive: true });
+    const tether = path.join(home, '.claude', 'scripts', 'tethered.mjs'); const other = path.join(home, '.claude', 'scripts', 'other.mjs');
+    for (const f of [tether, other, path.join(home, '.claude', 'settings.json')]) fs.writeFileSync(f, 'x');
+    denied(h.pre('Read', { file_path: tether }, HOME), 'R2', undefined, `not listed yet, sandbox ${sandbox}`);
+    denied(h.bash('node ~/.claude/scripts/tethered.mjs start', HOME), 'R2');
+    const stateFile = path.join(h.runDir, 'state.json');
+    fs.writeFileSync(stateFile, JSON.stringify({ ...readJson(stateFile), readFiles: [tether] }));
+    passes(h.pre('Read', { file_path: tether }, HOME), 'read');
+    passes(h.bash('node ~/.claude/scripts/tethered.mjs start -- npm run dev', HOME), 'run');
+    denied(h.pre('Edit', { file_path: tether, old_string: 'x', new_string: 'y' }, HOME), 'R2', /read-only/);
+    denied(h.bash('echo x > ~/.claude/scripts/tethered.mjs', HOME), 'R2');
+    denied(h.pre('Read', { file_path: other }, HOME), 'R2');
+    denied(h.pre('Read', { file_path: path.join(home, '.claude', 'settings.json') }, HOME), 'R2');
+    denied(h.bash('ls ~/.claude/scripts', HOME), 'R2');
+  }
+});
+
 test('sandbox on — R2 path jail: a symlink out of the clone is resolved and denied', (t) => {
   const h = referee(t, { sandbox: true });
   const outside = path.join(h.tmp, 'outside');
