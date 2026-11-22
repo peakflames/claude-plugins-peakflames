@@ -7,7 +7,7 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 209 pass, 13 skipped (the skipped
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 210 pass, 13 skipped (the skipped
   ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13 passed on 2026-11-21), lab suite 10
   pass.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
@@ -255,6 +255,10 @@ Why this order:
   nothing to test. Now: when no declared test directory holds a committed file, the base run
   and the probe are skipped and the first epic's checks run the tests (`noTestsYet` in
   `driver.mjs`). Not proven on a real run yet: Pilot Light's first epic is that proof.
+- [x] **The Python check stopped the launch although a current Python was installed** (*no
+  issue*; found 2026-11-22 on Pilot Light's first launch). macOS's Python 3.9 came first on
+  PATH and hid Homebrew's. `scripts/tor-lifecycle` now tries `python3` in every PATH folder,
+  then `/opt/homebrew/bin` and `/usr/local/bin`.
 - [ ] **A test that times out leaves its fake `claude` running** (*no issue*; seen 2026-11-21:
   six stray `fake-claude.mjs` processes after timed-out attend tests). Test-only; kill the
   child when a test ends.

@@ -232,6 +232,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Python check finds a newer Python behind an old one** — `tor-lifecycle` now tries
+  `python3` in every PATH folder and in the usual install folders, so macOS's own Python 3.9
+  no longer hides a Homebrew Python and stops every skill and autopilot's launch check.
 - **A resumed epic starts on its own branch** — the driver checks the epic's branch out before every session, so resumed work is committed there.
 - **Files a session left in autopilot's clone no longer block a run** — uncommitted and untracked files are set aside under `refs/autopilot/leftover/` at launch and before each epic. Nothing is deleted; the log and the report say how many.
 - **`tor-lifecycle` on a backslash path** — the launcher finds `tor_lifecycle.py` when Windows passes its own path with backslashes.
