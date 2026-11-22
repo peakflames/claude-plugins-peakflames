@@ -328,7 +328,7 @@ test('SKILL.md: the launch asks how careful the run is, writes the answer as `mo
     '`Prototype`', '"Keeps building. It takes the session\'s own recommendation, skips your looks, and lists every one of those at the end for you to review"',
     'The answer is the run\'s `mode`: `"full"` or `"prototype"`', 'Never pick Prototype for the owner', 'nothing is ever pushed',
     '`mode` (how careful the run is)', 'for `mode`, `"full"` or `"prototype"`',
-    '**Decided for you in this prototype run:** <only when `mode` is `prototype`>', 'its `check` exactly as given', 'never as verified', 'none folded into a count',
+    '**Decided for you in this prototype run:** <only when `mode` is `prototype`, or one of its four sources has an entry>', 'its `check` exactly as given', 'never as verified', 'none folded into a count',
   ]) assert.ok(flat.includes(text), text);
   assert.match(SKILL, /"attended": false,\n\s+"mode": "full"\n\s+\}/, 'the config.json block carries the mode');
   // The four launch questions fit one popup (AskUserQuestion takes at most four).

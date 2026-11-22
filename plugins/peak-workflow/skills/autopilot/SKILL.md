@@ -1004,7 +1004,7 @@ Leave out a part that has nothing to say.
 **Screens merged without your look:** <only when `unlooked` has entries without `prototype`>
 - <epic, short> — <n> pictures, sent now for you to review
 
-**Decided for you in this prototype run:** <only when `mode` is `prototype`>
+**Decided for you in this prototype run:** <only when `mode` is `prototype`, or one of its four sources has an entry>
 - <requirement, in plain words> — changed as the planner proposed. It read: <was>. Proposed: <proposed>
 - <requirement, in plain words> — left for a later epic, as the builder recommended
 - <requirement, in plain words> — nobody observed it; it is recorded as not verified. Still to see: <clauses>. To check it later: <check>
@@ -1047,7 +1047,8 @@ Leave out a part that has nothing to say.
   technical stops autopilot answered itself. One line each, by epic: "<label>: <why>, so
   autopilot <did>."
 - **Decided for you in this prototype run** is shown whenever status says `mode` is
-  `prototype`. It is the brake on a run that did not stop: where a full run would have asked
+  `prototype`, and also in a full run that finished work an earlier prototype run began
+  (one of the sources below has an entry). It is the brake on a run that did not stop: where a full run would have asked
   the owner, this one went on, and every such place is listed here, none folded into a
   count. It has four sources. The `decidedForYou` entries with `prototype`: a requirement
   changed on a session's proposal (`kind` `amendment`; give `was`, the text as it read, and

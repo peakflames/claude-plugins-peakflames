@@ -388,6 +388,20 @@ export function offeredLabel(labels, want) {
   const near = labels.filter((l) => { const n = norm(l); return starts(w, n) || starts(n, w); });
   return near.length === 1 ? near[0] : undefined;
 }
+/** Whether a requirement sits under a `# Safety` banner in the clone's feature files (as the driver's `readRequirements` reads them). One that cannot be found counts as Safety. */
+function isSafety(clone, tor) {
+  try {
+    const dir = path.join(clone, 'docs', 'requirements'); let found = false;
+    for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.feature.md'))) {
+      let safety = false;
+      for (const line of fs.readFileSync(path.join(dir, f), 'utf8').split(/\r?\n/)) {
+        if (/^#\s+\S/.test(line) && !/^#\s*-+\s*$/.test(line) && !/^#\s*Verification:/.test(line.trim())) safety = /^#\s+Safety\b/.test(line);
+        if (/^Scenario:\s*\[/.test(line) && line.includes(`[${tor}]`)) { if (safety) return true; found = true; }
+      }
+    }
+    return !found;
+  } catch { return true; }
+}
 const rowMatches = (row, question) => (row.fragments ?? []).every((f) => norm(question).includes(norm(f))) && (!row.pattern || new RegExp(row.pattern).test(question));
 
 function ruleR8(ctx) {
@@ -440,7 +454,11 @@ function ruleR8(ctx) {
     if (parkRow && proto) {
       // The same question again from a later session of the epic (the planner asked, now the builder does): the same answer, not a second one.
       // A session that now recommends something else (it tried the fix and wants to stop) is asking a new question: the owner's.
-      const before = protoTaken.find((g) => g.kind === kind && (g.tor ?? null) === tor && offered(g.decided.answer) && (kind !== 'deferral' || recommended(q.question) === g.recommendation));
+      // So is a different correction to a requirement already amended: only the proposal that was taken is taken again.
+      const proposal = (text) => norm((String(text ?? '').match(/\bProposed:\s*([\s\S]*?)\s*How to proceed\?\s*$/) ?? [])[1] ?? String(text ?? ''));
+      const before = protoTaken.find((g) => g.kind === kind && (g.tor ?? null) === tor && offered(g.decided.answer) && (kind === 'deferral' ? recommended(q.question) === g.recommendation : proposal(q.question) === proposal(g.question)));
+      // A Safety requirement is never amended or deferred by anyone but the owner, whatever a session offers.
+      if (!before && tor && anchors(ctx).includes(tor) && isSafety(ctx.clone, tor)) { park = { ...base, why: `${parkRow.why}; ${tor} is a Safety requirement, which a prototype run never decides` }; break; }
       if (before) { answers[q.question] = offered(before.decided.answer); protoAgain += 1; continue; }
       const p = prototypeAnswer({ kind, question: q.question, labels, tor, anchors: anchors(ctx), taken: [...protoTaken, ...protoNow] });
       if (p?.answer) { answers[q.question] = p.answer; protoNow.push({ ...base, why: parkRow.why, answer: p.answer, ...(kind === 'deferral' ? { recommendation: recommended(q.question) } : {}) }); continue; }

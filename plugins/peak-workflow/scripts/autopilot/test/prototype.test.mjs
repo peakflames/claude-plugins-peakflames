@@ -143,7 +143,8 @@ test('prototype: the planner\'s proposed correction is taken; the gate is record
   assert.deepEqual([g.kind, g.tor, g.session, g.decided.answer, g.decided.by, g.decided.standing, g.decided.prototype, g.decided.used.session], ['amendment', tor, 'plan-1', AMEND(tor)[0], 'autopilot (prototype run)', true, true, 'plan-1']);
   const scope = check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'scope');
   assert.equal(scope.pass, true, JSON.stringify(scope));
-  assert.match(scope.evidence, /requirement files changed under the owner's approved amendment/);
+  assert.match(scope.evidence, /requirement files changed under the amendment this prototype run took, not yet seen by the owner, of /);
+  assert.deepEqual(q.amendedUnseen, [tor]);
   assert.equal(q.state, 'MERGED', q.reason);
   assert.equal(q.prototype.length, 1);
   assert.match(q.prototype[0].was, new RegExp(`^Scenario: \\[${tor}\\]`));
@@ -154,6 +155,7 @@ test('prototype: the planner\'s proposed correction is taken; the gate is record
   const md = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
   assert.match(md, new RegExp(`\\*\\*Requirements changed on a session's proposal\\*\\*\\n- ${tor} \\(.*; merged\\)[\\s\\S]*As it read:\\n  > Scenario: \\[${tor}\\][\\s\\S]*Proposed: same title`));
   assert.ok(!/on your standing answer for technical stops: /.test(md), 'not listed as a technical stop');
+  assert.ok(!/amended with your approval/.test(md) && /amended without your approval, on a session's proposal/.test(md), 'never said to be approved by the owner');
   const events = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => eventLine(JSON.parse(l)));
   assert.ok(events.includes(`Took the planner's correction to ${tor} for you (prototype run)`), events.join('\n'));
 });
@@ -166,9 +168,12 @@ test('prototype: a deferral the builder recommends is taken through the build ch
   p.scenario({
     [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: deferringBuild(E1, [ask(deferQ(tor), DEFERRAL)], [tor], succ), [`${E1.id}/verify`]: waivingWrapup(E1, [tor], succ),
     [`${stop.id}/plan`]: planScript(stop), [`${stop.id}/build`]: { actions: [{ do: 'branch', name: stop.branch }, ask(deferQ(stop.tors[0], 'Stop — the rule list is not final'), DEFERRAL)] },
+    // The later epic builds only its own requirement: the driver now holds it to the deferred one too.
     ...happy(succ),
   });
-  const s = await p.go({ queue: [E1.id, stop.id] });
+  const s = await p.go({ queue: [E1.id, stop.id, succ.id] });
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`${succ.id}: now also anchors ${E1.tors[3]}, deferred to it by ${E1.id}`));
+  assert.deepEqual([s.queue[2].state, s.queue[2].reason], ['PARKED', `plan lint failed: does not name anchor ${E1.tors[3]}`], 'its plan, written for its own requirement alone, is not accepted');
   const q = s.queue[0];
   assert.equal(q.state, 'MERGED', `${q.reason} ${JSON.stringify(q.checks)}`);
   const g = gate(p, E1.id);

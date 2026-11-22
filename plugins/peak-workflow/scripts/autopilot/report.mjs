@@ -94,7 +94,7 @@ export function collectReport(runDir) {
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
       resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
       // What the closing screen says and this report used to leave out: approved amendments, the verifier's words on the pictures, sign-ins nobody answered.
-      amended: q.amended ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [], unlooked: q.unlooked ?? null,
+      amended: q.amended ?? [], amendedUnseen: q.amendedUnseen ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [], unlooked: q.unlooked ?? null,
       // A prototype run: the questions it answered with a session's own recommendation, and what nobody observed.
       prototype: q.prototype ?? [], unobserved: (q.unobserved ?? []).map((u) => ({ ...u, check: `/peak-workflow:wrapup-epic ${q.id} reverify ${u.tor}` })), deferred: q.deferred ?? [],
     };
@@ -335,7 +335,9 @@ export function renderReport(r) {
     }
     if (e.unlooked?.prototype) L.push('', `Not stopped for your look (prototype run): ${e.unlooked.pictures.length} picture(s) of its screens are kept in \`look/${e.id}/\`${e.unlooked.claudeMd ? `, and it changed the project's instructions file (CLAUDE.md) in ${e.unlooked.claudeMd.sections.join(', ')}` : ''}. See "Decided for you in this prototype run".`);
     else if (e.unlooked) L.push('', `Merged without your look ("look": "after"): ${e.unlooked.pictures.length} picture(s) of its screens are kept in \`look/${e.id}/\` for you to review. The verifier judged them; its words are below.`);
-    if (e.amended.length) L.push('', `Requirement amended with your approval: ${e.amended.join(', ')}. The build rewrote it in your name and the checks followed the amended text.`);
+    const yours = e.amended.filter((t) => !(e.amendedUnseen ?? []).includes(t));
+    if (yours.length) L.push('', `Requirement amended with your approval: ${yours.join(', ')}. The build rewrote it in your name and the checks followed the amended text.`);
+    if ((e.amendedUnseen ?? []).length) L.push('', `Requirement amended without your approval, on a session's proposal (prototype run): ${e.amendedUnseen.join(', ')}. The checks followed the amended text. See "Decided for you in this prototype run".`);
     if (e.seen.length) L.push('', 'What the verifier saw in the pictures (its own words):', ...e.seen.map((x) => `- ${x}`));
     if (e.unanswered.length) L.push('', 'Waited for you and nobody came:', ...e.unanswered.map((u) => `- ${u.step ? `${u.step}: ` : ''}${u.description}`), 'Run autopilot when you are at the computer and it will take you through them.');
     if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);

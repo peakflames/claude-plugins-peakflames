@@ -745,3 +745,25 @@ test('R8 prototype, final check: a deferral this run took is given the same answ
   denied(h.ask(cv, OPTS), 'R8', /not put to the owner: this is a prototype run and nobody will observe .*NOT OBSERVED — prototype run/);
   answered(h.ask(cv, OPTS), cv, 'Stop — epic FAILs');
 });
+
+test('R8 prototype: a Safety requirement is never amended or deferred, whatever the session offers; a different correction to an amended requirement is the owner\'s', (t) => {
+  const safe = E1.tors[4]; // the last requirement of the seed, put under a Safety banner
+  const h = referee(t, { config: { mode: 'prototype' }, seed: (project) => {
+    const file = path.join(project, 'docs', 'requirements', fs.readdirSync(path.join(project, 'docs', 'requirements')).find((f) => f.startsWith('01-') && f.endsWith('.feature.md')));
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('# Duplicate Handling', '# Safety'));
+  } });
+  const DEF = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
+  const d = h.ask(`${safe} cannot be fully met: x. Recommendation: Defer — a later epic. How to proceed?`, DEF);
+  parked(d);
+  assert.match(d.out.hookSpecificOutput.permissionDecisionReason, /is a Safety requirement, which a prototype run never decides/);
+  parked(h.ask(`${safe} — title looks wrong: y. Proposed: z. How to proceed?`, [`Amend ${safe} (owner approval)`, 'Implement as written', "Stop — I'll take it from here"]));
+  assert.deepEqual([h.gate(1).decided, h.gate(2).decided], [null, null]);
+
+  const tor = E1.tors[0]; const AM = [`Amend ${tor} (owner approval)`, 'Implement as written', "Stop — I'll take it from here"];
+  const a = `${tor} — title looks wrong: banks export a BOM. Proposed: skip the BOM. How to proceed?`;
+  answered(h.ask(a, AM), a, AM[0]);
+  answered(h.ask(a.replace('banks export a BOM', 'the files start with a BOM'), AM), a.replace('banks export a BOM', 'the files start with a BOM'), AM[0]); // the same proposal, reworded reason
+  const other = h.ask(a.replace('skip the BOM', 'reject files with a BOM'), AM);
+  parked(other);
+  assert.match(other.out.hookSpecificOutput.permissionDecisionReason, /one answer per requirement/);
+});

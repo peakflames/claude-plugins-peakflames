@@ -1216,7 +1216,7 @@ const stepKindOf = (session) => String(session ?? '').replace(/-\d+$/, '');
  * session resuming from that gate (`keep`): later sessions ask again.
  */
 export function ownerAnswers(workspace, epicId, { keep = null } = {}) {
-  return readGates(workspace).filter((g) => g.epic === epicId && g.decided?.answer && !g.void && !g.superseded && !g.cleared && gateEntry(g)?.question && (g.file === keep || !postpones(g.decided.answer)))
+  return readGates(workspace).filter((g) => g.epic === epicId && g.decided?.answer && !g.decided.prototype && !g.void && !g.superseded && !g.cleared && gateEntry(g)?.question && (g.file === keep || !postpones(g.decided.answer)))
     .map((g) => ({ gate: g.file, kind: stepKindOf(g.session), gateKind: g.kind ?? 'unmatched', tor: g.tor ?? null, question: g.question ?? '', options: g.options ?? [], answer: g.decided.answer, by: g.decided.by ?? null, date: g.decided.date ?? null, ...(g.decided.note ? { note: g.decided.note } : {}) }));
 }
 const answerList = (answers) => answers.map((a, i) => `${i + 1}. **Asked:** "${a.question}"\n   **Options offered:** ${a.options.map((o) => `"${o}"`).join(', ') || '(none)'}\n   **The owner's answer:** "${a.answer}" — ${a.by ?? 'the owner'}, ${a.date ?? 'earlier'}${a.note ? `\n   **Their words:** "${a.note}"` : ''}`).join('\n');
@@ -1785,7 +1785,7 @@ class Run {
       const brief = path.join(this.epicDir(e), 'fix-brief.md');
       all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, verifyFixRounds: e.verifyFixRounds ?? 0, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], unproven: e.unproven ?? [], fixBrief: exists(brief) ? read(brief) : null,
         // A prototype run: what it answered for the owner, and what went on without their look, for the run that finishes the epic.
-        ...(e.prototype?.length ? { prototype: e.prototype } : {}), ...(e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(e.unlooked?.prototype ? { unlooked: e.unlooked } : {}) };
+        ...(e.prototype?.length ? { prototype: e.prototype } : {}), ...(e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(e.unlooked?.prototype ? { unlooked: e.unlooked } : {}), ...(e.skippedLook ? { skippedLook: true } : {}) };
     }
     writeJson(path.join(this.stateDir, 'epics.json'), all);
   }
@@ -2055,6 +2055,22 @@ class Run {
       this.event('prototype-answer', e, { kind: g.kind, tor: g.tor ?? null, answer: g.decided.answer });
     }
   }
+  /**
+   * A deferral merged: the later epic's status file now lists the requirement, but what the driver knows of that
+   * epic was read at run start. Every epic not started yet is read again, so its checks hold it to the requirement too.
+   */
+  handDeferred(e) {
+    const reqs = readRequirements(this.clone);
+    for (const q of this.state.queue.filter((x) => x.state === 'QUEUED')) {
+      const m = this.metaById.get(q.id); if (!m) continue;
+      const now = parseSidecar(gitShow(this.clone, this.state.integration, m.sidecar)).requirements;
+      const gained = now.filter((t) => !m.anchors.includes(t) && e.deferred.includes(t));
+      if (!gained.length) continue;
+      m.anchors = [...m.anchors, ...gained];
+      for (const tor of gained.filter((t) => /operator-observed/.test(reqs[t]?.text ?? ''))) { m.humanCheck = true; m.reasons = [...m.reasons, `${tor} is operator-observed: parks for a person before verify`]; m.observed = [...(m.observed ?? []), { tor, clauses: thenClauses(reqs[tor].text) }]; }
+      this.log(`${q.id}: now also anchors ${gained.join(', ')}, deferred to it by ${e.id}`);
+    }
+  }
   /** A requirement's Scenario block as the integration line has it, or null. */
   requirementText(tor) {
     const r = gitRun(this.clone, 'grep', '-h', '-A', '30', '-F', `[${tor}]`, this.state.integration, '--', 'docs/requirements');
@@ -2194,7 +2210,7 @@ class Run {
       const t = this.runTests();
       const base = this.state.baseSkips;
       // A deferred requirement keeps its test, skipped with the reason `Deferred: <TOR>` (start-epic's rule): those skips, and no others, are allowed.
-      const deferSkips = deferOk ? rows.reduce((n, tor) => n + gitRun(this.clone, 'grep', '-h', '-F', `Deferred: ${tor}`, b, '--', ...dirs).out.split('\n').filter(Boolean).length, 0) : 0;
+      const deferSkips = deferOk ? rows.reduce((n, tor) => n + gitRun(this.clone, 'grep', '-h', '-F', `Deferred: ${tor}`, b, '--', ...dirs).out.split('\n').filter((l) => l.trim() && !/^\s*(\/\/|#|\*|\/\*|--)/.test(l)).length, 0) : 0; // the marker in a skip reason, not in a comment beside it
       add('tests-green', t.pass && (t.skips === null || base == null || t.skips <= base + deferSkips), { exit: t.code, timedOut: t.timedOut, skips: t.skips, baseSkips: base ?? null, ...(deferSkips ? { skipsAllowedForDeferrals: deferSkips } : {}), tail: t.pass ? undefined : t.tail });
     } else add('tests-green', false, 'not run: the working tree is not a clean checkout of the branch');
 
@@ -2230,8 +2246,11 @@ class Run {
       else if (Number(gitRun(this.clone, 'cat-file', '-s', `${b}:${f}`).out || 0) > 5 * 1024 * 1024) out.push(`${f}: larger than 5 MB`);
     }
     if (out.length === 0 && claudeMd) { if (JSON.stringify(e.claudeMd ?? null) !== JSON.stringify(claudeMd)) this.log(`${e.id}: the build changed CLAUDE.md in ${claudeMd.sections.join(', ')}; the owner is shown it before the final check`); e.claudeMd = claudeMd; } else delete e.claudeMd;
-    add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under the owner's approved amendment of ${amended.join(', ')}` : ''}`);
-    if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; this.log(`${e.id}: the build changed requirement files under the owner's approved amendment of ${amended.join(', ')}`); }
+    // Whose amendment it is: the owner's own answer, or one a prototype run took on the session's proposal (nobody approved that one).
+    const taken = prototypeGates(readGates(this.stateDir), e.id).filter((g) => g.kind === 'amendment').map((g) => g.tor);
+    const whose = amended.length && amended.every((t) => taken.includes(t)) ? 'the amendment this prototype run took, not yet seen by the owner, of' : "the owner's approved amendment of";
+    add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under ${whose} ${amended.join(', ')}` : ''}`);
+    if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; if (amended.some((t) => taken.includes(t))) e.amendedUnseen = amended.filter((t) => taken.includes(t)); this.log(`${e.id}: the build changed requirement files under ${whose} ${amended.join(', ')}`); }
 
     if (this.hasScreens(e)) {
       const pictures = this.collectLook(e); const captioned = pictures.filter((p) => p.shows);
@@ -2368,6 +2387,7 @@ class Run {
     // afterwards; what only a person can observe goes to the final check as not observed, and is never recorded as verified.
     if (this.config.mode === 'prototype') {
       const observed = (m.observed ?? []).map((o) => ({ tor: o.tor, clauses: o.clauses }));
+      e.skippedLook = true; // carried to a later run: a full run that takes this epic up at the final check asks for the look first
       if (observed.length) e.unobserved = observed; else delete e.unobserved;
       if (this.hasScreens(e) || e.claudeMd) e.unlooked = { pictures: lookPictures(this.lookStore(e)).map((p) => path.join(this.lookStore(e), p.file)), prototype: true, ...(e.claudeMd ? { claudeMd: e.claudeMd } : {}) };
       const what = [observed.length ? `${observed.map((o) => o.tor).join(', ')} will be recorded as not observed` : null, this.hasScreens(e) ? `${e.unlooked.pictures.length} picture(s) kept` : null, e.claudeMd ? `the CLAUDE.md change (${e.claudeMd.sections.join(', ')}) kept` : null].filter(Boolean).join('; ');
@@ -2488,6 +2508,8 @@ class Run {
 
   async doVerify(e) {
     const m = this.meta(e);
+    // A prototype run skipped this epic's look, and this run is a full one that re-enters here: the look is asked now, as a full run does.
+    if (this.config.mode !== 'prototype' && e.skippedLook && !e.look) { delete e.unobserved; delete e.unlooked; if (this.humanCheck(e)) return null; }
     const before = e.caughtUp ?? null;
     const stuck = this.catchUp(e);
     if (stuck) return this.parkResumable(e, stuck, 'VERIFY');
@@ -2746,6 +2768,7 @@ class Run {
       return this.finish(e, 'PARKED', reason);
     }
     gitRun(this.clone, 'config', '--remove-section', `branch.${e.preVerify.branch}`); // stale entry left by the sandboxed `git branch -d`
+    if (e.deferred?.length) this.handDeferred(e);
     return this.finish(e, 'MERGED', 'verify PASS, merge gate green');
   }
 
@@ -2840,6 +2863,7 @@ class Run {
       Object.assign(e, { fixRounds: rec.fixRounds ?? 0, verifyFixRounds: rec.verifyFixRounds ?? 0, plan: rec.plan ?? null, planApprovedBy: rec.planApprovedBy ?? null, buildSteps: rec.buildSteps ?? [], audits: rec.audits ?? [], unproven: (rec.unproven ?? []).filter((u) => u.source !== 'verifier') }); // a verifier's "not run" is of that verify session; the next one says its own
       if (rec.fixBrief) fs.writeFileSync(path.join(this.epicDir(e), 'fix-brief.md'), rec.fixBrief);
       if (rec.prototype?.length) e.prototype = rec.prototype;
+      if (rec.skippedLook) e.skippedLook = true;
       // Still a prototype run: an epic that re-enters at the final check is still not looked at. In a full run the verifier is not told so, and what it asks about the look goes to the owner.
       if (this.config.mode === 'prototype') Object.assign(e, { ...(rec.unobserved ? { unobserved: rec.unobserved.map(({ recorded, ...u }) => u) } : {}), ...(rec.unlooked ? { unlooked: rec.unlooked } : {}) });
       if (/^verify-\d+ FAIL after the fix round: /.test(g.reason ?? '')) {
@@ -3390,7 +3414,7 @@ export function continueRun(workspace, { by } = {}) {
   const continued = []; const left = [];
   for (const g of openGates(readGates(ws))) {
     const gates = readGates(ws);
-    const had = gates.filter((x) => x.epic === g.epic && x.decided?.standing).length;
+    const had = gates.filter((x) => x.epic === g.epic && x.decided?.standing && !x.decided.prototype).length;
     const answer = standingAnswer(g, gates, n);
     if (!answer) {
       const kind = technicalAnswer(g);
