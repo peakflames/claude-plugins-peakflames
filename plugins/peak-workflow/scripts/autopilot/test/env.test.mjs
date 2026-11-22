@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { REGISTRIES } from '../driver.mjs';
+import { PLUGIN_DIR, REGISTRIES } from '../driver.mjs';
 import { DRIVER, E1, git, happy, makeProject, readJson } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, json: () => JSON.parse(r.stdout) }; };
@@ -323,4 +323,16 @@ test('by default sessions run with the sandbox off: settings say so, the run rec
   fs.writeFileSync(settingsFile(p), JSON.stringify({ sandbox: 'yes' }));
   p.scenario(happy(E1));
   await assert.rejects(p.go(), /sandbox must be true or false/);
+});
+
+test('tor-lifecycle finds its folder when the path it is given uses backslashes, as Windows passes it', (t) => {
+  // POSIX has no backslash separator, so the Windows path is stood in for by a file whose name holds one:
+  // `sub\tor-lifecycle` beside a folder `sub` that holds the Python file.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tl-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, 'sub'));
+  fs.copyFileSync(path.join(PLUGIN_DIR, 'scripts', 'tor-lifecycle'), path.join(dir, 'sub\\tor-lifecycle'));
+  fs.writeFileSync(path.join(dir, 'sub', 'tor_lifecycle.py'), 'print("found")\n');
+  const r = spawnSync('sh', ['sub\\tor-lifecycle'], { cwd: dir, encoding: 'utf8' });
+  assert.deepEqual([r.status, r.stdout.trim()], [0, 'found'], r.stderr);
 });

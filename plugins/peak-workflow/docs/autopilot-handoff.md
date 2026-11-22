@@ -7,7 +7,7 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 195 pass, 11 skipped (the skipped
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 197 pass, 11 skipped (the skipped
   ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
 - **The cockpit mod is deferred** (`autopilot-cockpit-mod-handoff.md`, note at its top): the run
@@ -122,11 +122,13 @@ Why this order:
   counts untracked files, a run does not start on a dirty clone, and there is no recovery the
   owner can use. Keep session scratch out of the clone, or move leftovers into the workspace
   and continue.
-- [ ] **`**Not decided yet:** none` parks every epic** (#41 comment; in code). Preflight matches
-  the words `**Not decided yet:**` wherever they appear. *`driver.mjs:681`.* Whether
-  `/peak-workflow:setup` writes the `none` form itself is not checked.
-- [ ] **`tor-lifecycle` cannot find its folder from a backslash path** (#41 comment; in code).
-  The script handles `*/*` only. *`scripts/tor-lifecycle:8`.*
+- [x] **`**Not decided yet:** none` parks every epic** (#41 comment). Fixed 2026-11-21, tested
+  against the fake `claude`: a line that names nothing is the all-clear (`driver.mjs`, `tbd`).
+  Left: `wrapup-epic`'s deferred-value grep still fails a skeleton epic on any such line, and
+  whether `/peak-workflow:setup` writes the `none` form itself is not checked.
+- [x] **`tor-lifecycle` cannot find its folder from a backslash path** (#41 comment). Fixed
+  2026-11-21: either separator ends the folder. Tested on macOS with a stand-in path; not run
+  on Windows. Compare with the reporter's patches when they arrive.
 
 ### Step 2 — Make the tests trustworthy (C1)
 
