@@ -1,7 +1,8 @@
 #!/bin/sh
 # tor-lifecycle — finds a Python 3.11+ interpreter and runs tor_lifecycle.py with the given
 # arguments. Skills call: sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" <command> [args]
-# Probe order: python3, py -3 (Windows launcher), python. Uses shell builtins only.
+# Probe order: python3, py -3 (Windows launcher), python, then python3 in each PATH folder and
+# in /opt/homebrew/bin and /usr/local/bin. Uses shell builtins only.
 # Exit 3 with an install hint when no suitable interpreter is found.
 
 # Windows may pass this script's path with backslashes, so either separator ends the folder.
@@ -23,6 +24,19 @@ if v=$(probe py -3); then exec py -3 "$script" "$@"; fi
 [ -n "$v" ] && found="$found py -3 ($v)"
 if v=$(probe python); then exec python "$script" "$@"; fi
 [ -n "$v" ] && found="$found python ($v)"
+
+# The first python3 on PATH can be an old one that hides a newer one further along (on macOS,
+# /usr/bin comes before Homebrew in some shells). Try every PATH folder's python3, then the
+# usual install folders.
+old_ifs=$IFS
+IFS=:
+for dir in $PATH /opt/homebrew/bin /usr/local/bin; do
+  IFS=$old_ifs
+  if [ -n "$dir" ] && [ -x "$dir/python3" ]; then
+    if v=$(probe "$dir/python3"); then exec "$dir/python3" "$script" "$@"; fi
+  fi
+done
+IFS=$old_ifs
 
 {
   echo "peak-workflow needs Python 3.11 or newer to check requirements, and none was found."

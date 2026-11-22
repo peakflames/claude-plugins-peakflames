@@ -427,3 +427,24 @@ test('prepare on a project with no tests yet: the proof passes and says the test
   assert.equal(out.failed, null);
   assert.deepEqual(out.tests, { command: 'node --test test/', pass: true, skipped: 'no test files under test/ on develop yet' });
 });
+
+// ---- the Python guard (scripts/tor-lifecycle) ----------------------------------------------
+
+test('tor-lifecycle: an old python3 first on PATH does not hide a newer one further along', { skip: process.platform === 'win32' }, (t) => {
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-py-')));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  // Two stand-in interpreters: each answers the version probe; the newer one says what it was asked to run.
+  const fake = (dir, version, ok) => {
+    fs.mkdirSync(path.join(tmp, dir));
+    fs.writeFileSync(path.join(tmp, dir, 'python3'), `#!/bin/sh\nif [ "$1" = "-c" ]; then echo ${version}; exit ${ok ? 0 : 1}; fi\necho "ran ${dir}: $2"\n`, { mode: 0o755 });
+    return path.join(tmp, dir);
+  };
+  const old = fake('old', '3.9.6', false);
+  const cur = fake('new', '3.15.2', true);
+  const guard = path.join(PLUGIN_DIR, 'scripts', 'tor-lifecycle');
+  const run = (PATH) => spawnSync('/bin/sh', [guard, 'format'], { encoding: 'utf8', env: { PATH } });
+
+  const found = run(`${old}:${cur}`);
+  assert.equal(found.status, 0, found.stderr);
+  assert.match(found.stdout, /^ran new: format/);
+});
