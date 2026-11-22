@@ -15,6 +15,7 @@
   "setupFailed": null,
   "realSpend": null,
   "attended": false,
+  "mode": "full",
   "driverVersion": "0.2.0",
   "sync": null,
   "leftovers": [],
@@ -228,7 +229,10 @@
           "command": "node bin/ledger.js login"
         }
       ],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg4Fx2q",
@@ -408,7 +412,10 @@
       "amended": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg5Chr8",
@@ -535,7 +542,10 @@
       "amended": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg3Sum9",
@@ -787,7 +797,10 @@
       "amended": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg6Bud2",
@@ -832,7 +845,10 @@
       "amended": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg7Exp5",
@@ -863,7 +879,10 @@
       "amended": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     },
     {
       "id": "Lg8Hw01",
@@ -894,7 +913,10 @@
       "amended": [],
       "seen": [],
       "unanswered": [],
-      "unlooked": null
+      "unlooked": null,
+      "prototype": [],
+      "unobserved": [],
+      "deferred": []
     }
   ],
   "gates": [

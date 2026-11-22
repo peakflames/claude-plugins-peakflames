@@ -530,6 +530,19 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    five minutes". The answer is the run's `attended`. When the owner says in any answer that
    they will be away, that is `false`, whatever was picked. Skip this question in `dry-run`
    mode.
+
+   **How careful the run is, asked in the same popup.** Add one more question to this same
+   `AskUserQuestion` call: "How careful should this run be?" — options `Full (Recommended)`,
+   with the description "Stops and asks whenever a requirement, a deferral or a look needs
+   you", and `Prototype`, with the description "Keeps building. It takes the session's own
+   recommendation, skips your looks, and lists every one of those at the end for you to
+   review". The answer is the run's `mode`: `"full"` or `"prototype"`. In the lines before
+   the popup say once what Prototype trades: a later epic may be built on a correction to a
+   requirement that nobody approved, and a requirement only a person can observe is merged
+   as not verified. Failing tests, a file out of scope, a Safety requirement, the budget, a
+   serious finding of the reviewer and any question that comes without a recommendation stop
+   the epic either way, and nothing is ever pushed. Never pick Prototype for the owner, and
+   never suggest it because a run stopped. Skip this question in `dry-run` mode.
    - **Change:** take the change in plain text. (In `dry-run` mode nothing below is saved:
      show the dry run with the change applied in words only.) The owner may remove epics, reorder them (an
      epic never before one of its dependencies — refuse and say why), change the run budget,
@@ -571,7 +584,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      "runBudgetUsd": <launch.config.runBudgetUsd, or the amount the owner chose>,
      "autoContinue": 2,
      "realSpend": true,
-     "attended": false
+     "attended": false,
+     "mode": "full"
    }
    ```
 
@@ -582,7 +596,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    `realSpend` is the owner's answer to the real-money question: `true` or `false`, exactly as
    they answered; leave the key out when the question was not asked. Never write `true` unasked.
    `attended` is the owner's answer to whether they will be at the computer: `false` when
-   they will be away, `true` when they are here. Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
+   they will be away, `true` when they are here. `mode` is the owner's answer to how careful
+   the run is: `"full"`, or `"prototype"` only when they picked Prototype; leave the key out
+   when the question was not asked (the driver then runs a full run). Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
    Write the file with the Write tool, as JSON. Write every path with forward slashes, on
    Windows too (`"C:/Users/pat/app"`): a single backslash makes the file unreadable and the
    driver refuses to start.
@@ -612,7 +628,7 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 3. **Check it started:** wait three seconds, then `cat "<launch.workspace>/lock"` and
    `tail -n 5 "<launch.runDir>/autopilot.log"`. A `lock` file (JSON with a `pid`) means it is running.
    The log's two `run <name>:` lines state the queue, in order, and the limits the run
-   really has. Hold them against what the owner confirmed. When they differ, stop the run
+   really has, ending with its `mode`. Hold them against what the owner confirmed. When they differ, stop the run
    (Step 5) and tell the owner what differs; relaunch only once the cause is found.
    If there is no lock but the log tail has a `run ended:` line, the run already finished (a
    short queue, or a red base): say so in one line and go to Step 0. If there
@@ -625,10 +641,11 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 5. **Relaunch** (from Step 0, when `relaunch` is set after the owner answered a gate or a
    technical stop was continued in this session). The owner already confirmed this queue: ask
    nothing again — except what `relaunch.ask` names. It lists the launch questions this chain
-   of runs never put to the owner: `attended` (whether they will be at the computer) and
-   `realSpend` (real money). When it is not empty, ask exactly those, in one `AskUserQuestion`
-   call, in the item 1 wording, and add each answer to the config under that key (`true` or
-   `false`) before writing it; every later relaunch then carries it. When it is empty, ask
+   of runs never put to the owner: `attended` (whether they will be at the computer),
+   `realSpend` (real money) and `mode` (how careful the run is). When it is not empty, ask
+   exactly those, in one `AskUserQuestion` call, in the Step 2 wording, and add each answer to
+   the config under that key (`true` or `false`; for `mode`, `"full"` or `"prototype"`) before
+   writing it; every later relaunch then carries it. When it is empty, ask
    nothing. Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`
    (create the directory) — it holds the same queue minus what finished, what is left of the
    run budget, and the standing answer — then start the driver with the item 2 line, using
@@ -984,8 +1001,14 @@ Leave out a part that has nothing to say.
 **Decided for you:** <only when `decidedForYou` has entries>
 - <epic, short> — <why>, so autopilot <did>
 
-**Screens merged without your look:** <only when `unlooked` has entries>
+**Screens merged without your look:** <only when `unlooked` has entries without `prototype`>
 - <epic, short> — <n> pictures, sent now for you to review
+
+**Decided for you in this prototype run:** <only when `mode` is `prototype`>
+- <requirement, in plain words> — changed as the planner proposed. It read: <was>. Proposed: <proposed>
+- <requirement, in plain words> — left for a later epic, as the builder recommended
+- <requirement, in plain words> — nobody observed it; it is recorded as not verified. Still to see: <clauses>. To check it later: <check>
+- <epic, short> — your look was skipped: <n> pictures, sent now<, and the changed lines of the project's instructions file>
 
 **Fixed during the final check, without asking:** <only when `fixes` has entries>
 - <epic, short> — <what the verifier asked, in a few plain words> (<files>)
@@ -1020,8 +1043,25 @@ Leave out a part that has nothing to say.
   so once under the list. An entry with `auto` is a fix to the product itself, or a bigger
   one, that autopilot allowed on the standing answer for technical stops: mark its line
   "changed the product; checked only by the final check" and never leave one out.
-- **Decided for you** comes from `decidedForYou`: the technical stops autopilot answered
-  itself. One line each, by epic: "<label>: <why>, so autopilot <did>."
+- **Decided for you** comes from `decidedForYou`, the entries without `prototype`: the
+  technical stops autopilot answered itself. One line each, by epic: "<label>: <why>, so
+  autopilot <did>."
+- **Decided for you in this prototype run** is shown whenever status says `mode` is
+  `prototype`. It is the brake on a run that did not stop: where a full run would have asked
+  the owner, this one went on, and every such place is listed here, none folded into a
+  count. It has four sources. The `decidedForYou` entries with `prototype`: a requirement
+  changed on a session's proposal (`kind` `amendment`; give `was`, the text as it read, and
+  `proposed`, both as written), and a deferral or a fix taken on the builder's
+  recommendation (`did` says which). `unobserved`: a requirement only a person can observe,
+  merged recorded as not verified, never as verified; give its `clauses` as what is still to
+  see, and its `check` exactly as given, as what re-checks it once the work is in the
+  project and a person is there. The `unlooked` entries with `prototype`: send each epic's
+  `pictures` with `SendUserFile` when that tool exists (otherwise give the folder), and when
+  the entry has `claudeMd`, show its `lines`: every later session follows that file. An
+  entry with `dropped` belongs to an epic that was started over; leave it out. When all
+  four are empty, say "Nothing was decided for you." Then one sentence: if any of these is
+  wrong, the owner says which, and it becomes a `/peak-workflow:quick-fix` or
+  `/peak-workflow:triage`; work built on a wrong correction may need to change with it.
 - **Not proven for real** comes from `unproven`: what the independent reviewer or the
   verifier said was never exercised against the real thing — a paid service replaced by a
   stand-in, a call the verifier chose not to make, a check only a person can do. The epic

@@ -386,15 +386,39 @@ Why this order:
   `20261122-094004`). The second epic of 11 parked in planning after one minute; eight epics
   depended on it, so the run ended in 20 minutes with the owner away. Unexamined: whether
   launch should warn when most of the queue hangs on one epic. C3.
-- [ ] **A check that needs another machine parks as if the owner could do it** (*no issue*;
+- [x] **A check that needs another machine parks as if the owner could do it** (*no issue*;
   Pilot Light, gate `yZQYIVE-1`, 2026-11-22). TOR-01-bhQV3eP is operator-observed on Windows
   11; the owner was on a Mac. The skill's "Start it so I can check for real" offer assumes
   his machine meets the Given. Owner's wish: do not stop for it; carry on and report it as
   not checked here. C2.
-- [ ] **Owner's idea: a lighter "prototype" strictness chosen at launch** (*no issue*;
-  2026-11-22, not decided). Looks collected for the end, a planner's own amendment or a
+  **Built 2026-11-22, in a prototype run only** (next item): the epic goes to the final check,
+  the verifier is given `not-observed.md`, and the merge check passes the requirement only
+  with an `unverified:` line that says "NOT OBSERVED"; a `verified:` line for it fails the
+  merge. A full run still parks. **Not proven:** that a real verifier follows
+  `not-observed.md` (the tests use the fake `claude`); if it does not, the merge check parks
+  the epic rather than merging it as verified.
+- [x] **Owner's idea: a lighter "prototype" strictness chosen at launch** (*no issue*;
+  2026-11-22). Looks collected for the end, a planner's own amendment or a
   builder's deferral taken and recorded for review; failing tests, scope and pushing still
   stop. `look: "after"` covers part of it. He thinks Arun wants the same.
+  **Built 2026-11-22** as the run's `mode` (`full` by default, `prototype`), asked at launch.
+  Hook R8 takes "Amend TOR-…" when offered and a recommended "Fix now" or "Defer" (one per
+  requirement, three per epic, the epic's own requirements only) and writes the gate already
+  decided (`decided.prototype`); looks are skipped; `onPark` defaults to `continue`. The
+  report and the closing screen list all of it under "Decided for you in this prototype
+  run". Tests: `test/prototype.test.mjs`, and the R8 cases in `test/hooks.test.mjs`.
+  **Not proven, all against real sessions** (first proof: Pilot Light's next run):
+  - A deferral end to end. After "Defer" the skill asks which later epic builds the missing
+    part; the hook reminds the session once to use the epic it named, and a second ask parks.
+    The final check must then recommend "Defer" for the same requirement and write the
+    `waived:` line; otherwise policy answers "Stop" and the epic goes to its repair round.
+  - The build check lets a deferring epic change the later epic's spec and status file, and
+    allows one skipped test per `Deferred: <TOR>` marker. It does not check what was changed
+    in those two files.
+  - An amendment's change record names the owner as approver (the skill writes
+    `git config user.name`); the gate file says autopilot answered.
+  - The section prints the reverify command for an unobserved requirement. Every other
+    command is kept out of `report.md` (#41 I6); the owner asked for this one.
 - [ ] **The watch repeats its progress line once per blocked epic** (*no issue*; run
   `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3.
 - [ ] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`). The

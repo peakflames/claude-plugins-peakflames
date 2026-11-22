@@ -2,16 +2,18 @@
 
 /** A status sidecar: `key: value` lines, plus indented `TOR: fingerprint` lines under `verified:`. */
 export function parseSidecar(text) {
-  const fields = {}; const verified = {};
+  const fields = {}; const verified = {}; const unverified = {};
   let block = null;
   for (const line of (text ?? '').split(/\r?\n/)) {
     const top = line.match(/^([a-z_]+):\s*(.*)$/);
     if (top) { fields[top[1]] = top[2].trim(); block = top[2].trim() === '' ? top[1] : null; continue; }
     const sub = line.match(/^\s+(TOR-\d{2}-[A-Za-z0-9]{7}):\s*(.+)$/);
     if (sub && block === 'verified') verified[sub[1]] = sub[2].trim();
+    // `TOR: <date> <reason>`: a requirement recorded as not met, or (a prototype run) as not observed by anyone.
+    if (sub && block === 'unverified') unverified[sub[1]] = sub[2].trim();
   }
   const requirements = (fields.requirements ?? '').match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? [];
-  return { fields, verified, requirements };
+  return { fields, verified, unverified, requirements };
 }
 
 /**
@@ -170,7 +172,8 @@ export function technicalAnswer(gate) {
   }
   return null;
 }
-const standingUsed = (gate, gates) => gates.filter((g) => g.epic === gate.epic && g.decided?.standing).length;
+// A question a prototype run answered (below) is not a technical stop: it has its own count.
+const standingUsed = (gate, gates) => gates.filter((g) => g.epic === gate.epic && g.decided?.standing && !g.decided.prototype).length;
 /**
  * The answer autopilot records for this gate without asking ("decide a technical stop yourself, up
  * to `n` times per epic": the owner's standing answer from launch), or null. One count per epic
@@ -190,4 +193,45 @@ export function standingAnswer(gate, gates, n) {
 export function atLimit(gate, gates, n) {
   const answer = technicalAnswer(gate);
   return answer && !standingAnswer(gate, gates, n) ? { answer, stops: standingUsed(gate, gates) + 1 } : null;
+}
+
+// ---- a prototype run: the session's own recommendation is taken, and listed for the owner ------
+
+/** How many questions per epic a prototype run answers with the session's own recommendation; one more goes to the owner. */
+export const PROTOTYPE_LIMIT = 3;
+/** Who a gate answered this way says decided it. */
+export const PROTOTYPE_BY = 'autopilot (prototype run)';
+/** What a verifier writes after the date on the `unverified:` line of a requirement nobody observed in a prototype run. */
+export const NOT_OBSERVED = 'NOT OBSERVED';
+/** The gates of one epic that a prototype run answered itself and that still stand. */
+export const prototypeGates = (gates, epic) => gates.filter((g) => g.epic === epic && g.decided?.prototype && !g.void && !g.superseded && !g.cleared);
+/** The requirements of one epic whose deferral a prototype run took (the builder recommended it). */
+export const prototypeDeferred = (gates, epic) => [...new Set(prototypeGates(gates, epic).filter((g) => g.kind === 'deferral' && /^defer\b/i.test(g.decided.answer ?? '') && g.tor).map((g) => g.tor))];
+/** What a session's question recommends, in the skills' own wording ("Recommendation: Defer — …"): `Fix now`, `Defer`, `Stop`, or null. */
+export function recommended(question) {
+  const m = String(question ?? '').match(/\bRecommendation:\s*\**\s*(Fix now|Defer|Stop)\b/i);
+  return m ? { 'fix now': 'Fix now', defer: 'Defer', stop: 'Stop' }[m[1].toLowerCase()] : null;
+}
+/**
+ * The answer a prototype run gives to a question that parks a full run, or `{why}` when it goes
+ * to the owner after all, or null when the kind is not one a prototype run answers. Pure.
+ *   amendment → the "Amend TOR-…" option, when the session offers it (it never does for Safety)
+ *   deferral  → what the session recommends, when that is "Fix now" or "Defer"
+ * Only for one of the epic's own requirements, once per requirement, `PROTOTYPE_LIMIT` per epic.
+ * `taken` is what was already answered this way for the epic: `[{kind, tor}]`.
+ */
+export function prototypeAnswer({ kind, question, labels, tor, anchors, taken }) {
+  if (kind !== 'amendment' && kind !== 'deferral') return null;
+  let answer = null;
+  if (kind === 'amendment') answer = labels.find((l) => new RegExp(`^\\W*Amend\\s+${tor ?? 'TOR-\\S+'}\\b`, 'i').test(l)) ?? null;
+  else {
+    const rec = recommended(question);
+    const fits = labels.filter((l) => (rec === 'Fix now' ? /^\W*fix now\b/i : rec === 'Defer' ? /^\W*defer\b/i : /^$/).test(l));
+    answer = fits.length === 1 ? fits[0] : null;
+  }
+  if (!answer) return null; // no "Amend" on offer, "Stop" recommended, or no recommendation to read: the owner's, as in a full run
+  if (!tor || !anchors.includes(tor)) return { why: 'the question does not name one of this epic\'s own requirements, so the prototype setting does not cover it' };
+  if (taken.some((x) => x.tor === tor)) return { why: `the prototype setting covers one answer per requirement, and ${tor} already had one in this epic` };
+  if (taken.length >= PROTOTYPE_LIMIT) return { why: `the prototype setting covers ${PROTOTYPE_LIMIT} answers per epic, and this is one more` };
+  return { answer };
 }

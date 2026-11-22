@@ -16,6 +16,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot starts on a project with no tests yet** — when the declared test directories
   hold no committed file, the base test run and the sandbox probe are skipped, not failed as
   "base red"; the first epic's own checks run the tests. The launch screen says so.
+- **Autopilot prototype runs** — a launch question, "How careful should this run be?". A
+  prototype run takes a session's recommended amendment or deferral, skips the owner's looks,
+  merges an unobserved requirement as not verified, and lists each under "Decided for you in
+  this prototype run". Failing tests, scope and Safety still stop.
 - **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
   final check without stopping for the owner; its pictures are listed for review afterwards.
   A requirement a person must observe still stops.
