@@ -125,10 +125,13 @@ Why this order:
 - [x] **`**Not decided yet:** none` parks every epic** (#41 comment). Fixed 2026-11-21, tested
   against the fake `claude`: a line that names nothing is the all-clear (`driver.mjs`, `tbd`).
   Left: `wrapup-epic`'s deferred-value grep still fails a skeleton epic on any such line, and
-  whether `/peak-workflow:setup` writes the `none` form itself is not checked.
+  whether `/peak-workflow:setup` writes the `none` form itself is not checked. The reporter's
+  patch (#41, 2026-11-22) was compared and ours kept: ours still parks `none of the …` and
+  `- database`, which his pattern lets through.
 - [x] **`tor-lifecycle` cannot find its folder from a backslash path** (#41 comment). Fixed
   2026-11-21: either separator ends the folder. Tested on macOS with a stand-in path; not run
-  on Windows. Compare with the reporter's patches when they arrive.
+  on Windows. The reporter's patch (#41, 2026-11-22) is the same fix; ours also handles a path
+  that mixes both separators.
 
 ### Step 2 — Make the tests trustworthy (C1)
 
@@ -213,6 +216,11 @@ Why this order:
   read-back as something a run cannot prove; every session should be told MCP tools are
   unavailable; a question caused by a host denial should park once, with only possible
   answers. C2.
+- [ ] **The undecided-values check parks every epic** (#41, the reporter's comment of
+  2026-11-22; not examined). A `TBD — set by the walking-skeleton epic` value or a
+  `**Not decided yet:**` line that lists a layer parks every queued epic (`driver.mjs`, `tbd`).
+  He suggests it should apply to the walking-skeleton epic only, since that epic is the one
+  that settles those values. C2.
 - [ ] **Requirement questions are the main cause of stops** (#41 I3). Ask them once at launch
   (a requirements check over the queued epics), not mid-night. C2.
 - [ ] **The launch check spends real money before the real-money question** (#40) (5). C2.
