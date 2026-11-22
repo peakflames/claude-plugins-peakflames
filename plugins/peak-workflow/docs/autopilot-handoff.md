@@ -65,8 +65,8 @@ evaluation whose other lessons repeat #41. His run logs are on his machine
 ## Working rules
 
 - Work in a worktree on a sub-branch cut from `feature/peak-workflow-autopilot-poc`; merge
-  `--no-ff` into the PoC branch, then push (pushes to this branch have been pre-approved; ask
-  for anything else).
+  `--no-ff` into the PoC branch. Ask before every push, this branch included (owner,
+  2026-11-22); remind him when commits are waiting to be pushed.
 - **A session using the plugin reads it live from the main checkout.** Merge only when no
   driver is running there. `pgrep -f "driver.mjs run"` can match your own shell: check the
   workspace's `lock` file pid instead (`kill -0 <pid>`). A change that touches no referee hook
