@@ -1395,15 +1395,19 @@ class Run {
 
   /**
    * Puts the clone on the epic's branch before a session starts, when that branch exists: a session works where it is
-   * started, and a resumed one is not told to switch. Anything uncommitted on the branch being left is set aside first.
-   * Returns null, or the reason the branch could not be checked out.
+   * started, and a resumed one is not told to switch. Uncommitted work comes along, as with any checkout (the clone is
+   * clean when an epic starts, so it is this epic's); only when git refuses to carry it is it set aside.
+   * Returns null, or the reason the branch could not be checked out. Never throws.
    */
   ensureOnBranch(e, kind) {
     const b = this.meta(e).branch;
     const from = this.currentBranch();
     if (!b || !this.branchTip(b) || from === b) return null;
-    if (!this.setAside(`before ${e.id}'s ${kind} session started`)) return `the clone has uncommitted changes on ${from || 'no branch'} that could not be set aside, so ${b} could not be checked out`;
-    const r = gitRun(this.clone, 'checkout', '-q', b);
+    let r = gitRun(this.clone, 'checkout', '-q', b);
+    if (r.code !== 0 && this.dirty()) {
+      if (!this.setAside(`before ${e.id}'s ${kind} session started`)) return `the clone has uncommitted changes on ${from || 'no branch'} that could not be set aside, so ${b} could not be checked out`;
+      r = gitRun(this.clone, 'checkout', '-q', b);
+    }
     if (r.code !== 0 || this.currentBranch() !== b) return `${b} could not be checked out: ${r.err || `the clone is still on ${this.currentBranch() || 'no branch'}`}`;
     this.log(`${e.id}: checked out ${b} for its ${kind} session (the clone was on ${from || 'no branch'})`);
     return null;
@@ -1420,11 +1424,14 @@ class Run {
     const files = [...new Set([...names('diff', '--name-only', 'HEAD'), ...names('ls-files', '--others', '--exclude-standard')])].sort();
     const branch = this.currentBranch() || 'detached';
     const ref = `refs/autopilot/leftover/${branch}-${Date.now()}`;
+    const top = () => gitRun(this.clone, 'rev-parse', '--verify', '--quiet', 'refs/stash').out;
+    const before = top(); // a stash a session made itself is never taken for ours
     const stashed = gitRun(this.clone, 'stash', 'push', '-q', '--include-untracked', '-m', `autopilot: set aside ${why}`);
-    const sha = stashed.code === 0 ? gitRun(this.clone, 'rev-parse', '--verify', '--quiet', 'refs/stash').out : '';
-    if (!sha) { this.log(`could not set aside ${files.length} file(s) left uncommitted on ${branch}: ${stashed.err || 'git stash kept nothing'}`); return false; }
-    this.g('update-ref', ref, sha);
-    this.g('stash', 'drop', '-q');
+    const sha = stashed.code === 0 ? top() : '';
+    if (!sha || sha === before) { this.log(`could not set aside ${files.length} file(s) left uncommitted on ${branch}: ${stashed.err || 'git stash kept nothing'}`); return false; }
+    const kept = gitRun(this.clone, 'update-ref', ref, sha);
+    if (kept.code !== 0) { this.log(`set aside ${files.length} file(s) left uncommitted on ${branch}, but could not name them ${ref} (${kept.err}); they are kept in the clone's stash list instead`); return !this.dirty(); }
+    gitRun(this.clone, 'stash', 'drop', '-q');
     const left = { branch, ref, files, why, date: new Date().toISOString() };
     if (this.state) this.state.leftovers = [...(this.state.leftovers ?? []), left]; else this.leftoversAtStart.push(left);
     this.log(`set aside ${files.length} file(s) left uncommitted on ${branch} (${files.join(', ')}); nothing is lost: they are kept at ${ref} (${why})`);
@@ -1541,7 +1548,7 @@ class Run {
       const result = {
         ok: base && !(probed?.ran && !probed.pass), at: new Date().toISOString(), clone: this.clone, cloneMade: made, integration, tip: gitRun(this.clone, 'rev-parse', 'HEAD').out, sync: sync.state,
         failed: !env.pass ? env.step : !tests.pass ? 'tests' : leftovers.length ? 'leftovers' : probed?.ran && !probed.pass ? 'probe' : null,
-        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers, ...(gates.length ? { gates: gateResults, gatesFailed: gateResults.filter((g) => !g.pass).map((g) => g.command) } : {}), ...(probed ? { probe: probed } : {}),
+        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers, ...(this.leftoversAtStart.length ? { setAside: this.leftoversAtStart } : {}), ...(gates.length ? { gates: gateResults, gatesFailed: gateResults.filter((g) => !g.pass).map((g) => g.command) } : {}), ...(probed ? { probe: probed } : {}),
         // The latest probe that ran, with what it ran against, kept across later proofs: readiness says whether it still stands.
         lastProbe: probed?.ran ? { at: new Date().toISOString(), pass: probed.pass, exit: probed.exit, against: { testCommand: this.config.testCommand ?? null, setup: this.config.setup ?? null, readOnly: this.config.readOnly ?? [], network: cleanNetwork(this.config.network) } } : tryJson(path.join(this.stateDir, 'prepare.json'))?.lastProbe ?? null,
       };
@@ -1849,7 +1856,9 @@ class Run {
     for (;;) {
       // No session is started anywhere but on the epic's branch, once it exists.
       const off = this.ensureOnBranch(e, kind);
-      if (off) return this.parkResumable(e, `no ${kind} session was started: ${off}`, { plan: 'PLAN', build: 'BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind], { technical: true });
+      if (off && s) { s.outcome = 'infra'; s.why = off; break; } // on a retry: parked below, after what the first try did is undone
+      // Nothing ran, so nothing is judged: a build or a repair that never started is started, not checked.
+      if (off) return this.parkResumable(e, `no ${kind} session was started: ${off}`, { build: 'BUILD', fix: 'FIX_BUILD' }[kind] ?? again, { technical: true });
       s = await this.launch(e, kind, prepare);
       // A stopped session that cannot be resumed (its transcript is gone) is not an infra error: a new session takes the step, told the same answers.
       if (s.resumed && s.outcome === 'infra') {
@@ -2805,7 +2814,9 @@ class Run {
             this.finish(e, 'PARKED', m.reasons.join('; ')); this.stopOnPark(e); continue;
           }
           // Base red stops the whole run: every epic would build on it.
-          if (this.currentBranch() !== integration) { if (!this.setAside(`before ${e.id} started`)) { this.stopReason = `clone is dirty on ${this.currentBranch()}`; break; } this.g('checkout', '-q', integration); }
+          // Every epic starts on a clean clone: what an earlier epic's sessions left is not built into this one.
+          if (!this.setAside(`before ${e.id} started`)) { this.stopReason = `clone is dirty on ${this.currentBranch()}`; break; }
+          if (this.currentBranch() !== integration) this.g('checkout', '-q', integration);
           // What git does not carry (dependencies, local files): once per run, and again after every merge.
           if ((cfg.setup || (cfg.copy ?? []).length) && this.envSha !== this.integrationSha()) {
             const env = this.prepareEnv();

@@ -116,15 +116,16 @@ Why this order:
 
 - [x] **A resumed epic is not put back on its branch** (#41 B14). Fixed 2026-11-21, tested
   against the fake `claude`: before every session the driver checks the epic's branch out and
-  verifies HEAD (`driver.mjs`, `ensureOnBranch`, called from `step`). A checkout that fails
-  parks the epic as a technical stop; that path has no test. Not seen in a real run or on
+  verifies HEAD (`driver.mjs`, `ensureOnBranch`, called from `step`). Uncommitted work comes along with
+  the checkout. A checkout that fails parks the epic as a technical stop; that path has no
+  test, and a continued build parked that way is started from the top. Not seen in a real run or on
   Windows.
 - [x] **Scratch files left by a session block the next run** (#41 B15). Fixed 2026-11-21,
   tested against the fake `claude`: uncommitted and untracked files are set aside under
   `refs/autopilot/leftover/` in the clone, never deleted, and the log and report say how many
-  (`driver.mjs`, `setAside`). Left: files left while the clone is on the integration branch
-  mid-queue are not set aside before the next epic (they never stopped a run); nothing brings
-  a set-aside file back for the owner. Not seen in a real run or on Windows.
+  (`driver.mjs`, `setAside`), at launch, at the readiness proof (`prepare.json`, `setAside`)
+  and before each epic. Left: nothing brings a set-aside file back for the owner; a launch
+  that is refused after setting files aside says so only in the previous run's log. Not seen in a real run or on Windows.
 - [x] **`**Not decided yet:** none` parks every epic** (#41 comment). Fixed 2026-11-21, tested
   against the fake `claude`: a line that names nothing is the all-clear (`driver.mjs`, `tbd`).
   Left: `wrapup-epic`'s deferred-value grep still fails a skeleton epic on any such line, and
