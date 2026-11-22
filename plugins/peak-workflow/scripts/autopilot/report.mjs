@@ -111,7 +111,7 @@ export function collectReport(runDir) {
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, setupFailed: s.setupFailed ?? null,
-    realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
+    realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, leftovers: s.leftovers ?? [], stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
   // Is the clone's integration tip already in the project? (null: cannot tell — no project, no clone.) Read-only.
   const git = (cwd, ...args) => { try { return spawnSync('git', args, { cwd, encoding: 'utf8' }); } catch { return { status: 1, stdout: '' }; } };
@@ -225,6 +225,8 @@ export function renderReport(r) {
 
   if (r.sync?.state === 'project-ahead') L.push(`At the start the clone's ${r.integration} was fast-forwarded to the project's (${String(r.sync.cloneTip).slice(0, 9)} → ${String(r.sync.projectTip).slice(0, 9)}).`);
   if (r.sync?.state === 'clone-ahead') L.push(`At the start the clone was ahead of the project by work not fetched yet; this run built on top of it: ${r.sync.waiting.join('; ')}.`);
+  const setAside = (r.leftovers ?? []).reduce((n, l) => n + l.files.length, 0);
+  if (setAside) L.push(`Autopilot set aside ${setAside} file(s) an earlier session left behind. Nothing is lost.`);
 
   L.push(`Real money on outside services: ${r.realSpend === true ? 'you allowed it when a check needs it' : r.realSpend === false ? 'you said not to spend any; what that left unproven is in each verify report under "Not proven for real"' : 'not decided at launch; a session that needs it asks you'}.`);
 

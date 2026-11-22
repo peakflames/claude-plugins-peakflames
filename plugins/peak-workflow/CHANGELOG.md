@@ -222,6 +222,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Files a session left in autopilot's clone no longer block a run** — uncommitted and untracked files are set aside under `refs/autopilot/leftover/` instead of refusing the launch or stopping the queue. Nothing is deleted; the log and the report say how many.
 - **`tor-lifecycle` on a backslash path** — the launcher finds `tor_lifecycle.py` when Windows passes its own path with backslashes.
 - **Autopilot preflight and `**Not decided yet:** none`** — a line that names nothing (none, n/a, a dash, empty) no longer parks every epic; a line that lists a layer still does.
 - **Autopilot no longer hands the owner technical work** — the report, gate text and skill offer no "by hand" command, no other skill to run and no git line; autopilot brings merged work in itself. What it cannot repair yet is said plainly: it needs someone who maintains the code.

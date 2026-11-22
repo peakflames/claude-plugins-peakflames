@@ -1291,6 +1291,7 @@ class Run {
     this.stopReason = null;
     this.entry = {}; // epic id -> phase to re-enter after a crash
     this.early = []; // log lines from before the run directory exists
+    this.leftoversAtStart = []; // files set aside before the run's state exists
   }
 
   log(msg) {
@@ -1382,13 +1383,35 @@ class Run {
   currentBranch() { return gitRun(this.clone, 'branch', '--show-current').out; }
   dirty() { return this.g('status', '--porcelain') !== ''; }
 
-  /** Commits whatever a parked session left uncommitted on the epic branch. One of three driver git writes. */
+  /** Commits whatever a parked session left uncommitted on the epic branch. One of the driver's few git writes. */
   wipCommit(e) {
     if (this.currentBranch() !== this.meta(e).branch || !this.dirty()) return false;
     this.g('add', '-A');
     this.g('commit', '--no-verify', '-q', '-m', 'wip(autopilot): uncommitted work at park');
     this.log(`${e.id}: committed uncommitted work on ${this.meta(e).branch} as wip(autopilot)`);
     return true;
+  }
+
+  /**
+   * Sets aside whatever is uncommitted in the clone, untracked files included, so that it neither blocks a run nor is
+   * lost: one commit under refs/autopilot/leftover/ holds it (a stash commit, kept out of the stash list). Ignored
+   * files (dependencies) stay where they are. Returns whether the clone is clean afterwards.
+   */
+  setAside(why) {
+    if (!this.dirty()) return true;
+    const names = (...args) => gitRun(this.clone, ...args).out.split('\n').filter(Boolean);
+    const files = [...new Set([...names('diff', '--name-only', 'HEAD'), ...names('ls-files', '--others', '--exclude-standard')])].sort();
+    const branch = this.currentBranch() || 'detached';
+    const ref = `refs/autopilot/leftover/${branch}-${Date.now()}`;
+    const stashed = gitRun(this.clone, 'stash', 'push', '-q', '--include-untracked', '-m', `autopilot: set aside ${why}`);
+    const sha = stashed.code === 0 ? gitRun(this.clone, 'rev-parse', '--verify', '--quiet', 'refs/stash').out : '';
+    if (!sha) { this.log(`could not set aside ${files.length} file(s) left uncommitted on ${branch}: ${stashed.err || 'git stash kept nothing'}`); return false; }
+    this.g('update-ref', ref, sha);
+    this.g('stash', 'drop', '-q');
+    const left = { branch, ref, files, why, date: new Date().toISOString() };
+    if (this.state) this.state.leftovers = [...(this.state.leftovers ?? []), left]; else this.leftoversAtStart.push(left);
+    this.log(`set aside ${files.length} file(s) left uncommitted on ${branch} (${files.join(', ')}); nothing is lost: they are kept at ${ref} (${why})`);
+    return !this.dirty();
   }
 
   /** Puts the integration line back at `sha`; a discarded tip stays reachable under refs/autopilot/rejected/. */
@@ -2497,7 +2520,7 @@ class Run {
    */
   syncWithProject(integration) {
     const project = this.config.project;
-    if (this.dirty()) throw new Error(`the private clone has uncommitted changes on ${this.currentBranch()}; a run does not start on a dirty clone`);
+    if (!this.setAside('before the run started')) throw new Error(`the private clone has uncommitted changes on ${this.currentBranch()} that could not be set aside; a run does not start on a dirty clone`);
     const f = gitRun(this.clone, 'fetch', '-q', '--no-tags', project, integration);
     if (f.code !== 0) throw new Error(`could not fetch ${integration} from ${project}: ${f.err}`);
     const s = syncFacts(project, this.stateDir, integration);
@@ -2704,10 +2727,11 @@ class Run {
       } else {
         this.state = { realSpend: typeof cfg.realSpend === 'boolean' ? cfg.realSpend : null, attended: typeof cfg.attended === 'boolean' ? cfg.attended : null, run: new Date().toISOString(), name: this.runName, driverVersion: DRIVER_VERSION, pluginDir: this.pluginDir, integration, startSha: null, spentUsd: 0, runBudgetUsd: cfg.runBudgetUsd, testCommand: cfg.testCommand, status: 'running', stoppedBecause: null, consecutiveInfra: 0, baseSkips: null, sync, queue: [] };
       }
+      if (this.leftoversAtStart.length) this.state.leftovers = [...(this.state.leftovers ?? []), ...this.leftoversAtStart.splice(0)];
 
       // Preflight reads the integration line, so the clone must be on it.
       if (!resuming) {
-        if (this.currentBranch() !== integration) { if (this.dirty()) throw new Error(`the private clone has uncommitted changes on ${this.currentBranch()}; a run does not start on a dirty clone`); this.g('checkout', '-q', integration); }
+        if (this.currentBranch() !== integration) { if (!this.setAside('before the run started')) throw new Error(`the private clone has uncommitted changes on ${this.currentBranch()} that could not be set aside; a run does not start on a dirty clone`); this.g('checkout', '-q', integration); }
         this.state.startSha = this.integrationSha();
       } else if (!this.state.queue.some((q) => !TERMINAL.has(q.state) && q.state !== 'QUEUED') && this.currentBranch() !== integration && !this.dirty()) this.g('checkout', '-q', integration);
       // Gate decisions are judged once, at run start: valid ones resume, void ones are planned again.
@@ -2761,7 +2785,7 @@ class Run {
             this.finish(e, 'PARKED', m.reasons.join('; ')); this.stopOnPark(e); continue;
           }
           // Base red stops the whole run: every epic would build on it.
-          if (this.currentBranch() !== integration) { if (this.dirty()) { this.stopReason = `clone is dirty on ${this.currentBranch()}`; break; } this.g('checkout', '-q', integration); }
+          if (this.currentBranch() !== integration) { if (!this.setAside(`before ${e.id} started`)) { this.stopReason = `clone is dirty on ${this.currentBranch()}`; break; } this.g('checkout', '-q', integration); }
           // What git does not carry (dependencies, local files): once per run, and again after every merge.
           if ((cfg.setup || (cfg.copy ?? []).length) && this.envSha !== this.integrationSha()) {
             const env = this.prepareEnv();
