@@ -4,8 +4,9 @@
 # Probe order: python3, py -3 (Windows launcher), python. Uses shell builtins only.
 # Exit 3 with an install hint when no suitable interpreter is found.
 
+# Windows may pass this script's path with backslashes, so either separator ends the folder.
 case $0 in
-  */*) here=${0%/*} ;;
+  *[/\\]*) here=${0%[/\\]*} ;;
   *) here=. ;;
 esac
 script="$here/tor_lifecycle.py"

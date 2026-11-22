@@ -137,6 +137,18 @@ test('sync, diverged: readiness and the driver both refuse and print both tips; 
   assert.deepEqual([s.sync.state, s.queue[0].state, s.startSha], ['project-ahead', 'MERGED', tip(p.project)]);
 });
 
+test('a "Not decided yet" line that says none is the all-clear; one that lists a layer still parks', async (t) => {
+  const p = makeProject(t);
+  const md = path.join(p.project, 'CLAUDE.md');
+  const original = fs.readFileSync(md, 'utf8');
+  const eligibility = (line) => {
+    fs.writeFileSync(md, `${original}\n${line}\n`);
+    return preflight(p).epics.find((e) => e.id === E1.id).eligibility;
+  };
+  for (const clear of ['**Not decided yet:** none', '**Not decided yet:** None.', '**Not decided yet:** nothing', '**Not decided yet:** n/a', '**Not decided yet:** —', '**Not decided yet:**']) assert.equal(eligibility(clear), 'eligible', clear);
+  for (const open of ['**Not decided yet:** database (default SQLite), CI', '**Not decided yet:** none of the hosting options', '**Hosting:** TBD — set by the walking-skeleton epic']) assert.equal(eligibility(open), 'park', open);
+});
+
 test('preflight gate: not resumable — nothing to answer; it clears when the fix reaches the clone and preflight passes', async (t) => {
   const p = makeProject(t);
   const md = path.join(p.project, 'CLAUDE.md');
