@@ -386,6 +386,22 @@ Why this order:
   `20261122-094004`). The second epic of 11 parked in planning after one minute; eight epics
   depended on it, so the run ended in 20 minutes with the owner away. Unexamined: whether
   launch should warn when most of the queue hangs on one epic. C3.
+- [ ] **A check that needs another machine parks as if the owner could do it** (*no issue*;
+  Pilot Light, gate `yZQYIVE-1`, 2026-11-22). TOR-01-bhQV3eP is operator-observed on Windows
+  11; the owner was on a Mac. The skill's "Start it so I can check for real" offer assumes
+  his machine meets the Given. Owner's wish: do not stop for it; carry on and report it as
+  not checked here. C2.
+- [ ] **Owner's idea: a lighter "prototype" strictness chosen at launch** (*no issue*;
+  2026-11-22, not decided). Looks collected for the end, a planner's own amendment or a
+  builder's deferral taken and recorded for review; failing tests, scope and pushing still
+  stop. `look: "after"` covers part of it. He thinks Arun wants the same.
+- [ ] **The watch repeats its progress line once per blocked epic** (*no issue*; run
+  `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3.
+- [ ] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`). The
+  owner's "Amend" answer for n2g5TvI was given to a resumed plan session that he then
+  stopped after 2 minutes; a new resume gate was written. Check on the next launch whether
+  the planner asks again. That stop also added nothing to the spend (see "A session that is
+  killed costs nothing on the books").
 - [ ] **A builder was denied a tool its project uses** (*no issue*; same run):
   `mcp__shadcn__get_item_examples_from_registries`. Harmless there; a project's own MCP tools
   are not reachable from an autopilot session. Unexamined. C3.
