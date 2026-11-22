@@ -219,8 +219,13 @@ Why this order:
   brake on a fix autopilot allows itself: test-named files in the listed test directories, net
   loss of assert/test lines. A weakening it does not recognise merges unasked.
   *`checkVerify`, `autoFix`.*
-- [ ] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change.
-  Unexamined.
+- [ ] **The final check saw a defect and passed it without a word** (*no issue*; Pilot Light,
+  run `20261122-090420`). The verifier noted that the "Page not found" picture carries the
+  wrong text, did not fix it and did not park; the epic merged. What the verifier notes and
+  leaves should reach the owner (the report, or a question).
+- [ ] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change;
+  48 seconds on Pilot Light's whole walking skeleton (2026-11-22; it did find the deleted
+  lockfile, rated low). Unexamined.
 
 - [x] **The scope check made the walking skeleton worse** (*no issue*; Pilot Light, run
   `20261122-025513`; owner's decisions of 2026-11-22). It refused the new `bun.lock` and the
@@ -256,7 +261,11 @@ Why this order:
   skills (`docs/session-handoff.md` there); not yet filed. Its last epic (F5hv9T4) must not be
   queued until a real step folder with `stream.jsonl` is in its `samples/`. Seen working there
   on real runs: the no-tests-yet start, the Python check, a file `CLAUDE.md` names, and a
-  resumed epic put back on its branch (B14).
+  resumed epic put back on its branch (B14). Its walking skeleton was planned, built,
+  repaired, reviewed, looked at and merged from an empty repository on 2026-11-22 for $15.70
+  (build and final check on Opus 5.5): the first epic autopilot has built with no code to
+  start from. Also seen there: the owner's look with 25 pictures, a small fix made by the
+  final check on the standing answer, and the scratch folder in use.
 
   Seen live and working: the joined instruction file, the referee refusing a repeated check,
   "Not now" not carried forward, a no-verdict check parking instead of failing, the standing
@@ -280,6 +289,14 @@ Why this order:
   issue*; found 2026-11-22 on Pilot Light's first launch). macOS's Python 3.9 came first on
   PATH and hid Homebrew's. `scripts/tor-lifecycle` now tries `python3` in every PATH folder,
   then `/opt/homebrew/bin` and `/usr/local/bin`.
+- [ ] **A new project's first epic has 22,386 files set aside before its final check** (*no
+  issue*; Pilot Light, run `20261122-090420`). Build output and `node_modules` left by the
+  build are untracked on the integration line, whose `.gitignore` does not know them until the
+  epic merges, so `setAside` stores them all. The final check still passed; time and safety of
+  a set-aside that large are not examined.
+- [ ] **`setup` is not run for a new project's first epic** when it is guarded by a file the
+  epic creates (`if [ -f package.json ]`): it runs on the integration line before the branch
+  is checked out. The first real run of `setup` is the run after the merge. Not examined.
 - [ ] **A test that times out leaves its fake `claude` running** (*no issue*; seen 2026-11-21:
   six stray `fake-claude.mjs` processes after timed-out attend tests). Test-only; kill the
   child when a test ends.
@@ -376,6 +393,16 @@ Why this order:
   referee refuses (#41: the dev-server tether in `~/.claude/scripts`). Fixed 2026-11-21: a file
   `CLAUDE.md` names in backticks is readable (step 2). Not seen on Windows. Whether a dev
   server started that way survives the ban on background commands is not checked.
+- [ ] The look question reads "UI epic: parks for a human look before verify. Does what was
+  built look right?": the driver's own reason, not owner's words (*no issue*; Pilot Light).
+- [ ] The watch said "One command has been running for 3 min" for a tool call that had ended:
+  its `PreToolUse` had no `PostToolUse` (a failed command), so it counted as still running
+  (*no issue*; Pilot Light, `build-1/hooks.jsonl` line 57).
+- [ ] A look with 25 pictures and no operator-observed requirement is one yes for the whole
+  set; nothing lists what to check (*no issue*; Pilot Light). Maybe as intended.
+- [ ] The referee refused "$AUTOPILOT_SCRATCH" used in a cut-down form four times in one epic,
+  and four cwd-relative paths that resolved into the workspace (*no issue*; Pilot Light). The
+  scratch rule's wording may need an example.
 - [ ] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
   (#40) (15).
 - [ ] The build missed a console error the verifier later found (#40) (38).
