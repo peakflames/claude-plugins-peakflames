@@ -1527,6 +1527,18 @@ class Run {
     if (this.branchTip(pre.branch) !== pre.branchTip) this.g('branch', '-f', pre.branch, pre.branchTip);
   }
 
+  /**
+   * The declared test directories, when none of them holds a committed file on the checked-out
+   * line: the project has no tests yet (a new project before its first epic), so a failing test
+   * command there says nothing about the code. Null once any test file is committed.
+   */
+  noTestsYet() {
+    const declared = this.config.testDirs?.length ? this.config.testDirs : this.pre?.testDirs?.length ? this.pre.testDirs : readProjectFacts(this.clone).testDirs;
+    const dirs = (declared ?? []).map((d) => `${String(d).replace(/\/+$/, '')}/`);
+    if (!dirs.length) return null;
+    return gitRun(this.clone, 'ls-files', '--', ...dirs).out.trim() ? null : dirs;
+  }
+
   runTests() {
     const started = Date.now();
     const r = sh(this.config.testCommand, [], { cwd: this.clone, shell: true, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
@@ -1602,7 +1614,8 @@ class Run {
       const sync = this.syncWithProject(integration);
       if (this.currentBranch() !== integration) this.g('checkout', '-q', integration);
       const env = this.prepareEnv();
-      const tests = env.pass ? { command: this.config.testCommand ?? null, ...(this.config.testCommand ? this.runTests() : { pass: false, code: null, tail: 'CLAUDE.md has no **Tests:** command' }) } : null;
+      const noTests = env.pass && this.config.testCommand ? this.noTestsYet() : null;
+      const tests = env.pass ? { command: this.config.testCommand ?? null, ...(noTests ? { pass: true, skipped: `no test files under ${noTests.join(' ')} on ${integration} yet` } : this.config.testCommand ? this.runTests() : { pass: false, code: null, tail: 'CLAUDE.md has no **Tests:** command' }) } : null;
       const leftovers = gitRun(this.clone, 'status', '--porcelain').out.split('\n').filter(Boolean);
       if (leftovers.length) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); }
       const base = env.pass && !!tests?.pass && !leftovers.length;
@@ -1610,7 +1623,7 @@ class Run {
       // A gate that fails here is a warning, not a refusal: the verifier runs them, and some need what the copy lacks.
       const gateResults = base ? gates.map((g) => String(g).trim()).filter(Boolean).map((command) => this.runGate(command)) : [];
       // The probe is worth its few cents only once the plain shell passes: it answers the one question left, the sandbox.
-      const probed = probe ? (base ? await this.probe(integration) : { ran: false, skipped: 'the proof failed before the probe' }) : null;
+      const probed = probe ? (noTests ? { ran: false, skipped: 'the project has no tests yet for the probe to run' } : base ? await this.probe(integration) : { ran: false, skipped: 'the proof failed before the probe' }) : null;
       const result = {
         ok: base && !(probed?.ran && !probed.pass), at: new Date().toISOString(), clone: this.clone, cloneMade: made, integration, tip: gitRun(this.clone, 'rev-parse', 'HEAD').out, sync: sync.state,
         failed: !env.pass ? env.step : !tests.pass ? 'tests' : leftovers.length ? 'leftovers' : probed?.ran && !probed.pass ? 'probe' : null,
@@ -2899,7 +2912,10 @@ class Run {
             const env = this.prepareEnv();
             if (!env.pass) { this.stopReason = 'setup failed'; this.state.setupFailed = { before: e.id, step: env.step, problems: env.problems, command: env.setup.command, exit: env.setup.code ?? null, timedOut: env.setup.timedOut ?? false, couldNotRun: env.setup.couldNotRun ?? false, tail: env.setup.tail ?? null }; this.log(`setup failed (${env.step}) on ${integration}; stopping the run`); break; }
           }
-          const t = this.runTests();
+          // A project with no tests yet has no base to be red: the first epic's own checks run the tests.
+          const noTests = this.noTestsYet();
+          if (noTests) { this.state.baseEmpty = { before: e.id, testDirs: noTests }; this.log(`no test files under ${noTests.join(' ')} on ${integration} yet: the base test run is skipped; ${e.id}'s own checks run the tests`); }
+          const t = noTests ? { pass: true, skips: null } : this.runTests();
           if (!t.pass) { this.stopReason = 'base red'; this.state.baseRed = { before: e.id, exit: t.code, timedOut: t.timedOut, couldNotRun: t.couldNotRun, tail: t.tail }; this.log(`base red: \`${cfg.testCommand}\` fails on ${integration} (exit ${t.code}); stopping the run`); break; }
           this.state.baseSkips = t.skips;
           e.startedAt = new Date().toISOString();
