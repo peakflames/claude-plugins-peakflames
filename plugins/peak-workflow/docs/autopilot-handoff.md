@@ -17,7 +17,8 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 A second owner ran the alpha on Windows 11 (project Wayframe) and filed #41: 9 bugs, 7
 improvements. Five bugs and two improvements are fixed on this branch, each with tests against
-the fake `claude`; none has been seen in a real run yet, and nothing here was run on Windows.
+the fake `claude`. The reporter confirmed B1, B4 and I2 (owner away) in a real run on Windows on
+2026-11-21; the rest has not been seen in a real run, and our suites were not run on Windows.
 
 | Item | What changed |
 |---|---|
@@ -42,6 +43,12 @@ or "Try again") is `resumed.unasked` and never counts as their approval of a fix
 The review of I6a left six problems unfixed, and #41 still has B3, B6–B8, I1, I3–I5, I7 and
 I6c open (I6c is **#42**: only the wording changed, "it needs someone who maintains the
 code"). All of them are in the to-do list below.
+
+**The reporter's follow-up (2026-11-21, #41 comments and #43).** New items B10–B16 and I8, B3
+seen again, and two Windows fixes he carries locally that this branch lacks; his patches were
+asked for on #41. #43 tracks B11 only (sessions cannot use MCP connectors); its body is a pasted
+evaluation whose other lessons repeat #41. His run logs are on his machine
+(`Wayframe.autopilot/runs/20261121-130134/`). All of it is in the to-do list below.
 
 ## How to work with the owner
 
@@ -78,33 +85,57 @@ code"). All of them are in the to-do list below.
 ## To-do list, in working order
 
 Work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
-all its boxes are ticked. Order and criticality were agreed with the owner on 2026-11-21.
+all its boxes are ticked. Order and criticality were agreed with the owner on 2026-11-21 and
+reordered the same day after the Windows owner's real runs (#41 comments, #43).
 
 Criticality: **C1** something wrong could merge · **C2** wastes money or a night · **C3**
 confuses the owner, nothing lost · **C4** housekeeping.
 
-Tracked on GitHub (peakflames/claude-plugins-peakflames): #35–#42, named on each item. Plan each
+Tracked on GitHub (peakflames/claude-plugins-peakflames): #35–#43, named on each item. Plan each
 with `/triage <issue>`. Items marked *no issue* are tracked only here. Numbers in brackets are
-from the UAT notes; B and I numbers are from #41.
+from the UAT notes; B and I numbers are from #41 (B10–B16 and I8 are in its comments).
+
+How far each item reported on 2026-11-21 was checked: **in code** = the cause was found by
+reading the code; **code agrees** = the code is consistent with the report, cause not pinned
+down; **not checked** = taken from the report as written. None was reproduced here.
 
 Why this order:
-- Step 1 comes first: every fix is trusted only as far as the fake `claude` is.
-- Step 2's three items are the same code; do them together.
-- Step 4 comes before the real run in step 5: a stale attending session would spoil what the
+- Step 1 comes first: these stopped the last real runs, and the Windows owner is the one
+  running autopilot for real. He carries two of the fixes as local patches (asked for on #41).
+- Step 2 before the rest: every fix is trusted only as far as the fake `claude` is.
+- Step 3's four items are the same code (`doCheckVerify`, `missingResumeGates`, `enter`): a
+  stop that leaves no way back but starting over.
+- Step 5 comes before the real run in step 6: a stale attending session would spoil what the
   run proves.
-- In step 7, B6 comes before #42: otherwise autopilot would try to repair a project that is
-  only flaky. #42 also covers "a launch gate fails on a product bug".
-- Step 9's items share one screen and one question; do them as one piece of work.
-- Step 6 is independent; it blocks the Windows owner from confirming B1 and B4.
+- In step 8, B6 and B10 come before #42: otherwise autopilot would try to repair a project that
+  is only flaky or was only asleep. #42 also covers "a launch gate fails on a product bug".
+- Step 10's items share the launch check and its one screen; do them as one piece of work.
+- Step 7 is independent.
 
-### Step 1 — Make the tests trustworthy (C1)
+### Step 1 — What stopped the last real runs (C2)
+
+- [ ] **A resumed epic is not put back on its branch** (#41 B14; code agrees). The log says
+  "resuming at BUILD on <branch>" but the clone stays on the integration branch; once the
+  build's work was left uncommitted there and the next launch refused. The driver should check
+  out the branch and verify HEAD before a resumed session starts. *`driver.mjs` `enter`.*
+- [ ] **Scratch files left by a session block the next run** (#41 B15; in code). `dirty()`
+  counts untracked files, a run does not start on a dirty clone, and there is no recovery the
+  owner can use. Keep session scratch out of the clone, or move leftovers into the workspace
+  and continue.
+- [ ] **`**Not decided yet:** none` parks every epic** (#41 comment; in code). Preflight matches
+  the words `**Not decided yet:**` wherever they appear. *`driver.mjs:681`.* Whether
+  `/peak-workflow:setup` writes the `none` form itself is not checked.
+- [ ] **`tor-lifecycle` cannot find its folder from a backslash path** (#41 comment; in code).
+  The script handles `*/*` only. *`scripts/tor-lifecycle:8`.*
+
+### Step 2 — Make the tests trustworthy (C1)
 
 - [ ] **The fake `claude` is kinder than the real one** (#38). It read every
   `--append-system-prompt-file`; the real one keeps the last, so the owner's recorded look never
   reached a verifier (finding 44). Run the 11 live tests (`AUTOPILOT_LIVE=1`), fix what they
   show, and go through `fake-claude.mjs` for other places it accepts what the real one would not.
 
-### Step 2 — Stop throwing work away at the merge check (C2)
+### Step 3 — No stop that can only be started over (C2)
 
 - [ ] **A failed merge check throws away the verifier's work** (#35). `rollback()` resets the
   integration line and the epic branch, so a rerun repeats the whole final check (twice on
@@ -113,12 +144,16 @@ Why this order:
 - [ ] **A merge check that fails for any reason other than a small-fix limit parks with no
   question** (#35). The epic then looks eligible and would be planned and built again from
   scratch. *`doCheckVerify`, `missingResumeGates`.*
+- [ ] **"Real — fix before verify" after the repair is used goes straight to FAILED** (#41 B13;
+  in code). The reviewer gate offers the answer although `fixRounds` is already 1; the owner
+  cannot then change to "verify as built". Offer only answers that are possible, or write a
+  resume gate into VERIFY. *`driver.mjs:2562`, `missingResumeGates`.*
 - [ ] **An epic is started over without asking** (*no issue*; review of I6a). A standing answer
   whose branch has moved or no longer merges is void, and the epic is planned again from
   scratch without a question. Old behaviour, reachable from more gates since I6a.
   *`gateFacts`, `enter`.*
 
-### Step 3 — Strengthen the guards on what merges unasked (C1)
+### Step 4 — Strengthen the guards on what merges unasked (C1)
 
 - [ ] **The test-weakening guard is a heuristic** (*no issue*; review of I6a). It is the main
   brake on a fix autopilot allows itself: test-named files in the listed test directories, net
@@ -127,12 +162,12 @@ Why this order:
 - [ ] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change.
   Unexamined.
 
-### Step 4 — Keep the attending session current (C2)
+### Step 5 — Keep the attending session current (C2)
 
 - [ ] **An attending session keeps the skill text it loaded** (#37). After a plugin update it
   works from stale instructions until `/peak-workflow:autopilot` is run again.
 
-### Step 5 — Prove it in one real run (C1)
+### Step 6 — Prove it in one real run (C1)
 
 - [ ] **Tick off the live-proof checklist** (#39): the 2026-11-14 changes (run announcer, single
   spend figure, $250 budget and `configure --run-budget`, "Bring it in for me", "Combine them
@@ -143,27 +178,39 @@ Why this order:
   Seen live and working: the joined instruction file, the referee refusing a repeated check,
   "Not now" not carried forward, a no-verdict check parking instead of failing, the standing
   answer for small fixes and its "allow a fix of that size?" question, the planner's
-  contradiction line, `"look": "after"`.
+  contradiction line, `"look": "after"`. On Windows, 2026-11-21 (the reporter's run
+  `20261121-130134`): B1, B4, and I2 with the owner away (the run continued past a park and
+  blocked the dependent). I2 with the owner there is not yet seen.
 
-### Step 6 — Windows (C2)
+### Step 7 — Windows tests (C2)
 
-- [ ] **36 driver tests fail on Windows before any change** (#41 B8). Then ask the reporter to
-  confirm B1 and B4 on their machine; their local commit `4dcf789` is superseded by B1 here.
+- [ ] **36 driver tests fail on Windows before any change** (#41 B8).
 
-### Step 7 — A project that is broken before or during a run (C2)
+### Step 8 — A project that is broken, flaky or asleep before or during a run (C2)
 
+- [ ] **A laptop that sleeps during the base check reads as a red base** (#41 B10; in code).
+  Any failing exit ends the run; nothing looks at how long the check took. Treat a check that
+  ran far past its usual time as interrupted and run it once more; on Windows hold a
+  keep-awake request for the driver's life, or warn at launch (the warning exists for macOS
+  only). *`driver.mjs:2769`, `:2844`.*
 - [ ] **The base check has no retry for a flaky test** (#41 B6). One slow test ended two runs.
 - [ ] **One flaky gate failure is reported as "every epic will probably stop"** (#40) (6). C3.
 - [ ] **Autopilot cannot repair a red base, a preflight refusal or a merge conflict itself**
   (#42, I6c). Includes "no path for a launch gate that fails on a product bug" (#40) (7).
 
-### Step 8 — The budget (C2)
+### Step 9 — The budget (C2)
 
 - [ ] **The run budget is not enforced inside a step** (#36). Cost is known only when a step
   ends; a chain finished at $80.51 of $80. *`driver.mjs` spend accounting (evaluation gap G2).*
 
-### Step 9 — The launch screen (C2 and C3)
+### Step 10 — The launch check and its screen (C2 and C3)
 
+- [ ] **Sessions cannot use MCP connectors, and nothing says so up front** (#43, B11; in code:
+  `--allowedTools` is fixed, `driver.mjs:868`). One epic spent four relaunches on a block no
+  answer could change. Preflight should flag a requirement that needs an external app or API
+  read-back as something a run cannot prove; every session should be told MCP tools are
+  unavailable; a question caused by a host denial should park once, with only possible
+  answers. C2.
 - [ ] **Requirement questions are the main cause of stops** (#41 I3). Ask them once at launch
   (a requirements check over the queued epics), not mid-night. C2.
 - [ ] **The launch check spends real money before the real-money question** (#40) (5). C2.
@@ -171,16 +218,25 @@ Why this order:
   and limits itself.
 - [ ] **The launch popup lists epics by ID only** (#40) (10).
 - [ ] **No path for a free-text launch answer** such as "just do one epic" (#40) (8).
-- [ ] **Preflight text ignores `"look": "after"`** (#41 B3).
+- [ ] **Preflight text ignores `"look": "after"`** (#41 B3; in code, `driver.mjs:715`; the
+  reporter saw it again on `93a8b35`).
 
-### Step 10 — Time and progress (C2 and C3)
+### Step 11 — An approved amendment reaches every later step (C2 and C3)
+
+- [ ] **The reviewer flags an amendment the owner already approved** as `test-weakened`, and the
+  repair parks to have it confirmed (#41 B12; not checked). Pass decided amendment gates to the
+  reviewer and the fix session, as B9 did for plan and build. C2: it cost a relaunch.
+- [ ] **A person-only check quotes a requirement the owner already replaced** (#41 B16; not
+  checked). Gate `checks`, `live` and `question` should name the current requirement.
+
+### Step 12 — Time and progress (C2 and C3)
 
 - [ ] **The full end-to-end suite runs several times per epic** (#41 I7). C2.
 - [ ] **No hourly progress report** (#41 I1).
 - [ ] **The first epic is announced as "5 of 8"** (#41 B7): numbered by phase, not by queue
   position.
 
-### Step 11 — Wording and small behaviour (C3)
+### Step 13 — Wording and small behaviour (C3)
 
 - [ ] One of the epic's automatic tries can be wasted: a final check with no verdict because
   the owner put a check off is re-run on the standing answer and asks again (*no issue*).
@@ -190,6 +246,10 @@ Why this order:
   run's, so the two can differ (*no issue*).
 - [ ] `launch.warn` lines for a clone that is ahead or diverged still carry a `git fetch`
   command; the skill paraphrases them (*no issue*).
+- [ ] No gate kind for a value the owner types, such as a document ID; it travels in `--note`
+  (#41 I8).
+- [ ] A project's `CLAUDE.md` can tell sessions to use a script outside the clone, which the
+  referee refuses (#41, 2026-11-22 comment: the dev-server tether). Not checked.
 - [ ] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
   (#40) (15).
 - [ ] The build missed a console error the verifier later found (#40) (38).
@@ -197,7 +257,7 @@ Why this order:
 - [ ] The look question for a UI epic with no pictures is asked in chat, not the popup (#40) (41).
 - [ ] The skill text does not cover the sandbox-off case (#41 I4); mostly moot after B1.
 
-### Step 12 — Housekeeping (C4)
+### Step 14 — Housekeeping (C4)
 
 - [ ] `preflight --json` is 31 KB (#40) (23).
 - [ ] The verifier makes scratch git worktrees under `/tmp`, outside the clone, and tries forced
@@ -220,7 +280,7 @@ Why this order:
 
 ## Suggested skills
 
-- `mattpocock-skills:diagnosing-bugs` and `mattpocock-skills:tdd` — steps 2 and 8 (write the
+- `mattpocock-skills:diagnosing-bugs` and `mattpocock-skills:tdd` — steps 1, 3 and 9 (write the
   fake-`claude` scenario first; patterns in `test/resume.test.mjs`).
 - `mattpocock-skills:writing-for-agents` — any edit to `SKILL.md` or the rule texts sessions
   are given (`PLAN_RULES`, `BUILD_RULES`, `VERIFY_RULES`).
