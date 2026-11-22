@@ -48,10 +48,10 @@ test('watch on a finished run: one line on where it ended, then RUN ENDED, exit 
 test('watch on a live run: step lines as they happen, a repeated refusal said once, the tests\' result, and the end', async (t) => {
   const p = makeProject(t);
   const push = { do: 'tool', tool_name: 'Bash', tool_input: { command: 'git push origin develop' } };
-  const tests = (hook) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ hook, tool_name: 'Bash', tool_input: { command: 'cd . && node --test' } })}\n` });
+  const tests = (hook) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, unchecked: 'stands for a line the hooks themselves log', content: `${JSON.stringify({ hook, tool_name: 'Bash', tool_input: { command: 'cd . && node --test' } })}\n` });
   p.scenario({
     [`${E1.id}/plan`]: planScript(E1),
-    [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, push, push, tests('PostToolUseFailure'), tests('PostToolUse'), { do: 'write', path: '{{state}}/mid-build', content: '' }, { do: 'hang' }] },
+    [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, push, push, tests('PostToolUseFailure'), tests('PostToolUse'), { do: 'write', path: '{{state}}/mid-build', content: '', unchecked: 'a signal between this test and its script, not session work' }, { do: 'hang' }] },
   });
   const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
   t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
@@ -91,7 +91,7 @@ test('watch on a live run: step lines as they happen, a repeated refusal said on
 test('watch --once: returns after the first thing said, with where to pick up; a third identical refusal is said again', async (t) => {
   const p = makeProject(t);
   const push = { do: 'tool', tool_name: 'Bash', tool_input: { command: 'git push origin develop' } };
-  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, push, push, push, { do: 'write', path: '{{state}}/mid-build', content: '' }, { do: 'hang' }] } });
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, push, push, push, { do: 'write', path: '{{state}}/mid-build', content: '', unchecked: 'a signal between this test and its script, not session work' }, { do: 'hang' }] } });
   const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
   t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
   await waitFor(() => fs.existsSync(path.join(p.state, 'mid-build')));
@@ -152,7 +152,7 @@ test('status.next: readiness with no run, attend while a driver runs, decide for
   assert.deepEqual([none.next, none.run, none.running, none.epics, none.waiting, none.relaunch], ['readiness', null, null, [], [], null]);
   assert.deepEqual(fs.readdirSync(p.state), ['settings.json'], 'status writes nothing');
 
-  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, { do: 'write', path: '{{state}}/mid-build', content: '' }, { do: 'hang' }] } });
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, { do: 'write', path: '{{state}}/mid-build', content: '', unchecked: 'a signal between this test and its script, not session work' }, { do: 'hang' }] } });
   const name = confirmRun(p, { autoContinue: 2 });
   const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--run', name], { stdio: 'ignore' });
   t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
@@ -301,10 +301,10 @@ test('status.next: readiness when the only epics left are ones the owner could q
 
 test('watch and status see inside the step: a command marked "Needs you:" is said at once, a long one once; neither is a guess', async (t) => {
   const p = makeProject(t);
-  const pre = (id, description) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), hook: 'PreToolUse', tool_name: 'Bash', decision: 'pass', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description } })}\n` });
-  const post = (id) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), hook: 'PostToolUse', tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'x' } })}\n` });
-  const mark = (name) => ({ do: 'write', path: `{{state}}/${name}`, content: '' });
-  const until = (name) => ({ do: 'exec', cmd: `while [ ! -f "{{state}}/${name}" ]; do sleep 0.05; done` });
+  const pre = (id, description) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, unchecked: 'stands for a line the hooks themselves log', content: `${JSON.stringify({ t: new Date().toISOString(), hook: 'PreToolUse', tool_name: 'Bash', decision: 'pass', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description } })}\n` });
+  const post = (id) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, unchecked: 'stands for a line the hooks themselves log', content: `${JSON.stringify({ t: new Date().toISOString(), hook: 'PostToolUse', tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'x' } })}\n` });
+  const mark = (name) => ({ do: 'write', path: `{{state}}/${name}`, content: '', unchecked: 'a signal between this test and its script, not session work' });
+  const until = (name) => ({ do: 'exec', cmd: `while [ ! -f "{{state}}/${name}" ]; do sleep 0.05; done`, unchecked: 'a signal between this test and its script, not session work' });
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [pre('t1', 'Run the unit tests'), mark('at-1'), until('go-1'), post('t1'), pre('t2', 'Needs you: sign in to Okta in the browser window that opens'), mark('at-2'), until('go-2'), post('t2'), ...wrapupScript(E1).actions], result: { result: 'Verdict: PASS', total_cost_usd: 1.3 } } });
   const run = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double'], { stdio: 'ignore' });
   t.after(() => { if (alive(run.pid)) run.kill('SIGKILL'); });
@@ -339,9 +339,9 @@ test('watch and status see inside the step: a command marked "Needs you:" is sai
 
 test('a command the owner was called for and that gave up is said so; only an exit that is the test command\'s own says how the tests went', async (t) => {
   const p = makeProject(t);
-  const line = (row) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), tool_name: 'Bash', ...row })}\n` });
-  const mark = (name) => ({ do: 'write', path: `{{state}}/${name}`, content: '' });
-  const until = (name) => ({ do: 'exec', cmd: `while [ ! -f "{{state}}/${name}" ]; do sleep 0.05; done` });
+  const line = (row) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, unchecked: 'stands for a line the hooks themselves log', content: `${JSON.stringify({ t: new Date().toISOString(), tool_name: 'Bash', ...row })}\n` });
+  const mark = (name) => ({ do: 'write', path: `{{state}}/${name}`, content: '', unchecked: 'a signal between this test and its script, not session work' });
+  const until = (name) => ({ do: 'exec', cmd: `while [ ! -f "{{state}}/${name}" ]; do sleep 0.05; done`, unchecked: 'a signal between this test and its script, not session work' });
   const needs = { command: 'python build.py mcp tools --oauth', description: 'Needs you: sign in to Okta' };
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [
     line({ hook: 'PreToolUse', decision: 'pass', tool_use_id: 'n1', tool_input: needs }), mark('at-1'), until('go-1'),

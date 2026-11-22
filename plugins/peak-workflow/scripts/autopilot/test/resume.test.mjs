@@ -646,7 +646,7 @@ test('resume gate (STOP mid-build): the STOP file is cleared, and resuming conti
 test('STOP honoured by the referee (the session ends itself with a success line): parked as stopped, and resumed at BUILD', async (t) => {
   const p = makeProject(t, { config: { timing: { pollMs: 600000, killGraceMs: 300, infraRetryMs: 0 } } }); // the driver's own STOP poll stays out of it
   // As seen live: the hook ends the session at its next tool call, before the driver's poll kills it.
-  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'exec', cmd: 'touch "{{state}}/STOP"' }, { do: 'tool', tool_name: 'Bash', tool_input: { command: 'ls' } }] } });
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'exec', cmd: 'touch "{{state}}/STOP"', unchecked: 'the owner makes the STOP file, not the session' }, { do: 'tool', tool_name: 'Bash', tool_input: { command: 'ls' } }] } });
   await p.go();
   assert.match(p.epic(E1.id).reason, /stopped by the STOP file during build-1/);
   assert.equal(readJson(p.dir(E1.id, 'build-1', 'result.json')).terminal_reason, 'hook_stopped');
@@ -659,7 +659,7 @@ test('STOP honoured by the referee (the session ends itself with a success line)
 
 test('a gate an earlier driver wrote ("stopped before CHECK_BUILD" after a build the referee ended) follows the same rule; a build that ended by itself is still checked', async (t) => {
   const p = makeProject(t, { config: { timing: { pollMs: 600000, killGraceMs: 300, infraRetryMs: 0 } } });
-  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'exec', cmd: 'touch "{{state}}/STOP"' }, { do: 'tool', tool_name: 'Bash', tool_input: { command: 'ls' } }] } });
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'exec', cmd: 'touch "{{state}}/STOP"', unchecked: 'the owner makes the STOP file, not the session' }, { do: 'tool', tool_name: 'Bash', tool_input: { command: 'ls' } }] } });
   await p.go();
   // Rewritten as driver 0.4.0 left it: the session counted as ended, and the run stopped before the check.
   const file = path.join(p.state, 'gates', `${E1.id}-1.json`);
@@ -954,9 +954,9 @@ test('P3.5 exit: one run parks an epic at each resumable gate kind; decided thro
 /** A build that changes an existing test, records why as the referee asks, and commits its work file by file — leaving the record uncommitted. */
 const buildLeavingRecord = (e) => ({ actions: [
   ...buildActions(e, { commit: false }),
+  { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/ledger.test.js","reason":"the epic changes what it prints"}\n' },
   { do: 'write', path: 'test/ledger.test.js', content: "import test from 'node:test';\ntest('still passes', () => {});\n" },
   { do: 'write', path: 'test/package.json', content: '{"type":"module","devDependencies":{"x":"1"}}\n' },
-  { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/ledger.test.js","reason":"the epic changes what it prints"}\n' },
   { do: 'exec', cmd: `git add src test docs && git commit -q -m "feat(epic-${e.id}): implement ${e.slug}"` },
 ] });
 
@@ -1000,7 +1000,7 @@ test('the build check takes an empty reason for no reason, as the referee does',
   const p = makeProject(t);
   p.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [
     ...buildActions(E1, { commit: false }),
-    { do: 'exec', cmd: 'echo "// changed" >> test/smoke.test.js' },
+    { do: 'exec', cmd: 'echo "// changed" >> test/smoke.test.js', unchecked: 'the referee refuses a test edit with no reason; this tests the build check behind it' },
     { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/smoke.test.js","reason":" "}\n' },
     { do: 'exec', cmd: `git add -A && git commit -q -m "feat(epic-${E1.id}): implement ${E1.slug}"` },
   ] } });
@@ -1725,10 +1725,10 @@ test('a resumed epic is put on its branch by the driver: a session that does not
 
   // The resumed session works where it is started: it never checks the epic branch out.
   const feat = `feat(epic-${E1.id}): implement ${E1.slug}`;
-  p.scenario({ [`${E1.id}/build`]: { actions: [ask(q, DEFERRAL), { do: 'exec', cmd: 'git branch --show-current > "{{step}}/started-on.txt"' }, ...buildActions(E1, { message: feat }).filter((a) => a.do !== 'branch')] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  p.scenario({ [`${E1.id}/build`]: { actions: [ask(q, DEFERRAL), { do: 'exec', cmd: 'git branch --show-current > "$AUTOPILOT_SCRATCH/started-on.txt"' }, ...buildActions(E1, { message: feat }).filter((a) => a.do !== 'branch')] }, [`${E1.id}/verify`]: wrapupScript(E1) });
   const r = await again(p);
 
-  assert.equal(fs.readFileSync(p.dir(E1.id, 'build-1', 'started-on.txt'), 'utf8').trim(), E1.branch);
+  assert.equal(fs.readFileSync(p.dir(E1.id, 'build-1', 'scratch', 'started-on.txt'), 'utf8').trim(), E1.branch);
   assert.equal(p.epic(E1.id).state, 'MERGED');
   // The build's commit reached develop through the epic's merge, not as a commit made on develop itself.
   const onDevelopItself = git(p.clone, 'log', '--first-parent', '--format=%s', `${developBefore}..develop`).split('\n');

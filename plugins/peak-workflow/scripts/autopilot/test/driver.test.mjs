@@ -241,7 +241,7 @@ test('safety caps are sized for the confirm screen, and a scenario\'s Then lines
 
 test('bad merge (an extra commit on develop) is rolled back and the epic parks', async (t) => {
   const p = makeProject(t);
-  const extra = [{ do: 'write', path: 'src/extra.js', content: '// straight onto develop\n' }, { do: 'commit', message: 'chore: extra commit on develop' }];
+  const extra = [{ do: 'write', path: 'src/extra.js', content: '// straight onto develop\n' }, { do: 'commit', message: 'chore: extra commit on develop', unchecked: 'the referee refuses a commit on develop; this tests the merge check behind it' }];
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: wrapupScript(E1, { afterMerge: extra }) });
 
   await go(p);
@@ -521,7 +521,7 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
 
   assert.equal(p.epic(E1.id).state, 'MERGED');
   const dir = p.dir(E1.id);
-  const tools = (step) => fs.readFileSync(path.join(dir, step, 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).out);
+  const tools = (step) => fs.readFileSync(path.join(dir, step, 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).out).filter(Boolean); // a call the referee had no opinion on has no output
   const [start, exit] = tools('plan-1');
   assert.equal(Object.values(start.hookSpecificOutput.updatedInput.answers)[0], 'Start it');
   assert.equal(exit.stopReason, 'autopilot: plan captured');
@@ -534,7 +534,40 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
   assert.equal(Object.values(manual.hookSpecificOutput.updatedInput.answers)[0], 'No — only automated gates were run');
   assert.match(push.hookSpecificOutput.permissionDecisionReason, /^autopilot R3: git push/);
   assert.equal(p.epic(E1.id).sessions.find((s) => s.name === 'verify-1').denials, 1);
-  assert.deepEqual(fs.readFileSync(path.join(dir, 'verify-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).decision), ['answer', 'answer', 'answer', 'deny']);
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'verify-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).decision).filter((d) => d !== 'pass'), ['answer', 'answer', 'answer', 'deny']);
+});
+
+test('the fake puts scripted work to the referee as the real CLI does: a refused action is skipped and listed, an allowed one is applied, `unchecked` needs its reason', async (t) => {
+  const p = makeProject(t);
+  const s = happy(E1);
+  s[`${E1.id}/build`].actions.splice(1, 0,
+    { do: 'write', path: '{{state}}/settings.json', content: '{}' }, // the workspace: refused
+    { do: 'exec', cmd: 'echo x > ~/autopilot-fake-should-not-write.txt' }, // outside the clone: refused
+    { do: 'write', path: 'test/smoke.test.js', content: '// gutted\n' }, // an existing test, no reason: refused
+    { do: 'write', path: 'src/allowed.js', content: '// allowed\n' },
+    { do: 'write', path: '{{step}}/by-the-test.txt', content: 'x', unchecked: 'written by this test, not by a tool call' });
+  p.scenario(s);
+  const settingsBefore = fs.readFileSync(path.join(p.state, 'settings.json'), 'utf8');
+  await go(p);
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  const result = readJson(p.dir(E1.id, 'build-1', 'result.json'));
+  assert.deepEqual(result.permission_denials.map((d) => [d.tool_name, d.tool_input.file_path ?? d.tool_input.command]), [
+    ['Write', path.join(p.state, 'settings.json')], ['Bash', 'echo x > ~/autopilot-fake-should-not-write.txt'], ['Write', path.join(p.clone, 'test', 'smoke.test.js')]]);
+  assert.equal(fs.readFileSync(path.join(p.state, 'settings.json'), 'utf8'), settingsBefore);
+  assert.equal(fs.existsSync(path.join(os.homedir(), 'autopilot-fake-should-not-write.txt')), false);
+  assert.doesNotMatch(git(p.clone, 'show', 'develop:test/smoke.test.js'), /gutted/);
+  assert.equal(git(p.clone, 'show', 'develop:src/allowed.js'), '// allowed');
+  assert.equal(fs.readFileSync(p.dir(E1.id, 'build-1', 'by-the-test.txt'), 'utf8'), 'x');
+  // The referee logged every call the script made, as it does for a real session.
+  const logged = fs.readFileSync(p.dir(E1.id, 'build-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(logged.filter((h) => h.decision === 'deny').map((h) => h.rule), ['R2', 'R2', 'R7']);
+  assert.ok(logged.some((h) => h.tool_name === 'Bash' && /^git add -A && git commit -m /.test(h.tool_input.command) && h.decision === 'pass'));
+
+  // `unchecked` without a reason is a broken script, not a silent bypass.
+  const q = makeProject(t);
+  q.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [{ do: 'write', path: 'src/x.js', content: 'x', unchecked: true }] } });
+  await go(q);
+  assert.match(fs.readFileSync(q.dir(E1.id, 'build-1', 'stderr.log'), 'utf8'), /`unchecked` on a write action must be the reason/);
 });
 
 test('driver + real hooks: a deferral question in the build session parks the epic with the hook\'s gate file', async (t) => {
@@ -606,7 +639,7 @@ test('every working session gets a scratch folder: made before launch, named in 
 test('the owner is away: no session starts a step that waits for a person, and a step nobody came for is not tried again in that epic', async (t) => {
   const p = makeProject(t);
   // The build asks the owner to come and gives up; the verify session of the same epic is told.
-  const hook = (hook, id, extra = {}) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), hook, tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description: 'Needs you: sign in to Okta in the browser window that opens' }, ...extra })}\n` });
+  const hook = (hook, id, extra = {}) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, unchecked: 'stands for a line the hooks themselves log', content: `${JSON.stringify({ t: new Date().toISOString(), hook, tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description: 'Needs you: sign in to Okta in the browser window that opens' }, ...extra })}\n` });
   const scripts = happy(E1);
   scripts[`${E1.id}/build`].actions.unshift(hook('PreToolUse', 'n1', { decision: 'pass' }), hook('PostToolUseFailure', 'n1', { error: 'OAuth callback timed out after 300.0 seconds' }));
   p.scenario(scripts);
