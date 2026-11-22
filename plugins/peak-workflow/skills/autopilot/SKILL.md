@@ -297,6 +297,11 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
         copy, so each epic's final check will probably stop for you", with the one thing that
         would fix it. It is a warning, not a refusal. Then run the item 1 preflight again and
         use its output: the clone now exists.
+      - `tests.skipped` is set (with `ok: true`) → the project has no test files yet in its
+        declared test directories, so the test command was not run and the probe is skipped.
+        Not a failure. Put one line on the Step 2 screen: "This project has no tests yet, so
+        autopilot could not check them before starting. The first epic must leave them
+        passing; its own checks run them."
       - `failed: "copy"` → print `problems`. `failed: "setup"` or `"tests"` → print that step's
         `tail`; when its `couldNotRun` is true say plainly that the command was not found in a
         plain shell and the tests never ran, which is a missing tool or setup step and not a

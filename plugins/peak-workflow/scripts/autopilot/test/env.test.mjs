@@ -380,3 +380,50 @@ test('tor-lifecycle finds its folder when the path it is given uses backslashes,
   const r = spawnSync('sh', ['sub\\tor-lifecycle'], { cwd: dir, encoding: 'utf8' });
   assert.deepEqual([r.status, r.stdout.trim()], [0, 'found'], r.stderr);
 });
+
+// ---- a project with no tests yet ------------------------------------------------------------
+
+/** The seed as a new project is before its first epic: no test files, and a test command that fails because of it. */
+function noTestsYet(p) {
+  const md = path.join(p.project, 'CLAUDE.md');
+  fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replaceAll('`node --test`', '`node --test test/`'));
+  git(p.project, 'rm', '-rq', 'test');
+  git(p.project, 'commit', '-qam', 'chore: a project before its first test');
+}
+
+test('no tests on the integration line yet: the base check is skipped and the first epic is built', async (t) => {
+  const p = makeProject(t);
+  noTestsYet(p);
+  p.scenario(happy(E1));
+  const state = await p.go();
+  assert.equal(state.stoppedBecause, 'queue done');
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.deepEqual(state.baseEmpty, { before: E1.id, testDirs: ['test/'] });
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /no test files under test\/ on develop yet: the base test run is skipped/);
+  // The epic's own checks still ran the tests: the first epic must leave them passing.
+  assert.equal(readJson(p.dir(E1.id, 'check-build-1.json')).checks.find((c) => c.name === 'tests-green').pass, true);
+});
+
+test('a failing test command is still base red once a test file exists', async (t) => {
+  const p = makeProject(t);
+  noTestsYet(p);
+  fs.mkdirSync(path.join(p.project, 'test'));
+  fs.writeFileSync(path.join(p.project, 'test', 'red.test.js'), "import test from 'node:test';\ntest('red', () => { throw new Error('red'); });\n");
+  git(p.project, 'add', '-A');
+  git(p.project, 'commit', '-qm', 'test: a failing test');
+  p.scenario(happy(E1));
+  const state = await p.go();
+  assert.equal(state.stoppedBecause, 'base red');
+  assert.equal(state.baseEmpty, undefined);
+});
+
+test('prepare on a project with no tests yet: the proof passes and says the tests were not run', (t) => {
+  const p = makeProject(t);
+  noTestsYet(p);
+  const r = spawnSync(process.execPath, [DRIVER, 'prepare', '--project', p.project, '--workspace', p.state, '--allow-test-double'], { encoding: 'utf8' });
+  const out = JSON.parse(r.stdout);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(out.ok, true);
+  assert.equal(out.failed, null);
+  assert.deepEqual(out.tests, { command: 'node --test test/', pass: true, skipped: 'no test files under test/ on develop yet' });
+});

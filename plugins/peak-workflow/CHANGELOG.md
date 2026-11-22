@@ -13,6 +13,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot run announcer** — chat lines now say which epic of how many is starting, what
   comes next after each step, and "n of m done (%)" over the confirmed queue across relaunches;
   the ten-minute "still working" line is relayed. One spend figure: chain total of the budget.
+- **Autopilot starts on a project with no tests yet** — when the declared test directories
+  hold no committed file, the base test run and the sandbox probe are skipped, not failed as
+  "base red"; the first epic's own checks run the tests. The launch screen says so.
 - **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
   final check without stopping for the owner; its pictures are listed for review afterwards.
   A requirement a person must observe still stops.
