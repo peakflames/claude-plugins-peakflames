@@ -225,7 +225,8 @@ Why this order:
   leaves should reach the owner (the report, or a question).
 - [ ] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change;
   48 seconds on Pilot Light's whole walking skeleton (2026-11-22; it did find the deleted
-  lockfile, rated low). Unexamined.
+  lockfile, rated low); 47 seconds on its second epic (run `20261122-094004`, 4 findings, none
+  that park). Unexamined.
 
 - [x] **The scope check made the walking skeleton worse** (*no issue*; Pilot Light, run
   `20261122-025513`; owner's decisions of 2026-11-22). It refused the new `bun.lock` and the
@@ -266,6 +267,14 @@ Why this order:
   (build and final check on Opus 5.5): the first epic autopilot has built with no code to
   start from. Also seen there: the owner's look with 25 pictures, a small fix made by the
   final check on the standing answer, and the scratch folder in use.
+
+  Its second run (`20261122-094004`, 11 epics queued, owner away, $6.38, 20 minutes) merged
+  nothing: one epic parked for its operator-observed requirement, two parked on planner and
+  builder questions about requirements that did not match the samples (mistakes in the
+  project's plan, not autopilot's), eight were blocked behind them. Seen working: setup with
+  the lockfile, a planner's amendment question before any build spend, a deferral question,
+  dependents blocked while independent epics went on, a clean end with a report. Not reached:
+  the lockfile-with-its-manifest rule in the scope check, the final check, a merge.
 
   Seen live and working: the joined instruction file, the referee refusing a repeated check,
   "Not now" not carried forward, a no-verdict check parking instead of failing, the standing
@@ -373,6 +382,13 @@ Why this order:
 - [ ] **No hourly progress report** (#41 I1).
 - [ ] **The first epic is announced as "5 of 8"** (#41 B7): numbered by phase, not by queue
   position.
+- [ ] **One early stop idles most of an unattended run** (*no issue*; Pilot Light, run
+  `20261122-094004`). The second epic of 11 parked in planning after one minute; eight epics
+  depended on it, so the run ended in 20 minutes with the owner away. Unexamined: whether
+  launch should warn when most of the queue hangs on one epic. C3.
+- [ ] **A builder was denied a tool its project uses** (*no issue*; same run):
+  `mcp__shadcn__get_item_examples_from_registries`. Harmless there; a project's own MCP tools
+  are not reachable from an autopilot session. Unexamined. C3.
 
 ### Step 13 — Wording and small behaviour (C3)
 
