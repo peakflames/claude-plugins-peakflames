@@ -1393,6 +1393,22 @@ class Run {
   }
 
   /**
+   * Puts the clone on the epic's branch before a session starts, when that branch exists: a session works where it is
+   * started, and a resumed one is not told to switch. Anything uncommitted on the branch being left is set aside first.
+   * Returns null, or the reason the branch could not be checked out.
+   */
+  ensureOnBranch(e, kind) {
+    const b = this.meta(e).branch;
+    const from = this.currentBranch();
+    if (!b || !this.branchTip(b) || from === b) return null;
+    if (!this.setAside(`before ${e.id}'s ${kind} session started`)) return `the clone has uncommitted changes on ${from || 'no branch'} that could not be set aside, so ${b} could not be checked out`;
+    const r = gitRun(this.clone, 'checkout', '-q', b);
+    if (r.code !== 0 || this.currentBranch() !== b) return `${b} could not be checked out: ${r.err || `the clone is still on ${this.currentBranch() || 'no branch'}`}`;
+    this.log(`${e.id}: checked out ${b} for its ${kind} session (the clone was on ${from || 'no branch'})`);
+    return null;
+  }
+
+  /**
    * Sets aside whatever is uncommitted in the clone, untracked files included, so that it neither blocks a run nor is
    * lost: one commit under refs/autopilot/leftover/ holds it (a stash commit, kept out of the stash list). Ignored
    * files (dependencies) stay where they are. Returns whether the clone is clean afterwards.
@@ -1650,9 +1666,9 @@ class Run {
    * A park that is nobody's question (budget, infra, STOP, an auditor outage) gets a `resume` gate,
    * so the next run continues at `phase` instead of rebuilding the epic.
    */
-  parkResumable(e, reason, phase) {
+  parkResumable(e, reason, phase, { technical = false } = {}) {
     this.writeGate(e, {
-      kind: 'resume', skillStep: 'autopilot driver', phase, reason,
+      kind: 'resume', skillStep: 'autopilot driver', phase, reason, ...(technical ? { technical: true } : {}),
       question: `${this.meta(e).label} stopped: ${reason}. Continue it in the next run?`,
       options: [ANSWERS.resume, ANSWERS.startOver],
       why: `nothing was decided for you: the run stopped the epic before ${phase}. "${ANSWERS.resume}" re-enters at ${phase} on the same branch${phase === 'CHECK_BUILD' ? ' (or, when the build session was cut short, a new session continues the build from what is committed there)' : ''}; "${ANSWERS.startOver}" plans it again from scratch`,
@@ -1827,8 +1843,12 @@ class Run {
   async step(e, kind, prepare) {
     const gatesBefore = new Set(this.gateFiles());
     const devBefore = this.integrationSha();
+    const again = { plan: 'PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind];
     let s;
     for (;;) {
+      // No session is started anywhere but on the epic's branch, once it exists.
+      const off = this.ensureOnBranch(e, kind);
+      if (off) return this.parkResumable(e, `no ${kind} session was started: ${off}`, { plan: 'PLAN', build: 'BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind], { technical: true });
       s = await this.launch(e, kind, prepare);
       // A stopped session that cannot be resumed (its transcript is gone) is not an infra error: a new session takes the step, told the same answers.
       if (s.resumed && s.outcome === 'infra') {
@@ -1847,7 +1867,6 @@ class Run {
     const undo = () => { if (kind === 'verify') this.rollback(e); else if (moved) this.resetIntegration(e, devBefore); };
 
     // Re-entry after a park that is nobody's question: a parked build is judged from its WIP commit; any other step is run again once.
-    const again = { plan: 'PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind];
     if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return this.parkResumable(e, `stopped by the STOP file during ${s.name}`, again); }
     if (s.outcome === 'infra') { undo(); return this.parkResumable(e, `infra error during ${s.name}: ${s.why}`, again); }
     if (s.outcome === 'budget') { undo(); return this.parkResumable(e, `budget: ${s.name} hit ${s.why}`, again); }

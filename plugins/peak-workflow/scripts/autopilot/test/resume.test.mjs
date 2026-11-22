@@ -1713,3 +1713,29 @@ test('an epic that stops away from its own branch with files left uncommitted do
   assert.equal(git(p.clone, 'show', `${refs[0]}^3:tmp_playwright/shot.txt`), 'a session left this');
   assert.deepEqual(s.leftovers.map((l) => [l.branch, l.files, l.why]), [['spike/try-it', ['tmp_playwright/shot.txt'], `before ${d.id} started`]]);
 });
+
+test('a resumed epic is put on its branch by the driver: a session that does not switch branches itself still commits to the epic branch (issue #41 B14)', async (t) => {
+  const p = makeProject(t);
+  const q = `${E1.tors[3]} cannot be fully met: amounts with three decimals. How to proceed?`;
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, ask(q, DEFERRAL)] } });
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  decide(p, E1.id, 'Fix now');
+  const developBefore = git(p.clone, 'rev-parse', 'develop');
+
+  // The resumed session works where it is started: it never checks the epic branch out.
+  const feat = `feat(epic-${E1.id}): implement ${E1.slug}`;
+  p.scenario({ [`${E1.id}/build`]: { actions: [ask(q, DEFERRAL), { do: 'exec', cmd: 'git branch --show-current > "{{step}}/started-on.txt"' }, ...buildActions(E1, { message: feat }).filter((a) => a.do !== 'branch')] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+
+  assert.equal(fs.readFileSync(p.dir(E1.id, 'build-1', 'started-on.txt'), 'utf8').trim(), E1.branch);
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  // The build's commit reached develop through the epic's merge, not as a commit made on develop itself.
+  const onDevelopItself = git(p.clone, 'log', '--first-parent', '--format=%s', `${developBefore}..develop`).split('\n');
+  assert.ok(!onDevelopItself.includes(feat), onDevelopItself.join(' | '));
+  assert.ok(git(p.clone, 'log', '--format=%s', `${developBefore}..develop`).split('\n').includes(feat));
+  assert.equal(git(p.clone, 'status', '--porcelain'), '');
+  assert.deepEqual(leftoverRefs(p), []);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`${E1.id}: checked out ${E1.branch} for its build session \\(the clone was on develop\\)`));
+  assert.equal(r.state.stoppedBecause, 'queue done');
+});

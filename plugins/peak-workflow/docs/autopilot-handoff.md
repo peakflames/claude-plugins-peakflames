@@ -7,7 +7,7 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 197 pass, 11 skipped (the skipped
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 200 pass, 11 skipped (the skipped
   ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
 - **The cockpit mod is deferred** (`autopilot-cockpit-mod-handoff.md`, note at its top): the run
@@ -114,14 +114,17 @@ Why this order:
 
 ### Step 1 — What stopped the last real runs (C2)
 
-- [ ] **A resumed epic is not put back on its branch** (#41 B14; code agrees). The log says
-  "resuming at BUILD on <branch>" but the clone stays on the integration branch; once the
-  build's work was left uncommitted there and the next launch refused. The driver should check
-  out the branch and verify HEAD before a resumed session starts. *`driver.mjs` `enter`.*
-- [ ] **Scratch files left by a session block the next run** (#41 B15; in code). `dirty()`
-  counts untracked files, a run does not start on a dirty clone, and there is no recovery the
-  owner can use. Keep session scratch out of the clone, or move leftovers into the workspace
-  and continue.
+- [x] **A resumed epic is not put back on its branch** (#41 B14). Fixed 2026-11-21, tested
+  against the fake `claude`: before every session the driver checks the epic's branch out and
+  verifies HEAD (`driver.mjs`, `ensureOnBranch`, called from `step`). A checkout that fails
+  parks the epic as a technical stop; that path has no test. Not seen in a real run or on
+  Windows.
+- [x] **Scratch files left by a session block the next run** (#41 B15). Fixed 2026-11-21,
+  tested against the fake `claude`: uncommitted and untracked files are set aside under
+  `refs/autopilot/leftover/` in the clone, never deleted, and the log and report say how many
+  (`driver.mjs`, `setAside`). Left: files left while the clone is on the integration branch
+  mid-queue are not set aside before the next epic (they never stopped a run); nothing brings
+  a set-aside file back for the owner. Not seen in a real run or on Windows.
 - [x] **`**Not decided yet:** none` parks every epic** (#41 comment). Fixed 2026-11-21, tested
   against the fake `claude`: a line that names nothing is the all-clear (`driver.mjs`, `tbd`).
   Left: `wrapup-epic`'s deferred-value grep still fails a skeleton epic on any such line, and
@@ -258,6 +261,9 @@ Why this order:
   command; the skill paraphrases them (*no issue*).
 - [ ] No gate kind for a value the owner types, such as a document ID; it travels in `--note`
   (#41 I8).
+- [ ] Sessions write scratch files in the clone, because the referee's path rule refuses
+  `/tmp`. They no longer block a run (step 1, B15), but nothing stops them being written
+  (#41 B15).
 - [ ] A project's `CLAUDE.md` can tell sessions to use a script outside the clone, which the
   referee refuses (#41, 2026-11-22 comment: the dev-server tether). Not checked.
 - [ ] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
