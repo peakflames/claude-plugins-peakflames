@@ -237,6 +237,15 @@ Why this order:
   branch, B15 leftover files set aside, `Not decided yet: none — <a reason>`), the scratch
   folder and the files `CLAUDE.md` names. Open a bug for any that misbehaves.
 
+  **The test project from 2026-11-22 is Pilot Light** (`~/github/peakflames/pilot-light`,
+  github.com/peakflames/pilot-light, private): a dashboard for peak-workflow and autopilot,
+  planned with the plugin's own skills (13 epics, 168 requirements, screens, four
+  requirements a person confirms). Its planning sessions listed 28 problems in the planning
+  skills (`docs/session-handoff.md` there); not yet filed. Its last epic (F5hv9T4) must not be
+  queued until a real step folder with `stream.jsonl` is in its `samples/`. Seen working there
+  on real runs: the no-tests-yet start, the Python check, a file `CLAUDE.md` names, and a
+  resumed epic put back on its branch (B14).
+
   Seen live and working: the joined instruction file, the referee refusing a repeated check,
   "Not now" not carried forward, a no-verdict check parking instead of failing, the standing
   answer for small fixes and its "allow a fix of that size?" question, the planner's
@@ -277,6 +286,12 @@ Why this order:
 - [ ] **The run budget is not enforced inside a step** (#36). Cost is known only when a step
   ends; a chain finished at $80.51 of $80. *`driver.mjs` spend accounting (evaluation gap G2).*
 
+- [ ] **A session that is killed costs nothing on the books** (*no issue*; Pilot Light,
+  2026-11-22, runs `20261122-023444` and `-025133`). Two planners stopped by the STOP file had
+  made 20 and 30 model turns; neither has a `result.json` and the run reads $0.00. Cost comes
+  only from the session's closing line, which a killed session never writes. The same holds
+  for a time limit or a crash. Belongs with #36.
+
 ### Step 10 — The launch check and its screen (C2 and C3)
 
 - [ ] **Sessions cannot use MCP connectors, and nothing says so up front** (#43, B11; in code:
@@ -297,6 +312,21 @@ Why this order:
   and limits itself.
 - [ ] **The launch popup lists epics by ID only** (#40) (10).
 - [ ] **No path for a free-text launch answer** such as "just do one epic" (#40) (8).
+- [ ] **A setting changed during a run does not reach it** (*no issue*; Pilot Light,
+  2026-11-22). The owner asked for Opus for the build one minute in: `configure` saved it, but
+  the driver reads settings once, so it took a stop, a resume question and a relaunch. Ask for
+  models on the launch screen, or let the driver read budgets again before each step. C3.
+- [ ] **A run's files do not say which model and effort each step will use** (*no issue*;
+  Pilot Light). Only a fresh `preflight` shows them. C3.
+- [ ] **Autopilot's own settings file sets off its own warning** (*no issue*; Pilot Light).
+  `launch.warn` says "1 uncommitted change(s) in the project" when the only one is the
+  untracked `.claude/peak-workflow/autopilot.json` that `configure` just wrote. C3.
+- [ ] **`decide` refuses when the repository has no `git config user.name`** (*no issue*;
+  Pilot Light), although commits there carry a name from elsewhere. The skill text never
+  mentions `--by`. Fall back to the commit author name. C3.
+- [ ] **A stop the owner asked for leaves a question to answer before the next run**, even
+  one minute into planning (*no issue*; Pilot Light). C3.
+- [ ] **A format-guard refusal repeats the whole install hint** in `refuse` (*no issue*). C3.
 - [ ] **Preflight text ignores `"look": "after"`** (#41 B3; in code, `driver.mjs:715`; the
   reporter saw it again on `93a8b35`).
 
