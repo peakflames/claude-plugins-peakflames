@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, REGISTRIES } from '../driver.mjs';
+import { PLUGIN_DIR, REGISTRIES, claudeMdReads } from '../driver.mjs';
 import { DRIVER, E1, git, happy, makeProject, readJson } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, json: () => JSON.parse(r.stdout) }; };
@@ -299,6 +299,50 @@ test('prepare --gate tries the other quality gates in the clone after the tests:
   git(p.project, 'commit', '-qam', 'docs: a test command this shell does not have');
   const red = driver('prepare', '--project', p.project, '--gate', 'true').json();
   assert.deepEqual([red.ok, red.failed, red.gates], [false, 'tests', []]);
+});
+
+test('files CLAUDE.md names outside the project: single existing files in backticks, never credentials, settings, history or transcripts', (t) => {
+  const p = makeProject(t);
+  const home = path.join(p.tmp, 'home'); const old = process.env.HOME;
+  process.env.HOME = home; t.after(() => { process.env.HOME = old; });
+  const mk = (rel, link = null) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); if (link) fs.symlinkSync(path.join(home, link), f); else fs.writeFileSync(f, 'x'); return f; };
+  const tether = mk('.claude/scripts/tethered.mjs'); const tool = mk('tools/lint.sh'); const fenced = mk('tools/fenced.sh');
+  for (const f of ['.claude/.credentials.json', '.claude/settings.json', '.claude/projects/x/t.jsonl', '.claude/state/x.json', '.claude.json', '.ssh/config', '.zsh_history', 'work/other/.env', '.claude/scripts/unnamed.mjs']) mk(f);
+  mk('.claude/history.jsonl'); mk('.claude/scripts/link.mjs', '.claude/history.jsonl');
+  const md = [
+    'Start dev servers with `node ~/.claude/scripts/tethered.mjs start -- npm run dev`, never directly.',
+    `Lint with \`${tool}\`. The sources are in \`${path.join(p.project, 'src', 'index.js')}\` and \`src/index.js\`.`,
+    'A path without backticks does not count: ~/.claude/scripts/unnamed.mjs',
+    'Not files: `~/.claude/scripts`, `~/tools/missing.sh`, `~/tools/*.sh`, `/peak-workflow:autopilot`.',
+    'Closed: `~/.claude/.credentials.json` `~/.claude/settings.json` `~/.claude/projects/x/t.jsonl` `~/.claude/state/x.json` `~/.claude.json` `~/.ssh/config` `~/.zsh_history` `~/work/other/.env` `~/.claude/scripts/link.mjs`',
+    '```sh', 'sh $HOME/tools/fenced.sh --fix', '```',
+  ].join('\n');
+  const r = claudeMdReads(md, { project: p.project, workspace: p.state });
+  assert.deepEqual(r.files, [tether, tool, fenced].map((f) => fs.realpathSync(f)));
+  assert.deepEqual(r.refused.map((x) => x.path), ['~/.claude/.credentials.json', '~/.claude/settings.json', '~/.claude/projects/x/t.jsonl', '~/.claude/state/x.json', '~/.claude.json', '~/.ssh/config', '~/.zsh_history', '~/work/other/.env', '~/.claude/scripts/link.mjs']);
+  assert.ok(r.refused.every((x) => /credentials|sign-in/.test(x.why)));
+  // macOS and Windows ignore case in file names: a path spelled in capitals is the same private place.
+  if (process.platform === 'darwin') assert.deepEqual(claudeMdReads('`~/.SSH/config` `~/.CLAUDE/settings.json`', {}).files, []);
+  assert.deepEqual(claudeMdReads('', {}), { files: [], refused: [] });
+});
+
+test('a run hands the files CLAUDE.md names to the referee and says so at launch', async (t) => {
+  const p = makeProject(t, { config: { sandbox: true } });
+  const script = path.join(p.tmp, 'tools', 'tether.mjs'); fs.mkdirSync(path.dirname(script)); fs.writeFileSync(script, '// starts a dev server\n');
+  fs.appendFileSync(path.join(p.project, 'CLAUDE.md'), `\nStart dev servers with \`node ${script} start\`.\n`);
+  git(p.project, 'commit', '-qam', 'docs: name the dev-server script');
+  assert.deepEqual(driver('preflight', '--project', p.project, '--json', '--allow-test-double').json().launch.env.readFiles, [script]);
+  assert.ok(driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout.includes(`files CLAUDE.md names outside the project: ${script}`));
+  const s = happy(E1);
+  s[`${E1.id}/build`].actions.unshift({ do: 'tool', tool_name: 'Bash', tool_input: { command: `node ${script} start` } }, { do: 'tool', tool_name: 'Read', tool_input: { file_path: path.join(p.tmp, 'tools', 'other.mjs') } });
+  p.scenario(s);
+  const state = await p.go();
+  assert.deepEqual(state.readFiles, [script]);
+  assert.equal(state.queue[0].state, 'MERGED', JSON.stringify(state.queue[0]));
+  assert.ok(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8').includes(`the files CLAUDE.md names outside the project: ${script}`));
+  const tools = fs.readFileSync(p.dir(E1.id, 'build-1', 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(tools[0].out, null, 'the named script may be run');
+  assert.match(tools[1].out.hookSpecificOutput.permissionDecisionReason, /outside the private clone/);
 });
 
 test('by default sessions run with the sandbox off: settings say so, the run records it for the referee, and the dry run states what still guards the machine', async (t) => {

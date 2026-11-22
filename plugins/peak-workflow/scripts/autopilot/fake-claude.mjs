@@ -15,6 +15,18 @@
 //
 // Actions run in order in the session's cwd (the private clone). Strings may use {{step}}
 // (the step directory), {{state}} (the workspace), {{plugin}} and {{epic}}.
+//
+// The referee sees every action a real session would need a tool call for, as the real CLI's
+// PreToolUse hook does: branch, checkout, rm, commit, merge and exec as the `Bash` command a session
+// would run, write and sidecar as `Write` or `Edit` on the file. A refused action is skipped,
+// recorded in permission_denials, and the script goes on, as a session does after a refusal;
+// `continue: false` ends the session. Each call's outcome is a line in <step>/fake-tools.jsonl.
+// A script says which of its actions it expects to be refused, with `refused: true`: a refusal
+// it did not expect, or an expected one that did not come, ends the fake with an error (exit 70,
+// the reason in stderr.log), so a test never passes on work that silently did not happen.
+// `unchecked: "<why>"` on an action skips the referee. It is for what no tool call of the session
+// produces: a file the hooks or the driver write, something the owner or the test does, a
+// command's own side effect. The reason is required.
 //   {do:"branch", name}                 create and check out, or check out if it exists
 //   {do:"checkout", name}
 //   {do:"write", path, content, append?}    {do:"rm", path}
@@ -22,13 +34,11 @@
 //   {do:"commit", message}              git add -A && git commit
 //   {do:"merge", branch, message?}      git merge --no-ff into the current branch
 //   {do:"exec", cmd}                    any shell command
-//   {do:"plan", text}                   what hook R9 does: write <step>/plan.md
-//   {do:"gate", gate:{…}}               what hook R8 does on a park: write gates/<epic>-<n>.json
+//   {do:"plan", text}                   what hook R9 does: write <step>/plan.md (never put to the referee)
+//   {do:"gate", gate:{…}}               what hook R8 does on a park: write gates/<epic>-<n>.json (likewise)
 //   {do:"control_request", tool_name, input?}   ask the host for permission; the answer is logged
-//   {do:"tool", tool_name, tool_input}  run the session's real PreToolUse hook from settings.json, as
-//                                       Claude Code would before a tool call. A deny is recorded in
-//                                       permission_denials; `continue: false` ends the session
-//                                       (terminal_reason hook_stopped). Outputs go to <step>/fake-tools.jsonl
+//   {do:"tool", tool_name, tool_input}  a tool call that does nothing but ask the referee (an
+//                                       AskUserQuestion, a call expected to be refused)
 //   {do:"sleep", ms}   {do:"hang"}   {do:"crash", code?}
 //
 // `result: false` ends without a result line (a CLI crash). A result with
@@ -66,10 +76,60 @@ function fill(v) {
 
 const denials = [];
 let hookStopped = false;
+let toolCalls = 0;
+let lastReason = '';
 const lines = readline.createInterface({ input: process.stdin })[Symbol.asyncIterator]();
 const stdinClosed = new Promise((r) => process.stdin.on('end', r).on('close', r));
 
+const q = (v) => `'${String(v).replaceAll("'", "'\\''")}'`;
+const branchExists = (name) => { try { git('rev-parse', '--verify', '-q', `refs/heads/${name}`); return true; } catch { return false; } };
+
+/**
+ * Runs the session's real PreToolUse hook from settings.json, as Claude Code does before a tool
+ * call. Returns true when the call may go ahead. A deny is recorded in permission_denials;
+ * `continue: false` ends the session.
+ */
+function referee(tool_name, tool_input = {}) {
+  const hook = settings ? JSON.parse(fs.readFileSync(settings, 'utf8')).hooks?.PreToolUse?.[0]?.hooks?.[0]?.command : null;
+  if (!hook) return true; // launched without the referee's settings: nothing to ask
+  const r = spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PreToolUse', permission_mode: flag('--permission-mode'), tool_name, tool_input, tool_use_id: `toolu_${toolCalls++}` }) });
+  let out = null; try { out = r.stdout ? JSON.parse(r.stdout) : null; } catch { /* not JSON: no decision, as Claude Code reads it */ }
+  fs.appendFileSync(path.join(stepDir, 'fake-tools.jsonl'), JSON.stringify({ tool_name, exit: r.status, out }) + '\n');
+  const deny = out?.hookSpecificOutput?.permissionDecision === 'deny';
+  if (deny) { denials.push({ tool_name, tool_input }); lastReason = out.hookSpecificOutput.permissionDecisionReason; }
+  if (out?.continue === false) hookStopped = true;
+  return !deny && !hookStopped;
+}
+
+/** The tool call a real session would make for a scripted action, or null for an action that makes none. */
+function toolCall(a) {
+  switch (a.do) {
+    case 'branch': return ['Bash', { command: `git checkout ${branchExists(a.name) ? '' : '-b '}${a.name}` }];
+    case 'checkout': return ['Bash', { command: `git checkout ${a.name}` }];
+    case 'write': return a.append && fs.existsSync(a.path)
+      ? ['Edit', { file_path: path.resolve(a.path), old_string: '', new_string: a.content }]
+      : ['Write', { file_path: path.resolve(a.path), content: a.content }];
+    case 'rm': return ['Bash', { command: `rm -f ${q(a.path)}` }];
+    case 'sidecar': return ['Edit', { file_path: path.resolve(`docs/implementation-plan/status/epic-${epic}.md`), old_string: '', new_string: JSON.stringify(a.set) }];
+    case 'commit': return ['Bash', { command: `git add -A && git commit -m ${q(a.message)}` }];
+    case 'merge': return ['Bash', { command: `git merge --no-ff ${a.branch} -m ${q(a.message ?? `Merge branch '${a.branch}'`)}` }];
+    case 'exec': return ['Bash', { command: a.cmd }];
+    default: return null;
+  }
+}
+
 async function act(a) {
+  // Every action that stands for a tool call is put to the referee first, as the real CLI does. A refused action is
+  // skipped and the script goes on, as a session does after a refusal.
+  if ('unchecked' in a && !(typeof a.unchecked === 'string' && a.unchecked.trim())) throw new Error(`fake-claude: \`unchecked\` on a ${a.do} action must be the reason, in words`);
+  const call = a.unchecked ? null : toolCall(a);
+  if (call) {
+    const before = denials.length;
+    const allowed = referee(...call);
+    const denied = denials.length > before;
+    if (denied !== !!a.refused) throw new Error(`fake-claude: the referee ${denied ? 'refused' : 'allowed'} a ${a.do} action the script ${a.refused ? 'marks \`refused\`' : 'does not mark \`refused: true\`'}: ${JSON.stringify(call[1]).slice(0, 300)}${denied ? ` — ${lastReason}` : ''}`);
+    if (!allowed) return;
+  }
   switch (a.do) {
     case 'branch':
       try { git('checkout', '-q', '-b', a.name); } catch { git('checkout', '-q', a.name); }
@@ -107,15 +167,7 @@ async function act(a) {
       fs.writeFileSync(path.join(stepDir, 'fake-control-response.json'), value ?? 'null');
       break;
     }
-    case 'tool': {
-      const hook = JSON.parse(fs.readFileSync(settings, 'utf8')).hooks.PreToolUse[0].hooks[0].command;
-      const r = spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PreToolUse', permission_mode: flag('--permission-mode'), tool_name: a.tool_name, tool_input: a.tool_input ?? {}, tool_use_id: `toolu_${denials.length}` }) });
-      const out = r.stdout ? JSON.parse(r.stdout) : null;
-      fs.appendFileSync(path.join(stepDir, 'fake-tools.jsonl'), JSON.stringify({ tool_name: a.tool_name, exit: r.status, out }) + '\n');
-      if (out?.hookSpecificOutput?.permissionDecision === 'deny') denials.push({ tool_name: a.tool_name, tool_input: a.tool_input ?? {} });
-      if (out?.continue === false) hookStopped = true;
-      break;
-    }
+    case 'tool': referee(a.tool_name, a.tool_input ?? {}); break;
     case 'sleep': await sleep(a.ms); break;
     case 'hang': await new Promise(() => setInterval(() => {}, 1 << 30)); break;
     case 'crash': process.exit(a.code ?? 1); break;

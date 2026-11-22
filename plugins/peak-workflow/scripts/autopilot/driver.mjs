@@ -509,7 +509,8 @@ export function envFacts(project, workspace, config) {
     const copied = copy.some((c) => rel === c || rel.startsWith(`${c}/`) || c.startsWith(`${rel}/`));
     return { path: p, dir: p.endsWith('/'), status: copied ? 'copied' : exists(path.join(clone, rel)) ? 'present' : 'absent' };
   });
-  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], sandbox: config.sandbox === true, network: cleanNetwork(config.network), registries: REGISTRIES, problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
+  const named = namedReads(project, workspace);
+  return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], readFiles: named.files, readRefused: named.refused, sandbox: config.sandbox === true, network: cleanNetwork(config.network), registries: REGISTRIES, problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
 }
 /** `~`-expanded, absolute, symlinks resolved where the path exists. */
 const expandHome = (p) => { const x = path.resolve(String(p).trim().replace(/^~(?=\/|$)/, os.homedir())); try { return fs.realpathSync(x); } catch { return x; } };
@@ -538,6 +539,48 @@ export function readOnlyProblems(list, { project = null, workspace = null } = {}
   }
   return out;
 }
+/** The folders of ~/.claude where a file a project's CLAUDE.md names may be read: the owner's own scripts. Everything else there (sign-in data, settings, history, transcripts, whatever a later Claude Code adds) stays closed. */
+const CLAUDE_NAMED = ['scripts', 'bin', 'tools'];
+/** macOS and Windows file systems ignore case: `~/.SSH` is `~/.ssh`. */
+const foldCase = (p) => (process.platform === 'darwin' || process.platform === 'win32' ? p.toLowerCase() : p);
+/**
+ * The files outside the project that its CLAUDE.md names in backticks or in a fenced block, by an
+ * absolute path or one that starts with `~/`. A project that tells its sessions to use such a file
+ * (seen live: `node ~/.claude/scripts/tethered.mjs` to start a dev server) must be able to read it.
+ * One existing file at a time, never a directory. Never where credentials live, never a hidden
+ * file or a file below a hidden folder (`~/.zsh_history`, `~/.gitconfig`, a `.env`), and in
+ * ~/.claude only below the owner's script folders (`CLAUDE_NAMED`).
+ * CLAUDE.md is a file sessions edit and merge, so this list can grow without the owner typing
+ * it: it is shown at every launch, and the rules here are what holds if nobody reads that.
+ * Returns `{ files, refused: [{ path, why }] }`; a path that is not a file on this machine is left out.
+ */
+export function claudeMdReads(text, { project = null, workspace = null } = {}) {
+  const home = expandHome('~'); const claude = path.join(home, '.claude');
+  const files = []; const refused = []; const seen = new Set();
+  for (const m of String(text ?? '').matchAll(/```[\s\S]*?```|`[^`\n]+`/g)) {
+    for (const word of m[0].replace(/^`+|`+$/g, '').split(/[\s"'=<>|;&(),]+/)) {
+      const raw = word.replace(/^\$\{?HOME\}?(?=[\\/])/, '~').replace(/^~\\/, '~/').replace(/[.:]+$/, '');
+      if (!(raw.startsWith('~/') || path.isAbsolute(raw)) || /[*?{}$]/.test(raw)) continue;
+      const p = expandHome(raw);
+      if (seen.has(p)) continue;
+      seen.add(p);
+      let file = false; try { file = fs.statSync(p).isFile(); } catch { /* not on this machine */ }
+      if (!file) continue;
+      if ([project, workspace].some((dir) => dir && insideOrSame(p, expandHome(dir)))) continue; // the clone carries the project; the workspace is never a session's
+      const q = foldCase(p);
+      const inClaude = insideOrSame(q, foldCase(claude));
+      const parts = inClaude ? path.relative(foldCase(claude), q).split(path.sep) : [];
+      const below = insideOrSame(q, foldCase(home)) ? path.relative(foldCase(home), q).split(path.sep) : q.split(path.sep);
+      if (inClaude) { if (parts.length >= 2 && CLAUDE_NAMED.includes(parts[0]) && !parts.slice(1).some((x) => x.startsWith('.'))) files.push(p); else refused.push({ path: raw, why: `in ~/.claude only a file below ${CLAUDE_NAMED.join('/, ')}/ may be named; the rest is Claude Code's own sign-in data, settings, history or transcripts` }); }
+      else if (NEVER_READ.some((d) => insideOrSame(q, foldCase(path.join(home, d))))) refused.push({ path: raw, why: 'it is where credentials or private settings live' });
+      else if (below.some((x) => x.startsWith('.'))) refused.push({ path: raw, why: 'it is a hidden file or in a hidden folder, where credentials and private settings are kept' });
+      else files.push(p);
+    }
+  }
+  return { files, refused };
+}
+/** `claudeMdReads` for a project as it is now. */
+export const namedReads = (project, workspace) => claudeMdReads(readProjectFacts(project).claudeMd, { project, workspace });
 /** The `readOnly` list as the referee uses it: resolved absolute paths. */
 export const resolveReadOnly = (list) => (Array.isArray(list) ? list : []).filter((e) => typeof e === 'string' && e.trim()).map(expandHome);
 
@@ -791,7 +834,7 @@ function detectIntegration(root) {
 // ---------------------------------------------------------------------------------------------
 
 /** The referee layer written as each session's `settings.json` (plan §6.7, SPIKE.md S11). */
-export function sessionSettings(config = {}, { kind = null } = {}) {
+export function sessionSettings(config = {}, { kind = null, scratch = null } = {}) {
   // The auditor reads a bundle and needs nothing from outside. Every other session may reach the package registries and the
   // project's named hosts, and may use local sockets and ports: build tools talk to their own worker processes that way
   // (MSBuild and `dotnet test` over named pipes, test servers on localhost), and without it they cannot run at all (seen live).
@@ -815,6 +858,8 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
     sandbox: sandboxed ? {
       enabled: true, allowUnsandboxedCommands: false, failIfUnavailable: true,
       network: { allowedDomains, strictAllowlist: true, ...(open ? { allowAllUnixSockets: true, allowLocalBinding: true } : {}) },
+      // The session's scratch folder is outside the clone: the one other place a sandboxed command may write.
+      ...(open && scratch ? { filesystem: { allowWrite: [scratch] } } : {}),
     } : { enabled: false },
     hooks: {
       PreToolUse: [{ matcher: '*', hooks: [hook('pretool.mjs', { timeout: 30 })] }],
@@ -826,6 +871,25 @@ export function sessionSettings(config = {}, { kind = null } = {}) {
     },
   };
 }
+
+/** A session's scratch folder: in its step directory, so outside the clone. Nothing in it can be committed or left in the clone for the next run to trip on. */
+export const scratchDir = (stepDir) => path.join(stepDir, 'scratch');
+/**
+ * What every working session is told about temporary files. Seen live: a session refused `/tmp`
+ * left its scratch files in the clone, and the next launch stopped on a dirty clone.
+ */
+export const scratchRule = (dir) => `# Temporary files
+
+Put every file you need only while you work (a probe script, captured command output, a
+downloaded sample) in this folder:
+
+\`${dir}\`
+
+In a shell command it is \`"$AUTOPILOT_SCRATCH"\`. It is outside the repository, so nothing there is
+committed, and nothing there is part of what you deliver. Do not put such files in the
+repository: an untracked file left there fails the clean-tree check. Other places outside the
+repository, \`/tmp\` included, may be refused.
+`;
 
 /**
  * The exact command for one step: host mode for plan, build and verify (SPIKE.md "Host mode"),
@@ -847,6 +911,7 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
     BASH_DEFAULT_TIMEOUT_MS: '300000',
     CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '60000',
   };
+  if (kind !== 'audit') env.AUTOPILOT_SCRATCH = scratchDir(stepDir); // where the session keeps temporary files; the auditor only reads
   if (kind === 'audit') {
     // The auditor needs no gate tools, so it stays on plain `-p` (SPIKE.md correction 1): read-only
     // tools, the bundle as its working directory, the clone readable through --add-dir.
@@ -1181,7 +1246,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`When an epic parks: ${config.onParkFrom === 'project' ? `${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set by the project` : config.onParkFrom === 'attended' ? 'independent epics still run (the owner is away)' : 'follows the owner\'s answer at launch: away, independent epics still run; here, the run stops'}`);
-  p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}`);
+  p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}; files CLAUDE.md names outside the project: ${namedReads(project, workspace).files.join(' ') || '(none)'}`);
   p(config.sandbox === true
     ? `Sandbox:          on — sessions write only in the clone, may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`
     : 'Sandbox:          off — sessions run commands as a terminal does, with open network; the referee keeps file writes inside the clone and the temp directories (best effort for scripts) and still denies push, containers and sudo. The auditor only reads (WebFetch and WebSearch are always denied)');
@@ -1217,6 +1282,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
       p(`    env:   ${Object.entries(c.env).map(([k, v]) => `${k}=${shellQuote(v)}`).join(' ')}`);
       p(`    $ ${[c.bin, ...c.args].map(shellQuote).join(' ')} > ${shellQuote(path.join(stepDir, 'stream.jsonl'))} 2> ${shellQuote(path.join(stepDir, 'stderr.log'))}`);
       p(`    stdin: ${userLine(prompt)}`);
+      p(`    also appended: scratch-rule.md (temporary files go in ${scratchDir(stepDir)}); a real run joins a step's appended files into system-append.md`);
       if (kind === 'build') {
         const auditDir = path.join(runDir, 'epics', e.id, 'audit-1');
         const a = sessionCommand(config, { kind: 'audit', epicId: e.id, workspace, runDir, stepDir: auditDir, pluginDir, sessionId: '<uuid>', prompt: '<audit/prompt.md>', schema: '<audit/schema.json>' });
@@ -1234,7 +1300,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   }
 
   p(); p('Settings JSON (written as each step\'s settings.json; the auditor\'s has an empty allowedDomains):');
-  p(JSON.stringify(sessionSettings(config), null, 2));
+  p(JSON.stringify(sessionSettings(config, { scratch: '<step directory>/scratch' }), null, 2));
   p(); p('Gate policy:');
   const policy = path.join(pluginDir, 'scripts', 'autopilot', 'policy', 'gates.json');
   p(exists(policy) ? read(policy) : '  policy/gates.json is not built yet (P2). Until then every AskUserQuestion parks.');
@@ -1571,8 +1637,9 @@ class Run {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(stepDir, { recursive: true });
     const sessionId = randomUUID(); const marker = '.autopilot-probe-exit';
-    writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), sandbox: cfg.sandbox === true, queue: [] }); // what the referee reads
-    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind: 'probe' }));
+    writeJson(path.join(dir, 'state.json'), { name: 'probe', integration, readOnly: resolveReadOnly(cfg.readOnly), readFiles: namedReads(cfg.project, this.stateDir).files, sandbox: cfg.sandbox === true, queue: [] }); // what the referee reads
+    fs.mkdirSync(scratchDir(stepDir), { recursive: true });
+    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind: 'probe', scratch: scratchDir(stepDir) }));
     writeJson(path.join(stepDir, 'step.json'), { name: 'probe-1', kind: 'probe', role: KINDS.probe.role, epic: 'probe', sessionId, startedAt: new Date().toISOString(), startMb: this.cloneMb() });
     const command = `${cfg.testCommand}; echo $? > ${marker}`;
     const ms = Math.min(cfg.budgets.testRunMin * 60000, 900000);
@@ -1738,7 +1805,13 @@ class Run {
       fs.writeFileSync(file, ownerAnswersText(answers));
       appendFiles.push(file);
     }
-    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind }));
+    const scratch = kind === 'audit' ? null : scratchDir(stepDir);
+    if (scratch) {
+      fs.mkdirSync(scratch, { recursive: true });
+      fs.writeFileSync(path.join(stepDir, 'scratch-rule.md'), scratchRule(scratch));
+      appendFiles.push(path.join(stepDir, 'scratch-rule.md'));
+    }
+    writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind, scratch }));
     this.ignoreLook();
     const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles, resume });
 
@@ -2781,6 +2854,8 @@ class Run {
       const badRead = readOnlyProblems(cfg.readOnly, { project: cfg.project, workspace: this.stateDir });
       if (badRead.length) throw new Error(badRead.join('; '));
       this.state.readOnly = resolveReadOnly(cfg.readOnly);
+      const named = namedReads(cfg.project, this.stateDir);
+      this.state.readFiles = named.files;
       const badNet = networkProblems(cfg.network);
       if (badNet.length) throw new Error(badNet.join('; '));
       this.state.network = sessionNetwork(cfg);
@@ -2789,6 +2864,8 @@ class Run {
       this.save();
       this.log(cfg.sandbox ? `sandbox on: sessions may reach ${this.state.network.join(', ')}; local sockets and ports are open` : 'sandbox off: sessions run commands unsandboxed with open network; the referee keeps writes inside the clone');
       if (this.state.readOnly.length) this.log(`sessions may read (never write): ${this.state.readOnly.join(', ')}`);
+      if (named.files.length) this.log(`sessions may read (never write) the files CLAUDE.md names outside the project: ${named.files.join(', ')}`);
+      for (const r of named.refused) this.log(`CLAUDE.md names ${r.path}; sessions may not read it: ${r.why}`);
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
       // The limits this run really has, for whoever launched it to hold against what the owner confirmed.
       const limits = { runBudgetUsd: cfg.runBudgetUsd ?? null, endBy: cfg.endBy ?? null, autoContinue: cfg.autoContinue ?? 0, onPark: cfg.onPark, onParkFrom: cfg.onParkFrom ?? 'default' };

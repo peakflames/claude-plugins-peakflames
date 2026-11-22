@@ -154,6 +154,10 @@ test('live look: a real wrapup on an operator-observed epic uses the owner\'s re
 
   assert.deepEqual(ep.sessions.map((s) => s.name), ['verify-1'], 'the second run re-enters at VERIFY and runs nothing else');
   assert.ok(ses.costUsd > 0, 'a real session was paid for');
+  // Live tests run on Sonnet or Opus only (owner decision, 2026-11-21): the session must report the model that was asked for.
+  const init = lines(p.dir(e.id, 'verify-1', 'stream.jsonl')).find((l) => l.type === 'system' && l.subtype === 'init');
+  t.diagnostic(`verify-1 ran on ${init?.model} (claude ${init?.claude_code_version})`);
+  assert.match(String(init?.model), /opus/i, `the verify session reports model ${init?.model}, not opus`);
   assert.equal(readJson(p.dir(e.id, 'verify-1', 'step.json')).look.branchTip, tip);
   const look = asked.find((h) => h.decision === 'answer' && /the owner's recorded decision/.test(h.reason ?? ''));
   assert.ok(look, `the manual-verification question was not answered from the owner's look: ${JSON.stringify(asked.map((h) => [h.decision, h.reason]))}`);

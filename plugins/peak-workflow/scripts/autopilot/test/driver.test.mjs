@@ -56,7 +56,9 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.ok(prompt.includes(`sh "${PLUGIN_DIR}/scripts/tor-lifecycle"`));
   assert.ok(!prompt.includes('${CLAUDE_PLUGIN_ROOT}'));
   assert.ok(fs.readFileSync(path.join(dir, 'plan-1', 'plan.md'), 'utf8').includes('${CLAUDE_PLUGIN_ROOT}'));
-  assert.equal(build.argv[build.argv.indexOf('--append-system-prompt-file') + 1], path.join(dir, 'build-1', 'build-rules.md'));
+  // One file reaches the session: its rules and the scratch-folder rule, joined (`claude` keeps only the last such flag).
+  assert.equal(build.argv[build.argv.indexOf('--append-system-prompt-file') + 1], path.join(dir, 'build-1', 'system-append.md'));
+  assert.ok(fs.readFileSync(path.join(dir, 'build-1', 'system-append.md'), 'utf8').startsWith(fs.readFileSync(path.join(dir, 'build-1', 'build-rules.md'), 'utf8').trimEnd()));
 
   // The host approves nothing: a permission prompt that reaches it is denied and logged.
   const answer = readJson(path.join(dir, 'build-1', 'fake-control-response.json'));
@@ -183,7 +185,7 @@ test('check failure: exactly one repair session, then park', async (t) => {
   assert.equal(fix.env?.AUTOPILOT_ROLE ?? 'builder', 'builder');
   const rules = fs.readFileSync(path.join(dir, 'fix-1', 'build-rules.md'), 'utf8');
   assert.match(rules, /# Autopilot repair rules/);
-  assert.ok(fix.argv.includes(path.join(dir, 'fix-1', 'build-rules.md')));
+  assert.ok(fix.argv.includes(path.join(dir, 'fix-1', 'system-append.md')) && fs.readFileSync(path.join(dir, 'fix-1', 'system-append.md'), 'utf8').includes(rules.trimEnd()));
   assert.equal(fix.argv[fix.argv.indexOf('--max-turns') + 1], '150');
 });
 
@@ -239,7 +241,7 @@ test('safety caps are sized for the confirm screen, and a scenario\'s Then lines
 
 test('bad merge (an extra commit on develop) is rolled back and the epic parks', async (t) => {
   const p = makeProject(t);
-  const extra = [{ do: 'write', path: 'src/extra.js', content: '// straight onto develop\n' }, { do: 'commit', message: 'chore: extra commit on develop' }];
+  const extra = [{ do: 'write', path: 'src/extra.js', content: '// straight onto develop\n' }, { do: 'commit', message: 'chore: extra commit on develop', unchecked: 'the referee refuses a commit on develop; this tests the merge check behind it' }];
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: wrapupScript(E1, { afterMerge: extra }) });
 
   await go(p);
@@ -519,7 +521,7 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
 
   assert.equal(p.epic(E1.id).state, 'MERGED');
   const dir = p.dir(E1.id);
-  const tools = (step) => fs.readFileSync(path.join(dir, step, 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).out);
+  const tools = (step) => fs.readFileSync(path.join(dir, step, 'fake-tools.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).out).filter(Boolean); // a call the referee had no opinion on has no output
   const [start, exit] = tools('plan-1');
   assert.equal(Object.values(start.hookSpecificOutput.updatedInput.answers)[0], 'Start it');
   assert.equal(exit.stopReason, 'autopilot: plan captured');
@@ -532,7 +534,51 @@ test('driver + real hooks: the hook answers Step 2.5, captures and lints the pla
   assert.equal(Object.values(manual.hookSpecificOutput.updatedInput.answers)[0], 'No — only automated gates were run');
   assert.match(push.hookSpecificOutput.permissionDecisionReason, /^autopilot R3: git push/);
   assert.equal(p.epic(E1.id).sessions.find((s) => s.name === 'verify-1').denials, 1);
-  assert.deepEqual(fs.readFileSync(path.join(dir, 'verify-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).decision), ['answer', 'answer', 'answer', 'deny']);
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'verify-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).decision).filter((d) => d !== 'pass'), ['answer', 'answer', 'answer', 'deny']);
+});
+
+test('the fake puts scripted work to the referee as the real CLI does: a refused action is skipped and listed, an allowed one is applied, `unchecked` needs its reason', async (t) => {
+  const p = makeProject(t);
+  const outside = path.join(os.homedir(), `autopilot-fake-${process.pid}-should-not-exist.txt`);
+  t.after(() => fs.rmSync(outside, { force: true }));
+  const s = happy(E1);
+  s[`${E1.id}/build`].actions.splice(1, 0,
+    { do: 'write', path: '{{state}}/settings.json', content: '{}', refused: true }, // the workspace
+    { do: 'exec', cmd: `echo x > ${outside}`, refused: true }, // outside the clone
+    { do: 'write', path: 'test/smoke.test.js', content: '// gutted\n', refused: true }, // an existing test, no reason
+    { do: 'write', path: 'src/allowed.js', content: '// allowed\n' },
+    { do: 'write', path: '{{step}}/by-the-test.txt', content: 'x', unchecked: 'written by this test, not by a tool call' });
+  p.scenario(s);
+  const settingsBefore = fs.readFileSync(path.join(p.state, 'settings.json'), 'utf8');
+  await go(p);
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  const result = readJson(p.dir(E1.id, 'build-1', 'result.json'));
+  assert.deepEqual(result.permission_denials.map((d) => [d.tool_name, d.tool_input.file_path ?? d.tool_input.command]), [
+    ['Write', path.join(p.state, 'settings.json')], ['Bash', `echo x > ${outside}`], ['Write', path.join(p.clone, 'test', 'smoke.test.js')]]);
+  assert.equal(fs.readFileSync(path.join(p.state, 'settings.json'), 'utf8'), settingsBefore);
+  assert.equal(fs.existsSync(outside), false);
+  assert.doesNotMatch(git(p.clone, 'show', 'develop:test/smoke.test.js'), /gutted/);
+  assert.equal(git(p.clone, 'show', 'develop:src/allowed.js'), '// allowed');
+  assert.equal(fs.readFileSync(p.dir(E1.id, 'build-1', 'by-the-test.txt'), 'utf8'), 'x');
+  // The referee logged every call the script made, as it does for a real session.
+  const logged = fs.readFileSync(p.dir(E1.id, 'build-1', 'hooks.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(logged.filter((h) => h.decision === 'deny').map((h) => h.rule), ['R2', 'R2', 'R7']);
+  assert.ok(logged.some((h) => h.tool_name === 'Bash' && /^git add -A && git commit -m /.test(h.tool_input.command) && h.decision === 'pass'));
+
+  // `unchecked` without a reason is a broken script, not a silent bypass.
+  const q = makeProject(t);
+  q.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [{ do: 'write', path: 'src/x.js', content: 'x', unchecked: true }] } });
+  await go(q);
+  assert.match(fs.readFileSync(q.dir(E1.id, 'build-1', 'stderr.log'), 'utf8'), /`unchecked` on a write action must be the reason/);
+
+  // A refusal the script did not expect, or an expected one that did not come, ends the fake with the reason.
+  for (const [action, re] of [[{ do: 'write', path: '{{state}}/STOP', content: '' }, /the referee refused a write action the script does not mark `refused: true`.*autopilot R2/s], [{ do: 'write', path: 'src/x.js', content: 'x', refused: true }, /the referee allowed a write action the script marks `refused`/]]) {
+    const r = makeProject(t);
+    r.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, action] } });
+    await go(r);
+    assert.match(fs.readFileSync(r.dir(E1.id, 'build-1', 'stderr.log'), 'utf8'), re);
+    assert.notEqual(r.epic(E1.id).state, 'MERGED');
+  }
 });
 
 test('driver + real hooks: a deferral question in the build session parks the epic with the hook\'s gate file', async (t) => {
@@ -576,10 +622,35 @@ test('effort defaults by model family (haiku/sonnet high, opus/fable medium) and
   assert.throws(() => loadConfig(p.state, { project: p.project }), /budgets\.build\.effort must be one of/);
 });
 
+test('every working session gets a scratch folder: made before launch, named in its environment and its rules, writable in the sandbox; the auditor gets none', async (t) => {
+  const p = makeProject(t);
+  const s = happy(E1);
+  s[`${E1.id}/build`].actions.unshift({ do: 'write', path: '{{step}}/scratch/probe.json', content: '{}' }, { do: 'exec', cmd: 'echo x > "$AUTOPILOT_SCRATCH/out.txt"' });
+  p.scenario(s);
+  await p.go();
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  for (const step of ['plan-1', 'build-1', 'verify-1']) {
+    const call = p.calls().find((c) => c.step === step);
+    const scratch = p.dir(E1.id, step, 'scratch');
+    assert.equal(call.env.AUTOPILOT_SCRATCH, scratch, step);
+    assert.ok(fs.statSync(scratch).isDirectory(), step);
+    const rules = fs.readFileSync(call.argv[call.argv.indexOf('--append-system-prompt-file') + 1], 'utf8');
+    assert.ok(rules.includes(scratch) && rules.includes('$AUTOPILOT_SCRATCH'), `${step}: ${rules}`);
+  }
+  assert.deepEqual(fs.readdirSync(p.dir(E1.id, 'build-1', 'scratch')).sort(), ['out.txt', 'probe.json']);
+  assert.deepEqual(readJson(p.dir(E1.id, 'build-1', 'result.json')).permission_denials, []);
+  const audit = p.calls().find((c) => c.step === 'audit-1');
+  assert.equal(audit.env.AUTOPILOT_SCRATCH, undefined);
+  assert.equal(fs.existsSync(p.dir(E1.id, 'audit-1', 'scratch')), false);
+  // With the sandbox on, the scratch folder is the one place outside the clone a command may write.
+  assert.deepEqual(sessionSettings({ sandbox: true }, { kind: 'build', scratch: '/ws/step/scratch' }).sandbox.filesystem, { allowWrite: ['/ws/step/scratch'] });
+  assert.equal(sessionSettings({ sandbox: true }, { kind: 'audit' }).sandbox.filesystem, undefined);
+});
+
 test('the owner is away: no session starts a step that waits for a person, and a step nobody came for is not tried again in that epic', async (t) => {
   const p = makeProject(t);
   // The build asks the owner to come and gives up; the verify session of the same epic is told.
-  const hook = (hook, id, extra = {}) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, content: `${JSON.stringify({ t: new Date().toISOString(), hook, tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description: 'Needs you: sign in to Okta in the browser window that opens' }, ...extra })}\n` });
+  const hook = (hook, id, extra = {}) => ({ do: 'write', path: '{{step}}/hooks.jsonl', append: true, unchecked: 'stands for a line the hooks themselves log', content: `${JSON.stringify({ t: new Date().toISOString(), hook, tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'python build.py mcp tools --oauth', description: 'Needs you: sign in to Okta in the browser window that opens' }, ...extra })}\n` });
   const scripts = happy(E1);
   scripts[`${E1.id}/build`].actions.unshift(hook('PreToolUse', 'n1', { decision: 'pass' }), hook('PostToolUseFailure', 'n1', { error: 'OAuth callback timed out after 300.0 seconds' }));
   p.scenario(scripts);
@@ -618,7 +689,7 @@ test('real money: the owner\'s answer at launch reaches every build, repair and 
       assert.doesNotMatch(text, /# The owner is away/, 'not said unless the owner said so');
     }
     const [, build, , verify] = p.calls();
-    assert.ok(build.argv.includes(p.dir(E1.id, 'build-1', 'build-rules.md')) && verify.argv.includes(p.dir(E1.id, 'verify-1', 'verify-rules.md')));
+    for (const [call, step, file] of [[build, 'build-1', 'build-rules.md'], [verify, 'verify-1', 'verify-rules.md']]) assert.ok(call.argv.includes(p.dir(E1.id, step, 'system-append.md')) && fs.readFileSync(p.dir(E1.id, step, 'system-append.md'), 'utf8').includes(fs.readFileSync(p.dir(E1.id, step, file), 'utf8').trimEnd()), step);
     assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), realSpend === true ? /Real money on outside services: you allowed it when a check needs it\./ : realSpend === false ? /Real money on outside services: you said not to spend any/ : /Real money on outside services: not decided at launch/);
     assert.equal(readJson(path.join(p.runDir(), 'config.json')).realSpend ?? null, realSpend ?? null);
   }

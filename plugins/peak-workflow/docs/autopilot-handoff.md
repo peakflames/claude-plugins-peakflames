@@ -1,4 +1,4 @@
-# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-21)
+# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-22)
 
 For a fresh session, on any machine. Everything is on `feature/peak-workflow-autopilot-poc`
 (pushed). This file replaces the earlier handoffs kept outside the repository.
@@ -7,8 +7,9 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 200 pass, 11 skipped (the skipped
-  ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass.
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 206 pass, 13 skipped (the skipped
+  ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13 passed on 2026-11-21), lab suite 10
+  pass.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
 - **The cockpit mod is deferred** (`autopilot-cockpit-mod-handoff.md`, note at its top): the run
   announces itself in chat instead, because chat is the one display every device has.
@@ -116,16 +117,17 @@ Why this order:
 
 - [x] **A resumed epic is not put back on its branch** (#41 B14). Fixed 2026-11-21, tested
   against the fake `claude`: before every session the driver checks the epic's branch out and
-  verifies HEAD (`driver.mjs`, `ensureOnBranch`, called from `step`). Uncommitted work comes along with
-  the checkout. A checkout that fails parks the epic as a technical stop; that path has no
-  test, and a continued build parked that way is started from the top. Not seen in a real run or on
-  Windows.
+  verifies HEAD (`driver.mjs`, `ensureOnBranch`, called from `step`). Uncommitted work comes
+  along with the checkout. A checkout that fails parks the epic as a technical stop; that path
+  has no test, and a continued build parked that way is started from the top. Not seen in a
+  real run or on Windows.
 - [x] **Scratch files left by a session block the next run** (#41 B15). Fixed 2026-11-21,
   tested against the fake `claude`: uncommitted and untracked files are set aside under
   `refs/autopilot/leftover/` in the clone, never deleted, and the log and report say how many
   (`driver.mjs`, `setAside`), at launch, at the readiness proof (`prepare.json`, `setAside`)
   and before each epic. Left: nothing brings a set-aside file back for the owner; a launch
-  that is refused after setting files aside says so only in the previous run's log. Not seen in a real run or on Windows.
+  that is refused after setting files aside says so only in the previous run's log. Not seen
+  in a real run or on Windows.
 - [x] **`**Not decided yet:** none` parks every epic** (#41 comment). Fixed 2026-11-21, tested
   against the fake `claude`: a line that names nothing is the all-clear (`driver.mjs`, `tbd`).
   Left: `wrapup-epic`'s deferred-value grep still fails a skeleton epic on any such line, and
@@ -141,10 +143,57 @@ Why this order:
 
 ### Step 2 — Make the tests trustworthy (C1)
 
-- [ ] **The fake `claude` is kinder than the real one** (#38). It read every
-  `--append-system-prompt-file`; the real one keeps the last, so the owner's recorded look never
-  reached a verifier (finding 44). Run the 11 live tests (`AUTOPILOT_LIVE=1`), fix what they
-  show, and go through `fake-claude.mjs` for other places it accepts what the real one would not.
+- [x] **The fake `claude` is kinder than the real one** (#38). Done 2026-11-21.
+  - **The live run.** All live tests (now 13) pass on the real `claude` 2.1.323, about $4 in
+    all. They run on Sonnet or Opus only (owner's decision; never Fable) and each asserts the
+    model the session reports. One failed at first: "a read outside the clone is denied". The
+    test was stale, not the code: the sandbox has been off by default since 2026-11-13, and
+    with it off sessions read outside the clone. It is now two checks, sandbox on and off.
+    `--append-system-prompt-file`, `--permission-prompt-tool` and `--max-turns` are not in
+    `claude --help` of 2.1.323 and still work.
+  - **The fake goes through the referee.** Every scripted action a real session would need a
+    tool call for (`write`, `rm`, `sidecar`, `commit`, `merge`, `branch`, `checkout`, `exec`)
+    is put to the session's real `PreToolUse` hook first; a refused action is skipped and listed
+    in `permission_denials`. `unchecked: "<why>"` skips the hook and must give its reason. A
+    script marks the actions it expects to be refused with `refused: true`; a refusal it did
+    not expect, or an expected one that did not come, fails the test (`fake-claude.mjs`,
+    header). Switching it on failed 13 of 200 tests and one lab test. None
+    was a fault in the referee or the driver: 9 were test bookkeeping written into the
+    workspace, 3 did on purpose what the referee refuses, to test the driver's check behind
+    it, and 2 edited an existing test before recording the reason. The suite takes about 6.5
+    minutes instead of 5.
+  - **Open: differences the fake still has** (owner's decision: fix only what the live tests
+    show). It accepts any flag, a flag given twice, and `--resume` of a session that never
+    existed. It enforces no turn or money limit. A resumed session's cost is not the two
+    sessions added up. The shared build script switches to the epic branch itself, which hid
+    B14. Its `Edit` and `Write` calls carry no real `old_string`.
+- [x] **The referee's guards** (*no issue*; owner's decisions of 2026-11-21). The referee has
+  two jobs: plumbing autopilot cannot run without (questions R8, the plan R9, the STOP file R1)
+  and guards. The guards were reviewed because two refused ordinary work.
+
+  | Guard | Decision | What changed |
+  |---|---|---|
+  | Containers, background commands (R4, R6) | Keep | Nothing |
+  | `git push` (R3) | Keep | Nothing |
+  | Writes outside the clone (R2) | Keep; add a scratch folder | Each working session gets `<step>/scratch/` in the workspace (`scratchDir`, `scratchRule`, `AUTOPILOT_SCRATCH`); a refused write names it. `/tmp` is left as it was |
+  | Reads outside the clone (R2) | Loosen for what `CLAUDE.md` points to | A single existing file `CLAUDE.md` names in backticks is readable (`claudeMdReads`, the run's `readFiles`). In `~/.claude` only below `scripts/`, `bin/` or `tools/`; never a hidden file or folder, never where credentials live |
+  | Test edits without a recorded reason (R7) | No change | Nothing |
+
+  What the code showed, against what was assumed: with the sandbox off, `/tmp` is writable
+  on macOS and Linux and refused only on Windows (the referee does not know `/tmp` there) or
+  with the sandbox on; reads outside the clone are open with the sandbox off, except
+  credentials and `~/.claude`. Both refusals reported on #41 fit that. **The tally of real
+  refusals was not made:** the PeakMedia run logs are on another machine. Tested against the
+  fake and by three live rule checks on macOS (a real session used its scratch folder without
+  being refused first). Not seen on Windows; the reporter is asked to confirm on #41. Left:
+  - The scratch folders are never emptied, and their size is not counted by the growth cap.
+  - `CLAUDE.md` is a file sessions edit and merge, so the list of readable files can grow
+    without the owner typing it. It is shown at every launch; nothing asks him to confirm it.
+  - The referee's own credential checks compare names by case (`cat ~/.SSH/id_rsa` passes
+    with the sandbox off on macOS). Old behaviour, found by the review; belongs to step 4.
+  - A command can still reach the workspace through a variable it builds itself (`D=$PWD/..`).
+    Old behaviour: the Bash check is best effort. The scratch folder's own name is refused in
+    any form but `$AUTOPILOT_SCRATCH`.
 
 ### Step 3 — No stop that can only be started over (C2)
 
@@ -184,7 +233,9 @@ Why this order:
   spend figure, $250 budget and `configure --run-budget`, "Bring it in for me", "Combine them
   for me", the relaunch questions, "Start it so I can check for real", a look kept across a
   repair, the 80-line small-fix limit) and the 2026-11-21 changes (I2, I6a, the at-limit
-  question, no by-hand offers). Open a bug for any that misbehaves.
+  question, no by-hand offers), and step 1's fixes (B14 a resumed epic put back on its
+  branch, B15 leftover files set aside, `Not decided yet: none — <a reason>`), the scratch
+  folder and the files `CLAUDE.md` names. Open a bug for any that misbehaves.
 
   Seen live and working: the joined instruction file, the referee refusing a repeated check,
   "Not now" not carried forward, a no-verdict check parking instead of failing, the standing
@@ -264,11 +315,13 @@ Why this order:
   command; the skill paraphrases them (*no issue*).
 - [ ] No gate kind for a value the owner types, such as a document ID; it travels in `--note`
   (#41 I8).
-- [ ] Sessions write scratch files in the clone, because the referee's path rule refuses
-  `/tmp`. They no longer block a run (step 1, B15), but nothing stops them being written
-  (#41 B15).
-- [ ] A project's `CLAUDE.md` can tell sessions to use a script outside the clone, which the
-  referee refuses (#41, 2026-11-22 comment: the dev-server tether). Not checked.
+- [x] Sessions write scratch files in the clone, because the referee's path rule refuses
+  `/tmp` (#41 B15). Fixed 2026-11-21 with the scratch folder (step 2, "The referee's guards").
+  A session can still leave a file in the clone; step 1's B15 fix sets it aside.
+- [x] A project's `CLAUDE.md` can tell sessions to use a script outside the clone, which the
+  referee refuses (#41: the dev-server tether in `~/.claude/scripts`). Fixed 2026-11-21: a file
+  `CLAUDE.md` names in backticks is readable (step 2). Not seen on Windows. Whether a dev
+  server started that way survives the ban on background commands is not checked.
 - [ ] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
   (#40) (15).
 - [ ] The build missed a console error the verifier later found (#40) (38).

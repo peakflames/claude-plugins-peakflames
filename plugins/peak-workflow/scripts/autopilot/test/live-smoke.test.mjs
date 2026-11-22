@@ -6,35 +6,37 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import test from 'node:test';
-import { defaultConfig, sessionCommand, sessionSettings } from '../driver.mjs';
+import { defaultConfig, scratchDir, scratchRule, sessionCommand, sessionSettings } from '../driver.mjs';
 import { E1, git, makeProject, readJson } from './helpers.mjs';
 
 const LIVE = process.env.AUTOPILOT_LIVE === '1';
 const opts = { skip: LIVE ? false : 'set AUTOPILOT_LIVE=1 to run real sessions', timeout: 300000 };
 
 /** Launches one real session exactly as the driver does (host mode, --plugin-dir, the referee settings). */
-async function session(t, { kind = 'build', model = 'haiku', prompt, env = {}, before }) {
+async function session(t, { kind = 'build', model = 'sonnet', prompt, env = {}, before }) {
   const p = makeProject(t);
   git(p.project, 'clone', '-q', '--no-hardlinks', '--branch', 'develop', p.project, p.clone);
   git(p.clone, 'remote', 'remove', 'origin');
   if (kind !== 'plan') git(p.clone, 'checkout', '-q', '-b', E1.branch);
   const runDir = p.mockRun();
   const stepDir = path.join(runDir, 'epics', E1.id, `${kind}-1`);
-  fs.mkdirSync(stepDir, { recursive: true });
+  fs.mkdirSync(scratchDir(stepDir), { recursive: true });
   fs.writeFileSync(path.join(stepDir, 'settings.json'), JSON.stringify(sessionSettings()));
+  fs.writeFileSync(path.join(stepDir, 'scratch-rule.md'), scratchRule(scratchDir(stepDir)));
   before?.(p);
   const config = { ...defaultConfig(p.project), claudeBin: 'claude' };
   config.budgets[kind] = { wallMin: 4, turns: 12, usd: 1, model };
-  const cmd = sessionCommand(config, { kind, epicId: E1.id, workspace: p.state, runDir, stepDir, sessionId: randomUUID() });
+  const cmd = sessionCommand(config, { kind, epicId: E1.id, workspace: p.state, runDir, stepDir, sessionId: randomUUID(), appendFiles: [path.join(stepDir, 'scratch-rule.md')] });
   const childEnv = { ...process.env, ...cmd.env, ...env };
   delete childEnv.NODE_TEST_CONTEXT;
   for (const k of Object.keys(env)) if (env[k] === null) delete childEnv[k];
   const child = spawn(cmd.bin, cmd.args, { cwd: p.clone, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = ''; child.stderr.on('data', (d) => { stderr += d; });
-  const control = []; let result = null;
+  const control = []; let result = null; let init = null;
   child.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }) + '\n');
   readline.createInterface({ input: child.stdout }).on('line', (line) => {
     let d; try { d = JSON.parse(line); } catch { return; }
@@ -42,13 +44,16 @@ async function session(t, { kind = 'build', model = 'haiku', prompt, env = {}, b
       control.push(d.request);
       child.stdin.write(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: d.request_id, response: d.request.subtype === 'can_use_tool' ? { behavior: 'deny', message: 'autopilot: the host approves nothing' } : {} } }) + '\n');
     }
+    if (d.type === 'system' && d.subtype === 'init') init = d;
     if (d.type === 'result') { result = d; child.stdin.end(); }
   });
   const code = await new Promise((r) => child.on('close', r));
   const hooksFile = path.join(stepDir, 'hooks.jsonl');
   const hooks = fs.existsSync(hooksFile) ? fs.readFileSync(hooksFile, 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : [];
   assert.ok(result, `no result line (exit ${code}): ${stderr.slice(0, 500)}`);
-  t.diagnostic(`${kind}/${model}: $${result.total_cost_usd?.toFixed(3)}, ${result.num_turns} turns, ${result.terminal_reason}; hook decisions: ${hooks.filter((h) => h.hook === 'PreToolUse').map((h) => `${h.tool_name}:${h.rule ?? 'pass'}`).join(' ')}`);
+  // Live tests run on Sonnet or Opus only (owner decision, 2026-11-21): the session must report the model that was asked for.
+  assert.match(String(init?.model), new RegExp(model, 'i'), `the session reports model ${init?.model}, not ${model}`);
+  t.diagnostic(`${kind}/${init.model} (claude ${init.claude_code_version}): $${result.total_cost_usd?.toFixed(3)}, ${result.num_turns} turns, ${result.terminal_reason}; hook decisions: ${hooks.filter((h) => h.hook === 'PreToolUse').map((h) => `${h.tool_name}:${h.rule ?? 'pass'}`).join(' ')}`);
   return { p, stepDir, result, hooks, control, deniedBy: (rule) => hooks.find((h) => h.hook === 'PreToolUse' && h.rule === rule && h.decision !== 'answer') };
 }
 const inDenials = (r, tool) => assert.ok(r.result.permission_denials.some((d) => d.tool_name === tool), `permission_denials lacks ${tool}: ${JSON.stringify(r.result.permission_denials)}`);
@@ -59,10 +64,32 @@ test('live R1: with the STOP file present the first tool call is denied and the 
   assert.equal(r.result.terminal_reason, 'hook_stopped');
 });
 
-test('live R2: reading a file outside the clone is denied', opts, async (t) => {
-  const r = await session(t, { prompt: 'Use the Read tool to read the file /etc/hosts, then tell me its first line. Do not use any other tool.' });
+// The run's state.json says whether the project turned the sandbox on; the referee's read jail follows it.
+const strict = (p) => { const f = path.join(p.state, 'runs', '20261111-220500', 'state.json'); fs.writeFileSync(f, JSON.stringify({ ...readJson(f), sandbox: true })); };
+
+test('live R2, sandbox on: reading a file outside the clone is denied', opts, async (t) => {
+  const r = await session(t, { before: strict, prompt: 'Use the Read tool to read the file /etc/hosts, then tell me its first line. Do not use any other tool.' });
   assert.equal(r.deniedBy('R2')?.tool_name, 'Read');
   inDenials(r, 'Read');
+});
+
+test('live R2, sandbox off (the default): a read outside the clone passes; a write outside it is denied', opts, async (t) => {
+  const outside = path.join(os.homedir(), `autopilot-live-smoke-${randomUUID().slice(0, 8)}.txt`);
+  t.after(() => fs.rmSync(outside, { force: true }));
+  const r = await session(t, { prompt: `Do these two things in order. 1. Use the Read tool to read the file /etc/hosts. 2. Use the Write tool to create the file ${outside} with the content "x". If a tool call is refused, do not try any other way. Then tell me what happened at each step.` });
+  const read = r.hooks.find((h) => h.hook === 'PreToolUse' && h.tool_name === 'Read');
+  assert.equal(read?.decision, 'pass', JSON.stringify(read));
+  assert.equal(r.deniedBy('R2')?.tool_name, 'Write');
+  inDenials(r, 'Write');
+  assert.equal(fs.existsSync(outside), false);
+});
+
+test('live scratch folder: told only its rules, a session keeps a temporary file in its scratch folder and leaves the clone clean', opts, async (t) => {
+  const r = await session(t, { prompt: 'Run the project\'s tests with `node --test` and save the full output to a temporary file, then tell me the path of that file and how many tests passed. Do not commit anything.' });
+  const kept = fs.readdirSync(scratchDir(r.stepDir));
+  assert.ok(kept.length >= 1, `nothing in the scratch folder; hook decisions: ${JSON.stringify(r.hooks.filter((h) => h.hook === 'PreToolUse').map((h) => [h.tool_name, h.decision, h.tool_input?.command ?? h.tool_input?.file_path]))}`);
+  assert.equal(r.hooks.filter((h) => h.hook === 'PreToolUse' && h.decision === 'deny').length, 0, 'the scratch folder is used without a refusal first');
+  assert.equal(git(r.p.clone, 'status', '--porcelain'), '');
 });
 
 test('live R3: git push is denied', opts, async (t) => {

@@ -16,6 +16,13 @@ import { E1, FAKE, happy, makeProject, readJson } from './helpers.mjs';
 const LIVE = process.env.AUTOPILOT_LIVE === '1';
 const opts = { skip: LIVE ? false : 'set AUTOPILOT_LIVE=1 to run the real auditor', timeout: 900000 };
 
+/** Live tests run on Sonnet or Opus only (owner decision, 2026-11-21): the result must show the model that was asked for did the work. */
+function assertModel(result, model) {
+  const used = Object.keys(result?.modelUsage ?? {});
+  assert.ok(used.some((m) => new RegExp(model, 'i').test(m)), `asked for ${model}; the session reports ${used.join(', ') || 'no model'}`);
+  assert.ok(!used.some((m) => /fable|mythos/i.test(m)), `a live test must not run on ${used.join(', ')}`);
+}
+
 /** Builds the bundle and launches the auditor exactly as the driver's AUDIT step does. */
 async function audit(t, variant) {
   const c = cannedBuild(t, variant);
@@ -35,6 +42,7 @@ async function audit(t, variant) {
   const result = Array.isArray(parsed) ? parsed.find((x) => x?.type === 'result') : parsed;
   assert.ok(result, `no result (exit ${code}): ${stderr.slice(0, 600)} ${stdout.slice(0, 600)}`);
   assert.equal(result.subtype, 'success', JSON.stringify(result).slice(0, 800));
+  assertModel(result, config.budgets.audit.model);
   const value = auditOutput(result);
   assert.deepEqual(validateAudit(value), { ok: true, problems: [] }, JSON.stringify(result).slice(0, 1200));
   const judged = judgeAudit(value, config.audit.parkOn);
@@ -84,6 +92,9 @@ test('live auditor through the driver: the AUDIT step launches real `claude -p`,
   assert.ok(Array.isArray(audit.findings) && ['park', 'proceed'].includes(audit.decision));
   assert.ok(!/no usable result|could not start|infra/.test(e.reason ?? ''), e.reason);
   assert.equal(e.state, audit.decision === 'park' ? 'PARKED' : 'MERGED');
-  const lines = fs.readFileSync(p.dir(E1.id, 'audit-1', 'stream.jsonl'), 'utf8').trim().split('\n').length;
+  const raw = fs.readFileSync(p.dir(E1.id, 'audit-1', 'stream.jsonl'), 'utf8').trim();
+  const printed = JSON.parse(raw.split('\n').at(-1));
+  assertModel(Array.isArray(printed) ? printed.find((x) => x?.type === 'result') : printed, 'opus');
+  const lines = raw.split('\n').length;
   t.diagnostic(`real --output-format json printed ${lines} line(s)`);
 });

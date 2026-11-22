@@ -35,6 +35,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot drafts its own setup** — the skill works out `setup` and `copy` from how the project
   is built and tested, saves them through `driver.mjs configure` on the owner's confirmation, and
   never launches while the proof fails.
+- **Autopilot scratch folder** — each working session gets a folder outside the clone for
+  temporary files, named in its rules and as `$AUTOPILOT_SCRATCH`, writable with the sandbox on
+  or off. A refused write outside the clone says where it is.
+- **Autopilot reads the files `CLAUDE.md` names** — a single existing file outside the project
+  that `CLAUDE.md` names in backticks (a script under `~/.claude/scripts`) can be read and run
+  by sessions, never written, and is listed at launch. Hidden files and folders, credentials,
+  and the rest of `~/.claude` stay closed.
 - **Autopilot read-only directories** — `readOnly` in the project's `autopilot.json` names
   directories outside the clone (a dependency cache such as `~/.nuget/packages`) that sessions may
   read and never write; `driver.mjs configure --read-only` saves it and refuses broad or private paths.
