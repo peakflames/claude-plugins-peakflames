@@ -135,8 +135,8 @@ test('evaluate A: a merge that loosened E1\'s test, an E4 that merged instead of
   for (const x of Object.values(e)) { s[`${x.id}/plan`] = planScript(x); s[`${x.id}/build`] = build(x); s[`${x.id}/verify`] = wrapupScript(x); }
   // E1 merges an importer that never skips a duplicate: a false merge the oracle must catch.
   s['Lg1Csv7/build'] = build(e.Lg1Csv7, [{ do: 'write', path: 'src/index.js', content: REFERENCE.replace('if (seen.has(key(t))) { skipped += 1; continue; }', '') }]);
-  // E2 edits E1's existing test and records a reason, so the driver lets it through.
-  s['Lg2Cat4/build'] = build(e.Lg2Cat4, [{ do: 'write', path: 'test/csv-import.test.js', content: "import test from 'node:test';\ntest('loosened', () => {});\n" }, { do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/csv-import.test.js","reason":"descriptions are now normalised"}\n' }]);
+  // E2 records a reason and then edits E1's existing test (the referee refuses the edit without it), so the driver lets it through.
+  s['Lg2Cat4/build'] = build(e.Lg2Cat4, [{ do: 'write', path: '.autopilot/test-changes.jsonl', content: '{"path":"test/csv-import.test.js","reason":"descriptions are now normalised"}\n' }, { do: 'write', path: 'test/csv-import.test.js', content: "import test from 'node:test';\ntest('loosened', () => {});\n" }]);
   p.script(s);
   await p.go();
 
