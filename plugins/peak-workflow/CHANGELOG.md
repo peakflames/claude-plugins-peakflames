@@ -232,6 +232,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot accepts a lockfile that changes with its dependency list** — `bun.lock`,
+  `package-lock.json` and the like are in scope when the matching manifest changed in the same
+  epic. Before, the one repair round deleted a new project's lockfile to pass the check.
+- **Autopilot's first epic may record setup, run and test commands in `CLAUDE.md`** — only in
+  Tech Stack, Local Environment and Verification & Quality Gates, and the epic then always
+  stops for the owner with the changed lines shown.
+- **`CLAUDE.md` guard no longer misses list items** — a changed line starting with `- ` passed
+  the scope check unseen.
 - **Python check finds a newer Python behind an old one** — `tor-lifecycle` now tries
   `python3` in every PATH folder and in the usual install folders, so macOS's own Python 3.9
   no longer hides a Homebrew Python and stops every skill and autopilot's launch check.

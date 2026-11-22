@@ -789,6 +789,13 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       empty, say so and point to the session's files and the branch. Offer to open any of
       them; reading is fine, changing anything is not.
 
+      **A `human-check` gate with `claudeMd`:** the first epic changed the project's
+      instructions file, which every later session follows. Before the question, print "This
+      epic also changed the project's instructions (CLAUDE.md), in: <claudeMd.sections>" and
+      then `claudeMd.lines` as they are (`+` added, `-` removed; say so once), plus "and
+      <more> more lines" when `more` is set. A change the owner does not want is "Not right —
+      describe".
+
       **For a `human-check` gate, do the opening for them.** Many owners are not developers.
       For each path in the gate's `open` list (a built page, a chart), run the system's opener
       yourself — macOS `open "<path>"`, Windows `cmd.exe /c start "" "<path>"`, Linux

@@ -151,6 +151,17 @@ function nextEndBy(now = new Date()) {
   return d.toISOString();
 }
 
+/** The dependency list each lockfile belongs to: a lockfile that changes together with it is ordinary work. */
+export const MANIFEST_OF = { 'package-lock.json': 'package.json', 'npm-shrinkwrap.json': 'package.json', 'yarn.lock': 'package.json', 'pnpm-lock.yaml': 'package.json', 'bun.lock': 'package.json', 'bun.lockb': 'package.json', 'Cargo.lock': 'Cargo.toml', 'poetry.lock': 'pyproject.toml', 'uv.lock': 'pyproject.toml', 'Pipfile.lock': 'Pipfile', 'Gemfile.lock': 'Gemfile', 'go.sum': 'go.mod', 'composer.lock': 'composer.json' };
+/** The CLAUDE.md sections the first epic of a plan may change: where setup, run and test commands live. */
+export const SKELETON_SECTIONS = ['Tech Stack', 'Local Environment', 'Verification & Quality Gates'];
+/** The `## ` sections whose text differs between two versions of a markdown file ("(top of file)" for what precedes the first). */
+export function changedSections(before, after) {
+  const split = (text) => { const m = new Map(); let name = '(top of file)'; for (const line of String(text).split('\n')) { const h = line.match(/^## +(.+?)\s*$/); if (h) name = h[1]; m.set(name, `${m.get(name) ?? ''}${h ? '' : `${line}\n`}`); } return m; };
+  const a = split(before); const b = split(after);
+  return [...new Set([...a.keys(), ...b.keys()])].filter((k) => (a.get(k) ?? null) !== (b.get(k) ?? null));
+}
+
 /** Reads the test command and the test directories from the project's CLAUDE.md. */
 export function readProjectFacts(root) {
   const file = path.join(root, 'CLAUDE.md');
@@ -2103,18 +2114,31 @@ class Run {
     const lockfiles = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|go\.sum|composer\.lock)$/;
     const allow = (this.config.scope.allow ?? []).map(globToRegExp);
     const out = [];
+    let claudeMd = null;
     for (const f of changed) {
       const otherEpic = f.match(/(?:^|\/)epic-([A-Za-z0-9]{7})[-.]/);
       if (f.startsWith(`${PLAN_DIR}/`) && otherEpic && otherEpic[1] !== e.id) out.push(`${f}: another epic's file`);
       else if (f.startsWith('docs/requirements/')) { if (!amended.length) out.push(`${f}: requirements are frozen during a run`); } // an amendment the owner approved is theirs, not the session's
       else if (f.startsWith('.claude/')) out.push(`${f}: .claude/ is off limits`);
       else if (f === 'CLAUDE.md') {
-        const lines = this.g('diff', '-U0', `${dev}...${b}`, '--', 'CLAUDE.md').split('\n').filter((l) => /^[+-](?![+-])/.test(l));
-        if (lines.some((l) => !l.includes('**Test directories:**'))) out.push('CLAUDE.md: changed beyond the Test directories line');
-      } else if (lockfiles.test(f) && !(this.config.scope.lockfiles ?? []).includes(f)) out.push(`${f}: lockfile not named in config`);
+        // Every added or removed line after the diff's file header (a changed list item reads `+- …`, so the header is cut by position, not by its look).
+        const diff = this.g('diff', '-U0', `${dev}...${b}`, '--', 'CLAUDE.md').split('\n');
+        const lines = diff.slice(Math.max(0, diff.findIndex((l) => l.startsWith('@@')))).filter((l) => /^[+-]/.test(l));
+        const beyond = lines.filter((l) => !l.includes('**Test directories:**'));
+        // The first epic of the plan (the walking skeleton) is the one that settles how the project is set up, run
+        // and tested, so it may write that down. The owner is shown the change before anything merges (`humanCheck`).
+        const first = this.pre.epics[0];
+        if (beyond.length && first?.id === e.id && !first.deps.length) {
+          const sections = changedSections(gitRun(this.clone, 'show', `${dev}:CLAUDE.md`).out, gitRun(this.clone, 'show', `${b}:CLAUDE.md`).out);
+          const outside = sections.filter((x) => !SKELETON_SECTIONS.includes(x));
+          if (outside.length) out.push(`CLAUDE.md: changed in ${outside.join(', ')}; the first epic may change only ${SKELETON_SECTIONS.join(', ')}`);
+          else claudeMd = { sections, lines: beyond.slice(0, 40), ...(beyond.length > 40 ? { more: beyond.length - 40 } : {}) };
+        } else if (beyond.length) out.push('CLAUDE.md: changed beyond the Test directories line');
+      } else if (lockfiles.test(f) && !(this.config.scope.lockfiles ?? []).includes(f) && !changed.some((c) => path.posix.basename(c) === MANIFEST_OF[path.posix.basename(f)])) out.push(`${f}: lockfile changed but no ${MANIFEST_OF[path.posix.basename(f)]} changed with it, and it is not named in config`);
       else if (allow.length && !allow.some((re) => re.test(f))) out.push(`${f}: outside the allowed paths`);
       else if (Number(gitRun(this.clone, 'cat-file', '-s', `${b}:${f}`).out || 0) > 5 * 1024 * 1024) out.push(`${f}: larger than 5 MB`);
     }
+    if (out.length === 0 && claudeMd) { if (JSON.stringify(e.claudeMd ?? null) !== JSON.stringify(claudeMd)) this.log(`${e.id}: the build changed CLAUDE.md in ${claudeMd.sections.join(', ')}; the owner is shown it before the final check`); e.claudeMd = claudeMd; } else delete e.claudeMd;
     add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under the owner's approved amendment of ${amended.join(', ')}` : ''}`);
     if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; this.log(`${e.id}: the build changed requirement files under the owner's approved amendment of ${amended.join(', ')}`); }
 
@@ -2236,10 +2260,10 @@ class Run {
    */
   humanCheck(e) {
     const m = this.meta(e);
-    if (!m.humanCheck) return false;
+    if (!m.humanCheck && !e.claudeMd) return false;
     // The owner chose to look afterwards ("look": "after"): an epic that parks only because it has screens goes on
     // to the final check, where the verifier judges the pictures. What a person must observe is still theirs alone.
-    if (this.config.look === 'after' && !(m.observed ?? []).length) {
+    if (this.config.look === 'after' && !(m.observed ?? []).length && !e.claudeMd) {
       e.unlooked = { pictures: lookPictures(this.lookStore(e)).map((p) => path.join(this.lookStore(e), p.file)) };
       this.log(`${e.id}: not parked for a look ("look": "after"); ${e.unlooked.pictures.length} picture(s) kept for the owner to review afterwards`);
       this.save();
@@ -2252,7 +2276,8 @@ class Run {
     const made = this.produceArtifacts(e);
     this.writeGate(e, {
       kind: 'human-check', skillStep: 'wrapup-epic Step 1.2 item 7',
-      question: `${m.reasons.filter((r) => /operator-observed|UI epic/.test(r)).join('; ') || 'this epic needs a person to look'}. Does what was built look right?`,
+      question: `${m.reasons.filter((r) => /operator-observed|UI epic/.test(r)).join('; ') || (e.claudeMd ? 'this epic changed how the project is set up, run or tested' : 'this epic needs a person to look')}.${e.claudeMd ? ` It changed the project's instructions file (CLAUDE.md), in: ${e.claudeMd.sections.join(', ')}; every later session follows that file.` : ''} Does what was built look right?`,
+      ...(e.claudeMd ? { claudeMd: e.claudeMd } : {}),
       options: [ANSWERS.looksRight, ANSWERS.notRight],
       why: `autopilot never self-approves a look${made.artifacts.length ? '' : ` — and it could not produce anything to look at: ${made.notes.join('; ')}`}`,
       artifacts: made.artifacts, artifactNotes: made.notes, ...this.lookAids(e, made.artifacts),
