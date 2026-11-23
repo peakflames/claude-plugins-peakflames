@@ -45,8 +45,9 @@ current format.
 
 `/peak-workflow:wrapup-epic <id> reverify [TOR-… …]` re-checks requirements of an epic that is
 already **Complete** — after a requirement changed since it was verified (finding D), after a
-failed reverify (Verification failed) once the code is fixed, or to record that an earlier PASS
-was wrong. It never reopens the epic: the sidecar's `status:` line does not change.
+failed reverify (Verification failed) once the code is fixed, to give the look a requirement was
+merged without (its `states` row has `not_observed`; `/peak-workflow:status` lists it under Left
+for Later), or to record that an earlier PASS was wrong. It never reopens the epic: the sidecar's `status:` line does not change.
 
 The Session Guard and Format Guard above apply unchanged (verification stays independent: a
 fresh session, blind to the implementer handoff — reverify never reads one). The helper is called
@@ -126,6 +127,11 @@ sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" mark <id> --pass TOR-A --pass T
 - **PASS** writes the requirement's `verified:` line at its current fingerprint and drops any
   `unverified:` line. **FAIL** removes its `verified:` line and writes
   `unverified: TOR: <today> <reason>`. `reverified:` is set to today either way.
+- A scoped requirement whose `states` row had `not_observed`, and that the person here still
+  cannot look at (wrong machine, no device, no account): do not record it as CANNOT VERIFY. Keep
+  what it is — `--fail <TOR> "NOT OBSERVED — <what a person must still do>"` — so it stays under
+  Left for Later with the same next step, not under "fix the code first". A look that was done
+  and shows the Then is not met is an ordinary FAIL.
 - A failed Tests gate makes every scoped requirement whose tests failed a FAIL.
 
 Before running it, note each scoped requirement's previous sidecar line (its `unverified:` date and

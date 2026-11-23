@@ -5,7 +5,7 @@ from fixtures import FixtureRepo, scenario
 
 T = {k: f"TOR-01-{k:0<7}" for k in (
     "Verif", "Rewrd", "Rehis", "Chang", "Disp", "Vfail", "Legcy", "Spec", "Plan", "Prog", "Paus",
-    "Impl", "Waiv", "Wsucc", "Succ", "Dover", "Drenew", "Dres")}
+    "Impl", "Waiv", "Wsucc", "Succ", "Dover", "Drenew", "Dres", "Nobs")}
 T["Dsafe"] = "TOR-02-Dsafe00"
 GONE = {k: f"TOR-01-{k:0<7}" for k in ("Super", "Retd", "Rcode", "Rdone", "Rprog", "Wgone")}
 
@@ -28,10 +28,11 @@ class DerivedStateTests(unittest.TestCase):
 
         repo.sidecar("E1aaaaa", "Complete",
                      [T[k] for k in ("Verif", "Rewrd", "Rehis", "Chang", "Disp", "Vfail", "Waiv",
-                                     "Wsucc", "Dover", "Drenew", "Dres")] + [GONE["Super"], GONE["Wgone"]],
+                                     "Wsucc", "Dover", "Drenew", "Dres", "Nobs")] + [GONE["Super"], GONE["Wgone"]],
                      verified={T[k]: fp[k] for k in ("Verif", "Rewrd", "Rehis", "Chang", "Disp",
                                                      "Dover", "Drenew", "Dres")},
-                     unverified={T["Vfail"]: "2026-10-20 Then clause fails"},
+                     unverified={T["Vfail"]: "2026-10-20 Then clause fails",
+                                 T["Nobs"]: "2026-10-21 NOT OBSERVED — prototype run: open the chart and look at the bars"},
                      waived=f"{T['Waiv']} → E7aaaaa, {T['Wsucc']} → E3aaaaa, {GONE['Wgone']} → E3aaaaa")
         repo.sidecar("E2aaaaa", "Complete", [T["Legcy"], T["Dsafe"]], retires="CR-Rdone00")
         repo.sidecar("E3aaaaa", "Not Started", [T["Plan"], T["Wsucc"], T["Succ"]])
@@ -114,6 +115,20 @@ class DerivedStateTests(unittest.TestCase):
     def test_verification_failed(self):
         self.assertEqual(self.state(T["Vfail"]), "Verification failed")
         self.assertIn("Then clause fails", self.rows[T["Vfail"]]["unverified"])
+
+    def test_not_observed_is_a_failed_verification_that_says_nobody_looked(self):
+        row = self.rows[T["Nobs"]]
+        self.assertEqual(row["state"], "Verification failed")  # still not verified, still counted there
+        self.assertFalse(row["counts_as_verified"])
+        self.assertEqual(row["not_observed"], "prototype run: open the chart and look at the bars")
+        self.assertNotIn("not_observed", self.rows[T["Vfail"]])  # a real failure is not one
+
+    def test_deferred_to_a_later_epic_names_where_it_came_from(self):
+        row = self.rows[T["Wsucc"]]
+        self.assertEqual((row["state"], row["epic"]), ("Planned", "E3aaaaa"))
+        self.assertEqual(row["deferred_from"], ["E1aaaaa"])
+        self.assertNotIn("deferred_from", self.rows[T["Plan"]])
+        self.assertNotIn("deferred_from", self.rows[T["Waiv"]])  # no epic lists it: that is Waived, with waived_to
 
     def test_legacy_unfingerprinted_counts_as_verified(self):
         row = self.rows[T["Legcy"]]

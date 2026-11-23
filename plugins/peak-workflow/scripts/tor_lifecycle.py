@@ -537,6 +537,8 @@ class Sidecar:
 
 SIDECAR_SCALARS = ("status", "owner", "implemented", "completed", "handoff", "reverified")
 SIDECAR_BLOCKS = ("verified", "unverified")
+# An `unverified:` line that records a look nobody gave: "YYYY-MM-DD NOT OBSERVED — <what a person must still do>".
+NOT_OBSERVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\s+NOT OBSERVED\b\s*[—–-]*\s*(.*)$", re.S)
 KEY_LINE = re.compile(r"^([A-Za-z_][\w-]*):\s*(.*?)\s*$")
 BLOCK_LINE = re.compile(r"^\s+(TOR-\d{2}-[A-Za-z0-9]{7}):\s*(.*?)\s*$")
 WAIVED_ITEM = re.compile(r"^(TOR-\d{2}-[A-Za-z0-9]{7})\s*(?:→|->)\s*(\S+)$")
@@ -849,6 +851,8 @@ def requirement_state(project: Project, tor: str) -> dict:
     else:
         best = max(owners, key=lambda s: STATUS_ORDER.get(s.status, -1))
         row["epic"] = best.epic
+        if waivers:  # an earlier epic left it for this one
+            row["deferred_from"] = sorted(s.epic for s in waivers)
         complete = [s for s in owners if s.status == "Complete"]
         if complete:
             failed = [s for s in complete if tor in s.unverified]
@@ -856,6 +860,10 @@ def requirement_state(project: Project, tor: str) -> dict:
             if failed:
                 state, row["epic"] = "Verification failed", failed[0].epic
                 row["unverified"] = failed[0].unverified[tor]
+                # Recorded as "nobody looked", not as "it is wrong" (a requirement only a person can observe,
+                # merged without the look): there is no code to fix, only a look to give.
+                if (nobody := NOT_OBSERVED_RE.match(row["unverified"])) is not None:
+                    row["not_observed"] = nobody.group(1).strip()
             elif saved is None:
                 state = "Verified (legacy, unfingerprinted)"
             else:

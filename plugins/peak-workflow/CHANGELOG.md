@@ -26,6 +26,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot honours the owner's own "Defer"** — in any run, a requirement the owner answered
   "Defer" to passes the build and merge checks as left for the later epic, and the final
   check's same question is answered from it.
+- **`status` "Left for Later" panel** — one list of what earlier work knowingly left undone,
+  read from the project's files: requirements nobody has seen working and requirements left for
+  a later epic, each with its one next step. `states` rows gain `not_observed` and
+  `deferred_from`.
 - **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
   final check without stopping for the owner; its pictures are listed for review afterwards.
   A requirement a person must observe still stops.

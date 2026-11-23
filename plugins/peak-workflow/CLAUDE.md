@@ -23,7 +23,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `start-epic` | Implement an epic — TOR-driven plan + tasks + verification; settles superseded or retired anchors; owner-approved in-epic amendment (supersede) |
 | `wrapup-epic` | Independent TOR verification, complete, ship; owner-approved amend or record-as-pending at Step 1.4b; `reverify` mode re-checks a Complete epic's stale requirements |
 | `pause` | Save progress mid-epic |
-| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Requirements Health (findings A–F, Disputed) |
+| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Left for Later (what was knowingly left undone, each with its one next step), Requirements Health (findings A–F, Disputed) |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
