@@ -469,6 +469,20 @@ export function resumePhase(workspace, g, phase) {
   return /^fix-/.test(last?.name ?? '') && rec.fixBrief ? 'FIX_BUILD' : 'BUILD';
 }
 
+/**
+ * Where a "not proven" note is filed: under the requirement it is about, under the epic, or not at all (`skip`) when
+ * it is about a requirement already listed in its own right (a look nobody gave, a deferral). A note that opens with
+ * a requirement is about that one, whatever else it mentions in passing (seen live: a note about a phone check that
+ * cited an automated test was filed under the test).
+ */
+export function noteSubject(text, { anchors, listed }) {
+  const named = (String(text).match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? []).filter((t) => anchors.includes(t));
+  const subject = (String(text).match(/^\W*(TOR-\d{2}-[A-Za-z0-9]{7})/) ?? [])[1];
+  if (subject && anchors.includes(subject)) return listed(subject) ? { skip: true } : { about: subject };
+  if (named.length && named.every(listed)) return { skip: true };
+  return { about: named.find((t) => !listed(t)) ?? 'epic' };
+}
+
 // ---- the owner's usage limit ---------------------------------------------------------------------
 
 /**
@@ -2247,6 +2261,12 @@ class Run {
   }
 
   async doBuild(e, fix) {
+    // A session builds on the code as it will land: a branch behind the integration line is brought up to date first,
+    // and one that no longer merges cleanly is parked before a session is spent on it.
+    const caught = e.caughtUp ?? null;
+    const stuck = this.catchUp(e, fix ? 'the repair' : 'the build');
+    if (stuck) return this.parkResumable(e, stuck, fix ? 'FIX_BUILD' : 'BUILD');
+    if ((e.caughtUp ?? null) !== caught) { e.resumeSession = null; this.save(); } // the branch now holds other epics' work: a session that remembers the old branch is not resumed
     const brief = path.join(this.epicDir(e), 'fix-brief.md');
     const continuing = !!e.continuing; // set by `enter` when this session takes over one that was cut short
     const s = await this.step(e, fix ? 'fix' : 'build', (stepDir) => {
@@ -2637,21 +2657,23 @@ class Run {
    * epics merged; wrapup-epic refreshes the shared docs on the branch, and from an old copy of
    * them that refresh conflicts at the merge. Caught up first, it is written on top of what the
    * earlier epics left, and the verifier checks the code as it will land. Returns a reason when
-   * the two do not merge cleanly: a person resolves that.
+   * the two do not merge cleanly: a person resolves that. Also before a build or repair session
+   * on an existing branch (`when`): seen live, a build resumed 13 commits behind changed the same
+   * files the other epics had, and only this check before verify found it, after the build.
    */
-  catchUp(e) {
+  catchUp(e, when = 'verify') {
     const m = this.meta(e); const dev = this.state.integration; const b = m.branch;
     if (!this.branchTip(b) || gitOk(this.clone, 'merge-base', '--is-ancestor', dev, b)) return null;
     if (this.currentBranch() !== b) { if (this.dirty()) return `the clone has uncommitted changes, so ${b} could not be brought up to date with ${dev}`; this.g('checkout', '-q', b); }
     const from = this.branchTip(b);
-    const r = gitRun(this.clone, 'merge', '--no-ff', '--no-edit', '-m', `Merge ${dev} into ${b} (autopilot: catch up before verify)`, dev);
+    const r = gitRun(this.clone, 'merge', '--no-ff', '--no-edit', '-m', `Merge ${dev} into ${b} (autopilot: catch up before ${when})`, dev);
     if (r.code !== 0) {
       const files = gitRun(this.clone, 'diff', '--name-only', '--diff-filter=U').out.split('\n').filter(Boolean);
       gitRun(this.clone, 'merge', '--abort');
       return `${b} does not merge cleanly with ${dev} (${files.join(', ') || r.err.split('\n')[0]}): both changed the same lines, and autopilot cannot settle that itself yet`;
     }
     e.caughtUp = { from, to: this.branchTip(b), integration: this.integrationSha() };
-    this.log(`${e.id}: ${b} brought up to date with ${dev} before verify (${from.slice(0, 9)} → ${e.caughtUp.to.slice(0, 9)})`);
+    this.log(`${e.id}: ${b} brought up to date with ${dev} before ${when} (${from.slice(0, 9)} → ${e.caughtUp.to.slice(0, 9)})`);
     return null;
   }
 
@@ -2943,9 +2965,9 @@ class Run {
       const who = { reviewer: 'the reviewer', verifier: 'the final check', autopilot: 'autopilot' };
       let wrote = 0;
       for (const u of items) {
-        const named = (String(u.text).match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? []).filter((t) => all.includes(t));
-        if (named.length && named.every(listed)) continue; // only about a look nobody gave or a deferral: already on the list as that
-        const about = named.find((t) => !listed(t)) ?? 'epic';
+        const where = noteSubject(u.text, { anchors: all, listed });
+        if (where.skip) continue; // about a look nobody gave or a deferral: already on the list as that
+        const about = where.about;
         const r = torLifecycle(this.pluginDir, this.clone, 'mark', e.id, '--unconfirmed', about, `${who[u.source] ?? 'the final check'}: ${String(u.text).replace(/\s+/g, ' ').trim()}`);
         if (r.code === 0) wrote += 1; else this.log(`${e.id}: a "not proven" note could not be written into the project (${(r.err || r.out).split('\n')[0]})`);
       }

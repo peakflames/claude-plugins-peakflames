@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -731,6 +731,34 @@ test('not proven for real: a reviewer finding that never parks and the verifier\
   // The wording the parser accepts, and what it leaves alone.
   assert.deepEqual(unprovenLines('All good.\n- Not run - the soak test\n### Not proven for real\n1. Windows paths\n\n## Next\n- Not this\n'), ['the soak test', 'Windows paths']);
   assert.deepEqual(unprovenLines('Verdict: PASS. Everything ran.'), []);
+});
+
+test('unprovenLines keeps a point\'s sub-points with it, and noteSubject files a note under the requirement it is about (Pilot Light GIbz5Hu, 2026-11-23)', () => {
+  // The final check's own words: one point about a requirement, everything else nested under it. Seen live: each line was
+  // written into the status file as a note of its own ("What it was checked against instead:" alone).
+  const live = ['## Not proven for real',
+    '- **TOR-06-SDvIvsm — the Run screen is readable on a phone.** Recorded as `unverified: NOT OBSERVED`, not as a pass.',
+    '  - **What a person must still do:** follow `tests/manual/TOR-06-SDvIvsm.md` on a phone on the same network.',
+    '  - **What it was checked against instead:**',
+    '    - the checklist matches the requirement;',
+    '    - the automated 320 px test (TOR-06-eiZECdC) passes;',
+    '    - the 320 px screenshots below look readable.',
+    "  - **Commands when you're back:** start the app with `HOST=0.0.0.0 bun run start -- samples/ledger`.",
+    '', '## What the pictures show', '- **run.png:** the run'].join('\n');
+  const lines = unprovenLines(live);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /^TOR-06-SDvIvsm — the Run screen is readable on a phone\. Recorded as .* What a person must still do: follow .* What it was checked against instead: the checklist matches the requirement; the automated 320 px test \(TOR-06-eiZECdC\) passes; the 320 px screenshots below look readable\. Commands when you're back: start the app with/);
+  assert.deepEqual(unprovenLines('### Not proven for real\n- First\n  - its detail\n- Second\n'), ['First its detail', 'Second']);
+
+  // Filed by its subject: a note that opens with a requirement already listed as not observed is not filed again,
+  // even when it mentions another requirement in passing; one with no subject goes under the epic.
+  const anchors = ['TOR-06-SDvIvsm', 'TOR-06-eiZECdC', 'TOR-06-Rsi8KUv'];
+  const listed = (t) => t === 'TOR-06-SDvIvsm';
+  assert.deepEqual(noteSubject(lines[0], { anchors, listed }), { skip: true });
+  assert.deepEqual(noteSubject('TOR-06-Rsi8KUv: checked against the fake clock only', { anchors, listed }), { about: 'TOR-06-Rsi8KUv' });
+  assert.deepEqual(noteSubject('The cost lookup: checked against the fake only (see TOR-06-Rsi8KUv)', { anchors, listed }), { about: 'TOR-06-Rsi8KUv' }, 'no subject: the first requirement it names, as before');
+  assert.deepEqual(noteSubject('Windows paths', { anchors, listed }), { about: 'epic' });
+  assert.deepEqual(noteSubject('See TOR-06-SDvIvsm on a phone', { anchors, listed }), { skip: true }, 'names only listed requirements');
 });
 
 // ---- the run's own config.json (issue #41 B4) -----------------------------------------------------
