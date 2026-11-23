@@ -1085,6 +1085,7 @@
       "low": 1
     }
   },
+  "chain": null,
   "workInProject": null,
   "fetch": "git fetch \"<workspace>/clone\" develop:autopilot/develop && git log develop..autopilot/develop",
   "next": [

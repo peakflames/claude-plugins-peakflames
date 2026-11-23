@@ -242,6 +242,11 @@ test('continue: a budget stop is resumed on the standing answer, twice per epic;
   const relaunch = async (s) => { confirmRun(p, s.relaunch.config, s.relaunch.run); const before = p.calls().length; await p.go({ run: s.relaunch.run }); return p.steps().slice(before); };
   assert.deepEqual(await relaunch(s2), [`${E1.id}/build-1`], 'the build is continued; nothing is planned again');
   assert.equal(readJson(path.join(p.runDir(), 'config.json')).continues, run1);
+  // The run's own spend and the chain's, in one sentence, so the report and `status` never seem to disagree.
+  const md2 = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
+  assert.match(md2, /and spent \$1\.00 in this run; with the 1 run before it, \$2\.40 of the \$80 budget is spent\./);
+  assert.match(md2, /Spent \$1\.00 in this run; \$2\.40 of \$80 across this run and the 1 before it\./);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /limits: run budget \$78\.60 left of \$80 \(the 1 earlier run of this chain spent \$1\.40\)/);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /decided "Resume from where it stopped" by Pat Owner on \d{4}-\d{2}-\d{2} \(decided by autopilot on their standing answer for technical stops, given at launch; nobody was asked again\)/);
 
   // Stopped the same way again: the second and last standing answer.

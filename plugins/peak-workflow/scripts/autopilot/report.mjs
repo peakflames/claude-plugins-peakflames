@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { RULES, atLimitAsk } from './attend.mjs';
+import { RULES, atLimitAsk, chainOf } from './attend.mjs';
 import { gateEntry } from './lib.mjs';
 
 const TERMINAL = new Set(['MERGED', 'PARKED', 'FAILED', 'SKIPPED', 'BLOCKED']);
@@ -115,6 +115,9 @@ export function collectReport(runDir) {
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, setupFailed: s.setupFailed ?? null,
     realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, mode: s.mode === 'prototype' ? 'prototype' : 'full', driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, leftovers: s.leftovers ?? [], stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
+  // Runs chained by `continues` share one budget: what they spent together, so the report and `status` agree.
+  const chain = chainOf(workspace, runName);
+  report.chain = chain.runs.length > 1 ? { before: chain.runs.length - 1, spentUsd: +(chain.spentBefore + report.spentUsd).toFixed(2), budgetUsd: chain.runBudgetUsd } : null;
   // Is the clone's integration tip already in the project? (null: cannot tell — no project, no clone.) Read-only.
   const git = (cwd, ...args) => { try { return spawnSync('git', args, { cwd, encoding: 'utf8' }); } catch { return { status: 1, stdout: '' }; } };
   const cloneTip = fs.existsSync(clone) ? (git(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${s.integration}`).stdout ?? '').trim() : '';
@@ -150,8 +153,9 @@ function tldr(r) {
   else if (r.baseRed?.couldNotRun) T.push(`Nothing was built, because the test command could not be run in autopilot's private copy (\`${r.testCommand}\`: ${lastLine(r.baseRed.tail) || `exit ${r.baseRed.exit}`}). The tests never ran; this is a missing tool or setup step, not a failing test.`);
   else if (r.baseRed) T.push(`Nothing was built, because your project's own tests were already failing before autopilot started.`);
   else if (r.stoppedOnPark) T.push(r.stoppedOnPark.from === 'project' ? 'The run ended early on purpose: this project is set to stop at the first epic that needs you.' : 'The run ended early on purpose: while you are there to answer it stops at the first epic that needs you, so nothing else is built on a guess.');
+  else if (/^usage limit: /.test(r.stoppedBecause ?? '')) T.push(`The run ended early: ${r.stoppedBecause.replace(/^usage limit: /, '')}. Run \`/peak-workflow:autopilot\` once it has reset to carry on.`);
   else if (r.stoppedBecause && !['queue done', 'nothing runnable'].includes(r.stoppedBecause)) T.push(`The run ended early: ${r.stoppedBecause}.`);
-  T.push(`It ran from ${stamp(r.run)} to ${r.ended ? stamp(r.ended) : '(still running)'} and spent ${usd(r.spentUsd)}${r.budgetUsd == null ? '' : ` of a $${r.budgetUsd} limit`}.`);
+  T.push(`It ran from ${stamp(r.run)} to ${r.ended ? stamp(r.ended) : '(still running)'} and spent ${usd(r.spentUsd)}${r.chain ? ` in this run; with the ${plural(r.chain.before, 'run')} before it, ${usd(r.chain.spentUsd)}${r.chain.budgetUsd == null ? '' : ` of the $${r.chain.budgetUsd} budget`} is spent` : r.budgetUsd == null ? '' : ` of a $${r.budgetUsd} limit`}.`);
   T.push(r.next.length ? `What to do: follow "Do this next" below, from the top. It has ${plural(r.next.length, 'step')}.` : 'Nothing needs you.');
   return T;
 }
@@ -273,7 +277,7 @@ export function renderReport(r) {
   L.push('', 'New to this report? "Words used in this report", at the end, explains every term.');
   L.push('', '## Where things are');
   L.push(`Workspace: ${r.workspace} — run ${r.name}. Paths below are relative to the workspace.`);
-  L.push(`Integration line: ${r.integration} in ${r.clone} (not pushed). Spent ${usd(r.spentUsd)}${r.budgetUsd == null ? '' : ` of $${r.budgetUsd}`}.`);
+  L.push(`Integration line: ${r.integration} in ${r.clone} (not pushed). Spent ${usd(r.spentUsd)}${r.chain ? ` in this run; ${usd(r.chain.spentUsd)}${r.chain.budgetUsd == null ? '' : ` of $${r.chain.budgetUsd}`} across this run and the ${r.chain.before} before it` : r.budgetUsd == null ? '' : ` of $${r.budgetUsd}`}.`);
 
   if (r.sync?.state === 'project-ahead') L.push(`At the start the clone's ${r.integration} was fast-forwarded to the project's (${String(r.sync.cloneTip).slice(0, 9)} → ${String(r.sync.projectTip).slice(0, 9)}).`);
   if (r.sync?.state === 'clone-ahead') L.push(`At the start the clone was ahead of the project by work not fetched yet; this run built on top of it: ${r.sync.waiting.join('; ')}.`);

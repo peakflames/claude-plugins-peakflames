@@ -11,6 +11,8 @@ const tryJson = (p, fallback = null) => { try { return JSON.parse(fs.readFileSyn
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 const usd = (n) => `$${Number(n ?? 0).toFixed(2)}`;
+/** A clock time, with the day when it is not today. */
+const clock = (iso) => { const d = new Date(iso); const t = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); return d.toDateString() === new Date().toDateString() ? t : `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${t}`; };
 const took = (minutes) => (minutes >= 1 ? `${Math.round(minutes)} min` : 'under a minute');
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const oneLine = (s, max = 300) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > max ? `${t.slice(0, max - 1)}…` : t; };
@@ -40,6 +42,7 @@ const CHECK_WORDS = {
 export function plainReason(reason) {
   const r = String(reason ?? '');
   const table = [
+    [/^usage limit/, 'your Claude usage limit was reached'],
     [/STOP file/, 'you asked it to stop'],
     [/run stopped \(end time\)/, 'the run reached its end time'],
     [/run stopped \(run budget\)/, 'the run reached its spending limit'],
@@ -150,9 +153,12 @@ export function eventLine(ev) {
       if (ev.outcome === 'ok' && ev.asked) return `${done} stopped to ask you something after ${took(ev.minutes)}${cost}`;
       if (ev.outcome === 'ok') return `${done} finished in ${took(ev.minutes)}${cost}${NEXT[ev.kind] ? `. Next: ${NEXT[ev.kind]}` : ''}`;
       if (ev.outcome === 'stopped') return `${done} stopped, as you asked, after ${took(ev.minutes)}${cost}`;
+      if (ev.outcome === 'limit') return `${done} stopped after ${took(ev.minutes)}${cost}: your usage limit was reached`;
       if (ev.outcome === 'budget') return `${done} stopped at its ${/wall clock/.test(ev.why ?? '') ? 'time' : /disk|growth/.test(ev.why ?? '') ? 'disk' : 'spending'} limit after ${took(ev.minutes)}${cost}`;
       return `${done} stopped on a technical error after ${took(ev.minutes)}${cost}`;
     }
+    case 'limit-wait': return `Paused: your ${ev.words ? `${ev.words} ` : ''}usage limit was reached. ${ev.resets ? `It resets at ${clock(ev.resets)}; autopilot carries on then.` : `Autopilot tries again at ${clock(ev.until)}.`}`;
+    case 'limit-resume': return 'Your usage limit has reset; autopilot is carrying on.';
     case 'check': {
       const what = ev.name === 'verify' ? 'Final checks after the merge' : "Autopilot's checks on the build";
       if (ev.pass) return `${what} passed`;
@@ -262,6 +268,7 @@ const STATE_WORDS = { QUEUED: 'waiting its turn', PLAN: 'planning', BUILD: 'buil
 const sinceMin = (iso) => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
 /** What the driver is doing right now, from `state.json`: "building X, 12 min" — or null when nothing is in flight. */
 export function activity(state) {
+  if (state?.limitWait) return `waiting for your usage limit to reset (it carries on at ${clock(state.limitWait.until)})`;
   const q = (state?.queue ?? []).find((x) => x.step) ?? (state?.queue ?? []).find((x) => STATE_WORDS[x.state] && x.state !== 'QUEUED');
   if (!q) return null;
   const words = STATE_WORDS[q.state] ?? 'working on';
