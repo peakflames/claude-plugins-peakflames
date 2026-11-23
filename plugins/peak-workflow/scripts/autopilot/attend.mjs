@@ -160,7 +160,7 @@ export function eventLine(ev) {
     }
     case 'fix-round': return `${who} needs a repair: starting the one repair round`;
     case 'audit': return ev.parks ? `The independent reviewer found ${plural(ev.parks, 'serious problem')}` : ev.findings ? `The independent reviewer found ${plural(ev.findings, 'thing')} to note, none serious` : 'The independent reviewer found nothing';
-    case 'merged': return `Finished and merged: ${who} (${took(ev.minutes)}, ${usd(ev.costUsd)})${ev.unproven ? ` — ${plural(ev.unproven, 'thing')} not proven for real` : ''}`;
+    case 'merged': return `Finished and merged: ${who} (${took(ev.minutes)}, ${usd(ev.costUsd)})${ev.unproven ? ` — ${plural(ev.unproven, 'thing')} not proven for real` : ''}${ev.deferred ? ` — ${plural(ev.deferred, 'requirement')} left for a later epic` : ''}`;
     case 'parked':
       if (ev.question && ev.kind !== 'resume') return `Waiting for you: ${who} — ${oneLine(ev.question)}`;
       return `Stopped: ${who} — ${plainReason(ev.reason)}`;

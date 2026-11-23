@@ -62,5 +62,92 @@ class UpholdProjectTests(unittest.TestCase):
         self.assertIn("pending (closed by CR-Uph0001)", self.repo.cli("search", "fixture").stdout)
 
 
+
+
+
+class PrototypeCorrectionTests(unittest.TestCase):
+    """A correction an autopilot prototype run took on a session's proposal: recorded as such, listed
+    as not approved until the owner keeps it (an `uphold` naming the record) or changes it."""
+    OLD = "TOR-01-Oldone1"
+
+    def setUp(self):
+        self.repo = repo = FixtureRepo()
+        self.addCleanup(repo.cleanup)
+        repo.feature("01", "core", [S1, S2])
+        repo.sidecar("E1aaaaa", "Complete", [A1, A2], verified={A1: S1.fp(), A2: S2.fp()})
+        repo.record("supersede", "Proto01", "2026-11-23", tors=[self.OLD], approved_via="epic-branch",
+                    approved_by="autopilot (prototype run)",
+                    changes=[{"tor": self.OLD, "feature_file": "01-core.feature.md", "fingerprint": "a" * 12,
+                              "successors": [A1], "text": f"Scenario: [{self.OLD}] The tool shall walk"}])
+        repo.commit("a prototype run corrected a requirement")
+
+    def keep(self, tors, refs=("CR-Proto01",)):
+        data = record_data("uphold", "Keep001", "2026-11-24", tors=tors, refs=list(refs), title="The correction stays",
+                           reason="The owner read the corrected requirement and kept it.", keywords=["run"],
+                           approved_via="docs-branch", approved_by="Pat Owner",
+                           changes=[{"tor": t, "feature_file": "01-core.feature.md",
+                                     "fingerprint": {A1: S1.fp(), A2: S2.fp()}[t]} for t in tors])
+        return self.repo.write("docs/requirements/changes/2026-11-24-Keep001.toml", to_toml(data))
+
+    def test_the_record_is_valid_and_the_requirement_is_listed_as_not_approved(self):
+        self.assertEqual(self.repo.cli("validate").returncode, 0)
+        row = self.repo.states()[A1]
+        self.assertEqual(row["state"], "Verified")  # verified as it now reads; whether it should read so is the owner's
+        self.assertEqual(row["unapproved_change"], {"record": "CR-Proto01", "date": "2026-11-23", "replaces": [self.OLD]})
+        self.assertNotIn("unapproved_change", self.repo.states()[A2])
+
+    def test_keeping_it_is_an_uphold_that_names_the_record(self):
+        path = self.keep([A1])
+        result = self.repo.cli("validate", str(path))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("unapproved_change", self.repo.states()[A1])
+
+    def test_an_uphold_for_another_requirement_does_not_approve_it(self):
+        path = self.keep([A2])
+        self.assertNotEqual(self.repo.cli("validate", str(path)).returncode, 0)
+        self.assertIn("unapproved_change", self.repo.states()[A1])
+
+    def test_a_person_approved_correction_is_never_listed(self):
+        self.repo.record("supersede", "Owner01", "2026-11-23", tors=["TOR-01-Oldtwo2"],
+                         changes=[{"tor": "TOR-01-Oldtwo2", "feature_file": "01-core.feature.md", "fingerprint": "b" * 12,
+                                   "successors": [A2], "text": "Scenario: [TOR-01-Oldtwo2] old"}])
+        self.assertNotIn("unapproved_change", self.repo.states()[A2])
+
+    def test_keep_writes_the_uphold_for_the_owner(self):
+        # Named by the requirement as it now reads, or by the one it replaced (what a run's question named).
+        for name in (A1, self.OLD):
+            repo = self.repo
+            result = repo.cli("keep", name, "--by", "Pat Owner", "--via", "epic-branch", "--today", "2026-11-24")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            path = result.stdout.strip().splitlines()[-1]
+            self.assertRegex(path, r"^docs/requirements/changes/2026-11-24-[A-Za-z0-9]{7}\.toml$")
+            self.assertEqual(repo.cli("validate").returncode, 0)
+            self.assertNotIn("unapproved_change", repo.states()[A1])
+            text = (repo.root / path).read_text(encoding="utf-8")
+            for part in ('kind = "uphold"', 'approved_by = "Pat Owner"', 'approved_via = "epic-branch"', "CR-Proto01", A1):
+                self.assertIn(part, text)
+            # Nothing left to keep: said plainly, nothing written.
+            again = repo.cli("keep", name, "--by", "Pat Owner")
+            self.assertEqual(again.returncode, 1)
+            self.assertIn("no correction", again.stderr + again.stdout)
+            (repo.root / path).unlink()
+
+    def test_keep_needs_a_name(self):
+        self.assertEqual(self.repo.cli("keep", A1, "--by", " ").returncode, 2)
+
+    def test_changing_it_yourself_clears_it_too(self):
+        self.repo.record("reword", "Mine001", "2026-11-25", approved_by="Pat Owner", changes=[
+            {"tor": A1, "from": "0" * 12, "to": S1.fp()}])
+        self.assertNotIn("unapproved_change", self.repo.states()[A1])
+
+    def test_an_uphold_by_nobody_keeps_nothing(self):
+        data = record_data("uphold", "Keep002", "2026-11-24", tors=[A1], refs=["CR-Proto01"], keywords=["run"],
+                           approved_by="autopilot (prototype run)",
+                           changes=[{"tor": A1, "feature_file": "01-core.feature.md", "fingerprint": S1.fp()}])
+        self.repo.write("docs/requirements/changes/2026-11-24-Keep002.toml", to_toml(data))
+        self.assertIn("unapproved_change", self.repo.states()[A1])
+        self.assertEqual(self.repo.cli("keep", A1, "--by", "autopilot (prototype run)").returncode, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -247,7 +247,11 @@ Rules:
      feature number — generate the 7-character suffix with `LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 7` and regenerate it while it is all digits or `git grep --untracked -q <suffix>` finds it anywhere (feature files and `docs/requirements/changes/` included) — and write its block in place of the old one. Generate the record's
      `CR-` suffix the same way. Read the old tracing entry's sources first (they become the
      record's `traced_to`). Write the `supersede` record with `approved_via = "epic-branch"`, `approved_by` =
-     `git config user.name`, `refs` = `["epic <id>"]` plus the open `pending` record's ID when
+     `git config user.name` — except when no person chose "Amend": the answer came from an
+     autopilot prototype run (the answer says so: "No person picked this just now"). Then the
+     record says so too, with `approved_by = "autopilot (prototype run)"` (exactly that text;
+     `approved_via` stays `"epic-branch"`), never a person's name; `/peak-workflow:status` lists the requirement as
+     not approved until the owner keeps or changes it. Either way, `refs` = `["epic <id>"]` plus the open `pending` record's ID when
      the requirement was Disputed (that resolves it), and the old `text` and `fingerprint` from
      `tor-lifecycle text <TOR> --rev <base-branch> --json`. Run `tor-lifecycle validate <record>`
      until it prints `ok`.

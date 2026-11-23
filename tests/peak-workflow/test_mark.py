@@ -1,4 +1,5 @@
 """`mark`: the one writer of verified:, unverified:, reverified:, and requirements: appends."""
+import json
 import unittest
 
 from fixtures import FixtureRepo, parse_tsv, scenario, tor_lifecycle as tl
@@ -41,6 +42,50 @@ class MarkTests(unittest.TestCase):
         self.assertEqual(sc.verified, {})
         self.assertEqual(sc.unverified, {A2: "2026-09-01 wrong exit code", A1: "2026-10-26 shows 10 rows, not 25"})
         self.assertEqual(sc.reverified, "—")
+
+    def test_unconfirmed_is_a_note_beside_the_verdict_and_confirmed_removes_it(self):
+        note = "the sample run was written by hand: a person should confirm that is acceptable"
+        self.assertEqual(self.mark("--pass", A1, "--unconfirmed", A1, f"  {note} ").returncode, 0)
+        sc = tl.parse_sidecar("cMpl001", self.read())
+        self.assertEqual(sc.verified, {A1: S1.fp()})  # the verdict stands; the note is beside it
+        self.assertEqual(sc.unconfirmed, {A1: f"2026-10-26 {note}"})
+        self.assertIn(f"unconfirmed-{A1}: 2026-10-26 {note}", self.read())  # one plain `key: value` line
+        self.assertEqual(self.repo.states()[A1]["unconfirmed"], f"2026-10-26 {note}")
+        self.assertNotIn("unconfirmed", self.repo.states()[A2])
+        # A second note for the same requirement is added to the first, not put in its place.
+        self.assertEqual(self.mark("--unconfirmed", A1, "also: the chart was not opened").returncode, 0)
+        self.assertEqual(tl.parse_sidecar("cMpl001", self.read()).unconfirmed[A1],
+                         f"2026-10-26 {note} | 2026-10-26 also: the chart was not opened")
+        result = self.mark("--confirmed", A1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(tl.parse_sidecar("cMpl001", self.read()).unconfirmed, {})
+        self.assertNotIn("unconfirmed", self.read())
+        self.assertEqual(tl.parse_sidecar("cMpl001", self.read()).verified, {A1: S1.fp()})
+
+    def test_a_note_that_names_no_requirement_is_the_epics(self):
+        self.assertEqual(self.mark("--unconfirmed", "epic", "the soak test was not run").returncode, 0)
+        self.assertIn("unconfirmed-epic: 2026-10-26 the soak test was not run", self.read())
+        out = json.loads(self.repo.cli("states", "--json").stdout)
+        self.assertEqual(out["unconfirmed_epics"], {"cMpl001": "2026-10-26 the soak test was not run"})
+        self.assertEqual(self.mark("--confirmed", "epic").returncode, 0)
+        self.assertNotIn("unconfirmed", self.read())
+
+    def test_two_notes_in_one_call_are_both_kept(self):
+        self.assertEqual(self.mark("--unconfirmed", "epic", "soak test not run", "--unconfirmed", "epic", "paid API was faked").returncode, 0)
+        self.assertIn("unconfirmed-epic: 2026-10-26 soak test not run | 2026-10-26 paid API was faked", self.read())
+
+    def test_a_note_outlives_its_requirement_and_can_still_be_confirmed(self):
+        self.assertEqual(self.mark("--unconfirmed", A2, "written by hand").returncode, 0)
+        self.repo.feature("01", "core", [S1, S3, SN])  # A2 is gone from the feature file
+        out = json.loads(self.repo.cli("states", "--json").stdout)
+        self.assertEqual(out["unconfirmed_epics"], {"cMpl001": f"(about {A2}, since replaced or retired) 2026-10-26 written by hand"})
+        self.assertEqual(self.mark("--confirmed", A2).returncode, 0)
+        self.assertNotIn("unconfirmed", self.read())
+
+    def test_unconfirmed_needs_an_owned_requirement_and_words(self):
+        self.assertEqual(self.mark("--unconfirmed", NEW, "x").returncode, 2)
+        self.assertEqual(self.mark("--unconfirmed", A1, "  ").returncode, 2)
+        self.assertEqual(self.mark("--confirmed", A2).returncode, 2)  # nothing to confirm
 
     def test_append_successor_then_pass_it(self):
         self.assertEqual(self.mark("--append", NEW, "--pass", NEW).returncode, 0)

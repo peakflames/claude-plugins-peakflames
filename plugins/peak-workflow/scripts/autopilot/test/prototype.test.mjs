@@ -19,6 +19,8 @@ const check = (p, id, name) => readJson(p.dir(id, name));
 const sidecar = (p, e) => parseSidecar(git(p.clone, 'show', `develop:docs/implementation-plan/status/epic-${e.id}.md`));
 const appended = (call) => call.argv.filter((a, i) => call.argv[i - 1] === '--append-system-prompt-file').map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 
+/** What the change record of an amendment nobody approved says (the hook tells the session to write it so). */
+const PROTO_RECORD = '# change record\napproved_via = "epic-branch"\napproved_by = "autopilot (prototype run)"\n';
 const DEFERRAL = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
 const deferQ = (tor, rec = 'Defer — the export screen is built by a later epic') => `${tor} cannot be fully met: it needs the export screen. Recommendation: ${rec}. How to proceed?`;
 const amendQ = (tor) => `${tor} — The tool shall import every row looks wrong: the sample data has a header row. Proposed: same title / Then: "rows after the header are imported". How to proceed?`;
@@ -129,7 +131,7 @@ test('prototype: the planner\'s proposed correction is taken; the gate is record
   p.scenario({
     [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result },
     // The builder meets the same requirement and asks again: the same answer, not a second decision.
-    [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, ask(amendQ(tor), AMEND(tor)), ...build.slice(1), { do: 'exec', cmd: "printf '\\n# amended in the epic\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: '# change record\n' }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] },
+    [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, ask(amendQ(tor), AMEND(tor)), ...build.slice(1), { do: 'exec', cmd: "printf '\\n# amended in the epic\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: PROTO_RECORD }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] },
     [`${E1.id}/verify`]: wrapupScript(E1),
   });
   const s = await p.go();
@@ -144,6 +146,8 @@ test('prototype: the planner\'s proposed correction is taken; the gate is record
   const scope = check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'scope');
   assert.equal(scope.pass, true, JSON.stringify(scope));
   assert.match(scope.evidence, /requirement files changed under the amendment this prototype run took, not yet seen by the owner, of /);
+  assert.equal(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').pass, true);
+  assert.match(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.permissionDecisionReason, /approved_by = "autopilot \(prototype run\)"/);
   assert.deepEqual(q.amendedUnseen, [tor]);
   assert.equal(q.state, 'MERGED', q.reason);
   assert.equal(q.prototype.length, 1);
@@ -359,7 +363,7 @@ test('full run after a prototype run: a deferral the prototype run took is asked
 
 test('full run after a prototype run: an amendment the prototype run took is asked again before anything runs; the owner\'s "Amend" makes it theirs, "Implement as written" sends it back and the change is out of scope', async (t) => {
   const tor = E1.tors[0];
-  const amending = () => ({ actions: [...buildActions(E1, { commit: false }), { do: 'exec', cmd: "printf '\\n# amended in the epic\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: '# change record\n' }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] });
+  const amending = () => ({ actions: [...buildActions(E1, { commit: false }), { do: 'exec', cmd: "printf '\\n# amended in the epic\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: PROTO_RECORD }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] });
   const start = () => protoThenFull(t, () => ({ [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result }, [`${E1.id}/build`]: amending() }));
 
   const { p } = await start();
@@ -440,4 +444,19 @@ test('full run: a deferral the owner answers "Defer" to goes through the build c
   const s2 = await p2.go({ queue: [E1.id] });
   assert.equal(s2.queue[0].state, 'PARKED');
   assert.match(s2.queue[0].reason, /CHECK_BUILD: the handoff records 2 deferral\(s\): a human decision/);
+});
+
+test('prototype: an amendment whose change record names a person as approver does not pass the build check', async (t) => {
+  const p = makeProject(t, PROTO);
+  const tor = E1.tors[0];
+  const build = buildActions(E1, { commit: false });
+  p.scenario({
+    [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result },
+    [`${E1.id}/build`]: { actions: [...build, { do: 'exec', cmd: "printf '\\n# amended\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: '# change record\napproved_via = "epic-branch"\napproved_by = "Pat Owner"\n' }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] },
+    [`${E1.id}/fix`]: { actions: [{ do: 'exec', cmd: 'true' }] },
+  });
+  const s = await p.go();
+  assert.equal(s.queue[0].state, 'PARKED');
+  assert.match(s.queue[0].reason, /CHECK_BUILD still fails after the fix round \(.*amendment-record/);
+  assert.match(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').evidence, /must say approved_by = "autopilot \(prototype run\)"/);
 });

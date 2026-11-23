@@ -23,7 +23,7 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `start-epic` | Implement an epic — TOR-driven plan + tasks + verification; settles superseded or retired anchors; owner-approved in-epic amendment (supersede) |
 | `wrapup-epic` | Independent TOR verification, complete, ship; owner-approved amend or record-as-pending at Step 1.4b; `reverify` mode re-checks a Complete epic's stale requirements |
 | `pause` | Save progress mid-epic |
-| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Requirements Health (findings A–F, Disputed) |
+| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Left for Later (what was knowingly left undone, each with its one next step), Requirements Health (findings A–F, Disputed) |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
@@ -43,7 +43,9 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
 **Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup.
-Removal epics add `retires: CR-…`. `verified:` (TOR → fingerprint), `unverified:` (TOR → date and
+Removal epics add `retires: CR-…`. `unconfirmed-<TOR>:` / `unconfirmed-epic:` lines (a dated
+note of what a person should still confirm about work that passed) are written and removed only
+by `tor-lifecycle mark --unconfirmed` / `--confirmed`. `verified:` (TOR → fingerprint), `unverified:` (TOR → date and
 reason), and `reverified:` are written only by `tor-lifecycle mark`. A Complete sidecar's `status:`
 never changes and its `requirements:` is append-only — except deleting or correcting a non-ID
 entry that `check` reports as finding C, by hand on a `docs/` branch (`mark` refuses a sidecar
@@ -55,6 +57,16 @@ lifecycle decision — `reword` (same meaning, test evidence), `supersede` (new 
 live only in the feature file (tracing sidecars and specs carry IDs). Requirement states (Verified,
 Verified (reworded), Changed since verified, Verification failed, Disputed, …) are derived by
 `tor-lifecycle states`, never stored
+
+**Left for later, in one place:** whatever work knowingly leaves undone is written into the
+project's own files, never only into a run's report, and `status` is the single list of it
+(Left for Later): a correction nobody approved (a `supersede` record whose `approved_by` is
+`autopilot (prototype run)`, never a person, cleared by an `uphold` that names it — `tor-lifecycle keep` — or by changing
+the requirement), a look nobody gave (`unverified: … NOT OBSERVED — …`), a requirement left for
+a later epic (`waived:`), a test still skipped (`Deferred: <TOR>`), and a note to confirm
+(`unconfirmed-…:`). Each entry names the one existing skill that clears it
+(`capture-requirements <TOR>`, `wrapup-epic <id> reverify`, `start-epic`, `quick-fix`); no skill
+exists only to walk the list, and an entry leaves it when the files say it is done.
 
 **Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
 ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by

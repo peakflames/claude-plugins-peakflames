@@ -26,6 +26,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot honours the owner's own "Defer"** — in any run, a requirement the owner answered
   "Defer" to passes the build and merge checks as left for the later epic, and the final
   check's same question is answered from it.
+- **`status` "Left for Later" panel** — one list of what earlier work knowingly left undone,
+  read from the project's files, each with its one next step: unapproved corrections, looks
+  nobody gave, requirements left for a later epic, tests still skipped, and notes a person
+  should confirm.
+- **Corrections nobody approved are recorded as such** — an autopilot prototype amendment's
+  change record names `autopilot (prototype run)` as approver, never a person. `capture-requirements <TOR>` asks the
+  owner to keep or change it; `tor-lifecycle keep` writes the approval.
+- **"Not proven" notes are kept in the project** — after a merge, autopilot writes each
+  reviewer or final-check note into the epic's status file (`unconfirmed-…:`).
+  `wrapup-epic <id> reverify` shows them to a person and records the answer.
 - **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
   final check without stopping for the owner; its pictures are listed for review afterwards.
   A requirement a person must observe still stops.
