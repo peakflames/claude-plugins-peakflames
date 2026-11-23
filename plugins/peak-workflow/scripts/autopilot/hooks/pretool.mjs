@@ -158,10 +158,43 @@ function visibleWrites(s, ctx = null) {
   return [...bashWriteTargets([s]), ...more].filter((t) => t && !t.includes('://') && !t.startsWith('/dev/') && !t.startsWith('&'));
 }
 
+/**
+ * The variables a command assigns, read the way the shell reads them: a `NAME=value` word at the start of a simple
+ * command (alone, before a command, or after `export`/`local`/`declare`/`readonly`/`typeset`), outside quotes. The same
+ * text inside quotes or as a later argument (`echo "scratch=$X"`, `--filename=…`, a line of `python3 -c "…"`) assigns
+ * nothing. Best effort, like the rest of this parsing: a heredoc's body is read as commands.
+ */
+export function shellAssignments(command) {
+  const out = []; const n = command.length; let i = 0; let atStart = true;
+  const SEP = /[\s;&|()\n`]/;
+  const skipWord = (j) => {
+    while (j < n && !SEP.test(command[j])) {
+      if (command[j] === "'") { const k = command.indexOf("'", j + 1); j = k === -1 ? n : k + 1; }
+      else if (command[j] === '"') { let k = j + 1; while (k < n && command[k] !== '"') k += command[k] === '\\' ? 2 : 1; j = k + 1; }
+      else if (command[j] === '\\') j += 2;
+      else j++;
+    }
+    return j;
+  };
+  while (i < n) {
+    const ch = command[i];
+    if (ch === '$' && command[i + 1] === '(') { atStart = true; i += 2; continue; }
+    if (/[;&|(\n`]/.test(ch)) { atStart = true; i++; continue; }
+    if (ch === ')') { i++; continue; }
+    if (/\s/.test(ch)) { i++; continue; }
+    const m = atStart ? /^(?:(?:export|local|declare|readonly|typeset)(?:\s+-\w+)*\s+)?([A-Za-z_]\w*)=/.exec(command.slice(i)) : null;
+    if (m) { const from = i + m[0].length; i = skipWord(from); out.push({ name: m[1], value: command.slice(from, i) }); continue; } // more may follow
+    i = skipWord(i);
+    atStart = false;
+  }
+  return out;
+}
+
 function ruleR2Bash(base, segs, command) {
   if (/\$\{?AUTOPILOT_(STATE|RUN|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot workspace');
   // The scratch folder is inside the workspace: its name is used as it is, never cut down (`${AUTOPILOT_SCRATCH%/scratch}`) or copied into another name, which would lead back into the workspace unseen.
-  if (/\$\{[#!]?AUTOPILOT_SCRATCH[^}]/.test(command) || /[A-Za-z_]\w*=["']?[^\s;&|]*\$\{?AUTOPILOT_SCRATCH\b/.test(command)) return deny('R2', 'path jail — use "$AUTOPILOT_SCRATCH" as it is: a command may not cut it down or copy it into another variable');
+  // Seen live: 11 of 18 refusals were the name printed (`echo "scratch=$AUTOPILOT_SCRATCH"`), an option or quoted code; only a real assignment is a copy.
+  if (/\$\{[#!]?AUTOPILOT_SCRATCH[^}]/.test(command) || shellAssignments(command).some((a) => /\$\{?AUTOPILOT_SCRATCH\b/.test(a.value))) return deny('R2', 'path jail — use "$AUTOPILOT_SCRATCH" as it is: do not copy it into a variable (`S=…`) or cut it down; write "$AUTOPILOT_SCRATCH/<file>" wherever you need it');
   // The directory follows each `cd` through the command, so a later relative path (`cd tests/a/b && … ; cd ../../..`) is
   // judged from where the command then is, not from where it started (seen live: a way back to the clone root was refused).
   let ctx = base;

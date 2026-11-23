@@ -124,6 +124,25 @@ test('R2 scratch folder: a session writes temporary files in its step\'s scratch
   denied(a.pre('Read', { file_path: path.join(a.scratch, 'x.txt') }), 'R2');
 });
 
+test('R2 scratch folder: printing its name, an option or quoted code is not a copy; a real assignment still is (Pilot Light, 2026-11-22/23)', (t) => {
+  const h = referee(t);
+  // Refused live, and nothing was copied: the final check's first command, an option, a line of Python.
+  passes(h.bash('git remote; echo "scratch=$AUTOPILOT_SCRATCH"'), 'echo text');
+  passes(h.bash('git status --short && git branch --show-current && echo "SCRATCH=$AUTOPILOT_SCRATCH"'), 'echo text after other commands');
+  passes(h.bash("echo 'AUTOPILOT_SCRATCH=' \"$AUTOPILOT_SCRATCH\""), 'single-quoted text');
+  passes(h.bash('node tools/shot.js --filename="$AUTOPILOT_SCRATCH/s01-320.png"'), 'an option');
+  passes(h.bash(`python3 -I -c "import json;d=json.load(open('$AUTOPILOT_SCRATCH/states.json'));print(d)"`), 'quoted code');
+  // Copies into a variable, which a later command could cut down: still refused, at the start of any command.
+  for (const c of [
+    'S="$AUTOPILOT_SCRATCH" && cat "$S/run-head.ts"',
+    'F="$AUTOPILOT_SCRATCH/fresh" && mkdir -p "$F"',
+    'export S=$AUTOPILOT_SCRATCH',
+    'OUT="$AUTOPILOT_SCRATCH" node tools/shot.js',
+    'ls; (CONTROL="${AUTOPILOT_SCRATCH}/control.json" node a.js)',
+    'x=$(S=$AUTOPILOT_SCRATCH; echo $S)',
+  ]) denied(h.bash(c), 'R2', /as it is: do not copy it into a variable/, c);
+});
+
 test('R2 files CLAUDE.md names: a listed file outside the clone is read and run, never written; its neighbours stay closed', (t) => {
   for (const sandbox of [false, true]) {
     const h = referee(t, { sandbox });
