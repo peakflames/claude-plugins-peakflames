@@ -189,8 +189,15 @@ function visibleWrites(s, ctx = null) {
  * text inside quotes or as a later argument (`echo "scratch=$X"`, `--filename=…`, a line of `python3 -c "…"`) assigns
  * nothing. Best effort, like the rest of this parsing: a heredoc's body is read as commands.
  */
+/**
+ * A file below the scratch folder as the value of a one-command prefix (`CONTROL="$AUTOPILOT_SCRATCH/control.json" node a.js`):
+ * the name lives for that command only, so nothing after it can cut it down. Seen live (Pilot Light, 2026-11-23). The folder
+ * itself, a variable inside the value and a `..` still count as a copy.
+ */
+const FILE_IN_SCRATCH = /^(["']?)\$(?:\{AUTOPILOT_SCRATCH\}|AUTOPILOT_SCRATCH)\/(?!.*\.\.)[\w.@%+=,\/-]+\1$/;
+
 export function shellAssignments(command) {
-  const out = []; const n = command.length; let i = 0; let atStart = true;
+  const out = []; const n = command.length; let i = 0; let atStart = true; let run = []; // `run`: the assignments just read, before the word that tells whether a command follows
   const SEP = /[\s;&|()\n`]/;
   const skipWord = (j) => {
     while (j < n && !SEP.test(command[j])) {
@@ -203,12 +210,14 @@ export function shellAssignments(command) {
   };
   while (i < n) {
     const ch = command[i];
-    if (ch === '$' && command[i + 1] === '(') { atStart = true; i += 2; continue; }
-    if (/[;&|(\n`]/.test(ch)) { atStart = true; i++; continue; }
+    if (ch === '$' && command[i + 1] === '(') { atStart = true; run = []; i += 2; continue; }
+    if (/[;&|(\n`]/.test(ch)) { atStart = true; run = []; i++; continue; }
     if (ch === ')') { i++; continue; }
     if (/\s/.test(ch)) { i++; continue; }
     const m = atStart ? /^(?:(?:export|local|declare|readonly|typeset)(?:\s+-\w+)*\s+)?([A-Za-z_]\w*)=/.exec(command.slice(i)) : null;
-    if (m) { const from = i + m[0].length; i = skipWord(from); out.push({ name: m[1], value: command.slice(from, i) }); continue; } // more may follow
+    if (m) { const from = i + m[0].length; i = skipWord(from); const a = { name: m[1], value: command.slice(from, i), prefix: false }; out.push(a); run.push(a); continue; } // more may follow
+    for (const a of run) a.prefix = true; // a command word follows: they set the environment of that one command and nothing after it
+    run = [];
     i = skipWord(i);
     atStart = false;
   }
@@ -219,7 +228,7 @@ function ruleR2Bash(base, segs, command) {
   if (/\$\{?AUTOPILOT_(STATE|RUN|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot workspace');
   // The scratch folder is inside the workspace: its name is used as it is, never cut down (`${AUTOPILOT_SCRATCH%/scratch}`) or copied into another name, which would lead back into the workspace unseen.
   // Seen live: 11 of 18 refusals were the name printed (`echo "scratch=$AUTOPILOT_SCRATCH"`), an option or quoted code; only a real assignment is a copy.
-  if (/\$\{[#!]?AUTOPILOT_SCRATCH[^}]/.test(command) || shellAssignments(command).some((a) => /\$\{?AUTOPILOT_SCRATCH\b/.test(a.value))) return deny('R2', 'path jail — use "$AUTOPILOT_SCRATCH" as it is: do not copy it into a variable (`S=…`) or cut it down; write "$AUTOPILOT_SCRATCH/<file>" wherever you need it');
+  if (/\$\{[#!]?AUTOPILOT_SCRATCH[^}]/.test(command) || shellAssignments(command).some((a) => /\$\{?AUTOPILOT_SCRATCH\b/.test(a.value) && !(a.prefix && FILE_IN_SCRATCH.test(a.value)))) return deny('R2', 'path jail — use "$AUTOPILOT_SCRATCH" as it is: do not copy it into a variable (`S=…`) or cut it down; write "$AUTOPILOT_SCRATCH/<file>" wherever you need it');
   // The directory follows each `cd` through the command, so a later relative path (`cd tests/a/b && … ; cd ../../..`) is
   // judged from where the command then is, not from where it started (seen live: a way back to the clone root was refused).
   let ctx = base;

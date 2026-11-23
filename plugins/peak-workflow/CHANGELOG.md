@@ -255,6 +255,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A file in the scratch folder may be passed as a one-command prefix** — `CONTROL="$AUTOPILOT_SCRATCH/control.json" node a.js`
+  is allowed; a copy into a name that lasts (`S=…`), the bare folder and any `..` stay refused.
 - **A session may remove its own scratch worktree with `--force`** — `git worktree remove --force`
   on a worktree inside its scratch folder is allowed; every other forced git command stays denied.
 - **A resumed session may use its earlier step's scratch folder** — after a usage-limit wait
