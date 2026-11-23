@@ -255,6 +255,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A resumed session may use its earlier step's scratch folder** — after a usage-limit wait
+  the session kept writing to the first step's folder and was refused. Earlier steps' scratch
+  folders of the same epic are now open to it; everything else of theirs stays closed.
 - **Autopilot's referee no longer reads a quoted heredoc's text as commands** — a Python or
   `cat` script body behind `<<'EOF'` is skipped; before, a word like `kind` in a doc was refused
   as a container tool and a test import as a path in the workspace. Bodies run by a shell stay read.
