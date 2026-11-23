@@ -767,3 +767,27 @@ test('R8 prototype: a Safety requirement is never amended or deferred, whatever 
   parked(other);
   assert.match(other.out.hookSpecificOutput.permissionDecisionReason, /one answer per requirement/);
 });
+
+test('R8 the owner\'s own "Defer": answers the same question and the final check\'s; a session that now recommends something else is asking them again', (t) => {
+  const DEF = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
+  const q = (rec) => `${E1.tors[1]} cannot be fully met: the CSV has no year. Recommendation: ${rec}. How to proceed?`;
+  const decideDefer = (h) => { const file = path.join(h.state, 'gates', `${E1.id}-1.json`); fs.writeFileSync(file, JSON.stringify({ ...readJson(file), decided: { answer: DEF[1], by: 'Pat', date: '2026-11-23', scope: 'next-run' } })); };
+
+  // The builder found no later epic and now recommends stopping: not answered "Defer" for them.
+  const h = referee(t);
+  parked(h.ask(q('Defer — the year comes with the export epic'), DEF));
+  decideDefer(h);
+  parked(h.ask(q('Stop — no later epic builds the year'), DEF));
+  assert.equal(readJson(path.join(h.state, 'gates', `${E1.id}-1.json`)).decided.used, undefined, 'their answer was not spent on a different question');
+  answered(h.ask(q('Defer — the year comes with the export epic'), DEF), q('Defer — the year comes with the export epic'), DEF[1]);
+
+  // The final check meets the same unmet requirement in a full run: their "Defer" stands for it, and for no other requirement.
+  const v = referee(t, { role: 'verifier' });
+  const OPTS = ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'];
+  const vq = (tor, rec = 'Defer — the row names Lg7Exp5') => `${tor} is FAIL: the year is not there. Recommendation: ${rec}. How to proceed?`;
+  fs.mkdirSync(path.join(v.state, 'gates'), { recursive: true });
+  fs.writeFileSync(path.join(v.state, 'gates', `${E1.id}-1.json`), JSON.stringify({ epic: E1.id, kind: 'deferral', tor: E1.tors[1], options: DEF, session: 'build-1', decided: { answer: DEF[1], by: 'Pat', date: '2026-11-23', used: { run: 'x' } } }));
+  answered(v.ask(vq(E1.tors[1]), OPTS), vq(E1.tors[1]), OPTS[1]);
+  answered(v.ask(vq(E1.tors[2]), OPTS), vq(E1.tors[2]), 'Stop — epic FAILs');
+  answered(v.ask(vq(E1.tors[1], 'Stop — the builder should fix it'), OPTS), vq(E1.tors[1], 'Stop — the builder should fix it'), 'Stop — epic FAILs');
+});
