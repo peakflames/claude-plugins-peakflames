@@ -132,13 +132,21 @@ test('R2 scratch folder: printing its name, an option or quoted code is not a co
   passes(h.bash("echo 'AUTOPILOT_SCRATCH=' \"$AUTOPILOT_SCRATCH\""), 'single-quoted text');
   passes(h.bash('node tools/shot.js --filename="$AUTOPILOT_SCRATCH/s01-320.png"'), 'an option');
   passes(h.bash(`python3 -I -c "import json;d=json.load(open('$AUTOPILOT_SCRATCH/states.json'));print(d)"`), 'quoted code');
+  // A file below the folder as the prefix of one command is no copy: the name ends with that command (refused live).
+  passes(h.bash('PORT=3917 NODE_ENV=test CONTROL="$AUTOPILOT_SCRATCH/control.json" bun apps/api/src/index.ts'), 'a prefix with a file');
+  passes(h.bash('ls; (CONTROL="${AUTOPILOT_SCRATCH}/control.json" node a.js)'), 'a prefix, braces, in a group');
+  passes(h.bash('X=1 CONTROL=\'$AUTOPILOT_SCRATCH/c.json\' node a.js && echo ok'), 'single quotes');
   // Copies into a variable, which a later command could cut down: still refused, at the start of any command.
   for (const c of [
     'S="$AUTOPILOT_SCRATCH" && cat "$S/run-head.ts"',
     'F="$AUTOPILOT_SCRATCH/fresh" && mkdir -p "$F"',
     'export S=$AUTOPILOT_SCRATCH',
     'OUT="$AUTOPILOT_SCRATCH" node tools/shot.js',
-    'ls; (CONTROL="${AUTOPILOT_SCRATCH}/control.json" node a.js)',
+    'ls; (CONTROL="${AUTOPILOT_SCRATCH}/control.json"; node a.js)',
+    'CONTROL="$AUTOPILOT_SCRATCH/control.json"; node a.js',
+    'CONTROL="$AUTOPILOT_SCRATCH/../x.json" node a.js',
+    'A=1 CONTROL="$AUTOPILOT_SCRATCH/c.json" && node a.js',
+    'CONTROL="$AUTOPILOT_SCRATCH/$NAME" node a.js',
     'x=$(S=$AUTOPILOT_SCRATCH; echo $S)',
   ]) denied(h.bash(c), 'R2', /as it is: do not copy it into a variable/, c);
 });
