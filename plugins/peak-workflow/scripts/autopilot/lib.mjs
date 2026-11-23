@@ -101,6 +101,27 @@ export const SMALL_FIXES = { perEpic: 2, files: 5, lines: 80 }; // seen live: a 
 export const SMALL_FIX_PROBLEM = 'the fix made on the standing answer ';
 /** A line that checks something or declares a test: a fix may change how a test waits, never how much it checks. */
 export const TEST_CHECK_LINE = /\b(assert\w*|expect\w*|should\w*|verify\w*)\b|\[(Fact|Theory|Test|TestMethod|TestCase|InlineData)\b|^\s*(test|it|describe)\s*\(|\bdef test_|\bfunc Test/i;
+/** A test that no longer runs: skipped, marked as expected to fail, or the one test of its file that runs. */
+const TEST_OFF = /\b(it|test|describe|context|suite|bench)\.(skip|todo|only|fixme|failing)\b|\b(xit|xtest|xdescribe|fit|fdescribe)\s*\(|@(Ignore|Disabled)\b|\[(Fact|Theory|Test|TestMethod)\b[^\]]*\bSkip\s*=|\bpytest\.mark\.(skip|skipif|xfail)\b|\bt\.skip\b|\bt\.Skip\(/;
+/** A check that passes for nearly any value. */
+const LOOSE_CHECK = /\.(toBeTruthy|toBeFalsy|toBeDefined)\(\s*\)|\.not\.(toThrow|toBeNull|toBeUndefined)\(\s*\)|\bassert\s+True\b|\bassertTrue\(\s*True\s*\)|\bassert\.ok\(\s*\)/;
+
+/**
+ * What a fix did to the tests it touched, from the changed lines of one test file's diff (`+…` and `-…`, no headers).
+ * `lost`: it removes more checking lines than it adds. `off`: a test now skipped or the only one run. `loosened`: more
+ * checks that pass for nearly anything than before. A heuristic, but it names what it saw, and a person decides.
+ */
+export function testWeakening(lines) {
+  const ls = lines.filter((l) => /^[+-](?![+-])/.test(l));
+  const checks = ls.filter((l) => TEST_CHECK_LINE.test(l.slice(1)));
+  const count = (re, sign) => ls.filter((l) => l[0] === sign && re.test(l.slice(1))).length;
+  return {
+    lost: checks.filter((l) => l[0] === '-').length > checks.filter((l) => l[0] === '+').length,
+    off: count(TEST_OFF, '+') > count(TEST_OFF, '-'),
+    loosened: count(LOOSE_CHECK, '+') > count(LOOSE_CHECK, '-'),
+  };
+}
+
 export function smallFixLimits(config) {
   const v = config?.smallFixes;
   if (v === false || v === 0) return null;

@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -2849,10 +2849,8 @@ class Run {
           // it may not lose more checking lines (assertions, test declarations) than it gains.
           const testDirs = (this.pre?.testDirs?.length ? this.pre.testDirs : this.config.testDirs ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
           const named = this.testNamedDirs([pre.developSha, p2], testDirs);
-          const tests = stat.map(([, , f]) => f).filter((f) => isTestPath(f, testDirs, named)).filter((f) => {
-            const d = this.g('diff', '-U0', `${pre.branchTip}..${p2}`, '--', f).split('\n').filter((l) => /^[+-](?![+-])/.test(l) && TEST_CHECK_LINE.test(l.slice(1)));
-            return d.filter((l) => l[0] === '-').length > d.filter((l) => l[0] === '+').length;
-          });
+          const weak = stat.map(([, , f]) => f).filter((f) => isTestPath(f, testDirs, named)).map((f) => ({ f, ...testWeakening(this.g('diff', '-U0', `${pre.branchTip}..${p2}`, '--', f).split('\n')) }));
+          const tests = weak.filter((w) => w.lost).map((w) => w.f);
           const reqs = own.filter((f) => f.startsWith('docs/requirements/'));
           // A fix was "add the test this requirement lacks": anything that is not a test is product code changed by
           // the session that then judges it. With an ordinary small fix beside it the two cannot be told apart, so
@@ -2862,6 +2860,9 @@ class Run {
           if (standing.length && stray.length > limits.files) problems.push(`${SMALL_FIX_PROBLEM}changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
           if (standing.length && lines > limits.lines) problems.push(`${SMALL_FIX_PROBLEM}changes ${lines} lines (the limit is ${limits.lines})`);
           if (tests.length) problems.push(`${SMALL_FIX_PROBLEM}removes checks from a test (${tests.join(', ')})`);
+          const off = weak.filter((w) => w.off).map((w) => w.f); const loose = weak.filter((w) => w.loosened).map((w) => w.f);
+          if (off.length) problems.push(`${SMALL_FIX_PROBLEM}skips a test, or leaves only one running (${off.join(', ')})`);
+          if (loose.length) problems.push(`${SMALL_FIX_PROBLEM}makes a check pass for nearly any value (${loose.join(', ')})`);
           if (reqs.length) problems.push(`${SMALL_FIX_PROBLEM}changes a requirement file (${reqs.join(', ')})`);
         }
         if (gitOk(this.clone, 'merge-base', '--is-ancestor', pre.developSha, p2) && this.g('rev-parse', `${dev}^{tree}`) !== this.g('rev-parse', `${p2}^{tree}`)) problems.push('the merge commit itself changes files');

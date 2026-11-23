@@ -255,6 +255,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The small-fix guard also catches a skipped or loosened test** — a verify-session fix that
+  skips a test, leaves only one running, or swaps a precise check for one that passes for nearly
+  any value now parks for a person, as removing checks already did.
 - **A resumed session may use its earlier step's scratch folder** — after a usage-limit wait
   the session kept writing to the first step's folder and was refused. Earlier steps' scratch
   folders of the same epic are now open to it; everything else of theirs stays closed.
