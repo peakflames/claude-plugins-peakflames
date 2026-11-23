@@ -30,6 +30,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   read from the project's files, each with its one next step: unapproved corrections, looks
   nobody gave, requirements left for a later epic, tests still skipped, and notes a person
   should confirm.
+- **`status` sees autopilot's copy** — a banner names epics autopilot finished that are not
+  in the project yet, and questions autopilot is waiting on, with `/peak-workflow:autopilot` as
+  the next step; those epics are left out of Ready to Start.
 - **Corrections nobody approved are recorded as such** — an autopilot prototype amendment's
   change record names `autopilot (prototype run)` as approver, never a person. `capture-requirements <TOR>` asks the
   owner to keep or change it; `tor-lifecycle keep` writes the approval.

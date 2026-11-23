@@ -14,7 +14,8 @@ requirements baseline.
 
 **This command is strictly read-only — do NOT modify any files.** The one git command that
 writes anything is `git fetch` (Step 0.5), which updates remote-tracking refs only — never a
-tracked file, a local branch, or the working tree.
+tracked file, a local branch, or the working tree. Step 0.6 reads autopilot's private copy and
+changes nothing there either.
 
 **Epic references.** Everywhere this dashboard names an epic, print it as `<id> (<slug>) — <Name>`,
 where `<slug>` is the spec filename with the `epic-<id>-` prefix and `.md` suffix stripped (the
@@ -66,6 +67,41 @@ A dashboard read from a stale checkout hides a teammate's work. Before loading a
    > `/peak-workflow:status`.
 
 Do not pull — this command stays read-only.
+
+## Step 0.6: Autopilot's Copy
+
+Autopilot builds in its own private copy of the project, and its finished epics reach this project
+only when the owner brings them in. This dashboard reads only the project, so without this step it
+shows that work as not started, and its leftovers are missing from Left for Later.
+
+`<root>` is `git rev-parse --show-toplevel`. If the directory `<root>.autopilot` does not exist,
+skip this step silently. Otherwise run, once:
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/autopilot/driver.mjs" status --project "<root>" --json` →
+**`autopilot`**. It only reads. If it fails, print one line under the banners — "I couldn't read
+autopilot's copy of this project, so work autopilot finished may be missing here." — and go on.
+
+From `autopilot`:
+- `sync.epics` — epics finished in autopilot's copy that this project does not have yet, each with
+  its `label` (already `<id> (<slug>) — <Name>`). `sync.state` is `diverged` when this project
+  has new commits of its own as well.
+- `waiting` — questions autopilot is waiting for the owner to answer, each with `label` and
+  `question`.
+- `running` — set while autopilot is running.
+
+When `sync.epics` is not empty, print this banner below the Step 0.5 banner:
+
+> 🛬 Autopilot finished <n> epic(s) that are not in this project yet: <label>; <label>. This
+> dashboard counts them as not done, and cannot see what they left for later. Run
+> `/peak-workflow:autopilot` — it offers to bring them in[`diverged`: and to combine them with
+> your own new commits].[`running`: Autopilot is still running; it offers this when the run ends.]
+
+When `waiting` is not empty, print one more line below it:
+
+> ❓ Autopilot is waiting for your answer to <n> question(s): <label> — <question, cut to about 80
+> characters>; … Run `/peak-workflow:autopilot` to answer them.
+
+Never bring the work in or answer a question from here — this command stays read-only. An epic in
+`sync.epics` is left out of Ready to Start: it is already built.
 
 ## Step 1: Load Phase Indexes
 
@@ -296,7 +332,7 @@ Render the result in Step 7's **New Since You Last Looked** panel.
 
 ## Step 6: Identify Ready-to-Start Epics
 
-Using the dependency graph from Step 3 and statuses from Step 2, find epics that are "Not Started" but whose dependencies are ALL satisfied (status "Implemented" or "Complete"). These are unblocked and ready to begin.
+Using the dependency graph from Step 3 and statuses from Step 2, find epics that are "Not Started" (and not in Step 0.6's `sync.epics`) but whose dependencies are ALL satisfied (status "Implemented" or "Complete"). These are unblocked and ready to begin.
 
 For each ready epic, also compute **Unblocks** — the number of Not Started epics that list it as a
 direct dependency. Then read the spec facts for the ready epics only — never every spec — with one
@@ -316,6 +352,7 @@ Using the data assembled from phase indexes and sidecars (Steps 1–3) and the r
 
 [Format Guard behind banner, if any — degraded mode]
 [Step 0.5 behind-origin banner, if any]
+[Step 0.6 autopilot banners, if any]
 [Step 4.5 nudge, if any]
 
 ## New Since You Last Looked
@@ -466,7 +503,8 @@ means the spec records no planner.]
 ## Suggested Next Action
 
 [Based on the current state, recommend what to do next, in this order. Name every epic as `<id> (<slug>) — <Name>` and every requirement as `TOR-… — <title>`:
- - **First (after the degraded-mode fix, if any), when Step 4.5 item 4 found one:** the overdue Disputed requirement — "TOR-… — <title> is known to be wrong (<record>, <age_days> days[, a Safety requirement — no branch that touches it can ship]). Resolve it: `/peak-workflow:capture-requirements <TOR>`". When several are overdue, name the oldest (Safety first) and the count of the rest.
+ - **First (after the degraded-mode fix, if any), when Step 0.6 found epics in `sync.epics`:** "Bring in the <n> epic(s) autopilot finished: `/peak-workflow:autopilot` — every figure on this dashboard changes once they are in." Then, when `waiting` is not empty: "Answer autopilot's <n> question(s): `/peak-workflow:autopilot`."
+ - **Next, when Step 4.5 item 4 found one:** the overdue Disputed requirement — "TOR-… — <title> is known to be wrong (<record>, <age_days> days[, a Safety requirement — no branch that touches it can ship]). Resolve it: `/peak-workflow:capture-requirements <TOR>`". When several are overdue, name the oldest (Safety first) and the count of the rest.
  - If there's an "In Progress" epic: "Continue working on Epic <id> (<slug>) — <Name> with `/peak-workflow:start-epic <id>`" — when its `owner:` is set and is not you, say whose it is instead ("In progress by <owner> — coordinate before touching it"); when `owner:` is `—` or missing and a `feature/epic-<id>-*` branch exists locally or on origin (`git branch -a --list '*feature/epic-<id>-*'`), say "In progress on <branch> — owner unknown; check with whoever pushed it before touching it"
  - If there's an "Implemented" epic awaiting review: "Review Epic <id> (<slug>) — <Name> with `/peak-workflow:wrapup-epic <id>`"
  - If a Disputed requirement is not overdue and the nudge's command does not name it: "Settle
