@@ -207,6 +207,11 @@ export const NOT_OBSERVED = 'NOT OBSERVED';
 export const prototypeGates = (gates, epic) => gates.filter((g) => g.epic === epic && g.decided?.prototype && !g.void && !g.superseded && !g.cleared);
 /** The requirements of one epic whose deferral a prototype run took (the builder recommended it). */
 export const prototypeDeferred = (gates, epic) => [...new Set(prototypeGates(gates, epic).filter((g) => g.kind === 'deferral' && /^defer\b/i.test(g.decided.answer ?? '') && g.tor).map((g) => g.tor))];
+/**
+ * The requirements of one epic the owner themself answered "Defer" for: a deferral gate a person decided, that still
+ * stands. Their decision holds in any run; one a prototype run took (`prototypeDeferred`) holds in a prototype run only.
+ */
+export const ownerDeferred = (gates, epic) => [...new Set(gates.filter((g) => g.epic === epic && g.kind === 'deferral' && g.tor && g.decided && !g.decided.prototype && !g.decided.standing && /^\W*defer\b/i.test(g.decided.answer ?? '') && !g.void && !g.superseded && !g.cleared).map((g) => g.tor))];
 /** What a session's question recommends, in the skills' own wording ("Recommendation: Defer — …"): `Fix now`, `Defer`, `Stop`, or null. */
 export function recommended(question) {
   const m = String(question ?? '').match(/\bRecommendation:\s*\**\s*(Fix now|Defer|Stop)\b/i);

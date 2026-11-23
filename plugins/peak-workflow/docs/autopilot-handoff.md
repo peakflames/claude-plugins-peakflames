@@ -407,6 +407,16 @@ Why this order:
   decided (`decided.prototype`); looks are skipped; `onPark` defaults to `continue`. The
   report and the closing screen list all of it under "Decided for you in this prototype
   run". Tests: `test/prototype.test.mjs`, and the R8 cases in `test/hooks.test.mjs`.
+  **Changed 2026-11-23, on the owner's decision:** a full run does not honour an amendment or
+  a deferral a prototype run took for an epic not yet merged. `approvedAmendments()` and the
+  build and merge checks count a `decided.prototype` gate only when the run's `mode` is
+  `prototype`; the question parks and the owner answers it. An epic that already merged is
+  not reopened (it is only listed). Found while building it: in a full run the owner's own
+  "Defer" never got through (the build check parked "a human decision", the next run planned
+  again and asked again). Now a deferral gate a person answered "Defer" to (`ownerDeferred`
+  in `lib.mjs`) passes the same checks, in any run, for that requirement only; the final
+  check's same question is answered from it. Tests: the "full run…" cases at the end of
+  `test/prototype.test.mjs`. Not proven against real sessions.
   **Not proven, all against real sessions** (first proof: Pilot Light's next run):
   - A deferral end to end. After "Defer" the skill asks which later epic builds the missing
     part; the hook reminds the session once to use the epic it named, and a second ask parks.

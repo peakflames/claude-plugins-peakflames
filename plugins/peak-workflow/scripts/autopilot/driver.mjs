@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, prototypeDeferred, prototypeGates, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -1453,9 +1453,20 @@ class Run {
    * (the old requirement retired, a new one in its place), and the driver's own checks then failed
    * the build for changing requirement files and for not testing the retired one.
    */
-  approvedAmendments(e) {
-    return readGates(this.stateDir).filter((g) => g.epic === e.id && /^amendment/.test(g.kind ?? '') && /^amend\b/i.test(g.decided?.answer ?? '') && !g.void && !g.superseded && !g.cleared).map((g) => g.tor).filter(Boolean);
-  }
+  approvedAmendments(e) { return [...new Set([...this.ownerAmendments(e), ...this.takenAmendments(e)])]; }
+  amendGates(e) { return readGates(this.stateDir).filter((g) => g.epic === e.id && /^amendment/.test(g.kind ?? '') && /^amend\b/i.test(g.decided?.answer ?? '') && !g.void && !g.superseded && !g.cleared && g.tor); }
+  /** The amendments a person approved. */
+  ownerAmendments(e) { return this.amendGates(e).filter((g) => !g.decided.prototype).map((g) => g.tor); }
+  /**
+   * The amendments a prototype run took on a session's proposal and no person has approved since. They stand in a
+   * prototype run only: a full run does not honour one (the owner's decision), so the question is asked again and
+   * parks, and a build that changes requirement files without that answer is out of scope.
+   */
+  takenAmendments(e) { const owner = this.ownerAmendments(e); return this.config.mode === 'prototype' ? this.amendGates(e).filter((g) => g.decided.prototype && !owner.includes(g.tor)).map((g) => g.tor) : []; }
+  /** The deferrals a prototype run took for this epic. As with amendments, only a prototype run honours them: in a full run the owner is asked. */
+  takenDeferrals(e) { return this.config.mode === 'prototype' ? prototypeDeferred(readGates(this.stateDir), e.id) : []; }
+  /** The deferrals the owner themself answered "Defer" to, for one of this epic's own requirements: theirs in any run. */
+  ownerDeferrals(e) { const anchors = this.meta(e).anchors; return ownerDeferred(readGates(this.stateDir), e.id).filter((t) => anchors.includes(t)); }
   /**
    * The epic's anchors as they stand where `sc` (a parsed status sidecar) was read. They are the
    * launch check's, except after an approved amendment: an amended requirement the sidecar no
@@ -2190,11 +2201,11 @@ class Run {
     const count = handoff && /^## Deferrals\b/m.test(handoff) ? (handoff.slice(handoff.search(/^## Deferrals\b/m)).match(/^Count:\s*(\d+)/m) ?? [])[1] : undefined;
     // A prototype run took the builder's recommendation to defer (a decided gate per requirement): that many rows, each
     // naming one of those requirements, are the owner's setting at work. One more is a deferral nobody agreed to.
-    const deferred = prototypeDeferred(readGates(this.stateDir), e.id);
+    const ownerDefer = this.ownerDeferrals(e); const deferred = [...new Set([...ownerDefer, ...this.takenDeferrals(e)])];
     const section = deferralsSection(handoff) ?? '';
     const rows = [...new Set(section.match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? [])];
     const deferOk = Number(count) > 0 && Number(count) <= deferred.length && rows.length === Number(count) && rows.every((t) => deferred.includes(t));
-    if (!add('handoff', count === '0' || deferOk, handoff === null ? 'handoff file missing on the branch' : count === undefined ? 'no "## Deferrals" section with a Count: line' : `Deferrals Count: ${count}${deferOk ? ` (${rows.join(', ')}: deferred on the builder's recommendation in this prototype run)` : deferred.length ? `; this prototype run took a deferral only for ${deferred.join(', ')}, and the rows name ${rows.join(', ') || 'no requirement'}` : ''}`) && Number(count) > 0) parkOnly = parkOnly ?? `the handoff records ${count} deferral(s): a human decision`;
+    if (!add('handoff', count === '0' || deferOk, handoff === null ? 'handoff file missing on the branch' : count === undefined ? 'no "## Deferrals" section with a Count: line' : `Deferrals Count: ${count}${deferOk ? ` (${rows.join(', ')}: ${rows.every((t) => ownerDefer.includes(t)) ? "deferred with the owner's approval" : "deferred on the builder's recommendation in this prototype run"})` : deferred.length ? `; a deferral stands only for ${deferred.join(', ')}, and the rows name ${rows.join(', ') || 'no requirement'}` : ''}`) && Number(count) > 0) parkOnly = parkOnly ?? `the handoff records ${count} deferral(s): a human decision`;
     // The later epics those rows hand the unmet part to: the skill adds the requirement to each one's spec and status file.
     const successors = deferOk ? this.pre.epics.map((x) => x.id).filter((id) => id !== e.id && new RegExp(`(?<![A-Za-z0-9])${id}(?![A-Za-z0-9])`).test(section)) : [];
 
@@ -2247,7 +2258,7 @@ class Run {
     }
     if (out.length === 0 && claudeMd) { if (JSON.stringify(e.claudeMd ?? null) !== JSON.stringify(claudeMd)) this.log(`${e.id}: the build changed CLAUDE.md in ${claudeMd.sections.join(', ')}; the owner is shown it before the final check`); e.claudeMd = claudeMd; } else delete e.claudeMd;
     // Whose amendment it is: the owner's own answer, or one a prototype run took on the session's proposal (nobody approved that one).
-    const taken = prototypeGates(readGates(this.stateDir), e.id).filter((g) => g.kind === 'amendment').map((g) => g.tor);
+    const taken = this.takenAmendments(e);
     const whose = amended.length && amended.every((t) => taken.includes(t)) ? 'the amendment this prototype run took, not yet seen by the owner, of' : "the owner's approved amendment of";
     add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under ${whose} ${amended.join(', ')}` : ''}`);
     if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; if (amended.some((t) => taken.includes(t))) e.amendedUnseen = amended.filter((t) => taken.includes(t)); this.log(`${e.id}: the build changed requirement files under ${whose} ${amended.join(', ')}`); }
@@ -2703,7 +2714,7 @@ class Run {
     // one nobody observed (told to the verifier, and an `unverified:` line that says so), and one whose deferral was
     // taken on the builder's recommendation (a decided gate, and the sidecar's `waived:` line naming it).
     const told = new Set((e.unobserved ?? []).map((u) => u.tor));
-    const deferred = prototypeDeferred(readGates(this.stateDir), e.id);
+    const ownerDefer = this.ownerDeferrals(e); const deferred = [...new Set([...ownerDefer, ...this.takenDeferrals(e)])];
     const waivedTors = (sc.fields.waived ?? '').split(',').map((x) => (x.match(/TOR-\d{2}-[A-Za-z0-9]{7}/) ?? [])[0]).filter(Boolean);
     const notObservedOk = (t) => told.has(t) && /\bnot observed\b/i.test(sc.unverified[t] ?? '');
     const deferredOk = (t) => deferred.includes(t) && waivedTors.includes(t);
@@ -2733,9 +2744,9 @@ class Run {
     const undisclosed = Number((countLine?.match(/undisclosed:\s*(\d+)/i) ?? [])[1] ?? 0);
     const forgiven = ownerFix && !autoFix ? fixed : Math.min(fixed, asked.filter((x) => x.testOnly).length);
     const others = countLine ? [...countLine.matchAll(/([a-z][a-z ]*):\s*(\d+)/gi)].filter(([, k]) => !/^(fixed at wrapup|undisclosed)$/i.test(k.trim()) && !/^count$/i.test(k.trim()) && !(protoWaived && /^waived$/i.test(k.trim()))).map(([, , n]) => Number(n)) : [];
-    const total = Number(numbers[0] ?? NaN) - protoWaived; // the rows that are not this prototype run's deferrals
+    const total = Number(numbers[0] ?? NaN) - protoWaived; // the rows that are not deferrals that stand (the owner's, or this prototype run's)
     const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && undisclosed <= forgiven && ((ownerFix && !autoFix) || fixed <= asked.length) : protoWaived ? total === 0 && fixed === 0 && undisclosed === 0 : numbers.every((x) => Number(x) === 0));
-    add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: 'waived' in sc.fields, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}), ...(protoWaived ? { deferredInThisPrototypeRun: waivedTors } : {}) });
+    add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: 'waived' in sc.fields, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}), ...(protoWaived ? { [waivedTors.every((t) => ownerDefer.includes(t)) ? 'deferredWithTheOwnersApproval' : 'deferredInThisPrototypeRun']: waivedTors } : {}) });
     if (protoWaived) e.deferred = waivedTors;
     if (fixed > 0 || fixedFiles.length) e.fixedAtWrapup = { count: fixed, files: fixedFiles, approvedBy: approval, ...(autoFix ? { auto: { question: tryJson(this.gatePath(autoFix))?.question ?? null } } : {}), ...(standing.length && !ownerFix ? { standing: standing.map((x) => ({ question: x.question, tor: x.tor ?? null, ...(x.testOnly ? { testOnly: true } : {}) })) } : {}) };
 

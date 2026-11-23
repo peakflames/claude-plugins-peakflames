@@ -293,3 +293,142 @@ test('mode: a relaunch carries the run\'s mode; a chain that began before the qu
   const st2 = status(p.project, p.state);
   assert.deepEqual([st2.mode, 'mode' in st2.relaunch.config, st2.relaunch.ask.includes('mode')], [null, false, true]);
 });
+
+// ---- a full run after a prototype run: what the prototype run took is the owner's to answer -------
+
+/** The next run of this workspace is a full one (the owner's answer at the relaunch). */
+const setMode = (p, mode) => { const f = path.join(p.state, 'settings.json'); fs.writeFileSync(f, JSON.stringify({ ...readJson(f), mode })); };
+const decideGate = (p, id, n, answer) => { const r = spawnSync(process.execPath, [DRIVER, 'decide', '--workspace', p.state, '--gate', `gates/${id}-${n}.json`, '--answer', answer, '--by', 'Pat Owner'], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
+/** A question no policy row knows: it parks the epic in a prototype run too, which is how these tests end the first run. */
+const COLOUR = ask('Which colour should the totals row be?', ['Red', 'Blue']);
+
+test('full run after a prototype run: a deferral the prototype run took at the build is not honoured; the owner is asked', async (t) => {
+  for (const asks of [true, false]) {
+    const p = makeProject(t, PROTO);
+    const succ = addEpic(p.project, { id: 'Lg7Exp5', slug: 'export', name: 'Export', nn: '07', deps: [E1.id] });
+    const tor = E1.tors[3];
+    p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, ask(deferQ(tor), DEFERRAL), COLOUR] } });
+    await p.go({ queue: [E1.id] });
+    assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).decided.prototype, gate(p, E1.id, 2).decided], ['PARKED', true, null], 'the prototype run took the deferral, then parked on something else');
+    assert.equal(decideGate(p, E1.id, 2, 'Red').enters, 'BUILD');
+
+    setMode(p, 'full');
+    // The new builder either asks the deferral again, or (as a resumed session may) just writes the row and the skipped test.
+    p.scenario({ [`${E1.id}/build`]: deferringBuild(E1, asks ? [ask(deferQ(tor), DEFERRAL)] : [], [tor], succ), [`${E1.id}/verify`]: waivingWrapup(E1, [tor], succ) });
+    const s = await p.go({ queue: [E1.id] });
+    assert.equal(s.mode, 'full');
+    const q = s.queue[0];
+    assert.equal(q.state, 'PARKED', `asks=${asks}: ${q.reason}`);
+    assert.ok(!p.steps().some((k) => /verify/.test(k)), `asks=${asks}: nothing reached the final check`);
+    if (asks) {
+      const g = gate(p, E1.id, 3);
+      assert.deepEqual([g.kind, g.tor, g.decided], ['deferral', tor, null], 'the question is the owner\'s');
+    } else {
+      assert.match(q.reason, /CHECK_BUILD: the handoff records 1 deferral\(s\): a human decision/);
+      const cb = check(p, E1.id, 'check-build-1.json').checks;
+      assert.equal(cb.find((c) => c.name === 'handoff').pass, false);
+      assert.ok(!/deferred on the builder's recommendation/.test(JSON.stringify(cb.find((c) => c.name === 'handoff').evidence)));
+      assert.equal(cb.find((c) => c.name === 'tests-green').evidence.skipsAllowedForDeferrals, undefined, 'the skipped test is not excused');
+    }
+    // What the prototype run did is still on record for the owner.
+    assert.equal(gate(p, E1.id).decided.prototype, true);
+  }
+});
+
+test('full run after a prototype run: a waiver for a deferral the prototype run took does not pass the merge check', async (t) => {
+  const p = makeProject(t, PROTO);
+  const succ = addEpic(p.project, { id: 'Lg7Exp5', slug: 'export', name: 'Export', nn: '07', deps: [E1.id] });
+  const tor = E1.tors[3];
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: deferringBuild(E1, [ask(deferQ(tor), DEFERRAL)], [tor], succ), [`${E1.id}/verify`]: { actions: [COLOUR] } });
+  await p.go({ queue: [E1.id] });
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).decided.prototype, gate(p, E1.id, 2).session], ['PARKED', true, 'verify-1'], 'built with the deferral, parked at the final check');
+  assert.equal(decideGate(p, E1.id, 2, 'Red').enters, 'VERIFY');
+
+  setMode(p, 'full');
+  // The verifier writes the waiver without asking anyone.
+  const silent = waivingWrapup(E1, [tor], succ);
+  silent.actions = silent.actions.filter((a) => a.tool_name !== 'AskUserQuestion');
+  p.scenario({ [`${E1.id}/verify`]: silent });
+  const s = await p.go({ queue: [E1.id] });
+  const q = s.queue[0];
+  assert.equal(q.state, 'PARKED', q.reason);
+  assert.notEqual(git(p.clone, 'show', `develop:docs/implementation-plan/status/epic-${E1.id}.md`).match(/^status: (.*)$/m)?.[1], 'Complete', 'nothing merged');
+  assert.match(q.reason, /deferral|no-waivers|sidecar-on-integration/);
+});
+
+test('full run after a prototype run: an amendment the prototype run took is not honoured; the owner is asked, and their "Amend" then stands', async (t) => {
+  const tor = E1.tors[0];
+  const amending = () => ({ actions: [...buildActions(E1, { commit: false }), { do: 'exec', cmd: "printf '\\n# amended in the epic\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: '# change record\n' }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] });
+  const start = async () => {
+    const p = makeProject(t, PROTO);
+    p.scenario({ [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), COLOUR] } });
+    await p.go();
+    assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind, gate(p, E1.id).decided.prototype, gate(p, E1.id, 2).decided], ['PARKED', 'amendment', true, null]);
+    assert.equal(decideGate(p, E1.id, 2, 'Red').enters, 'PLAN');
+    setMode(p, 'full');
+    return p;
+  };
+
+  // The build changes the requirement files without anyone asking again: out of scope, as with no amendment at all.
+  const p = await start();
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: amending(), [`${E1.id}/fix`]: { actions: [{ do: 'exec', cmd: 'true' }] } });
+  const s = await p.go();
+  assert.equal(s.queue[0].state, 'PARKED', s.queue[0].reason);
+  const scope = check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'scope');
+  assert.equal(scope.pass, false, JSON.stringify(scope));
+  assert.match([scope.evidence].flat().join(' '), /requirements are frozen during a run/);
+  assert.ok(!p.steps().some((k) => /verify/.test(k)));
+
+  // The planner asks again: the question parks for the owner; when they answer "Amend", it is their amendment.
+  const p2 = await start();
+  p2.scenario({ [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result } });
+  const s2 = await p2.go();
+  assert.equal(s2.queue[0].state, 'PARKED');
+  const g3 = gate(p2, E1.id, 3);
+  assert.deepEqual([g3.kind, g3.tor, g3.decided], ['amendment', tor, null]);
+  assert.equal(decideGate(p2, E1.id, 3, AMEND(tor)[0]).enters, 'PLAN');
+  p2.scenario({ [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result }, [`${E1.id}/build`]: amending(), [`${E1.id}/verify`]: wrapupScript(E1) });
+  const s3 = await p2.go();
+  assert.equal(s3.queue[0].state, 'MERGED', s3.queue[0].reason);
+  const steps = fs.readdirSync(p2.dir(E1.id)).filter((f) => /^check-build-\d+\.json$/.test(f)).sort();
+  const scope3 = check(p2, E1.id, steps.at(-1)).checks.find((c) => c.name === 'scope');
+  assert.match(scope3.evidence, /requirement files changed under the owner's approved amendment of /, 'said to be the owner\'s, not the prototype run\'s');
+  assert.equal(s3.queue[0].amendedUnseen, undefined);
+});
+
+test('full run: a deferral the owner answers "Defer" to goes through the build checks and the merge as theirs; one they were not asked about still parks', async (t) => {
+  const p = makeProject(t);
+  const succ = addEpic(p.project, { id: 'Lg7Exp5', slug: 'export', name: 'Export', nn: '07', deps: [E1.id] });
+  const tor = E1.tors[3];
+  const build = deferringBuild(E1, [ask(deferQ(tor), DEFERRAL)], [tor], succ);
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: build, [`${E1.id}/verify`]: waivingWrapup(E1, [tor], succ) });
+  await p.go({ queue: [E1.id] });
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).kind, gate(p, E1.id).decided], ['PARKED', 'deferral', null], 'a full run asks');
+  assert.equal(decideGate(p, E1.id, 1, DEFERRAL[1]).enters, 'BUILD');
+  const s = await p.go({ queue: [E1.id] });
+  const q = s.queue[0];
+  assert.equal(q.state, 'MERGED', `${q.reason} ${JSON.stringify(q.checks)}`);
+  assert.equal(gateCount(p), 1, 'asked once: the final check\'s same question is not a second decision');
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.decided.answer, g.decided.by, g.decided.prototype ?? false], [DEFERRAL[1], 'Pat Owner', false]);
+  const cb = check(p, E1.id, 'check-build-1.json').checks;
+  assert.match(cb.find((c) => c.name === 'handoff').evidence, new RegExp(`Deferrals Count: 1 \\(${tor}: deferred with the owner's approval`));
+  assert.equal(cb.find((c) => c.name === 'tests-green').evidence.skipsAllowedForDeferrals, 1);
+  assert.equal(cb.find((c) => c.name === 'scope').pass, true);
+  assert.deepEqual(Object.values(tools(p, E1.id, 'verify-1').find((o) => o?.hookSpecificOutput?.updatedInput?.answers).hookSpecificOutput.updatedInput.answers), [DEFERRAL[1]]);
+  const nw = check(p, E1.id, 'check-verify-1.json').checks.find((c) => c.name === 'no-waivers');
+  assert.deepEqual([nw.pass, nw.evidence.deferredWithTheOwnersApproval, nw.evidence.deferredInThisPrototypeRun], [true, [tor], undefined]);
+  assert.deepEqual(sidecar(p, E1).fields.waived, `${tor} → ${succ.id}`);
+  assert.deepEqual(q.deferred, [tor]);
+  assert.deepEqual(status(p.project, p.state).decidedForYou, [], 'the owner decided it; nothing was decided for them');
+
+  // The owner said "Defer" for one requirement; the handoff defers two.
+  const p2 = makeProject(t);
+  const succ2 = addEpic(p2.project, { id: 'Lg7Exp5', slug: 'export', name: 'Export', nn: '07', deps: [E1.id] });
+  p2.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: deferringBuild(E1, [ask(deferQ(tor), DEFERRAL)], [tor, E1.tors[4]], succ2) });
+  await p2.go({ queue: [E1.id] });
+  decideGate(p2, E1.id, 1, DEFERRAL[1]);
+  const s2 = await p2.go({ queue: [E1.id] });
+  assert.equal(s2.queue[0].state, 'PARKED');
+  assert.match(s2.queue[0].reason, /CHECK_BUILD: the handoff records 2 deferral\(s\): a human decision/);
+});

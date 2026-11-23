@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROTOTYPE_BY, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
+import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROTOTYPE_BY, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -465,11 +465,15 @@ function ruleR8(ctx) {
       if (p?.why) { park = { ...base, why: `${parkRow.why}; ${p.why}` }; break; }
     }
     if (parkRow) { park = { ...base, why: parkRow.why }; break; }
-    if (proto && ctx.role === 'verifier' && kind === 'tor-fail' && tor) {
-      // A deferral the builder recommended and this run took: the final check meets the same unmet requirement, and
-      // when it too recommends deferring, the same decision stands. It is not a new one, so it is not counted again.
+    // A deferral that stands (the owner answered "Defer" at the build, or this prototype run took the builder's
+    // recommendation): the final check meets the same unmet requirement, and when it too recommends deferring, the
+    // same decision stands. It is not a new one, so it is not asked or counted again.
+    if (ctx.role === 'verifier' && kind === 'tor-fail' && tor && recommended(q.question) === 'Defer') {
       const label = labels.filter((l) => /^\W*defer\b/i.test(l));
-      if (prototypeDeferred(protoTaken, ctx.epic).includes(tor) && recommended(q.question) === 'Defer' && label.length === 1) { answers[q.question] = label[0]; protoAgain += 1; continue; }
+      if (label.length === 1 && anchors(ctx).includes(tor) && ownerDeferred(gatesNow(), ctx.epic).includes(tor)) { answers[q.question] = label[0]; told += 1; continue; }
+      if (label.length === 1 && prototypeDeferred(protoTaken, ctx.epic).includes(tor)) { answers[q.question] = label[0]; protoAgain += 1; continue; }
+    }
+    if (proto && ctx.role === 'verifier' && kind === 'tor-fail' && tor) {
       // A requirement only a person can observe, in a run where nobody will: the verifier was told to record it as
       // not observed and not to ask. Reminded once; asked again, the question is answered as in a full run.
       const unobserved = ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).unobserved ?? [] : [];
@@ -514,9 +518,10 @@ function ruleR8(ctx) {
       // After a deferral this run took, the skill asks which later epic builds the missing part. Nobody is there to
       // say, and autopilot never names one: the session is told once to use the epic it (or the builder) already named.
       const succMemo = ctx.step ? path.join(ctx.step, 'successor-reminded.json') : null;
-      if (proto && succMemo && /which later epic creates the code/i.test(q.question) && prototypeDeferred(protoTaken, ctx.epic).length && !fs.existsSync(succMemo)) {
+      const byOwner = ownerDeferred(gatesNow(), ctx.epic).length > 0;
+      if (succMemo && /which later epic creates the code/i.test(q.question) && (byOwner || prototypeDeferred(protoTaken, ctx.epic).length) && !fs.existsSync(succMemo)) {
         fs.writeFileSync(succMemo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
-        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: this is a prototype run, and the deferral was taken on your own recommendation. The later epic is the one ${ctx.role === 'verifier' ? "the implementer's Deferrals row names as the successor" : 'your recommendation named'}: use it, run the skill's successor check with it and carry on. If no such epic's spec exists, Defer is not available: ask the first question again, recommending Fix now or Stop` };
+        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: ${byOwner ? 'they answered "Defer" to the recommendation that named the later epic, and are not asked to name it again' : 'this is a prototype run, and the deferral was taken on your own recommendation'}. The later epic is the one ${ctx.role === 'verifier' ? "the implementer's Deferrals row names as the successor" : 'your recommendation named'}: use it, run the skill's successor check with it and carry on. If no such epic's spec exists, Defer is not available: ask the first question again, recommending Fix now or Stop` };
       }
       const memo = ctx.step ? path.join(ctx.step, 'answers-reminded.json') : null;
       if (earlier.length && memo && !fs.existsSync(memo)) {

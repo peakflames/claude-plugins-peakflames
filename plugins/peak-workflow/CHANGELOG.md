@@ -20,6 +20,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   amendment or deferral, skips the owner's looks, merges an unobserved requirement as not
   verified, and lists each under "Decided for you in this prototype run". Failing tests,
   scope and Safety still stop.
+- **Autopilot full run after a prototype run** — a full run no longer relies on a correction
+  or deferral a prototype run took for an epic not yet merged: the owner is asked, and a build
+  or final check that relies on it without their answer parks.
+- **Autopilot honours the owner's own "Defer"** — in any run, a requirement the owner answered
+  "Defer" to passes the build and merge checks as left for the later epic. Before, the epic
+  parked after every such answer and was asked again.
 - **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
   final check without stopping for the owner; its pictures are listed for review afterwards.
   A requirement a person must observe still stops.
