@@ -1081,6 +1081,13 @@ Leave out a part that has nothing to say.
   say how many more the full report holds. Then one sentence on what the owner can do: run
   autopilot while they are at the computer, so a check that needs a person is done for real,
   or queue work that proves it.
+- **What is left for later, and where it is kept.** Whenever this screen showed anything
+  under "Decided for you in this prototype run", "Screens merged without your look" or "Not
+  proven for real", end that part with one plain sentence: "All of this is also written into
+  your project. Once the work is brought in, run `/peak-workflow:status` there at any time: its
+  'Left for Later' list shows each of these with the one thing that clears it, and an item
+  drops off the list when it is done." Say it once. It is the only place the owner needs to
+  remember; never ask them to keep the run's report for it.
 - **Things autopilot got in the way of** comes from `friction` (what the referee refused,
   grouped, with a `count`): at most five lines, each in plain words a non-developer follows
   — "It stopped the build from writing outside its own copy of the project (3 times)" — and

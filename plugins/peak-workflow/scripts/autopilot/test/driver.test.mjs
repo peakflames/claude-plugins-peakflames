@@ -721,6 +721,13 @@ test('not proven for real: a reviewer finding that never parks and the verifier\
   const status = JSON.parse(spawnSync(process.execPath, [DRIVER, 'status', '--project', p.project, '--json', '--queue', E1.id], { encoding: 'utf8' }).stdout);
   assert.deepEqual(status.unproven.map((u) => [u.epic, u.source, u.text]), e.unproven.map((u) => [E1.id, u.source, u.text]));
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Not proven for real \(said by the reviewer or the verifier; nothing here stopped the epic\):\n- Reviewer F1: The cost path is tested only against a fake .*\n- Verifier: a real synthesis, to avoid spending the shared credit\.\n- Verifier: The cost lookup: checked against the fake only\n/);
+  // The project remembers it too, without autopilot's files: the epic's status file on the integration line holds each
+  // note, under the requirement it names or under the epic, and the project's own status reads it from there.
+  const side = git(p.clone, 'show', `develop:docs/implementation-plan/status/epic-${E1.id}.md`);
+  assert.match(side, new RegExp(`^unconfirmed-epic: \\d{4}-\\d{2}-\\d{2} the reviewer: The cost path is tested only against a fake .* \\| \\d{4}-\\d{2}-\\d{2} the final check: a real synthesis, .* \\| \\d{4}-\\d{2}-\\d{2} the final check: The cost lookup: checked against the fake only$`, 'm'));
+  assert.match(git(p.clone, 'log', '-1', '--format=%s', 'develop'), new RegExp(`^docs\\(epic-${E1.id}\\): note what a person should still confirm$`));
+  assert.equal(git(p.clone, 'status', '--porcelain'), '');
+  assert.match(side, /^status: Complete$/m);
   // The wording the parser accepts, and what it leaves alone.
   assert.deepEqual(unprovenLines('All good.\n- Not run - the soak test\n### Not proven for real\n1. Windows paths\n\n## Next\n- Not this\n'), ['the soak test', 'Windows paths']);
   assert.deepEqual(unprovenLines('Verdict: PASS. Everything ran.'), []);

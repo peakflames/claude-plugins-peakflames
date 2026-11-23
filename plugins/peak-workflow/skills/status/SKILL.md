@@ -91,10 +91,14 @@ panels. Otherwise run both, once each:
   `requirements` holds one row per ID: `tor`, `state`, `live`, `title`, `epic` (the owning epic
   the state comes from), `dispute` (for a Disputed row: `record`, `age_days`, `threshold_days`,
   `safety`, `overdue`), `underlying_state` (what a Disputed row would otherwise be), `waived_to`,
-  `successors`, `record`, and `removal_epics`. Two more mark what was left for later:
+  `successors`, `record`, and `removal_epics`. These mark what was left for later:
   `not_observed` (on a Verification failed row whose recorded reason is that nobody looked —
   the text is what a person must still do) and `deferred_from` (the epic or epics that left
-  this requirement for the one in `epic`). Retired and superseded IDs appear with
+  this requirement for the one in `epic`), and `unapproved_change` (`record`, `date`,
+  `replaces`: an autopilot prototype run corrected the requirement on a session's proposal and
+  no person has approved it), and `unconfirmed` (a dated note, on a requirement that passed, of
+  what a person should still confirm). The report's top-level `unconfirmed_epics` maps an epic
+  to such a note that names no requirement. Retired and superseded IDs appear with
   `live: false` and are never in the denominator.
 - `sh "${CLAUDE_PLUGIN_ROOT}/scripts/tor-lifecycle" check --json` → **`check`**. Exit 0 (no
   findings) and exit 1 (findings) are both success. `counts` is the number per letter A–F;
@@ -189,8 +193,15 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
 2.5. **Left for later.** What earlier work knowingly left undone, each with the one thing that
    clears it. This is the single list of it: whichever way the work was done (by hand, an
    autopilot full run, an autopilot prototype run), it is read from the project's own files, so
-   it is the same list for everyone and an entry disappears by itself once it is cleared. Two
+   it is the same list for everyone and an entry disappears by itself once it is cleared. Five
    kinds, in this order:
+   - **A requirement was corrected and nobody approved it** — every live row with
+     `unapproved_change`. Later work may be built on it, so it comes first. Read the record
+     (`docs/requirements/changes/*.toml` whose `id` is `unapproved_change.record`) and show, in
+     full, how the requirement read (the record's `text`) and how it reads now
+     (`tor-lifecycle text <TOR>`), with the record's `reason`. What clears it: the owner runs
+     `/peak-workflow:capture-requirements <TOR>`, which shows both texts again and asks whether
+     to keep the correction or change it.
    - **Nobody has seen it working** — every live row with `not_observed`, grouped by `epic`. It
      merged without the look only a person can give. Say what must be looked at in the row's
      own `not_observed` words. What clears it: a person who can do that look runs
@@ -207,7 +218,20 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
      `state` is `Waived` (no epic lists it) belongs here too, first in the group: "no epic has
      picked it up — add it to <waived_to>'s spec and status file, or plan it with
      `/peak-workflow:add`".
-   The top entry (first kind first, oldest `unverified` date first) is this list's next step.
+   - **A test is still switched off** — for each live row with `deferred_from` whose `state`
+     now counts as verified, run `git grep -n -F "Deferred: <TOR>" -- <test directories>` (the
+     `**Test directories:**` line of `CLAUDE.md`). A hit is a test the earlier epic skipped
+     while the requirement was not built, and nobody switched back on. What clears it:
+     `/peak-workflow:quick-fix <TOR>: switch the skipped test at <path:line> back on`, then
+     `/peak-workflow:wrapup-epic <owning epic> reverify <TOR>`.
+   - **Passed, but a person should still confirm something** — every live row with
+     `unconfirmed`, and every entry of `unconfirmed_epics`. The work passed its checks; a
+     reviewer or the final check noted something no test could settle (data written by hand, a
+     paid service that was not really called, a check that was not run). Give the note as
+     written, without its date. What clears it: a person who can judge it runs
+     `/peak-workflow:wrapup-epic <epic> reverify` (add the TOR when the note has one), which
+     shows the note and records their answer.
+   The top entry (kinds in the order above; within a kind, oldest date first) is this list's next step.
 3. **Health.** Group `check.findings` by letter A–F with `check.counts`. Print each finding's
    `message` verbatim; when a letter has more than 8 findings, print the first 8 and "… and N
    more". Do not reword, re-rank, or re-check them. The panel carries their next steps;
@@ -216,7 +240,7 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    requirement (`dispute.safety`) is always overdue (its threshold is 0 days). The oldest one —
    Safety first — becomes the **top** Suggested Next Action.
 5. **The nudge.** If any live row is Disputed, Changed since verified, or Verification failed (not counting
-   rows with `not_observed`: when those or deferred rows are all there is, the sentence is
+   rows with `not_observed`: when Left for Later entries are all there is, the sentence is
    instead "<N> thing(s) were left for later — see Left for Later; next: <the list's next
    step>"), Step 7 opens with one
    plain sentence naming the counts and the next command, for example: "2 requirements are known
@@ -376,6 +400,12 @@ with removal pending.
 undone on purpose. Each has one next step; run this dashboard again afterwards and it is gone
 from the list."]
 
+**Corrected, not approved yet** [skip when none; one block per requirement]
+- TOR-… — <title> (corrected <date>, <record>; it replaced <replaces>). Why: <the record's reason>
+  > As it read: <the record's old text, in full>
+  > As it reads now: <the current block, in full>
+- Next step: the owner runs `/peak-workflow:capture-requirements <TOR-…>` — it shows both again and asks: keep the correction, or change it.
+
 **Nobody has seen it working** [skip when none; one block per epic]
 **<id> (<slug>) — <Name>**
 - TOR-… — <title>. Still to see: <not_observed text>.
@@ -383,6 +413,14 @@ from the list."]
 
 **Left for a later epic** [skip when none; one line per requirement]
 - TOR-… — <title>: <deferred_from epic `<id> (<slug>) — <Name>`> was finished without it; <owning epic `<id> (<slug>) — <Name>`> builds it. <the next step from item 2.5>
+
+**A test is still switched off** [skip when none; one line per hit]
+- TOR-… — <title>: `<path:line>` still skips its test, though <owning epic> has built it. Next step: `/peak-workflow:quick-fix <TOR-…>: switch the skipped test at <path:line> back on`, then `/peak-workflow:wrapup-epic <owning epic id> reverify <TOR-…>`.
+
+**Passed, but a person should still confirm something** [skip when none; one block per epic]
+**<id> (<slug>) — <Name>**
+- [TOR-… — <title>: ]<the note, as written>
+- Next step: someone who can judge it runs `/peak-workflow:wrapup-epic <id> reverify [TOR-…]` — it shows each note and asks whether it is acceptable.
 
 ## Requirements Health
 
@@ -433,6 +471,7 @@ means the spec records no planner.]
  - If there's an "Implemented" epic awaiting review: "Review Epic <id> (<slug>) — <Name> with `/peak-workflow:wrapup-epic <id>`"
  - If a Disputed requirement is not overdue and the nudge's command does not name it: "Settle
    disputed TOR-… — <title> (<CR-ID>, <age> days of <threshold>): `/peak-workflow:capture-requirements <TOR>`" — the oldest one, after the re-check lines.
+ - If Left for Later has a "Corrected, not approved yet" entry: "Decide the correction to TOR-… — <title>: `/peak-workflow:capture-requirements <TOR>`" — one line per requirement, at most three, before every other requirement line: later epics build on it.
  - If Left for Later has a "Nobody has seen it working" entry: "Have someone look at TOR-… — <title> (<what is still to see>): `/peak-workflow:wrapup-epic <id> reverify <TOR>`" — the list's top entry only, after the re-check lines. A "Left for a later epic" entry adds no line of its own: starting its owning epic is already a ready-to-start line.
  - If any epic has requirements to re-check (Step 4.5 item 2): "Re-check Epic <id> (<slug>) — <Name>: `/peak-workflow:wrapup-epic <id> reverify`" — one line per epic, at most three, each carrying its group's caveat first ("fix the code with `/peak-workflow:quick-fix`, then …" or "decide on TOR-… with `/peak-workflow:capture-requirements TOR-…` first" — also for an edit from before 3.0)
  - If there's a stale paused epic: "Resume or close paused Epic <id> (<slug>) — <Name> — it's been [X] days"

@@ -47,7 +47,9 @@ current format.
 already **Complete** — after a requirement changed since it was verified (finding D), after a
 failed reverify (Verification failed) once the code is fixed, to give the look a requirement was
 merged without (its `states` row has `not_observed`; `/peak-workflow:status` lists it under Left
-for Later), or to record that an earlier PASS was wrong. It never reopens the epic: the sidecar's `status:` line does not change.
+for Later), to have a person confirm what a reviewer or the final check noted as not proven
+(an `unconfirmed-…:` line in the sidecar; `states` row `unconfirmed`, or `unconfirmed_epics`),
+or to record that an earlier PASS was wrong. It never reopens the epic: the sidecar's `status:` line does not change.
 
 The Session Guard and Format Guard above apply unchanged (verification stays independent: a
 fresh session, blind to the implementer handoff — reverify never reads one). The helper is called
@@ -72,7 +74,11 @@ has findings). Run these steps instead of Phases
      which epic owns it (`states` row `epic`).
    - A named ID that is not live → stop with its `tor-lifecycle titles` line: superseded or
      retired requirements are history — the successor is re-checked through its own epic.
-   - Default scope empty → stop: `Every requirement Epic <id> owns is verified — nothing to
+     With no IDs given, every requirement of this epic whose row has `unconfirmed` joins the
+     scope as **note only**: its verdict is not re-checked (R3 skips it) unless the person asks;
+     R3.5 handles its note. An entry for this epic in `unconfirmed_epics` is handled in R3.5 too
+     and needs no requirement in scope.
+   - Default scope empty and no note to confirm → stop: `Every requirement Epic <id> owns is verified — nothing to
      re-check.` (Run the sidecar C check below first; when it fires, print its message instead.)
    - A named ID that is Verified is allowed: re-checking it records a past false PASS as data.
    - A scoped ID whose `states` row has `historical_records` → say `<TOR> was edited before 3.0
@@ -114,6 +120,21 @@ delete it and create it fresh.
   `# UX Baseline` banner — checked on the `S-NN` screens the scoped requirements name, not every
   screen of the epic. No code review, no docs refresh, no Fix now — reverify records results;
   code fixes go through `/peak-workflow:quick-fix`.
+
+### R3.5: Notes a person should confirm
+
+Skip when neither a scoped requirement has `unconfirmed` nor `unconfirmed_epics` names this
+epic. Otherwise, for each note (several notes on one line are separated by ` | `): say in plain
+words what was noted and why no test could settle it, show what the person can look at to judge
+it (the file, the screen, the data the note names), and ask via `AskUserQuestion`:
+`"<the note>. Is this acceptable as it is?"` with `["Yes — acceptable", "No — it needs work",
+"I can't judge this now"]`.
+- **Yes** for every note on that line → R4 adds `--confirmed <TOR>` (or `--confirmed epic`).
+- **No** on a requirement's note → that requirement is a FAIL in R4, with the person's reason;
+  add `--confirmed <TOR>` as well (the failure now carries it). **No** on an epic's note → the
+  note stays; say the next step is `/peak-workflow:triage <the note, and what they said>`,
+  which sizes the work.
+- **I can't judge this now** → the note stays; nothing is recorded for it.
 
 ### R4: Record
 

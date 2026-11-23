@@ -1463,6 +1463,22 @@ class Run {
    * parks, and a build that changes requirement files without that answer is out of scope.
    */
   takenAmendments(e) { const owner = this.ownerAmendments(e); return this.config.mode === 'prototype' ? this.amendGates(e).filter((g) => g.decided.prototype && !owner.includes(g.tor)).map((g) => g.tor) : []; }
+  /**
+   * Writes, on the epic's branch, the record that the owner kept a correction a prototype run took (`tor-lifecycle
+   * keep`), and commits it. When nothing waits to be kept (the record never said "prototype-run"), nothing is written
+   * and the log says so: the project then still lists the correction as not approved, which is the safe side.
+   */
+  keepCorrection(e, g) {
+    const stuck = this.ensureOnBranch(e, 'owner\'s approval');
+    const by = g.decided.by ?? 'the owner';
+    const r = stuck ? { code: 1, err: stuck, out: '' } : torLifecycle(this.pluginDir, this.clone, 'keep', g.tor, '--by', by, '--via', 'epic-branch');
+    if (r.code === 0 && this.dirty()) {
+      this.g('add', '-A', 'docs/requirements/changes');
+      this.g('commit', '--no-verify', '-q', '-m', `docs(epic-${e.id}): ${by} keeps the correction to ${g.tor}`);
+      this.markGate(g.file, (x) => ({ ...x, reask: { ...x.reask, kept: r.out.split('\n').filter(Boolean) } }));
+      this.log(`${e.id}: ${by} kept the correction to ${g.tor}; recorded in the project (${r.out.split('\n').filter(Boolean).join(', ')})`);
+    } else this.log(`${e.id}: ${by} kept the correction to ${g.tor}, but no record of it could be written in the project (${(r.err || r.out || 'nothing waited to be kept').split('\n')[0]}); the project's status may still list it as not approved`);
+  }
   /** The deferrals a prototype run took for this epic. As with amendments, only a prototype run honours them: in a full run the owner is asked. */
   takenDeferrals(e) { return this.config.mode === 'prototype' ? prototypeDeferred(readGates(this.stateDir), e.id) : []; }
   /** The deferrals the owner themself answered "Defer" to, for one of this epic's own requirements: theirs in any run. */
@@ -1825,7 +1841,7 @@ class Run {
       // The question the owner will be asked, when this run wrote one for the epic.
       const name = (e.gates ?? []).at(-1); const g = name ? tryJson(this.gatePath(name)) : null;
       this.event(type, e, { reason, ...(g && !g.decided ? { gate: `gates/${name}`, kind: g.kind ?? null, question: (g.options ?? []).length ? g.question ?? null : null } : {}) });
-    } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0, ...((e.unproven ?? []).length ? { unproven: e.unproven.length } : {}) } : {}) });
+    } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0, ...((e.unproven ?? []).length ? { unproven: e.unproven.length } : {}), ...((e.deferred ?? []).length ? { deferred: e.deferred.length } : {}) } : {}) });
     return null;
   }
   park(e, reason) { try { this.wipCommit(e); } catch (err) { this.log(`${e.id}: could not commit uncommitted work: ${err.message}`); } return this.finish(e, 'PARKED', reason); }
@@ -2265,6 +2281,12 @@ class Run {
     const taken = this.takenAmendments(e);
     const whose = amended.length && amended.every((t) => taken.includes(t)) ? 'the amendment this prototype run took, not yet seen by the owner, of' : "the owner's approved amendment of";
     add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under ${whose} ${amended.join(', ')}` : ''}`);
+    // An amendment nobody approved says so in the project too, not only in autopilot's own files: its change record
+    // names no person. That is what lets the project's status list it for the owner afterwards.
+    if (amended.some((t) => taken.includes(t)) && changed.some((f) => f.startsWith('docs/requirements/'))) {
+      const honest = changed.filter((f) => f.startsWith('docs/requirements/changes/')).some((f) => /^approved_via\s*=\s*"prototype-run"\s*$/m.test(gitShow(this.clone, b, f)));
+      add('amendment-record', honest, honest ? 'the change record says no person approved the amendment (approved_via = "prototype-run")' : `a prototype run took the amendment of ${amended.filter((t) => taken.includes(t)).join(', ')}: its change record under docs/requirements/changes/ must say approved_via = "prototype-run" and approved_by = "autopilot (prototype run)", not a person's name`);
+    }
     if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; if (amended.some((t) => taken.includes(t))) e.amendedUnseen = amended.filter((t) => taken.includes(t)); this.log(`${e.id}: the build changed requirement files under ${whose} ${amended.join(', ')}`); }
 
     if (this.hasScreens(e)) {
@@ -2784,7 +2806,35 @@ class Run {
     }
     gitRun(this.clone, 'config', '--remove-section', `branch.${e.preVerify.branch}`); // stale entry left by the sandboxed `git branch -d`
     if (e.deferred?.length) this.handDeferred(e);
+    this.noteUnconfirmed(e);
     return this.finish(e, 'MERGED', 'verify PASS, merge gate green');
+  }
+
+  /**
+   * What the reviewer and the final check said is not proven for real stopped nothing, and until now lived only in
+   * this run's files. After the merge each note is written into the epic's status file on the integration line
+   * (`tor-lifecycle mark --unconfirmed`, under the requirement it names, else under the epic) and committed, so the
+   * project's own status lists it for whoever opens it later. Never fails the epic: a note that cannot be written is logged.
+   */
+  noteUnconfirmed(e) {
+    const items = e.unproven ?? [];
+    if (!items.length) return;
+    try {
+      const dev = this.state.integration; const m = this.meta(e);
+      if (this.currentBranch() !== dev || this.dirty()) { this.log(`${e.id}: ${items.length} "not proven" note(s) were not written into the project (the clone is ${this.dirty() ? 'not clean' : `on ${this.currentBranch() || 'no branch'}`}); they are in this run's report`); return; }
+      const sc = parseSidecar(gitShow(this.clone, dev, m.sidecar));
+      const anchors = this.anchorsFor(e, sc).filter((t) => !(e.unobserved ?? []).some((u) => u.tor === t) && !(e.deferred ?? []).includes(t)); // those two are listed in their own right
+      let wrote = 0;
+      for (const u of items) {
+        const about = (String(u.text).match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? []).find((t) => anchors.includes(t)) ?? 'epic';
+        const r = torLifecycle(this.pluginDir, this.clone, 'mark', e.id, '--unconfirmed', about, `${u.source === 'reviewer' ? 'the reviewer' : 'the final check'}: ${String(u.text).replace(/\s+/g, ' ').trim()}`);
+        if (r.code === 0) wrote += 1; else this.log(`${e.id}: a "not proven" note could not be written into the project (${(r.err || r.out).split('\n')[0]})`);
+      }
+      if (!wrote || !this.dirty()) return;
+      this.g('add', m.sidecar);
+      this.g('commit', '--no-verify', '-q', '-m', `docs(epic-${e.id}): note what a person should still confirm`);
+      this.log(`${e.id}: ${wrote} "not proven" note(s) written into ${m.sidecar} on ${dev}, for the project's status to list`);
+    } catch (err) { this.log(`${e.id}: the "not proven" notes were not written into the project (${err.message}); they are in this run's report`); }
   }
 
   async runEpic(e, entry = 'PLAN') {
@@ -2902,6 +2952,9 @@ class Run {
           this.finish(e, 'PARKED', `a prototype run took an answer for ${tors}: a full run asks the owner before it goes on`);
           return null;
         }
+        // The owner kept a correction the prototype run took: the project's own record of it still says nobody approved
+        // it, so the record that says they did is written on the epic's branch before the epic goes on.
+        for (const x of all.filter((x) => x.epic === e.id && x.reask && x.kind === 'amendment' && x.decided?.answer === x.reask.took && !x.decided.used && !x.reask.kept && !x.void && !x.superseded && !x.cleared)) this.keepCorrection(e, x);
         // Their answers are in: one that is not what the prototype run took sends the epic back to the session that asked.
         const answered = all.filter((x) => x.epic === e.id && x.reask && x.decided?.answer && !x.decided.used && !x.void && !x.superseded && !x.cleared && x.decided.answer !== x.reask.took);
         if (answered.length) phase = answered.some((x) => stepKindOf(x.session) === 'plan') ? 'PLAN' : 'BUILD';
