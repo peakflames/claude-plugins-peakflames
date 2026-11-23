@@ -255,6 +255,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot's referee no longer reads a quoted heredoc's text as commands** — a Python or
+  `cat` script body behind `<<'EOF'` is skipped; before, a word like `kind` in a doc was refused
+  as a container tool and a test import as a path in the workspace. Bodies run by a shell stay read.
 - **Autopilot waits out the owner's usage limit** — a session stopped by the 5-hour limit is
   resumed after the reset, with no question and no "infra error". A weekly limit, or one
   that resets after the end time, stops the run and says when it resets.
