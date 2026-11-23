@@ -113,6 +113,27 @@ export function unprovenLines(text) {
 }
 
 /**
+ * What the verifier says it saw wrong and left as it was: the points under a "Seen but not fixed" heading. A defect
+ * it noticed (wrong text in a picture, a console error) otherwise reaches nobody (Pilot Light, 2026-11-22: the epic
+ * merged with it). Pure; "none" and "nothing" are no entries.
+ */
+export function leftLines(text) {
+  const out = []; let under = false;
+  const clean = (l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\*\*/g, '').trim();
+  for (const raw of String(text ?? '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (/^(#+\s*|\*\*)?seen but not fixed\b[^\n]{0,6}$/i.test(line.replace(/\*\*\s*$/, ''))) { under = true; continue; }
+    if (!under) continue;
+    if (/^(#+\s|\*\*[^*]+\*\*:?\s*$)/.test(line)) { under = false; continue; }
+    if (!/^(?:[-*•]|\d+[.)])\s+\S/.test(line)) { if (line && out.length && /^\s/.test(raw)) out[out.length - 1] = `${out.at(-1)} ${clean(line)}`; continue; }
+    if (/^(none|nothing)\b/i.test(clean(line))) continue;
+    if (/^\s{2,}/.test(raw) && out.length) { out[out.length - 1] = `${out.at(-1)} ${clean(line)}`; continue; }
+    out.push(clean(line));
+  }
+  return [...new Set(out)].map((t) => oneLine(t, 700));
+}
+
+/**
  * What a verifier's final report says it saw in the pictures of an epic with screens: the bullets
  * under a "What the pictures show" heading. Pure, and quoted to the owner as the verifier's words.
  */
