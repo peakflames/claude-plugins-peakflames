@@ -260,6 +260,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   that resets after the end time, stops the run and says when it resets.
 - **A cut-off build is continued, not judged finished** — a build stopped by an API error
   re-enters as a build session; before, its half-done branch went straight to the checks.
+- **A branch behind `develop` is brought up to date before its build** — a continued build or
+  repair works on the other epics' merged code; a branch that no longer merges cleanly parks
+  before any session is spent, not after the build and review.
+- **"Should still confirm" notes keep their sub-points** — a final-check point and its nested
+  points are one note, filed under the requirement it opens with; before, each line was saved
+  as a separate fragment.
 - **The scratch-folder rule refuses only real copies** — a session may print
   `$AUTOPILOT_SCRATCH`, pass it in an option or use it in quoted code; only assigning it to a
   variable is refused. On Pilot Light, 11 of 18 refusals were of the harmless kind.

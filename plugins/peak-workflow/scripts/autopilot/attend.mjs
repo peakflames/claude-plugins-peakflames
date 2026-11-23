@@ -92,18 +92,24 @@ export const UNPROVEN_CATEGORIES = ['never-ran-real', 'stand-in', 'cannot-fail']
  * account, so this is quoted to the owner as the verifier's words, never as a finding of autopilot's.
  */
 export function unprovenLines(text) {
-  const out = []; let under = false;
+  const out = []; let under = false; let top = null; // `top`: the indent of the section's points; deeper ones belong to the point above
   const clean = (l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\*\*/g, '').trim();
   for (const raw of String(text ?? '').split(/\r?\n/)) {
     const line = raw.trim();
+    const indent = raw.match(/^\s*/)[0].replace(/\t/g, '    ').length;
     if (/^(#+\s*|\*\*)?not proven for real\b[^\n]{0,6}$/i.test(line.replace(/\*\*\s*$/, ''))) { under = true; continue; }
     const notRun = clean(line).match(/^not run\s*[:—–-]\s*(.+)$/i);
     if (notRun) { out.push(notRun[1].trim()); continue; }
     if (!under) continue;
     if (/^(#+\s|\*\*[^*]+\*\*:?\s*$)/.test(line)) { under = false; continue; } // the next heading ends the section
-    if (/^(?:[-*•]|\d+[.)])\s+\S/.test(line) && !/^[-*•]?\s*(none|nothing)\b/i.test(clean(line))) out.push(clean(line));
+    if (!/^(?:[-*•]|\d+[.)])\s+\S/.test(line) || /^[-*•]?\s*(none|nothing)\b/i.test(clean(line))) continue;
+    // A sub-point is part of the point above it (seen live: "What it was checked against instead:" and its three
+    // sub-points were each written into the project as a note of their own).
+    if (top !== null && indent > top && out.length) { out[out.length - 1] = `${out.at(-1)} ${clean(line)}`; continue; }
+    top = indent;
+    out.push(clean(line));
   }
-  return [...new Set(out)].map((t) => oneLine(t, 400));
+  return [...new Set(out)].map((t) => oneLine(t, 700));
 }
 
 /**

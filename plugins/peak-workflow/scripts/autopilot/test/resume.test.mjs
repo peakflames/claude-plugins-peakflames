@@ -732,6 +732,50 @@ test('another epic merged after the park: the decision still holds, because the 
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /The branch was \d+ commits? behind `develop` and merged cleanly in a trial merge\./);
 });
 
+test('a build continued on a branch that is behind develop is brought up to date first, so it builds on the other epics\' work (Pilot Light JlkOIsy, 2026-11-23)', async (t) => {
+  // Seen live: resumed 13 commits behind and merging cleanly, the build changed the same files the other epics had,
+  // and only the catch-up before verify found the overlap, after $5 of build and review.
+  const p = makeProject(t);
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: buildActions(E1, { commit: false }), result: { subtype: 'error_max_turns', is_error: true } }, ...happy(d) });
+  const s1 = await p.go();
+  assert.deepEqual(s1.queue.map((q) => q.state), ['PARKED', 'MERGED']);
+  const parkedTip = git(p.clone, 'rev-parse', E1.branch);
+  decide(p, E1.id, ANSWERS.resume);
+
+  p.scenario({ [`${E1.id}/build`]: buildScript(E1), [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+
+  assert.equal(r.steps[0], `${E1.id}/build-1`, 'the cut-off build is continued');
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  const log = fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8');
+  assert.match(log, /brought up to date with develop before the build/);
+  const merge = git(p.clone, 'log', '--format=%H %s', 'develop').split('\n').find((l) => /\(autopilot: catch up before the build\)$/.test(l))?.split(' ')[0];
+  assert.ok(merge, 'the catch-up merge landed with the epic');
+  assert.deepEqual(git(p.clone, 'rev-list', '--parents', '-n', '1', merge).split(' ').slice(1)[0], parkedTip);
+  assert.ok(log.indexOf('before the build') < log.indexOf(`${E1.id}: build-1 starting`), 'before the session starts');
+  assert.doesNotMatch(log, /before verify/, 'nothing is left to catch up before verify');
+});
+
+test('a branch that stops merging cleanly during the run is parked before its build, not after it: no session is spent', async (t) => {
+  // The run-start check found it clean; an epic that merged earlier in the same run then changed the same file.
+  const p = makeProject(t);
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  const notes = (who) => ({ do: 'write', path: 'docs/notes.md', content: `notes by ${who}\n` });
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: [...buildActions(E1, { commit: false }), notes('csv')], result: { subtype: 'error_max_turns', is_error: true } } });
+  await p.go({ queue: [E1.id] });
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  decide(p, E1.id, ANSWERS.resume);
+
+  p.scenario({ ...happy(d), [`${d.id}/build`]: { actions: [...buildActions(d, { commit: false }), notes('config'), { do: 'commit', message: `feat(epic-${d.id}): config` }] }, [`${E1.id}/build`]: buildScript(E1), [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p, { queue: [d.id, E1.id] });
+  if (p.epic(d.id).state !== 'MERGED') return t.skip(`setup: ${d.id} did not merge (${p.epic(d.id).reason})`);
+  assert.deepEqual(r.steps.filter((x) => x.startsWith(E1.id)), [], 'no session is spent on a branch that cannot land');
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  assert.match(p.epic(E1.id).reason, /does not merge cleanly with develop \(docs\/notes\.md\)/);
+});
+
 test('a verifier that first merges develop into the waiting branch is not blamed for the other epic\'s files; a file it writes itself still is', async (t) => {
   const setup = async () => {
     const p = makeProject(t);
