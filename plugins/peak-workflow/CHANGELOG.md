@@ -255,6 +255,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A session may remove its own scratch worktree with `--force`** — `git worktree remove --force`
+  on a worktree inside its scratch folder is allowed; every other forced git command stays denied.
 - **A resumed session may use its earlier step's scratch folder** — after a usage-limit wait
   the session kept writing to the first step's folder and was refused. Earlier steps' scratch
   folders of the same epic are now open to it; everything else of theirs stays closed.

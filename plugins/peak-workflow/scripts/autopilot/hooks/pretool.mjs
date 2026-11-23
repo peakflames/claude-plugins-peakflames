@@ -297,7 +297,11 @@ function ruleR3(ctx, segs, command) {
     if (branch === null) branch = git(dir, 'branch', '--show-current').out;
 
     if (sub === 'remote' && ['add', 'set-url', 'rename', 'remove', 'rm'].includes(names[0])) return deny('R3', `git remote ${names[0]} is denied; the clone has no remote on purpose (listing remotes is fine)`);
-    if (args.some((a) => /^--force/.test(a))) return deny('R3', 'git --force is denied');
+    // A worktree the session made in its scratch folder is removed with --force when it has files in it (seen live, three
+    // times, Pilot Light 2026-11-23). That is the one forced command that can only touch the session's own scratch folder.
+    const scratchWorktree = sub === 'worktree' && names[0] === 'remove' && names.length === 2 && ctx.scratch
+      && classify(ctx, plain(names[1])) === 'rw' && /(^|\/)scratch(\/|$)/.test(realDeep(path.resolve(dir, String(plain(names[1])).replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch))));
+    if (args.some((a) => /^--force/.test(a)) && !scratchWorktree) return deny('R3', 'git --force is denied');
     if (['branch', 'tag', 'switch', 'checkout'].includes(sub) && args.some((a) => /^-[a-zA-Z]*f/.test(a))) return deny('R3', `git ${sub} -f is denied`);
     if (sub === 'reset' && has('--hard')) return deny('R3', 'git reset --hard is denied');
     if (['update-ref', 'filter-branch', 'filter-repo', 'replace', 'symbolic-ref'].includes(sub) && names.length) return deny('R3', `git ${sub} is denied`);

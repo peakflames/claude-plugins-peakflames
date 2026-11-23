@@ -317,6 +317,19 @@ test('R2 auditor: reads the bundle and the clone, and nothing else is allowed', 
   denied(h.bash('ls'), 'R2', /only reads/);
 });
 
+test('R3 git: a worktree made in the scratch folder may be removed with --force; no other forced command, and no other worktree (Pilot Light, 2026-11-23)', (t) => {
+  const h = referee(t);
+  passes(h.bash('git worktree remove --force "$AUTOPILOT_SCRATCH/wt-develop"'), 'by name');
+  passes(h.bash(`git worktree remove --force ${h.scratch}/base`), 'absolute path');
+  passes(h.bash('git worktree add -q --detach "$AUTOPILOT_SCRATCH/base" develop && git worktree remove --force "$AUTOPILOT_SCRATCH/base"'), 'add then remove');
+  denied(h.bash(`git worktree remove --force ${h.clone}`), 'R3', /--force/, 'the clone itself');
+  denied(h.bash('git worktree remove --force /tmp/other'), 'R3', /--force/, 'a worktree elsewhere');
+  denied(h.bash('git worktree remove --force "$AUTOPILOT_SCRATCH/a" /tmp/other'), 'R3', /--force/, 'two paths');
+  denied(h.bash('git worktree remove --force "$AUTOPILOT_SCRATCH/../.."'), 'R2', /autopilot workspace/, 'climbing out');
+  denied(h.bash('git worktree prune --force'), 'R3', /--force/, 'prune');
+  denied(h.bash('git checkout --force develop'), 'R3', /--force/, 'checkout');
+});
+
 test('R3 git: push, remote writes, force, hard reset, branch -D, release line and tags are denied', (t) => {
   const h = referee(t);
   // `git stash push` keeps work on this machine: it is not a push. A push after it in the same command still is.
