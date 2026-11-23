@@ -130,6 +130,27 @@ function tokenize(segment) {
   for (const m of segment.matchAll(/(?:[^\s"']+|"(?:[^"\\]|\\.)*"|'[^']*')+/g)) out.push(m[0].replace(/"((?:[^"\\]|\\.)*)"|'([^']*)'/g, (_, a, b) => a ?? b ?? ''));
   return out;
 }
+/**
+ * The command with the bodies of quoted heredocs taken out. A body behind `<<'EOF'` is text the shell hands to the
+ * command unread (a Python script, a markdown file); it is not commands, and reading it as commands refused real
+ * work: seen live (Pilot Light, 2026-11-23), a table cell `kind` in a doc was refused as the container tool, and
+ * `'../support/control'` in a test import as a path in the workspace. A body for a shell (`bash <<'EOF'`, `eval`)
+ * is run, so it stays; so does a body behind an unquoted delimiter, where the shell expands `$(...)`.
+ */
+export function withoutHeredocBodies(command) {
+  const lines = String(command).split('\n'); const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    out.push(lines[i]);
+    const m = lines[i].match(/<<(-?)\s*(?:'([^']+)'|"([^"]+)")/);
+    if (!m || /(^|[\s;&|(])(bash|sh|zsh|dash|ksh|fish|eval|source|\.|xargs|ssh)(\s|$)/.test(lines[i].slice(0, m.index))) continue;
+    const delim = m[2] ?? m[3];
+    const end = lines.findIndex((l, j) => j > i && (m[1] ? l.replace(/^\t+/, '') : l) === delim);
+    if (end === -1) continue; // never closed: the rest stays visible
+    out.push(lines[end]); i = end;
+  }
+  return out.join('\n');
+}
+
 function parseBash(command) {
   return command.split(/&&|\|\||[;|\n]|\$\(|`|(?<![\w$])\(|\)/).map((s) => s.trim()).filter(Boolean).map((raw) => {
     const all = tokenize(raw);
@@ -636,7 +657,7 @@ export function decide(input, env = process.env) {
   let d = ruleR2Files(ctx);
   if (d) return d;
   if (tool === 'Bash') {
-    const command = String(ti.command ?? '');
+    const command = withoutHeredocBodies(String(ti.command ?? ''));
     const segs = parseBash(command);
     d = ruleR2Bash(ctx, segs, command) ?? ruleR3(ctx, segs, command) ?? ruleR4(segs) ?? ruleR7(ctx, bashWriteTargets(segs)) ?? ruleR5(ctx);
   } else if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {

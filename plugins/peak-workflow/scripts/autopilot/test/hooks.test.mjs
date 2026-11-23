@@ -143,6 +143,24 @@ test('R2 scratch folder: printing its name, an option or quoted code is not a co
   ]) denied(h.bash(c), 'R2', /as it is: do not copy it into a variable/, c);
 });
 
+test('Bash: the body of a quoted heredoc is text, not commands; a body for a shell is still read (Pilot Light, 2026-11-23)', (t) => {
+  const h = referee(t);
+  const hd = (head, body, delim = 'EOF', tail = '') => `${head}\n${body}\n${delim}${tail}`;
+  // Refused live: a table cell `kind` read as the container tool, a test import read as a path in the workspace.
+  passes(h.bash(hd("python3 - <<'EOF'", "s='''| `kind` | e.g. audit |\n| `gh` | sudo docker |'''\nopen('docs/x.md','w').write(s)")), 'markdown in a Python heredoc');
+  passes(h.bash(hd("python3 - <<'EOF'", "s=s.replace('a','import { c } from \"../support/control\";')")), 'a relative path in a string');
+  passes(h.bash(hd("cat > docs/n.md <<'EOF'", 'run `docker ps` and `sudo ls`', 'EOF', '\ngit status')), 'cat to a file');
+  passes(h.bash(hd('cat <<-"EOT"', '\tgh issue', '\tEOT')), 'a double-quoted, indented delimiter');
+  // Still read: a command before or after the body, a shell that runs the body, an unquoted body, a redirect on the header, a body never closed.
+  denied(h.bash(hd("python3 - <<'EOF'", 'print(1)', 'EOF', '\ndocker ps')), 'R4', null, 'command after the body');
+  denied(h.bash(hd("docker ps && python3 - <<'EOF'", 'print(1)')), 'R4', null, 'command before the body');
+  denied(h.bash(hd("bash <<'EOF'", 'sudo ls')), 'R4', null, 'body run by a shell');
+  denied(h.bash(hd("sh <<'EOF'", 'docker ps')), 'R4', null, 'body run by sh');
+  denied(h.bash(hd('python3 - <<EOF', '$(docker ps)')), 'R4', null, 'unquoted body expands');
+  denied(h.bash(hd("cat > ../outside.md <<'EOF'", 'x')), 'R2', null, 'redirect target on the header line');
+  denied(h.bash("python3 - <<'EOF'\nx\n; docker ps"), 'R4', null, 'never closed');
+});
+
 test('R2 files CLAUDE.md names: a listed file outside the clone is read and run, never written; its neighbours stay closed', (t) => {
   for (const sandbox of [false, true]) {
     const h = referee(t, { sandbox });
