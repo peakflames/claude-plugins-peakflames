@@ -6,10 +6,11 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, syncFacts } from '../driver.mjs';
+import { ANSWERS, PLUGIN_DIR, syncFacts } from '../driver.mjs';
 import { DRIVER, E1, addEpic, git, happy, makeProject, readJson } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
+const status = (p) => { const r = cli('status', '--project', p.project, '--json'); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
 const preflight = (p) => JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
 const tip = (repo, ref = 'develop') => git(repo, 'rev-parse', ref);
 const audit = (category) => ({ result: { structured_output: { findings: [{ category, severity: 'high', evidence: 'x:1', explanation: 'canned' }], recommend: 'park', summary: 's' } } });
@@ -104,6 +105,44 @@ test('sync, C ahead of P: the run builds on the clone; readiness reads the clone
   // One fetch brings both runs' work in.
   ownerFetches(p);
   assert.equal(preflight(p).launch.sync.state, 'same');
+});
+
+test('status names the finished epics that wait in the clone, for the status dashboard: clone ahead, diverged, while a driver runs, and none once fetched', async (t) => {
+  const p = makeProject(t);
+  const e2 = addEpic(p.project, { ...E2, deps: [E1.id] });
+  p.scenario({ ...happy(E1), ...happy(e2) });
+  await p.go({ queue: [E1.id] });
+  const P = tip(p.project);
+  const waits = (s) => [s.sync.state, s.sync.epics.map((e) => e.id)];
+
+  // Clone ahead: E1 is Complete in the clone and Not Started in the project.
+  const ahead = status(p);
+  assert.deepEqual(waits(ahead), ['clone-ahead', [E1.id]]);
+  assert.match(ahead.sync.epics[0].label, new RegExp(`^${E1.id} .*CSV import`));
+  assert.equal(ahead.sync.fetch.length, 2);
+  // The command exactly as skills/status/SKILL.md Step 0.6 writes it.
+  const line = fs.readFileSync(path.join(PLUGIN_DIR, 'skills', 'status', 'SKILL.md'), 'utf8').match(/`(node "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/autopilot\/driver\.mjs" status [^`]+)`/)?.[1];
+  assert.ok(line, 'status SKILL.md names the driver status command');
+  const r = spawnSync('sh', ['-c', line.replaceAll('${CLAUDE_PLUGIN_ROOT}', PLUGIN_DIR).replaceAll('<root>', p.project)], { encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(r.stdout).sync.epics, ahead.sync.epics);
+
+  // While a driver runs, the same facts, and no fetch to offer: the run is still writing the clone.
+  fs.writeFileSync(path.join(p.state, 'lock'), JSON.stringify({ pid: process.pid }));
+  const live = status(p);
+  assert.deepEqual([live.next, ...waits(live), live.sync.fetch], ['attend', 'clone-ahead', [E1.id], []]);
+  fs.rmSync(path.join(p.state, 'lock'));
+
+  // Diverged: the owner committed by day; the finished epic still waits.
+  fs.writeFileSync(path.join(p.project, 'NOTES.md'), 'a commit made by day\n');
+  git(p.project, 'add', '-A'); git(p.project, 'commit', '-q', '-m', 'docs: notes');
+  assert.deepEqual(waits(status(p)), ['diverged', [E1.id]]);
+  git(p.project, 'reset', '-q', '--hard', P);
+
+  // Once fetched, nothing waits.
+  git(p.project, 'fetch', '-q', p.clone, 'develop:autopilot/develop');
+  git(p.project, 'merge', '-q', '--ff-only', 'autopilot/develop');
+  assert.deepEqual(waits(status(p)), ['same', []]);
+  assert.equal(fs.existsSync(path.join(p.state, 'lock')), false);
 });
 
 test('sync, diverged: readiness and the driver both refuse and print both tips; nothing is written', async (t) => {

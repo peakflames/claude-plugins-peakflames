@@ -66,7 +66,10 @@ the requirement), a look nobody gave (`unverified: … NOT OBSERVED — …`), a
 a later epic (`waived:`), a test still skipped (`Deferred: <TOR>`), and a note to confirm
 (`unconfirmed-…:`). Each entry names the one existing skill that clears it
 (`capture-requirements <TOR>`, `wrapup-epic <id> reverify`, `start-epic`, `quick-fix`); no skill
-exists only to walk the list, and an entry leaves it when the files say it is done.
+exists only to walk the list, and an entry leaves it when the files say it is done. Epics
+autopilot finished in its private copy and the owner has not brought in are outside the
+project's files, so `status` says so in a banner (from `driver.mjs status`: `sync.epics`, and
+the questions autopilot waits on) rather than show them as not started.
 
 **Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
 ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by

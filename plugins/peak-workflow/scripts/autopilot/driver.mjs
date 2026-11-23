@@ -491,6 +491,27 @@ export function syncFacts(project, workspace, integration) {
   }
   return { state: 'diverged', ...facts };
 }
+/**
+ * The epics Complete on the clone's integration line and not in the project: finished work the owner
+ * has not brought in yet. Read-only; the status dashboard names them, since it reads only the project.
+ */
+export function waitingEpics(project, workspace, integration) {
+  const clone = path.join(workspace, 'clone');
+  if (!integration || !exists(clone)) return [];
+  const here = new Map(readEpics(project).map((e) => [e.id, e.status]));
+  return readEpics(project, { sidecarText: (rel) => gitShow(clone, integration, rel) })
+    .filter((e) => e.status === 'Complete' && here.get(e.id) !== 'Complete').map((e) => ({ id: e.id, label: e.label }));
+}
+/** `sync` as `status` reports it. No fetch is offered while a driver runs: it is still writing the clone. */
+function syncReport(project, workspace, integration, { running = false } = {}) {
+  const s = syncFacts(project, workspace, integration);
+  const clone = path.join(workspace, 'clone');
+  return {
+    state: s.state, waiting: s.waiting ?? [],
+    epics: ['clone-ahead', 'diverged'].includes(s.state) ? waitingEpics(project, workspace, integration) : [],
+    fetch: !running && integration && s.state === 'clone-ahead' ? [`${fetchCommand(clone, integration)} && git log ${integration}..autopilot/${integration}`, `git merge --ff-only autopilot/${integration}`] : [],
+  };
+}
 // ---- the clone's environment: what git does not carry ------------------------------------------
 
 const noSlash = (p) => String(p).replace(/\/+$/, '');
@@ -3616,7 +3637,10 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     ];
     return out;
   };
-  if (pid) { out.next = 'attend'; out.why = 'a driver is running'; return say(); }
+  if (pid) {
+    try { const integration = state?.integration ?? detectIntegration(root); out.sync = syncReport(root, ws, integration, { running: true }); } catch { /* the dashboard goes without it */ }
+    out.next = 'attend'; out.why = 'a driver is running'; return say();
+  }
 
   // Not running: what could run next, read as readiness reads it.
   let pre = null; let launch = null;
@@ -3632,7 +3656,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     });
     launch = launchFacts(root, ws, config, { epics: pre.epics });
     out.integration = integration;
-    out.sync = { state: sync.state, waiting: sync.waiting ?? [], fetch: integration && sync.state === 'clone-ahead' ? [`${fetchCommand(clone, integration)} && git log ${integration}..autopilot/${integration}`, `git merge --ff-only autopilot/${integration}`] : [] };
+    out.sync = syncReport(root, ws, integration);
     out.refuse = [...pre.refuse, ...launch.refuse];
     for (const e of pre.epics) if (e.eligibility === 'complete' && e.reasons.some((r) => /not fetched into the project yet/.test(r))) merged.set(e.id, e.label);
     out.merged = [...merged.values()];
