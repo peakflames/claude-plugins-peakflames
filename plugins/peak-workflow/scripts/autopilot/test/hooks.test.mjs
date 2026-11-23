@@ -161,6 +161,24 @@ test('Bash: the body of a quoted heredoc is text, not commands; a body for a she
   denied(h.bash("python3 - <<'EOF'\nx\n; docker ps"), 'R4', null, 'never closed');
 });
 
+test('R2 scratch folder: a resumed session may keep using the scratch folder of an earlier step of the same epic, and nothing else of it (Pilot Light, 2026-11-23)', (t) => {
+  const h = referee(t);
+  const earlier = path.join(path.dirname(h.step), 'build-0', 'scratch');
+  fs.mkdirSync(earlier, { recursive: true });
+  passes(h.pre('Write', { file_path: path.join(earlier, 'zz-look.spec.ts'), content: 'x' }), 'write in an earlier step\'s scratch');
+  passes(h.pre('Read', { file_path: path.join(earlier, 'zz-look.spec.ts') }), 'read there');
+  passes(h.bash(`echo x > ${earlier}/out.txt`), 'a redirect there');
+  // Still closed: the earlier step's own files, another epic's scratch, the run's files, a link out of it.
+  denied(h.pre('Write', { file_path: path.join(path.dirname(earlier), 'hooks.jsonl'), content: 'x' }), 'R2', /autopilot workspace/);
+  denied(h.pre('Write', { file_path: path.join(h.runDir, 'epics', 'OTHER', 'build-1', 'scratch', 'x'), content: 'x' }), 'R2', /autopilot workspace/);
+  denied(h.pre('Write', { file_path: path.join(h.runDir, 'state.json'), content: 'x' }), 'R2', /autopilot workspace/);
+  fs.symlinkSync(h.state, path.join(earlier, 'ws'));
+  denied(h.pre('Write', { file_path: path.join(earlier, 'ws', 'STOP'), content: '' }), 'R2', /autopilot workspace/);
+  // The auditor has no scratch folder and gets none of them.
+  const a = referee(t, { role: 'auditor' });
+  denied(a.pre('Write', { file_path: path.join(path.dirname(a.step), 'build-0', 'scratch', 'x'), content: 'x' }), 'R2');
+});
+
 test('R2 files CLAUDE.md names: a listed file outside the clone is read and run, never written; its neighbours stay closed', (t) => {
   for (const sandbox of [false, true]) {
     const h = referee(t, { sandbox });

@@ -80,6 +80,10 @@ function classify(ctx, raw, { bash = false } = {}) {
   if (ctx.scratch) p = p.replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch);
   p = realDeep(path.resolve(ctx.cwd, p));
   if (ctx.scratch && within(p, ctx.scratch)) return 'rw';
+  // A session the driver resumes (after a usage-limit wait, or to continue a build) remembers the scratch folder of the
+  // step it began in; seen live (Pilot Light, 2026-11-23): build-2 wrote to build-1's and was refused. The earlier steps'
+  // scratch folders of the same epic are the same kind of place: private, and in this run.
+  if (ctx.scratch && ctx.epic && /^\/[^/]+\/scratch(\/|$)/.test(p.startsWith(path.join(ctx.runDir, 'epics', ctx.epic)) ? p.slice(path.join(ctx.runDir, 'epics', ctx.epic).length) : '')) return 'rw';
   if (ctx.role === 'auditor') {
     if (ctx.step && within(p, path.join(ctx.step, 'bundle'))) return 'ro';
     if (within(p, ctx.clone)) return 'ro';
