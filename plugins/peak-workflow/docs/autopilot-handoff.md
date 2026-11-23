@@ -7,9 +7,14 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests: 215 pass, 13 skipped (the skipped
-  ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13 passed on 2026-11-21), lab suite 10
-  pass.
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-23): 250, of which 237
+  pass and 13 are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13
+  passed on 2026-11-21), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
+  Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
+  base as well (cause not looked for).
+- **Pilot Light** (the second real project) is mid-queue: run `20261123-081039`, a prototype
+  run, merged 3 epics and stopped when the owner's usage limit was reached; 1 epic waits to
+  resume and 6 have not started. What it proved is under Step 12.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
 - **The cockpit mod is deferred** (`autopilot-cockpit-mod-handoff.md`, note at its top): the run
   announces itself in chat instead, because chat is the one display every device has.
@@ -434,13 +439,52 @@ Why this order:
   - The build check lets a deferring epic change the later epic's spec and status file, and
     allows one skipped test per `Deferred: <TOR>` marker. It does not check what was changed
     in those two files.
-  - An amendment's change record names the owner as approver (the skill writes
-    `git config user.name`); the gate file says autopilot answered.
+  - ~~An amendment's change record names the owner as approver.~~ Changed 2026-11-23: the
+    record names `autopilot (prototype run)`, the build check requires it
+    (`amendment-record`), and the project's `status` lists the requirement until a person
+    keeps or changes it. Not proven: that a real session writes the record so.
   - The section prints the reverify command for an unobserved requirement. Every other
     command is kept out of `report.md` (#41 I6); the owner asked for this one.
+  **What Pilot Light's prototype run `20261123-081039` proved (2026-11-23, real sessions;
+  3 epics merged, 1 parked, 6 not started, $41.28, 08:11 to 10:06):**
+  - Proven: a prototype run does not stop for a look at screens. `wotOahf` logged
+    `prototype-skip`, kept 17 pictures, went to the final check and merged; `status` and
+    `report.md` list it under "Looks that were skipped".
+  - Proven: an amendment the owner approved in an earlier run reaches the next run's planner
+    and builder without being asked again (`n2g5TvI`, TOR-03-BIA0vmf: "told 1 answer(s) the
+    owner already gave"; scope passed "under the owner's approved amendment"). This answers
+    "does an approved amendment survive a stop?" below: yes.
+  - Proven: three epics in a row from plan to merge with no person (22 to 27 minutes and
+    $8.56 to $13.02 each), one of them through a repair round (tests citing a requirement ID
+    that does not exist).
+  - **Not proven, because the run stopped before the Board and Run epics:** a requirement
+    only a person can observe going to the final check as not observed (the verifier and
+    `not-observed.md`); a planner's amendment taken by the run; a builder's deferral taken,
+    end to end; the later epic gaining the deferred requirement.
+  - Not proven at all, built the same day and tested only against the fake `claude`: a full
+    run asking again what a prototype run took; the owner's own "Defer" passing the checks;
+    the notes written into the status file after a merge (`unconfirmed-…:`); the project's
+    `status` "Left for Later" panel.
+- [ ] **A usage limit is reported as an "infra error", retried, and never named** (*no
+  issue*; run `20261123-081039`, `Vbz68Ea` build-1 and build-2). The owner's 5-hour limit was
+  reached: `result.json` has `is_error: true`, `terminal_reason: "api_error"`,
+  `api_error_status: 429`, and the text "You've hit your 5-hour limit · resets 1pm". The
+  driver logged "infra error (success); retrying once in 300 s", the retry failed at once, and
+  the run ended "stopped: infra" with the reason "infra error during build-2: success". The
+  owner learned the cause from Claude, not from autopilot. Wanted: recognise a 429 usage
+  limit, do not retry, stop the run saying in plain words that the usage limit was reached
+  and when it resets (the session's own text), and say that the same command continues it.
+  The resume gate it wrote was correct, and the standing answer decided it. C2.
+- [ ] **An epic that extends a screen another epic owns gets no look** (*no issue*; same run,
+  `n2g5TvI`). Its spec has no Screens table ("S-01 is owned by the skeleton; this epic
+  extends it"), so it is not a "UI epic" and never stops for a look, in a full run either.
+  Unexamined. C3.
+- [ ] **`status` gave the run budget as $250; the run's `config.json` says $243.62**
+  (*no issue*; same run). Unexamined. C3.
 - [ ] **The watch repeats its progress line once per blocked epic** (*no issue*; run
   `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3.
-- [ ] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`). The
+- [x] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`).
+  Answered by run `20261123-081039`: yes, see above. The
   owner's "Amend" answer for n2g5TvI was given to a resumed plan session that he then
   stopped after 2 minutes; a new resume gate was written. Check on the next launch whether
   the planner asks again. That stop also added nothing to the spend (see "A session that is
