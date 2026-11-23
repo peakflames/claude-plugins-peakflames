@@ -20,7 +20,7 @@ const sidecar = (p, e) => parseSidecar(git(p.clone, 'show', `develop:docs/implem
 const appended = (call) => call.argv.filter((a, i) => call.argv[i - 1] === '--append-system-prompt-file').map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 
 /** What the change record of an amendment nobody approved says (the hook tells the session to write it so). */
-const PROTO_RECORD = '# change record\napproved_via = "prototype-run"\napproved_by = "autopilot (prototype run)"\n';
+const PROTO_RECORD = '# change record\napproved_via = "epic-branch"\napproved_by = "autopilot (prototype run)"\n';
 const DEFERRAL = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
 const deferQ = (tor, rec = 'Defer — the export screen is built by a later epic') => `${tor} cannot be fully met: it needs the export screen. Recommendation: ${rec}. How to proceed?`;
 const amendQ = (tor) => `${tor} — The tool shall import every row looks wrong: the sample data has a header row. Proposed: same title / Then: "rows after the header are imported". How to proceed?`;
@@ -147,7 +147,7 @@ test('prototype: the planner\'s proposed correction is taken; the gate is record
   assert.equal(scope.pass, true, JSON.stringify(scope));
   assert.match(scope.evidence, /requirement files changed under the amendment this prototype run took, not yet seen by the owner, of /);
   assert.equal(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').pass, true);
-  assert.match(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.permissionDecisionReason, /approved_via = "prototype-run"/);
+  assert.match(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.permissionDecisionReason, /approved_by = "autopilot \(prototype run\)"/);
   assert.deepEqual(q.amendedUnseen, [tor]);
   assert.equal(q.state, 'MERGED', q.reason);
   assert.equal(q.prototype.length, 1);
@@ -458,5 +458,5 @@ test('prototype: an amendment whose change record names a person as approver doe
   const s = await p.go();
   assert.equal(s.queue[0].state, 'PARKED');
   assert.match(s.queue[0].reason, /CHECK_BUILD still fails after the fix round \(.*amendment-record/);
-  assert.match(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').evidence, /must say approved_via = "prototype-run"/);
+  assert.match(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').evidence, /must say approved_by = "autopilot \(prototype run\)"/);
 });

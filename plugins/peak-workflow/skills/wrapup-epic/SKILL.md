@@ -74,10 +74,12 @@ has findings). Run these steps instead of Phases
      which epic owns it (`states` row `epic`).
    - A named ID that is not live → stop with its `tor-lifecycle titles` line: superseded or
      retired requirements are history — the successor is re-checked through its own epic.
-     With no IDs given, every requirement of this epic whose row has `unconfirmed` joins the
-     scope as **note only**: its verdict is not re-checked (R3 skips it) unless the person asks;
-     R3.5 handles its note. An entry for this epic in `unconfirmed_epics` is handled in R3.5 too
-     and needs no requirement in scope.
+   - **Notes to confirm.** Every requirement of this epic whose row has `unconfirmed` is in
+     scope as **note only** when it counts as verified, whether it was named or not: R3 does not
+     re-check its verdict (unless the person asks for that); R3.5 handles its note. A
+     requirement that has a note and is also Changed since verified or Verification failed is
+     re-checked as usual, and R3.5 follows. An entry for this epic in `unconfirmed_epics` is
+     handled in R3.5 too and needs no requirement in scope.
    - Default scope empty and no note to confirm → stop: `Every requirement Epic <id> owns is verified — nothing to
      re-check.` (Run the sidecar C check below first; when it fires, print its message instead.)
    - A named ID that is Verified is allowed: re-checking it records a past false PASS as data.

@@ -1083,11 +1083,15 @@ Leave out a part that has nothing to say.
   or queue work that proves it.
 - **What is left for later, and where it is kept.** Whenever this screen showed anything
   under "Decided for you in this prototype run", "Screens merged without your look" or "Not
-  proven for real", end that part with one plain sentence: "All of this is also written into
-  your project. Once the work is brought in, run `/peak-workflow:status` there at any time: its
-  'Left for Later' list shows each of these with the one thing that clears it, and an item
-  drops off the list when it is done." Say it once. It is the only place the owner needs to
-  remember; never ask them to keep the run's report for it.
+  proven for real", end that part with one plain sentence: "What still needs a person is also
+  written into your project. Once the work is brought in, run `/peak-workflow:status` there at
+  any time: its 'Left for Later' list shows each one with the one thing that clears it, and an
+  item drops off the list when it is done." Say it once. What is written there: a correction
+  nobody approved, a requirement nobody saw working, a requirement left for a later epic, the
+  screens (and a CLAUDE.md change) merged without a look, and each "not proven" note. What is
+  not: a fix a session made on its own recommendation (nothing is left to do for it), and any
+  note the run's log says could not be written (`autopilot.log`, "not written into the
+  project") — name those here, so the owner does not look for them in status.
 - **Things autopilot got in the way of** comes from `friction` (what the referee refused,
   grouped, with a `count`): at most five lines, each in plain words a non-developer follows
   — "It stopped the build from writing outside its own copy of the project (3 times)" — and

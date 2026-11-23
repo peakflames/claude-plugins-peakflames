@@ -62,8 +62,7 @@ class UpholdProjectTests(unittest.TestCase):
         self.assertIn("pending (closed by CR-Uph0001)", self.repo.cli("search", "fixture").stdout)
 
 
-if __name__ == "__main__":
-    unittest.main()
+
 
 
 class PrototypeCorrectionTests(unittest.TestCase):
@@ -76,7 +75,7 @@ class PrototypeCorrectionTests(unittest.TestCase):
         self.addCleanup(repo.cleanup)
         repo.feature("01", "core", [S1, S2])
         repo.sidecar("E1aaaaa", "Complete", [A1, A2], verified={A1: S1.fp(), A2: S2.fp()})
-        repo.record("supersede", "Proto01", "2026-11-23", tors=[self.OLD], approved_via="prototype-run",
+        repo.record("supersede", "Proto01", "2026-11-23", tors=[self.OLD], approved_via="epic-branch",
                     approved_by="autopilot (prototype run)",
                     changes=[{"tor": self.OLD, "feature_file": "01-core.feature.md", "fingerprint": "a" * 12,
                               "successors": [A1], "text": f"Scenario: [{self.OLD}] The tool shall walk"}])
@@ -135,3 +134,20 @@ class PrototypeCorrectionTests(unittest.TestCase):
 
     def test_keep_needs_a_name(self):
         self.assertEqual(self.repo.cli("keep", A1, "--by", " ").returncode, 2)
+
+    def test_changing_it_yourself_clears_it_too(self):
+        self.repo.record("reword", "Mine001", "2026-11-25", approved_by="Pat Owner", changes=[
+            {"tor": A1, "from": "0" * 12, "to": S1.fp()}])
+        self.assertNotIn("unapproved_change", self.repo.states()[A1])
+
+    def test_an_uphold_by_nobody_keeps_nothing(self):
+        data = record_data("uphold", "Keep002", "2026-11-24", tors=[A1], refs=["CR-Proto01"], keywords=["run"],
+                           approved_by="autopilot (prototype run)",
+                           changes=[{"tor": A1, "feature_file": "01-core.feature.md", "fingerprint": S1.fp()}])
+        self.repo.write("docs/requirements/changes/2026-11-24-Keep002.toml", to_toml(data))
+        self.assertIn("unapproved_change", self.repo.states()[A1])
+        self.assertEqual(self.repo.cli("keep", A1, "--by", "autopilot (prototype run)").returncode, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

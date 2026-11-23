@@ -355,10 +355,15 @@ def _is_int(value: object) -> bool:
 # --------------------------------------------------------------------------------------------
 
 KINDS = ("reword", "supersede", "retire", "pending", "uphold")
-APPROVED_VIA = ("docs-branch", "epic-branch", "wrapup", "quick-fix", "migration", "prototype-run")
-# `prototype-run`: nobody approved it. An autopilot prototype run took a session's proposed correction; the owner
-# keeps it with an `uphold` record that names this one, or changes the requirement again.
-UNAPPROVED_VIA = "prototype-run"
+APPROVED_VIA = ("docs-branch", "epic-branch", "wrapup", "quick-fix", "migration")
+# A record nobody approved names no person: an autopilot prototype run took a session's proposed correction and wrote
+# this as its `approved_by`. The owner keeps it with an `uphold` record that names this one, or decides the requirement
+# again. (A fixed approver name, not a new `approved_via` value: every released version reads the record.)
+UNAPPROVED_BY = "autopilot (prototype run)"
+
+
+def nobody_approved(data: dict) -> bool:
+    return isinstance(data.get("approved_by"), str) and data["approved_by"].strip().lower() == UNAPPROVED_BY
 EVIDENCE_RESULTS = ("pass", "fail", "historical")
 
 
@@ -780,16 +785,19 @@ class Project:
             if r.kind in ("supersede", "retire"):
                 for tor in r.tors:
                     self.gone[tor] = r
-        # Corrections nobody approved: the successors of a `prototype-run` supersede, until an uphold names that
-        # record and the successor. tor -> {record, date, replaces}.
-        kept = {(cr, t) for r in self.records if r.kind == "uphold" for ref in r.data.get("refs", [])
-                if isinstance(ref, str) for cr in CR_ANY.findall(ref) for t in r.tors}
+        # Corrections nobody approved: the successors of a supersede no person approved, until a person decides the
+        # successor — an uphold that names the record (they keep it), or any later record of theirs about it (a reword,
+        # a dispute, another supersede: they changed or questioned it). tor -> {record, date, replaces}.
+        kept = {(cr, t) for r in self.records if r.kind == "uphold" and not nobody_approved(r.data)
+                for ref in r.data.get("refs", []) if isinstance(ref, str) for cr in CR_ANY.findall(ref) for t in r.tors}
         self.unapproved: dict[str, dict] = {}
-        for r in self.records:
-            if r.kind == "supersede" and r.data.get("approved_via") == UNAPPROVED_VIA:
+        for n, r in enumerate(self.records):
+            if r.kind == "supersede" and nobody_approved(r.data):
+                later = {t for x in self.records[n + 1:] if not nobody_approved(x.data) and x.kind != "uphold"
+                         for t in x.tors}
                 for c in r.changes:
                     for succ in c["successors"]:
-                        if (r.id, succ) not in kept:
+                        if (r.id, succ) not in kept and succ not in later:
                             entry = self.unapproved.setdefault(
                                 succ, {"record": r.id, "date": r.date.isoformat(), "replaces": []})
                             entry["replaces"].append(c["tor"])
@@ -935,8 +943,12 @@ def derive_states(project: Project) -> dict:
                     "by_state": dict(sorted(counts.items()))},
         "requirements": live_rows + gone_rows,
         # notes on finished work that name no requirement: epic -> what a person should still confirm
-        "unconfirmed_epics": {s.epic: s.unconfirmed[WHOLE_EPIC] for s in project.sidecars.values()
-                              if WHOLE_EPIC in s.unconfirmed and s.status == "Complete"},
+        # (also a note on a requirement that is no longer live, said so: it has no row of its own)
+        "unconfirmed_epics": {s.epic: " | ".join(
+            (what if t == WHOLE_EPIC else f"(about {t}, since replaced or retired) {what}")
+            for t, what in s.unconfirmed.items() if t == WHOLE_EPIC or t not in project.live)
+            for s in project.sidecars.values() if s.status == "Complete"
+            and any(t == WHOLE_EPIC or t not in project.live for t in s.unconfirmed)},
     }
 
 
@@ -2673,7 +2685,7 @@ def validate_record_files(root: Path, paths: list[str]) -> list[tuple[str, list[
             if other.get("kind") == "pending" and isinstance(other.get("changes"), list):
                 pending_tors[rid] = {c.get("tor") for c in other["changes"] if isinstance(c, dict)}
             # ... and a correction nobody approved: an uphold of its successor is the owner keeping it
-            if (other.get("kind") == "supersede" and other.get("approved_via") == UNAPPROVED_VIA
+            if (other.get("kind") == "supersede" and nobody_approved(other)
                     and isinstance(other.get("changes"), list)):
                 pending_tors[rid] = {t for c in other["changes"] if isinstance(c, dict)
                                      for t in (c.get("successors") or []) if isinstance(t, str)}
@@ -2986,10 +2998,15 @@ def cmd_mark(args: argparse.Namespace, root: Path) -> int:
     ids = lambda raw: [i for r in raw for i in _id_list(r)]  # noqa: E731
     append, passes = ids(args.append), ids(args.passes)
     fails = {tor: reason.strip() for tor, reason in args.fail}
-    notes = {tor: " ".join(what.split()) for tor, what in args.unconfirmed}
+    notes: dict[str, str] = {}  # several notes for one requirement in one call are all kept
+    blank = [tor for tor, what in args.unconfirmed if not what.strip()]
+    for tor, what in args.unconfirmed:
+        if what.strip():
+            notes[tor] = f"{notes[tor]} | {' '.join(what.split())}" if tor in notes else " ".join(what.split())
     confirmed = ids(args.confirmed)
-    named = append + passes + list(fails) + [t for t in list(notes) + confirmed if t != WHOLE_EPIC]
-    anything = named or notes or confirmed
+    # A note may outlive its requirement (superseded or retired since): it can still be confirmed and removed.
+    named = append + passes + list(fails) + [t for t in notes if t != WHOLE_EPIC]
+    anything = named or notes or confirmed or blank
     if not anything and not args.reverified:
         raise DataError("nothing to do: give --append, --pass, --fail, --unconfirmed, --confirmed, or --reverified")
     live = live_requirements(root)
@@ -3001,9 +3018,8 @@ def cmd_mark(args: argparse.Namespace, root: Path) -> int:
                  for t in passes + list(fails) if t in sc.waived]
     problems += [f"{t}: both --pass and --fail" for t in passes if t in fails]
     problems += [f"{t}: --fail needs a reason" for t, why in fails.items() if not why]
-    problems += [f"{t}: not in epic {epic}'s requirements:" for t in list(notes) + confirmed
-                 if t != WHOLE_EPIC and t not in owned]
-    problems += [f"{t}: --unconfirmed needs what a person should still confirm" for t, what in notes.items() if not what]
+    problems += [f"{t}: not in epic {epic}'s requirements:" for t in notes if t != WHOLE_EPIC and t not in owned]
+    problems += [f"{t}: --unconfirmed needs what a person should still confirm" for t in blank]
     problems += [f"{t}: epic {epic} has no unconfirmed note for it" for t in confirmed
                  if t not in sc.unconfirmed and t not in notes]
     if problems:
@@ -3012,7 +3028,8 @@ def cmd_mark(args: argparse.Namespace, root: Path) -> int:
     new = mark_sidecar(text, append=append, verified={t: live[t].fingerprint for t in passes},
                        unverified={t: f"{today} {why}" for t, why in fails.items()},
                        reverified=today if args.reverified else None,
-                       unconfirmed={t: f"{today} {what}" for t, what in notes.items()}, confirmed=confirmed)
+                       unconfirmed={t: " | ".join(f"{today} {w}" for w in what.split(" | "))
+                                    for t, what in notes.items()}, confirmed=confirmed)
     parse_sidecar(epic, new, f"{STATUS_DIR}/epic-{epic}.md")  # never write a sidecar we cannot read
     write_text(path, new)
     for t in append:
@@ -3109,12 +3126,12 @@ def cmd_search(args: argparse.Namespace, root: Path) -> int:
 
 
 def cmd_keep(args: argparse.Namespace, root: Path) -> int:
-    """The owner keeps a correction nobody approved (a `prototype-run` supersede): writes the `uphold`
+    """The owner keeps a correction nobody approved (a supersede whose `approved_by` is no person): writes the `uphold`
     record that names it. `tor` is the requirement as it now reads, or the one it replaced."""
     if not TOR_RE.match(args.tor):
         raise DataError(f"{args.tor}: not a TOR-NN-XXXXXXX ID")
     by = (args.by or "").strip()
-    if not by:
+    if not by or by.lower() == UNAPPROVED_BY:
         raise DataError("--by is required: the name of the person who keeps the correction")
     p = load_project(root, _today(args))
     kept = [t for t, u in p.unapproved.items() if t == args.tor or args.tor in u["replaces"]]
@@ -3434,7 +3451,7 @@ def build_parser() -> argparse.ArgumentParser:
                                       "that names it (exit 1 when none waits)")
     kp.add_argument("tor", help="the requirement as it now reads, or the one it replaced")
     kp.add_argument("--by", required=True, help="the person who keeps it")
-    kp.add_argument("--via", default="docs-branch", choices=[v for v in APPROVED_VIA if v not in ("migration", UNAPPROVED_VIA)])
+    kp.add_argument("--via", default="docs-branch", choices=[v for v in APPROVED_VIA if v != "migration"])
     kp.add_argument("--today", help=argparse.SUPPRESS)
     kp.set_defaults(func=cmd_keep)
 

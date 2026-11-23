@@ -60,8 +60,8 @@ Verified (reworded), Changed since verified, Verification failed, Disputed, …)
 
 **Left for later, in one place:** whatever work knowingly leaves undone is written into the
 project's own files, never only into a run's report, and `status` is the single list of it
-(Left for Later): a correction nobody approved (a `supersede` record with `approved_via =
-"prototype-run"`, cleared by an `uphold` that names it — `tor-lifecycle keep` — or by changing
+(Left for Later): a correction nobody approved (a `supersede` record whose `approved_by` is
+`autopilot (prototype run)`, never a person, cleared by an `uphold` that names it — `tor-lifecycle keep` — or by changing
 the requirement), a look nobody gave (`unverified: … NOT OBSERVED — …`), a requirement left for
 a later epic (`waived:`), a test still skipped (`Deferred: <TOR>`), and a note to confirm
 (`unconfirmed-…:`). Each entry names the one existing skill that clears it

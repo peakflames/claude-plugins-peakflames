@@ -31,7 +31,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   nobody gave, requirements left for a later epic, tests still skipped, and notes a person
   should confirm.
 - **Corrections nobody approved are recorded as such** — an autopilot prototype amendment's
-  change record says `approved_via = "prototype-run"`. `capture-requirements <TOR>` asks the
+  change record names `autopilot (prototype run)` as approver, never a person. `capture-requirements <TOR>` asks the
   owner to keep or change it; `tor-lifecycle keep` writes the approval.
 - **"Not proven" notes are kept in the project** — after a merge, autopilot writes each
   reviewer or final-check note into the epic's status file (`unconfirmed-…:`).

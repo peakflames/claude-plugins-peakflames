@@ -1,4 +1,5 @@
 """`mark`: the one writer of verified:, unverified:, reverified:, and requirements: appends."""
+import json
 import unittest
 
 from fixtures import FixtureRepo, parse_tsv, scenario, tor_lifecycle as tl
@@ -64,11 +65,21 @@ class MarkTests(unittest.TestCase):
     def test_a_note_that_names_no_requirement_is_the_epics(self):
         self.assertEqual(self.mark("--unconfirmed", "epic", "the soak test was not run").returncode, 0)
         self.assertIn("unconfirmed-epic: 2026-10-26 the soak test was not run", self.read())
-        report = self.repo.states_report() if hasattr(self.repo, "states_report") else None
-        import json
         out = json.loads(self.repo.cli("states", "--json").stdout)
         self.assertEqual(out["unconfirmed_epics"], {"cMpl001": "2026-10-26 the soak test was not run"})
         self.assertEqual(self.mark("--confirmed", "epic").returncode, 0)
+        self.assertNotIn("unconfirmed", self.read())
+
+    def test_two_notes_in_one_call_are_both_kept(self):
+        self.assertEqual(self.mark("--unconfirmed", "epic", "soak test not run", "--unconfirmed", "epic", "paid API was faked").returncode, 0)
+        self.assertIn("unconfirmed-epic: 2026-10-26 soak test not run | 2026-10-26 paid API was faked", self.read())
+
+    def test_a_note_outlives_its_requirement_and_can_still_be_confirmed(self):
+        self.assertEqual(self.mark("--unconfirmed", A2, "written by hand").returncode, 0)
+        self.repo.feature("01", "core", [S1, S3, SN])  # A2 is gone from the feature file
+        out = json.loads(self.repo.cli("states", "--json").stdout)
+        self.assertEqual(out["unconfirmed_epics"], {"cMpl001": f"(about {A2}, since replaced or retired) 2026-10-26 written by hand"})
+        self.assertEqual(self.mark("--confirmed", A2).returncode, 0)
         self.assertNotIn("unconfirmed", self.read())
 
     def test_unconfirmed_needs_an_owned_requirement_and_words(self):

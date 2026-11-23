@@ -1465,7 +1465,7 @@ class Run {
   takenAmendments(e) { const owner = this.ownerAmendments(e); return this.config.mode === 'prototype' ? this.amendGates(e).filter((g) => g.decided.prototype && !owner.includes(g.tor)).map((g) => g.tor) : []; }
   /**
    * Writes, on the epic's branch, the record that the owner kept a correction a prototype run took (`tor-lifecycle
-   * keep`), and commits it. When nothing waits to be kept (the record never said "prototype-run"), nothing is written
+   * keep`), and commits it. When nothing waits to be kept (the record never named "autopilot (prototype run)" as its approver), nothing is written
    * and the log says so: the project then still lists the correction as not approved, which is the safe side.
    */
   keepCorrection(e, g) {
@@ -2284,8 +2284,8 @@ class Run {
     // An amendment nobody approved says so in the project too, not only in autopilot's own files: its change record
     // names no person. That is what lets the project's status list it for the owner afterwards.
     if (amended.some((t) => taken.includes(t)) && changed.some((f) => f.startsWith('docs/requirements/'))) {
-      const honest = changed.filter((f) => f.startsWith('docs/requirements/changes/')).some((f) => /^approved_via\s*=\s*"prototype-run"\s*$/m.test(gitShow(this.clone, b, f)));
-      add('amendment-record', honest, honest ? 'the change record says no person approved the amendment (approved_via = "prototype-run")' : `a prototype run took the amendment of ${amended.filter((t) => taken.includes(t)).join(', ')}: its change record under docs/requirements/changes/ must say approved_via = "prototype-run" and approved_by = "autopilot (prototype run)", not a person's name`);
+      const honest = changed.filter((f) => f.startsWith('docs/requirements/changes/')).some((f) => /^approved_by\s*=\s*"autopilot \(prototype run\)"\s*$/im.test(gitShow(this.clone, b, f)));
+      add('amendment-record', honest, honest ? 'the change record says no person approved the amendment (approved_by = "autopilot (prototype run)")' : `a prototype run took the amendment of ${amended.filter((t) => taken.includes(t)).join(', ')}: its change record under docs/requirements/changes/ must say approved_by = "autopilot (prototype run)", not a person's name`);
     }
     if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; if (amended.some((t) => taken.includes(t))) e.amendedUnseen = amended.filter((t) => taken.includes(t)); this.log(`${e.id}: the build changed requirement files under ${whose} ${amended.join(', ')}`); }
 
@@ -2817,17 +2817,24 @@ class Run {
    * project's own status lists it for whoever opens it later. Never fails the epic: a note that cannot be written is logged.
    */
   noteUnconfirmed(e) {
-    const items = e.unproven ?? [];
+    // Also what a prototype run (or `look: "after"`) merged without the owner's look: the screens, and a changed CLAUDE.md.
+    const items = [...(e.unproven ?? []),
+      ...(e.unlooked?.pictures?.length ? [{ source: 'autopilot', text: `its screens were merged without a person's look (${e.unlooked.pictures.length} picture(s) were taken; the final check judged them). Open the app and look at each screen this epic built or changed` }] : []),
+      ...(e.unlooked?.claudeMd ? [{ source: 'autopilot', text: `it changed the project's instructions file (CLAUDE.md), in ${e.unlooked.claudeMd.sections.join(', ')}, and nobody read the change; every later session follows that file` }] : [])];
     if (!items.length) return;
     try {
       const dev = this.state.integration; const m = this.meta(e);
       if (this.currentBranch() !== dev || this.dirty()) { this.log(`${e.id}: ${items.length} "not proven" note(s) were not written into the project (the clone is ${this.dirty() ? 'not clean' : `on ${this.currentBranch() || 'no branch'}`}); they are in this run's report`); return; }
       const sc = parseSidecar(gitShow(this.clone, dev, m.sidecar));
-      const anchors = this.anchorsFor(e, sc).filter((t) => !(e.unobserved ?? []).some((u) => u.tor === t) && !(e.deferred ?? []).includes(t)); // those two are listed in their own right
+      const all = this.anchorsFor(e, sc);
+      const listed = (t) => (e.unobserved ?? []).some((u) => u.tor === t) || (e.deferred ?? []).includes(t); // those two are listed in their own right
+      const who = { reviewer: 'the reviewer', verifier: 'the final check', autopilot: 'autopilot' };
       let wrote = 0;
       for (const u of items) {
-        const about = (String(u.text).match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? []).find((t) => anchors.includes(t)) ?? 'epic';
-        const r = torLifecycle(this.pluginDir, this.clone, 'mark', e.id, '--unconfirmed', about, `${u.source === 'reviewer' ? 'the reviewer' : 'the final check'}: ${String(u.text).replace(/\s+/g, ' ').trim()}`);
+        const named = (String(u.text).match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? []).filter((t) => all.includes(t));
+        if (named.length && named.every(listed)) continue; // only about a look nobody gave or a deferral: already on the list as that
+        const about = named.find((t) => !listed(t)) ?? 'epic';
+        const r = torLifecycle(this.pluginDir, this.clone, 'mark', e.id, '--unconfirmed', about, `${who[u.source] ?? 'the final check'}: ${String(u.text).replace(/\s+/g, ' ').trim()}`);
         if (r.code === 0) wrote += 1; else this.log(`${e.id}: a "not proven" note could not be written into the project (${(r.err || r.out).split('\n')[0]})`);
       }
       if (!wrote || !this.dirty()) return;
