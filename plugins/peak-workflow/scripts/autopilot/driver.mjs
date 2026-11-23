@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
+import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs } from './lib.mjs';
 import { writeReport } from './report.mjs';
@@ -1254,6 +1254,9 @@ export const VERIFY_RULES = `# Autopilot session rules
   is for a choice a person made in this session.
 - Stop anything you start (a server, a watcher) before you finish. Whatever is still running
   when the session ends is stopped for you.
+- Whatever you see that is wrong and you leave as it is (wrong text in a picture, a console error,
+  a check that fails and is not this epic's) goes in your final report under the heading "Seen but
+  not fixed", one line each, or "none". A defect only noticed in passing reaches nobody.
 `;
 
 /**
@@ -2707,6 +2710,7 @@ class Run {
     });
     if (!s) return null;
     this.unproven(e, unprovenLines(s.result?.result).map((text) => ({ source: 'verifier', step: s.name, text })));
+    this.unproven(e, leftLines(s.result?.result).map((text) => ({ source: 'verifier', kind: 'left', step: s.name, text })));
     // What the verifier says it saw in the pictures, in its own words, for the closing screen.
     if (this.hasScreens(e)) { e.seen = pictureLines(s.result?.result); if (e.seen.length) this.log(`${e.id}: the verifier described ${e.seen.length} picture(s)`); }
     this.save();

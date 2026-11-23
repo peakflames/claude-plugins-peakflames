@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, atLimit, ensureResumeGates, gateReason, newRunName, standingAnswer, standingCovers, strayProcesses } from '../driver.mjs';
-import { chainOf, eventLine, progressLine, queueLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
+import { chainOf, eventLine, leftLines, progressLine, queueLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, lines: () => r.stdout.trim().split('\n'), json: () => JSON.parse(r.stdout) }; };
@@ -632,4 +632,23 @@ test('a final check that still fails after its repair is repaired once more with
   assert.deepEqual([s.next, s.waiting.map((g) => [g.file, g.options])], ['decide', [[`gates/${E1.id}-2.json`, TRY]]]);
   assert.match(s.waiting[0].question, /has stopped 2 times for technical reasons \(it did not pass its independent check, even after the one repair\)\. Try again, which costs more, or leave it for now\?$/);
   assert.equal(cont(p).status, 1);
+});
+
+test('leftLines: what the verifier saw wrong and left is read from "Seen but not fixed"; none, other sections and a sub-point are handled (Pilot Light, 2026-11-22)', () => {
+  const report = [
+    '## What the pictures show', '- 404 screen shown', '',
+    '**Seen but not fixed**',
+    '- The "Page not found" picture carries the wrong text ("Nothing here").',
+    '  It should read "Page not found" (S-09).',
+    '- A console error on the Run screen: `ResizeObserver loop`.',
+    '',
+    '## Not proven for real', '- never ran against a real device',
+  ].join('\n');
+  assert.deepEqual(leftLines(report), [
+    'The "Page not found" picture carries the wrong text ("Nothing here"). It should read "Page not found" (S-09).',
+    'A console error on the Run screen: `ResizeObserver loop`.',
+  ]);
+  assert.deepEqual(leftLines('## Seen but not fixed\n- none\n'), [], 'none is no entry');
+  assert.deepEqual(leftLines('## Seen but not fixed\n- Nothing\n\n## Other\n- a point'), [], 'nothing, and the next heading ends it');
+  assert.deepEqual(leftLines('no such section\n- a point'), []);
 });

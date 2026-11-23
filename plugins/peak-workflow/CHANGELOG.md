@@ -262,6 +262,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **A resumed session may use its earlier step's scratch folder** — after a usage-limit wait
   the session kept writing to the first step's folder and was refused. Earlier steps' scratch
   folders of the same epic are now open to it; everything else of theirs stays closed.
+- **A defect the verifier saw and left now reaches the report** — the verifier lists it under
+  "Seen but not fixed"; the run report shows it as "Verifier saw this wrong and left it" and the
+  project's status notes carry it. Before, an epic could merge with a known defect unannounced.
 - **Autopilot's referee no longer reads a quoted heredoc's text as commands** — a Python or
   `cat` script body behind `<<'EOF'` is skipped; before, a word like `kind` in a doc was refused
   as a container tool and a test import as a path in the workspace. Bodies run by a shell stay read.

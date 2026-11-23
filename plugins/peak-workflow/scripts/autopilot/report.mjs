@@ -377,7 +377,7 @@ export function renderReport(r) {
     }
     if (e.unproven.length) {
       L.push('', 'Not proven for real (said by the reviewer or the verifier; nothing here stopped the epic):');
-      for (const u of e.unproven) L.push(`- ${u.source === 'reviewer' ? `Reviewer${u.id ? ` ${u.id}` : ''}` : 'Verifier'}: ${cell(u.text)}`);
+      for (const u of e.unproven) L.push(`- ${u.source === 'reviewer' ? `Reviewer${u.id ? ` ${u.id}` : ''}` : u.kind === 'left' ? 'Verifier saw this wrong and left it' : 'Verifier'}: ${cell(u.text)}`);
     }
     if (e.testChanges.length) {
       L.push('', 'Existing tests changed:');
