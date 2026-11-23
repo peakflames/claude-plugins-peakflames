@@ -255,6 +255,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot waits out the owner's usage limit** — a session stopped by the 5-hour limit is
+  resumed after the reset, with no question and no "infra error". A weekly limit, or one
+  that resets after the end time, stops the run and says when it resets.
+- **A cut-off build is continued, not judged finished** — a build stopped by an API error
+  re-enters as a build session; before, its half-done branch went straight to the checks.
+- **One budget figure across chained runs** — the report and run log say what this run spent
+  and what the chain spent of its budget, matching `status`.
 - **Autopilot accepts a lockfile that changes with its dependency list** — `bun.lock`,
   `package-lock.json` and the like are in scope when the matching manifest changed in the same
   epic. Before, the one repair round deleted a new project's lockfile to pass the check.

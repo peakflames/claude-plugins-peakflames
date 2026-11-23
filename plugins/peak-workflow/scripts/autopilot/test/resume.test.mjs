@@ -7,8 +7,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, ensureResumeGates, gateFacts, ownerAnswers } from '../driver.mjs';
-import { pictureLines } from '../attend.mjs';
+import { ANSWERS, ensureResumeGates, gateFacts, limitDecision, ownerAnswers, usageLimit } from '../driver.mjs';
+import { activity, eventLine, pictureLines, plainReason } from '../attend.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
@@ -1738,4 +1738,92 @@ test('a resumed epic is put on its branch by the driver: a session that does not
   assert.deepEqual(leftoverRefs(p), []);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`${E1.id}: checked out ${E1.branch} for its build session \\(the clone was on develop\\)`));
   assert.equal(r.state.stoppedBecause, 'queue done');
+});
+
+// ---- the owner's usage limit -------------------------------------------------------------------
+
+/** What a real session sent when it reached the 5-hour limit (Pilot Light, 2026-11-23), part of the build done. */
+const LIMIT_RESULT = { subtype: 'success', is_error: true, terminal_reason: 'api_error', api_error_status: 429, api_error: 'usage_limit_reached', result: "You've hit your 5-hour limit · resets 1pm (America/Detroit)", total_cost_usd: 0.5 };
+const limitHit = (e, resetsAt, rateLimitType = 'five_hour') => ({
+  actions: [...buildActions(e, { commit: false }), { do: 'emit', line: { type: 'rate_limit_event', rate_limit_info: { status: 'rejected', resetsAt, rateLimitType } } }],
+  result: LIMIT_RESULT, exit: 1,
+});
+const LIMIT_TIMING = { timing: { pollMs: 100, killGraceMs: 300, infraRetryMs: 0, limitMarginMs: 0 } };
+
+test('usageLimit reads the limit from what the session sent; anything else is not one', () => {
+  const info = { status: 'rejected', resetsAt: 1795456800, rateLimitType: 'five_hour' };
+  assert.deepEqual(usageLimit(LIMIT_RESULT, info), { kind: 'five_hour', words: '5-hour', resetsAt: 1795456800 });
+  assert.deepEqual(usageLimit(LIMIT_RESULT, null), { kind: null, words: '', resetsAt: null }, 'the result alone says it; the reset time is not known');
+  assert.deepEqual(usageLimit({ ...LIMIT_RESULT, api_error: null }, { ...info, rateLimitType: 'seven_day' }), { kind: 'seven_day', words: 'weekly', resetsAt: 1795456800 });
+  assert.equal(usageLimit({ subtype: 'success', is_error: false }, null), null);
+  assert.equal(usageLimit({ subtype: 'success', is_error: false }, { ...info, status: 'allowed' }), null);
+  assert.equal(usageLimit({ subtype: 'success', is_error: true, api_error_status: 529, api_error: 'overloaded_error' }, null), null, 'an overloaded service is a technical error, not the owner\'s limit');
+  assert.equal(usageLimit(null, null), null);
+  // While the driver waits, `status` says so instead of naming the step it was on.
+  assert.match(activity({ limitWait: { until: new Date(Date.now() + 3600000).toISOString() }, queue: [{ id: 'x', state: 'BUILD', step: null }] }), /^waiting for your usage limit to reset \(it carries on at \d{1,2}:\d{2} [AP]M\)$/);
+});
+
+test('limitDecision: wait until the reset, or stop when it is too far off, after the end time, or reached again too often', () => {
+  const now = Date.parse('2026-11-23T15:00:00Z'); const timing = { limitMarginMs: 120000, limitRetryMs: 600000, limitWaitMaxMs: 6 * 3600000, limitWaitsMax: 3 };
+  const at = (min) => Math.floor((now + min * 60000) / 1000);
+  assert.deepEqual(limitDecision({ resetsAt: at(120), now, timing, waits: 0 }), { wait: true, until: now + 120 * 60000 + 120000 });
+  assert.deepEqual(limitDecision({ resetsAt: null, now, timing, waits: 0 }), { wait: true, until: now + 600000 + 120000 }, 'no reset time: try again after a while');
+  assert.deepEqual(limitDecision({ resetsAt: at(-5), now, timing, waits: 0 }), { wait: true, until: now + 120000 }, 'a reset already past waits only the margin');
+  assert.match(limitDecision({ resetsAt: at(3 * 24 * 60), now, timing, waits: 0 }).stop, /^it resets .+, too long to wait$/);
+  assert.match(limitDecision({ resetsAt: at(120), now, timing, waits: 0, endBy: new Date(now + 60 * 60000).toISOString() }).stop, /^it resets .+, after the run's end time$/);
+  assert.equal(limitDecision({ resetsAt: at(120), now, timing, waits: 3 }).stop, 'it was reached again 3 times after waiting');
+});
+
+test('a usage limit is waited out and the same session carries on: not an infra error, no question, nothing lost', async (t) => {
+  const p = makeProject(t, { config: LIMIT_TIMING });
+  const resetsAt = Math.floor(Date.now() / 1000) + 2;
+  p.scenario({ ...happy(E1), [`${E1.id}/build-1`]: limitHit(E1, resetsAt), [`${E1.id}/build-2`]: { actions: buildActions(E1) } });
+  const started = Date.now();
+  await p.go();
+
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED');
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'build-2', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  assert.ok(Date.now() - started >= 1000, 'it waited for the reset');
+  const [b1, b2] = p.calls().filter((c) => c.kind === 'build');
+  const flag = (c, name) => c.argv[c.argv.indexOf(name) + 1];
+  assert.equal(flag(b2, '--resume'), flag(b1, '--session-id'), 'the interrupted session is resumed');
+  assert.match(b2.prompt, /usage limit/);
+  assert.deepEqual(e.sessions.slice(1, 3).map((x) => [x.name, x.outcome]), [['build-1', 'limit'], ['build-2', 'ok']]);
+  assert.match(e.sessions[1].why, /^your 5-hour usage limit was reached; it resets /);
+  const log = fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8');
+  assert.doesNotMatch(log, /infra error/);
+  assert.match(log, /usage limit was reached; it resets .*waiting until .* then carrying on/);
+  const events = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const wait = events.find((x) => x.type === 'limit-wait');
+  assert.equal(wait.limit, 'five_hour');
+  assert.match(eventLine(wait), /^Paused: your 5-hour usage limit was reached\. It resets at .+; autopilot carries on then\.$/);
+  assert.equal(eventLine(events.find((x) => x.type === 'limit-resume')), 'Your usage limit has reset; autopilot is carrying on.');
+  assert.equal(fs.existsSync(path.join(p.state, 'gates')) ? fs.readdirSync(path.join(p.state, 'gates')).length : 0, 0);
+  assert.equal(readJson(path.join(p.runDir(), 'state.json')).limitWait ?? null, null, 'nothing is left saying it waits');
+});
+
+test('a usage limit that resets too late stops the run: the epic parks with a question (not a technical stop) and the next run continues the build', async (t) => {
+  const p = makeProject(t, { config: LIMIT_TIMING });
+  const e2 = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02' });
+  const resetsAt = Math.floor(Date.now() / 1000) + 3 * 24 * 3600;
+  p.scenario({ ...happy(E1), ...happy(e2), [`${E1.id}/build-1`]: limitHit(E1, resetsAt, 'seven_day') });
+  const s = await p.go({ queue: [E1.id, e2.id] });
+
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1'].map((x) => `${E1.id}/${x}`), 'nothing is retried, and no other epic starts');
+  assert.match(s.stoppedBecause, /^usage limit: your weekly usage limit was reached; it resets .+, too long to wait$/);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'PARKED');
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.technical], ['resume', undefined], 'the standing answer for technical stops does not relaunch into the same limit');
+  assert.match(g.reason, /^usage limit during build-1: your weekly usage limit was reached/);
+  assert.equal(plainReason(g.reason), 'your Claude usage limit was reached');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /The run ended early: your weekly usage limit was reached; it resets/);
+
+  // Answered "Resume": the cut-off build is continued by a build session, not judged as if it had finished.
+  decide(p, E1.id, ANSWERS.resume);
+  p.scenario({ ...happy(E1), ...happy(e2) });
+  const r = await again(p, { queue: [E1.id] });
+  assert.equal(r.steps[0], `${E1.id}/build-1`);
+  assert.equal(p.epic(E1.id).state, 'MERGED');
 });

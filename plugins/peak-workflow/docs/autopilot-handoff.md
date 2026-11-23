@@ -465,7 +465,7 @@ Why this order:
     run asking again what a prototype run took; the owner's own "Defer" passing the checks;
     the notes written into the status file after a merge (`unconfirmed-…:`); the project's
     `status` "Left for Later" panel.
-- [ ] **A usage limit is reported as an "infra error", retried, and never named** (*no
+- [x] **A usage limit is reported as an "infra error", retried, and never named** (*no
   issue*; run `20261123-081039`, `Vbz68Ea` build-1 and build-2). The owner's 5-hour limit was
   reached: `result.json` has `is_error: true`, `terminal_reason: "api_error"`,
   `api_error_status: 429`, and the text "You've hit your 5-hour limit · resets 1pm". The
@@ -475,12 +475,25 @@ Why this order:
   limit, do not retry, stop the run saying in plain words that the usage limit was reached
   and when it resets (the session's own text), and say that the same command continues it.
   The resume gate it wrote was correct, and the standing answer decided it. C2.
+  **Fixed 2026-11-23, tested against the fake `claude` only.** The owner chose to wait rather
+  than stop: the driver reads the limit from the result and the stream's `rate_limit_event`
+  (`resetsAt`), waits until two minutes after the reset, and resumes the same session; watch
+  and `status` say it is waiting and until when. It stops the run (a resume gate for the owner, not a technical one: relaunching before the reset cannot cure it)
+  only for a wait over 6 hours (a weekly limit), past the end time, or a fourth limit in one
+  step. The same run showed a second fault, now fixed: the cut-off build re-entered at
+  CHECK_BUILD, because its error result still says `success`, so the half-done branch went to
+  the checks and a fix session (`Vbz68Ea` fix-1 in run `20261123-100729`). Not proven on a
+  real limit yet.
 - [ ] **An epic that extends a screen another epic owns gets no look** (*no issue*; same run,
   `n2g5TvI`). Its spec has no Screens table ("S-01 is owned by the skeleton; this epic
   extends it"), so it is not a "UI epic" and never stops for a look, in a full run either.
   Unexamined. C3.
-- [ ] **`status` gave the run budget as $250; the run's `config.json` says $243.62**
-  (*no issue*; same run). Unexamined. C3.
+- [x] **`status` gave the run budget as $250; the run's `config.json` says $243.62**
+  (*no issue*; same run). Not a wrong number: runs chained by `continues` share one budget
+  ($250); each run's `config.json` holds what was left of it when that run started ($250 less
+  the $6.38 spent before). `status` showed the chain ("$47.85 of $250"), the report the run
+  ("$41.28 of a $243.62 limit"). Fixed 2026-11-23: the report and the run log now give both
+  ("spent $41.28 in this run; with the 2 runs before it, $47.66 of the $250 budget is spent").
 - [ ] **The watch repeats its progress line once per blocked epic** (*no issue*; run
   `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3.
 - [x] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`).

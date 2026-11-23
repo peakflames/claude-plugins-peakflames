@@ -452,7 +452,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      these an estimate or say what a run will cost.
    - Run limits: `launch.config.runBudgetUsd` dollars; an end time only if the owner gave one; the run also
      stops on a red base, low disk (`launch.config.diskFloorGb` GB), or two infrastructure errors
-     in a row.
+     in a row. When the owner's 5-hour usage limit is reached it waits until the limit resets
+     and carries on with the same session; a weekly limit, or one that resets after the end
+     time, stops the run instead.
    - **When an epic parks or fails** (`launch.config.onPark`): `null` — "it follows your
      answer: while you are here the run stops at the first epic that needs you, so you can
      answer before more is built; if you are away, epics that depend on it wait and the

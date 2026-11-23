@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { UNPROVEN_CATEGORIES, activity, atLimitAsk, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
+import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs } from './lib.mjs';
 import { writeReport } from './report.mjs';
@@ -224,7 +224,7 @@ export function defaultConfig(project) {
     },
     audit: { parkOn: ['stand-in', 'test-weakened', 'cannot-fail', 'never-ran-real'] },
     scope: { allow: [], lockfiles: [] },
-    timing: { pollMs: 30000, killGraceMs: 30000, infraRetryMs: 300000 },
+    timing: { pollMs: 30000, killGraceMs: 30000, infraRetryMs: 300000, ...LIMIT_TIMING },
   };
 }
 
@@ -464,8 +464,53 @@ export function resumePhase(workspace, g, phase) {
   const last = (rec.buildSteps ?? []).at(-1);
   const result = last ? tryJson(path.join(workspace, last.dir, 'result.json')) : null;
   // `hook_stopped` is the referee ending the session (the STOP file): a success line, and still not the session's own end.
-  if (result?.subtype === 'success' && result.terminal_reason !== 'hook_stopped') return phase;
+  // An error result (the usage limit, an API error) is a success line too, and the session was cut off all the same.
+  if (result?.subtype === 'success' && !result.is_error && result.terminal_reason !== 'hook_stopped') return phase;
   return /^fix-/.test(last?.name ?? '') && rec.fixBrief ? 'FIX_BUILD' : 'BUILD';
+}
+
+// ---- the owner's usage limit ---------------------------------------------------------------------
+
+/**
+ * Waiting out the owner's Claude usage limit: a margin after the reset; a retry interval when no
+ * reset time was given; the longest wait (a weekly limit is not waited out); waits per step.
+ */
+export const LIMIT_TIMING = { limitMarginMs: 120000, limitRetryMs: 600000, limitWaitMaxMs: 6 * 3600000, limitWaitsMax: 3 };
+const LIMIT_WORDS = { five_hour: '5-hour', seven_day: 'weekly', seven_day_opus: 'weekly Opus', seven_day_sonnet: 'weekly Sonnet' };
+/** A clock time the owner reads, with the day when it is not today. */
+export function clockTime(ms, now = Date.now()) {
+  const d = new Date(ms); const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return d.toDateString() === new Date(now).toDateString() ? time : `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${time}`;
+}
+/**
+ * The owner's usage limit, from what a session sent: an error result naming it (`usage_limit_reached`,
+ * or a 429 refusal) and the CLI's last `rate_limit_event`. Null for anything else: an overloaded
+ * service is a technical error, not the owner's limit.
+ */
+export function usageLimit(result, info) {
+  const refused = info?.status === 'rejected';
+  if (!(result?.is_error && (result.api_error === 'usage_limit_reached' || result.api_error_status === 429 || refused))) return null;
+  const kind = (refused && info.rateLimitType) || null;
+  const resetsAt = (refused && (info.resetsAt ?? info.unifiedWindows?.[info.rateLimitType]?.resetsAt)) || null;
+  return { kind, words: LIMIT_WORDS[kind] ?? '', resetsAt };
+}
+/** `{wait: true, until}` (epoch ms), or `{stop: why}` when waiting is not worth it. */
+export function limitDecision({ resetsAt, now = Date.now(), endBy = null, waits = 0, timing }) {
+  const t = { ...LIMIT_TIMING, ...timing };
+  if (waits >= t.limitWaitsMax) return { stop: `it was reached again ${waits} times after waiting` };
+  const reset = resetsAt ? Math.max(resetsAt * 1000, now) : now + t.limitRetryMs;
+  const until = reset + t.limitMarginMs;
+  if (until - now > t.limitWaitMaxMs) return { stop: `it resets ${clockTime(reset, now)}, too long to wait` };
+  if (endBy && until > Date.parse(endBy)) return { stop: `it resets ${clockTime(reset, now)}, after the run's end time` };
+  return { wait: true, until };
+}
+/** What a session stopped by the usage limit is told when it is resumed after the reset. */
+export function limitResumeMessage({ branch }) {
+  return [
+    'Your usage limit was reached in the middle of this step, and autopilot waited until it reset. It has reset now.',
+    `Carry on with the step from where you stopped. Run \`git status\` on \`${branch}\` first: anything you had not committed is still there.`,
+    'Do not start the step over.',
+  ].join('\n');
 }
 
 // ---- sync with the project (plan P3.5 Part 3) --------------------------------------------------
@@ -1907,7 +1952,7 @@ class Run {
    * Launches one host-mode session in its own process group and waits for it.
    * Resolves with how it ended; never throws for a session failure.
    */
-  async launch(e, kind, prepare, { noResume = false } = {}) {
+  async launch(e, kind, prepare, { noResume = false, afterLimit = null } = {}) {
     const cfg = this.config; const k = KINDS[kind];
     const n = (e.attempts[kind] = (e.attempts[kind] ?? 0) + 1);
     const name = `${k.prefix}-${n}`;
@@ -1919,10 +1964,17 @@ class Run {
     // The owner's answers to questions an earlier session of this step asked. The session that was stopped at its
     // question is resumed with them (it keeps what it had worked out); any other session is told them up front.
     const answers = (e.answers ?? []).filter((a) => a.kind === kind);
-    const from = e.resumeSession?.kind === kind ? e.resumeSession : null;
-    if (from) e.resumeSession = null; // one attempt: a second session of this step starts fresh
+    const owners = e.resumeSession?.kind === kind ? e.resumeSession : null;
+    if (owners) e.resumeSession = null; // one attempt: a second session of this step starts fresh
+    // A session the usage limit cut off is resumed once it has reset: it keeps what it had worked out.
+    const from = afterLimit && !noResume ? { sessionId: afterLimit.sessionId, step: afterLimit.name, run: this.runName, limit: true } : owners;
     let resume = null; let costBefore = 0;
-    if (answers.length && from && !noResume) {
+    if (from?.limit) {
+      resume = from.sessionId;
+      costBefore = afterLimit.result?.total_cost_usd ?? 0;
+      prompt = limitResumeMessage({ branch: this.meta(e).branch });
+      fs.writeFileSync(path.join(stepDir, 'resume-prompt.md'), prompt);
+    } else if (answers.length && from && !noResume) {
       resume = from.sessionId;
       // A resumed session's result line counts the session it continues as well (seen live: its per-model totals were
       // the two sessions' added up), and that session's cost is already in the books.
@@ -1948,7 +2000,7 @@ class Run {
     e.state = k.state; e.lastStep = name;
     e.step = { name, kind, sessionId, pid: null, startedAt: new Date().toISOString() };
     this.save();
-    this.log(`${e.id}: ${name} starting (${k.role}, ${cmd.wallMin} min, session ${sessionId}${resume ? `, resuming session ${resume} (${from.step} of run ${from.run}) with the owner's answer` : answers.length ? `, told ${answers.length} answer(s) the owner already gave` : ''})`);
+    this.log(`${e.id}: ${name} starting (${k.role}, ${cmd.wallMin} min, session ${sessionId}${resume ? `, resuming session ${resume} (${from.step} of run ${from.run}) ${from.limit ? 'after the usage limit reset' : "with the owner's answer"}` : answers.length ? `, told ${answers.length} answer(s) the owner already gave` : ''})`);
     this.event('step-start', e, { step: name, kind, capMin: cmd.wallMin, ...((e.continuing && (kind === 'build' || kind === 'fix')) || resume ? { continuing: true } : {}) });
 
     const startMb = this.cloneMb();
@@ -1966,7 +2018,7 @@ class Run {
     child.stdin.on('error', () => {});
     const send = (o) => { if (child.stdin.writable) child.stdin.write((typeof o === 'string' ? o : JSON.stringify(o)) + '\n'); };
 
-    const s = { name, stepDir, kind, result: null, init: null, controlRequests: [], killed: null, exitCode: null, signal: null, spawnError: null, resumed: !!resume };
+    const s = { name, sessionId, stepDir, kind, result: null, rateLimit: null, init: null, controlRequests: [], killed: null, exitCode: null, signal: null, spawnError: null, resumed: !!resume };
     let graceTimer = null;
     const kill = (why) => {
       if (s.killed) return;
@@ -1986,7 +2038,8 @@ class Run {
       readline.createInterface({ input: child.stdout }).on('line', (line) => {
         stream.write(line + '\n');
         let d; try { d = JSON.parse(line); } catch { return; }
-        if (Array.isArray(d)) { s.init = d.find((x) => x?.type === 'system' && x.subtype === 'init') ?? s.init; d = d.find((x) => x?.type === 'result') ?? {}; }
+        if (Array.isArray(d)) { s.init = d.find((x) => x?.type === 'system' && x.subtype === 'init') ?? s.init; s.rateLimit = d.findLast((x) => x?.type === 'rate_limit_event')?.rate_limit_info ?? s.rateLimit; d = d.find((x) => x?.type === 'result') ?? {}; }
+        if (d.type === 'rate_limit_event') s.rateLimit = d.rate_limit_info ?? null;
         if (d.type === 'system' && d.subtype === 'init') s.init = d;
         if (d.type === 'control_request') {
           // The host approves nothing (SPIKE.md): hooks and acceptEdits decide; anything that reaches us is denied and logged.
@@ -2024,9 +2077,16 @@ class Run {
     else if (!s.killed && kind !== 'plan' && s.result?.terminal_reason === 'hook_stopped' && this.stopRequested()) { s.outcome = 'stopped'; s.stoppedBy = 'STOP file'; }
     else if (s.killed) s.outcome = 'budget';
     else if (sub === 'error_max_turns' || sub === 'error_max_budget_usd') s.outcome = 'budget';
+    // The owner's usage limit: an error result that still says `success`. Waited out by `step`, never an infra error.
+    else if ((s.limit = usageLimit(s.result, s.rateLimit))) s.outcome = 'limit';
     else if (s.exitCode === 0 && sub === 'success') s.outcome = 'ok';
     else s.outcome = 'infra';
-    s.why = s.killed ?? s.stoppedBy ?? (s.outcome === 'ok' ? 'success' : sub ?? s.spawnError ?? `exit ${s.exitCode ?? s.signal}, no result line`);
+    if (s.limit) {
+      s.limit.reached = `your ${s.limit.words ? `${s.limit.words} ` : ''}usage limit was reached`;
+      s.limit.why = s.limit.resetsAt ? `${s.limit.reached}; it resets ${clockTime(s.limit.resetsAt * 1000)}` : `${s.limit.reached} (no reset time was given)`;
+    }
+    const apiError = s.result?.is_error && s.result.api_error ? `${s.result.api_error}${s.result.api_error_status ? ` (${s.result.api_error_status})` : ''}` : null;
+    s.why = s.killed ?? s.stoppedBy ?? (s.outcome === 'ok' ? 'success' : s.outcome === 'limit' ? s.limit.why : apiError ?? sub ?? s.spawnError ?? `exit ${s.exitCode ?? s.signal}, no result line`);
 
     const reported = s.result?.total_cost_usd ?? 0;
     const cost = resume && reported >= costBefore ? +(reported - costBefore).toFixed(6) : reported;
@@ -2046,6 +2106,25 @@ class Run {
   }
 
   /**
+   * Waits until the owner's usage limit has reset (`until`, epoch ms), saying so in the log, the events and
+   * the state `status` reads. False when the STOP file ends the wait.
+   */
+  async waitForLimit(e, s, until) {
+    const resets = s.limit.resetsAt ? new Date(s.limit.resetsAt * 1000).toISOString() : null;
+    this.state.limitWait = { epic: e.id, step: s.name, until: new Date(until).toISOString(), resets, limit: s.limit.kind };
+    this.save();
+    this.log(`${e.id}: ${s.name}: ${s.limit.why}; waiting until ${new Date(until).toISOString()} (${clockTime(until)}), then carrying on with the same session`);
+    this.event('limit-wait', e, { step: s.name, until: new Date(until).toISOString(), resets, limit: s.limit.kind, words: s.limit.words });
+    while (Date.now() < until && !this.stopRequested()) await sleep(Math.max(0, Math.min(1000, until - Date.now())));
+    this.state.limitWait = null;
+    this.save();
+    if (this.stopRequested()) return false;
+    this.log(`${e.id}: the usage limit has reset; resuming ${s.name}'s session`);
+    this.event('limit-resume', e, { step: s.name });
+    return true;
+  }
+
+  /**
    * A step: launch, retry once on an infra error, and apply the rules every session shares.
    * Returns the session when it ended `ok` with no new gate; otherwise the epic is already
    * parked (or the run is stopping) and this returns null.
@@ -2054,18 +2133,27 @@ class Run {
     const gatesBefore = new Set(this.gateFiles());
     const devBefore = this.integrationSha();
     const again = { plan: 'PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind];
-    let s;
+    let s; let afterLimit = null; let limitWaits = 0;
     for (;;) {
       // No session is started anywhere but on the epic's branch, once it exists.
       const off = this.ensureOnBranch(e, kind);
       if (off && s) { s.outcome = 'infra'; s.why = off; break; } // on a retry: parked below, after what the first try did is undone
       // Nothing ran, so nothing is judged: a build or a repair that never started is started, not checked.
       if (off) return this.parkResumable(e, `no ${kind} session was started: ${off}`, { build: 'BUILD', fix: 'FIX_BUILD' }[kind] ?? again, { technical: true });
-      s = await this.launch(e, kind, prepare);
+      s = await this.launch(e, kind, prepare, afterLimit ? { afterLimit } : {});
+      afterLimit = null;
       // A stopped session that cannot be resumed (its transcript is gone) is not an infra error: a new session takes the step, told the same answers.
       if (s.resumed && s.outcome === 'infra') {
         this.log(`${e.id}: ${s.name} could not resume the earlier session (${s.why}); starting a new session for this step`);
         s = await this.launch(e, kind, prepare, { noResume: true });
+      }
+      if (s.outcome === 'limit') {
+        const d = limitDecision({ resetsAt: s.limit.resetsAt, endBy: this.config.endBy, waits: limitWaits, timing: this.config.timing });
+        if (d.stop) { s.why = `${s.limit.reached}; ${d.stop}`; break; }
+        limitWaits += 1;
+        if (!(await this.waitForLimit(e, s, d.until))) { s.outcome = 'stopped'; s.why = 'STOP file'; break; }
+        afterLimit = s;
+        continue;
       }
       if (s.outcome !== 'infra') { this.state.consecutiveInfra = 0; break; }
       this.state.consecutiveInfra = (this.state.consecutiveInfra ?? 0) + 1;
@@ -2084,6 +2172,9 @@ class Run {
     // Re-entry after a park that is nobody's question: a parked build is judged from its WIP commit; any other step is run again once.
     if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return this.parkResumable(e, `stopped by the STOP file during ${s.name}`, again); }
     if (s.outcome === 'infra') { undo(); return this.parkResumable(e, `infra error during ${s.name}: ${s.why}`, again); }
+    // Not worth waiting for (a weekly limit, past the end time): nothing else can run either, so the run stops too. Not a
+    // technical stop: running again before the reset cannot cure it, so the standing answer does not relaunch it.
+    if (s.outcome === 'limit') { this.stopReason = `usage limit: ${s.why}`; undo(); return this.parkResumable(e, `usage limit during ${s.name}: ${s.why}`, again); }
     if (s.outcome === 'budget') { undo(); return this.parkResumable(e, `budget: ${s.name} hit ${s.why}`, again); }
     const newGates = this.gateFiles().filter((f) => !gatesBefore.has(f) && !took.includes(f));
     if (newGates.length) { e.gates.push(...newGates.filter((g) => !e.gates.includes(g))); undo(); return this.park(e, `parked at a human gate (${newGates.join(', ')})`); }
@@ -3188,7 +3279,11 @@ class Run {
       // The limits this run really has, for whoever launched it to hold against what the owner confirmed.
       const limits = { runBudgetUsd: cfg.runBudgetUsd ?? null, endBy: cfg.endBy ?? null, autoContinue: cfg.autoContinue ?? 0, onPark: cfg.onPark, onParkFrom: cfg.onParkFrom ?? 'default' };
       const parkWhy = { project: 'set by the project', prototype: 'a prototype run keeps going', attended: 'you said you would be away', default: 'you did not say you would be away' }[limits.onParkFrom];
-      this.log(`run ${this.runName}: limits: run budget ${limits.runBudgetUsd == null ? 'none' : `$${limits.runBudgetUsd}`}; end by ${limits.endBy ?? 'no end time'}; technical stops continued ${limits.autoContinue} per epic; when an epic parks: ${limits.onPark} (${parkWhy}); mode ${MODE_LINE[cfg.mode]}`);
+      // A run that continues others has what is left of their shared budget: said as such, so it never reads as a different budget from `status`.
+      const chain = chainOf(this.stateDir, this.runName);
+      if (chain.runs.length > 1) Object.assign(limits, { chainBudgetUsd: chain.runBudgetUsd, chainSpentBeforeUsd: +chain.spentBefore.toFixed(2) });
+      const budgetWords = limits.runBudgetUsd == null ? 'none' : limits.chainBudgetUsd != null ? `$${Number(limits.runBudgetUsd).toFixed(2)} left of $${limits.chainBudgetUsd} (the ${chain.runs.length - 1} earlier run${chain.runs.length > 2 ? 's' : ''} of this chain spent $${limits.chainSpentBeforeUsd.toFixed(2)})` : `$${limits.runBudgetUsd}`;
+      this.log(`run ${this.runName}: limits: run budget ${budgetWords}; end by ${limits.endBy ?? 'no end time'}; technical stops continued ${limits.autoContinue} per epic; when an epic parks: ${limits.onPark} (${parkWhy}); mode ${MODE_LINE[cfg.mode]}`);
       this.event('run-start', null, { run: this.runName, queue: this.state.queue.map((q) => q.label ?? q.id), mode: cfg.mode, ...limits, ...(resuming ? { resuming: true } : {}) });
 
       if (!this.pre.ok) this.stopReason = `preflight: ${this.pre.refuse.join('; ')}`;
