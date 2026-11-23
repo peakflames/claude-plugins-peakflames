@@ -121,6 +121,9 @@ export function gateEntry(g) {
   const a = g.decided?.answer; const asked = stepKind(g.session);
   if (!a) return null;
   if (g.kind === 'preflight') return null; // the fix is in the project; it clears when preflight passes
+  // A full run asking the owner what a prototype run took (`reask`): the answer the prototype run gave makes it theirs and
+  // the epic goes on from where it stood; any other answer goes back to the kind of session that asked.
+  if (g.reask) return a === g.reask.took && g.reask.phase ? { phase: g.reask.phase, question: true } : STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
   if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
   if (g.kind === 'audit') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_BUILD', fix: 'audit' } : null;
   if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_BUILD', fix: 'look' } : null;
@@ -205,8 +208,10 @@ export const PROTOTYPE_BY = 'autopilot (prototype run)';
 export const NOT_OBSERVED = 'NOT OBSERVED';
 /** The gates of one epic that a prototype run answered itself and that still stand. */
 export const prototypeGates = (gates, epic) => gates.filter((g) => g.epic === epic && g.decided?.prototype && !g.void && !g.superseded && !g.cleared);
+/** Of those, the ones a full run does not rely on and asks the owner about instead: a requirement amended, a requirement left for a later epic. */
+export const prototypeReasked = (gates, epic) => prototypeGates(gates, epic).filter((g) => g.tor && ((g.kind === 'amendment' && /^\W*amend\b/i.test(g.decided.answer ?? '')) || (g.kind === 'deferral' && /^\W*defer\b/i.test(g.decided.answer ?? ''))));
 /** The requirements of one epic whose deferral a prototype run took (the builder recommended it). */
-export const prototypeDeferred = (gates, epic) => [...new Set(prototypeGates(gates, epic).filter((g) => g.kind === 'deferral' && /^defer\b/i.test(g.decided.answer ?? '') && g.tor).map((g) => g.tor))];
+export const prototypeDeferred = (gates, epic) => [...new Set(prototypeGates(gates, epic).filter((g) => g.kind === 'deferral' && /^\W*defer\b/i.test(g.decided.answer ?? '') && g.tor).map((g) => g.tor))];
 /**
  * The requirements of one epic the owner themself answered "Defer" for: a deferral gate a person decided, that still
  * stands. Their decision holds in any run; one a prototype run took (`prototypeDeferred`) holds in a prototype run only.

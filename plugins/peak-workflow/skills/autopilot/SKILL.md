@@ -543,10 +543,13 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    serious finding of the reviewer and any question that comes without a recommendation stop
    the epic either way, and nothing is ever pushed. Never pick Prototype for the owner, and
    never suggest it because a run stopped. Skip this question in `dry-run` mode.
-   A Full run does not rely on what an earlier Prototype run took: for an epic that has not
-   merged yet, the driver has the correction or the deferral asked again, and that question
-   reaches the owner like any other. Say so in one line when the owner picks Full after a
-   Prototype run of the same work. Work that already merged is not reopened; it stays listed.
+   A Full run does not rely on what an earlier Prototype run took. Before it continues an epic
+   that has not merged yet, the driver parks it and asks the owner each correction or deferral
+   the Prototype run took for it, as an ordinary waiting question (`reask` on the gate; its
+   `why` says what the Prototype run answered). The same answer keeps what was built and the
+   epic goes on from where it stood; any other answer sends it back to be planned or built
+   again. Say so in one line when the owner picks Full after a Prototype run of the same work.
+   Work that already merged is not reopened; it stays listed.
    - **Change:** take the change in plain text. (In `dry-run` mode nothing below is saved:
      show the dry run with the change applied in words only.) The owner may remove epics, reorder them (an
      epic never before one of its dependencies — refuse and say why), change the run budget,

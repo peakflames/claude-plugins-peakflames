@@ -431,15 +431,18 @@ function ruleR8(ctx) {
     // A question no policy row knows is matched on its recorded text. A void or superseded gate never answers.
     const dir = path.join(ctx.state, 'gates');
     const same = (g) => (kind === 'unmatched' ? norm(g.question ?? '') === norm(q.question) : (g.tor ?? null) === tor);
+    // The owner's "Defer" answered a session that recommended deferring. A session that now recommends something else
+    // (it found no later epic, it wants to stop) is asking a new question: theirs again.
+    const stillFits = (answer) => kind !== 'deferral' || !/^\W*defer\b/i.test(answer ?? '') || [null, 'Defer'].includes(recommended(q.question));
     const decided = (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => f.startsWith(`${ctx.epic}-`) && f.endsWith('.json')).map((f) => ({ f, g: readJson(path.join(dir, f), {}) }))
-      .find(({ g }) => g.decided?.answer && !g.decided.used && !g.void && !g.superseded && g.kind === kind && same(g) && offered(g.decided.answer));
+      .find(({ g }) => g.decided?.answer && !g.decided.used && !g.void && !g.superseded && g.kind === kind && same(g) && offered(g.decided.answer) && stillFits(g.decided.answer));
     if (decided) {
       answers[q.question] = offered(decided.g.decided.answer);
       used.push(decided); continue;
     }
     // The same question again after its recorded answer was spent (a later session of the step asks it verbatim):
     // the owner's answer still stands.
-    const again = earlier.find((a) => (a.gateKind ?? 'unmatched') === kind && (kind === 'unmatched' ? norm(a.question ?? '') === norm(q.question) : (a.tor ?? null) === tor) && offered(a.answer));
+    const again = earlier.find((a) => (a.gateKind ?? 'unmatched') === kind && (kind === 'unmatched' ? norm(a.question ?? '') === norm(q.question) : (a.tor ?? null) === tor) && offered(a.answer) && stillFits(a.answer));
     if (again) { answers[q.question] = offered(again.answer); told += 1; continue; }
     // The owner's recorded look at a human-check gate (the driver puts it in step.json for the verify
     // session it resumes): wrapup's manual-verification question is answered with it, not the policy "No".
@@ -518,7 +521,9 @@ function ruleR8(ctx) {
       // After a deferral this run took, the skill asks which later epic builds the missing part. Nobody is there to
       // say, and autopilot never names one: the session is told once to use the epic it (or the builder) already named.
       const succMemo = ctx.step ? path.join(ctx.step, 'successor-reminded.json') : null;
-      const byOwner = ownerDeferred(gatesNow(), ctx.epic).length > 0;
+      // Whose deferral: the owner's own for the requirement asked about (or, when the question names none, for any of this epic's), else this prototype run's.
+      const ownDeferred = ownerDeferred(gatesNow(), ctx.epic).filter((t) => anchors(ctx).includes(t));
+      const byOwner = tor ? ownDeferred.includes(tor) : ownDeferred.length > 0;
       if (succMemo && /which later epic creates the code/i.test(q.question) && (byOwner || prototypeDeferred(protoTaken, ctx.epic).length) && !fs.existsSync(succMemo)) {
         fs.writeFileSync(succMemo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
         return { rule: 'R8', decision: 'remind', reason: `not put to the owner: ${byOwner ? 'they answered "Defer" to the recommendation that named the later epic, and are not asked to name it again' : 'this is a prototype run, and the deferral was taken on your own recommendation'}. The later epic is the one ${ctx.role === 'verifier' ? "the implementer's Deferrals row names as the successor" : 'your recommendation named'}: use it, run the skill's successor check with it and carry on. If no such epic's spec exists, Defer is not available: ask the first question again, recommending Fix now or Stop` };
