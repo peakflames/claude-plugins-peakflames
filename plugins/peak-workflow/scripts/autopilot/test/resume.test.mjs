@@ -209,12 +209,28 @@ test('audit gate, "Real — fix before verify": the fix round runs with the park
   assert.ok(fs.existsSync(path.join(p.state, 'runs', run1, 'epics', E1.id, 'audit-1', 'audit.json')));
 });
 
-test('audit gate, "Real", when the one fix round is already used: FAILED without a session', async (t) => {
+test('audit gate, "Real" from a person when the one fix round is already used: one more repair runs, then the checks (Pilot Light, 2026-11-24)', async (t) => {
   const p = makeProject(t);
   p.scenario({ ...roundSpent(E1), [`${E1.id}/audit`]: audit([finding('cannot-fail')]) });
   await p.go();
   assert.deepEqual([p.epic(E1.id).state, p.epic(E1.id).fixRounds, readJson(path.join(p.state, 'epics.json'))[E1.id].fixRounds], ['PARKED', 1, 1]);
   decide(p, E1.id, ANSWERS.auditReal);
+
+  const r = await again(p);
+
+  assert.ok(r.steps.some((x) => x.startsWith(`${E1.id}/fix`)), `a repair session ran: ${r.steps}`);
+  assert.notEqual(p.epic(E1.id).state, 'FAILED', p.epic(E1.id).reason);
+  assert.doesNotMatch(String(p.epic(E1.id).reason ?? ''), /one fix round is already used/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /Pat Owner asked on gates\/\w+-1\.json for another, so one more runs/);
+});
+
+test('audit gate, "Real" that no person gave (a standing answer) when the one fix round is already used: FAILED without a session', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...roundSpent(E1), [`${E1.id}/audit`]: audit([finding('cannot-fail')]) });
+  await p.go();
+  const g = path.join(p.state, 'gates', `${E1.id}-1.json`);
+  const rec = readJson(g);
+  fs.writeFileSync(g, JSON.stringify({ ...rec, decided: { answer: ANSWERS.auditReal, by: 'Pat Owner', date: '2026-11-24', scope: 'next-run', standing: true } }, null, 2));
 
   const r = await again(p);
 
@@ -965,6 +981,8 @@ test('P3.5 exit: one run parks an epic at each resumable gate kind; decided thro
   const ran1 = p.steps();
 
   for (const [e, answer] of [[ef, ANSWERS.auditReal], [eq, 'Fix now'], [ea, ANSWERS.auditNotReal], [eh, ANSWERS.looksRight], [el, ANSWERS.approvePlan], [er, ANSWERS.resume]]) decide(p, e.id, answer, answer === ANSWERS.looksRight ? { note: 'opened the page: it reads well' } : {});
+  // The spent-repair epic's answer is a standing one (nobody gave it just now): a person's "Real" would run one more repair (its own test above).
+  { const g = path.join(p.state, 'gates', `${ef.id}-1.json`); fs.writeFileSync(g, JSON.stringify({ ...readJson(g), decided: { ...readJson(g).decided, standing: true } }, null, 2)); }
   assert.match(readJson(path.join(p.state, 'runs', run1, 'report.json')).next.join('\n'), /6 decided gates \(.*\) resume their epics on the branch this run left/);
 
   p.scenario({

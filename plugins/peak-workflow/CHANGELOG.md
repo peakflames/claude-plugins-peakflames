@@ -255,6 +255,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A person's "Real — fix before verify" after the one repair is spent runs one more repair** —
+  before, it failed the epic. Autopilot's own retries and standing answers keep the one-repair limit;
+  each further repair takes a person's answer.
 - **A build is told who approved an amendment a prototype run took** — its rules now say the change
   record must read `approved_by = "autopilot (prototype run)"`, never a person's name. Before, only the
   planner knew, and the build spent the one repair round on it.
