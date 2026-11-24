@@ -3130,7 +3130,11 @@ class Run {
       if (g.lookAfter) e.unlooked = { pictures: lookPictures(this.lookStore(e)).map((p) => path.join(this.lookStore(e), p.file)) };
       if (entry.look) e.look = { gate: f.gate, by: g.decided.by, date: g.decided.date, note: g.decided.note ?? null, observations: g.decided.observations ?? [], branchTip: g.branchTip, artifacts: g.artifacts ?? [] };
       if (entry.fix) {
-        if (e.fixRounds >= 1) { used(); return this.finish(e, 'FAILED', `you answered "${f.answer}" on ${f.gate}, but this epic's one fix round is already used, so it cannot be repaired again: it can only be started over`); }
+        // The one repair is autopilot's own limit, for an answer nobody gave (a standing answer, a retry it asked for). A person who
+        // answers "Real" after it is spent has asked for another: seen live (Pilot Light, 2026-11-24), that answer failed the epic and
+        // cost a launch. Each further repair takes a person's answer, so it cannot loop.
+        if (e.fixRounds >= 1 && e.resumed.unasked) { used(); return this.finish(e, 'FAILED', `the answer on ${f.gate} was not given by a person, and this epic's one fix round is already used, so it cannot be repaired again: it can only be started over`); }
+        if (e.fixRounds >= 1) this.log(`${e.id}: the one fix round was used; ${f.by} asked on ${f.gate} for another, so one more runs`);
         e.fixRounds = 1;
         this.event('fix-round', e, { why: e.resumed.unasked ? 'standing' : 'owner' });
         if (entry.fix === 'audit') {
