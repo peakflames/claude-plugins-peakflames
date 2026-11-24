@@ -1,4 +1,4 @@
-# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-23)
+# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-24)
 
 For a fresh session, on any machine. Everything is on `feature/peak-workflow-autopilot-poc`
 (pushed). This file replaces the earlier handoffs kept outside the repository.
@@ -13,11 +13,14 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
   passed on 2026-11-21), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
   Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
   base as well (cause not looked for).
-- **Pilot Light** (the second real project) is mid-queue. Run `20261123-140347` (prototype)
+- **Pilot Light** (the second real project) finished its queue on 2026-11-24 (see "2026-11-24"
+  below); the older note follows. It was mid-queue: Run `20261123-140347` (prototype)
   merged Waiting and Conversation drawer and parked Outstanding on a question; a prototype run
   started 19:26 on 2026-11-23 plans Outstanding again, then runs Session stream (F5hv9T4).
   What it proved is under Step 12 and "2026-11-23 session" below.
-- **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
+- **Merged to `develop` on 2026-11-24 (`6eb64ae`), not released.** Work continues on
+  `feature/peak-workflow-autopilot-poc`; `develop` takes it again only when the owner asks.
+  Next phase is beta use (#41).
 - **The cockpit mod is deferred** (`autopilot-cockpit-mod-handoff.md`, note at its top): the run
   announces itself in chat instead, because chat is the one display every device has.
 
@@ -90,6 +93,31 @@ evaluation whose other lessons repeat #41. His run logs are on his machine
 - Changelog bullets ≤ 50 words under `[3.1.0] — UNDER DEVELOPMENT`; commits
   `<type>(peak-workflow): … (v3.1.0)`; no attribution lines.
 
+## This file is the master list
+
+Every open autopilot item is a box in this file. GitHub issues are where people talk about
+them; the state is here. The rule:
+
+1. Fix and test an item, then tick its box here (with the commit).
+2. When every box that names an issue is ticked, comment on that issue with what fixed each one
+   and close it. An issue's body points here instead of keeping its own checklist.
+3. A new problem gets a box here first; an issue only when someone outside this repository
+   needs to follow it.
+
+| Issue | What it tracks | Where here | Open / all boxes |
+|---|---|---|---|
+| #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 2 / 2 |
+| #36 | The run budget is not enforced inside a step | Step 9 | 1 / 1 |
+| #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
+| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 11 / 14 |
+| #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 13 / 13 |
+| #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
+| #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
+| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 1 / 1 |
+
+Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
+2026-11-24. Not autopilot, so not in this file: #44 (port the requirements checker to Node).
+
 ## To-do list, in working order
 
 Work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
@@ -99,8 +127,8 @@ reordered the same day after the Windows owner's real runs (#41 comments, #43).
 Criticality: **C1** something wrong could merge · **C2** wastes money or a night · **C3**
 confuses the owner, nothing lost · **C4** housekeeping.
 
-Tracked on GitHub (peakflames/claude-plugins-peakflames): #35–#43, named on each item. Plan each
-with `/triage <issue>`. Items marked *no issue* are tracked only here. Numbers in brackets are
+Tracked on GitHub (peakflames/claude-plugins-peakflames): #35–#43, named on each item (see "This
+file is the master list" above). Plan each with `/triage <issue>`. Items marked *no issue* are tracked only here. Numbers in brackets are
 from the UAT notes; B and I numbers are from #41 (B10–B16 and I8 are in its comments).
 
 How far each item reported on 2026-11-21 was checked: **in code** = the cause was found by
@@ -211,8 +239,10 @@ Why this order:
 - [ ] **A merge check that fails for any reason other than a small-fix limit parks with no
   question** (#35). The epic then looks eligible and would be planned and built again from
   scratch. *`doCheckVerify`, `missingResumeGates`.*
-- [ ] **"Real — fix before verify" after the repair is used goes straight to FAILED** (#41 B13;
-  in code). The reviewer gate offers the answer although `fixRounds` is already 1; the owner
+- [x] **"Real — fix before verify" after the repair is used goes straight to FAILED** (#41 B13;
+  in code). *Fixed 2026-11-23 (`fc329da`, the owner's choice "B"): a person's "Real" after the
+  one repair runs one more repair; an answer nobody gave still fails. Tested
+  (`test/resume.test.mjs`); not yet seen live.* Was: The reviewer gate offers the answer although `fixRounds` is already 1; the owner
   cannot then change to "verify as built". Offer only answers that are possible, or write a
   resume gate into VERIFY. *`driver.mjs:2562`, `missingResumeGates`.*
 - [ ] **An epic is started over without asking** (*no issue*; review of I6a). A standing answer
@@ -254,13 +284,40 @@ Why this order:
 
 ### Step 6 — Prove it in one real run (C1)
 
-- [ ] **Tick off the live-proof checklist** (#39): the 2026-11-14 changes (run announcer, single
-  spend figure, $250 budget and `configure --run-budget`, "Bring it in for me", "Combine them
-  for me", the relaunch questions, "Start it so I can check for real", a look kept across a
-  repair, the 80-line small-fix limit) and the 2026-11-21 changes (I2, I6a, the at-limit
-  question, no by-hand offers), and step 1's fixes (B14 a resumed epic put back on its
-  branch, B15 leftover files set aside, `Not decided yet: none — <a reason>`), the scratch
-  folder and the files `CLAUDE.md` names. Open a bug for any that misbehaves.
+The live-proof checklist (#39). Tick each when a real run shows it, naming the run; open a bug
+for any that misbehaves. Built and tested against the fake `claude` only until ticked.
+
+The 2026-11-14 changes:
+- [ ] The run announcer: "Starting n of m", "Next: …" after each step, "Progress: n of m done
+  (%)" across relaunches, the ten-minute "still working" line relayed. *Partly seen: the
+  Progress line on Pilot Light, 2026-11-23.*
+- [ ] One spend figure: chain total of the budget, in every line.
+- [x] $250 default run budget (Pilot Light, every run 2026-11-22 to 24).
+- [ ] `configure --run-budget` raises a chain in progress.
+- [x] "Bring it in for me" at the end of a run, then the tidy-up: temporary
+  `autopilot/<integration>` branch deleted, offer to commit `autopilot.json` (Pilot Light: the
+  walking skeleton 2026-11-22 with "Commit it for me" answered; F5hv9T4 2026-11-24).
+- [ ] "Combine them for me" on a diverged project, with abort on conflict.
+- [ ] The relaunch questions (`relaunch.ask`: at the computer, real money).
+- [ ] "Start it so I can check for real" at the look; a yes from pictures alone refused (`how`).
+- [ ] A look kept across a repair that changes no screen file.
+- [ ] Small-fix limit of 80 changed lines.
+
+The 2026-11-21 changes (#41, I2 and I6):
+- [x] "I'll be away": an epic that needs the owner is set aside, independent epics keep
+  building, its dependents are blocked (Pilot Light run `20261122-094004`: yZQYIVE and n2g5TvI
+  parked, their 8 dependents blocked, JlkOIsy still ran).
+- [ ] With the owner there, the run stops at the first one.
+- [ ] Autopilot decides a technical stop itself (new plan, repair, re-run of the final check,
+  the final check's own fix, reviewer findings), under the one count per epic, and the closing
+  screen lists what it decided.
+- [ ] Past the count: the one question "Try again" / "Leave it for now"; "Try again" never
+  lets a fix change a requirement or weaken a test.
+
+Also to see in a real run: no by-hand command, git line or other skill offered anywhere the
+owner reads; step 1's fixes (B14 a resumed epic put back on its branch — seen, see below; B15
+leftover files set aside; `Not decided yet: none — <a reason>`), the scratch folder and the
+files `CLAUDE.md` names.
 
   **The test project from 2026-11-22 is Pilot Light** (`~/github/peakflames/pilot-light`,
   github.com/peakflames/pilot-light, private): a dashboard for peak-workflow and autopilot,
@@ -681,6 +738,8 @@ behavior there (triage: HEAVY).
 - Every finding, in the order it happened (1–49), with what was fixed:
   `plugins/peak-workflow/docs/uat-2026-11-13b-autopilot-first-run-of-fixes-peakmedia.md`.
   Earlier UAT notes are beside it.
+- GitHub issues for this work: the table under "This file is the master list". Outside it:
+  #44, porting `tor_lifecycle.py` to Node so the plugin needs one runtime.
 - What changed: `git log a2d716b..feature/peak-workflow-autopilot-poc` and
   `plugins/peak-workflow/CHANGELOG.md` `[3.1.0]`.
 - The driver's own design notes: `plugins/peak-workflow/scripts/autopilot/SPIKE.md`,
