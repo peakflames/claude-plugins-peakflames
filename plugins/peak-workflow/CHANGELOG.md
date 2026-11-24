@@ -255,6 +255,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A build is told who approved an amendment a prototype run took** — its rules now say the change
+  record must read `approved_by = "autopilot (prototype run)"`, never a person's name. Before, only the
+  planner knew, and the build spent the one repair round on it.
 - **Autopilot's referee no longer cuts a command inside single quotes** — a `;` in a `sed` script or a
   `|` in a pattern made a fake command of half the script, so a quoted import path or a tool's name
   was refused. Text in double quotes and everything outside quotes is still read.

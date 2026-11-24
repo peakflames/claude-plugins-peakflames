@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROTOTYPE_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -1162,6 +1162,16 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
  * live: with the owner away, a build and then a verify each opened a browser sign-in and each
  * waited five minutes; that was a third of the run and two calls to the owner's phone.
  */
+/**
+ * Told to a build or repair session when a prototype run took an amendment of a requirement for this epic: the change
+ * record is its to write, and it must say no person approved it. Before, only the planner knew, so the build wrote a
+ * person's name and the check (`amendment-record`) sent it into the one repair round (Pilot Light, 2026-11-23).
+ */
+export function amendmentRule(tors) {
+  if (!tors?.length) return '';
+  return `\n# Requirements amended in this run\n\nThis is a prototype run. ${tors.length === 1 ? 'The requirement' : 'The requirements'} ${tors.join(', ')} ${tors.length === 1 ? 'was' : 'were'} amended on a session's own recommendation, and no person has approved ${tors.length === 1 ? 'it' : 'them'}. The change record you write under \`docs/requirements/changes/\` must say \`approved_by = "${PROTOTYPE_BY}"\`, exactly, and never a person's name. The owner confirms it afterward.\n`;
+}
+
 export function presenceRule(attended, unanswered = []) {
   const tried = unanswered.length ? `\nAlready tried in this epic, and nobody came:\n\n${unanswered.map((u) => `- ${u.description}${u.command ? ` (\`${u.command}\`)` : ''}`).join('\n')}\n\nDo not start ${unanswered.length === 1 ? 'that' : 'any of those'} again. List ${unanswered.length === 1 ? 'it' : 'each'} in your final report under the heading "Not proven for real", with the command the\nowner can run by hand.\n` : '';
   if (attended === false) return `\n# The owner is away\n\nThe project's owner has said they will not be at the computer during this run. Do not start a\ncommand that waits for a person (a sign-in in a browser, a device to plug in): nobody will come.\nDo everything that needs no person. In your final report list, under the heading "Not proven for\nreal", each thing that needed them, what it was checked against instead, and the exact command\nthey can run by hand when they are back.\n${tried}`;
@@ -2276,7 +2286,7 @@ class Run {
       (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir), ...(continuing ? { continues: e.continuing } : {}) }); // what the next audit reads, in this run or a later one
       fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? (continuing ? CONTINUE_LEAD : '') + fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir, { continuing }));
       if (!fix && !continuing && !(e.answers ?? []).length) fs.rmSync(path.join(this.clone, LOOK_DIR), { recursive: true, force: true }); // a build from the top: no other epic's pictures, no stale ones
-      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (this.hasScreens(e) ? LOOK_RULE : ''));
+      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + amendmentRule(this.takenAmendments(e)) + (this.hasScreens(e) ? LOOK_RULE : ''));
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
     });
     if (s) e.continuing = null; // it ended by itself: what follows is judged like any build
