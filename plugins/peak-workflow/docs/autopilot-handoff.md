@@ -106,10 +106,10 @@ them; the state is here. The rule:
 
 | Issue | What it tracks | Where here | Open / all boxes |
 |---|---|---|---|
-| #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 2 / 2 |
+| #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 0 / 2 |
 | #36 | The run budget is not enforced inside a step | Step 9 | 1 / 1 |
 | #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
-| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 11 / 14 |
+| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 12 / 15 |
 | #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 13 / 13 |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
@@ -232,13 +232,21 @@ Why this order:
 
 ### Step 3 — No stop that can only be started over (C2)
 
-- [ ] **A failed merge check throws away the verifier's work** (#35). `rollback()` resets the
-  integration line and the epic branch, so a rerun repeats the whole final check (twice on
-  2026-11-14: about $4.50 and $3). Keep the verified branch; re-judge only the merge.
-  *`driver.mjs`: `rollback`, `doCheckVerify`, `checkVerify`.*
-- [ ] **A merge check that fails for any reason other than a small-fix limit parks with no
-  question** (#35). The epic then looks eligible and would be planned and built again from
-  scratch. *`doCheckVerify`, `missingResumeGates`.*
+- [x] **A failed merge check throws away the verifier's work** (#35). *Fixed 2026-11-24
+  (`52e8847`): the merge is undone and the final check's work kept at
+  `refs/autopilot/verified/<id>`; "Resume" merges it again onto the integration line as it
+  now is and checks that merge, with no new final check, where the failure allows (tests or
+  the requirements check red once merged, a malformed merge, a fix the owner must allow). A
+  conflict, or work that is gone, asks to run the final check again. Tested
+  (`test/resume.test.mjs`, `test/attend.test.mjs`); not yet seen live.* Was: `rollback()`
+  reset the integration line and the epic branch, so a rerun repeated the whole final check
+  (twice on 2026-11-14: about $4.50 and $3; $5.85 on Outstanding, 2026-11-23).
+- [x] **A merge check that fails for any reason other than a small-fix limit parks with no
+  question** (#35). *Fixed 2026-11-24 (`52e8847`): every failure writes a technical `resume`
+  gate the standing answer may take; a changed requirement, a weaker test, a missing verified
+  line, a counted deferral, or files nobody allowed run the final check again. Epics an
+  earlier driver parked this way get the gate from their last undone merge.* Was: the epic
+  then looked eligible and would be planned and built again from scratch.
 - [x] **"Real — fix before verify" after the repair is used goes straight to FAILED** (#41 B13;
   in code). *Fixed 2026-11-23 (`fc329da`, the owner's choice "B"): a person's "Real" after the
   one repair runs one more repair; an answer nobody gave still fails. Tested
@@ -302,6 +310,8 @@ The 2026-11-14 changes:
 - [ ] "Start it so I can check for real" at the look; a yes from pictures alone refused (`how`).
 - [ ] A look kept across a repair that changes no screen file.
 - [ ] Small-fix limit of 80 changed lines.
+- [ ] A failed merge check keeps the final check's work, and "Resume" re-checks the merge with
+  no new final check (#35).
 
 The 2026-11-21 changes (#41, I2 and I6):
 - [x] "I'll be away": an epic that needs the owner is set aside, independent epics keep
@@ -699,8 +709,8 @@ change-record notes).
   `epic-detail-drawer.tsx` and `.autopilot/test-changes.jsonl`). The epic was planned again;
   the old branch is kept at `refs/autopilot/superseded/…`. The same item as the Step 3 line
   "An epic is started over without asking": it says so in the log but spends the money again.
-- **"Resume" after a failed merge check repeats the whole final check** (about $5.85 and 29
-  minutes on Outstanding). Step 3, first item.
+- ~~**"Resume" after a failed merge check repeats the whole final check** (about $5.85 and 29
+  minutes on Outstanding). Step 3, first item.~~ Fixed 2026-11-24 (#35); not yet seen live.
 - The build is told to log a reason before it edits an existing test, but a build whose first
   command was refused for another reason (the false alarms above) tried the edit first and was
   refused again: a few seconds each, no stop.

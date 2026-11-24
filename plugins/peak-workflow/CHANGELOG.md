@@ -258,6 +258,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A failed merge check keeps the final check's work** — every failure now asks; "Resume"
+  re-checks the merge without a new final check where that suffices, and epics an earlier
+  driver parked unasked are recovered (#35).
 - **Autopilot: a put-off question no longer hides ready work** — `status` lists `ready` epics even
   while a question waits, and after "Not now" the skill offers them instead of ending.
 - **A person's "Real — fix before verify" after the one repair is spent runs one more repair** —
