@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROTOTYPE_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -198,7 +198,7 @@ export function defaultConfig(project) {
     endBy: nextEndBy(),
     runBudgetUsd: 250, // the whole chain of runs; the project's autopilot.json may set its own (`configure --run-budget`)
     realSpend: null, // run-level, the owner's answer at launch: true = sessions may spend real money on an outside service when a check needs it; false = never; null = not decided, a session asks
-    mode: 'full', // run-level, the owner's answer at launch: 'full' = every doubt stops and asks; 'prototype' = the run keeps building: it takes a session's own recommendation (an amendment, a deferral), skips the owner's looks, and lists every one of those at the end. Failing tests, scope, push, budget and Safety stop either way
+    mode: 'full', // run-level, the owner's answer at launch: 'full' = every doubt stops and asks; 'provisional' = the run keeps building: it takes a session's own recommendation (an amendment, a deferral), skips the owner's looks, and lists every one of those at the end. Failing tests, scope, push, budget and Safety stop either way
     attended: null, // run-level, the owner's answer at launch: true = at the computer while it runs; false = away, so no session starts anything that waits for a person; null = not asked
     autoContinue: 0, // run-level: how many technical stops per epic the owner's standing answer continues without asking (0 = always ask)
     diskFloorGb: 15,
@@ -294,10 +294,11 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
   if (!['before', 'after'].includes(cfg.look)) throw new Error(`look must be "before" or "after", not ${JSON.stringify(cfg.look)} (${projectSettingsFile(root)})`);
   // An explicit `onPark` wins. Otherwise a park while the owner is away must not idle the night (issue 41, I2):
   // the epics that do not depend on the parked one keep building, and its dependents are BLOCKED by `next()`.
-  if (!MODES.includes(cfg.mode)) throw new Error(`mode must be "full" or "prototype", not ${JSON.stringify(cfg.mode)} (the run's config.json)`);
-  // A prototype run keeps going past an epic that stops, whether or not the owner is there: that is what it is for.
-  cfg.onParkFrom = cfg.onPark != null ? 'project' : cfg.mode === 'prototype' ? 'prototype' : cfg.attended === false ? 'attended' : 'default';
-  cfg.onPark ??= cfg.mode === 'prototype' || cfg.attended === false ? 'continue' : 'stop';
+  if (cfg.mode === 'prototype') cfg.mode = 'provisional'; // its name before 3.1.0: a run from then relaunches as provisional
+  if (!MODES.includes(cfg.mode)) throw new Error(`mode must be "full" or "provisional", not ${JSON.stringify(cfg.mode)} (the run's config.json)`);
+  // A provisional run keeps going past an epic that stops, whether or not the owner is there: that is what it is for.
+  cfg.onParkFrom = cfg.onPark != null ? 'project' : cfg.mode === 'provisional' ? 'provisional' : cfg.attended === false ? 'attended' : 'default';
+  cfg.onPark ??= cfg.mode === 'provisional' || cfg.attended === false ? 'continue' : 'stop';
   if (!['stop', 'continue'].includes(cfg.onPark)) throw new Error(`onPark must be "stop" or "continue", not ${JSON.stringify(cfg.onPark)} (${projectSettingsFile(root)})`);
   for (const [kind, b] of Object.entries(cfg.budgets)) {
     if (b && typeof b === 'object' && b.effort !== undefined && !EFFORT_LEVELS.includes(b.effort)) throw new Error(`budgets.${kind}.effort must be one of ${EFFORT_LEVELS.join(', ')}, not ${JSON.stringify(b.effort)}`);
@@ -308,8 +309,8 @@ export function loadConfig(workspace, { project, run: runName, overrides = {} } 
 /** The keys that belong to one run; everything else is a workspace setting. */
 const RUN_KEYS = ['project', 'queue', 'explicit', 'endBy', 'runBudgetUsd', 'allowTestDouble', 'autoContinue', 'continues', 'realSpend', 'attended', 'smallFixes', 'mode'];
 /** How careful a run is (`mode`): see `defaultConfig`. */
-export const MODES = ['full', 'prototype'];
-const MODE_LINE = { full: 'full: it stops and asks whenever a requirement, a deferral or a look needs the owner', prototype: 'prototype: it keeps building, takes a session\'s own recommendation, skips the owner\'s looks, and lists every one of those at the end' };
+export const MODES = ['full', 'provisional'];
+const MODE_LINE = { full: 'full: it stops and asks whenever a requirement, a deferral or a look needs the owner', provisional: 'provisional: the AI decides now, you confirm later. It keeps building, takes a session\'s own recommendation, skips the owner\'s looks, and lists every one of those at the end' };
 const TEST_DOUBLE = (bin) => `claudeBin is ${bin}, not the real \`claude\`: a test double runs only when the run's config.json says "allowTestDouble": true (or --allow-test-double)`;
 
 // ---------------------------------------------------------------------------------------------
@@ -908,14 +909,14 @@ they are answered for you. Never skip one or choose its answer yourself.
 }
 
 /**
- * What a verify session is told in a prototype run about requirements only a person can observe:
+ * What a verify session is told in a provisional run about requirements only a person can observe:
  * nobody will, so they are recorded as not observed (an `unverified:` line), never as verified.
  * `unobserved` is `[{tor, clauses}]`.
  */
 export function notObserved(unobserved) {
   return `# Requirements nobody will observe in this run
 
-The project's owner started this run as a prototype run: it does not stop for a person to look.
+The project's owner started this run as a provisional run: it does not stop for a person to look.
 The requirements below are operator-observed. Nobody has observed them, and nobody will during
 this session:
 
@@ -933,7 +934,7 @@ For these requirements, and only these:
   write no Deferrals row for it, leave the Deferrals \`Count:\` as it is, write no \`waived:\`
   line, and judge the epic's verdict on its other requirements and gates.
 - In Step 2.2 record it in the same \`tor-lifecycle mark\` call as the others, as
-  \`--fail <TOR> "NOT OBSERVED — prototype run: <what a person must still do, in one line>"\`.
+  \`--fail <TOR> "NOT OBSERVED — provisional run: <what a person must still do, in one line>"\`.
   That writes its \`unverified:\` line, so nothing reads it as verified.
 - In your final report list it under the heading "Not proven for real", with what a person
   must still do and the checklist file that says how.
@@ -1163,13 +1164,13 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
  * waited five minutes; that was a third of the run and two calls to the owner's phone.
  */
 /**
- * Told to a build or repair session when a prototype run took an amendment of a requirement for this epic: the change
+ * Told to a build or repair session when a provisional run took an amendment of a requirement for this epic: the change
  * record is its to write, and it must say no person approved it. Before, only the planner knew, so the build wrote a
  * person's name and the check (`amendment-record`) sent it into the one repair round (Pilot Light, 2026-11-23).
  */
 export function amendmentRule(tors) {
   if (!tors?.length) return '';
-  return `\n# Requirements amended in this run\n\nThis is a prototype run. ${tors.length === 1 ? 'The requirement' : 'The requirements'} ${tors.join(', ')} ${tors.length === 1 ? 'was' : 'were'} amended on a session's own recommendation, and no person has approved ${tors.length === 1 ? 'it' : 'them'}. The change record you write under \`docs/requirements/changes/\` must say \`approved_by = "${PROTOTYPE_BY}"\`, exactly, and never a person's name. The owner confirms it afterward.\n`;
+  return `\n# Requirements amended in this run\n\nThis is a provisional run. ${tors.length === 1 ? 'The requirement' : 'The requirements'} ${tors.join(', ')} ${tors.length === 1 ? 'was' : 'were'} amended on a session's own recommendation, and no person has approved ${tors.length === 1 ? 'it' : 'them'}. The change record you write under \`docs/requirements/changes/\` must say \`approved_by = "${PROVISIONAL_BY}"\`, exactly, and never a person's name. The owner confirms it afterward.\n`;
 }
 
 export function presenceRule(attended, unanswered = []) {
@@ -1400,7 +1401,7 @@ export function dryRun({ project, workspace, config, pluginDir = PLUGIN_DIR, out
   if (sync.state !== 'same' && sync.state !== 'no-clone') p(`Project and clone: ${sync.state}${sync.state === 'diverged' ? ' — A REAL RUN IS REFUSED until they are brought together' : ''}`);
   p(`Test command:     ${pre.testCommand ?? '(none)'}    Test directories: ${pre.testDirs.join(' ') || '(none)'}`);
   p(`How careful:      ${MODE_LINE[config.mode]}`);
-  p(`When an epic parks: ${config.onParkFrom === 'project' ? `${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set by the project` : config.onParkFrom === 'prototype' ? 'independent epics still run (a prototype run)' : config.onParkFrom === 'attended' ? 'independent epics still run (the owner is away)' : 'follows the owner\'s answer at launch: away, independent epics still run; here, the run stops'}`);
+  p(`When an epic parks: ${config.onParkFrom === 'project' ? `${config.onPark === 'stop' ? 'the run stops (onPark: stop)' : 'independent epics still run (onPark: continue)'} — set by the project` : config.onParkFrom === 'provisional' ? 'independent epics still run (a provisional run)' : config.onParkFrom === 'attended' ? 'independent epics still run (the owner is away)' : 'follows the owner\'s answer at launch: away, independent epics still run; here, the run stops'}`);
   p(`Clone environment: setup ${config.setup ? `\`${config.setup}\`` : '(none)'}; copied from the project: ${(config.copy ?? []).join(' ') || '(nothing)'}; readable outside the clone: ${(config.readOnly ?? []).join(' ') || '(nothing)'}; files CLAUDE.md names outside the project: ${namedReads(project, workspace).files.join(' ') || '(none)'}`);
   p(config.sandbox === true
     ? `Sandbox:          on — sessions write only in the clone, may use local sockets and ports, and reach ${REGISTRIES.length} package registries${cleanNetwork(config.network).length ? ` plus ${cleanNetwork(config.network).join(', ')}` : ''}; nothing else. The auditor has no network (WebFetch and WebSearch are always denied)`
@@ -1551,14 +1552,14 @@ class Run {
   /** The amendments a person approved. */
   ownerAmendments(e) { return this.amendGates(e).filter((g) => !g.decided.prototype).map((g) => g.tor); }
   /**
-   * The amendments a prototype run took on a session's proposal and no person has approved since. They stand in a
-   * prototype run only: a full run does not honour one (the owner's decision), so the question is asked again and
+   * The amendments a provisional run took on a session's proposal and no person has approved since. They stand in a
+   * provisional run only: a full run does not honour one (the owner's decision), so the question is asked again and
    * parks, and a build that changes requirement files without that answer is out of scope.
    */
-  takenAmendments(e) { const owner = this.ownerAmendments(e); return this.config.mode === 'prototype' ? this.amendGates(e).filter((g) => g.decided.prototype && !owner.includes(g.tor)).map((g) => g.tor) : []; }
+  takenAmendments(e) { const owner = this.ownerAmendments(e); return this.config.mode === 'provisional' ? this.amendGates(e).filter((g) => g.decided.prototype && !owner.includes(g.tor)).map((g) => g.tor) : []; }
   /**
-   * Writes, on the epic's branch, the record that the owner kept a correction a prototype run took (`tor-lifecycle
-   * keep`), and commits it. When nothing waits to be kept (the record never named "autopilot (prototype run)" as its approver), nothing is written
+   * Writes, on the epic's branch, the record that the owner kept a correction a provisional run took (`tor-lifecycle
+   * keep`), and commits it. When nothing waits to be kept (the record never named "autopilot (provisional run)" as its approver), nothing is written
    * and the log says so: the project then still lists the correction as not approved, which is the safe side.
    */
   keepCorrection(e, g) {
@@ -1572,11 +1573,11 @@ class Run {
       this.log(`${e.id}: ${by} kept the correction to ${g.tor}; recorded in the project (${r.out.split('\n').filter(Boolean).join(', ')})`);
     } else this.log(`${e.id}: ${by} kept the correction to ${g.tor}, but no record of it could be written in the project (${(r.err || r.out || 'nothing waited to be kept').split('\n')[0]}); the project's status may still list it as not approved`);
   }
-  /** The deferrals a prototype run took for this epic. As with amendments, only a prototype run honours them: in a full run the owner is asked. */
-  takenDeferrals(e) { return this.config.mode === 'prototype' ? prototypeDeferred(readGates(this.stateDir), e.id) : []; }
+  /** The deferrals a provisional run took for this epic. As with amendments, only a provisional run honours them: in a full run the owner is asked. */
+  takenDeferrals(e) { return this.config.mode === 'provisional' ? prototypeDeferred(readGates(this.stateDir), e.id) : []; }
   /** The deferrals the owner themself answered "Defer" to, for one of this epic's own requirements: theirs in any run. */
   ownerDeferrals(e, sc) { const anchors = sc ? this.anchorsFor(e, sc) : this.meta(e).anchors; return ownerDeferred(readGates(this.stateDir), e.id).filter((t) => anchors.includes(t)); }
-  /** The deferrals that stand for this epic where `sc` (its status file) was read: `owner` (theirs, in any run) and `all` (with what this prototype run took). */
+  /** The deferrals that stand for this epic where `sc` (its status file) was read: `owner` (theirs, in any run) and `all` (with what this provisional run took). */
   standingDeferrals(e, sc) { const owner = this.ownerDeferrals(e, sc); return { owner, all: [...new Set([...owner, ...this.takenDeferrals(e)])] }; }
   /** Evidence for deferrals that passed a check: whose each one is. */
   static deferredBy(tors, owner) { const [o, p] = [tors.filter((t) => owner.includes(t)), tors.filter((t) => !owner.includes(t))]; return { ...(o.length ? { deferredWithTheOwnersApproval: o } : {}), ...(p.length ? { deferredInThisPrototypeRun: p } : {}) }; }
@@ -1908,7 +1909,7 @@ class Run {
     else {
       const brief = path.join(this.epicDir(e), 'fix-brief.md');
       all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, verifyFixRounds: e.verifyFixRounds ?? 0, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], unproven: e.unproven ?? [], fixBrief: exists(brief) ? read(brief) : null,
-        // A prototype run: what it answered for the owner, and what went on without their look, for the run that finishes the epic.
+        // A provisional run: what it answered for the owner, and what went on without their look, for the run that finishes the epic.
         ...(e.prototype?.length ? { prototype: e.prototype } : {}), ...(e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(e.unlooked?.prototype ? { unlooked: e.unlooked } : {}), ...(e.skippedLook ? { skippedLook: true } : {}), ...(e.amended?.length ? { amended: e.amended } : {}), ...(e.amendedUnseen?.length ? { amendedUnseen: e.amendedUnseen } : {}) };
     }
     writeJson(path.join(this.stateDir, 'epics.json'), all);
@@ -2189,7 +2190,7 @@ class Run {
       for (let waited = 0; waited < this.config.timing.infraRetryMs && !this.stopRequested(); waited += 1000) await sleep(Math.min(1000, this.config.timing.infraRetryMs - waited));
       if (this.stopRequested()) { s.outcome = 'stopped'; s.why = 'STOP file'; break; }
     }
-    // Questions this session asked that a prototype run answered itself (hook R8): recorded, never a park.
+    // Questions this session asked that a provisional run answered itself (hook R8): recorded, never a park.
     const took = this.gateFiles().filter((f) => !gatesBefore.has(f) && tryJson(this.gatePath(f))?.decided?.prototype);
     if (took.length) this.tookForOwner(e, took);
     this.save();
@@ -2210,7 +2211,7 @@ class Run {
   }
 
   /**
-   * A prototype run answered these questions with the session's own recommendation (gate files hook R8
+   * A provisional run answered these questions with the session's own recommendation (gate files hook R8
    * wrote, already decided). Kept on the epic with what the owner needs to review each one afterwards:
    * for an amendment, the requirement as it read on the integration line and what was proposed.
    */
@@ -2221,7 +2222,7 @@ class Run {
       const was = g.kind === 'amendment' && g.tor ? this.requirementText(g.tor) : null;
       const proposed = g.kind === 'amendment' ? (String(g.question ?? '').match(/\bProposed:\s*([\s\S]*?)\s*How to proceed\?\s*$/) ?? [])[1] ?? null : null;
       e.prototype = [...(e.prototype ?? []), { gate: `gates/${f}`, kind: g.kind, tor: g.tor ?? null, answer: g.decided.answer, question: g.question ?? null, session: g.session ?? null, ...(was ? { was } : {}), ...(proposed ? { proposed } : {}) }];
-      this.log(`${e.id}: prototype run: answered "${g.decided.answer}" for the owner (${g.kind}${g.tor ? `, ${g.tor}` : ''}; ${f}); it is listed for them at the end`);
+      this.log(`${e.id}: provisional run: answered "${g.decided.answer}" for the owner (${g.kind}${g.tor ? `, ${g.tor}` : ''}; ${f}); it is listed for them at the end`);
       this.event('prototype-answer', e, { kind: g.kind, tor: g.tor ?? null, answer: g.decided.answer });
     }
   }
@@ -2364,13 +2365,13 @@ class Run {
 
     const handoff = gitShow(this.clone, b, `${PLAN_DIR}/${handoffRel}`);
     const count = handoff && /^## Deferrals\b/m.test(handoff) ? (handoff.slice(handoff.search(/^## Deferrals\b/m)).match(/^Count:\s*(\d+)/m) ?? [])[1] : undefined;
-    // A prototype run took the builder's recommendation to defer (a decided gate per requirement): that many rows, each
+    // A provisional run took the builder's recommendation to defer (a decided gate per requirement): that many rows, each
     // naming one of those requirements, are the owner's setting at work. One more is a deferral nobody agreed to.
     const { owner: ownerDefer, all: deferred } = this.standingDeferrals(e, sc);
     const section = deferralsSection(handoff) ?? '';
     const rows = [...new Set(section.match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? [])];
     const deferOk = Number(count) > 0 && Number(count) <= deferred.length && rows.length === Number(count) && rows.every((t) => deferred.includes(t));
-    if (!add('handoff', count === '0' || deferOk, handoff === null ? 'handoff file missing on the branch' : count === undefined ? 'no "## Deferrals" section with a Count: line' : `Deferrals Count: ${count}${deferOk ? ` (${rows.join(', ')}: ${[rows.filter((t) => ownerDefer.includes(t)), rows.filter((t) => !ownerDefer.includes(t))].map((x, i) => (x.length ? `${rows.length === x.length ? '' : `${x.join(', ')} `}${i ? "deferred on the builder's recommendation in this prototype run" : "deferred with the owner's approval"}` : null)).filter(Boolean).join('; ')})` : deferred.length ? `; a deferral stands only for ${deferred.join(', ')}, and the rows name ${rows.join(', ') || 'no requirement'}` : ''}`) && Number(count) > 0) parkOnly = parkOnly ?? `the handoff records ${count} deferral(s): a human decision`;
+    if (!add('handoff', count === '0' || deferOk, handoff === null ? 'handoff file missing on the branch' : count === undefined ? 'no "## Deferrals" section with a Count: line' : `Deferrals Count: ${count}${deferOk ? ` (${rows.join(', ')}: ${[rows.filter((t) => ownerDefer.includes(t)), rows.filter((t) => !ownerDefer.includes(t))].map((x, i) => (x.length ? `${rows.length === x.length ? '' : `${x.join(', ')} `}${i ? "deferred on the builder's recommendation in this provisional run" : "deferred with the owner's approval"}` : null)).filter(Boolean).join('; ')})` : deferred.length ? `; a deferral stands only for ${deferred.join(', ')}, and the rows name ${rows.join(', ') || 'no requirement'}` : ''}`) && Number(count) > 0) parkOnly = parkOnly ?? `the handoff records ${count} deferral(s): a human decision`;
     // The later epics those rows hand the unmet part to: the skill adds the requirement to each one's spec and status file.
     const successors = deferOk ? this.pre.epics.map((x) => x.id).filter((id) => id !== e.id && new RegExp(`(?<![A-Za-z0-9])${id}(?![A-Za-z0-9])`).test(section)) : [];
 
@@ -2422,15 +2423,15 @@ class Run {
       else if (Number(gitRun(this.clone, 'cat-file', '-s', `${b}:${f}`).out || 0) > 5 * 1024 * 1024) out.push(`${f}: larger than 5 MB`);
     }
     if (out.length === 0 && claudeMd) { if (JSON.stringify(e.claudeMd ?? null) !== JSON.stringify(claudeMd)) this.log(`${e.id}: the build changed CLAUDE.md in ${claudeMd.sections.join(', ')}; the owner is shown it before the final check`); e.claudeMd = claudeMd; } else delete e.claudeMd;
-    // Whose amendment it is: the owner's own answer, or one a prototype run took on the session's proposal (nobody approved that one).
+    // Whose amendment it is: the owner's own answer, or one a provisional run took on the session's proposal (nobody approved that one).
     const taken = this.takenAmendments(e);
-    const whose = amended.length && amended.every((t) => taken.includes(t)) ? 'the amendment this prototype run took, not yet seen by the owner, of' : "the owner's approved amendment of";
+    const whose = amended.length && amended.every((t) => taken.includes(t)) ? 'the amendment this provisional run took, not yet seen by the owner, of' : "the owner's approved amendment of";
     add('scope', out.length === 0, out.length ? out : `${changed.length} changed paths in scope${amended.length && changed.some((f) => f.startsWith('docs/requirements/')) ? `; requirement files changed under ${whose} ${amended.join(', ')}` : ''}`);
     // An amendment nobody approved says so in the project too, not only in autopilot's own files: its change record
     // names no person. That is what lets the project's status list it for the owner afterwards.
     if (amended.some((t) => taken.includes(t)) && changed.some((f) => f.startsWith('docs/requirements/'))) {
-      const honest = changed.filter((f) => f.startsWith('docs/requirements/changes/')).some((f) => /^approved_by\s*=\s*"autopilot \(prototype run\)"\s*$/im.test(gitShow(this.clone, b, f)));
-      add('amendment-record', honest, honest ? 'the change record says no person approved the amendment (approved_by = "autopilot (prototype run)")' : `a prototype run took the amendment of ${amended.filter((t) => taken.includes(t)).join(', ')}: its change record under docs/requirements/changes/ must say approved_by = "autopilot (prototype run)", not a person's name`);
+      const honest = changed.filter((f) => f.startsWith('docs/requirements/changes/')).some((f) => UNAPPROVED_BY.some((by) => new RegExp(`^approved_by\\s*=\\s*"${by.replace(/[()]/g, '\\$&')}"\\s*$`, 'im').test(gitShow(this.clone, b, f))));
+      add('amendment-record', honest, honest ? 'the change record says no person approved the amendment (approved_by = "autopilot (provisional run)")' : `a provisional run took the amendment of ${amended.filter((t) => taken.includes(t)).join(', ')}: its change record under docs/requirements/changes/ must say approved_by = "autopilot (provisional run)", not a person's name`);
     }
     if (amended.length && changed.some((f) => f.startsWith('docs/requirements/')) && !e.amended) { e.amended = amended; if (amended.some((t) => taken.includes(t))) e.amendedUnseen = amended.filter((t) => taken.includes(t)); this.log(`${e.id}: the build changed requirement files under ${whose} ${amended.join(', ')}`); }
 
@@ -2565,15 +2566,15 @@ class Run {
     const stands = this.standingLook(e, tip); // the owner already looked at exactly this tip, or at these screens before a repair that changed none
     if (stands) { if (stands.kept && e.look?.kept?.to !== tip) this.log(`${e.id}: the repair changed no screen file (${stands.kept.files.join(', ') || 'no files'}); ${stands.by}'s look at ${String(stands.branchTip).slice(0, 9)} is kept`); e.look = stands; delete e.unobserved; this.save(); return false; }
     e.look = null;
-    // A prototype run does not stop for a look. Screens and a changed CLAUDE.md are kept for the owner to review
+    // A provisional run does not stop for a look. Screens and a changed CLAUDE.md are kept for the owner to review
     // afterwards; what only a person can observe goes to the final check as not observed, and is never recorded as verified.
-    if (this.config.mode === 'prototype') {
+    if (this.config.mode === 'provisional') {
       const observed = (m.observed ?? []).map((o) => ({ tor: o.tor, clauses: o.clauses }));
       e.skippedLook = true; // carried to a later run: a full run that takes this epic up at the final check asks for the look first
       if (observed.length) e.unobserved = observed; else delete e.unobserved;
       if (this.hasScreens(e) || e.claudeMd) e.unlooked = { pictures: lookPictures(this.lookStore(e)).map((p) => path.join(this.lookStore(e), p.file)), prototype: true, ...(e.claudeMd ? { claudeMd: e.claudeMd } : {}) };
       const what = [observed.length ? `${observed.map((o) => o.tor).join(', ')} will be recorded as not observed` : null, this.hasScreens(e) ? `${e.unlooked.pictures.length} picture(s) kept` : null, e.claudeMd ? `the CLAUDE.md change (${e.claudeMd.sections.join(', ')}) kept` : null].filter(Boolean).join('; ');
-      this.log(`${e.id}: not parked for a look (prototype run); ${what}; all of it is listed for the owner at the end`);
+      this.log(`${e.id}: not parked for a look (provisional run); ${what}; all of it is listed for the owner at the end`);
       this.event('prototype-skip', e, { unobserved: observed.map((o) => o.tor), pictures: e.unlooked?.pictures.length ?? 0, claudeMd: !!e.claudeMd });
       this.save();
       return false;
@@ -2692,8 +2693,8 @@ class Run {
 
   async doVerify(e) {
     const m = this.meta(e);
-    // A prototype run skipped this epic's look, and this run is a full one that re-enters here: the look is asked now, as a full run does.
-    if (this.config.mode !== 'prototype' && e.skippedLook && !e.look) { delete e.unobserved; delete e.unlooked; if (this.humanCheck(e)) return null; }
+    // A provisional run skipped this epic's look, and this run is a full one that re-enters here: the look is asked now, as a full run does.
+    if (this.config.mode !== 'provisional' && e.skippedLook && !e.look) { delete e.unobserved; delete e.unlooked; if (this.humanCheck(e)) return null; }
     const before = e.caughtUp ?? null;
     const stuck = this.catchUp(e);
     if (stuck) return this.parkResumable(e, stuck, 'VERIFY');
@@ -2705,7 +2706,7 @@ class Run {
       const pictures = this.hasScreens(e) ? this.restoreLook(e) : [];
       fs.writeFileSync(rules, VERIFY_RULES + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (pictures.length ? LOOK_VERIFY_RULE : ''));
       if (!e.look && e.unobserved?.length) {
-        // A prototype run: nobody looked and nobody will. The verifier is told up front, so it neither asks nor records a PASS.
+        // A provisional run: nobody looked and nobody will. The verifier is told up front, so it neither asks nor records a PASS.
         const file = path.join(stepDir, 'not-observed.md');
         fs.writeFileSync(file, notObserved(e.unobserved));
         return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [file, rules] };
@@ -2885,7 +2886,7 @@ class Run {
     add('verdict', problems.length === 0, problems.length ? problems : { merge: this.integrationSha(), parents, ...(fixedFiles.length ? { fixedDuringWrapup: fixedFiles, approvedBy: approval } : {}) });
 
     const sc = parseSidecar(gitShow(this.clone, dev, m.sidecar));
-    // A prototype run merges two kinds of requirement without a `verified:` line, and only with the record that says why:
+    // A provisional run merges two kinds of requirement without a `verified:` line, and only with the record that says why:
     // one nobody observed (told to the verifier, and an `unverified:` line that says so), and one whose deferral was
     // taken on the builder's recommendation (a decided gate, and the sidecar's `waived:` line naming it).
     const told = new Set((e.unobserved ?? []).map((u) => u.tor));
@@ -2907,7 +2908,7 @@ class Run {
     const section = handoff && /^## Deferrals\b/m.test(handoff) ? handoff.slice(handoff.search(/^## Deferrals\b/m)) : null;
     const countLine = section ? (section.match(/^Count:.*$/m) ?? [])[0] : null;
     const numbers = countLine ? countLine.match(/\d+/g) ?? [] : [];
-    // A waiver is a deferral agreed at the final check. Only the ones this prototype run took are allowed, and only
+    // A waiver is a deferral agreed at the final check. Only the ones this provisional run took are allowed, and only
     // when the handoff counts exactly those.
     const waivedCount = Number((countLine?.match(/waived:\s*(\d+)/i) ?? [])[1] ?? 0);
     const standingWaived = waivedTors.length > 0 && waivedTors.every((t) => deferred.includes(t)) && waivedCount === waivedTors.length ? waivedCount : 0;
@@ -2919,7 +2920,7 @@ class Run {
     const undisclosed = Number((countLine?.match(/undisclosed:\s*(\d+)/i) ?? [])[1] ?? 0);
     const forgiven = ownerFix && !autoFix ? fixed : Math.min(fixed, asked.filter((x) => x.testOnly).length);
     const others = countLine ? [...countLine.matchAll(/([a-z][a-z ]*):\s*(\d+)/gi)].filter(([, k]) => !/^(fixed at wrapup|undisclosed)$/i.test(k.trim()) && !/^count$/i.test(k.trim()) && !(standingWaived && /^waived$/i.test(k.trim()))).map(([, , n]) => Number(n)) : [];
-    const total = Number(numbers[0] ?? NaN) - standingWaived; // the rows that are not deferrals that stand (the owner's, or this prototype run's)
+    const total = Number(numbers[0] ?? NaN) - standingWaived; // the rows that are not deferrals that stand (the owner's, or this provisional run's)
     const countsOk = numbers.length > 0 && others.every((n) => n === 0) && (approval ? total === fixed && undisclosed <= forgiven && ((ownerFix && !autoFix) || fixed <= asked.length) : standingWaived ? total === 0 && fixed === 0 && undisclosed === 0 : numbers.every((x) => Number(x) === 0));
     add('no-waivers', !waivedLine && countsOk, { waivedLineInSidecar: 'waived' in sc.fields, countLine: countLine ?? (handoff === null ? 'complete handoff missing' : 'no Deferrals Count: line'), ...(ownerFix ? { fixedAtWrapupApprovedBy: ownerFix } : {}), ...(standingWaived ? Run.deferredBy(waivedTors, ownerDefer) : {}) });
     if (standingWaived) e.deferred = waivedTors;
@@ -2966,7 +2967,7 @@ class Run {
    * project's own status lists it for whoever opens it later. Never fails the epic: a note that cannot be written is logged.
    */
   noteUnconfirmed(e) {
-    // Also what a prototype run (or `look: "after"`) merged without the owner's look: the screens, and a changed CLAUDE.md.
+    // Also what a provisional run (or `look: "after"`) merged without the owner's look: the screens, and a changed CLAUDE.md.
     const items = [...(e.unproven ?? []),
       ...(e.unlooked?.pictures?.length ? [{ source: 'autopilot', text: `its screens were merged without a person's look (${e.unlooked.pictures.length} picture(s) were taken; the final check judged them). Open the app and look at each screen this epic built or changed` }] : []),
       ...(e.unlooked?.claudeMd ? [{ source: 'autopilot', text: `it changed the project's instructions file (CLAUDE.md), in ${e.unlooked.claudeMd.sections.join(', ')}, and nobody read the change; every later session follows that file` }] : [])];
@@ -3088,10 +3089,10 @@ class Run {
       // A requirement the build amended stays amended on the branch: the run that finishes the epic says so too, and whose amendment it is.
       const stillAmended = (rec.amended ?? []).filter((t) => this.approvedAmendments(e).includes(t));
       if (stillAmended.length) { e.amended = stillAmended; const unseen = stillAmended.filter((t) => this.takenAmendments(e).includes(t)); if (unseen.length) e.amendedUnseen = unseen; }
-      // A full run does not rely on what a prototype run took for this epic: before any session, the owner is asked
-      // each of those questions as the session asked it. Their answer is a gate like any other; the prototype run's
+      // A full run does not rely on what a provisional run took for this epic: before any session, the owner is asked
+      // each of those questions as the session asked it. Their answer is a gate like any other; the provisional run's
       // no longer stands, in this run or a later one.
-      if (this.config.mode !== 'prototype') {
+      if (this.config.mode !== 'provisional') {
         const all = readGates(this.stateDir);
         const took = prototypeReasked(all, e.id);
         const open = all.filter((x) => x.epic === e.id && x.reask && !x.decided && !x.void && !x.superseded && !x.cleared);
@@ -3100,23 +3101,23 @@ class Run {
           for (const x of [...took].sort((a, b) => (order[stepKindOf(a.session)] ?? 0) - (order[stepKindOf(b.session)] ?? 0))) {
             this.markGate(x.file, { superseded: { run: this.runName, date: now(), why: 'a full run asks the owner' } });
             this.writeGate(e, { kind: x.kind, skillStep: x.skillStep ?? 'unknown', session: x.session ?? null, question: x.question, options: x.options ?? [], tor: x.tor, ...(x.recommendation ? { recommendation: x.recommendation } : {}), artifacts: [],
-              why: `a prototype run answered "${x.decided.answer}" to this for you on ${String(x.decided.date).slice(0, 10)}, on the session's own recommendation; a full run asks you. "${x.decided.answer}" keeps what was built on it; any other answer sends the epic back to be ${stepKindOf(x.session) === 'plan' ? 'planned' : 'built'} again with your answer`,
+              why: `a provisional run answered "${x.decided.answer}" to this for you on ${String(x.decided.date).slice(0, 10)}, on the session's own recommendation; a full run asks you. "${x.decided.answer}" keeps what was built on it; any other answer sends the epic back to be ${stepKindOf(x.session) === 'plan' ? 'planned' : 'built'} again with your answer`,
               reask: { of: x.file, took: x.decided.answer, phase } });
           }
           const tors = [...new Set([...took, ...open].map((x) => x.tor))].join(', ');
-          this.log(`${e.id}: a prototype run took an answer for ${tors}; a full run asks the owner before it goes on (no session started)`);
-          this.finish(e, 'PARKED', `a prototype run took an answer for ${tors}: a full run asks the owner before it goes on`);
+          this.log(`${e.id}: a provisional run took an answer for ${tors}; a full run asks the owner before it goes on (no session started)`);
+          this.finish(e, 'PARKED', `a provisional run took an answer for ${tors}: a full run asks the owner before it goes on`);
           return null;
         }
-        // The owner kept a correction the prototype run took: the project's own record of it still says nobody approved
+        // The owner kept a correction the provisional run took: the project's own record of it still says nobody approved
         // it, so the record that says they did is written on the epic's branch before the epic goes on.
         for (const x of all.filter((x) => x.epic === e.id && x.reask && x.kind === 'amendment' && x.decided?.answer === x.reask.took && !x.decided.used && !x.reask.kept && !x.void && !x.superseded && !x.cleared)) this.keepCorrection(e, x);
-        // Their answers are in: one that is not what the prototype run took sends the epic back to the session that asked.
+        // Their answers are in: one that is not what the provisional run took sends the epic back to the session that asked.
         const answered = all.filter((x) => x.epic === e.id && x.reask && x.decided?.answer && !x.decided.used && !x.void && !x.superseded && !x.cleared && x.decided.answer !== x.reask.took);
         if (answered.length) phase = answered.some((x) => stepKindOf(x.session) === 'plan') ? 'PLAN' : 'BUILD';
       }
-      // Still a prototype run: an epic that re-enters at the final check is still not looked at. In a full run the verifier is not told so, and what it asks about the look goes to the owner.
-      if (this.config.mode === 'prototype') Object.assign(e, { ...(rec.unobserved ? { unobserved: rec.unobserved.map(({ recorded, ...u }) => u) } : {}), ...(rec.unlooked ? { unlooked: rec.unlooked } : {}) });
+      // Still a provisional run: an epic that re-enters at the final check is still not looked at. In a full run the verifier is not told so, and what it asks about the look goes to the owner.
+      if (this.config.mode === 'provisional') Object.assign(e, { ...(rec.unobserved ? { unobserved: rec.unobserved.map(({ recorded, ...u }) => u) } : {}), ...(rec.unlooked ? { unlooked: rec.unlooked } : {}) });
       if (/^verify-\d+ FAIL after the fix round: /.test(g.reason ?? '')) {
         e.verifyFixRounds = 1; // a record from before the final check had a round of its own
         // A gate written for an epic an earlier driver left FAILED: its brief is from the round already spent.
@@ -3176,8 +3177,8 @@ class Run {
     // start from scratch (seen live: approved, the epic failed and was rebuilt, and the owner was asked again).
     const amendment = (x) => /^amendment/.test(x.kind ?? '') && /^amend\b/i.test(x.decided?.answer ?? '') && !x.void && !x.superseded && !x.cleared;
     for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && amendment(x) && !x.decided.used)) this.markGate(g.file, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase: 'PLAN', date: now(), carried: true } } }));
-    // From scratch in a full run: nothing is built on what a prototype run took, and nothing takes it up again.
-    if (this.config.mode !== 'prototype') for (const x of prototypeReasked(readGates(this.stateDir), e.id)) { this.markGate(x.file, { superseded: { run: this.runName, date: now(), why: 'a full run starts the epic again and asks the owner' } }); this.log(`${e.id}: the answer a prototype run took for ${x.tor} ("${x.decided.answer}") does not stand in a full run; if the question comes up, the owner is asked`); }
+    // From scratch in a full run: nothing is built on what a provisional run took, and nothing takes it up again.
+    if (this.config.mode !== 'provisional') for (const x of prototypeReasked(readGates(this.stateDir), e.id)) { this.markGate(x.file, { superseded: { run: this.runName, date: now(), why: 'a full run starts the epic again and asks the owner' } }); this.log(`${e.id}: the answer a provisional run took for ${x.tor} ("${x.decided.answer}") does not stand in a full run; if the question comes up, the owner is asked`); }
     this.supersedeGates(e, null);
     // From scratch: every other answer given about the earlier attempt is not handed to the new one.
     for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && x.decided?.used && !x.superseded && !x.void && gateEntry(x)?.question && !amendment(x))) this.markGate(g.file, { superseded: { run: this.runName, date: now() } });
@@ -3319,7 +3320,7 @@ class Run {
       this.log(`run ${this.runName}: queue ${this.state.queue.map((q) => q.id).join(', ') || '(empty)'}; integration line ${integration}`);
       // The limits this run really has, for whoever launched it to hold against what the owner confirmed.
       const limits = { runBudgetUsd: cfg.runBudgetUsd ?? null, endBy: cfg.endBy ?? null, autoContinue: cfg.autoContinue ?? 0, onPark: cfg.onPark, onParkFrom: cfg.onParkFrom ?? 'default' };
-      const parkWhy = { project: 'set by the project', prototype: 'a prototype run keeps going', attended: 'you said you would be away', default: 'you did not say you would be away' }[limits.onParkFrom];
+      const parkWhy = { project: 'set by the project', provisional: 'a provisional run keeps going', attended: 'you said you would be away', default: 'you did not say you would be away' }[limits.onParkFrom];
       // A run that continues others has what is left of their shared budget: said as such, so it never reads as a different budget from `status`.
       const chain = chainOf(this.stateDir, this.runName);
       if (chain.runs.length > 1) Object.assign(limits, { chainBudgetUsd: chain.runBudgetUsd, chainSpentBeforeUsd: +chain.spentBefore.toFixed(2) });
@@ -3636,7 +3637,7 @@ function standingDid(gate, answer) {
   if (gate.phase === 'VERIFY') return 'ran the final check again';
   return 'continued it from where it stopped';
 }
-/** What a prototype run did when it answered a session's question itself, in the owner's words. */
+/** What a provisional run did when it answered a session's question itself, in the owner's words. */
 export function prototypeDid(gate) {
   const a = gate.decided?.answer ?? ''; const tor = gate.tor ?? 'a requirement';
   if (gate.kind === 'amendment') return `took the proposed correction to ${tor}`;
@@ -3718,6 +3719,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const stateOf = (name) => tryJson(path.join(runDirOf(ws, name), 'state.json'));
   const cfgOf = (name) => tryJson(path.join(runDirOf(ws, name), 'config.json'), {}) ?? {};
   const state = run ? stateOf(run) : null; const lastCfg = run ? cfgOf(run) : {};
+  if (lastCfg.mode === 'prototype') lastCfg.mode = 'provisional'; // its name before 3.1.0
   const chain = runChain(ws, run);
   const spentUsd = +chain.reduce((sum, name) => sum + (stateOf(name)?.spentUsd ?? 0), 0).toFixed(2);
   // The budget the owner set when the chain began; raised mid-chain when they have since set a higher one for the project.
@@ -3740,9 +3742,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
 
   // Screens merged without the owner's look ("look": "after"), with where the pictures are, for the closing screen.
   const unlooked = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && q.unlooked).map((q) => ({ epic: q.id, label: q.label ?? q.id, pictures: q.unlooked.pictures ?? [], ...(q.unlooked.prototype ? { prototype: true } : {}), ...(q.unlooked.claudeMd ? { claudeMd: q.unlooked.claudeMd } : {}) })));
-  // Requirements merged in a prototype run that only a person can observe and nobody did: recorded as not verified, with how to check each later.
+  // Requirements merged in a provisional run that only a person can observe and nobody did: recorded as not verified, with how to check each later.
   const unobserved = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unobserved ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, tor: u.tor, clauses: u.clauses ?? [], check: reverifyCommand(q.id, u.tor) }))));
-  // What a prototype run answered with a session's own recommendation, each with what the owner needs to review it.
+  // What a provisional run answered with a session's own recommendation, each with what the owner needs to review it.
   const tookOf = new Map(chain.flatMap((name) => (stateOf(name)?.queue ?? []).flatMap((q) => (q.prototype ?? []).map((x) => [x.gate, x]))));
 
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).

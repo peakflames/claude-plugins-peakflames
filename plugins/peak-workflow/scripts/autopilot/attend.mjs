@@ -5,7 +5,7 @@
 // the driver alone decides what runs, and nothing in this file changes a run.
 import fs from 'node:fs';
 import path from 'node:path';
-import { ANSWERS, LEAVE_IT, TRY_AGAIN, atLimit, gateReason } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, TRY_AGAIN, atLimit, gateReason, isProvisional } from './lib.mjs';
 
 const tryJson = (p, fallback = null) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -172,7 +172,7 @@ export function eventLine(ev) {
   const who = shortLabel(ev.label ?? ev.epic ?? 'the epic');
   const [doing, done] = STEP_WORDS[ev.kind] ?? ['Working on', 'Step'];
   switch (ev.type) {
-    case 'run-start': return ev.resuming ? 'Autopilot picked the run back up.' : `Autopilot started: ${plural((ev.queue ?? []).length, 'epic')} queued${ev.mode === 'prototype' ? ', as a prototype run: it keeps building and lists what it decided for you at the end' : ''}.`;
+    case 'run-start': return ev.resuming ? 'Autopilot picked the run back up.' : `Autopilot started: ${plural((ev.queue ?? []).length, 'epic')} queued${isProvisional(ev.mode) ? ', as a provisional run: it keeps building and lists what it decided for you at the end' : ''}.`;
     case 'epic-start': { const at = ev.pos && ev.of > 1 ? `${ev.pos} of ${ev.of}: ` : ''; return ev.resumedAt ? `Continuing ${at}${who} from where it stopped` : `Starting ${at}${who}`; }
     case 'step-start': return ev.continuing ? `Picking ${who} back up where it stopped (${doing.toLowerCase()}); nothing is started over` : `${doing} ${who}`;
     case 'step-end': {
@@ -199,13 +199,13 @@ export function eventLine(ev) {
       return `Stopped: ${who} — ${plainReason(ev.reason)}`;
     case 'failed': return `Did not pass: ${who} — ${plainReason(ev.reason)}`;
     case 'blocked': return `Not started: ${who} — ${plainReason(ev.reason)}`;
-    // A prototype run went on where a full run would have asked: said as it happens, and listed again at the end.
+    // A provisional run went on where a full run would have asked: said as it happens, and listed again at the end.
     case 'prototype-answer':
-      if (ev.kind === 'amendment') return `Took the planner's correction to ${ev.tor ?? 'a requirement'} for you (prototype run)`;
-      return `Took the builder's recommendation for ${ev.tor ?? 'a requirement'} for you: ${/^\W*defer\b/i.test(ev.answer ?? '') ? 'left for a later epic' : 'fix it now'} (prototype run)`;
+      if (ev.kind === 'amendment') return `Took the planner's correction to ${ev.tor ?? 'a requirement'} for you (provisional run)`;
+      return `Took the builder's recommendation for ${ev.tor ?? 'a requirement'} for you: ${/^\W*defer\b/i.test(ev.answer ?? '') ? 'left for a later epic' : 'fix it now'} (provisional run)`;
     case 'prototype-skip': {
       const parts = [(ev.unobserved ?? []).length ? `${ev.unobserved.join(', ')} will be recorded as not observed` : null, ev.pictures ? `${plural(ev.pictures, 'picture')} kept` : null, ev.claudeMd ? 'the change to the project\'s instructions file kept' : null].filter(Boolean);
-      return `Not stopping ${who} for your look (prototype run)${parts.length ? `: ${parts.join('; ')}` : ''}`;
+      return `Not stopping ${who} for your look (provisional run)${parts.length ? `: ${parts.join('; ')}` : ''}`;
     }
     case 'run-end': return `RUN ENDED: ${plainEnd(ev.why)}. Spent ${usd(ev.spentUsd)}.`;
     default: return null;

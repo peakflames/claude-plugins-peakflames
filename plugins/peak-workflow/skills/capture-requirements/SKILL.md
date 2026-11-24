@@ -889,7 +889,7 @@ greenfield files.
 
    | Case | When | Old text (for L3) | New text |
    |---|---|---|---|
-   | **Correction nobody approved** | The row has `unapproved_change` (an autopilot prototype run took a session's proposed correction; `/peak-workflow:status` lists it under Left for Later) | `tor-lifecycle text <replaced TOR> --json` is not available for a replaced ID: read the old text from the record named in `unapproved_change.record` (`text` under `[[changes]]`) | The current block, plus the description's change if one is given |
+   | **Correction nobody approved** | The row has `unapproved_change` (an autopilot provisional run took a session's proposed correction; `/peak-workflow:status` lists it under Left for Later) | `tor-lifecycle text <replaced TOR> --json` is not available for a replaced ID: read the old text from the record named in `unapproved_change.record` (`text` under `[[changes]]`) | The current block, plus the description's change if one is given |
    | **Changed since verified** | Finding D, or state `Changed since verified` | `tor-lifecycle text <TOR> --verified --json` | The current block, plus the description's change if one is given |
    | **Edited without a record** | Finding A | `tor-lifecycle text <TOR> --rev <merged_commit> --json` (the finding's `detail.merged_commit`) | Same as above |
    | **Disputed** | State `Disputed` (an open `pending` record) | The current block | The description's change, if any (step 4 asks first whether it stands) |
@@ -905,7 +905,7 @@ greenfield files.
    **Correction nobody approved** is decided before anything else, whatever other case also
    matches. Show the owner both texts in full — "As it read" (the record's old `text`) and "As it
    reads now" (the current block) — and the record's `reason`, then ask via `AskUserQuestion`:
-   `"<TOR> was corrected during an autopilot prototype run and nobody has approved the correction
+   `"<TOR> was corrected during an autopilot provisional run and nobody has approved the correction
    yet. Keep it?"` with `["Keep the correction", "Change it", "Leave it for now"]`.
    - **Keep the correction** → run `tor-lifecycle keep <TOR> --by "<git config user.name>"`
      (it writes the record that says a person kept it), `tor-lifecycle validate` until `ok`,

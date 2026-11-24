@@ -1,4 +1,4 @@
-// A prototype run (the run's `mode: "prototype"`, the owner's answer at launch), against fake-claude:
+// A provisional run (the run's `mode: "provisional"`, the owner's answer at launch), against fake-claude:
 // what it goes past that a full run stops at, what it records for the owner, and what still stops it.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import { eventLine } from '../attend.mjs';
 import { PROTOTYPE_LIMIT } from '../lib.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, wrapupActions, wrapupScript } from './helpers.mjs';
 
-const PROTO = { config: { mode: 'prototype' } };
+const PROTO = { config: { mode: 'provisional' } };
 const gate = (p, id, n = 1) => readJson(path.join(p.state, 'gates', `${id}-${n}.json`));
 const gateCount = (p) => (fs.existsSync(path.join(p.state, 'gates')) ? fs.readdirSync(path.join(p.state, 'gates')).length : 0);
 const ask = (question, options) => ({ do: 'tool', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question, header: 'Gate', multiSelect: false, options: options.map((label) => ({ label, description: '' })) }] } });
@@ -20,7 +20,7 @@ const sidecar = (p, e) => parseSidecar(git(p.clone, 'show', `develop:docs/implem
 const appended = (call) => call.argv.filter((a, i) => call.argv[i - 1] === '--append-system-prompt-file').map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 
 /** What the change record of an amendment nobody approved says (the hook tells the session to write it so). */
-const PROTO_RECORD = '# change record\napproved_via = "epic-branch"\napproved_by = "autopilot (prototype run)"\n';
+const PROTO_RECORD = '# change record\napproved_via = "epic-branch"\napproved_by = "autopilot (provisional run)"\n';
 const DEFERRAL = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
 const deferQ = (tor, rec = 'Defer — the export screen is built by a later epic') => `${tor} cannot be fully met: it needs the export screen. Recommendation: ${rec}. How to proceed?`;
 const amendQ = (tor) => `${tor} — The tool shall import every row looks wrong: the sample data has a header row. Proposed: same title / Then: "rows after the header are imported". How to proceed?`;
@@ -35,7 +35,7 @@ function addLookEpic(p, spec = { id: 'Lg5Chr8', slug: 'chart', name: 'Spending c
   return e;
 }
 const buildWithManual = (e) => ({ actions: [...buildActions(e, { commit: false }), { do: 'write', path: `test/${e.slug}.test.js`, content: "import test from 'node:test';\ntest('the chart command exists', () => {});\n" }, { do: 'write', path: `tests/manual/${e.tors[0]}.md`, content: `# Manual check — ${e.tors[0]}\n\n1. Open chart.html\n` }, { do: 'commit', message: `feat(epic-${e.id}): implement ${e.slug}` }] });
-/** A final check that records the requirement as the prototype rules say (or as `mark` says instead), then completes and merges. */
+/** A final check that records the requirement as the provisional rules say (or as `mark` says instead), then completes and merges. */
 const wrapupMarking = (e, mark, opts = {}) => {
   const a = wrapupActions(e, opts);
   a[1] = { do: 'exec', cmd: `${TL} mark ${e.id} ${mark}` };
@@ -81,35 +81,35 @@ test('a full run is unchanged: a requirement a person must observe, a proposed c
   assert.deepEqual([st.mode, st.unobserved, st.decidedForYou], ['full', [], []], 'the default is recorded with the run; nothing was decided for the owner');
 });
 
-test('prototype: a requirement a person must observe does not park; it merges recorded as not verified, and is listed with the command that checks it later', async (t) => {
+test('provisional: a requirement a person must observe does not park; it merges recorded as not verified, and is listed with the command that checks it later', async (t) => {
   const p = makeProject(t, PROTO);
   const e = addLookEpic(p);
-  p.scenario({ ...happy(E1), [`${e.id}/plan`]: planScript(e), [`${e.id}/build`]: buildWithManual(e), [`${e.id}/verify`]: wrapupMarking(e, `--fail ${e.tors[0]} "NOT OBSERVED — prototype run: open chart.html and look at the bars"`) });
+  p.scenario({ ...happy(E1), [`${e.id}/plan`]: planScript(e), [`${e.id}/build`]: buildWithManual(e), [`${e.id}/verify`]: wrapupMarking(e, `--fail ${e.tors[0]} "NOT OBSERVED — provisional run: open chart.html and look at the bars"`) });
   const s = await p.go();
-  assert.equal(s.mode, 'prototype');
+  assert.equal(s.mode, 'provisional');
   assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[E1.id, 'MERGED'], [e.id, 'MERGED']]);
   assert.equal(gateCount(p), 0, 'no look gate was written');
   // The verifier was told before it started, and so was the referee.
   const call = p.calls().find((c) => c.key === `${e.id}/verify-1`);
-  assert.match(appended(call), new RegExp(`# Requirements nobody will observe in this run[\\s\\S]*\\*\\*${e.tors[0]}\\*\\*[\\s\\S]*the standard output should contain the string "chart"[\\s\\S]*never\\s+record a PASS[\\s\\S]*NOT OBSERVED — prototype run`));
+  assert.match(appended(call), new RegExp(`# Requirements nobody will observe in this run[\\s\\S]*\\*\\*${e.tors[0]}\\*\\*[\\s\\S]*the standard output should contain the string "chart"[\\s\\S]*never\\s+record a PASS[\\s\\S]*NOT OBSERVED — provisional run`));
   assert.deepEqual(readJson(p.dir(e.id, 'verify-1', 'step.json')).unobserved.map((u) => u.tor), [e.tors[0]]);
   // The status file says so, and never says verified.
   const sc = sidecar(p, e);
   assert.deepEqual([sc.fields.status, Object.keys(sc.verified)], ['Complete', []]);
-  assert.match(sc.unverified[e.tors[0]], /^\d{4}-\d{2}-\d{2} NOT OBSERVED — prototype run: open chart\.html/);
+  assert.match(sc.unverified[e.tors[0]], /^\d{4}-\d{2}-\d{2} NOT OBSERVED — provisional run: open chart\.html/);
   assert.deepEqual(check(p, e.id, 'check-verify-1.json').checks.find((c) => c.name === 'sidecar-on-integration').evidence.notObservedInThisPrototypeRun, [e.tors[0]]);
   const st = status(p.project, p.state);
   assert.deepEqual(st.unobserved.map((u) => [u.epic, u.tor, u.check]), [[e.id, e.tors[0], `/peak-workflow:wrapup-epic ${e.id} reverify ${e.tors[0]}`]]);
   assert.ok(st.unobserved[0].clauses.length >= 1);
   const md = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
-  assert.match(md, /How careful this run was: a prototype run/);
-  assert.match(md, new RegExp(`## Decided for you in this prototype run[\\s\\S]*\\*\\*Requirements nobody observed\\*\\*[\\s\\S]*${e.tors[0]}[\\s\\S]*wrapup-epic ${e.id} reverify ${e.tors[0]}`));
+  assert.match(md, /How careful this run was: a provisional run/);
+  assert.match(md, new RegExp(`## Decided for you in this provisional run[\\s\\S]*\\*\\*Requirements nobody observed\\*\\*[\\s\\S]*${e.tors[0]}[\\s\\S]*wrapup-epic ${e.id} reverify ${e.tors[0]}`));
   const events = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => eventLine(JSON.parse(l)));
-  assert.ok(events.includes('Autopilot started: 2 epics queued, as a prototype run: it keeps building and lists what it decided for you at the end.'));
-  assert.ok(events.some((l) => /^Not stopping .*Spending chart for your look \(prototype run\): .* will be recorded as not observed$/.test(l ?? '')), events.join('\n'));
+  assert.ok(events.includes('Autopilot started: 2 epics queued, as a provisional run: it keeps building and lists what it decided for you at the end.'));
+  assert.ok(events.some((l) => /^Not stopping .*Spending chart for your look \(provisional run\): .* will be recorded as not observed$/.test(l ?? '')), events.join('\n'));
 });
 
-test('prototype: without the not-observed record the merge check fails, and so does a verified line nobody could have earned', async (t) => {
+test('provisional: without the not-observed record the merge check fails, and so does a verified line nobody could have earned', async (t) => {
   for (const [mark, evidence] of [[null, 'anchorsWithoutVerifiedLine'], ['--pass', 'verifiedThoughNobodyObserved'], ['--fail-plain', 'anchorsWithoutVerifiedLine']]) {
     const p = makeProject(t, PROTO);
     const e = addLookEpic(p);
@@ -124,7 +124,7 @@ test('prototype: without the not-observed record the merge check fails, and so d
   }
 });
 
-test('prototype: the planner\'s proposed correction is taken; the gate is recorded decided, the build may change the requirement file, and the owner is shown old and proposed text', async (t) => {
+test('provisional: the planner\'s proposed correction is taken; the gate is recorded decided, the build may change the requirement file, and the owner is shown old and proposed text', async (t) => {
   const p = makeProject(t, PROTO);
   const tor = E1.tors[0];
   const build = buildActions(E1, { commit: false });
@@ -138,16 +138,16 @@ test('prototype: the planner\'s proposed correction is taken; the gate is record
   const q = s.queue[0];
   assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${E1.id}/build-1`, `${E1.id}/audit-1`, `${E1.id}/verify-1`], 'nothing parked');
   assert.deepEqual(Object.values(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.updatedInput.answers), [AMEND(tor)[0]]);
-  assert.match(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.permissionDecisionReason, /the owner's prototype setting for this run: Amend .*No person picked this just now/);
+  assert.match(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.permissionDecisionReason, /the owner's provisional setting for this run: Amend .*No person picked this just now/);
   assert.deepEqual(Object.values(tools(p, E1.id, 'build-1').find((o) => o?.hookSpecificOutput?.updatedInput?.answers).hookSpecificOutput.updatedInput.answers), [AMEND(tor)[0]]);
   assert.equal(gateCount(p), 1, 'one decision, one record');
   const g = gate(p, E1.id);
-  assert.deepEqual([g.kind, g.tor, g.session, g.decided.answer, g.decided.by, g.decided.standing, g.decided.prototype, g.decided.used.session], ['amendment', tor, 'plan-1', AMEND(tor)[0], 'autopilot (prototype run)', true, true, 'plan-1']);
+  assert.deepEqual([g.kind, g.tor, g.session, g.decided.answer, g.decided.by, g.decided.standing, g.decided.prototype, g.decided.used.session], ['amendment', tor, 'plan-1', AMEND(tor)[0], 'autopilot (provisional run)', true, true, 'plan-1']);
   const scope = check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'scope');
   assert.equal(scope.pass, true, JSON.stringify(scope));
-  assert.match(scope.evidence, /requirement files changed under the amendment this prototype run took, not yet seen by the owner, of /);
+  assert.match(scope.evidence, /requirement files changed under the amendment this provisional run took, not yet seen by the owner, of /);
   assert.equal(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').pass, true);
-  assert.match(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.permissionDecisionReason, /approved_by = "autopilot \(prototype run\)"/);
+  assert.match(tools(p, E1.id, 'plan-1')[0].hookSpecificOutput.permissionDecisionReason, /approved_by = "autopilot \(provisional run\)"/);
   assert.deepEqual(q.amendedUnseen, [tor]);
   assert.equal(q.state, 'MERGED', q.reason);
   assert.equal(q.prototype.length, 1);
@@ -161,10 +161,10 @@ test('prototype: the planner\'s proposed correction is taken; the gate is record
   assert.ok(!/on your standing answer for technical stops: /.test(md), 'not listed as a technical stop');
   assert.ok(!/amended with your approval/.test(md) && /amended without your approval, on a session's proposal/.test(md), 'never said to be approved by the owner');
   const events = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => eventLine(JSON.parse(l)));
-  assert.ok(events.includes(`Took the planner's correction to ${tor} for you (prototype run)`), events.join('\n'));
+  assert.ok(events.includes(`Took the planner's correction to ${tor} for you (provisional run)`), events.join('\n'));
 });
 
-test('prototype: a deferral the builder recommends is taken through the build checks and the merge; "Stop" still parks', async (t) => {
+test('provisional: a deferral the builder recommends is taken through the build checks and the merge; "Stop" still parks', async (t) => {
   const p = makeProject(t, PROTO);
   const succ = addEpic(p.project, { id: 'Lg7Exp5', slug: 'export', name: 'Export', nn: '07', deps: [E1.id] });
   const stop = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02' });
@@ -197,7 +197,7 @@ test('prototype: a deferral the builder recommends is taken through the build ch
   assert.deepEqual([s.queue[1].state, gate(p, stop.id).kind, gate(p, stop.id).decided], ['PARKED', 'deferral', null]);
 });
 
-test('prototype: one more deferral than was taken parks, and so does a waiver nobody took', async (t) => {
+test('provisional: one more deferral than was taken parks, and so does a waiver nobody took', async (t) => {
   // The handoff records two deferrals; the run took one.
   const p = makeProject(t, PROTO);
   const succ = addEpic(p.project, { id: 'Lg7Exp5', slug: 'export', name: 'Export', nn: '07', deps: [E1.id] });
@@ -214,7 +214,7 @@ test('prototype: one more deferral than was taken parks, and so does a waiver no
   assert.match(s2.queue[0].reason, /merge gate failed \(.*no-waivers/);
 });
 
-test(`prototype: ${PROTOTYPE_LIMIT} answers per epic, then the next question is the owner's; one answer per requirement`, async (t) => {
+test(`provisional: ${PROTOTYPE_LIMIT} answers per epic, then the next question is the owner's; one answer per requirement`, async (t) => {
   const p = makeProject(t, PROTO);
   const fix = (tor) => deferQ(tor, 'Fix now — a small parser change');
   p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, ...E1.tors.slice(0, 4).map((tor) => ask(fix(tor), DEFERRAL))] } });
@@ -222,7 +222,7 @@ test(`prototype: ${PROTOTYPE_LIMIT} answers per epic, then the next question is 
   assert.equal(s.queue[0].state, 'PARKED');
   const gates = [1, 2, 3, 4].map((n) => gate(p, E1.id, n));
   assert.deepEqual(gates.map((g) => g.decided?.answer ?? null), ['Fix now', 'Fix now', 'Fix now', null]);
-  assert.match(gates[3].why, /the prototype setting covers 3 answers per epic, and this is one more/);
+  assert.match(gates[3].why, /the provisional setting covers 3 answers per epic, and this is one more/);
   assert.equal(s.queue[0].prototype.length, 3, 'the three it took are kept for the owner although the epic parked');
 
   // Amended, then the same requirement "cannot be met": the second question about it goes to the owner.
@@ -234,7 +234,7 @@ test(`prototype: ${PROTOTYPE_LIMIT} answers per epic, then the next question is 
   assert.match(gate(p2, E1.id, 2).why, new RegExp(`one answer per requirement, and ${tor} already had one`));
 });
 
-test('prototype: a Safety-style correction (no "Amend" on offer), another epic\'s requirement and a question without a recommendation all park', async (t) => {
+test('provisional: a Safety-style correction (no "Amend" on offer), another epic\'s requirement and a question without a recommendation all park', async (t) => {
   const p = makeProject(t, PROTO);
   const other = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02' });
   const third = addEpic(p.project, { id: 'Lg4Fx2q', slug: 'currency', name: 'Currency conversion', nn: '04' });
@@ -250,8 +250,8 @@ test('prototype: a Safety-style correction (no "Amend" on offer), another epic\'
   assert.deepEqual(status(p.project, p.state).decidedForYou, []);
 });
 
-test('prototype: failing tests and a file out of scope still stop the epic, and an independent epic still runs', async (t) => {
-  const p = makeProject(t, { config: { mode: 'prototype', onPark: undefined } });
+test('provisional: failing tests and a file out of scope still stop the epic, and an independent epic still runs', async (t) => {
+  const p = makeProject(t, { config: { mode: 'provisional', onPark: undefined } });
   const red = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02' });
   const out = addEpic(p.project, { id: 'Lg4Fx2q', slug: 'currency', name: 'Currency conversion', nn: '04' });
   const broken = { actions: buildActions(red, { testBody: " throw new Error('red'); " }) };
@@ -265,19 +265,20 @@ test('prototype: failing tests and a file out of scope still stop the epic, and 
   assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[red.id, 'PARKED'], [out.id, 'PARKED'], [E1.id, 'MERGED']]);
   assert.match(s.queue[0].reason, /CHECK_BUILD still fails after the fix round \(.*tests-green/);
   assert.match(s.queue[1].reason, /CHECK_BUILD still fails after the fix round \(.*scope/);
-  assert.equal(s.stoppedOnPark, undefined, 'a prototype run does not stop the line at the first park');
-  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /when an epic parks: continue \(a prototype run keeps going\); mode prototype: it keeps building/);
+  assert.equal(s.stoppedOnPark, undefined, 'a provisional run does not stop the line at the first park');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /when an epic parks: continue \(a provisional run keeps going\); mode provisional: the AI decides now, you confirm later\. It keeps building/);
 });
 
 test('mode: an unknown value is refused; a project file cannot set it; status carries it into a relaunch or asks for it', async (t) => {
   const p = makeProject(t, { config: { onPark: undefined } });
   const cfg = (mode) => loadConfig(p.state, { overrides: mode === undefined ? {} : { mode } });
   assert.deepEqual([cfg().mode, cfg().onPark, cfg().onParkFrom], ['full', 'stop', 'default']);
-  assert.deepEqual([cfg('prototype').mode, cfg('prototype').onPark, cfg('prototype').onParkFrom], ['prototype', 'continue', 'prototype']);
-  assert.throws(() => cfg('fast'), /mode must be "full" or "prototype", not "fast"/);
+  assert.deepEqual([cfg('provisional').mode, cfg('provisional').onPark, cfg('provisional').onParkFrom], ['provisional', 'continue', 'provisional']);
+  assert.throws(() => cfg('fast'), /mode must be "full" or "provisional", not "fast"/);
+  assert.deepEqual([cfg('prototype').mode, cfg('prototype').onPark, cfg('prototype').onParkFrom], ['provisional', 'continue', 'provisional'], '"prototype", the name before 3.1.0, still reads');
   fs.mkdirSync(path.join(p.project, '.claude', 'peak-workflow'), { recursive: true });
-  fs.writeFileSync(path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json'), JSON.stringify({ mode: 'prototype', onPark: 'stop' }));
-  assert.deepEqual([cfg().mode, cfg('prototype').onPark, cfg('prototype').onParkFrom], ['full', 'stop', 'project'], 'the mode is the run\'s; an explicit project onPark still wins');
+  fs.writeFileSync(path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json'), JSON.stringify({ mode: 'provisional', onPark: 'stop' }));
+  assert.deepEqual([cfg().mode, cfg('provisional').onPark, cfg('provisional').onParkFrom], ['full', 'stop', 'project'], 'the mode is the run\'s; an explicit project onPark still wins');
   const r = spawnSync(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--allow-test-double', '--dry-run'], { encoding: 'utf8' });
   assert.match(r.stdout, /How careful: +full: it stops and asks/);
 });
@@ -287,53 +288,56 @@ test('mode: a relaunch carries the run\'s mode; a chain that began before the qu
   p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, ask(deferQ(E1.tors[3], 'Stop — beyond this session'), DEFERRAL)] } });
   await p.go();
   const cfgFile = path.join(p.runDir(), 'config.json');
-  assert.equal(readJson(cfgFile).mode, 'prototype', 'the run records its mode');
+  assert.equal(readJson(cfgFile).mode, 'provisional', 'the run records its mode');
   const r = spawnSync(process.execPath, [DRIVER, 'decide', '--workspace', p.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Fix now', '--by', 'Pat Owner'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const st = status(p.project, p.state);
-  assert.deepEqual([st.mode, st.relaunch.config.mode, st.relaunch.ask.includes('mode')], ['prototype', 'prototype', false]);
-  const { mode, ...old } = readJson(cfgFile);
-  fs.writeFileSync(cfgFile, JSON.stringify(old));
+  assert.deepEqual([st.mode, st.relaunch.config.mode, st.relaunch.ask.includes('mode')], ['provisional', 'provisional', false]);
+  fs.writeFileSync(cfgFile, JSON.stringify({ ...readJson(cfgFile), mode: 'prototype' }));
+  const old = status(p.project, p.state);
+  assert.deepEqual([old.mode, old.relaunch.config.mode], ['provisional', 'provisional'], 'a run from before the rename relaunches as provisional');
+  const { mode, ...before } = readJson(cfgFile);
+  fs.writeFileSync(cfgFile, JSON.stringify(before));
   const st2 = status(p.project, p.state);
   assert.deepEqual([st2.mode, 'mode' in st2.relaunch.config, st2.relaunch.ask.includes('mode')], [null, false, true]);
 });
 
-// ---- a full run after a prototype run: what the prototype run took is the owner's to answer -------
+// ---- a full run after a provisional run: what the provisional run took is the owner's to answer -------
 
 /** The next run of this workspace is a full one (the owner's answer at the relaunch). */
 const setMode = (p, mode) => { const f = path.join(p.state, 'settings.json'); fs.writeFileSync(f, JSON.stringify({ ...readJson(f), mode })); };
 const decideGate = (p, id, n, answer) => { const r = spawnSync(process.execPath, [DRIVER, 'decide', '--workspace', p.state, '--gate', `gates/${id}-${n}.json`, '--answer', answer, '--by', 'Pat Owner'], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
-/** A question no policy row knows: it parks the epic in a prototype run too, which is how these tests end the first run. */
+/** A question no policy row knows: it parks the epic in a provisional run too, which is how these tests end the first run. */
 const COLOUR = ask('Which colour should the totals row be?', ['Red', 'Blue']);
 
-/** The first run, a prototype one: `scripts` take something for the owner, then the final check parks on a question nobody can take. The owner answers that, and the next run is a full one. */
+/** The first run, a provisional one: `scripts` take something for the owner, then the final check parks on a question nobody can take. The owner answers that, and the next run is a full one. */
 async function protoThenFull(t, scripts, { extra = () => ({}) } = {}) {
   const p = makeProject(t, PROTO);
   const more = extra(p);
   p.scenario({ ...scripts(more), [`${E1.id}/verify`]: { actions: [COLOUR] } });
   await p.go({ queue: [E1.id] });
-  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).decided.prototype, gate(p, E1.id, 2).session, gate(p, E1.id, 2).decided], ['PARKED', true, 'verify-1', null], 'built on what the prototype run took, parked at the final check');
+  assert.deepEqual([p.epic(E1.id).state, gate(p, E1.id).decided.prototype, gate(p, E1.id, 2).session, gate(p, E1.id, 2).decided], ['PARKED', true, 'verify-1', null], 'built on what the provisional run took, parked at the final check');
   assert.equal(decideGate(p, E1.id, 2, 'Red').enters, 'VERIFY');
   setMode(p, 'full');
   return { p, ...more };
 }
-/** The full run that follows: it starts no session for the epic; it asks the owner what the prototype run took. */
+/** The full run that follows: it starts no session for the epic; it asks the owner what the provisional run took. */
 async function reasked(p, kind, tor) {
   const before = p.calls().length;
   const s = await p.go({ queue: [E1.id] });
   assert.equal(s.mode, 'full');
   assert.equal(s.queue[0].state, 'PARKED', s.queue[0].reason);
-  assert.match(s.queue[0].reason, /a prototype run took .* a full run asks the owner/);
+  assert.match(s.queue[0].reason, /a provisional run took .* a full run asks the owner/);
   assert.equal(p.calls().length, before, 'no session was started before the owner answered');
   const [old, g] = [gate(p, E1.id), gate(p, E1.id, 3)];
-  assert.ok(old.superseded, 'what the prototype run took no longer stands');
+  assert.ok(old.superseded, 'what the provisional run took no longer stands');
   assert.deepEqual([g.kind, g.tor, g.decided, g.question, g.options, g.reask.of, g.reask.took], [kind, tor, null, old.question, old.options, `gates/${E1.id}-1.json`, old.decided.answer]);
-  assert.match(g.why, /a prototype run answered ".*" to this for you/);
+  assert.match(g.why, /a provisional run answered ".*" to this for you/);
   assert.deepEqual(status(p.project, p.state).waiting.map((w) => w.file), [`gates/${E1.id}-3.json`]);
   return before;
 }
 
-test('full run after a prototype run: a deferral the prototype run took is asked again before anything runs; the owner\'s "Defer" finishes the epic as theirs, any other answer goes back to the build', async (t) => {
+test('full run after a provisional run: a deferral the provisional run took is asked again before anything runs; the owner\'s "Defer" finishes the epic as theirs, any other answer goes back to the build', async (t) => {
   const tor = E1.tors[3];
   const start = () => protoThenFull(t, ({ succ }) => ({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: deferringBuild(E1, [ask(deferQ(tor), DEFERRAL)], [tor], succ) }), { extra: (p) => ({ succ: addEpic(p.project, { id: 'Lg7Exp5', slug: 'export', name: 'Export', nn: '07', deps: [E1.id] }) }) });
 
@@ -361,7 +365,7 @@ test('full run after a prototype run: a deferral the prototype run took is asked
   assert.equal(cb.find((c) => c.name === 'tests-green').evidence.skipsAllowedForDeferrals, undefined, 'the skipped test is not excused');
 });
 
-test('full run after a prototype run: an amendment the prototype run took is asked again before anything runs; the owner\'s "Amend" makes it theirs, "Implement as written" sends it back and the change is out of scope', async (t) => {
+test('full run after a provisional run: an amendment the provisional run took is asked again before anything runs; the owner\'s "Amend" makes it theirs, "Implement as written" sends it back and the change is out of scope', async (t) => {
   const tor = E1.tors[0];
   const amending = () => ({ actions: [...buildActions(E1, { commit: false }), { do: 'exec', cmd: "printf '\\n# amended in the epic\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: PROTO_RECORD }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] });
   const start = () => protoThenFull(t, () => ({ [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result }, [`${E1.id}/build`]: amending() }));
@@ -389,7 +393,7 @@ test('full run after a prototype run: an amendment the prototype run took is ask
   assert.match([scope.evidence].flat().join(' '), /requirements are frozen during a run/);
 });
 
-test('full run after a prototype run: an epic started from scratch does not inherit the amendment; a later prototype run does not take up what the owner turned down', async (t) => {
+test('full run after a provisional run: an epic started from scratch does not inherit the amendment; a later provisional run does not take up what the owner turned down', async (t) => {
   const tor = E1.tors[0];
   const p = makeProject(t, PROTO);
   p.scenario({ [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), COLOUR] } });
@@ -400,8 +404,8 @@ test('full run after a prototype run: an epic started from scratch does not inhe
   await p.go();
   assert.equal(gate(p, E1.id, 3).reask.of, `gates/${E1.id}-1.json`);
   assert.equal(decideGate(p, E1.id, 3, 'Implement as written').enters, 'PLAN');
-  // The owner said no. The next run is a prototype one again, and the planner asks the same thing.
-  setMode(p, 'prototype');
+  // The owner said no. The next run is a provisional one again, and the planner asks the same thing.
+  setMode(p, 'provisional');
   p.scenario({ [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result }, ...{ [`${E1.id}/build`]: buildScript(E1), [`${E1.id}/verify`]: wrapupScript(E1) } });
   const s = await p.go();
   assert.equal(s.queue[0].state, 'MERGED', s.queue[0].reason);
@@ -446,7 +450,7 @@ test('full run: a deferral the owner answers "Defer" to goes through the build c
   assert.match(s2.queue[0].reason, /CHECK_BUILD: the handoff records 2 deferral\(s\): a human decision/);
 });
 
-test('prototype: an amendment whose change record names a person as approver does not pass the build check', async (t) => {
+test('provisional: an amendment whose change record names a person as approver does not pass the build check', async (t) => {
   const p = makeProject(t, PROTO);
   const tor = E1.tors[0];
   const build = buildActions(E1, { commit: false });
@@ -458,5 +462,21 @@ test('prototype: an amendment whose change record names a person as approver doe
   const s = await p.go();
   assert.equal(s.queue[0].state, 'PARKED');
   assert.match(s.queue[0].reason, /CHECK_BUILD still fails after the fix round \(.*amendment-record/);
-  assert.match(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').evidence, /must say approved_by = "autopilot \(prototype run\)"/);
+  assert.match(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').evidence, /must say approved_by = "autopilot \(provisional run\)"/);
+});
+
+test('provisional: a run launched as "prototype" (the name before 3.1.0) takes the correction, and a change record that says "autopilot (prototype run)" still passes', async (t) => {
+  const p = makeProject(t, { config: { mode: 'prototype' } });
+  const tor = E1.tors[0];
+  const build = buildActions(E1, { commit: false });
+  p.scenario({
+    [`${E1.id}/plan`]: { actions: [ask(amendQ(tor), AMEND(tor)), ...planScript(E1).actions], result: planScript(E1).result },
+    [`${E1.id}/build`]: { actions: [...build, { do: 'exec', cmd: "printf '\\n# amended\\n' >> docs/requirements/01-csv-import.feature.tracing.json.note" }, { do: 'write', path: 'docs/requirements/changes/CR-test.md', content: '# change record\napproved_via = "epic-branch"\napproved_by = "autopilot (prototype run)"\n' }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }] },
+    [`${E1.id}/verify`]: wrapupScript(E1),
+  });
+  const s = await p.go();
+  assert.equal(s.mode, 'provisional');
+  assert.equal(s.queue[0].state, 'MERGED', s.queue[0].reason);
+  assert.equal(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').pass, true);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /## Decided for you in this provisional run/);
 });

@@ -16,12 +16,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot starts on a project with no tests yet** — when the declared test directories
   hold no committed file, the base test run and the sandbox probe are skipped, not failed as
   "base red"; the first epic's own checks run the tests. The launch screen says so.
-- **Autopilot prototype runs** — a launch choice. The run takes a session's recommended
+- **Autopilot provisional runs** — a launch choice: the AI decides now, you confirm later. The run takes a session's recommended
   amendment or deferral, skips the owner's looks, merges an unobserved requirement as not
-  verified, and lists each under "Decided for you in this prototype run". Failing tests,
+  verified, and lists each under "Decided for you in this provisional run". Failing tests,
   scope and Safety still stop.
-- **Autopilot full run after a prototype run** — before it continues an unmerged epic, a full
-  run asks the owner each correction or deferral a prototype run took for it. The same answer
+- **Autopilot full run after a provisional run** — before it continues an unmerged epic, a full
+  run asks the owner each correction or deferral a provisional run took for it. The same answer
   keeps what was built; any other sends the epic back to be planned or built again.
 - **Autopilot honours the owner's own "Defer"** — in any run, a requirement the owner answered
   "Defer" to passes the build and merge checks as left for the later epic, and the final
@@ -33,8 +33,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`status` sees autopilot's copy** — a banner names epics autopilot finished that are not
   in the project yet, and questions autopilot is waiting on, with `/peak-workflow:autopilot` as
   the next step; those epics are left out of Ready to Start.
-- **Corrections nobody approved are recorded as such** — an autopilot prototype amendment's
-  change record names `autopilot (prototype run)` as approver, never a person. `capture-requirements <TOR>` asks the
+- **Corrections nobody approved are recorded as such** — an autopilot provisional amendment's
+  change record names `autopilot (provisional run)` as approver, never a person. `capture-requirements <TOR>` asks the
   owner to keep or change it; `tor-lifecycle keep` writes the approval.
 - **"Not proven" notes are kept in the project** — after a merge, autopilot writes each
   reviewer or final-check note into the epic's status file (`unconfirmed-…:`).
@@ -235,6 +235,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Autopilot "prototype" is now "Provisional"** — the launch option, report heading and
+  project records say provisional. Runs and change records written as "prototype" still read
+  as provisional; stored field names are unchanged.
 - **Autopilot does it for the owner** — the skill no longer hands over terminal commands: it
   offers to bring finished work into the project (fast-forward, nothing pushed) or to combine a
   diverged project, runs it on a yes, and says what happened. It then removes its temporary

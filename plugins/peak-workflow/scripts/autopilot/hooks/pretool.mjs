@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROTOTYPE_BY, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
+import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROVISIONAL_BY, isProvisional, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -505,9 +505,9 @@ function ruleR8(ctx) {
   // What the owner already answered for this step, in this run or an earlier one (the driver writes it to step.json
   // and tells the session before it starts).
   const earlier = ctx.step ? readJson(path.join(ctx.step, 'step.json'), {}).answers ?? [] : [];
-  // A prototype run (the owner's choice at launch, the run's `mode`): a session's own recommendation is taken where
+  // A provisional run (the owner's choice at launch, the run's `mode`): a session's own recommendation is taken where
   // a full run would stop and ask, recorded as a gate that is already decided, and listed for the owner at the end.
-  const proto = ctx.config.mode === 'prototype';
+  const proto = isProvisional(ctx.config.mode);
   const gatesNow = () => { const dir = path.join(ctx.state, 'gates'); return (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => f.endsWith('.json')).map((f) => readJson(path.join(dir, f), {})); };
   const protoTaken = proto ? prototypeGates(gatesNow(), ctx.epic) : [];
   const protoNow = [];
@@ -555,14 +555,14 @@ function ruleR8(ctx) {
       const proposal = (text) => norm((String(text ?? '').match(/\bProposed:\s*([\s\S]*?)\s*How to proceed\?\s*$/) ?? [])[1] ?? String(text ?? ''));
       const before = protoTaken.find((g) => g.kind === kind && (g.tor ?? null) === tor && offered(g.decided.answer) && (kind === 'deferral' ? recommended(q.question) === g.recommendation : proposal(q.question) === proposal(g.question)));
       // A Safety requirement is never amended or deferred by anyone but the owner, whatever a session offers.
-      if (!before && tor && anchors(ctx).includes(tor) && isSafety(ctx.clone, tor)) { park = { ...base, why: `${parkRow.why}; ${tor} is a Safety requirement, which a prototype run never decides` }; break; }
+      if (!before && tor && anchors(ctx).includes(tor) && isSafety(ctx.clone, tor)) { park = { ...base, why: `${parkRow.why}; ${tor} is a Safety requirement, which a provisional run never decides` }; break; }
       if (before) { answers[q.question] = offered(before.decided.answer); protoAgain += 1; continue; }
       const p = prototypeAnswer({ kind, question: q.question, labels, tor, anchors: anchors(ctx), taken: [...protoTaken, ...protoNow] });
       if (p?.answer) { answers[q.question] = p.answer; protoNow.push({ ...base, why: parkRow.why, answer: p.answer, ...(kind === 'deferral' ? { recommendation: recommended(q.question) } : {}) }); continue; }
       if (p?.why) { park = { ...base, why: `${parkRow.why}; ${p.why}` }; break; }
     }
     if (parkRow) { park = { ...base, why: parkRow.why }; break; }
-    // A deferral that stands (the owner answered "Defer" at the build, or this prototype run took the builder's
+    // A deferral that stands (the owner answered "Defer" at the build, or this provisional run took the builder's
     // recommendation): the final check meets the same unmet requirement, and when it too recommends deferring, the
     // same decision stands. It is not a new one, so it is not asked or counted again.
     if (ctx.role === 'verifier' && kind === 'tor-fail' && tor && recommended(q.question) === 'Defer') {
@@ -577,7 +577,7 @@ function ruleR8(ctx) {
       const memo = ctx.step ? path.join(ctx.step, `not-observed-reminded-${tor}.json`) : null;
       if (memo && unobserved.some((u) => u.tor === tor) && /is CANNOT VERIFY: /.test(q.question) && !fs.existsSync(memo)) {
         fs.writeFileSync(memo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
-        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: this is a prototype run and nobody will observe ${tor}. Do not ask about it. Follow the file "Requirements nobody will observe in this run" you were given: no PASS for it, no Deferrals row, record it with \`tor-lifecycle mark\` as \`--fail ${tor} "${NOT_OBSERVED} — prototype run: <what a person must still do>"\`, list it under "Not proven for real", and judge the epic on its other requirements` };
+        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: this is a provisional run and nobody will observe ${tor}. Do not ask about it. Follow the file "Requirements nobody will observe in this run" you were given: no PASS for it, no Deferrals row, record it with \`tor-lifecycle mark\` as \`--fail ${tor} "${NOT_OBSERVED} — provisional run: <what a person must still do>"\`, list it under "Not proven for real", and judge the epic on its other requirements` };
       }
     }
     // The owner's standing answer for small fixes: the verifier itself recommends "Fix now", that option is on
@@ -615,12 +615,12 @@ function ruleR8(ctx) {
       // After a deferral this run took, the skill asks which later epic builds the missing part. Nobody is there to
       // say, and autopilot never names one: the session is told once to use the epic it (or the builder) already named.
       const succMemo = ctx.step ? path.join(ctx.step, 'successor-reminded.json') : null;
-      // Whose deferral: the owner's own for the requirement asked about (or, when the question names none, for any of this epic's), else this prototype run's.
+      // Whose deferral: the owner's own for the requirement asked about (or, when the question names none, for any of this epic's), else this provisional run's.
       const ownDeferred = ownerDeferred(gatesNow(), ctx.epic).filter((t) => anchors(ctx).includes(t));
       const byOwner = tor ? ownDeferred.includes(tor) : ownDeferred.length > 0;
       if (succMemo && /which later epic creates the code/i.test(q.question) && (byOwner || prototypeDeferred(protoTaken, ctx.epic).length) && !fs.existsSync(succMemo)) {
         fs.writeFileSync(succMemo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
-        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: ${byOwner ? 'they answered "Defer" to the recommendation that named the later epic, and are not asked to name it again' : 'this is a prototype run, and the deferral was taken on your own recommendation'}. The later epic is the one ${ctx.role === 'verifier' ? "the implementer's Deferrals row names as the successor" : 'your recommendation named'}: use it, run the skill's successor check with it and carry on. If no such epic's spec exists, Defer is not available: ask the first question again, recommending Fix now or Stop` };
+        return { rule: 'R8', decision: 'remind', reason: `not put to the owner: ${byOwner ? 'they answered "Defer" to the recommendation that named the later epic, and are not asked to name it again' : 'this is a provisional run, and the deferral was taken on your own recommendation'}. The later epic is the one ${ctx.role === 'verifier' ? "the implementer's Deferrals row names as the successor" : 'your recommendation named'}: use it, run the skill's successor check with it and carry on. If no such epic's spec exists, Defer is not available: ask the first question again, recommending Fix now or Stop` };
       }
       const memo = ctx.step ? path.join(ctx.step, 'answers-reminded.json') : null;
       if (earlier.length && memo && !fs.existsSync(memo)) {
@@ -645,20 +645,20 @@ function ruleR8(ctx) {
     const done = { ...g, decided: { ...g.decided, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date: new Date().toISOString() } } };
     fs.writeFileSync(path.join(ctx.state, 'gates', f), JSON.stringify(done, null, 2) + '\n');
   }
-  // Each answer taken on the prototype setting is a gate file like any other, already decided and already used:
+  // Each answer taken on the provisional setting is a gate file like any other, already decided and already used:
   // the one record the driver's checks, the report and the closing screen read.
   const taken = protoNow.map(({ answer, ...g }) => {
     const date = new Date().toISOString();
-    return { kind: g.kind, tor: g.tor, answer, gate: writeGate(ctx, { ...g, artifacts: [], decided: { answer, by: PROTOTYPE_BY, date, standing: true, prototype: true, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date } } }) };
+    return { kind: g.kind, tor: g.tor, answer, gate: writeGate(ctx, { ...g, artifacts: [], decided: { answer, by: PROVISIONAL_BY, date, standing: true, prototype: true, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date } } }) };
   });
   if (standing.length) { const file = path.join(ctx.step, SMALL_FIX_FILE); fs.writeFileSync(file, JSON.stringify([...readJson(file, []), ...standing], null, 2) + '\n'); }
   if (standing.length === Object.keys(answers).length) return { rule: 'R8', decision: 'answer', owner: standing.length, reason: `answered from the owner's standing answer for small fixes: ${Object.values(answers).join(' | ')}. Keep the fix small: it is checked at the merge against the owner's limits, never touches a requirement file and never removes a line from a test${standing.some((x) => x.testOnly) ? `. For ${standing.filter((x) => x.testOnly).map((x) => x.tor).join(' and ')} the fix is the missing test alone, in a test file: when that test passes against the code as built, the requirement is met; when it fails, the code is wrong, so ask the question again without "Fix now"` : ''}`, updatedInput: { ...ctx.input.tool_input, answers } };
   const owner = used.length + told + (looked ? 1 : 0) + standing.length;
   const byProto = taken.length + protoAgain; const all = Object.keys(answers).length;
-  const source = [owner + byProto < all ? 'policy' : null, owner ? "the owner's recorded decision" : null, byProto ? "the owner's prototype setting for this run" : null].filter(Boolean).join(' and ');
+  const source = [owner + byProto < all ? 'policy' : null, owner ? "the owner's recorded decision" : null, byProto ? "the owner's provisional setting for this run" : null].filter(Boolean).join(' and ');
   const annotations = Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { notes: v }]));
-  // What the session is told with a prototype answer: nobody picked it just now, and what the option still asks of it.
-  const how = !byProto ? '' : `. No person picked this just now: the owner chose a prototype run, which takes your own recommendation and shows it to them afterwards. Act on it as their decision and say in your report that autopilot answered it${Object.values(answers).some((a) => /^\W*amend\b/i.test(a)) ? '. Amend: write the change as the skill says, and say in its record that no person approved it: `approved_by = "autopilot (prototype run)"`, exactly that text and never a person\'s name' : ''}${Object.values(answers).some((a) => /^\W*defer\b/i.test(a)) ? ". Defer: do not ask which later epic builds the missing part; it is the one already named (in your recommendation, or in the implementer's Deferrals row). If no such epic's spec exists, Defer is not available: ask again, recommending Fix now or Stop" : ''}`;
+  // What the session is told with a provisional answer: nobody picked it just now, and what the option still asks of it.
+  const how = !byProto ? '' : `. No person picked this just now: the owner chose a provisional run, which takes your own recommendation and shows it to them afterwards. Act on it as their decision and say in your report that autopilot answered it${Object.values(answers).some((a) => /^\W*amend\b/i.test(a)) ? '. Amend: write the change as the skill says, and say in its record that no person approved it: `approved_by = "autopilot (provisional run)"`, exactly that text and never a person\'s name' : ''}${Object.values(answers).some((a) => /^\W*defer\b/i.test(a)) ? ". Defer: do not ask which later epic builds the missing part; it is the one already named (in your recommendation, or in the implementer's Deferrals row). If no such epic's spec exists, Defer is not available: ask again, recommending Fix now or Stop" : ''}`;
   return { rule: 'R8', decision: 'answer', owner, ...(taken.length ? { prototype: taken } : {}), reason: `answered from ${source}: ${Object.values(answers).join(' | ')}${how}`, updatedInput: { ...ctx.input.tool_input, answers, ...(looked ? { annotations: { ...(ctx.input.tool_input.annotations ?? {}), ...annotations } } : {}) } };
 }
 
