@@ -554,7 +554,7 @@ Why this order:
 
 ## 2026-11-23 session — live fixes, what the run proved, and a rename
 
-### Decided (2026-11-23): "prototype" becomes **Provisional**; not yet built
+### Decided (2026-11-23): "prototype" becomes **Provisional**; built 2026-11-24 (`c166b80`)
 
 The owner finds "prototype" untrue: the mode builds and tests to the same standard. What it
 skips is waiting for a person. The AI makes the judgment calls that are the owner's (take a
@@ -659,8 +659,22 @@ change-record notes).
 
 Done: the false referee refusals, the usage-limit wait, verifier notes, the stricter test
 guard. Still open: the short review (above); a note for the tester that Windows is unproven and
-what to send back if it breaks (the run report and the run's `hooks.jsonl`); the rename to
-Provisional built.
+what to send back if it breaks (the run report and the run's `hooks.jsonl`). The rename to
+Provisional is built (2026-11-24, `c166b80`): new runs write `mode: "provisional"` and
+`approved_by = "autopilot (provisional run)"`; the old `"prototype"` values in configs, events and
+project change records still read as provisional. Stored field names (`decided.prototype`,
+`e.prototype`, `prototype-answer` events, `prototypeAnswer()` and friends) keep their old names on
+purpose. Not yet seen in a live run.
+
+### 2026-11-24: Pilot Light's queue finished
+
+Run `20261124-031115` (prototype, the last before the rename) merged F5hv9T4 (session-stream-
+paging) in 36 min for $11.65: build, check, audit (3 findings, none parking), final check PASS.
+Referee refusals were all correct (`S=` copies, a test edit before its reason, a planner looking
+into the workspace). Brought into the project's `develop` by fast-forward; yZQYIVE stays In
+Progress for the Windows 11 look (the owner's decision). Pilot Light itself does not read the run
+mode or `approved_by`; showing a run's mode and listing corrections nobody approved is new
+behavior there (triage: HEAVY).
 
 ## Where the detail is
 
