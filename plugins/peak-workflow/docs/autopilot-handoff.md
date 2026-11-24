@@ -617,6 +617,19 @@ the build"); the budget wording ("$117.36 left of $250 (the N earlier runs … s
   00:34 UTC). Single-quoted text is no longer cut (`splitCommand`, commit `f28dfec`, merged
   `827ed0b`, live for the running build).
 
+- **A build is told who approved an amendment a prototype run took** (`amendmentRule`, commit
+  `e43e32c`): its change record must say `approved_by = "autopilot (prototype run)"`. Before, only
+  the planner knew and the build spent the one repair round on it (seen on F5hv9T4). Not yet seen
+  working in a real run.
+
+### Run 20261123-192602 (prototype), result
+
+Merged: Outstanding (rxNf3oR, 31 min, $11.27). Parked: Session stream (F5hv9T4) on the auditor's
+high finding "F3 stand-in": every test uses a stream the test writes itself, never checked against
+a real recorded stream (gate `F5hv9T4-2`, the owner's to answer). The verifier's "Seen but not
+fixed" section worked live on Outstanding (3 lines; one is an absolute path not stripped from
+change-record notes).
+
 ### Known, not fixed
 
 - `attend.test.mjs` "watch and status see inside the step … each said once" fails (expected 2,
@@ -634,8 +647,6 @@ the build"); the budget wording ("$117.36 left of $250 (the N earlier runs … s
 - The build is told to log a reason before it edits an existing test, but a build whose first
   command was refused for another reason (the false alarms above) tried the edit first and was
   refused again: a few seconds each, no stop.
-- Only the planner is told the prototype-approver rule, so a build writes a person's name on a
-  taken amendment and costs a repair round. Tell the build too (`BUILD_RULES`).
 - The watch repeats its progress line once per blocked epic, and prints a refusal that has
   already cleared in words that read as a live blocker.
 - An epic that extends another epic's screen gets no look (`n2g5TvI`).
