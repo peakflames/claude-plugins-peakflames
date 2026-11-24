@@ -115,7 +115,7 @@ do not:
 | `next` | Do |
 |---|---|
 | `attend` | A driver is running. Go to Step 3b |
-| `decide` | A question needs the owner (`waiting`). Go to Step 4. If every gate in `waiting` is one the owner chose `Decide later` on in this session, do not ask again: relaunch when `relaunch` is set (Step 3 item 5), otherwise closing screen |
+| `decide` | A question needs the owner (`waiting`). Go to Step 4. If every gate in `waiting` is one the owner chose `Decide later` on in this session, do not ask again: relaunch when `relaunch` is set (Step 3 item 5); otherwise, when `ready` names epics (work no waiting question holds), go to Steps 1–3 for those, and say in one line that the put-off questions stay waiting; otherwise closing screen. A question put off never hides `ready` work |
 | `continue` | Only technical stops are open, and the owner's standing answer covers them (`autoContinue`). Run `DRIVER continue --workspace "<ws>" --json`, say one line for each entry of `continued` — "<label> stopped for a technical reason (<the entry's `why`>), so autopilot <the entry's `did`>, as you asked." — and come back to Step 0 |
 | `readiness` | There is work that can run. If `relaunch` is set **and** you came here from Step 4 or from `continue` in this session, relaunch (Step 3 item 5). Otherwise Steps 1–3 |
 | `fetch` | Everything queued is merged and waits in autopilot's copy. Closing screen |
@@ -975,8 +975,9 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
      confirmed it, so nothing is asked again unless Step 0 reports a refusal.
    - The owner chose `Decide later` on a gate → remember which, and never ask it again in
      this session. If a run is still going: Step 3b. Otherwise Step 0: what they did answer
-     still continues (its `decide` row relaunches when `relaunch` is set), and when only
-     deferred questions are left the session ends on the closing screen. Say "I'm continuing
+     still continues (its `decide` row relaunches when `relaunch` is set, or offers the `ready`
+     epics through Steps 1–3), and only when nothing else is ready either does the session end
+     on the closing screen. Say "I'm continuing
      this epic" (item d) only for an epic that will in fact relaunch.
    - You came by the `report` shortcut → never launch from a request to read: after the
      report and any answers, go to Step 3b if a run is going, otherwise to Step 0 only when

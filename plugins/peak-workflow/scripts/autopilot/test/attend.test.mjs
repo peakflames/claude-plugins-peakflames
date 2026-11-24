@@ -193,6 +193,12 @@ test('status.next: decide for a gate only the owner answers (a look, a finding t
   assert.deepEqual([s.next, s.autoContinue, s.relaunch], ['decide', [], null]);
   assert.deepEqual(s.waiting.map((g) => [g.epic, g.kind]), [[E1.id, 'audit'], [e5.id, 'human-check']]);
   assert.equal(s.say[2], '2 question(s) wait for you.');
+  // An epic that depends on neither parked one can still run while their questions wait (Pilot Light, 2026-11-24:
+  // a look put off with "Not now" hid gECJh6C, which was ready). `next` stays `decide`; `ready` names what can run.
+  assert.deepEqual(s.ready, [], 'nothing else is ready yet');
+  const e6 = addEpic(p.project, { id: 'Lg6Tag9', slug: 'tags', name: 'Tags', nn: '06' });
+  const s2 = st(p);
+  assert.deepEqual([s2.next, s2.ready], ['decide', [`${e6.id} (${e6.slug}) — Tags`]]);
   const r = driver('continue', '--workspace', p.state, '--json', '--by', 'Pat Owner');
   assert.equal(r.status, 1);
   assert.deepEqual(r.json().left.map((l) => l.why), ['a question only the owner answers (audit)', 'a question only the owner answers (human-check)']);
