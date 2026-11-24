@@ -248,8 +248,8 @@ Rules:
      `CR-` suffix the same way. Read the old tracing entry's sources first (they become the
      record's `traced_to`). Write the `supersede` record with `approved_via = "epic-branch"`, `approved_by` =
      `git config user.name` — except when no person chose "Amend": the answer came from an
-     autopilot prototype run (the answer says so: "No person picked this just now"). Then the
-     record says so too, with `approved_by = "autopilot (prototype run)"` (exactly that text;
+     autopilot provisional run (the answer says so: "No person picked this just now"). Then the
+     record says so too, with `approved_by = "autopilot (provisional run)"` (exactly that text;
      `approved_via` stays `"epic-branch"`), never a person's name; `/peak-workflow:status` lists the requirement as
      not approved until the owner keeps or changes it. Either way, `refs` = `["epic <id>"]` plus the open `pending` record's ID when
      the requirement was Disputed (that resolves it), and the old `text` and `fingerprint` from

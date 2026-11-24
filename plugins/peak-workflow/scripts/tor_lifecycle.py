@@ -356,14 +356,15 @@ def _is_int(value: object) -> bool:
 
 KINDS = ("reword", "supersede", "retire", "pending", "uphold")
 APPROVED_VIA = ("docs-branch", "epic-branch", "wrapup", "quick-fix", "migration")
-# A record nobody approved names no person: an autopilot prototype run took a session's proposed correction and wrote
+# A record nobody approved names no person: an autopilot provisional run took a session's proposed correction and wrote
 # this as its `approved_by`. The owner keeps it with an `uphold` record that names this one, or decides the requirement
 # again. (A fixed approver name, not a new `approved_via` value: every released version reads the record.)
-UNAPPROVED_BY = "autopilot (prototype run)"
+# Written "autopilot (prototype run)" before 3.1.0; project files keep it, and it means the same.
+UNAPPROVED_BY = ("autopilot (provisional run)", "autopilot (prototype run)")
 
 
 def nobody_approved(data: dict) -> bool:
-    return isinstance(data.get("approved_by"), str) and data["approved_by"].strip().lower() == UNAPPROVED_BY
+    return isinstance(data.get("approved_by"), str) and data["approved_by"].strip().lower() in UNAPPROVED_BY
 EVIDENCE_RESULTS = ("pass", "fail", "historical")
 
 
@@ -2713,7 +2714,7 @@ def validate_record_files(root: Path, paths: list[str]) -> list[tuple[str, list[
                 if not any(ch["tor"] in pending_tors.get(cr, ()) for cr in named):
                     problems.append(f"{ch['tor']}: no pending record in `refs` names it — an uphold "
                                     "closes a pending record on the same requirement (or keeps a "
-                                    "correction a prototype run took for it)")
+                                    "correction a provisional run took for it)")
         out.append((rel, problems))
     return out
 
@@ -3131,13 +3132,13 @@ def cmd_keep(args: argparse.Namespace, root: Path) -> int:
     if not TOR_RE.match(args.tor):
         raise DataError(f"{args.tor}: not a TOR-NN-XXXXXXX ID")
     by = (args.by or "").strip()
-    if not by or by.lower() == UNAPPROVED_BY:
+    if not by or by.lower() in UNAPPROVED_BY:
         raise DataError("--by is required: the name of the person who keeps the correction")
     p = load_project(root, _today(args))
     kept = [t for t, u in p.unapproved.items() if t == args.tor or args.tor in u["replaces"]]
     kept = [t for t in kept if t in p.live]
     if not kept:
-        print(f"{args.tor}: no correction waits for approval (none was taken by a prototype run, "
+        print(f"{args.tor}: no correction waits for approval (none was taken by a provisional run, "
               "or it was already kept or changed).", file=sys.stderr)
         return EXIT_FINDINGS
     taken = {r.id[3:] for r in p.records}
@@ -3447,7 +3448,7 @@ def build_parser() -> argparse.ArgumentParser:
     sr.add_argument("--json", action="store_true")
     sr.set_defaults(func=cmd_search)
 
-    kp = sub.add_parser("keep", help="the owner keeps a correction a prototype run took: write the uphold record "
+    kp = sub.add_parser("keep", help="the owner keeps a correction a provisional run took: write the uphold record "
                                       "that names it (exit 1 when none waits)")
     kp.add_argument("tor", help="the requirement as it now reads, or the one it replaced")
     kp.add_argument("--by", required=True, help="the person who keeps it")

@@ -766,25 +766,33 @@ test('log hook appends one line per event; the config-change hook blocks setting
   assert.equal(h.hooksLog().at(-1).hook, 'ConfigChange');
 });
 
-// ---- R8 in a prototype run (the run's `mode`) --------------------------------------------------
+// ---- R8 in a provisional run (the run's `mode`) --------------------------------------------------
 
-test('R8 prototype: takes "Amend" when offered and the recommended "Fix now" or "Defer", as a gate already decided; "Stop", no recommendation, no "Amend" and another epic\'s requirement park', (t) => {
+test('R8 provisional: a run whose config.json says "prototype" (the name before 3.1.0) is a provisional run', (t) => {
   const h = referee(t, { config: { mode: 'prototype' } });
+  const DEF = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
+  const defer = `${E1.tors[1]} cannot be fully met: the CSV has no year. Recommendation: Defer — the year comes with the export epic. How to proceed?`;
+  answered(h.ask(defer, DEF), defer, DEF[1]);
+  assert.equal(h.gate(1).decided.by, 'autopilot (provisional run)');
+});
+
+test('R8 provisional: takes "Amend" when offered and the recommended "Fix now" or "Defer", as a gate already decided; "Stop", no recommendation, no "Amend" and another epic\'s requirement park', (t) => {
+  const h = referee(t, { config: { mode: 'provisional' } });
   const DEF = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
   const defer = `${E1.tors[1]} cannot be fully met: the CSV has no year. Recommendation: Defer — the year comes with the export epic. How to proceed?`;
   const r = h.ask(defer, DEF);
   answered(r, defer, DEF[1]);
-  assert.match(r.out.hookSpecificOutput.permissionDecisionReason, /^autopilot R8: answered from the owner's prototype setting for this run: Defer — depends on a later epic\. No person picked this just now.*do not ask which later epic/);
+  assert.match(r.out.hookSpecificOutput.permissionDecisionReason, /^autopilot R8: answered from the owner's provisional setting for this run: Defer — depends on a later epic\. No person picked this just now.*do not ask which later epic/);
   const g = h.gate(1);
   assert.deepEqual([g.kind, g.tor, g.recommendation, g.question, g.session], ['deferral', E1.tors[1], 'Defer', defer, 'build-1']);
-  assert.deepEqual([g.decided.answer, g.decided.by, g.decided.standing, g.decided.prototype, g.decided.used.session], [DEF[1], 'autopilot (prototype run)', true, true, 'build-1']);
+  assert.deepEqual([g.decided.answer, g.decided.by, g.decided.standing, g.decided.prototype, g.decided.used.session], [DEF[1], 'autopilot (provisional run)', true, true, 'build-1']);
   assert.deepEqual(h.hooksLog().at(-1).prototype, [{ kind: 'deferral', tor: E1.tors[1], answer: DEF[1], gate: `${E1.id}-1.json` }]);
   // Asked again by a later session: the same answer, and no second record.
   answered(h.ask(defer, DEF), defer, DEF[1]);
   assert.ok(!fs.existsSync(path.join(h.state, 'gates', `${E1.id}-2.json`)));
   // The skill's follow-up has no answer anyone can give: reminded once, then it is the owner's.
   const which = 'Which later epic creates the code this Then clause depends on?';
-  denied(h.ask(which, ['Lg7Exp5 — Export', 'Another epic']), 'R8', /not put to the owner: this is a prototype run.*the one your recommendation named/);
+  denied(h.ask(which, ['Lg7Exp5 — Export', 'Another epic']), 'R8', /not put to the owner: this is a provisional run.*the one your recommendation named/);
   parked(h.ask(which, ['Lg7Exp5 — Export', 'Another epic']));
 
   const fix = `${E1.tors[2]} cannot be fully met: three decimals. Recommendation: **Fix now** — small. How to proceed?`;
@@ -811,7 +819,7 @@ test('R8 prototype: takes "Amend" when offered and the recommended "Fix now" or 
   assert.match(fourth.out.hookSpecificOutput.permissionDecisionReason, /covers 3 answers per epic/);
 });
 
-test('R8 prototype is the run\'s setting: without it the same questions park, and a prototype answer does not use up the standing answer for technical stops', (t) => {
+test('R8 provisional is the run\'s setting: without it the same questions park, and a provisional answer does not use up the standing answer for technical stops', (t) => {
   const h = referee(t);
   const defer = `${E1.tors[1]} cannot be fully met: the CSV has no year. Recommendation: Defer — a later epic. How to proceed?`;
   parked(h.ask(defer, ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"]));
@@ -820,8 +828,8 @@ test('R8 prototype is the run\'s setting: without it the same questions park, an
   assert.equal(standingAnswer(gates[1], gates, 1), 'Re-plan');
 });
 
-test('R8 prototype, final check: a deferral this run took is given the same answer; a requirement nobody will observe is not put to the owner', (t) => {
-  const h = referee(t, { role: 'verifier', config: { mode: 'prototype' } });
+test('R8 provisional, final check: a deferral this run took is given the same answer; a requirement nobody will observe is not put to the owner', (t) => {
+  const h = referee(t, { role: 'verifier', config: { mode: 'provisional' } });
   const OPTS = ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'];
   const q = (tor, rec = 'Defer — the row names Lg7Exp5') => `${tor} is FAIL: the export is not there. Recommendation: ${rec}. How to proceed?`;
   // Nothing was taken for this requirement: policy answers as in a full run.
@@ -834,20 +842,20 @@ test('R8 prototype, final check: a deferral this run took is given the same answ
 
   fs.writeFileSync(path.join(h.step, 'step.json'), JSON.stringify({ unobserved: [{ tor: E1.tors[2], clauses: ['the user should see one bar'] }] }));
   const cv = `${E1.tors[2]} is CANNOT VERIFY: nobody looked at the chart. Recommendation: Stop — a person must look. How to proceed?`;
-  denied(h.ask(cv, OPTS), 'R8', /not put to the owner: this is a prototype run and nobody will observe .*NOT OBSERVED — prototype run/);
+  denied(h.ask(cv, OPTS), 'R8', /not put to the owner: this is a provisional run and nobody will observe .*NOT OBSERVED — provisional run/);
   answered(h.ask(cv, OPTS), cv, 'Stop — epic FAILs');
 });
 
 test('R8 prototype: a Safety requirement is never amended or deferred, whatever the session offers; a different correction to an amended requirement is the owner\'s', (t) => {
   const safe = E1.tors[4]; // the last requirement of the seed, put under a Safety banner
-  const h = referee(t, { config: { mode: 'prototype' }, seed: (project) => {
+  const h = referee(t, { config: { mode: 'provisional' }, seed: (project) => {
     const file = path.join(project, 'docs', 'requirements', fs.readdirSync(path.join(project, 'docs', 'requirements')).find((f) => f.startsWith('01-') && f.endsWith('.feature.md')));
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('# Duplicate Handling', '# Safety'));
   } });
   const DEF = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
   const d = h.ask(`${safe} cannot be fully met: x. Recommendation: Defer — a later epic. How to proceed?`, DEF);
   parked(d);
-  assert.match(d.out.hookSpecificOutput.permissionDecisionReason, /is a Safety requirement, which a prototype run never decides/);
+  assert.match(d.out.hookSpecificOutput.permissionDecisionReason, /is a Safety requirement, which a provisional run never decides/);
   parked(h.ask(`${safe} — title looks wrong: y. Proposed: z. How to proceed?`, [`Amend ${safe} (owner approval)`, 'Implement as written', "Stop — I'll take it from here"]));
   assert.deepEqual([h.gate(1).decided, h.gate(2).decided], [null, null]);
 

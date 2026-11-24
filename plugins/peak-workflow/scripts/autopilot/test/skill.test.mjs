@@ -321,14 +321,15 @@ test('the loop, end to end: launch, a technical stop, status says continue, the 
   assert.equal(git(p.project, 'status', '--porcelain'), '', 'the project is never written by the loop');
 });
 
-test('SKILL.md: the launch asks how careful the run is, writes the answer as `mode`, asks it on a relaunch that never had it, and reads out what a prototype run decided', () => {
+test('SKILL.md: the launch asks how careful the run is, writes the answer as `mode`, asks it on a relaunch that never had it, and reads out what a provisional run decided', () => {
   const flat = SKILL.replace(/\s+/g, ' ');
   for (const text of [
-    '"How careful should this run be?"', '`Full (Recommended)`', '"Stops and asks whenever a requirement, a deferral or a look needs you"',
-    '`Prototype`', '"Keeps building. It takes the session\'s own recommendation, skips your looks, and lists every one of those at the end for you to review"',
-    'The answer is the run\'s `mode`: `"full"` or `"prototype"`', 'Never pick Prototype for the owner', 'nothing is ever pushed',
-    '`mode` (how careful the run is)', 'for `mode`, `"full"` or `"prototype"`',
-    '**Decided for you in this prototype run:** <only when `mode` is `prototype`, or one of its four sources has an entry>', 'its `check` exactly as given', 'never as verified', 'none folded into a count',
+    '"How careful should this run be?"', '`Full (Recommended)`', '"You decide as it goes. It stops and asks whenever a requirement, a deferral or a look needs you"',
+    '`Provisional`', '"The AI decides now, you confirm later. It keeps building where a Full run would stop and ask: it makes the calls that are yours (a requirement correction, a deferral, a screen to look at) and lists every one at the end for you to review"',
+    '"Confirm later" is an invitation, not a gate',
+    'The answer is the run\'s `mode`: `"full"` or `"provisional"`', 'Never pick Provisional for the owner', 'The AI decides now, you confirm later', 'You decide as it goes', 'nothing is ever pushed',
+    '`mode` (how careful the run is)', 'for `mode`, `"full"` or `"provisional"`',
+    '**Decided for you in this provisional run:** <only when `mode` is `provisional`, or one of its four sources has an entry>', 'its `check` exactly as given', 'never as verified', 'none folded into a count',
   ]) assert.ok(flat.includes(text), text);
   assert.match(SKILL, /"attended": false,\n\s+"mode": "full"\n\s+\}/, 'the config.json block carries the mode');
   // The four launch questions fit one popup (AskUserQuestion takes at most four).

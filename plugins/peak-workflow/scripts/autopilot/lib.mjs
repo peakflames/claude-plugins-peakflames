@@ -9,7 +9,7 @@ export function parseSidecar(text) {
     if (top) { fields[top[1]] = top[2].trim(); block = top[2].trim() === '' ? top[1] : null; continue; }
     const sub = line.match(/^\s+(TOR-\d{2}-[A-Za-z0-9]{7}):\s*(.+)$/);
     if (sub && block === 'verified') verified[sub[1]] = sub[2].trim();
-    // `TOR: <date> <reason>`: a requirement recorded as not met, or (a prototype run) as not observed by anyone.
+    // `TOR: <date> <reason>`: a requirement recorded as not met, or (a provisional run) as not observed by anyone.
     if (sub && block === 'unverified') unverified[sub[1]] = sub[2].trim();
   }
   const requirements = (fields.requirements ?? '').match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? [];
@@ -142,7 +142,7 @@ export function gateEntry(g) {
   const a = g.decided?.answer; const asked = stepKind(g.session);
   if (!a) return null;
   if (g.kind === 'preflight') return null; // the fix is in the project; it clears when preflight passes
-  // A full run asking the owner what a prototype run took (`reask`): the answer the prototype run gave makes it theirs and
+  // A full run asking the owner what a provisional run took (`reask`): the answer the provisional run gave makes it theirs and
   // the epic goes on from where it stood; any other answer goes back to the kind of session that asked.
   if (g.reask) return a === g.reask.took && g.reask.phase ? { phase: g.reask.phase, question: true } : STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
   if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
@@ -196,7 +196,7 @@ export function technicalAnswer(gate) {
   }
   return null;
 }
-// A question a prototype run answered (below) is not a technical stop: it has its own count.
+// A question a provisional run answered (below) is not a technical stop: it has its own count.
 const standingUsed = (gate, gates) => gates.filter((g) => g.epic === gate.epic && g.decided?.standing && !g.decided.prototype).length;
 /**
  * The answer autopilot records for this gate without asking ("decide a technical stop yourself, up
@@ -219,23 +219,32 @@ export function atLimit(gate, gates, n) {
   return answer && !standingAnswer(gate, gates, n) ? { answer, stops: standingUsed(gate, gates) + 1 } : null;
 }
 
-// ---- a prototype run: the session's own recommendation is taken, and listed for the owner ------
+// ---- a provisional run: the session's own recommendation is taken, and listed for the owner ------
 
-/** How many questions per epic a prototype run answers with the session's own recommendation; one more goes to the owner. */
+/** How many questions per epic a provisional run answers with the session's own recommendation; one more goes to the owner. */
 export const PROTOTYPE_LIMIT = 3;
-/** Who a gate answered this way says decided it. */
-export const PROTOTYPE_BY = 'autopilot (prototype run)';
-/** What a verifier writes after the date on the `unverified:` line of a requirement nobody observed in a prototype run. */
+/**
+ * A provisional run: the AI decides now, the owner confirms later. Its `mode` was "prototype" before 3.1.0,
+ * and runs' config.json, events and state from then still say so: both read as provisional. The fields that
+ * mark what such a run decided (`decided.prototype`, `e.prototype`, the `prototype-answer` event) keep their
+ * stored names.
+ */
+export const isProvisional = (mode) => mode === 'provisional' || mode === 'prototype';
+/** Who a gate answered this way says decided it, and the `approved_by` of a change record nobody approved. */
+export const PROVISIONAL_BY = 'autopilot (provisional run)';
+/** The same, as written before 3.1.0: project files keep it, and it still means nobody approved. */
+export const UNAPPROVED_BY = [PROVISIONAL_BY, 'autopilot (prototype run)'];
+/** What a verifier writes after the date on the `unverified:` line of a requirement nobody observed in a provisional run. */
 export const NOT_OBSERVED = 'NOT OBSERVED';
-/** The gates of one epic that a prototype run answered itself and that still stand. */
+/** The gates of one epic that a provisional run answered itself and that still stand. */
 export const prototypeGates = (gates, epic) => gates.filter((g) => g.epic === epic && g.decided?.prototype && !g.void && !g.superseded && !g.cleared);
 /** Of those, the ones a full run does not rely on and asks the owner about instead: a requirement amended, a requirement left for a later epic. */
 export const prototypeReasked = (gates, epic) => prototypeGates(gates, epic).filter((g) => g.tor && ((g.kind === 'amendment' && /^\W*amend\b/i.test(g.decided.answer ?? '')) || (g.kind === 'deferral' && /^\W*defer\b/i.test(g.decided.answer ?? ''))));
-/** The requirements of one epic whose deferral a prototype run took (the builder recommended it). */
+/** The requirements of one epic whose deferral a provisional run took (the builder recommended it). */
 export const prototypeDeferred = (gates, epic) => [...new Set(prototypeGates(gates, epic).filter((g) => g.kind === 'deferral' && /^\W*defer\b/i.test(g.decided.answer ?? '') && g.tor).map((g) => g.tor))];
 /**
  * The requirements of one epic the owner themself answered "Defer" for: a deferral gate a person decided, that still
- * stands. Their decision holds in any run; one a prototype run took (`prototypeDeferred`) holds in a prototype run only.
+ * stands. Their decision holds in any run; one a provisional run took (`prototypeDeferred`) holds in a provisional run only.
  */
 export const ownerDeferred = (gates, epic) => [...new Set(gates.filter((g) => g.epic === epic && g.kind === 'deferral' && g.tor && g.decided && !g.decided.prototype && !g.decided.standing && /^\W*defer\b/i.test(g.decided.answer ?? '') && !g.void && !g.superseded && !g.cleared).map((g) => g.tor))];
 /** What a session's question recommends, in the skills' own wording ("Recommendation: Defer — …"): `Fix now`, `Defer`, `Stop`, or null. */
@@ -244,8 +253,8 @@ export function recommended(question) {
   return m ? { 'fix now': 'Fix now', defer: 'Defer', stop: 'Stop' }[m[1].toLowerCase()] : null;
 }
 /**
- * The answer a prototype run gives to a question that parks a full run, or `{why}` when it goes
- * to the owner after all, or null when the kind is not one a prototype run answers. Pure.
+ * The answer a provisional run gives to a question that parks a full run, or `{why}` when it goes
+ * to the owner after all, or null when the kind is not one a provisional run answers. Pure.
  *   amendment → the "Amend TOR-…" option, when the session offers it (it never does for Safety)
  *   deferral  → what the session recommends, when that is "Fix now" or "Defer"
  * Only for one of the epic's own requirements, once per requirement, `PROTOTYPE_LIMIT` per epic.
@@ -261,8 +270,8 @@ export function prototypeAnswer({ kind, question, labels, tor, anchors, taken })
     answer = fits.length === 1 ? fits[0] : null;
   }
   if (!answer) return null; // no "Amend" on offer, "Stop" recommended, or no recommendation to read: the owner's, as in a full run
-  if (!tor || !anchors.includes(tor)) return { why: 'the question does not name one of this epic\'s own requirements, so the prototype setting does not cover it' };
-  if (taken.some((x) => x.tor === tor)) return { why: `the prototype setting covers one answer per requirement, and ${tor} already had one in this epic` };
-  if (taken.length >= PROTOTYPE_LIMIT) return { why: `the prototype setting covers ${PROTOTYPE_LIMIT} answers per epic, and this is one more` };
+  if (!tor || !anchors.includes(tor)) return { why: 'the question does not name one of this epic\'s own requirements, so the provisional setting does not cover it' };
+  if (taken.some((x) => x.tor === tor)) return { why: `the provisional setting covers one answer per requirement, and ${tor} already had one in this epic` };
+  if (taken.length >= PROTOTYPE_LIMIT) return { why: `the provisional setting covers ${PROTOTYPE_LIMIT} answers per epic, and this is one more` };
   return { answer };
 }

@@ -65,10 +65,11 @@ class UpholdProjectTests(unittest.TestCase):
 
 
 
-class PrototypeCorrectionTests(unittest.TestCase):
-    """A correction an autopilot prototype run took on a session's proposal: recorded as such, listed
+class ProvisionalCorrectionTests(unittest.TestCase):
+    """A correction an autopilot provisional run took on a session's proposal: recorded as such, listed
     as not approved until the owner keeps it (an `uphold` naming the record) or changes it."""
     OLD = "TOR-01-Oldone1"
+    BY = "autopilot (provisional run)"
 
     def setUp(self):
         self.repo = repo = FixtureRepo()
@@ -76,10 +77,10 @@ class PrototypeCorrectionTests(unittest.TestCase):
         repo.feature("01", "core", [S1, S2])
         repo.sidecar("E1aaaaa", "Complete", [A1, A2], verified={A1: S1.fp(), A2: S2.fp()})
         repo.record("supersede", "Proto01", "2026-11-23", tors=[self.OLD], approved_via="epic-branch",
-                    approved_by="autopilot (prototype run)",
+                    approved_by=self.BY,
                     changes=[{"tor": self.OLD, "feature_file": "01-core.feature.md", "fingerprint": "a" * 12,
                               "successors": [A1], "text": f"Scenario: [{self.OLD}] The tool shall walk"}])
-        repo.commit("a prototype run corrected a requirement")
+        repo.commit("a provisional run corrected a requirement")
 
     def keep(self, tors, refs=("CR-Proto01",)):
         data = record_data("uphold", "Keep001", "2026-11-24", tors=tors, refs=list(refs), title="The correction stays",
@@ -142,11 +143,16 @@ class PrototypeCorrectionTests(unittest.TestCase):
 
     def test_an_uphold_by_nobody_keeps_nothing(self):
         data = record_data("uphold", "Keep002", "2026-11-24", tors=[A1], refs=["CR-Proto01"], keywords=["run"],
-                           approved_by="autopilot (prototype run)",
+                           approved_by=self.BY,
                            changes=[{"tor": A1, "feature_file": "01-core.feature.md", "fingerprint": S1.fp()}])
         self.repo.write("docs/requirements/changes/2026-11-24-Keep002.toml", to_toml(data))
         self.assertIn("unapproved_change", self.repo.states()[A1])
-        self.assertEqual(self.repo.cli("keep", A1, "--by", "autopilot (prototype run)").returncode, 2)
+        self.assertEqual(self.repo.cli("keep", A1, "--by", self.BY).returncode, 2)
+
+
+class PrototypeCorrectionTests(ProvisionalCorrectionTests):
+    """The same, for a record written before the rename: "prototype" was the provisional run's old name."""
+    BY = "autopilot (prototype run)"
 
 
 if __name__ == "__main__":

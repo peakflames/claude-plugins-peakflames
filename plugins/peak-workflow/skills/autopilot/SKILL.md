@@ -535,22 +535,26 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
 
    **How careful the run is, asked in the same popup.** Add one more question to this same
    `AskUserQuestion` call: "How careful should this run be?" — options `Full (Recommended)`,
-   with the description "Stops and asks whenever a requirement, a deferral or a look needs
-   you", and `Prototype`, with the description "Keeps building. It takes the session's own
-   recommendation, skips your looks, and lists every one of those at the end for you to
-   review". The answer is the run's `mode`: `"full"` or `"prototype"`. In the lines before
-   the popup say once what Prototype trades: a later epic may be built on a correction to a
-   requirement that nobody approved, and a requirement only a person can observe is merged
-   as not verified. Failing tests, a file out of scope, a Safety requirement, the budget, a
-   serious finding of the reviewer and any question that comes without a recommendation stop
-   the epic either way, and nothing is ever pushed. Never pick Prototype for the owner, and
-   never suggest it because a run stopped. Skip this question in `dry-run` mode.
-   A Full run does not rely on what an earlier Prototype run took. Before it continues an epic
+   with the description "You decide as it goes. It stops and asks whenever a requirement, a
+   deferral or a look needs you", and `Provisional`, with the description "The AI decides now,
+   you confirm later. It keeps building where a Full run would stop and ask: it makes the
+   calls that are yours (a requirement correction, a deferral, a screen to look at) and lists
+   every one at the end for you to review". The answer is the run's `mode`: `"full"` or
+   `"provisional"`. In the lines before the popup say once what Provisional trades: a later
+   epic may be built on a correction to a requirement that nobody approved, and a requirement
+   only a person can observe is merged as not verified. "Confirm later" is an invitation, not a
+   gate: merged work stands until the owner reviews it, and nothing stops them leaving it
+   unreviewed. Failing tests, a file out of scope, a Safety requirement, the budget, a serious
+   finding of the reviewer and any question that comes without a recommendation stop the epic
+   either way, and nothing is ever pushed. Never pick Provisional for the owner, and never
+   suggest it because a run stopped. Skip this question in `dry-run` mode. (Runs from before
+   3.1.0 called it Prototype and wrote `"prototype"`; the driver reads that as `"provisional"`.)
+   A Full run does not rely on what an earlier Provisional run took. Before it continues an epic
    that has not merged yet, the driver parks it and asks the owner each correction or deferral
-   the Prototype run took for it, as an ordinary waiting question (`reask` on the gate; its
-   `why` says what the Prototype run answered). The same answer keeps what was built and the
+   the Provisional run took for it, as an ordinary waiting question (`reask` on the gate; its
+   `why` says what the Provisional run answered). The same answer keeps what was built and the
    epic goes on from where it stood; any other answer sends it back to be planned or built
-   again. Say so in one line when the owner picks Full after a Prototype run of the same work.
+   again. Say so in one line when the owner picks Full after a Provisional run of the same work.
    Work that already merged is not reopened; it stays listed.
    - **Change:** take the change in plain text. (In `dry-run` mode nothing below is saved:
      show the dry run with the change applied in words only.) The owner may remove epics, reorder them (an
@@ -606,7 +610,7 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    they answered; leave the key out when the question was not asked. Never write `true` unasked.
    `attended` is the owner's answer to whether they will be at the computer: `false` when
    they will be away, `true` when they are here. `mode` is the owner's answer to how careful
-   the run is: `"full"`, or `"prototype"` only when they picked Prototype; leave the key out
+   the run is: `"full"`, or `"provisional"` only when they picked Provisional; leave the key out
    when the question was not asked (the driver then runs a full run). Add `"allowTestDouble": true` only when the owner said yes to a rehearsal in Step 1 item 3.
    Write the file with the Write tool, as JSON. Write every path with forward slashes, on
    Windows too (`"C:/Users/pat/app"`): a single backslash makes the file unreadable and the
@@ -653,7 +657,7 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    of runs never put to the owner: `attended` (whether they will be at the computer),
    `realSpend` (real money) and `mode` (how careful the run is). When it is not empty, ask
    exactly those, in one `AskUserQuestion` call, in the Step 2 wording, and add each answer to
-   the config under that key (`true` or `false`; for `mode`, `"full"` or `"prototype"`) before
+   the config under that key (`true` or `false`; for `mode`, `"full"` or `"provisional"`) before
    writing it; every later relaunch then carries it. When it is empty, ask
    nothing. Write `relaunch.config` exactly as given to `<relaunch.runDir>/config.json`
    (create the directory) — it holds the same queue minus what finished, what is left of the
@@ -1013,7 +1017,7 @@ Leave out a part that has nothing to say.
 **Screens merged without your look:** <only when `unlooked` has entries without `prototype`>
 - <epic, short> — <n> pictures, sent now for you to review
 
-**Decided for you in this prototype run:** <only when `mode` is `prototype`, or one of its four sources has an entry>
+**Decided for you in this provisional run:** <only when `mode` is `provisional`, or one of its four sources has an entry>
 - <requirement, in plain words> — changed as the planner proposed. It read: <was>. Proposed: <proposed>
 - <requirement, in plain words> — left for a later epic, as the builder recommended
 - <requirement, in plain words> — nobody observed it; it is recorded as not verified. Still to see: <clauses>. To check it later: <check>
@@ -1055,8 +1059,8 @@ Leave out a part that has nothing to say.
 - **Decided for you** comes from `decidedForYou`, the entries without `prototype`: the
   technical stops autopilot answered itself. One line each, by epic: "<label>: <why>, so
   autopilot <did>."
-- **Decided for you in this prototype run** is shown whenever status says `mode` is
-  `prototype`, and also in a full run that finished work an earlier prototype run began
+- **Decided for you in this provisional run** is shown whenever status says `mode` is
+  `provisional`, and also in a full run that finished work an earlier provisional run began
   (one of the sources below has an entry). It is the brake on a run that did not stop: where a full run would have asked
   the owner, this one went on, and every such place is listed here, none folded into a
   count. It has four sources. The `decidedForYou` entries with `prototype`: a requirement
@@ -1084,7 +1088,7 @@ Leave out a part that has nothing to say.
   autopilot while they are at the computer, so a check that needs a person is done for real,
   or queue work that proves it.
 - **What is left for later, and where it is kept.** Whenever this screen showed anything
-  under "Decided for you in this prototype run", "Screens merged without your look" or "Not
+  under "Decided for you in this provisional run", "Screens merged without your look" or "Not
   proven for real", end that part with one plain sentence: "What still needs a person is also
   written into your project. Once the work is brought in, run `/peak-workflow:status` there at
   any time: its 'Left for Later' list shows each one with the one thing that clears it, and an

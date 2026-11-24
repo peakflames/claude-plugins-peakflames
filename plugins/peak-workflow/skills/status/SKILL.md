@@ -131,7 +131,7 @@ panels. Otherwise run both, once each:
   `not_observed` (on a Verification failed row whose recorded reason is that nobody looked —
   the text is what a person must still do) and `deferred_from` (the epic or epics that left
   this requirement for the one in `epic`), and `unapproved_change` (`record`, `date`,
-  `replaces`: an autopilot prototype run corrected the requirement on a session's proposal and
+  `replaces`: an autopilot provisional run corrected the requirement on a session's proposal and
   no person has approved it), and `unconfirmed` (a dated note, on a requirement that passed, of
   what a person should still confirm). The report's top-level `unconfirmed_epics` maps an epic
   to such a note that names no requirement. Retired and superseded IDs appear with
@@ -228,7 +228,7 @@ Skip this step when Step 1.5 was skipped or failed. Everything below reads `stat
    Complete — the Phase Progress and Overall Progress counts do not change.
 2.5. **Left for later.** What earlier work knowingly left undone, each with the one thing that
    clears it. This is the single list of it: whichever way the work was done (by hand, an
-   autopilot full run, an autopilot prototype run), it is read from the project's own files, so
+   autopilot full run, an autopilot provisional run), it is read from the project's own files, so
    it is the same list for everyone and an entry disappears by itself once it is cleared. Five
    kinds, in this order:
    - **A requirement was corrected and nobody approved it** — every live row with
