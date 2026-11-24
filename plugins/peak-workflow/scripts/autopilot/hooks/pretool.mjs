@@ -155,8 +155,31 @@ export function withoutHeredocBodies(command) {
   return out.join('\n');
 }
 
+/**
+ * The command cut into simple commands at `&&`, `||`, `;`, `|`, a newline, `$(`, a backtick and brackets, except inside
+ * single quotes: nothing there runs, and a `;` in a sed script or a `|` in a pattern made a command of half a script
+ * (seen live, Pilot Light 2026-11-24: `'s#from "../support/samples";#…#'` read as the path `../support/samples`).
+ * A backslash keeps the next character with its word, so `don\'t` opens no quote. Double quotes are still cut at, as
+ * before: `$(…)` and a backtick run there.
+ */
+export function splitCommand(command) {
+  const SEP = /&&|\|\||[;|\n]|\$\(|`|(?<![\w$])\(|\)/y;
+  const out = []; let cur = ''; let i = 0; let dq = false;
+  while (i < command.length) {
+    const ch = command[i];
+    if (ch === '\\') { cur += command.slice(i, i + 2); i += 2; continue; }
+    if (!dq && ch === "'") { const k = command.indexOf("'", i + 1); if (k !== -1) { cur += command.slice(i, k + 1); i = k + 1; continue; } } // no closing quote: an ordinary character, so nothing after it is hidden
+    if (ch === '"') dq = !dq;
+    SEP.lastIndex = i; const m = SEP.exec(command);
+    if (m) { out.push(cur); cur = ''; i += m[0].length; continue; }
+    cur += ch; i++;
+  }
+  out.push(cur);
+  return out;
+}
+
 function parseBash(command) {
-  return command.split(/&&|\|\||[;|\n]|\$\(|`|(?<![\w$])\(|\)/).map((s) => s.trim()).filter(Boolean).map((raw) => {
+  return splitCommand(command).map((s) => s.trim()).filter(Boolean).map((raw) => {
     const all = tokenize(raw);
     let i = 0;
     while (i < all.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(all[i]) || WRAPPERS.has(all[i]) || (i > 0 && all[i - 1] === 'env' && all[i].startsWith('-')))) i++;

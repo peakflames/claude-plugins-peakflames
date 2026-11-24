@@ -255,6 +255,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot's referee no longer cuts a command inside single quotes** — a `;` in a `sed` script or a
+  `|` in a pattern made a fake command of half the script, so a quoted import path or a tool's name
+  was refused. Text in double quotes and everything outside quotes is still read.
 - **A file in the scratch folder may be passed as a one-command prefix** — `CONTROL="$AUTOPILOT_SCRATCH/control.json" node a.js`
   is allowed; a copy into a name that lasts (`S=…`), the bare folder and any `..` stay refused.
 - **A session may remove its own scratch worktree with `--force`** — `git worktree remove --force`
