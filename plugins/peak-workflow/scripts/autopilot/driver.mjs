@@ -43,6 +43,7 @@ const KINDS = {
   verify: { prefix: 'verify', role: 'verifier', state: 'VERIFY' },
   fix: { prefix: 'fix', role: 'builder', state: 'FIX_BUILD' },
   audit: { prefix: 'audit', role: 'auditor', state: 'AUDIT' },
+  catchup: { prefix: 'catchup', role: 'builder', state: 'CATCH_UP' }, // brings a branch that no longer merges cleanly up to date (`doCatchUp`)
   probe: { prefix: 'probe', role: 'verifier', state: null }, // readiness's sandbox probe: no epic, no state
 };
 const PLAN_DIR = 'docs/implementation-plan';
@@ -428,22 +429,72 @@ export function gateFacts(workspace, integration, { integrationTip = null } = {}
       // `integrationTip`: where the integration line will be once the run has fast-forwarded it (readiness, before the sync).
       const dev = integrationTip ?? (gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${integration}`).out || null);
       if (!g.branchTip) { // parked before the session made a branch (a question in the planning session): nothing to merge
-        if (tip) why = `a branch ${g.branch} has appeared since the gate was written`;
+        if (tip) { why = `a branch ${g.branch} has appeared since the gate was written`; f.voidKind = 'gone'; }
       } else if (!tip) why = `the branch ${g.branch} no longer exists in the clone`;
-      else if (tip !== g.branchTip) why = `the branch ${g.branch} moved since the gate was written (${String(g.branchTip).slice(0, 9)} → ${tip.slice(0, 9)})`;
+      else if (tip !== g.branchTip) { why = `the branch ${g.branch} moved since the gate was written (${String(g.branchTip).slice(0, 9)} → ${tip.slice(0, 9)})`; Object.assign(f, { voidKind: 'moved', tip }); }
       else if (!gitOk(clone, 'cat-file', '-e', `${dev}^{commit}`)) f.checkedAtRunStart = true; // the project's new commits are not in the clone yet
       else {
         // A trial merge, in memory: nothing in the clone changes. The integration line may have moved (another
         // epic merged, the owner committed); the decision stands as long as the parked branch still merges cleanly.
+        // A gate that brings the branch up to date first (`catchUpGate`) expects it not to: that is its job.
         const trial = gitRun(clone, 'merge-tree', '--write-tree', '--name-only', '--no-messages', dev, tip);
-        if (trial.code === 1) why = `the branch ${g.branch} no longer merges cleanly into ${integration} (conflicts in ${trial.out.split('\n').slice(1).filter(Boolean).join(', ') || 'its files'})`;
-        else if (trial.code !== 0) why = `the trial merge of ${g.branch} into ${integration} could not run (${trial.err.split('\n')[0] || `git merge-tree exited ${trial.code}`})`;
+        if (trial.code !== 0 && bringsUpToDate(g)) f.mergeIn = true;
+        else if (trial.code === 1) { const files = trial.out.split('\n').slice(1).filter(Boolean); why = `the branch ${g.branch} no longer merges cleanly into ${integration} (conflicts in ${files.join(', ') || 'its files'})`; Object.assign(f, { voidKind: 'conflict', files }); }
+        else if (trial.code !== 0) { why = `the trial merge of ${g.branch} into ${integration} could not run (${trial.err.split('\n')[0] || `git merge-tree exited ${trial.code}`})`; Object.assign(f, { voidKind: 'conflict', files: [] }); }
         else f.behind = Number(gitRun(clone, 'rev-list', '--count', `${tip}..${dev}`).out || 0); // commits on the integration line the branch has not seen
       }
     }
+    // What a void decision becomes (`restartGate`): conflict → brought up to date, moved → checked again, gone → asked.
+    if (why && !f.voidKind) f.voidKind = 'gone';
     facts.set(id, why ? { ...f, state: 'void', why } : { ...f, state: 'resume', entry, enters: resumePhase(workspace, g, entry.phase) });
   }
   return facts;
+}
+
+/** A gate whose "Resume" first brings the branch up to date with the integration line: the conflict gate, or a stop or question of its catch-up session. */
+const bringsUpToDate = (g) => !!g.mergeIn || g.phase === 'CATCH_UP' || stepKindOf(g.session) === 'catchup';
+
+/**
+ * The one question a void decision becomes (handoff Step 3, owner decisions 2026-11-24). A void decision is never
+ * acted on silently, and an epic is never started over without a "Start over" answer:
+ *   conflict  technical. "Resume" brings the branch up to date (`doCatchUp`), then goes on with the old answer (`then`)
+ *   moved     technical. "Resume" runs autopilot's checks, the review and the final check on the branch as it now is
+ *   gone      "Start over" / "Leave it for now". A provisional run answers "Start over" itself and lists it
+ * `old` is the gate whose decision is void, `{file, …gate}` (null for a conflict found mid-run, which re-enters at
+ * `phase`). Returns the gate's own fields; the caller adds where it stands (epic, branch, tip, run).
+ */
+export function restartGate(kind, { label, old = null, files = [], why = '', branch = '', integration = 'develop', phase = null } = {}) {
+  const was = old?.decided?.answer ?? null;
+  const theirs = !(old?.decided?.standing || old?.decided?.asked); // a person gave that answer
+  const base = { kind: 'resume', skillStep: 'autopilot driver', restart: kind, artifacts: old ? [old.file] : [] };
+  if (kind === 'conflict') {
+    const entry = old ? gateEntry(old) : null;
+    // A final check's kept work is merged again by its own step: brought up to date instead, the final check runs again.
+    const then = entry?.phase && entry.phase !== 'CHECK_VERIFY' ? old.file : null;
+    const both = files.length ? files.join(', ') : 'the same files';
+    return {
+      ...base, phase: then ? entry.phase : phase ?? 'VERIFY', mergeIn: true, ...(then ? { then } : {}), technical: true, conflicts: files,
+      reason: `${branch} does not merge cleanly with ${integration} (${both}): other finished work merged since changed the same lines`,
+      question: `${label}: other finished work merged since, and its branch no longer fits on top of it (both changed ${both}). Bring it up to date and go on${then ? ` with ${theirs ? 'your answer' : 'the answer'} "${was}"` : ''}?`,
+      options: [ANSWERS.resume, ANSWERS.startOver],
+      why: `a short session merges the other work into this epic's branch and settles the clashing lines; the final check and the merge check then judge everything. "${ANSWERS.startOver}" plans the epic again from scratch`,
+    };
+  }
+  if (kind === 'moved') {
+    return {
+      ...base, phase: 'CHECK_BUILD', technical: true, reason: why,
+      question: `${label}: its branch was changed after ${theirs ? 'you answered' : 'autopilot answered'} "${was}" (new commits on it). Check it again from where its branch is now?`,
+      options: [ANSWERS.resume, ANSWERS.startOver],
+      why: `the answer was about the branch as it was, so it does not carry. "${ANSWERS.resume}" runs autopilot's checks, the independent review and the final check on the branch as it now is; nothing is planned or built again, and a look at its screens is asked again. "${ANSWERS.startOver}" plans the epic again from scratch`,
+    };
+  }
+  const what = /clone is gone/.test(why) ? 'the private copy autopilot works in is gone' : /has appeared/.test(why) ? 'a branch appeared that autopilot did not make' : 'its branch is gone';
+  return {
+    ...base, reason: why,
+    question: `${label}: there is nothing left to continue it from: ${what}. Start it over from scratch?`,
+    options: [ANSWERS.startOver, LEAVE_IT],
+    why: `${was ? `the answer "${was}" was about work that is no longer there. ` : ''}"${ANSWERS.startOver}" plans and builds the epic again from scratch, which costs the most; "${LEAVE_IT}" keeps it waiting`,
+  };
 }
 
 /**
@@ -843,7 +894,7 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
     if (gate?.state === 'waiting') set('skip', `waiting for your decision on ${gate.gate} (${gate.kind}): /peak-workflow:autopilot report`);
     else if (gate?.state === 'resume') reasons.push(`resumes at ${gate.enters} on ${gate.branch}: you answered "${gate.answer}" on ${gate.gate}${gate.checkedAtRunStart ? ' (whether the branch still merges cleanly is checked when the run starts)' : ''}`);
     else if (gate?.state === 'fresh') reasons.push(`starts over: you answered "${gate.answer}" on ${gate.gate}`);
-    else if (gate?.state === 'void') reasons.push(`your decision on ${gate.gate} is void (${gate.why}): the epic is planned again from scratch`);
+    else if (gate?.state === 'void') reasons.push(`your decision on ${gate.gate} can no longer be used as given (${gate.why}): autopilot asks how to go on`);
     if (e.status !== 'Not Started' && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) set('skip', `status is ${e.status}: someone is part-way through it; queue it explicitly to have autopilot take it over`);
     if (!e.anchors.length) set('skip', 'no Requirements Anchors');
     if (embedded) set('skip', 'hardware project: never unattended');
@@ -1038,7 +1089,7 @@ repository, \`/tmp\` included, may be refused.
  * plain `-p` for the auditor (plan §6.6 "Audit"). Pure: used by the dry run too.
  */
 export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema, resume = null }) {
-  const b = config.budgets[kind];
+  const b = config.budgets[kind] ?? (kind === 'catchup' ? config.budgets.fix : undefined); // a catch-up session: a repair's limits unless set
   const effort = effortFor(b);
   const clone = path.join(workspace, 'clone');
   const env = {
@@ -1156,6 +1207,31 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
   to plug in). A repair does the part that needs no person; the final check is where a person is
   asked to come, once. Say in your handoff what you left for it and the exact command.
 `;
+
+export const CATCHUP_RULES = `# Autopilot catch-up rules
+
+You are bringing one epic's branch up to date with the other finished work, unattended. The steps
+in your prompt are the whole job.
+
+- Do not enter plan mode: \`EnterPlanMode\` and \`ExitPlanMode\` are denied. Do not run a skill.
+- Merge only the integration line into this branch, with \`git merge\`. Do not merge this branch into
+  the integration line, and do not rebase, reset or push.
+- Settle each clash so both sides hold: keep what the integration line added and what this epic
+  added. Change no file that did not clash: no new work, no tidying, nothing renamed.
+- Never edit a requirement file (\`docs/requirements/\`). If one clashes, or the two sides cannot both
+  hold, run \`git merge --abort\` and ask with \`AskUserQuestion\`, naming the files and what each side wants.
+- Never weaken, skip or delete a test to make the merge pass. If a test fails after the merge, say so
+  in your last message: the final check judges it.
+- Commit the merge. \`git status\` must be clean when you finish.
+`;
+/** The catch-up session's prompt: which line, which files clash, how to check. */
+export function catchUpPrompt({ branch, integration, files, testCommand }) {
+  return [`Bring the branch \`${branch}\` up to date with \`${integration}\`. Other epics merged into \`${integration}\` since this branch was made, and both sides changed ${files.length ? files.map((x) => `\`${x}\``).join(', ') : 'the same lines'}.`, '',
+    `1. You are on \`${branch}\`. Run \`git merge --no-ff ${integration}\`; it stops on the clash.`,
+    '2. In each clashing file, keep both sides\' work: what the other epics added and what this epic added.',
+    `3. Run the tests${testCommand ? `: \`${testCommand}\`` : ''}.`,
+    '4. Commit the merge (`git commit --no-edit`) and finish with a clean `git status`.'].join('\n');
+}
 
 /**
  * What a session is told about steps only a person can do, from the owner's answer at launch (the
@@ -1639,7 +1715,10 @@ class Run {
 
   /** Commits whatever a parked session left uncommitted on the epic branch. One of the driver's few git writes. */
   wipCommit(e) {
-    if (this.currentBranch() !== this.meta(e).branch || !this.dirty()) return false;
+    if (this.currentBranch() !== this.meta(e).branch) return false;
+    // A catch-up session stopped mid-merge: a half-settled merge is not work to keep. The branch stays where it was.
+    if (gitOk(this.clone, 'rev-parse', '-q', '--verify', 'MERGE_HEAD')) { gitRun(this.clone, 'merge', '--abort'); this.log(`${e.id}: an unfinished merge on ${this.meta(e).branch} was undone at park`); }
+    if (!this.dirty()) return false;
     this.g('add', '-A');
     this.g('commit', '--no-verify', '-q', '-m', 'wip(autopilot): uncommitted work at park');
     this.log(`${e.id}: committed uncommitted work on ${this.meta(e).branch} as wip(autopilot)`);
@@ -1921,7 +2000,7 @@ class Run {
       const brief = path.join(this.epicDir(e), 'fix-brief.md');
       all[e.id] = { run: this.runName, state: e.state, reason: e.reason, branch: this.meta(e).branch, fixRounds: e.fixRounds, verifyFixRounds: e.verifyFixRounds ?? 0, plan: e.plan ?? null, planApprovedBy: e.planApprovedBy ?? null, buildSteps: e.buildSteps ?? [], audits: e.audits ?? [], unproven: e.unproven ?? [], fixBrief: exists(brief) ? read(brief) : null,
         // A provisional run: what it answered for the owner, and what went on without their look, for the run that finishes the epic.
-        ...(e.prototype?.length ? { prototype: e.prototype } : {}), ...(e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(e.unlooked?.prototype ? { unlooked: e.unlooked } : {}), ...(e.skippedLook ? { skippedLook: true } : {}), ...(e.amended?.length ? { amended: e.amended } : {}), ...(e.amendedUnseen?.length ? { amendedUnseen: e.amendedUnseen } : {}) };
+        ...(e.prototype?.length ? { prototype: e.prototype } : {}), ...(e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(e.unlooked?.prototype ? { unlooked: e.unlooked } : {}), ...(e.skippedLook ? { skippedLook: true } : {}), ...(e.amended?.length ? { amended: e.amended } : {}), ...(e.amendedUnseen?.length ? { amendedUnseen: e.amendedUnseen } : {}), ...(e.catchUpAfter ? { catchUpAfter: e.catchUpAfter } : {}), ...(e.catchUpThen ? { catchUpThen: e.catchUpThen } : {}) };
     }
     writeJson(path.join(this.stateDir, 'epics.json'), all);
   }
@@ -2171,7 +2250,7 @@ class Run {
   async step(e, kind, prepare) {
     const gatesBefore = new Set(this.gateFiles());
     const devBefore = this.integrationSha();
-    const again = { plan: 'PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY' }[kind];
+    const again = { plan: 'PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY', catchup: 'CATCH_UP' }[kind];
     let s; let afterLimit = null; let limitWaits = 0;
     for (;;) {
       // No session is started anywhere but on the epic's branch, once it exists.
@@ -2290,7 +2369,7 @@ class Run {
     // and one that no longer merges cleanly is parked before a session is spent on it.
     const caught = e.caughtUp ?? null;
     const stuck = this.catchUp(e, fix ? 'the repair' : 'the build');
-    if (stuck) return this.parkResumable(e, stuck, fix ? 'FIX_BUILD' : 'BUILD');
+    if (stuck) return stuck.conflicts ? this.parkCatchUp(e, stuck.why, stuck.conflicts, fix ? 'FIX_BUILD' : 'BUILD') : this.parkResumable(e, stuck.why, fix ? 'FIX_BUILD' : 'BUILD');
     if ((e.caughtUp ?? null) !== caught) { e.resumeSession = null; this.save(); } // the branch now holds other epics' work: a session that remembers the old branch is not resumed
     const brief = path.join(this.epicDir(e), 'fix-brief.md');
     const continuing = !!e.continuing; // set by `enter` when this session takes over one that was cut short
@@ -2682,20 +2761,21 @@ class Run {
    * epics merged; wrapup-epic refreshes the shared docs on the branch, and from an old copy of
    * them that refresh conflicts at the merge. Caught up first, it is written on top of what the
    * earlier epics left, and the verifier checks the code as it will land. Returns a reason when
-   * the two do not merge cleanly: a person resolves that. Also before a build or repair session
+   * the two do not merge cleanly, `{why, conflicts}` comes back and the conflict gate is written. Also before a build or repair session
    * on an existing branch (`when`): seen live, a build resumed 13 commits behind changed the same
    * files the other epics had, and only this check before verify found it, after the build.
    */
   catchUp(e, when = 'verify') {
     const m = this.meta(e); const dev = this.state.integration; const b = m.branch;
     if (!this.branchTip(b) || gitOk(this.clone, 'merge-base', '--is-ancestor', dev, b)) return null;
-    if (this.currentBranch() !== b) { if (this.dirty()) return `the clone has uncommitted changes, so ${b} could not be brought up to date with ${dev}`; this.g('checkout', '-q', b); }
+    if (this.currentBranch() !== b) { if (this.dirty()) return { why: `the clone has uncommitted changes, so ${b} could not be brought up to date with ${dev}`, conflicts: null }; this.g('checkout', '-q', b); }
     const from = this.branchTip(b);
     const r = gitRun(this.clone, 'merge', '--no-ff', '--no-edit', '-m', `Merge ${dev} into ${b} (autopilot: catch up before ${when})`, dev);
     if (r.code !== 0) {
       const files = gitRun(this.clone, 'diff', '--name-only', '--diff-filter=U').out.split('\n').filter(Boolean);
       gitRun(this.clone, 'merge', '--abort');
-      return `${b} does not merge cleanly with ${dev} (${files.join(', ') || r.err.split('\n')[0]}): both changed the same lines, and autopilot cannot settle that itself yet`;
+      // A clash is settled by a catch-up session on the conflict gate (`parkCatchUp`, `doCatchUp`), never by starting over.
+      return { why: `${b} does not merge cleanly with ${dev} (${files.join(', ') || r.err.split('\n')[0]}): other finished work merged since changed the same lines`, conflicts: files };
     }
     e.caughtUp = { from, to: this.branchTip(b), integration: this.integrationSha() };
     this.log(`${e.id}: ${b} brought up to date with ${dev} before ${when} (${from.slice(0, 9)} → ${e.caughtUp.to.slice(0, 9)})`);
@@ -2708,7 +2788,7 @@ class Run {
     if (this.config.mode !== 'provisional' && e.skippedLook && !e.look) { delete e.unobserved; delete e.unlooked; if (this.humanCheck(e)) return null; }
     const before = e.caughtUp ?? null;
     const stuck = this.catchUp(e);
-    if (stuck) return this.parkResumable(e, stuck, 'VERIFY');
+    if (stuck) return stuck.conflicts ? this.parkCatchUp(e, stuck.why, stuck.conflicts, 'VERIFY') : this.parkResumable(e, stuck.why, 'VERIFY');
     if ((e.caughtUp ?? null) !== before) e.resumeSession = null; // the branch now holds other epics' work: a session that remembers the old branch is not resumed
     e.preVerify = { developSha: this.integrationSha(), branchTip: this.branchTip(m.branch), branch: m.branch };
     this.save();
@@ -3014,8 +3094,95 @@ class Run {
     } catch (err) { this.log(`${e.id}: the "not proven" notes were not written into the project (${err.message}); they are in this run's report`); }
   }
 
+  /** Parks on the conflict gate (`restartGate`): a technical stop that "Resume" settles with a catch-up session. `then`: the gate whose answer it carries on. */
+  parkCatchUp(e, reason, files, phase, then = null) {
+    const m = this.meta(e); const old = then ? tryJson(this.gatePath(then)) : null;
+    this.writeGate(e, { ...restartGate('conflict', { label: m.label, old: old ? { file: then, ...old } : null, files, branch: m.branch, integration: this.state.integration, phase }), reason });
+    return this.park(e, reason);
+  }
+
+  /**
+   * Brings a branch that no longer merges cleanly up to date with the integration line, before the epic goes on (the
+   * conflict gate, handoff Step 3). A clean merge needs no session. Otherwise one catch-up session merges and settles
+   * the clashing lines, and the driver judges what it left: the integration line merged in, no conflict markers, a
+   * clean tree, no file changed that did not clash, no requirement file of its own making, no test weakened. Anything
+   * else is undone (kept under refs/autopilot/rejected/) and the same question parks again: a technical stop, so the
+   * standing answer's count stops it looping. It does not use the epic's one fix round. True to go on, null on a park.
+   */
+  async doCatchUp(e) {
+    const m = this.meta(e); const dev = this.state.integration; const b = m.branch;
+    const via = e.mergeIn; const after = e.catchUpAfter;
+    e.mergeIn = null;
+    const caught = e.caughtUp ?? null;
+    const stuck = this.catchUp(e, 'it goes on');
+    e.catchUpThen = via?.then ?? null; // carried into the next run if this stops before it is done
+    const done = () => { if ((e.caughtUp ?? null) !== caught) e.resumeSession = null; Object.assign(e, { catchUpAfter: null, catchUpFrom: null, catchUpThen: null, catchUpConflicts: null }); this.save(); return true; };
+    if (!stuck) return done(); // already up to date, or it merged cleanly after all (the other side changed again)
+    // A park here is not a repair: the epic's fix round stays as it was before the gate was entered.
+    const parked = () => { e.fixRounds = via?.fixRounds ?? e.fixRounds; e.catchUpFrom = null; this.record(e); this.save(); return null; };
+    if (!stuck.conflicts) { this.parkResumable(e, stuck.why, 'CATCH_UP'); return parked(); }
+    const from = this.branchTip(b);
+    Object.assign(e, { catchUpFrom: from, catchUpConflicts: stuck.conflicts }); this.save();
+    const s = await this.step(e, 'catchup', (stepDir) => {
+      const rules = path.join(stepDir, 'catchup-rules.md');
+      fs.writeFileSync(rules, CATCHUP_RULES + presenceRule(this.config.attended, e.unanswered));
+      return { prompt: catchUpPrompt({ branch: b, integration: dev, files: stuck.conflicts, testCommand: this.state.testCommand }), appendFiles: [rules] };
+    });
+    if (!s) return parked();
+    const problems = this.catchUpProblems(e, { from, files: stuck.conflicts });
+    if (problems.length) {
+      if (gitOk(this.clone, 'rev-parse', '-q', '--verify', 'MERGE_HEAD')) gitRun(this.clone, 'merge', '--abort');
+      const tip = this.branchTip(b);
+      if (tip && tip !== from) { const ref = `refs/autopilot/rejected/${e.id}-catchup-${Date.now()}`; this.g('update-ref', ref, tip); e.catchUpRejected = [...(e.catchUpRejected ?? []), ref]; }
+      if (this.currentBranch() !== b) this.g('checkout', '-q', '-f', b);
+      this.g('reset', '-q', '--hard', from); this.g('clean', '-fdq');
+      const why = `${s.name} did not bring it up to date: ${problems.join('; ')}`;
+      this.log(`${e.id}: ${why}; its work is undone (kept at ${(e.catchUpRejected ?? []).at(-1) ?? 'nothing to keep'}) and ${b} is back at ${from.slice(0, 9)}`);
+      this.parkCatchUp(e, why, stuck.conflicts, after ?? 'VERIFY', via?.then ?? null);
+      return parked();
+    }
+    e.caughtUp = { from, to: this.branchTip(b), integration: this.integrationSha(), session: s.name };
+    this.log(`${e.id}: ${s.name} brought ${b} up to date with ${dev} (${from.slice(0, 9)} → ${e.caughtUp.to.slice(0, 9)}); the epic goes on at ${after}`);
+    return done();
+  }
+
+  /** What a catch-up session left that the epic must not go on with. Empty when the branch is up to date and only the clash was settled. */
+  catchUpProblems(e, { from, files }) {
+    const b = this.meta(e).branch; const dev = this.state.integration; const tip = this.branchTip(b);
+    const out = [];
+    if (gitOk(this.clone, 'rev-parse', '-q', '--verify', 'MERGE_HEAD')) out.push('the merge was left unfinished');
+    else if (this.dirty()) out.push('it left uncommitted changes');
+    if (!tip || !gitOk(this.clone, 'merge-base', '--is-ancestor', dev, b)) { out.push(`${dev} is not merged into the branch`); return out; }
+    const names = (...args) => gitRun(this.clone, 'diff', '--name-only', ...args).out.split('\n').filter(Boolean);
+    const changed = names(from, tip);
+    const marked = changed.length ? gitRun(this.clone, 'grep', '-l', '-E', '^(<{7}|>{7})( |$)', tip, '--', ...changed).out.split('\n').filter(Boolean).map((l) => l.replace(`${tip}:`, '')) : [];
+    if (marked.length) out.push(`conflict markers are left in ${marked.join(', ')}`);
+    // Every file that did not clash must be what git's own merge of the two sides makes of it: nothing dropped from either
+    // side (a `merge -s ours` or `-X ours` names no file, so only this sees it), nothing added. Only the clash is the session's.
+    const auto = gitRun(this.clone, 'merge-tree', '--write-tree', '--no-messages', dev, from).out.split('\n')[0];
+    const differs = /^[0-9a-f]{40,64}$/.test(auto) ? names(auto, tip).filter((x) => !files.includes(x) && x !== '.autopilot/test-changes.jsonl') : null;
+    if (!differs) out.push('git could not make its own merge of the two sides to compare with');
+    else if (differs.length) out.push(`${differs.join(', ')} ${differs.length === 1 ? 'is' : 'are'} not what the merge of the two sides makes ${differs.length === 1 ? 'it' : 'them'}: only the clashing lines may be settled by hand`);
+    // A requirement is the owner's: a clash in one is asked, never settled here.
+    const reqs = files.filter((x) => x.startsWith('docs/requirements/'));
+    if (reqs.length) out.push(`the requirement file ${reqs.join(', ')} clashed: a requirement is never settled by a catch-up`);
+    const dirs = this.pre?.testDirs ?? [];
+    for (const x of files.filter((y) => dirs.some((d) => y.startsWith(d)))) {
+      const weak = [from, dev].map((side) => testWeakening(gitRun(this.clone, 'diff', '-U0', side, tip, '--', x).out.split('\n'))).find((w) => w.lost || w.off || w.loosened);
+      if (weak) out.push(`it weakened the test ${x}`);
+    }
+    return out;
+  }
+
   async runEpic(e, entry = 'PLAN') {
     let phase = entry;
+    // The conflict gate's "Resume": the branch is brought up to date before the epic goes on where the answer says.
+    if (e.mergeIn && phase) {
+      const stop = this.runStop();
+      e.catchUpAfter = phase; this.save();
+      if (stop) return this.parkResumable(e, `run stopped (${stop}) before the branch was brought up to date`, 'CATCH_UP');
+      if (!(await this.doCatchUp(e))) return null;
+    }
     while (phase) {
       const stop = this.runStop();
       if (stop && phase === 'RECHECK') return this.parkRecheck(e, `run stopped (${stop}) before the final check's kept work was merged again`);
@@ -3142,10 +3309,22 @@ class Run {
    * already reached a terminal state here.
    */
   enter(e) {
-    const m = this.meta(e); const f = this.gates.get(e.id);
+    const m = this.meta(e); let f = this.gates.get(e.id);
     const now = () => new Date().toISOString();
     if (f?.state === 'resume') {
-      const g = readJson(this.gatePath(f.gate)); const rec = this.records()[e.id] ?? {};
+      let g = { file: f.gate, ...readJson(this.gatePath(f.gate)) }; const rec = this.records()[e.id] ?? {};
+      if (bringsUpToDate(g)) {
+        // The conflict gate (`restartGate`), or a catch-up session that stopped (a question, a budget, STOP): the branch
+        // is brought up to date first (`runEpic` → `doCatchUp`), then the epic goes on with the answer it carries
+        // (`then`), entered exactly as that answer would have been; without one, at the phase it was brought up to date for.
+        this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase: 'CATCH_UP', date: now() } } }));
+        const thenFile = g.mergeIn ? g.then ?? null : rec.catchUpThen ?? null;
+        e.mergeIn = { gate: f.gate, then: thenFile, fixRounds: rec.fixRounds ?? 0 };
+        const old = thenFile ? tryJson(this.gatePath(thenFile)) : null;
+        const carried = old?.decided?.answer && !old.void && !old.superseded && !old.cleared ? gateEntry(old) : null;
+        if (!(carried && !carried.fresh) && !g.mergeIn) f = { ...f, entry: { phase: rec.catchUpAfter ?? 'VERIFY' } };
+        if (carried && !carried.fresh) { f = { ...f, gate: thenFile, kind: old.kind, answer: old.decided.answer, by: old.decided.by, entry: carried }; g = { file: thenFile, ...old }; this.markGate(thenFile, (x) => { const { restarted, ...rest } = x; return { ...rest, carried: { by: e.mergeIn.gate, run: this.runName, date: now() }, decided: { ...x.decided, used: undefined } }; }); }
+      }
       const entry = f.entry; let phase = entry.phase;
       // A build that was cut short is continued, not checked (see `resumePhase`).
       const to = resumePhase(this.stateDir, g, phase);
@@ -3236,9 +3415,22 @@ class Run {
       return phase;
     }
     if (f?.state === 'void') {
-      this.markGate(f.gate, { void: { run: this.runName, date: now(), why: f.why } });
-      e.voided = { gate: f.gate, answer: f.answer, why: f.why };
-      this.log(`${e.id}: the decision on ${f.gate} ("${f.answer}") is void — ${f.why}; planning the epic again from scratch`);
+      // Found when the run starts (status between runs writes the same question): one question (`restartGate`), never a
+      // silent start over. Only a provisional run starts an epic with nothing left to continue from over itself, and lists it.
+      const old = { file: f.gate, ...readJson(this.gatePath(f.gate)) };
+      const name = this.writeGate(e, { ...restartGate(f.voidKind, { label: m.label, old, files: f.files ?? [], why: f.why, branch: m.branch, integration: this.state.integration }) });
+      const mark = { run: this.runName, date: now(), why: f.why, by: `gates/${name}` };
+      this.markGate(f.gate, f.voidKind === 'conflict' ? { restarted: mark } : { void: mark });
+      e.voided = { gate: f.gate, answer: f.answer, why: f.why, asked: `gates/${name}` };
+      if (f.voidKind !== 'gone' || this.config.mode !== 'provisional') {
+        this.log(`${e.id}: the decision on ${f.gate} ("${f.answer}") can no longer be used as given — ${f.why}; asking how to go on (gates/${name}); no session started`);
+        return this.finish(e, 'PARKED', readJson(this.gatePath(name)).reason);
+      }
+      const decided = { answer: ANSWERS.startOver, by: PROVISIONAL_BY, date: today(), scope: 'next-run', standing: true, prototype: true, run: this.runName, used: { run: this.runName, phase: 'PLAN', date: now() } };
+      this.markGate(name, (x) => ({ ...x, decided }));
+      e.voided.startedOver = true;
+      e.resumed = { gate: `gates/${name}`, kind: 'resume', answer: ANSWERS.startOver, by: PROVISIONAL_BY, phase: 'PLAN', fresh: true };
+      this.log(`${e.id}: nothing is left to continue from (${f.why}); a provisional run starts it over from scratch and lists that for the owner (gates/${name})`);
     } else if (f?.state === 'fresh') {
       this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase: 'PLAN', date: now() } } }));
       e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase: 'PLAN', fresh: true };
@@ -3252,7 +3444,7 @@ class Run {
     if (this.config.mode !== 'provisional') for (const x of prototypeReasked(readGates(this.stateDir), e.id)) { this.markGate(x.file, { superseded: { run: this.runName, date: now(), why: 'a full run starts the epic again and asks the owner' } }); this.log(`${e.id}: the answer a provisional run took for ${x.tor} ("${x.decided.answer}") does not stand in a full run; if the question comes up, the owner is asked`); }
     this.supersedeGates(e, null);
     // From scratch: every other answer given about the earlier attempt is not handed to the new one.
-    for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && x.decided?.used && !x.superseded && !x.void && gateEntry(x)?.question && !amendment(x))) this.markGate(g.file, { superseded: { run: this.runName, date: now() } });
+    for (const g of readGates(this.stateDir).filter((x) => x.epic === e.id && (x.decided?.used || x.restarted) && !x.superseded && !x.void && gateEntry(x)?.question && !amendment(x))) this.markGate(g.file, { superseded: { run: this.runName, date: now() } });
     // The planner meets the same requirement first, the builder writes the change: both are told.
     const carried = ownerAnswers(this.stateDir, e.id).filter((a) => /^amendment/.test(a.gateKind) && /^amend\b/i.test(a.answer));
     e.answers = carried.flatMap((a) => ['plan', 'build'].map((kind) => ({ ...a, kind })));
@@ -3261,6 +3453,22 @@ class Run {
     this.supersedeBranch(e);
     this.forget(e);
     return 'PLAN';
+  }
+
+  /**
+   * A provisional run, at its start: an epic of this run whose question says nothing is left to continue from
+   * (`restartGate` "gone", written between runs) is started over on "Start over", in the run's name, listed under
+   * "Decided for you" (owner decision 2026-11-24). A full run leaves it to the owner.
+   */
+  startOverGone() {
+    const queue = this.config.queue;
+    const live = readGates(this.stateDir).filter((g) => gateLive(g) && g.kind !== 'preflight');
+    for (const id of new Set(live.map((g) => g.epic))) {
+      const g = live.filter((x) => x.epic === id).at(-1);
+      if (g.restart !== 'gone' || g.decided || (queue && !queue.includes(id))) continue;
+      this.markGate(g.file, (x) => ({ ...x, decided: { answer: ANSWERS.startOver, by: PROVISIONAL_BY, date: today(), scope: 'next-run', standing: true, prototype: true, run: this.runName } }));
+      this.log(`${id}: nothing is left to continue from (${g.reason}); a provisional run starts it over from scratch and lists that for the owner (${g.file})`);
+    }
   }
 
   // ---- crash resume (§9): an in-flight step is never re-trusted ---------------------------------
@@ -3280,6 +3488,14 @@ class Run {
       else if (e.state === 'FIX_PLAN') entry = again(e.state) ? 'FIX_BUILD' : null;
       else if (e.state === 'BUILD' || e.state === 'FIX_BUILD') entry = 'CHECK_BUILD_INTERRUPTED';
       else if (e.state === 'CHECK_BUILD' || e.state === 'AUDIT' || e.state === 'CHECK_VERIFY') entry = e.state;
+      else if (e.state === 'CATCH_UP') {
+        // What the catch-up session did is not trusted: the branch goes back to where it was and is brought up to date again.
+        const b = this.meta(e).branch;
+        if (gitOk(this.clone, 'rev-parse', '-q', '--verify', 'MERGE_HEAD')) gitRun(this.clone, 'merge', '--abort');
+        if (e.catchUpFrom && this.branchTip(b) && this.branchTip(b) !== e.catchUpFrom) { if (this.currentBranch() !== b) this.g('checkout', '-q', '-f', b); this.g('reset', '-q', '--hard', e.catchUpFrom); this.g('clean', '-fdq'); }
+        if (again('CATCH_UP')) { e.mergeIn = { gate: null, then: e.catchUpThen ?? null, fixRounds: e.fixRounds }; entry = e.catchUpAfter ?? 'VERIFY'; }
+        else { e.step = null; this.parkCatchUp(e, `interrupted twice while bringing ${b} up to date`, e.catchUpConflicts ?? [], e.catchUpAfter ?? 'VERIFY', e.catchUpThen ?? null); continue; }
+      }
       else if (e.state === 'VERIFY') {
         if (e.preVerify && this.integrationSha() !== e.preVerify.developSha) entry = 'CHECK_VERIFY';
         else if (again('VERIFY')) { if (e.preVerify) this.rollback(e); entry = 'VERIFY'; }
@@ -3359,6 +3575,7 @@ class Run {
         this.state.startSha = this.integrationSha();
       } else if (!this.state.queue.some((q) => !TERMINAL.has(q.state) && q.state !== 'QUEUED') && this.currentBranch() !== integration && !this.dirty()) this.g('checkout', '-q', integration);
       // Gate decisions are judged once, at run start: valid ones resume, void ones are planned again.
+      if (!resuming && this.config.mode === 'provisional') this.startOverGone();
       if (!resuming) this.state.gateFacts = Object.fromEntries(gateFacts(this.stateDir, integration));
       this.gates = new Map(Object.entries(this.state.gateFacts ?? {}));
       this.pre = preflight(this.clone, cfg, { pluginDir: this.pluginDir, gates: this.gates });
@@ -3496,7 +3713,7 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
   const openGates = gates.filter((g) => !g.decided && (g.options ?? []).length).map(brief);
   const decidedGates = gates.filter((g) => g.decided?.answer).map(brief);
   const voidGates = decidedGates.filter((g) => g.state === 'void');
-  if (voidGates.length) warn.push(`${voidGates.length} decision(s) can no longer be used (${voidGates.map((g) => `${g.epic}: ${g.why}`).join('; ')}); those epics are planned again from scratch`);
+  if (voidGates.length) warn.push(`${voidGates.length} decision(s) can no longer be used as given (${voidGates.map((g) => `${g.epic}: ${g.why}`).join('; ')}); autopilot asks how to go on with those epics`);
   if (openGates.length) warn.push(`${openGates.length} gate(s) wait for your decision (${[...new Set(openGates.map((g) => g.epic))].join(', ')}); decide them with /peak-workflow:autopilot report`);
 
   const env = integration ? envFacts(project, workspace, config) : null;
@@ -3534,7 +3751,8 @@ export function ensureResumeGates(workspace, { write = true } = {}) {
   const missing = missingResumeGates(workspace);
   if (write) for (const m of missing) {
     // The question the new gate replaces stops counting: the owner answers one thing, not two.
-    if (m.replaces) { const f = path.join(workspace, m.replaces); writeJson(f, { ...readJson(f), superseded: { date: new Date().toISOString(), by: `gates/${m.name}`, why: m.gate.reason } }); }
+    // A void decision (`restartGate`): marked void, or, when the branch only needs bringing up to date, kept to be carried on.
+    if (m.replaces) { const f = path.join(workspace, m.replaces); const mark = { date: new Date().toISOString(), by: `gates/${m.name}`, why: m.why ?? m.gate.reason }; writeJson(f, { ...readJson(f), [m.restart === 'conflict' ? 'restarted' : m.restart ? 'void' : 'superseded']: mark }); }
     writeJson(path.join(workspace, 'gates', m.name), m.gate);
   }
   return missing.map((m) => m.name);
@@ -3628,8 +3846,22 @@ function missingResumeGates(workspace) {
   const last = currentRun(workspace); const project = last ? tryJson(path.join(runDirOf(workspace, last), 'config.json'))?.project : null;
   let lookAfter = false; try { lookAfter = !!project && projectSettings(project).look === 'after'; } catch { /* an unreadable settings file is reported at launch */ }
   const gates = readGates(workspace);
+  // A decision that can no longer be used as given becomes one question (`restartGate`), never a silent start over.
+  // Without the clone nothing can be judged here: the run that recreates it finds the void decision itself (`enter`).
+  const integrationNow = exists(clone) ? detectIntegration(clone) : null;
+  for (const [id, f] of integrationNow ? gateFacts(workspace, integrationNow) : []) {
+    if (f.state !== 'void') continue;
+    const old = gates.find((g) => g.file === f.gate);
+    const tipNow = integrationNow && old.branch ? gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${old.branch}`).out || null : null;
+    made.push({ name: `${id}-${gates.filter((g) => g.epic === id).length + 1}.json`, replaces: old.file, restart: f.voidKind, why: f.why, gate: {
+      epic: id, epicName: old.epicName ?? id, run: old.run ?? null, session: null, branch: old.branch ?? null, branchTip: tipNow, base: integrationNow ? gitRun(clone, 'rev-parse', integrationNow).out || null : null,
+      resume: old.resume ?? null, decided: null,
+      ...restartGate(f.voidKind, { label: labelOf(workspace, id), old, files: f.files ?? [], why: f.why, branch: old.branch, integration: integrationNow ?? 'the integration line' }),
+    } });
+  }
   for (const [id, rec] of Object.entries(records)) {
     if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch) continue;
+    if (made.some((x) => x.gate.epic === id)) continue;
     const redo = rec.state === 'PARKED' ? redoneCheck(workspace, gates, id) : null;
     // The project says "look": "after", and this epic waits only for a look at its screens (asked before the setting,
     // or by a driver that started before it): the owner's setting is the answer. A line a person must observe still waits.
@@ -3736,6 +3968,8 @@ function missingResumeGates(workspace) {
 export const standingCovers = (gate, gates, n) => !!standingAnswer(gate, gates, n);
 /** What autopilot did when it answered a technical stop itself, in the owner's words: for the `continue` line and the closing screen. */
 function standingDid(gate, answer) {
+  if (gate.mergeIn) return 'brought it up to date with the other finished work';
+  if (gate.restart === 'moved') return 'checked it again from where its branch is now';
   if (answer === ANSWERS.replan) return 'had it planned again';
   if (answer === ANSWERS.auditReal) return 'had what the reviewer found repaired';
   if (gate.phase === 'CHECK_VERIFY') return gate.approvesFix ? 'allowed the final check\'s fix and checked its merge again' : 'checked the final check\'s merge again';
@@ -3747,6 +3981,7 @@ function standingDid(gate, answer) {
 /** What a provisional run did when it answered a session's question itself, in the owner's words. */
 export function prototypeDid(gate) {
   const a = gate.decided?.answer ?? ''; const tor = gate.tor ?? 'a requirement';
+  if (gate.restart === 'gone') return 'started it over from scratch: its branch was gone';
   if (gate.kind === 'amendment') return `took the proposed correction to ${tor}`;
   if (/^\W*defer\b/i.test(a)) return `deferred ${tor} to a later epic, as the builder recommended`;
   if (/^\W*fix now\b/i.test(a)) return `had ${tor} fixed in the same build, as the builder recommended`;
@@ -3863,7 +4098,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const covered = open.filter((g) => standingCovers(g, gates, n));
   const waiting = open.filter((g) => !covered.includes(g));
   // What autopilot decided in the owner's name in this chain of runs, for the closing screen.
-  const decidedForYou = gates.filter((g) => g.decided?.standing && chain.includes(g.run)).map((g) => (g.decided.prototype
+  const decidedForYou = gates.filter((g) => g.decided?.standing && chain.includes(g.decided.run ?? g.run)).map((g) => (g.decided.prototype
     ? { gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), prototype: true, kind: g.kind, tor: g.tor ?? null, answer: g.decided.answer, did: prototypeDid(g), question: g.question ?? null, ...(tookOf.get(g.file)?.was ? { was: tookOf.get(g.file).was } : {}), ...(tookOf.get(g.file)?.proposed ? { proposed: tookOf.get(g.file).proposed } : {}), ...(g.void || g.superseded ? { dropped: true } : {}) }
     : { gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), did: standingDid(g, g.decided.answer), why: plainReason(gateReason(g)) }));
 
@@ -3956,11 +4191,9 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   // The at-limit question for a technical stop (`atLimitAsk`): "Try again" is the owner's, and records the answer that
   // takes this stop forward; autopilot picks which. "Leave it for now" decides nothing.
   let asked = null;
-  if (!standing && technicalAnswer(gate)) {
-    const said = String(answer ?? '').trim().toLowerCase();
-    if (said === LEAVE_IT.toLowerCase()) return { gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: null, effect: 'none', enters: null };
-    if (said === TRY_AGAIN.toLowerCase()) { asked = TRY_AGAIN; answer = technicalAnswer(gate); }
-  }
+  const said = String(answer ?? '').trim().toLowerCase();
+  if (!standing && said === LEAVE_IT.toLowerCase() && (technicalAnswer(gate) || (gate.options ?? []).includes(LEAVE_IT))) return { gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: null, effect: 'none', enters: null };
+  if (!standing && technicalAnswer(gate) && said === TRY_AGAIN.toLowerCase()) { asked = TRY_AGAIN; answer = technicalAnswer(gate); }
   const options = asked ? [answer] : gate.options ?? [];
   if (!options.length) throw new Error(`${path.basename(file)} (${gate.kind}) has no answer to record: ${gate.kind === 'preflight' ? 'the fix is in the project, and the gate clears when preflight passes' : 'it offers no options, so nothing is decided here'}`);
   const label = options.find((o) => o.trim().toLowerCase() === String(answer).trim().toLowerCase());
@@ -4012,7 +4245,7 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   return {
     gate: path.basename(file), epic: gate.epic, kind: gate.kind, decided: gate.decided, effect: 'resume',
     enters: entry?.fresh ? 'PLAN (from scratch, on a fresh branch)' : entry?.phase ? resumePhase(workspace, gate, entry.phase) : null,
-    validWhile: entry?.fresh ? null : `${gate.branch} stays at ${String(gate.branchTip).slice(0, 9)} and still merges cleanly into the integration line; otherwise the decision is void and the epic is planned again`,
+    validWhile: entry?.fresh ? null : `${gate.branch} stays at ${String(gate.branchTip).slice(0, 9)}${bringsUpToDate(gate) ? '' : ' and still merges cleanly into the integration line'}; otherwise autopilot asks how to go on`,
     resume: gate.resume ?? null,
   };
 }

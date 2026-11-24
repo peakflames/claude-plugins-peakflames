@@ -51,7 +51,7 @@ run, what stops, and what comes next (`DRIVER status`) are the driver's answers,
    is given ahead of time, and it is the owner's own: the standing answer for technical stops,
    agreed in the launch question (Step 2 item 3). Only `DRIVER continue` applies it, to the
    stops the driver says it covers, and the driver picks the answer (continue, repair, plan
-   again, run the final check again); you never record "resume" on a gate yourself. When
+   again, run the final check again, bring it up to date with the other finished work); you never record "resume" on a gate yourself. When
    that answer is used up, the driver's own question takes the gate's place: `Try again` or
    `Leave it for now` (Step 4 item 5b).
 4. **It never picks among ready epics.** The proposed queue is every eligible epic in phase and
@@ -492,7 +492,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    plan missing a required part, a final check that needs a repair or another run, a fix the
    final check made itself to the product or bigger than a small fix, or a finding of the
    independent reviewer (treated as real, and repaired). Autopilot then picks the technical
-   way on: continue, repair, plan again, run the final check again, or allow that fix. Always
+   way on: continue, repair, plan again, run the final check again, bring it up to date with
+   the other finished work, or allow that fix. Starting an epic over is never covered. Always
    asked, never covered: a question about the product or a requirement, a look, a finding
    that a paid service was never really called, a fix that changes a requirement or makes a
    test check less, and a stop the owner asked for. Say so if the owner asks what it covers,

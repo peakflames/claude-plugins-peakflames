@@ -23,10 +23,10 @@ export const shortLabel = (label) => String(label ?? '').replace(/^(\S+) \([^)]*
 /** What each kind of session is doing, in plain words: [doing, done]. */
 const STEP_WORDS = {
   plan: ['Planning', 'Plan'], build: ['Building', 'Build'], fix: ['Repairing', 'Repair'],
-  audit: ['Reviewing', 'Review'], verify: ['Verifying', 'Verification'],
+  audit: ['Reviewing', 'Review'], verify: ['Verifying', 'Verification'], catchup: ['Bringing up to date with the other finished work', 'Catch-up'],
 };
 /** What follows a step that finished, so every line says where the run goes from here. The chat is the one display every device has. */
-const NEXT = { plan: 'the build', build: "autopilot's own checks, then an independent review", fix: "autopilot's own checks, then an independent review", verify: 'checks on the merged result' };
+const NEXT = { plan: 'the build', build: "autopilot's own checks, then an independent review", fix: "autopilot's own checks, then an independent review", verify: 'checks on the merged result', catchup: 'the rest of the epic, on the answer already given' };
 /** A driver check, as what is wrong when it fails. */
 const CHECK_WORDS = {
   'branch-and-commit': 'the work was not committed as expected', 'clean-tree': 'files were left uncommitted',
@@ -59,7 +59,9 @@ export function plainReason(reason) {
     [/merge gate failed/, "autopilot's checks on the merge failed, so the merge was undone"],
     [/kept work could not be merged again/, "the final check's kept work could not be merged again"],
     [/did not merge it/, 'it was verified but not merged'],
-    [/does not merge cleanly|could not be brought up to date/, 'its work no longer fits on top of the other finished work'],
+    [/did not bring it up to date|does not merge cleanly|could not be brought up to date/, 'its work no longer fits on top of the other finished work'],
+    [/moved since the gate was written/, 'someone changed its branch after the answer was given'],
+    [/no longer exists in the clone|private clone is gone|has appeared since the gate was written/, 'there is nothing left to continue it from'],
     [/ended without a verdict/, 'the final check ended before it judged anything'],
     [/already done and recorded/, 'the final check asked for a check you had already done'],
     [/recorded look did not settle/, 'the check needs one more look from you'],

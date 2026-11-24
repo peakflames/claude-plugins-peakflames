@@ -109,7 +109,7 @@ them; the state is here. The rule:
 | #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 0 / 2 |
 | #36 | The run budget is not enforced inside a step | Step 9 | 1 / 1 |
 | #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
-| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 12 / 15 |
+| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 13 / 16 |
 | #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 13 / 13 |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
@@ -253,10 +253,20 @@ Why this order:
   (`test/resume.test.mjs`); not yet seen live.* Was: The reviewer gate offers the answer although `fixRounds` is already 1; the owner
   cannot then change to "verify as built". Offer only answers that are possible, or write a
   resume gate into VERIFY. *`driver.mjs:2562`, `missingResumeGates`.*
-- [ ] **An epic is started over without asking** (*no issue*; review of I6a). A standing answer
-  whose branch has moved or no longer merges is void, and the epic is planned again from
-  scratch without a question. Old behaviour, reachable from more gates since I6a.
-  *`gateFacts`, `enter`.*
+- [x] **An epic is started over without asking** (*no issue*; review of I6a; #35's second
+  left-out item; the conflict part of #42). *Fixed 2026-11-24 (`b7c2d14`), on the owner's
+  decisions of that day: a void decision becomes one question (`restartGate`), written between
+  runs by `status`/`continue` or by the run itself, never acted on silently. A branch that no
+  longer merges: a technical gate; "Resume" runs a short catch-up session (merge the
+  integration line in, settle the clash; the driver undoes it if markers, other files, a
+  requirement file or a weaker test are left) and goes on with the old answer. A changed
+  branch: a technical gate into autopilot's checks, the review and the final check. A gone
+  branch: "Start over" / "Leave it for now"; a provisional run starts it over itself and lists
+  it. A clash found mid-run writes the same conflict gate. The referee refuses a catch-up
+  session's write to a requirement file (R10). Tested (`test/resume.test.mjs`,
+  `test/hooks.test.mjs`); not yet seen live (Step 6).* Was: a standing answer whose branch had
+  moved or no longer merged was void, and the epic was planned again from scratch without a
+  question.
 
 ### Step 4 — Strengthen the guards on what merges unasked (C1)
 
@@ -312,6 +322,9 @@ The 2026-11-14 changes:
 - [ ] Small-fix limit of 80 changed lines.
 - [ ] A failed merge check keeps the final check's work, and "Resume" re-checks the merge with
   no new final check (#35).
+- [ ] A decision whose branch no longer fits is not planned again: a catch-up session settles
+  the clash on the standing answer and the epic goes on with the old answer; a changed branch is
+  checked again; a gone one is asked, or started over and listed in a provisional run (Step 3).
 
 The 2026-11-21 changes (#41, I2 and I6):
 - [x] "I'll be away": an epic that needs the owner is set aside, independent epics keep
@@ -392,6 +405,8 @@ files `CLAUDE.md` names.
 - [ ] **One flaky gate failure is reported as "every epic will probably stop"** (#40) (6). C3.
 - [ ] **Autopilot cannot repair a red base, a preflight refusal or a merge conflict itself**
   (#42, I6c). Includes "no path for a launch gate that fails on a product bug" (#40) (7).
+  *The merge conflict part is done (Step 3, `b7c2d14`): a catch-up session settles it on the
+  standing answer. Open: a red base and a preflight refusal.*
 
 ### Step 9 — The budget (C2)
 
@@ -709,6 +724,7 @@ change-record notes).
   `epic-detail-drawer.tsx` and `.autopilot/test-changes.jsonl`). The epic was planned again;
   the old branch is kept at `refs/autopilot/superseded/…`. The same item as the Step 3 line
   "An epic is started over without asking": it says so in the log but spends the money again.
+  Fixed 2026-11-24 (Step 3): now a catch-up session settles the clash; not yet seen live.
 - ~~**"Resume" after a failed merge check repeats the whole final check** (about $5.85 and 29
   minutes on Outstanding). Step 3, first item.~~ Fixed 2026-11-24 (#35); not yet seen live.
 - The build is told to log a reason before it edits an existing test, but a build whose first

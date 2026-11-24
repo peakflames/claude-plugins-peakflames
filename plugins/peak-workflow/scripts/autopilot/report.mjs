@@ -195,7 +195,7 @@ function nextSteps(r) {
   else if (r.baseRed) next.push(`Nothing was built: your project's own tests were already failing on \`${r.integration}\` before autopilot started. ${NEEDS_MAINTAINER} Once the tests pass, run \`/peak-workflow:autopilot\` again.`);
   if (/^preflight:/.test(r.stoppedBecause ?? '')) next.push(`Autopilot refused to start: ${r.stoppedBecause.replace(/^preflight:\s*/, '')}. ${NEEDS_MAINTAINER}`);
   const parked = by('PARKED');
-  const liveGate = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
+  const liveGate = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared && !g.restarted;
   const epicsOf = (list) => [...new Set(list.map((g) => g.epic))].join(', ');
   const open = r.gates.filter((g) => !g.decided && liveGate(g) && g.effect === 'resume');
   const noGate = parked.filter((e) => !r.gates.some((g) => g.epic === e.id && e.gates.includes(path.basename(g.file))));
@@ -205,7 +205,7 @@ function nextSteps(r) {
   if (noGate.length) next.push(`${plural(noGate.length, 'parked epic')} stopped with no question to answer (${ids(noGate)}): the reason is under "Per epic". ${NEEDS_MAINTAINER} Queued again, such an epic starts over.`);
   const decided = r.gates.filter((g) => g.decided && liveGate(g));
   const voided = r.epics.filter((e) => e.voided);
-  if (voided.length) next.push(`${plural(voided.length, 'decision')} could not be used and the epic was planned again from scratch (${ids(voided)}): the reason is under "Per epic".`);
+  if (voided.length) next.push(`${plural(voided.length, 'decision')} could not be used as given (${ids(voided)}): what was asked or decided instead is under "Per epic".`);
   if (by('FAILED').length) next.push(`${plural(by('FAILED').length, 'epic')} did not pass the final check (${ids(by('FAILED'))}): why is under "Per epic", and the work is kept. Run \`/peak-workflow:autopilot\` to queue it again; it then starts over.`);
   const waiting = r.sync?.state === 'clone-ahead' ? r.sync.waiting : [];
   const bring = 'Run `/peak-workflow:autopilot`: it shows you what is new and brings it into your project for you, after asking.';
@@ -325,7 +325,7 @@ export function renderReport(r) {
   for (const e of r.epics) {
     L.push('', `### ${e.label} — ${e.outcome}`, '', e.reason ?? '(no reason recorded)');
     if (e.resumed) L.push('', e.resumed.fresh ? `Started over: ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`.` : `Resumed at ${e.resumed.phase} on \`${e.resumed.branch}\` (${String(e.resumed.branchTip).slice(0, 9)}, left by run ${e.resumed.fromRun ?? '?'}): ${e.resumed.by} answered "${e.resumed.answer}" on \`${e.resumed.gate}\`. No earlier session was run again.${e.resumed.behind ? ` The branch was ${plural(e.resumed.behind, 'commit')} behind \`${r.integration}\` and merged cleanly in a trial merge.` : ''}`);
-    if (e.voided) L.push('', `Your decision "${e.voided.answer}" on \`${e.voided.gate}\` was void — ${e.voided.why}. The epic was planned again from scratch.`);
+    if (e.voided) L.push('', `Your decision "${e.voided.answer}" on \`${e.voided.gate}\` could not be used — ${e.voided.why}. ${e.voided.startedOver ? `Nothing was left to continue from, so this provisional run started the epic over from scratch (\`${e.voided.asked}\`); it is listed under what was decided for you.` : e.voided.asked ? `You are asked how to go on: \`${e.voided.asked}\`.` : 'The epic was planned again from scratch.'}`);
     for (const ref of e.superseded) L.push('', `The earlier branch is kept in the clone at \`${ref}\`.`);
     if (e.fixedAtWrapup?.standing) L.push('', `Fixed during verification, on your standing answer for small fixes: ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. What the verifier asked: ${e.fixedAtWrapup.standing.map((x) => `"${x.question}"`).join('; ')}.${e.fixedAtWrapup.standing.some((x) => x.testOnly) ? ` A test was added for a requirement the build left untested: ${e.fixedAtWrapup.standing.filter((x) => x.testOnly).map((x) => x.tor).join(', ')}.` : ''} The verifier checked its own fix; no separate audit ran on it.`);
     else if (e.fixedAtWrapup?.auto) L.push('', `Fixed during the final check without asking you, on your standing answer for technical stops (\`${e.fixedAtWrapup.approvedBy}\`): ${e.fixedAtWrapup.files.join(', ') || 'no code file'}. Only the verifier checked this fix; no second reviewer judged it.`);
