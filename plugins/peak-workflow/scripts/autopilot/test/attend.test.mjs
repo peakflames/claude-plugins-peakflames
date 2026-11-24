@@ -199,6 +199,7 @@ test('status.next: decide for a gate only the owner answers (a look, a finding t
   const e6 = addEpic(p.project, { id: 'Lg6Tag9', slug: 'tags', name: 'Tags', nn: '06' });
   const s2 = st(p);
   assert.deepEqual([s2.next, s2.ready], ['decide', [`${e6.id} (${e6.slug}) — Tags`]]);
+  assert.match(s2.why, /2 gate\(s\) need the owner; meanwhile 1 epic\(s\) can run \(`ready`\)/, 'said in `why`, which a session reads first');
   const r = driver('continue', '--workspace', p.state, '--json', '--by', 'Pat Owner');
   assert.equal(r.status, 1);
   assert.deepEqual(r.json().left.map((l) => l.why), ['a question only the owner answers (audit)', 'a question only the owner answers (human-check)']);
