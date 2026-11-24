@@ -187,6 +187,22 @@ test('R2 scratch folder: a resumed session may keep using the scratch folder of 
   denied(a.pre('Write', { file_path: path.join(path.dirname(a.step), 'build-0', 'scratch', 'x'), content: 'x' }), 'R2');
 });
 
+test('Bash: single-quoted text is not cut at ; | && or brackets, and runs nothing; a quote that is escaped opens none (Pilot Light, 2026-11-24)', (t) => {
+  const h = referee(t);
+  // Refused live: the `;` inside a sed script cut it in two, and `"../support/samples"` read as a path in the workspace.
+  passes(h.bash(`sed -i '' 's#^import { a } from "../support/samples";#import { b } from "../support/b";\\nimport { a } from "../support/samples";#' tests/unit/x.test.ts`), 'a sed script with ; and a relative import');
+  passes(h.bash("grep -E 'kind|gh|docker' docs/notes.md"), 'a pattern with | and words that are tools');
+  passes(h.bash("echo 'a && sudo ls; (docker ps)' > notes.txt"), 'text that only looks like commands');
+  passes(h.bash("echo '$(docker ps)'"), 'a substitution in single quotes is literal');
+  // Still read: everything outside single quotes, double quotes that run a substitution, and an escaped quote that hides nothing.
+  denied(h.bash("echo 'ok' && docker ps"), 'R4', null, 'a command after a quoted word');
+  denied(h.bash("echo 'ok'; sudo ls"), 'R4', null, 'after ;');
+  denied(h.bash('echo "$(docker ps)"'), 'R4', null, 'substitution in double quotes');
+  denied(h.bash("echo don\\'t; docker ps"), 'R4', null, 'an escaped apostrophe opens no quote');
+  denied(h.bash("echo 'a' 'b' | docker run x"), 'R4', null, 'after a pipe');
+  denied(h.bash("echo x; echo 'unclosed ; docker ps"), 'R4', null, 'an unclosed quote hides nothing');
+});
+
 test('R2 files CLAUDE.md names: a listed file outside the clone is read and run, never written; its neighbours stay closed', (t) => {
   for (const sandbox of [false, true]) {
     const h = referee(t, { sandbox });
