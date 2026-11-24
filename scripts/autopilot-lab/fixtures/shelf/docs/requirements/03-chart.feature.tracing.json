@@ -1,0 +1,85 @@
+{
+  "feature_id": "03",
+  "feature_file": "03-chart.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-03-Ch1Wr3w",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Drawing the pages finished each month is the third goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 1,
+            "paraphrase": "chart writes the HTML file the reader named."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-03-Ch2Lb6x",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A chart the reader can read needs each bar named and valued."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 2,
+            "paraphrase": "Each bar is labelled with the month and its pages."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-03-Ch3Sc1y",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Local and private: the chart loads nothing from anywhere else."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 2,
+            "paraphrase": "The page opens in a browser from the local file alone."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-03-Ch4Lk7z",
+      "rationale": "Whether a picture is readable cannot be asserted by a test; a person opens the page and looks.",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "A glance is enough: a person judges whether the chart reads well."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S3",
+            "step": 2,
+            "paraphrase": "Bars are tall in proportion to the pages, with nothing overlapping."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

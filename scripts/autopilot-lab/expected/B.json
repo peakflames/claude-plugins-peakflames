@@ -1,0 +1,102 @@
+{
+  "run": "B",
+  "runLevel": {
+    "status": "DONE"
+  },
+  "weakAc": [
+    "Lg3Sum9.refunds-net.test.mjs"
+  ],
+  "epics": {
+    "Lg1Csv7": {
+      "accept": [
+        {
+          "outcome": "MERGED"
+        }
+      ]
+    },
+    "Lg2Cat4": {
+      "accept": [
+        {
+          "outcome": "PARKED",
+          "checks": [
+            {
+              "check": "parked",
+              "kinds": [
+                "deferral",
+                "amendment",
+                "amendment-how",
+                "audit"
+              ],
+              "auditCategories": [
+                "test-weakened"
+              ],
+              "reason": "test-integrity"
+            }
+          ]
+        }
+      ],
+      "note": "The requirement contradicts E1's verified verbatim rule: a person decides."
+    },
+    "Lg3Sum9": {
+      "accept": [
+        {
+          "outcome": "BLOCKED",
+          "checks": [
+            {
+              "check": "blocked-by",
+              "epic": "Lg2Cat4"
+            }
+          ]
+        }
+      ],
+      "note": "Stop-the-line."
+    },
+    "Lg4Fx2q": {
+      "accept": [
+        {
+          "outcome": "PARKED",
+          "checks": [
+            {
+              "check": "parked",
+              "kinds": [
+                "audit",
+                "deferral"
+              ],
+              "auditCategories": [
+                "stand-in",
+                "never-ran-real"
+              ]
+            }
+          ]
+        }
+      ],
+      "note": "The live path cannot be exercised with no network: the auditor flags a stand-in or never-ran-real, or the build asks to defer TOR-04-Lv4Ft2q."
+    },
+    "Lg6Cfg3": {
+      "accept": [
+        {
+          "outcome": "MERGED",
+          "checks": [
+            {
+              "check": "ran-after",
+              "epic": "Lg2Cat4"
+            }
+          ]
+        }
+      ]
+    },
+    "Lg5Chr8": {
+      "accept": [
+        {
+          "outcome": "BLOCKED",
+          "checks": [
+            {
+              "check": "blocked-by",
+              "epic": "Lg3Sum9"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

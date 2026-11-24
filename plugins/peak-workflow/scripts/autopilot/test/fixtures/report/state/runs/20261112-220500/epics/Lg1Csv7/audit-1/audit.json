@@ -1,0 +1,24 @@
+{
+  "step": "audit-1",
+  "epic": "Lg1Csv7",
+  "delta": false,
+  "parkOn": [
+    "stand-in",
+    "test-weakened",
+    "cannot-fail",
+    "never-ran-real"
+  ],
+  "decision": "proceed",
+  "recommend": "proceed",
+  "summary": "The import is exercised through the real CLI in every test. One note on scope.",
+  "findings": [
+    {
+      "id": "F1",
+      "category": "scope",
+      "severity": "low",
+      "evidence": "README.md:14",
+      "explanation": "README.md is not a Key Component of this epic; the edit only documents the new command.",
+      "parks": false
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "feature_id": "02",
+  "feature_file": "02-page.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-02-Pg1Wr5s",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Writing the list as a page is the second goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 1,
+            "paraphrase": "page writes the HTML file the reader named."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-02-Pg2Sc8t",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Local and private: the page loads nothing from anywhere else."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 2,
+            "paraphrase": "The page opens in a browser from the local file alone."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-02-Pg3Es4u",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Faithful record: a title is shown exactly as typed."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 2,
+            "paraphrase": "The reader sees every book as they typed it."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-02-Pg4Gl9v",
+      "rationale": "Whether a page can be taken in at a glance cannot be asserted by a test; a person opens the page and looks.",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "A glance is enough: a person judges whether the page reads well."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 2,
+            "paraphrase": "Finished and unfinished books can be told apart without reading the dates."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

@@ -1,0 +1,7 @@
+node_modules/
+ledger.json
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db

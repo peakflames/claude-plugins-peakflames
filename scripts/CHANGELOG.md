@@ -9,6 +9,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **`autopilot-lab/fixtures/ledger/` seed (epic E1 only).** A pre-planned peak-workflow project
+  for the autopilot proof of concept; passes `tor-lifecycle format` and `check`.
+- **`autopilot-lab/spike/` P0 harness.** The stdio host and hook scripts used to answer the
+  spike's questions; reference only, replaced by the driver in P1.
+- **`autopilot-lab/lab.mjs reset`.** Builds the seeded six-epic `ledger` project for run A, B or
+  C in a throwaway directory, byte-for-byte the same each time, and prints how to launch it.
+- **`autopilot-lab/lab.mjs evaluate`.** Compares a finished autopilot run with the scenario's
+  expected outcomes, runs the hidden oracle tests on the merged code, and writes `evaluation.json`.
+- **`autopilot-lab/fixtures/ledger-full/` epics E2–E6.** Requirements, specs and sidecars with the
+  planted traps; copied over the E1 seed by `reset`.
+- **`autopilot-lab/oracle/` and `reference/`.** Hidden black-box tests per epic, and a reference
+  `ledger` that passes them; neither is ever copied into a seeded project.
+- **`autopilot-lab` scenario D.** `lab.mjs reset --run D` seeds a separate five-epic `shelf`
+  project (`fixtures/shelf/`) built to reach the repair, unsettled-look and "Fix now" paths in
+  real sessions; `scenarios/D.md` is the owner's walkthrough.
+- **`autopilot-lab/oracle-shelf/` and `reference-shelf/`.** Hidden tests and a reference
+  implementation for the `shelf` project; `evaluate --run D` judges the first launch.
+
 ## [0.1.1] — 2026-11-04
 
 ### Fixed

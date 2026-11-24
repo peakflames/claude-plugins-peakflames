@@ -23,10 +23,11 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 | `start-epic` | Implement an epic — TOR-driven plan + tasks + verification; settles superseded or retired anchors; owner-approved in-epic amendment (supersede) |
 | `wrapup-epic` | Independent TOR verification, complete, ship; owner-approved amend or record-as-pending at Step 1.4b; `reverify` mode re-checks a Complete epic's stale requirements |
 | `pause` | Save progress mid-epic |
-| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Requirements Health (findings A–F, Disputed) |
+| `status` | Read-only dashboard — phase progress, Requirements Coverage over live requirements, Changed Since Verified, Left for Later (what was knowingly left undone, each with its one next step), Requirements Health (findings A–F, Disputed) |
 | `quick-fix` | Trivial bug fix on a hotfix/ branch; owner-approved amendment path (reword, or supersede + same-branch reverify) for one non-Safety requirement |
 | `refresh-docs` | Refresh architecture.md + design-notes.md from as-built code |
 | `upgrade` | Bring a project's files to this plugin's format — numbered steps (0001 epic provenance, 0002 requirements lifecycle), one commit each or one per phase |
+| `autopilot` | Proof of concept — front door to the unattended driver: readiness (preflight, the clone's `setup`/`copy`/`readOnly`/`network` environment, its proof with the quality gates, and the sandbox probe, scope and cost review), confirm, detached launch — then it stays with the run: one command, one session. Every pass starts at `driver.mjs status`, whose `next` (`readiness`, `attend`, `decide`, `continue`, `fetch`, `nothing`) the skill follows and never decides; it relays `driver.mjs watch` lines through the Monitor tool, asks each parked gate's question when it arises, relaunches the confirmed queue, and ends on a closing screen (merged, waiting, spend, what the referee got in the way of). A technical stop is decided by `driver.mjs continue` on the owner's standing answer from the launch question (`autoContinue`, twice per epic by default, one count for every kind): continue, repair once more, plan again, run the final check again, let the final check make its own fix, or repair a reviewer's finding (never one that a paid service was not really called). Past the count the owner gets one question, `Try again` or `Leave it for now`. Closing the session is safe; the same command picks the run back up. The launch also asks how careful the run is (`mode`): `full`, or `provisional` (the AI decides now, the owner confirms later; called `prototype` before 3.1.0), which takes a session's own recommendation for an amendment or a deferral, skips the owner's looks, merges a requirement nobody observed as not verified, and lists every one of those on the closing screen; failing tests, scope, Safety, the budget and pushing stop either way. Never edits project code: it writes the project's `autopilot.json` entries through `driver.mjs configure` (`setup`, `readOnly`, `network` without asking; `copy` and `budgets` on the owner's word), and makes a project fix it named itself (the `**Tests:**` or `**Build:**` line, a `.gitignore` line) only after the owner approves that exact change through `AskUserQuestion`. It does routine git for a non-technical owner instead of printing commands: on a yes through `AskUserQuestion` it fast-forwards the finished work into the project (or merges a diverged one, aborting on conflict), and never pushes. Never runs `start-epic` or `wrapup-epic`, answers a gate, or picks among ready epics |
 
 ## Key Design Invariants
 
@@ -42,7 +43,9 @@ Forked from `epic-workflow` v2.5.1. There is no migration path from epic-workflo
 **Feature file:** `docs/requirements/{NN}-{name}.feature.md`
 **Tracing sidecar:** `docs/requirements/{NN}-{name}.feature.tracing.json` (written by Haiku sub-agent)
 **Epic sidecar:** `docs/implementation-plan/status/epic-<id>.md` — has a `requirements:` field listing TOR IDs (each owned by exactly one epic), an `owner:` line (`—` until `start-epic` sets it to `git config user.name`), and an optional `waived: TOR-… → <succ>` line written by wrapup.
-Removal epics add `retires: CR-…`. `verified:` (TOR → fingerprint), `unverified:` (TOR → date and
+Removal epics add `retires: CR-…`. `unconfirmed-<TOR>:` / `unconfirmed-epic:` lines (a dated
+note of what a person should still confirm about work that passed) are written and removed only
+by `tor-lifecycle mark --unconfirmed` / `--confirmed`. `verified:` (TOR → fingerprint), `unverified:` (TOR → date and
 reason), and `reverified:` are written only by `tor-lifecycle mark`. A Complete sidecar's `status:`
 never changes and its `requirements:` is append-only — except deleting or correcting a non-ID
 entry that `check` reports as finding C, by hand on a `docs/` branch (`mark` refuses a sidecar
@@ -54,6 +57,19 @@ lifecycle decision — `reword` (same meaning, test evidence), `supersede` (new 
 live only in the feature file (tracing sidecars and specs carry IDs). Requirement states (Verified,
 Verified (reworded), Changed since verified, Verification failed, Disputed, …) are derived by
 `tor-lifecycle states`, never stored
+
+**Left for later, in one place:** whatever work knowingly leaves undone is written into the
+project's own files, never only into a run's report, and `status` is the single list of it
+(Left for Later): a correction nobody approved (a `supersede` record whose `approved_by` is
+`autopilot (provisional run)`, never a person, cleared by an `uphold` that names it — `tor-lifecycle keep` — or by changing
+the requirement), a look nobody gave (`unverified: … NOT OBSERVED — …`), a requirement left for
+a later epic (`waived:`), a test still skipped (`Deferred: <TOR>`), and a note to confirm
+(`unconfirmed-…:`). Each entry names the one existing skill that clears it
+(`capture-requirements <TOR>`, `wrapup-epic <id> reverify`, `start-epic`, `quick-fix`); no skill
+exists only to walk the list, and an entry leaves it when the files say it is done. Epics
+autopilot finished in its private copy and the owner has not brought in are outside the
+project's files, so `status` says so in a banner (from `driver.mjs status`: `sync.epics`, and
+the questions autopilot waits on) rather than show them as not started.
 
 **Orientation (team awareness):** every skill names an epic as `<id> (<slug>) — <Name>`, never by
 ID alone. Specs carry `**Planned by:**` / `**Planned:**` / `**Plan branch:**` (written by
@@ -190,6 +206,13 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
   2 usage/data error, 3 interpreter. Decisions (what to ask, what to block) stay in `SKILL.md`.
   `tor-lifecycle mark` is the only writer of a sidecar's `verified:`, `unverified:`, and
   `reverified:` lines and of an append to a Complete epic's `requirements:`
+- `scripts/autopilot/` is the autopilot proof of concept: `driver.mjs` (state machine, done-ness
+  checks, merge gate), `hooks/` (the referee), `policy/gates.json`, `audit/` (the auditor's prompt
+  and schema), `audit.mjs`, `report.mjs` and `attend.mjs` (read-only: the plain sentence for each
+  run event, `watch`, the friction count). Node 22+, no dependencies. The `autopilot` skill only
+  talks to the user and calls `driver.mjs`; what may run unattended, what parks, what the standing
+  answer covers and what comes next (`status`) is decided by the driver and the hooks, never by a
+  prompt. Tests: `node --test scripts/autopilot/test/`
 - `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
   templates. They are **forward-only and append-only**: a shipped step is never edited; a
   correction is a new step. Each step starts with a detect check (so re-running is harmless) and

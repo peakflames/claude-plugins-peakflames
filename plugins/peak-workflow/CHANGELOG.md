@@ -8,6 +8,415 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [3.1.0] — UNDER DEVELOPMENT
 
+### Added
+
+- **Autopilot run announcer** — chat lines now say which epic of how many is starting, what
+  comes next after each step, and "n of m done (%)" over the confirmed queue across relaunches;
+  the ten-minute "still working" line is relayed. One spend figure: chain total of the budget.
+- **Autopilot starts on a project with no tests yet** — when the declared test directories
+  hold no committed file, the base test run and the sandbox probe are skipped, not failed as
+  "base red"; the first epic's own checks run the tests. The launch screen says so.
+- **Autopilot provisional runs** — a launch choice: the AI decides now, you confirm later. The run takes a session's recommended
+  amendment or deferral, skips the owner's looks, merges an unobserved requirement as not
+  verified, and lists each under "Decided for you in this provisional run". Failing tests,
+  scope and Safety still stop.
+- **Autopilot full run after a provisional run** — before it continues an unmerged epic, a full
+  run asks the owner each correction or deferral a provisional run took for it. The same answer
+  keeps what was built; any other sends the epic back to be planned or built again.
+- **Autopilot honours the owner's own "Defer"** — in any run, a requirement the owner answered
+  "Defer" to passes the build and merge checks as left for the later epic, and the final
+  check's same question is answered from it.
+- **`status` "Left for Later" panel** — one list of what earlier work knowingly left undone,
+  read from the project's files, each with its one next step: unapproved corrections, looks
+  nobody gave, requirements left for a later epic, tests still skipped, and notes a person
+  should confirm.
+- **`status` sees autopilot's copy** — a banner names epics autopilot finished that are not
+  in the project yet, and questions autopilot is waiting on, with `/peak-workflow:autopilot` as
+  the next step; those epics are left out of Ready to Start.
+- **Corrections nobody approved are recorded as such** — an autopilot provisional amendment's
+  change record names `autopilot (provisional run)` as approver, never a person. `capture-requirements <TOR>` asks the
+  owner to keep or change it; `tor-lifecycle keep` writes the approval.
+- **"Not proven" notes are kept in the project** — after a merge, autopilot writes each
+  reviewer or final-check note into the epic's status file (`unconfirmed-…:`).
+  `wrapup-epic <id> reverify` shows them to a person and records the answer.
+- **Autopilot `"look": "after"`** — a project setting that lets an epic with screens go to the
+  final check without stopping for the owner; its pictures are listed for review afterwards.
+  A requirement a person must observe still stops.
+- **Autopilot planner checks requirements for contradictions** — before planning, each epic's
+  requirements are read against each other; one that cannot be met or contradicts another is
+  asked as an amendment then, not mid-build. Plan lint requires the "checked" line.
+- **Autopilot `report.md` catches up with the closing screen** — whether the owner was there,
+  pictures and lines seen for real at the look, the verifier's words on the pictures, approved
+  amendments, small fixes made without asking, and sign-ins nobody answered.
+- **Autopilot standing answer for small fixes** — a fix the verifier recommends is made without
+  stopping: up to 2 per epic, 5 files and 80 changed lines, never a requirement file or a
+  test made to check less. A bigger fix is rolled back and put to the owner to approve. Listed in the report and closing
+  screen; `"smallFixes": false` turns it off.
+- **Autopilot clone environment** — `setup` (a command) and `copy` (git-ignored files) in
+  `.claude/peak-workflow/autopilot.json` give the private clone what git does not carry; the driver
+  applies them at run start and after each merge.
+- **Autopilot readiness proof** — `driver.mjs prepare` makes the clone, applies `setup` and `copy`,
+  and runs the project's test command there before launch; readiness lists every git-ignored path
+  the clone lacks.
+- **Autopilot drafts its own setup** — the skill works out `setup` and `copy` from how the project
+  is built and tested, saves them through `driver.mjs configure` on the owner's confirmation, and
+  never launches while the proof fails.
+- **Autopilot scratch folder** — each working session gets a folder outside the clone for
+  temporary files, named in its rules and as `$AUTOPILOT_SCRATCH`, writable with the sandbox on
+  or off. A refused write outside the clone says where it is.
+- **Autopilot reads the files `CLAUDE.md` names** — a single existing file outside the project
+  that `CLAUDE.md` names in backticks (a script under `~/.claude/scripts`) can be read and run
+  by sessions, never written, and is listed at launch. Hidden files and folders, credentials,
+  and the rest of `~/.claude` stay closed.
+- **Autopilot read-only directories** — `readOnly` in the project's `autopilot.json` names
+  directories outside the clone (a dependency cache such as `~/.nuget/packages`) that sessions may
+  read and never write; `driver.mjs configure --read-only` saves it and refuses broad or private paths.
+- **Autopilot continues a build that was cut short** — a build stopped by STOP, a budget or the
+  wall clock resumes in a new build session told what is already committed, instead of failing
+  CHECK_BUILD and spending the one repair round on a part-built branch.
+- **Autopilot sandbox off by default** — sessions run commands unsandboxed with open network, so
+  real toolchains (MSBuild, `dotnet test`) work; the referee keeps file writes inside the clone
+  and temp directories. `"sandbox": true` in the project's `autopilot.json` turns it back on.
+- **Autopilot referee reads freely** — with the sandbox off, a session may read anywhere except
+  credentials, Claude Code's own data and the workspace; Bash commands that visibly write outside
+  the clone are refused. Saved long tool outputs are always readable.
+- **Autopilot sandbox network** — with the sandbox on, sessions may use local sockets and ports
+  and reach the public package registries; `network` adds a private registry. Everything else
+  stays closed.
+- **Autopilot sandbox probe** — `driver.mjs prepare --probe` launches one cheap session, set up
+  exactly as a build, that runs the test command inside the sandbox; readiness learns whether the
+  toolchain works there before an epic is spent on it.
+- **Autopilot per-step settings** — `driver.mjs configure --budget <step>.<key>=<value>` saves a
+  step's model, effort, time cap or dollar cap to the project's `autopilot.json`; the skill takes
+  "build on opus" in plain words and names a workspace value that still wins.
+- **Autopilot remembers the queue** — readiness reports `lastQueue`, the last confirmed queue minus
+  finished epics; the skill asks "same queue as last time, or all eligible epics?" instead of
+  proposing the full list again.
+- **Autopilot proves the quality gates** — `driver.mjs prepare --gate "<command>"` (repeatable)
+  runs each build or lint gate in the clone after the tests and reports it; a failing gate is a
+  warning, and the tests remain the only refusal.
+- **Autopilot readiness fits one screen** — the skill saves the settings a run cannot work without
+  (`setup`, `readOnly`, `network`) and runs the proof and probe without asking, then shows one
+  short screen; tables, caps and the scope review appear only on request.
+- **Autopilot keeps a finished build** — the driver commits the referee's own record
+  (`.autopilot/`) when a build leaves it uncommitted, judges the session's commit and not its own,
+  and no longer asks for a reason when a test project's manifest changes.
+- **Every park has a question** — a build parked for uncommitted work now gets a resume gate, and
+  `driver.mjs report` writes one for an epic an earlier driver parked without any.
+- **Autopilot plan lint accepts shorthand anchors** — a plan that writes the prefix once and then bare
+  seven-character suffixes (`TOR-03-Vaata1w, nt9zDad`) names those requirements; it no longer parks.
+- **Autopilot missing-command message** — a test or setup command the shell cannot find (exit 126
+  or 127) is reported as "could not be run", with its own next step, instead of as failing tests.
+- **Autopilot `--effort`** — each session passes `--effort`: `high` for haiku and sonnet, `medium` for
+  opus and fable. Override per step with `budgets.<step>.effort` in `<project>/.claude/peak-workflow/autopilot.json`.
+- **Autopilot driver (proof of concept)** — `scripts/autopilot/driver.mjs` runs queued epics
+  unattended in a private clone: plan, build, driver checks, verify, and a merge gate that rolls
+  back a bad merge.
+- **Autopilot dry run** — `driver.mjs run --dry-run` prints the queue, each exact session
+  command, the settings JSON and the gate policy, and invokes nothing.
+- **`fake-claude.mjs` test double** — scripted stand-in for `claude` that drives the driver's
+  `node:test` suite without calling a model.
+- **Autopilot referee hooks** — `scripts/autopilot/hooks/` deny unattended sessions anything
+  outside the private clone, pushes and remote writes, containers, background tasks, and unrecorded
+  edits to existing tests; a stop hook refuses to end with work running.
+- **Autopilot gate policy** — `scripts/autopilot/policy/gates.json` lists the few questions
+  autopilot answers and with what; every other `AskUserQuestion` parks the epic with a gate file
+  for a person.
+- **Autopilot plan capture** — in a planning session `ExitPlanMode` saves the plan, lints it for
+  anchors, closing steps and gate rules, and ends the session; a failed lint parks.
+- **`autopilot` skill (proof of concept)** — `/peak-workflow:autopilot` checks readiness, confirms
+  the queue and limits, and launches the driver detached; it never builds, never answers a gate,
+  and never picks among ready epics.
+- **`autopilot report`** — presents the morning report, asks the owner each parked gate's own
+  question, records the answer in the gate file, and prints the fetch command for merged work.
+- **Autopilot auditor** — after the driver's build checks, a read-only session audits the epic
+  diff for stand-ins, weakened tests and unrun paths; a high finding in a park category parks the
+  epic before verification. After a fix round it audits only the delta.
+- **Autopilot morning report** — `report.md` and `report.json` list what to do next, each epic's
+  outcome with evidence, referee blocks, test changes with reasons, and auditor findings.
+- **Owner's look reaches the verifier** — after a decided human-check gate, the verify session is
+  given the owner's recorded observation, so `wrapup-epic` records it as operator-observed
+  evidence instead of parking on a question nobody can answer.
+- **Human-check answers need the owner's account** — `autopilot report` asks what the owner did
+  to check and what they saw, with suggested ways of looking; `driver.mjs decide` refuses a
+  human-check answer without that note.
+- **Autopilot repair is one session** — a failed check, a confirmed audit finding, a "Not right"
+  look or a verify FAIL goes to a single builder session with the fixes as its prompt; the
+  fix-round planning session is gone.
+- **Owner-approved "Fix now" during verify** — when the owner answers a verifier's own question
+  with Fix now, the resumed verify may repair inline and merge; the report names what it fixed.
+- **An unsettled look returns to the owner** — when the verifier cannot judge an
+  operator-observed requirement from the owner's note, autopilot asks the owner again with the
+  verifier's reason instead of starting a repair.
+- **Report TL;DR and glossary** — `report.md` opens with a plain-language TL;DR and ends with
+  "Words used in this report"; `autopilot report` presents the TL;DR first and explains each term
+  on first use; once merged work is in the project, the report stops listing the fetch command.
+- **Autopilot readiness facts** — `driver.mjs preflight --json` adds a `launch` block (workspace,
+  the new run's directory, earlier runs, open and decided gates, refusals, warnings) and per-epic
+  `scopeFlags` for requirements that need network, keys, big data or long runs.
+- **`driver.mjs decide` and `report`** — record a person's gate answer (only one of the gate's own
+  options) and re-render the report; a gate with no options is refused.
+- **Resume from a decided gate** — the next run re-enters a parked epic at the phase its gate
+  names, on the branch the earlier run left, without repeating a finished session; an undecided
+  gate keeps its epic out of the run.
+- **Decision validity** — a decision holds while the parked branch is unchanged and still merges
+  cleanly into the integration line (a trial merge); a void one is reported and the epic is
+  planned again, with the old branch kept under `refs/autopilot/superseded/`.
+- **`onPark` setting** — by default the first epic that parks or fails ends the run;
+  `"onPark": "continue"` in the project's `.claude/peak-workflow/autopilot.json` keeps building independent
+  epics.
+- **`resume` gate** — budget, infra, STOP and auditor-outage parks get a gate offering "Resume
+  from where it stopped" or "Start over"; the auditor still fails closed.
+- **Plan-lint gate options** — "Approve this plan" builds the captured plan, recorded as approved
+  by the owner; "Re-plan" plans again.
+- **Sync with the project** — each run first fetches the project's integration line into the
+  clone: fast-forwards when the project is ahead, builds on top when the clone is, and refuses a
+  diverged project with both tips printed.
+- **Scope-flag keywords** — bare `server`, `account` and `token` no longer flag a requirement;
+  the flags stay advisory word matches for the readiness review.
+- **Human-check artifact** — a human-check gate lists the build's manual test files and the output
+  of the project's run command, or says plainly that nothing could be produced.
+- **Autopilot workspace** — one long-lived `<project>.autopilot/` per project holds
+  `settings.json`, the single private clone and every gate; each run gets `runs/<timestamp>/` with
+  its own config, state, log and report.
+- **Test-double guard** — a `claudeBin` other than `claude` in `settings.json` is refused by
+  preflight and by the driver unless that run's `config.json` sets `allowTestDouble`.
+- **Autopilot catches a waiting branch up before verify** — a branch behind the integration line is
+  merged with it first, so the verifier checks the code as it will land and its docs refresh no
+  longer conflicts with an earlier epic's.
+- **Autopilot look as a yes/no form** — a human-check gate lists the requirement's own Then lines;
+  the report asks one yes or no per line and records them as the look. No free-text note is needed
+  for "Looks right".
+- **Autopilot opens what there is to look at** — the report opens the built page or chart for the
+  owner, gives its full path, and shows the build's checklist steps in the chat.
+- **Autopilot second look asks only what is missing** — when the verifier wants more, the earlier
+  look is kept and only lines not yet confirmed are asked.
+- **Autopilot safety caps shown as sizes** — the confirm screen labels the per-step limits as caps,
+  sized XS to XL with the ceiling beside each, and no longer shows turns.
+- **Autopilot report ends with one next step** — after the owner's answers it names a single
+  action; the fetch commands, the by-hand route and the conditions are given only when asked for.
+- **Autopilot run events** — the driver writes one line per milestone (a step starting or ending,
+  a check, the reviewer's result, a merge, a park) to `runs/<run>/events.jsonl`, each readable as
+  one plain sentence.
+- **Autopilot `driver.mjs watch`** — follows a run and prints one line per milestone, each
+  referee refusal once, the result of each test run, a heartbeat, and `RUN ENDED` when it is
+  over. Read-only; `--once` returns after the first line.
+- **Autopilot `driver.mjs status`** — one read-only answer to where the run is and what comes
+  next (`readiness`, `attend`, `decide`, `continue`, `fetch`, `nothing`), with the waiting gates,
+  what merged, the spend, and what the referee refused.
+- **Autopilot standing answer for technical stops** — a run's `autoContinue: <n>` lets
+  `driver.mjs continue` resume an epic stopped by an infra error, a step's own cap or autopilot's
+  own check, up to `n` times per epic, recorded as the owner's standing answer. Every other gate
+  is still asked.
+- **Autopilot stays with the run** — `/peak-workflow:autopilot` is one command and one session:
+  it launches, relays each milestone in plain words, asks each question when it arises,
+  relaunches the confirmed queue, and ends on a closing screen. Closing the session is safe.
+- **Autopilot real-money answer at launch** — the launch popup asks once whether a check may
+  spend real money on an outside service; every build, repair and verify session is told the
+  answer (`realSpend`), and a session with no answer asks instead of skipping the call.
+- **Autopilot says what was not proven for real** — a reviewer finding that the work never ran
+  for real, and the verifier's own "not run" lines, are recorded per epic, flagged on the merge
+  line, listed on the closing screen and in the report, even when nothing parks.
+- **Autopilot closing screen** — lists what merged, what waits for the owner, the spend, one
+  next step, and what the referee got in the way of, in plain words.
+
+- **Autopilot pictures for the owner's look** — the build of an epic with screens must leave
+  screenshots and a captioned `index.md` in `.autopilot/look/`; the look question shows them, and
+  they are never committed or merged.
+- **Autopilot verifier looks at the pictures** — the final check of an epic with screens opens
+  each screenshot and reports what it sees; its lines appear on the closing screen.
+- **Autopilot asks whether the owner will be there** — the launch popup's answer is the run's
+  `attended`; when away, no session starts a step that waits for a person, and each such check is
+  listed as not proven with the command to run by hand.
+- **Autopilot progress line** — in a run of more than one epic the watch prints
+  `Progress: N merged, N waiting for you, N still to go` after each epic ends.
+- **Autopilot says how a wait for the owner ended** — the watch prints `NO LONGER NEEDS YOU`
+  when a `Needs you:` command finishes or gives up, and the skill relays it.
+
+### Changed
+
+- **Autopilot "prototype" is now "Provisional"** — the launch option, report heading and
+  project records say provisional. Runs and change records written as "prototype" still read
+  as provisional; stored field names are unchanged.
+- **Autopilot does it for the owner** — the skill no longer hands over terminal commands: it
+  offers to bring finished work into the project (fast-forward, nothing pushed) or to combine a
+  diverged project, runs it on a yes, and says what happened. It then removes its temporary
+  `autopilot/<integration>` branch and offers to commit the project's `autopilot.json`.
+- **Autopilot default run budget is $250** (was $80), counted over the whole chain of runs; a
+  project sets its own with `configure --run-budget`, which also raises a chain in progress.
+- **Autopilot watch is quieter** — a first refusal and `TESTS passed|failed` are printed only
+  with `watch --verbose`, so an attending session is not woken for routine lines.
+- **Autopilot step wording** — a resumed step reads "Picking … back up where it stopped", and a
+  step that parked reads "stopped to ask you something" instead of "finished".
+- **Autopilot requirement questions** — the skill explains in plain words what the requirement
+  is for and what "Amend" does before asking; a four-option gate stays in the popup.
+- **Autopilot launch question** — carries the standing answer ("I'll continue a technical stop
+  automatically, up to 2 times per epic"); an attended run has no end time unless the owner
+  gives one, and the run budget is the ceiling.
+- **Autopilot `report` and `stop`** — now shortcuts into the same loop; the skill no longer ends
+  with a `tail -f` line or a command to run next.
+
+### Fixed
+
+- **Autopilot: a put-off question no longer hides ready work** — `status` lists `ready` epics even
+  while a question waits, and after "Not now" the skill offers them instead of ending.
+- **A person's "Real — fix before verify" after the one repair is spent runs one more repair** —
+  before, it failed the epic. Autopilot's own retries and standing answers keep the one-repair limit;
+  each further repair takes a person's answer.
+- **A build is told who approved an amendment a prototype run took** — its rules now say the change
+  record must read `approved_by = "autopilot (prototype run)"`, never a person's name. Before, only the
+  planner knew, and the build spent the one repair round on it.
+- **Autopilot's referee no longer cuts a command inside single quotes** — a `;` in a `sed` script or a
+  `|` in a pattern made a fake command of half the script, so a quoted import path or a tool's name
+  was refused. Text in double quotes and everything outside quotes is still read.
+- **A file in the scratch folder may be passed as a one-command prefix** — `CONTROL="$AUTOPILOT_SCRATCH/control.json" node a.js`
+  is allowed; a copy into a name that lasts (`S=…`), the bare folder and any `..` stay refused.
+- **A session may remove its own scratch worktree with `--force`** — `git worktree remove --force`
+  on a worktree inside its scratch folder is allowed; every other forced git command stays denied.
+- **The small-fix guard also catches a skipped or loosened test** — a verify-session fix that
+  skips a test, leaves only one running, or swaps a precise check for one that passes for nearly
+  any value now parks for a person, as removing checks already did.
+- **A resumed session may use its earlier step's scratch folder** — after a usage-limit wait
+  the session kept writing to the first step's folder and was refused. Earlier steps' scratch
+  folders of the same epic are now open to it; everything else of theirs stays closed.
+- **A defect the verifier saw and left now reaches the report** — the verifier lists it under
+  "Seen but not fixed"; the run report shows it as "Verifier saw this wrong and left it" and the
+  project's status notes carry it. Before, an epic could merge with a known defect unannounced.
+- **Autopilot's referee no longer reads a quoted heredoc's text as commands** — a Python or
+  `cat` script body behind `<<'EOF'` is skipped; before, a word like `kind` in a doc was refused
+  as a container tool and a test import as a path in the workspace. Bodies run by a shell stay read.
+- **Autopilot waits out the owner's usage limit** — a session stopped by the 5-hour limit is
+  resumed after the reset, with no question and no "infra error". A weekly limit, or one
+  that resets after the end time, stops the run and says when it resets.
+- **A cut-off build is continued, not judged finished** — a build stopped by an API error
+  re-enters as a build session; before, its half-done branch went straight to the checks.
+- **A branch behind `develop` is brought up to date before its build** — a continued build or
+  repair works on the other epics' merged code; a branch that no longer merges cleanly parks
+  before any session is spent, not after the build and review.
+- **"Should still confirm" notes keep their sub-points** — a final-check point and its nested
+  points are one note, filed under the requirement it opens with; before, each line was saved
+  as a separate fragment.
+- **The scratch-folder rule refuses only real copies** — a session may print
+  `$AUTOPILOT_SCRATCH`, pass it in an option or use it in quoted code; only assigning it to a
+  variable is refused. On Pilot Light, 11 of 18 refusals were of the harmless kind.
+- **One budget figure across chained runs** — the report and run log say what this run spent
+  and what the chain spent of its budget, matching `status`.
+- **Autopilot accepts a lockfile that changes with its dependency list** — `bun.lock`,
+  `package-lock.json` and the like are in scope when the matching manifest changed in the same
+  epic. Before, the one repair round deleted a new project's lockfile to pass the check.
+- **Autopilot's first epic may record setup, run and test commands in `CLAUDE.md`** — only in
+  Tech Stack, Local Environment and Verification & Quality Gates, and the epic then always
+  stops for the owner with the changed lines shown.
+- **`CLAUDE.md` guard no longer misses list items** — a changed line starting with `- ` passed
+  the scope check unseen.
+- **Python check finds a newer Python behind an old one** — `tor-lifecycle` now tries
+  `python3` in every PATH folder and in the usual install folders, so macOS's own Python 3.9
+  no longer hides a Homebrew Python and stops every skill and autopilot's launch check.
+- **A resumed epic starts on its own branch** — the driver checks the epic's branch out before every session, so resumed work is committed there.
+- **Files a session left in autopilot's clone no longer block a run** — uncommitted and untracked files are set aside under `refs/autopilot/leftover/` at launch and before each epic. Nothing is deleted; the log and the report say how many.
+- **`tor-lifecycle` on a backslash path** — the launcher finds `tor_lifecycle.py` when Windows passes its own path with backslashes.
+- **Autopilot preflight and `**Not decided yet:** none`** — a line that names nothing (none, n/a, a dash, empty, or `none — ` and a reason) no longer parks every epic; a line that lists a layer still does.
+- **Autopilot no longer hands the owner technical work** — the report, gate text and skill offer no "by hand" command, no other skill to run and no git line; autopilot brings merged work in itself. What it cannot repair yet is said plainly: it needs someone who maintains the code.
+- **Autopilot decides technical stops itself** — the standing answer now also covers a failed plan check, a final check needing a repair or re-run, its own product fix, and reviewer findings (not "paid service never called"). One count per epic; past it the owner is asked "Try again" or "Leave it for now".
+- **Autopilot keeps building while the owner is away** — with "I'll be away" at launch, an epic
+  that needs the owner is set aside and the epics that do not depend on it are still built. With
+  the owner there, the run stops at the first one. An `onPark` in the project file wins.
+- **Autopilot keeps the confirmed run config** — a run `config.json` that cannot be read stops
+  the launch with the reason instead of running on defaults and saving them over it. The launch
+  passes `--project`, the log states the run's real queue and limits, and a relaunch keeps the
+  owner's order.
+- **Autopilot keeps an approved amendment across a rebuild** — when an epic is started over, the
+  owner's approval to amend a requirement is handed to the new plan and build sessions; the same
+  contradiction is no longer asked again.
+- **Autopilot final check adds a missing test** — a requirement that fails only because no test
+  covers it gets that test on the standing answer for small fixes, test files only; the epic is
+  no longer rebuilt. Product code changed that way is rolled back and put to the owner.
+- **Autopilot final check has its own fix round** — a repair spent on the build's checks no
+  longer leaves a failed final check with none. A final check that still fails after its repair
+  parks with "repair it once more?" instead of FAILED with nothing to answer.
+- **Autopilot auditor follows the sandbox setting** — the auditor was sandboxed even with the
+  sandbox off, so on a machine with no sandbox (Windows) every audit failed in seconds and the
+  run ended. It still has read-only tools and no web access.
+- **Autopilot tells tests from code by name** — where a listed test directory also holds
+  production code (`src/` with tests beside it), only test-named files need a recorded reason;
+  production files no longer fail the build check or spend the repair round. The build check
+  now refuses an empty reason.
+- **Autopilot sessions get every instruction file** — `claude` keeps only the last appended
+  prompt file, so the owner's recorded look and earlier answers never reached a session that
+  also got rules. Several files now go in as one.
+- **Autopilot verifier may not ask for a check the owner already did** — the referee refuses
+  the first such question and points the verifier at the owner's recorded observation; asked
+  again, it goes to the owner. A redo question an earlier driver let through becomes "run the
+  final check again".
+- **Autopilot look: seen for real** — a look gate names (`live`) the requirements that must be
+  seen on the running build; the skill offers to start it, "Not now" waits, and a yes given
+  from pictures alone is refused.
+- **Autopilot keeps a look across a repair that changes no screen** — the owner is not sent
+  back to the same screens; the verifier is told which files changed since.
+- **Autopilot asks the launch questions it skipped** — a relaunch names (`relaunch.ask`) whether
+  the owner was never asked if they are at the computer or about real money; the skill asks
+  once and every later relaunch carries the answer.
+- **Autopilot: a check the owner puts off is not a FAIL** — a verify that ends without a verdict
+  parks the epic to run the final check again (no repair round), and an earlier false FAIL gets
+  that question too. The owner's look on the same build is kept.
+- **Autopilot forgets "Not now"** — a postponing answer is told only to the session that asked;
+  later sessions ask again instead of ending with no verdict.
+- **Autopilot pre-approved answers survive a reworded option** — the referee matches an answer to
+  the one option that shortens or pads it, so a passing epic no longer parks on wording.
+- **Autopilot resumed-session cost** — a resumed session's reported cost includes the session it
+  continues; the driver now counts only what was added.
+- **Autopilot `TESTS failed` false alarm** — the watch reports a test result only when the
+  command's exit is the test command's own.
+- **Autopilot honours an approved requirement amendment** — after the owner answers "Amend", the
+  build's checks allow the requirement files to change and follow the amended anchors; a session's
+  last commit may be any commit of the epic.
+- **Autopilot spend line** — status and the opening line show the spend and budget of every
+  run chained by `continues`, not the last run's alone.
+- **Autopilot merge with a variable** — the referee accepts `git merge $B --no-ff` when the
+  variable is set once, in the same command, to the epic's branch.
+- **Autopilot "cannot fail" review notes** — now carried with the not-proven items to the merge
+  line, the closing screen and the report.
+- **Autopilot build rules state the test-edit rule** — build sessions are told to record a
+  reason before changing an existing test, instead of learning it from a refusal.
+- **Autopilot referee false alarms** — `git stash push` is no longer refused as a push, and the
+  empty word of macOS `sed -i ''` is no longer read as a change to the test directory.
+- **Autopilot builds no longer wait for a person** — build and repair sessions leave sign-ins to
+  the final check, and a step nobody came for is not tried again in that epic.
+- **Autopilot no longer asks an answered question twice** — a session that takes a step up
+  again is told every answer the owner already gave; a reworded question gets one reminder
+  instead of a new park, and a genuinely different question still reaches the owner.
+- **Autopilot resumes the session that asked** — after the owner answers a session's question,
+  that session continues from where it stopped instead of a new one redoing the step; a session
+  that cannot be resumed is replaced by a new one told the same answers.
+- **Autopilot says when a step waits for the owner** — a session marks a command that needs
+  the owner (a browser sign-in) with `Needs you:`; `watch` says it at once, `status` reports the
+  command in flight, and a command open three minutes is said once.
+- **Autopilot stops what a session leaves running** — a server or other process still working
+  out of the clone when a session ends is stopped and logged, so no port stays taken after a run.
+- **Autopilot questions say what an answer asks of the owner** — an option that needs them at
+  the computer is flagged in the question, and after answering they are told what will happen
+  and what they will see.
+- **`tor-lifecycle` in a sandbox** — with four or more feature files the helper crashed where
+  process pools are denied (Claude Code's sandbox on macOS); it now parses in-process instead.
+- **Autopilot traceability check accepts a checklist** — an operator-observed requirement named
+  only by its `tests/manual/` checklist no longer fails the build check.
+- **Autopilot plan lint accepts shortened step headings** — a plan that keeps every template
+  step under a shorter heading ("Feature branch", "Mark Implemented") no longer parks.
+- **Autopilot answers "verdict: PASS"** — the verifier's "Proceed to Phase 2" question is now
+  answered when it reads "verdict: PASS", not only "verdict is PASS"; it no longer parks a passed epic.
+- **Autopilot answers a "Start it?" question worded differently** — a start-of-epic question that names
+  the queued epic and ends "Start it?" is answered, even without the words "Start Epic"; it no longer parks.
+- **Autopilot accepts a repair's `fix(epic-<id>):` commit** — the build check required a `feat`
+  subject, so a repair that committed as its prompt asks was parked; after a fix round both pass.
+- **Autopilot merge gate allows a catch-up merge** — a verifier that merges the integration line
+  into a branch that waited for the owner is no longer blamed for the other epics' files.
+- **Autopilot parks a verified, unmerged epic** — an epic the verifier marked Complete but did not
+  merge now waits with a resume question; it was reported FAILED. The hook's denial of a commit on
+  the integration line now says where to resolve a merge conflict.
+- **Autopilot verifier no longer rejects a look for an unmentioned line** — "Looks right" is the
+  owner's answer to the whole requirement; the verifier sends it back only when the record
+  contradicts a line or says it was not checked.
+
 ## [3.0.1] — 2026-11-05
 
 ### Fixed

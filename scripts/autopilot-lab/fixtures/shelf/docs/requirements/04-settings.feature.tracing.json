@@ -1,0 +1,84 @@
+{
+  "feature_id": "04",
+  "feature_file": "04-settings.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-04-Cf1Ok3a",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Telling the reader about their settings file is the fourth goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 1,
+            "paraphrase": "A correct settings file is confirmed."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-04-Cf2Er6b",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A wrong settings file is explained in plain words."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 1,
+            "paraphrase": "A file that is not valid JSON is reported in one line with what to do."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-04-Cf3Uk9c",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A wrong settings file is explained in plain words."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 1,
+            "paraphrase": "A key the tool does not know is named."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-04-Cf4Ty2d",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A wrong settings file is explained in plain words."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 1,
+            "paraphrase": "A value of the wrong kind is reported against its key."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

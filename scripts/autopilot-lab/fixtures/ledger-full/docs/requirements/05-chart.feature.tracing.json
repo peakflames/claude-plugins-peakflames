@@ -1,0 +1,85 @@
+{
+  "feature_id": "05",
+  "feature_file": "05-chart.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-05-Ch1Wr4s",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Drawing the month's spending as a chart is the fifth goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 1,
+            "paraphrase": "chart writes the HTML file the user named."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-05-Ch2Lb7t",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A chart the user can read needs each bar named and valued."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 2,
+            "paraphrase": "Each bar is labelled with the category and its total."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-05-Ch4Sc9v",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Local and private: the chart loads nothing from anywhere else."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 2,
+            "paraphrase": "The page opens in a browser from the local file alone."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-05-Ch3Lk2u",
+      "rationale": "Whether a picture is readable cannot be asserted by a test; a person opens the page and looks.",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "The chart is for a person to look at, so a person judges whether it reads well."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S4",
+            "step": 2,
+            "paraphrase": "Bars are tall in proportion to the money spent, with nothing overlapping."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

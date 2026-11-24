@@ -1,0 +1,17 @@
+{
+  "name": "ledger",
+  "version": "0.1.0",
+  "description": "Personal-budget CLI: import bank CSV exports, categorise them, and summarise spending.",
+  "type": "module",
+  "bin": {
+    "ledger": "bin/ledger.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "private": true
+}

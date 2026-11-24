@@ -9,6 +9,11 @@ in `plugins/peak-media/docs/build/decisions.md`. Facts about Claude Code cite
 docs is marked **UNCONFIRMED** and is a P0 spike item. Section 14 maps Anthropic's own guidance for
 unattended agents onto this design.*
 
+*Updated 2026-11-11 after P0. The spike's answers and the owner's decisions are in
+`plugins/peak-workflow/scripts/autopilot/SPIKE.md`; where this plan and SPIKE.md differ, SPIKE.md
+wins. Changed here: host-mode sessions and `--plugin-dir` (§6.6), the merge gate and no-waivers
+checks (§6.5), the `git remote` rule and gate matching (§6.7), and the P0 status (§10, §13).*
+
 ---
 
 ## 1. TL;DR
@@ -46,6 +51,10 @@ unattended agents onto this design.*
   3. Do **P0** (section 10): a half-day spike that answers the UNCONFIRMED items in a throwaway
      directory. Record the answers in `plugins/peak-workflow/scripts/autopilot/SPIKE.md`.
   4. Only then start P1. Ask the owner before every push.
+
+  **P0 is done (2026-11-11).** Start at P1 after reading `SPIKE.md`. The E1 seed is in
+  `scripts/autopilot-lab/fixtures/ledger/` and the spike's host and hook scripts are in
+  `scripts/autopilot-lab/spike/`.
 
 ### 1.1 The parts and who does what
 
@@ -302,18 +311,25 @@ The original idea was a git worktree per epic. That clashes with the skills as w
 - `wrapup-epic` Step 5a runs `git checkout <base>`, merges and deletes the branch.
 - Git refuses to check out `develop` in a worktree while another worktree has it checked out.
 
-So autopilot works in **one private clone** per run: `<state>/clone/`, made with
-`git clone --no-hardlinks <project> <state>/clone`, followed by `git remote remove origin`.
-This choice has these effects:
+So autopilot works in **one private clone per project** (P3.5 Part 1; it was one per run until
+then): `<workspace>/clone/`, made once with `git clone --no-hardlinks <project> <workspace>/clone`
+followed by `git remote remove origin`, and reused by every later run, so a parked or failed
+epic's branch is still there when the owner has decided its gate. This choice has these effects:
 
 - Serial order needs only one working tree.
 - With no `origin`, `start-epic`'s Freshness Guard skips silently. `wrapup-epic` Step 5 skips the
   ship-mode question and ships **solo**: "No remote — shipping solo (local merge)". Push becomes
   physically impossible as well as denied by hook.
 - The user's own repository and working copy are never touched. In the morning the user runs
-  `git fetch <state>/clone develop:autopilot/develop`, reviews, and merges it like any branch.
+  `git fetch <workspace>/clone develop:autopilot/develop`, reviews, and merges it like any branch.
 - **Integration line = `develop` in the clone.** That is the base `start-epic` and `wrapup-epic`
   already detect (`develop` > `main` > `master`).
+- **Sync at run start (P3.5 Part 3).** Before preflight the driver fetches the project's
+  integration line into the clone by URL (still no remote) and compares the tips: equal — nothing;
+  the project ahead — fast-forward the clone; the clone ahead (merged epics the owner has not
+  fetched) — build on top, and the report repeats the fetch command and lists what waits;
+  diverged — refuse the run and print both tips. Readiness (`preflight --json`, `launch.sync`)
+  reports the same case without fetching, and reads sidecars from the clone when it is ahead.
 
 **Merge ownership (refined).** The original design had the driver merge after wrapup passed. In
 solo mode, `wrapup-epic` Step 5a merges `--no-ff` itself, and stopping it mid-skill would make the
@@ -325,30 +341,45 @@ decides whether a merge stands.
 
 ### 6.3 State and file layout
 
+One **workspace** per project, long-lived (P3.5 Part 1; `<state>` elsewhere in this plan means
+the workspace, and a step's files are under `runs/<run>/`):
+
 ```
 <project>/                              user's repository — never written by autopilot
-<project>.autopilot/                  state dir (sibling; path configurable)
-  config.json                           queue, budgets, policy choices, end time — written at confirm
-  lock                                  {"pid":…, "started":…} single-instance lock
-  STOP                                  kill switch (presence = stop)
-  state.json                            the state machine; atomic write (tmp + rename) before every action
-  autopilot.log                             driver log
-  clone/                                private clone, no origin; develop = integration line
-  epics/<id>/
-    preflight.json                      eligibility, flags, anchors, deps
-    plan-1/   settings.json  stream.jsonl  result.json  stderr.log  hooks.jsonl  plan.md  plan-lint.json
-    build-1/  settings.json  prompt.md  stream.jsonl  result.json  stderr.log  hooks.jsonl  effective-setup.json
-    check-build-1.json                  driver done-ness checks with evidence
-    audit-1/  bundle/  result.json      auditor input bundle and output
-    verify-1/ …                         same files as build
-    check-verify-1.json                 merge-gate checks
-    plan-fix-1/ … fix-1/ … verify-2/ …  at most one fix round (plan + implement again)
-  gates/<id>-<n>.json                   queued human gates (§6.8)
-  report.md  report.json                morning report (§6.9)
+<project>.autopilot/                    the workspace (sibling; path configurable with --workspace)
+  settings.json                         owner settings that outlive a run: budgets, scope, audit, claudeBin, …
+                                        edited by hand; the driver creates it once, holding only `project`
+  lock                                  {"pid":…, "started":…} single-instance lock, one driver per workspace
+  STOP                                  kill switch (presence = stop); removed once a run has honoured it
+  clone/                                the one private clone, no origin; develop = integration line;
+                                        parked and failed branches stay here between runs
+  gates/<id>-<n>.json                   every queued human gate, across runs (§6.8); each names its `run`
+  current                               a one-line file: the name of the latest run
+  runs/<YYYYMMDD-HHMMSS>/               one directory per run
+    config.json                         that run's queue, explicit, end time, run budget, allowTestDouble
+    state.json                          the state machine; atomic write (tmp + rename) before every action
+    preflight.json  autopilot.log       the preflight it ran from; the driver log
+    report.md  report.json              morning report (§6.9); its paths are relative to the workspace
+    epics/<id>/
+      preflight.json                    eligibility, flags, anchors, deps
+      plan-1/   settings.json  stream.jsonl  result.json  stderr.log  hooks.jsonl  plan.md  plan-lint.json
+      build-1/  settings.json  prompt.md  stream.jsonl  result.json  stderr.log  hooks.jsonl  effective-setup.json
+      check-build-1.json                driver done-ness checks with evidence
+      audit-1/  bundle/  result.json    auditor input bundle and output
+      verify-1/ …                       same files as build
+      check-verify-1.json               merge-gate checks
+      fix-1/ … verify-2/ …                at most one repair round (one builder session)
 ```
 
-Hooks deny every session access to `<state>/` except `<state>/clone/` (and the auditor's bundle,
-for the auditor only). That prevents the WP17 D1 contamination.
+A run's effective config is the defaults, then `settings.json`, then the run's `config.json`,
+then command-line flags. A `claudeBin` other than `claude` is refused, by preflight and by the
+driver, unless that run's `config.json` says `allowTestDouble: true`: a rehearsal's test double
+is never inherited by a real run.
+
+Sessions get `AUTOPILOT_STATE` (the workspace), `AUTOPILOT_RUN` (the run directory) and
+`AUTOPILOT_STEP`. Hooks deny every session access to the workspace except `clone/` (and the
+auditor's bundle, for the auditor only), in this run and every earlier one. That prevents the
+WP17 D1 contamination.
 
 `state.json` sketch:
 
@@ -375,7 +406,7 @@ for the auditor only). That prevents the WP17 D1 contamination.
              │  park gate / budget / crash ──────────────────────────────────────► PARKED ───────┤
              ▼                                                                                    │
         CHECK_BUILD (driver: sidecar, commit, tests, trace, scope, test-integrity, tor-lifecycle) │
-             │  fail ──(fix round left?)── yes ─► FIX (plan + build) ─► CHECK_BUILD               │
+             │  fail ──(fix round left?)── yes ─► FIX (one session) ─► CHECK_BUILD               │
              │                             no ──────────────────────────────────► PARKED/FAILED ─┤
              ▼                                                                                    │
            AUDIT  (fresh read-only session; advisory) ── parkOn rule hit ───────────► PARKED ─────┤
@@ -403,6 +434,16 @@ merged work. Building them doesn't break strict order or G1, and it uses the tim
 **base** stops the whole run, because every epic would build on it. The driver runs the test
 command on `develop` before each epic and stops if it fails.
 
+**`onPark` (owner decision 2026-11-11).** Which epics are independent is the planner's
+judgement (the Dependencies column `plan-project` wrote), and nothing deterministic checks it. So
+the default is **`onPark: "stop"`**: the first epic that ends PARKED or FAILED ends the run, and
+the rest stay not started. `onPark: "continue"` gives the stop-the-line rule above (dependents
+BLOCKED, independent epics still run). The setting lives with the project, in
+`<project>/.claude/peak-workflow/autopilot.json` — read from the project, never from the clone, so no session
+can change it; that file may also set budgets and the like, but never the run's own keys or
+`claudeBin`. Runs A–C set `continue`, because their expected outcomes need an independent epic
+to run after a park.
+
 **Plan, then implement in a fresh session.** Decided (owner, 2026-11-11): autopilot mirrors
 Claude Code's "clear context on plan accept" (`showClearContextOnPlanAccept: true` in
 `settings.json`), which is how peak-workflow users are meant to work by hand. Planning can use a
@@ -428,8 +469,9 @@ lot of context, so implementation starts fresh.
   hook R8 parks them. R9's lint checks that those items are present before approving.
 
 **Fix round.** There is at most one per epic, shared between CHECK_BUILD and VERIFY failures. The
-fix round is a planning session that runs `/peak-workflow:start-epic <id>` again, followed by a
-fresh build session given its plan. The epic is In Progress or Implemented,
+fix round is **one builder session** whose prompt is the fix brief (owner decision 2026-11-12,
+§10 P4; it was first built as a planning session followed by a build session, and the rest of
+this paragraph describes that). The epic is In Progress or Implemented,
 so `start-epic` treats it as a resumption: "rework after a wrapup FAIL", per PLAN_TEMPLATE opening
 step 2. Both fix sessions get `--append-system-prompt-file <state>/epics/<id>/fix-brief.md`, which
 lists the driver's failed checks and the verifier's FAIL items, copied from the verify session's
@@ -462,9 +504,9 @@ feature branch until merge (`start-epic` Step 2.5).
 
 | Check | How |
 |---|---|
-| Verdict | The verify session ended `success`, and `develop` advanced from `preVerify.developSha` by exactly one merge commit whose second parent is `preVerify.branchTip`, plus nothing else. The wrapup commit and the Haiku docs-refresh commit are on the branch side, which is expected (`wrapup-epic` Step 2.3, Step 4) |
+| Verdict | The verify session ended `success`, and `develop` advanced from `preVerify.developSha` by exactly one merge commit, plus nothing else. Its second parent must **descend from** `preVerify.branchTip`, and the commits between them may touch only `docs/` and the epic's sidecar; otherwise roll back and park (decided, SPIKE.md). Wrapup adds commits on the branch side before merging — three in the spike: complete, docs refresh, a docs follow-up (`wrapup-epic` Step 2.3, Step 4) |
 | Sidecar on develop | `status: Complete`, `completed:` set, a `verified:` line for each anchor TOR (written by `tor-lifecycle mark`, `wrapup-epic` Step 2.2) |
-| No waivers | No `waived:` line; no `FIXED DURING WRAPUP`, `UNDISCLOSED`, `PENDING` or `AMENDED` strings in `session-handoffs/epic-<id>-complete.md`. Policy never offers those answers, so their presence is an anomaly. Roll back and park |
+| No waivers | No `waived:` line in the sidecar, and every number on the Deferrals `Count:` line of `session-handoffs/epic-<id>-complete.md` is 0 (a clean handoff reads `Count: 0 (undisclosed: 0, waived: 0, fixed at wrapup: 0, amended: 0, pending: 0)`, so the words themselves always appear — parse the counts). Policy never offers those answers, so a non-zero count is an anomaly. Roll back and park |
 | Tests green on develop | The driver runs the test command on `develop` |
 | Requirements health | `tor-lifecycle check --base develop` has no blocking finding |
 
@@ -478,13 +520,26 @@ AUTOPILOT_STATE=<state>  AUTOPILOT_ROLE=planner|builder|verifier|auditor  AUTOPI
 CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1      # removes run_in_background (env-vars)
 BASH_MAX_TIMEOUT_MS=900000  BASH_DEFAULT_TIMEOUT_MS=300000
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=60000  # belt and braces (headless "background tasks at exit")
-TMPDIR=<state>/epics/<id>/<step>/tmp        # per-session temp dir, removed after the step
 ```
 
-`$PLUGIN_DIR` is the **installed** peak-workflow root, the directory `driver.mjs` runs from.
-Epic sessions load plugins the normal way (no `--plugin-dir`, no `--setting-sources`), so they
-see the user's own plugins, settings, `CLAUDE.md` and memory, as by hand. Decided (owner,
-2026-11-11). Autopilot's `--settings` layer adds the referee on top.
+No per-step `TMPDIR`: the sandbox sets its own (`/tmp/claude-<uid>`) for Bash and overrides it.
+
+`$PLUGIN_DIR` is the peak-workflow root that `driver.mjs` runs from — the copy that launched
+autopilot. Every epic session gets `--plugin-dir "$PLUGIN_DIR"`, so the skills and the referee
+are always the same version; a same-named installed or synced copy is replaced, not double-loaded
+(P0 S7). Everything else is inherited (no `--setting-sources`): the user's other plugins,
+settings, `CLAUDE.md` and memory, as by hand. Decided (owner, 2026-11-11). Autopilot's
+`--settings` layer adds the referee on top.
+
+**Host mode (P0 finding).** Plain `claude -p` has no `AskUserQuestion`, `EnterPlanMode` or
+`ExitPlanMode` tool, and `--tools` cannot add them. Plan, build and verify sessions are therefore
+launched as a stdio host — `claude -p --input-format stream-json --output-format stream-json
+--verbose --permission-prompt-tool stdio` plus the flags below — with the prompt sent as one
+`{"type":"user",…}` line on stdin and stdin closed at the `result` line. The driver denies and
+logs any `control_request` (`can_use_tool`) that arrives; none did in the spike, because hooks
+and `acceptEdits` decide everything. SPIKE.md "Host mode" has the message shapes. **Read the
+command blocks below with those flags and `--plugin-dir "$PLUGIN_DIR"` added, and the prompt
+moved to stdin.** The auditor stays on plain `-p`.
 
 **Plan (and fix plan):**
 
@@ -567,7 +622,8 @@ sessions); autopilot does not need it, because each step is a fresh session.
 **Result fields used:** `session_id`, `total_cost_usd`, `num_turns`, `usage`, `modelUsage` (whole
 tree, including subagents such as wrapup's Haiku docs refresh), `stop_reason`, the subtypes listed
 above, and `permission_denials`. `is_error`, `duration_ms` and the presence of every field in the
-CLI's JSON form are **UNCONFIRMED** (P0). The driver also measures wall clock itself.
+CLI's JSON form are confirmed (P0 S1), as is `terminal_reason` (`completed`, `hook_stopped`). The
+driver also measures wall clock itself.
 
 **Inherited setup and the referee layer.** Sessions inherit the user's setup on purpose. The
 referee must still hold:
@@ -582,23 +638,22 @@ session in `effective-setup.json`: the settings files that applied, enabled plug
 version, the `--settings` layer, and the stream-json init message. The report shows a one-line
 digest and flags any difference between sessions.
 
-**Testing an unreleased copy.** For the PoC, the installed peak-workflow *is* the branch copy. Add
-this repository checkout as a local marketplace and install peak-workflow from it, so the
-working tree on `feature/peak-workflow-autopilot-poc` is what loads. Don't add `--plugin-dir` on
-top of an install, which risks a double load. Reinstall the released version after the PoC. P0
-S7 confirms which copy loaded.
+**Testing an unreleased copy.** Nothing to install: run the driver from the checkout, and
+`--plugin-dir` makes the working tree on `feature/peak-workflow-autopilot-poc` the copy that
+loads (P0 S7: one `peak-workflow`, source `peak-workflow@inline`).
 
 `--bare` is **not** usable, because it skips hooks passed with `--settings` (`headless` bare mode).
 
 ### 6.7 Referee hooks
 
 The driver writes `settings.json` per session. The JSON fields are confirmed in `hooks`; whether
-non-bare `-p` honours hooks from `--settings` is inferred, not stated (**UNCONFIRMED**, P0):
+non-bare `-p` honours hooks from `--settings` is confirmed, in an untrusted directory too (P0 S2):
 
 ```json
 {
   "permissions": { "deny": [
-    "Bash(git push *)", "Bash(git remote *)", "Bash(docker *)", "Bash(podman *)", "Bash(colima *)",
+    "Bash(git push *)", "Bash(git remote add *)", "Bash(git remote set-url *)", "Bash(git remote rename *)",
+    "Bash(git remote remove *)", "Bash(docker *)", "Bash(podman *)", "Bash(colima *)",
     "Bash(lima *)", "Bash(limactl *)", "Bash(multipass *)", "Bash(vagrant *)", "Bash(qemu* *)",
     "Bash(sudo *)", "Bash(gh *)", "Bash(npm publish *)", "WebFetch", "WebSearch" ] },
   "hooks": {
@@ -619,7 +674,7 @@ Two additions follow Anthropic's guidance (§14):
   to the clone and the session `TMPDIR`, and **no network** (an allowlist only if config names a
   registry). Command deny-lists match only the text as written; the sandbox's network isolation
   doesn't depend on it (`security`, `sandboxing`). The sandbox confines Bash only; Read, Edit and
-  Write stay under hook R2. The exact settings keys are **UNCONFIRMED** (P0 S11).
+  Write stay under hook R2. The settings keys are in SPIKE.md (P0 S11).
 - **`ConfigChange` hook.** Block settings changes during a session, so a session cannot unload
   its own referee (`hooks` ConfigChange; `security`).
 
@@ -631,13 +686,13 @@ input (`hooks`). The rules:
 | Rule | Applies to | Logic |
 |---|---|---|
 | R1 kill switch | all | `<state>/STOP` exists: deny, plus `continue: false` with `stopReason` |
-| R2 path jail | Read, Edit, Write, NotebookEdit, Glob, Grep, Bash paths | Resolve `realpath`. Allow under `<state>/clone` and the session `TMPDIR`. Allow read-only access to `$PLUGIN_DIR` and the user's inherited setup (`~/.claude/` plugins, `CLAUDE.md`, memory). Deny `<state>/` outside the clone (except the bundle for the auditor) and anything else. For Bash, it scans absolute paths and `cd` targets in the command (best effort) |
-| R3 git rules | Bash `git …` | Deny push, remote, `--force`, `reset --hard`, `branch -D`, `checkout main`, `rebase` on develop or main, `tag`. **Builder:** deny `commit` or `merge` when `git branch --show-current` is `develop` or `main`. **Verifier:** allow `git merge --no-ff feature/epic-<AUTOPILOT_EPIC>-*` and `git branch -d` of that branch only |
+| R2 path jail | Read, Edit, Write, NotebookEdit, Glob, Grep, Bash paths | Resolve `realpath`. Allow under `<state>/clone` and the session `TMPDIR`. Allow read-only access to `$PLUGIN_DIR` and the user's inherited setup (`~/.claude/` plugins, `CLAUDE.md`, memory). Allow writes to `~/.claude/plans/` (plan mode writes its plan file there) and the sandbox temp directory. Deny `<state>/` outside the clone (except the bundle for the auditor) and anything else. For Bash, it scans absolute paths and `cd` targets in the command (best effort) |
+| R3 git rules | Bash `git …` | Deny push, `remote add/set-url/rename/remove` (the bare `git remote` listing is allowed; both skills' Freshness Guard runs it), `--force`, `reset --hard`, `branch -D`, `checkout main`, `rebase` on develop or main, `tag`. **Builder:** deny `commit` or `merge` when `git branch --show-current` is `develop` or `main`. **Verifier:** allow `git merge --no-ff feature/epic-<AUTOPILOT_EPIC>-*` and `git branch -d` of that branch only |
 | R4 containers and VMs | Bash | Deny docker, podman, colima, lima, multipass, vagrant, qemu, VirtualBox, kind, minikube, nvm/asdf/volta installs, `brew`, global `npm -g` / `pip install --user` |
 | R5 disk and growth | Bash, Write | Deny when free disk < `config.diskFloorGb` (default 15) or `du` of the clone grows by more than `config.growthCapMb` (default 1024) since the step started. The driver checks the same every 30 s and kills the step |
 | R6 background | Bash, Agent | Deny `run_in_background: true`. This duplicates the env var in case it is ignored |
 | R7 test integrity | Edit, Write, MultiEdit, NotebookEdit; Bash `rm`, `git rm`, `mv`, `sed -i`, `>` redirect on a path | If the target is a test file that exists on `develop` (by `git cat-file -e develop:<path>`) and `.autopilot/test-changes.jsonl` has no line for that path, deny with the instruction: "append {path, reason} to .autopilot/test-changes.jsonl first". Writing that file is allowed. The driver's diff check (§6.5) backs this up |
-| R8 gate policy | AskUserQuestion | Match each question against `policy/gates.json` (§7). **Answer:** `permissionDecision: "allow"` with `updatedInput` = the original `questions` plus `answers` {question text → option label}, which is documented for PreToolUse (`hooks`; `agent-sdk/user-input`). **Park:** write `gates/<id>-<n>.json`, deny, and `continue: false` with `stopReason: "autopilot: parked at human gate"` |
+| R8 gate policy | AskUserQuestion | Match each question against `policy/gates.json` (§7) by a stable fragment of the skill's question plus the queued epic ID, and require the answer label to be among the offered options (the model appends detail to question text; decided, SPIKE.md). Anything unmatched parks. **Answer:** `permissionDecision: "allow"` with `updatedInput` = the original `questions` plus `answers` {question text exactly as asked → option label}, which is documented for PreToolUse (`hooks`; `agent-sdk/user-input`). **Park:** write `gates/<id>-<n>.json`, deny, and `continue: false` with `stopReason: "autopilot: parked at human gate"` |
 | R9 plan capture and lint | ExitPlanMode | **Planner role:** save `tool_input.plan` to `plan.md`, then lint it. The plan must name every anchor TOR ID; contain the PLAN_TEMPLATE opening steps ("Create (or verify) feature branch", "Update status to \"In Progress\"") and closing-step headings ("Implementer self-assessment", "Reconcile spec", "Mark as Implemented", "Commit"); copy the Deferral and Amendment gate paragraphs; and contain no `git push`, container or `sudo` command. On pass, write `plan-lint.json`, deny the call, and return `continue: false` with `stopReason: "autopilot: plan captured"`. The driver then starts the build session. On fail, write a gate file and park with the plan attached. The report always says "plan approved by lint, not by a person". **Builder and verifier roles:** deny EnterPlanMode and ExitPlanMode, since the build session runs an already-approved plan |
 
 `stop.mjs`: if the `Stop` input's `background_tasks` is non-empty, return `decision: "block"` with
@@ -654,24 +709,64 @@ allowed, and the driver's CHECK_BUILD decides.
 
 ### 6.8 Gate queue format
 
-`gates/<epicId>-<n>.json`:
+`<workspace>/gates/<epicId>-<n>.json` (one directory for every run; P3.5 Parts 1 and 2):
 
 ```json
-{ "epic": "Lg5Chr8", "epicName": "Spending chart", "kind": "human-check",
-  "session": "verify-1", "skillStep": "wrapup-epic Step 1.2 item 7 (operator-observed)",
-  "question": "TOR-05-Vw8Kp2d: a person opening chart.html sees one bar per category with readable labels",
+{ "epic": "Lg5Chr8", "epicName": "Spending chart", "run": "20261112-220500", "kind": "human-check",
+  "session": "audit-1", "skillStep": "wrapup-epic Step 1.2 item 7",
+  "question": "TOR-05-Vw8Kp2d is operator-observed: parks for a person before verify. Does what was built look right?",
   "options": ["Looks right", "Not right — describe"],
-  "why": "operator-observed TOR; autopilot never self-approves a look",
-  "artifacts": ["epics/Lg5Chr8/artifacts/chart.html", "clone:tests/manual/TOR-05-Vw8Kp2d.md"],
-  "branch": "feature/epic-Lg5Chr8-spending-chart", "branchTip": "…",
+  "why": "autopilot never self-approves a look",
+  "artifacts": ["clone:tests/manual/TOR-05-Vw8Kp2d.md", "runs/20261112-220500/epics/Lg5Chr8/artifacts/run-output.txt",
+                "runs/20261112-220500/epics/Lg5Chr8/artifacts/files/chart.html"],
+  "branch": "feature/epic-Lg5Chr8-spending-chart", "branchTip": "…", "base": "<integration tip at park>",
   "resume": "open a new session in the fetched repo: /peak-workflow:wrapup-epic Lg5Chr8",
   "decided": null }
 ```
 
-When `autopilot report` records a human answer, `decided` becomes
-`{"answer": "...", "by": "<git user.name>", "date": "...", "scope": "next-run"}`. The next run,
-R8 answers that one gate kind for that epic with the human's answer, and only that one. Gate kinds
-whose question text is dynamic (deferral, amendment) match on kind plus TOR ID, not on full text.
+Artifact paths are relative to the workspace; `clone:` means inside the clone. `branch`,
+`branchTip` and `base` are written when the epic parks, after the WIP commit.
+
+When `autopilot report` records a human answer (through `driver.mjs decide`, the only writer of
+`decided`), `decided` becomes `{"answer": "...", "by": "<git user.name>", "date": "...",
+"scope": "next-run"}`, with `note` when the owner explained. **Every decided gate resumes its
+epic in the next run** (there is no next-run / by-hand split); `resume`, the by-hand command,
+stays in the gate as the fallback and is always shown.
+
+**Validity (owner decision 2026-11-11; replaces the strict rule P3.5 first shipped).** A
+decision is used only while the branch tip in the clone equals `branchTip` **and that branch
+still merges cleanly into the integration line** — a trial merge in memory (`git merge-tree`),
+which changes nothing in the clone. The integration line may have moved since the park: another
+epic merged later in the same run, or the owner brought work in with a merge commit or committed
+by day. The strict rule ("the base has not moved") voided the decision in all three cases. The
+backstop for a branch that merges cleanly but no longer works is unchanged: the merge gate runs
+the tests on the integration line after every merge and rolls a bad merge back. Validity is
+judged once, at run start, for every queued epic. A void decision is marked
+`void: {run, date, why}` (naming the conflicting files), reported, and the epic is planned again
+from scratch on a fresh branch; the old branch is kept under
+`refs/autopilot/superseded/<epic>-<time>`. An epic whose latest gate is still undecided is
+skipped ("waiting for your decision"), never rebuilt.
+
+| Gate kind | Written by | Owner's answer | Re-entry |
+|---|---|---|---|
+| a question a session asked (`deferral`, `amendment`, any policy `park` row, `unmatched`) | hook R8 | one of its options | the session kind that asked: PLAN, BUILD, FIX_BUILD or VERIFY, as a fresh session on the existing branch (a build session gets the first run's captured plan). R8 answers that question once: by kind and TOR, or for `unmatched` by the recorded question text |
+| `audit` | driver | `Not real — verify as built` | VERIFY on the same tip; the audit is not re-run |
+| `audit` | driver | `Real — fix before verify` | FIX_BUILD → CHECK_BUILD → AUDIT (delta), with the parking findings as `fix-brief.md`. Uses the one fix round; if it is already used, the epic is FAILED |
+| `human-check` | driver | `Looks right` | VERIFY. The look is recorded against `branchTip`; R8 answers wrapup's Step 2.0 question "Yes" with the owner's look as its note |
+| `human-check` | driver | `Not right — describe` | the fix round with the owner's note as the brief; the changed build parks for a new look |
+| `plan-lint` | driver or hook | `Approve this plan` / `Re-plan` | BUILD with the captured plan, recorded as approved by the owner, or PLAN again |
+| `resume` | driver, for a budget, infra, STOP or auditor-outage park | `Resume from where it stopped` / `Start over` | the gate's `phase`: CHECK_BUILD for a parked build (its WIP commit is on the branch), otherwise the interrupted step once. `Start over` plans from scratch on a fresh branch |
+| `preflight` | driver | none (no options) | not resumable: the fix is in the project, and the gate clears when preflight passes |
+
+What an epic carries from one run to the next is in `<workspace>/epics.json`: `fixRounds`, the
+captured plan's path and who approved it, the build sessions not yet audited, the audits (so the
+delta audit and the one-fix-round cap survive), and the fix brief. A merged epic's entry is removed.
+
+**Human-check artifact (guardrail G2).** Before writing a `human-check` gate the driver lists the
+build's `tests/manual/<TOR>.md` files and runs one command on the branch — `settings.json`
+`humanCheck["<epic>"]` or `humanCheck["*"]`, else the `**Run:**` command of `CLAUDE.md` with its
+`<placeholders>` dropped — keeping its output and any file it leaves as artifacts. When there is
+nothing to look at, the gate's `why` says so.
 
 ### 6.9 Morning report
 
@@ -848,14 +943,16 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
 | N1 | No unattended stall | 12 | The driver has no turns; per-step wall clock; `stop.mjs`; `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` |
 | N2 | No runaway verify loops | WP9 | Fix-round counter; run budget |
 | N3 | No model answers human gates | DEC-42/43 | R8 answers only from `policy/gates.json`; every other question parks |
-| N4 | The orchestrator never builds | WP1/WP2 | The driver writes only to `<state>/` and makes only these git operations in the clone: clone, WIP commit, rollback |
+| N4 | The orchestrator never builds | WP1/WP2 | The driver writes only to `<state>/` and makes only these git operations in the clone: clone, WIP commit, rollback, a fast-forward of the integration line from the project at run start, and setting a superseded branch aside under `refs/autopilot/` |
 
 ---
 
 ## 9. Operational design
 
 - **Crash-safe resume.** Before each action the driver writes the intended step to `state.json`
-  (tmp + rename). On restart (`driver.mjs run --resume`), an in-flight step is never re-trusted:
+  (tmp + rename). On restart (`driver.mjs run --workspace <dir> --resume`, which continues the
+  latest run; a new run is refused while the latest one is unfinished), an in-flight step is
+  never re-trusted:
   - PLAN in flight: kill leftovers and re-run it once. `start-epic` resumes on the existing empty
     branch (Step 3), and its Leftover check removes the branch if needed.
   - BUILD or FIX in flight: kill leftover processes, then run CHECK_BUILD from files. If it
@@ -864,21 +961,28 @@ G1–G14 are the explainer's guardrails (§8). N1–N4 are the autopilot-specifi
     re-run VERIFY once.
   - AUDIT in flight: re-run it.
 - **Kill switch.** The `STOP` file is checked by the driver between steps and every 30 s, and by
-  hook R1 on every tool call. `driver.mjs stop` writes it and waits for a clean report.
+  hook R1 on every tool call. `driver.mjs stop` writes it and waits for a clean report. The
+  workspace outlives the run, so the driver removes `STOP` once the run has stopped for it.
+- **Sync with the project.** Each new run starts by bringing the project's integration line
+  into the clone (§6.2); a diverged project refuses the run before anything is written. After
+  a fast-forward a decision on a parked branch still holds if that branch merges cleanly (§6.8).
 - **Single-instance lock.** `lock` holds pid and start time. A lock whose pid isn't alive is
   stale and is taken over with a log line.
 - **Sleep.** macOS laptops sleep. The launch wraps the driver in `caffeinate -i`. Readiness warns
   that a closed lid on battery may still sleep.
-- **Logs.** Per session: `stream.jsonl`, `stderr.log`, `hooks.jsonl`. Per run: `autopilot.log`.
-  All live outside the clone.
+- **Logs.** Per session: `stream.jsonl`, `stderr.log`, `hooks.jsonl`. Per run:
+  `runs/<run>/autopilot.log`. All live outside the clone.
 - **Dry run.** `driver.mjs run --dry-run` prints the queue, each exact command line, the
   settings JSON and the policy table, and invokes nothing. `--claude-bin <path>` swaps in
-  `fake-claude.mjs` for tests.
+  `fake-claude.mjs` for tests; a real run with it also needs `--allow-test-double`.
 - **Local by default.** No push. No `origin` in the clone. `gh` is denied. Network tools are
   denied for sessions (WebFetch, WebSearch). Package installs inside the project are allowed,
   because an epic may add a dependency; the report lists any lockfile change.
 - **Infra errors.** Auth failure, rate limit or CLI crash: retry the step once after 5 min. Two
   consecutive infra errors stop the run with `stoppedBecause: "infra"`.
+- **Parks that are nobody's question** (budget, infra, STOP, a run-level stop between steps, an
+  auditor that could not run) get a `resume` gate (§6.8), so the next run continues the epic
+  instead of rebuilding it. The auditor stays fail closed: nothing is verified without an audit.
 
 ---
 
@@ -923,9 +1027,12 @@ the answers to `SPIKE.md`.
 
 **Exit:** S1–S4, S7 and S8 pass, or each failure has a decided fallback (§13 risks).
 
+**Status: done 2026-11-11 — exit met.** S3 and S4b pass only in host mode (§6.6). S12 was not
+run. E1 ran plan, build, verify and merge headlessly for $2.19 in about 5 minutes. See SPIKE.md.
+
 ### P1: Driver with a fake `claude`
 
-Build `driver.mjs`: config load, preflight (sidecars, phase indexes, deps, flags), the state
+Build `driver.mjs` with the host-mode launcher (§6.6) and `--plugin-dir`: config load, preflight (sidecars, phase indexes, deps, flags), the state
 machine, process-group launch with wall clock, the checks in §6.5, rollback, crash resume, lock,
 STOP and dry-run. Build `fake-claude.mjs`: it reads a scenario file and emits stream-json lines,
 writes the git commits or sidecar edits the scenario names, and can hang, crash, exceed a budget
@@ -939,6 +1046,11 @@ mid-VERIFY then resume; stale lock; dry-run invokes nothing.
 
 **Exit:** all green; the dry run of the ledger seed prints the expected queue and commands.
 
+**Status: done 2026-11-11 — exit met.** 17 tests green. Deviations: the driver lints `plan.md`
+itself (P2's hook reuses `lintPlan`); AUDIT is recorded as skipped until P3; rollback also keeps
+the rejected tip under `refs/autopilot/rejected/` and cleans untracked files; sessions get
+`AUTOPILOT_STEP` and `AUTOPILOT_HOOKS`; `report.md` is a plain rendering until P3.
+
 ### P2: Referee hooks
 
 Build `pretool.mjs`, `stop.mjs`, `log.mjs` and `policy/gates.json`. Unit tests pipe fixture hook
@@ -950,6 +1062,13 @@ family, using `claude -p` in a throwaway repo with a prompt that tries the actio
 
 **Exit:** unit tests green; live smoke shows each denial in `hooks.jsonl` and `permission_denials`.
 
+**Status: done 2026-11-11 — exit met.** 23 hook unit tests green, plus two driver tests in which
+the fake calls the real hooks. Live smoke (`AUTOPILOT_LIVE=1`, skipped otherwise): 8 real sessions,
+R1–R4 and R6–R9, all denied, answered or parked as designed, about $0.40 in total. R5 has unit
+tests only. Additions: `config-change.mjs` blocks settings changes; `lib.mjs` holds the plan lint
+and sidecar parse shared with the driver; the planner may not commit; a person's decided gate is
+answered once; file-tool writes under `.git/` are denied.
+
 ### P3: Auditor, report, and the `autopilot` skill
 
 Build the bundle builder, `audit/prompt.md`, `audit/schema.json`, the report renderer and
@@ -960,6 +1079,253 @@ dry-run simulation as `plugins/peak-workflow/CLAUDE.md` "Validating Changes" des
 
 **Exit:** the skill launches a dry-run autopilot run end to end and presents its report.
 
+**Status: done 2026-11-11 — exit met.** 17 new tests green (auditor 10, report 4, skill 3), plus
+one live auditor test (`AUTOPILOT_LIVE=1`): on the canned build that widens a tolerance in an
+existing test the real auditor returned a high `test-weakened` finding; on the clean build, none
+that parks (about $0.25 each on Opus). The skill test runs SKILL.md's own launch line against
+`fake-claude.mjs`: readiness, `config.json`, detached run, report, a decided gate replayed once in
+the next run. Deviations and additions:
+
+- The auditor's findings are in `audit-N/audit.json` (with the driver's decision per finding);
+  `audit-N/result.json` is the raw CLI result, as for every other step.
+- `--json-schema` takes the schema text, not a path; the result arrives as `structured_output`
+  through a `StructuredOutput` tool call, which the referee lets the auditor make.
+- The digest is built from `hooks.jsonl` and each session's last message (`result.json`);
+  `stream.jsonl` is not parsed.
+- An audit that cannot start, or returns nothing usable, parks the epic: nothing is verified
+  without an audit.
+- A new run always gets a fresh state directory (`<project>.autopilot`, then `-2`, `-3`, …).
+  `config.carryGatesFrom` copies the last run's decided, unused gates in, so R8 answers each once.
+  Gates the driver writes itself (`audit`, `human-check`, `plan-lint`, `preflight`) and unmatched
+  questions cannot be replayed; the report gives their by-hand `resume` command.
+- Added `driver.mjs decide` (the skill records a gate answer through it; an answer outside the
+  gate's options is refused) and `driver.mjs report` (re-render). `preflight --json` gained a
+  `launch` block and per-epic `scopeFlags` (the deterministic half of the G12 review).
+- A fresh state directory inherits the last run's saved settings (`launch.carriedSettings`:
+  budgets, scope, `claudeBin`, …) but never its queue, end time or run budget.
+- Skill dry-run simulation: four passes by sub-agents that executed SKILL.md against
+  `fake-claude.mjs` on a `git init` copy of the seed; the last two had no Critical finding, and
+  every finding from all four is fixed.
+- `README.md` and the other skills are untouched: discoverability is deferred to P6 (§5.2).
+
+### P3.5: One workspace, resume from a decided gate, and sync with the project
+
+**Approved by the owner 2026-11-11. All of it lands before P4.** Where this section differs from
+§6.2, §6.3, §6.8 or §9, this section wins; update those sections as each part lands.
+
+**Why.** P3 left everything per run: each run gets a new state directory (`<project>.autopilot`,
+then `-2`, `-3`, …) and a new clone. A parked epic's branch is stranded in the old clone, so the
+next run rebuilds the epic from scratch and only replays the owner's answer. Gates the driver
+writes itself (`audit`, `human-check`, `plan-lint`, `preflight`) and unmatched questions cannot be
+continued at all except by hand. Runs B and C exist to measure parks and human review time, so
+they must run on the workflow that is meant to ship.
+
+**Starting point (commit `0afe1d7`, branch `feature/peak-workflow-autopilot-poc`, pushed to
+`origin`).** Suite: `node --test
+plugins/peak-workflow/scripts/autopilot/test/` → 69 tests, 59 pass, 10 live skipped. Code to know,
+all under `plugins/peak-workflow/scripts/autopilot/`:
+
+| File | What P3.5 touches |
+|---|---|
+| `driver.mjs` | `Run.run()` (clone creation, `resuming`, `carryGates()`), `nextStateDir()`, `carriedSettings()`, `launchFacts()`, `decideGate()`, `runEpic()` phases, `recover()`, `writeGate()`, `doAudit()` |
+| `report.mjs` | `collectReport(stateDir)` reads one run's `state.json`, `gates/`, `epics/`; `replayableKinds()` |
+| `hooks/pretool.mjs` | `ruleR8` reads `<state>/gates/` for a decided, unused gate and marks it `used` (also in `carriedFrom`); `context()` derives `clone` as `<AUTOPILOT_STATE>/clone` |
+| `skills/autopilot/SKILL.md` | Steps 1, 2 item 4, 4 and "What a run leaves behind" name the per-run layout and `carryGatesFrom` / `carriedSettings` |
+| `test/skill.test.mjs` | the two-run test asserts `-2` directories and carried gates; rewrite it for the new layout |
+
+#### Part 1 — one workspace per project (M)
+
+```
+<project>.autopilot/                 the workspace; one per project, long-lived
+  settings.json                      owner settings that outlive a run: budgets, scope, audit, claudeBin, …
+  lock  STOP                         as today, one driver per workspace
+  clone/                             the one private clone; parked and failed branches stay here
+  gates/<epic>-<n>.json              every gate, across runs
+  runs/<YYYYMMDD-HHMMSS>/            one directory per run
+    config.json  state.json  preflight.json  autopilot.log  report.md  report.json
+    epics/<id>/…                     sessions, checks, audits of that run
+  current -> runs/<…>                the latest run (a file holding the name is fine if symlinks are awkward)
+```
+
+- `AUTOPILOT_STATE` stays the workspace (hooks jail on it and find `clone/` and `gates/` there);
+  `AUTOPILOT_STEP` moves under `runs/<run>/epics/…`. Hook R2 must still deny everything in the
+  workspace except `clone/` (and the auditor's bundle). The hooks read `state.json` for
+  `integration` and the epic name: point them at the current run.
+- Delete `nextStateDir`, `carriedSettings`, `config.carryGatesFrom`, `Run.carryGates` and the
+  `carriedFrom` write-back in R8. Settings live in `settings.json`; a run's `config.json` holds
+  only that run's queue, `explicit`, end time and run budget.
+- A `claudeBin` other than `claude` in `settings.json` is refused by `launchFacts` unless the run
+  config says `allowTestDouble: true` (closes "a rehearsal's fake binary is inherited").
+- `driver.mjs` commands take `--workspace <dir>` (keep `--state` as an alias for the tests'
+  sake or migrate the tests; do not support the old layout — nothing has shipped).
+- The report is per run. `launchFacts` reports the workspace, the last run, and open gates.
+
+#### Part 2 — resume from a decided gate (M)
+
+A gate records `branch` and `branchTip`. A decision is **valid only while the branch tip in the
+clone still equals `branchTip` and the epic's base has not moved** (the merge-base of the branch
+and the integration line is still the integration tip, or the branch rebases cleanly — pick the
+strict rule first: equal, else void). A void decision is reported and the epic is re-planned from
+scratch on a fresh branch (the old one kept under `refs/autopilot/superseded/`).
+
+Preflight treats an epic with a valid decided gate as eligible although its sidecar is not
+`Not Started`. The driver enters it at the phase the gate kind names:
+
+| Gate kind | Written by | Owner's answer | Re-entry |
+|---|---|---|---|
+| a question a session asked (`deferral`, `amendment`, any policy `park` row, `unmatched`) | hook R8 | one of its options | the session kind that asked (`session` field): a fresh plan or build session on the existing branch through `start-epic`'s own resume path (the sidecar is In Progress; PLAN_TEMPLATE opening step 2). R8 answers that exact question once. `unmatched` becomes replayable: match on the recorded question text |
+| `audit` | driver | `Not real — verify as built` | VERIFY on the same tip. The audit is not re-run |
+| `audit` | driver | `Real — fix before verify` | the fix round (FIX_BUILD → CHECK_BUILD → AUDIT delta), with the parking findings as `fix-brief.md`. It uses the epic's one fix round |
+| `human-check` | driver | `Looks right` | VERIFY. The look is recorded against `branchTip`; R8 answers wrapup's Step 2.0 manual-verification question with the owner's recorded look instead of the policy "No" |
+| `human-check` | driver | `Not right — describe` | the fix round, with the owner's note as the brief |
+| `plan-lint` | driver or hook | `Approve this plan` / `Re-plan` (add these options; today it has none) | BUILD with the captured plan, recorded as "approved by <owner>", or PLAN again |
+| `preflight` | driver | none: the fix is in the project (requirements, TBD values) | not resumable; clears when preflight passes |
+
+- **Human-check artifact (guardrail G2, open since P1).** Before writing a `human-check` gate the
+  driver produces the thing to look at and lists it in `artifacts`: for an operator-observed TOR,
+  the output of the project's run command from `CLAUDE.md` plus the manual test file the build
+  wrote under `tests/manual/`; for a UI epic, at least the built page or a screenshot command's
+  output. If it cannot produce one, the gate says so plainly.
+- **Budget, infra and STOP parks** have no gate. Add a `resume` gate kind for them
+  (`Resume from where it stopped` / `Start over`), entering at CHECK_BUILD for a parked build
+  (the WIP commit is on the branch) or re-running the interrupted step once.
+- `decideGate` stays the only writer of `decided`. Every gate is now `effect: resume`; the
+  `next-run` / `by-hand` split, and `replayableKinds`, go away. `resume` (the by-hand command) stays in
+  the gate as the fallback and is shown, not hidden.
+- State per epic persists across runs in the workspace (`epics.json` or the gate itself):
+  `fixRounds`, `planStep` path, `audits` (so the delta audit and the one-fix-round cap survive).
+
+#### Part 3 — sync with the project at run start (S–M)
+
+Before preflight, in the clone: `git fetch <project> <integration>` (a one-off URL fetch; the
+clone still has no remote), then compare the fetched tip `P` with the clone's integration tip `C`:
+
+| Case | Action |
+|---|---|
+| `P == C` | nothing |
+| `P` ahead of `C` (the owner merged or committed) | fast-forward the clone's integration line |
+| `C` ahead of `P` (autopilot merged epics the owner has not fetched) | keep building on `C`; the report repeats the fetch command and lists what is waiting |
+| diverged | refuse the run and print both tips; the owner fetches `autopilot/<integration>` and merges, or says which side wins |
+
+After a fast-forward, parked branches whose base is no longer the integration tip fall under
+Part 2's validity rule. This replaces the "would build those epics again" warning.
+
+#### Also in P3.5 (small, from the P3 review)
+
+| Item | Action | Effort |
+|---|---|---|
+| Auditor outage | **Decided (owner, 2026-11-11): fail closed.** An audit that cannot run or returns nothing usable parks the epic, and two infra errors in a row stop the run. Give that park the new `resume` gate so the next run re-audits instead of rebuilding | S |
+| P2 live smoke | Re-run `AUTOPILOT_LIVE=1 … test/live-smoke.test.mjs` (about $0.40) after the hook changes in P3 and P3.5; needs the owner's go-ahead for real sessions | S |
+| Real skill run | The owner invokes `/peak-workflow:autopilot dry-run` and one fake-backed run from a real Claude Code session (plugin loaded with `--plugin-dir`) to confirm `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion` and the `nohup` launch prompt behave | S |
+| Scope flags | Tighten the keyword list (`account`, `server` are noisy); keep it advisory | S |
+| Linux / Windows launch | Not in the PoC. Note it as a P6 item | — |
+
+#### Tests and exit
+
+Rewrite `test/skill.test.mjs`'s two-run test for the workspace layout, and add, all against
+`fake-claude.mjs`: one test per row of the Part 2 table (decide, next run re-enters at the named
+phase on the same branch tip, no earlier session is re-run); a void decision after the tip or the
+base moves; each row of the Part 3 table; two runs sharing one clone and one `gates/`; the hook
+jail on the new paths; `allowTestDouble`. Keep the golden report test (regenerate with
+`UPDATE_GOLDEN=1`). Then one skill simulation pass per "Validating Changes", and the live items
+above with the owner's go-ahead.
+
+**Exit:** a run parks an epic at each resumable gate kind; the owner decides in
+`/peak-workflow:autopilot report`; the next run finishes every one of them to MERGED or FAILED on
+the branch the first run left, with no session of the first run repeated; the suite is green.
+
+**Status: done 2026-11-11 — exit met against `fake-claude.mjs`.** Suite: 99 tests, 89 pass, 10 live
+skipped (`test/resume.test.mjs` has one test per row of the Part 2 table, the void and
+waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 table). §6.2, §6.3,
+§6.8 and §9 are updated. Deviations and additions:
+
+- **Layout.** `current` is a one-line file, not a symlink. The skill writes the new run's
+  `config.json` at `launch.runDir` and launches with `--run <launch.run>`; the driver creates
+  `settings.json` once (holding only `project`) and never rewrites it. `--state` stays as an
+  alias of `--workspace`. Sessions also get `AUTOPILOT_RUN`. Report and gate paths are relative
+  to the workspace.
+- **Test double.** The driver refuses it as well as `launchFacts`; `--allow-test-double` exists
+  on `preflight` and `run`, and the choice is saved in that run's `config.json` only.
+- **Unfinished run.** A new run is refused while the latest one is unfinished (the driver was
+  killed); `--resume` continues it. `STOP` is removed once a run has honoured it.
+- **Validity is judged once, at run start** (after the sync), for every queued epic. The strict
+  rule this section names was built first and then **replaced the same day by the owner's
+  decision**: a decision holds while the branch tip is unchanged and the branch still merges
+  cleanly into the integration line (§6.8). Under the strict rule a park followed by a merge in
+  the same run (Run A's shape), or a `--no-ff` bring-in, voided the decision every time.
+- **`onPark`, default `stop`** (owner decision): the first park or failure ends the run unless
+  `<project>/.claude/peak-workflow/autopilot.json` says `"onPark": "continue"` (§6.4). Not in the original
+  section.
+- **Undecided and gate-less parks.** An epic whose latest gate is undecided is skipped
+  ("waiting for your decision"), never rebuilt. A parked or failed epic with no decidable gate
+  (CHECK_BUILD still failing after the fix round, a failed merge gate, a verify FAIL after the
+  fix round) starts over when queued again, its branch set aside under
+  `refs/autopilot/superseded/`.
+- **Re-entry details.** A question asked in a build session re-enters at BUILD with the first
+  run's captured plan (no new planning session). `Real — fix before verify` or
+  `Not right — describe` on an epic whose fix round is used ends it FAILED. The `resume` gate is
+  also written for a run-level stop between steps (end time, run budget). Per-epic state is in
+  `<workspace>/epics.json`.
+- **Human-check artifact.** The command is `settings.json` `humanCheck["<epic>"]` /
+  `humanCheck["*"]`, else the `**Run:**` line of `CLAUDE.md` with `<placeholders>` dropped,
+  capped at two minutes, run by the driver on the branch outside the sandbox (as the test command
+  is). For the ledger's E5 the bare run command shows little: Run A should set
+  `humanCheck.Lg5Chr8` to the chart command.
+- **The owner's look.** R8 answers wrapup's Step 2.0 question "Yes" and passes the look as the
+  `AskUserQuestion` `annotations` note, because the skill's follow-up is free text that no hook
+  can answer. **Not yet seen in a real session.**
+- **Sync.** Readiness classifies the case without fetching and, when the clone is ahead, reads
+  sidecars from the clone's integration line so merged epics show as Complete.
+- **Scope flags** no longer match bare `server`, `account` or `token`.
+- **Skill simulation:** two passes by sub-agents that executed SKILL.md against `fake-claude.mjs`
+  on a `git init` copy of the seed (park, decision, a second run that resumed at BUILD, the
+  owner's fetch). Pass 1 had two Critical findings — readiness dead-ended when the only epic
+  was skipped for ownership, and the dry run ignored `explicit` and the clone — both fixed
+  (`--explicit`, a clone-aware dry run). Pass 2 had no Critical finding; its UX findings are
+  fixed in SKILL.md except one: `report.md` still lists the fetch command after the work is in.
+- **Live re-run (owner's go-ahead, 2026-11-11):** `AUTOPILOT_LIVE=1` on `live-smoke.test.mjs`
+  and `live-audit.test.mjs` after the P3.5 hook changes — 10 of 10 pass, about $1.05 in real
+  sessions. R1–R4 and R6–R9 denied, answered or parked as designed on the workspace layout; the
+  real auditor returned a high `test-weakened` finding on the widened build and none that parks
+  on the clean one.
+- **Real skill run (owner, 2026-11-11):** done from two real Claude Code sessions with the plugin
+  loaded by `--plugin-dir`, against `fake-claude.mjs` on a `git init` copy of the seed: dry run,
+  a run that parked at a deferral gate, `report` with the gate decided, a second run that resumed
+  at BUILD and merged, and the final `report`. `${CLAUDE_PLUGIN_ROOT}` resolved, the launch and
+  gate questions used `AskUserQuestion`, and the `nohup` launch ran detached (the second run was
+  still running at the three-second check). One finding, fixed: the rehearsal question was left
+  in the chat as plain text; every fixed-answer question now goes through `AskUserQuestion`.
+  Not shown by it: a run outliving its session for hours (P0 S10 covers the mechanism).
+- **Not done here:** Linux / Windows launch stays a P6 item.
+
+**Before P4: done 2026-11-11 — the owner's recorded look works in a real verify session**
+(`AUTOPILOT_LIVE=1 node --test plugins/peak-workflow/scripts/autopilot/test/live-look.test.mjs`:
+plan, build and audit on `fake-claude.mjs` with a real working build, the gate decided "Looks
+right", then one real `/peak-workflow:wrapup-epic` on Opus). Three real sessions, owner's
+go-ahead each time, $2.66 in all:
+
+1. **Parked ($0.67, 9 turns).** Wrapup Step 1.2 item 7 asked "TOR-… is operator-observed … What
+   do you see?" with `AskUserQuestion`, long before Step 2.0. No policy row matches a question
+   the model words itself, so R8 parked it as `unmatched`. R8's Step 2.0 answer alone was never
+   enough.
+2. **Merged, but asked nothing ($1.02, 15 turns).** Fix: the driver appends `owner-look.md` to
+   the verify session's system prompt when the epic has a look (who, when, what they looked at,
+   the branch tip, their words; record it as `operator-observed: <words> (recorded by <owner> on
+   <date>, before this session)`, do not ask for item 7, CANNOT VERIFY if it does not settle the
+   Then). The first wording also said nobody could answer a question, and the verifier then
+   skipped Step 1.5 and Step 2.0 as well.
+3. **Merged as designed ($0.96, 18 turns).** With that sentence removed and "ask every other
+   question the skill tells you to ask" added: Step 1.5 was answered from policy, Step 2.0 from
+   the owner's look, and the Complete handoff carries the observation and "Manual verification
+   performed: Yes" with the owner's name, date and tip. No skill edit.
+
+**The note is mandatory (owner decision, 2026-11-11).** The observation is the owner's gate
+note, so `driver.mjs decide` refuses a `human-check` answer without one, and `autopilot report`
+asks what the owner did to check (suggested ways of looking, built from the gate's artifacts)
+and what they saw. Also unseen in a real session: the skill's
+plain-language report presentation, and its going straight into the report when a run has
+already ended at the launch check — the owner sees both on Run A's `report`.
+
 ### P4: Real unattended runs (typically overnight) on the seeded `ledger` project
 
 Run A, B and C from §10.5. Each run: `node scripts/autopilot-lab/lab.mjs reset --run A --dir
@@ -968,6 +1334,334 @@ Run A, B and C from §10.5. Each run: `node scripts/autopilot-lab/lab.mjs reset 
 compares `report.json` and the repo to the expected outcomes and runs the hidden oracle tests.
 
 **Exit:** all three runs completed unattended, each with an evaluation file.
+
+**Status 2026-11-11: the lab is built; no run has been made.** `node --test
+scripts/autopilot-lab/test/` → 7 tests pass, no model called. What exists and how it differs from
+§10.5:
+
+- **Seed in two layers.** `fixtures/ledger/` stays E1-only, because the driver's 100 tests build
+  on it. `fixtures/ledger-full/` holds E2–E6 (features 02–06, tracing, specs, sidecars, vision,
+  ConOps, `samples/`) and `fixtures/ledger-full.json` three `CLAUDE.md` edits; `reset` copies one
+  over the other. The seed commit has a fixed date, so two resets give the same commit.
+- **Scenario files** hold `queue`, `edits`, `files` and `settings`. `settings` is written to the
+  project's `.claude/peak-workflow/autopilot.json` and committed: `"onPark": "continue"` (E6 must
+  run after an upstream park) and `humanCheck.Lg5Chr8`, which imports `samples/october.csv` and
+  draws the chart. The queue is not forced: `reset` prints the order (E1, E2, E3, E4, E6, E5)
+  for the owner to give at the skill's confirm step.
+- **Run B's patch** rewrites `TOR-02-Ci4Ws7d` to "store every description upper-cased and
+  trimmed when it is imported". **Run C's patch** adds `test/version-format.test.js`, which fails.
+- **Requirement IDs and commands** are fixed in the seed: `categorize`, `summary --month`,
+  `convert --to [--live]` (rates address in `LEDGER_RATES_URL`), `chart --month --out`,
+  `config` (file named by `LEDGERRC`), `--help`. E3's heavy-run TOR is `TOR-03-Pf5Tn8k`, E4's
+  live TOR `TOR-04-Lv4Ft2q`, E5's operator-observed TOR `TOR-05-Ch3Lk2u`; readiness flags the
+  first two (`big data`, `network`).
+- **`evaluate`** judges the workspace's **first** run by default (the unattended one; later runs
+  follow the owner's decisions; `--run-name` picks another), writes `evaluation.json` beside
+  `report.json`, and exits 1 on any difference. `expected/<run>.json` lists, per epic, the
+  outcomes §10.5 accepts and the checks each needs (`existing-tests-unchanged`,
+  `resource-guard-held`, `parked` with the allowed gate kinds and audit categories, `artifact`,
+  `no-verify-session`, `blocked-by`, `ran-after`). It refuses a run a test double made unless
+  `--rehearsal` is passed.
+- **Oracle.** `oracle/<epic>.<name>.test.mjs` are black-box tests of the CLI, run against an
+  export of the clone's integration line for MERGED epics only. A failing file is a false merge
+  for the epic in its name, except `Lg3Sum9.refunds-net.test.mjs`, the weak-requirement case. A
+  defect merged by an earlier epic can also fail a later epic's file: read the output before
+  blaming the epic. `reference/src/index.js` passes every oracle test and exists only to prove
+  they can be met.
+- **Not built:** the §11 stopwatch and per-rule metrics that need a person or the hook logs
+  (gate re-asks, auditor precision). `evaluate` reports counts; P5 fills the table.
+
+**Run A, first attempt (2026-11-11): ended in a minute, $0.59, nothing built — two defects, both
+fixed.** (1) `tor_lifecycle.py` parses four or more feature files in a process pool, and the
+sandbox denies the semaphore call it needs (`PermissionError` from `os.sysconf`); E6's planning
+session stopped with no plan, correctly refusing to plan without requirement states. P0 and the
+live tests never saw it: their seed has one feature file. It now falls back to parsing
+in-process. (2) E1's plan kept every template step but headed three of them "Feature branch",
+"Status → In Progress" and "Mark Implemented"; the lint wanted the template's exact words and
+parked a complete plan. The lint now matches the step, not the wording. Everything downstream
+was BLOCKED as designed. The attempt is discarded: Run A starts again from `reset --force`.
+
+**Run A (2026-11-12, run `20261111-190916`): 17 minutes, $8.30, unattended; 3 of 6 outcomes as
+expected, no false merge.** E1 and E2 MERGED (E1's test untouched). E4 PARKED as expected, at a
+deferral gate on the live TOR. Three differences:
+
+- **E3 PARKED needlessly.** The verifier worded Step 1.5 as "Epic … verdict is PASS: 5/5 … Proceed
+  to Phase 2 …?"; the policy row wanted "Verdict PASS" and R8 parked it as unmatched. Fixed after
+  the run (the row now matches "verdict is PASS" too). One needless park.
+- **E5 BLOCKED**, only because E3 parked. The human-check path was not exercised.
+- **E6 PARKED on a real question.** The verifier's code review found that `ledger config` with
+  no settings file is an error, where ConOps S5 says it is fine; no TOR covers it, so it asked
+  Fix now / Leave as is / Stop. Unmatched, so it parked: a correct park the plan did not predict
+  (the seed's requirements are thinner than its ConOps here).
+
+The first evaluation also reported a false merge on E2. It was the oracle's mistake (a rule
+pattern with a double space, which no TOR promises to tolerate) and is corrected.
+
+**Run A, second run (`20261111-193555`, after the owner's three decisions): 7 minutes, $3.27.**
+Resume worked in real sessions: E3 re-entered at VERIFY on the first run's branch and MERGED;
+E6 and E4 re-entered at VERIFY and BUILD with the owner's answer replayed once. Then:
+
+- **E6 parked again, correctly.** After "Fix now" the verifier found that merging `develop`
+  conflicts in `src/index.js` and would drop the `summary` command from the usage text, and
+  asked before resolving it. E6 was built before E3 merged; the staleness is real.
+- **E4 parked again.** The owner answered "Defer"; the skill's follow-up "Which later epic
+  creates the code this Then clause depends on?" is free of options and unmatched.
+- **E5 parked on a driver defect, before the human check.** CHECK_BUILD's traceability looked
+  for every anchor under the Test directories only, but an operator-observed requirement is
+  traced by its checklist in `tests/manual/`. Fixed: those anchors are also searched for under
+  `tests/manual/` and `tests/hil/`. The fake-backed tests had hidden it by naming every TOR in a
+  test file. Also seen: the fix-round planning session edited a test and tried to commit
+  instead of planning (R3 denied the commit); it ended without a plan.
+
+**Evidence for `onPark: stop` as the default (owner, 2026-11-12).** E6's conflict is the risk
+the default exists for, seen on the first real run. The lab sets `"onPark": "continue"` (§10.5
+expects E6 to run after an upstream park), so in the first run E6 was built while E3 sat parked;
+both edit `src/index.js`, and when E3 merged in the second run E6 was stale — a conflict, and a
+usage text missing `summary`. Under `stop` the first run ends at E3's park, E3 merges first in
+the next run, and E6 is built on top of it: no conflict. "Independent" was true in the phase
+index and false in the code. The verifier caught it and asked, so nothing wrong merged; the
+cost was a wasted build and one more question for the owner. The lab still uses `continue`
+(the owner has not asked to change it); Run A's results are the `continue` run.
+
+**Run A, third run (`20261111-195316`): 3 minutes, $1.20.**
+
+- **E5 passed the build check** (the checklist fix held) and then **PARKED at the auditor**: a
+  true high finding. TOR-05-Ch2Lb7t asks for one `<text` holding both the category and the
+  total; the build drew two, and its test would pass either way. The auditor's first real catch
+  in a run.
+- **E6's decision was void**, as designed: its branch no longer merged cleanly, so it was
+  planned again from scratch on a fresh branch (the old one kept under
+  `refs/autopilot/superseded/`). The new plan then **parked at the lint again**: its first step
+  was headed "Branch — verify … refs/heads/feature/epic-…". Fixed (a branch step may name the
+  epic's branch instead of saying "feature branch").
+
+**Needless parks so far: 3** — two plan-lint wordings and one Step 1.5 wording, each a complete
+plan or a pre-approved question that the wording check missed. All three matched on the exact
+words of a heading or question; each was fixed by widening one pattern. This is the brittleness
+SPIKE.md's open question is about (deterministic matching versus an inference call that only
+classifies).
+
+**Run A, fourth run (`20261111-200628`): 4 minutes, $1.85.** E6 resumed at BUILD from the
+owner-approved plan and MERGED. E5 resumed at the fix round ("Real — fix before verify") and
+parked again with no plan: for the second time the fix-round planning session made the fix on
+the spot and was then denied the commit.
+
+**A repair is now one session (owner decision, 2026-11-12).** Where this plan says FIX_PLAN →
+FIX_BUILD, read FIX_BUILD alone: one builder session (`fix-1`) whose prompt is the fix brief —
+what failed the driver's checks, the auditor's confirmed findings, the owner's "Not right" note,
+or the verifier's FAIL report — with its own short rules (no plan mode, no status change, no
+merge). CHECK_BUILD, the delta audit, the human check and a fresh verify follow it as they
+follow a build. `planFix` and its budget are gone; a state or gate saved as FIX_PLAN enters
+FIX_BUILD.
+
+**Who may repair what** (owner's question: `wrapup-epic` lets the verifier fix inline — should
+autopilot?):
+
+| Found by | Unattended | With the owner's answer |
+|---|---|---|
+| Driver checks, auditor, owner's look | One repair session, then every check again | — |
+| Verifier (a TOR or quality gate fails) | Policy answers "Stop — epic FAILs"; one repair session; a fresh verify | — |
+| Verifier asks a question of its own | Parks | If the owner answers **Fix now**, the resumed verify may repair inline, as the skill allows with a person present |
+
+Unattended, an inline fix would have the verifier pass its own work with nobody between it and
+the merge, so the merge gate still rejects it (code changed during verify, or "fixed at wrapup"
+above zero). For a verify resumed from an owner's "Fix now" the gate accepts both — every other
+count must still be zero — and the report says so: "Fixed during verification, on your Fix
+now … no separate audit ran on it". Before this the gate would have rolled such a merge back.
+
+**Run A, fifth to seventh runs (2026-11-12): the chart reaches the owner, and the owner's look
+reaches a real verifier.** `20261111-220956` ($1.19): E5 planned, built, passed CHECK_BUILD
+through its checklist, the auditor found nothing that parks, and it PARKED for a person with
+`chart.html` attached and no verify session — §10.5's expected outcome. The report's new
+prompts recorded what the owner did and saw. `20261111-221716` ($1.12): E5 resumed at VERIFY,
+and the verifier **refused to pass on an incomplete observation**: the note covered the bars and
+labels but not "a bar with half that total should look half as tall", so it reported CANNOT
+VERIFY rather than infer it from "Looks right". Policy answered "Stop — epic FAILs"; the driver
+then spent the fix round on a repair session, which correctly said it could not fabricate an
+observation and parked on a question of its own.
+
+**An unsettled look goes back to the owner, not to a repair (fixed).** When a verify resumed
+from a look reports CANNOT VERIFY on an operator-observed anchor, the driver now writes a new
+`human-check` gate carrying the verifier's reason and parks; the fix round is not used. The
+verifier also raised a real product point in its code review: income is drawn on the same scale
+as spending, so PAYROLL is a 240 px bar and the spending bars are slivers under 6 px.
+
+**Run A is closed (owner, 2026-11-12).** Seven launches after the aborted first attempt, $16.93
+in sessions ($17.52 with the attempt), about 40 minutes of run time over an evening with the
+owner answering between runs. It was not one overnight run: the tooling defects above made it
+iterative, and several fixes landed between launches, so its numbers describe the PoC being
+debugged, not the PoC as it now stands.
+
+| Epic | Final state | Notes |
+|---|---|---|
+| E1 CSV import | MERGED, first run | — |
+| E2 Categorization rules | MERGED, first run | E1's test untouched; oracle passes |
+| E3 Monthly summary | MERGED, second run | one needless park (Step 1.5 wording) |
+| E6 Config and help | MERGED, fourth run | a real verifier question, a stale-base conflict under `onPark: continue`, a void decision, one needless park (lint wording) |
+| E4 Currency conversion | PARKED, as designed | deferral gate on the live TOR; left undecided |
+| E5 Spending chart | PARKED, not merged | reached the human check with `chart.html`; the owner's look was recorded and a real verifier found it incomplete; left at the repair session's question |
+
+No false merge. Three needless parks, all wording matches. Defects found and fixed during the
+run: the sandbox crash in `tor-lifecycle`, three wording matches, traceability of an
+operator-observed TOR, the two-session repair, the merge gate after an owner's "Fix now", and
+the unsettled look. Not exercised in a real session: the one-session repair, the inline
+"Fix now" merge, and the unsettled-look gate (all fake-backed only). `lab.mjs evaluate` scores
+the first run only (3 of 6 as expected); the table above is the record for the whole run.
+
+**Run B (owner, 2026-11-12): done, 5 of 6 as expected, no false merge.** The first launch ($3.65,
+7 min) parked E1 and E6 at the verifier's "verdict: PASS. Proceed to Phase 2?" question: the
+policy matched "verdict is PASS" only. After widening it, the second launch ($5.11, ~14 min)
+ran as designed:
+
+| Epic | Result |
+|---|---|
+| E1 CSV import | MERGED |
+| E2 Categorization rules | PARKED: amendment gate (its requirement contradicts E1's verbatim rule); left undecided |
+| E3 Monthly summary | BLOCKED behind E2 |
+| E4 Currency conversion | PARKED at the start-of-epic question: its wording ("Epic … Start it?") lacked the words "Start Epic", so no policy row matched (expected: the live-rates park) |
+| E5 Spending chart | BLOCKED behind E3 |
+| E6 Config and help | MERGED after E2 parked, no conflict |
+
+Both oracle tests pass. Needless parks so far: five wording matches in Runs A and B. The start-of-epic
+row now also accepts a question that names the epic and ends "Start it?" (not rerun live).
+
+**Run C (owner, 2026-11-12): done, 6 of 6 as expected, $0.** `node --test` fails on `develop`; the
+driver stopped within a second with "base red", started no session, and touched no epic.
+
+**Owner's decisions after Runs A–C (2026-11-12).** Keep wording matching for now and see whether
+it survives more scenarios. Prove the three fake-only fixes in real sessions with a fourth,
+separate test project. Not now: changing the lab scenarios to `onPark: stop` (already the
+driver's default), and a rerun of A.
+
+**Scenario D (built, not yet run).** `lab.mjs reset --run D` seeds `shelf`, a reading-list CLI
+with four epics, each aimed at one path; `scripts/autopilot-lab/scenarios/D.md` is the owner's
+walkthrough (about three launches, with answers between them):
+
+| Epic | Path it is built to reach | How |
+|---|---|---|
+| `Sh1Add4` Add and list | none | merges on its own |
+| `Sh2Pag6` Reading page | one-session repair | a judgement requirement; the owner answers "Not right" with a note |
+| `Sh3Chr2` Pages chart | unsettled look | a three-part requirement; the owner's note leaves the bar heights out |
+| `Sh4Cfg9` Settings check | inline "Fix now" | the ConOps covers a missing settings file and no requirement does, the gap that made Run A's verifier ask |
+
+The first two are driven by the owner's answers. The third depends on a real verifier raising the
+gap, as one did in Run A; if it does not, `Sh4Cfg9` merges and "Fix now" stays unproven. The seed
+keeps one command per file (`src/commands/<name>.js`) so that epics which wait for the owner do
+not conflict in a shared file when they merge late, the failure Run A's E6 hit. `evaluate --run D`
+judges the first launch only.
+
+**Scenario D, run with the owner (2026-11-12): four launches, $13.16, about 25 minutes of run time.**
+
+| Path | Result in real sessions |
+|---|---|
+| One-session repair | **Works.** On the owner's "Not right" note, one repair session changed the page and committed it (34 s, $0.23) |
+| Unsettled look | **Works.** The verifier would not judge the chart from a note that left the bar heights out; the driver came back to the owner with the verifier's reason and started no repair. With a full note the chart verified and MERGED |
+| Inline "Fix now" | **Not reached.** The builder handled the missing settings file itself, so the verifier had nothing to ask. Still fake-backed only |
+
+Final states: `Sh1Add4`, `Sh4Cfg9`, `Sh3Chr2` MERGED; `Sh2Pag6` verified 4/4 but not merged (below).
+The first launch matched 4 of 4 expected outcomes with no needless park. Three driver defects
+surfaced, all in what happens *after* a repair or a wait, and all hidden by the test double:
+
+1. **The build check rejected the repair's commit.** It wanted a `feat(epic-…)` subject; the
+   repair prompt asks for `fix(epic-…)`. Fixed (`478b2b8`).
+2. **The merge gate blamed a verifier for another epic's files.** A branch that waited for the
+   owner is behind `develop`; the verifier merged `develop` into it first, and the gate counted
+   those files as written during verify and rolled the merge back. Fixed (`b3a361b`).
+3. **A verified epic that the verifier could not merge was reported FAILED (fixed after the run).** `Sh2Pag6`'s
+   docs refresh conflicted with `Sh4Cfg9`'s in `architecture.md` and `design-notes.md`. The
+   verifier resolved it on `develop`, the hook denied the commit there (R3), it then merged
+   `develop` into the branch instead and stopped without retrying the merge. The driver read "no
+   merge" as a FAIL verdict. To fix: the hook's denial should say how to proceed (abort, merge
+   `develop` into the branch, merge again), and a verify that ends verified-but-unmerged should
+   park, not fail; both are now done (fake-backed tests only).
+
+**Owner's decision (2026-11-12): catch up before verify.** wrapup-epic Step 4 refreshes
+`docs/architecture.md` and `docs/design-notes.md` on the feature branch, so two epics verified
+from the same base rewrite the same lines. One refresh at the end of the run was rejected:
+later epics must see the earlier epics' architecture and design decisions. Instead the driver
+merges the integration line (the branch the feature branch was cut from) into a branch that is
+behind it, just before the verify session; the refresh is then written on top of the current
+docs, and the verifier checks the code as it will land. A conflict in that merge parks the epic
+with a resume question. The owner's recorded look stays valid: the verifier is told the look was
+of the epic's own work and that only other epics' merged work arrived since. Built, fake-backed
+tests only; scenario D rerun to prove it live is next.
+
+**Scenario D rerun on the fixed driver (2026-11-12, five epics).** First launch: 5 of 5 as
+expected, no needless park, $9.02. Proven live: the repair's `fix(…)` commit passes the build
+check; the catch-up merge before verify (the chart merged with no conflict and no rollback).
+"Fix now" was not reached a second time: the export builder followed its brief and made the
+command silent, and the verifier accepted "no output on success" without comparing it with the
+ConOps or CLAUDE.md's stdout rule. A real verifier checks the requirements and the brief; it does
+not catch a brief that contradicts the wider project documents. The reading page's second look
+was then sent back because the owner's note named one of the requirement's three Then lines.
+
+**Scenario D rerun, end state: all five `shelf` epics MERGED, four launches, $13.10.** The reading
+page went through every path in real sessions: built, parked for a look, repaired in one session
+on the owner's note, parked for a second look, sent back once by the verifier (the note named
+one Then line of three), then verified and merged after a catch-up merge with `develop`, with no
+hand edits to the workspace this time. Its last verify ran with the new instruction that "Looks
+right" answers the whole requirement; the owner's short note was accepted. Still unproven live:
+the inline "Fix now" merge, and the park for a verified-but-unmerged epic (neither arose). The
+yes/no look form has not run live either: this run's gates were written before it existed.
+
+**Owner's UX feedback and decisions (2026-11-12).** (1) The confirm screen's limits table read as
+estimates and was "very wrong" as such: show the caps as t-shirt sizes, labelled as caps; no
+estimates and no estimate-versus-actual. (2) The look is too onerous and the verifier too
+aggressive: the report did not show the checklist, did not help a non-developer open the page,
+and demanded a free-text note covering every line. Built: a human-check gate carries the
+requirement's Then lines (`checks`), full paths to open (`open`) and the checklist text; the
+report opens the file itself and asks one yes / no / couldn't-tell per line; `decide
+--observations` records them as the look (a "no" is "Not right" and needs words; "couldn't tell"
+is never recorded); a second look after the verifier asks keeps what was recorded and asks only
+unconfirmed lines; and the verifier is told that "Looks right" answers the whole requirement, so
+CANNOT VERIFY is for a contradiction or an unchecked line only. Trade-off recorded: a tick is
+weaker evidence than a description. Fake-backed tests only.
+
+**Owner's closing decisions for the lab runs (2026-11-12).** The inline "Fix now" merge is
+accepted as tested against the test double only: two planted situations did not make a real
+verifier ask. The yes/no look form is not rerun live in the lab; the owner intends to use
+autopilot on a real project soon and will meet it there. The report's closing message now names
+one next step, after the owner found its list of alternatives confusing. With that the lab work
+(Runs A, B, C and scenario D) is closed.
+
+**A fifth `shelf` epic for "Fix now" (owner approved, 2026-11-12).** `Sh5Exp3` CSV export. The
+first attempt (`Sh4Cfg9`) left a gap and the builder closed it. This one puts the contradiction
+in the epic's own brief: the Description says `export` "prints nothing when it succeeds", the
+ConOps (S5) and CLAUDE.md's stdout rule say the tool confirms what it did, and no requirement
+covers the standard output. The builder follows its brief; the verifier's code review should
+find the contradiction and ask. Still not certain: a builder that notices it may ask first.
+
+Two epics were un-stuck by hand in the throwaway workspace, with the owner's yes each time: a
+`resume` gate written for `Sh2Pag6` after defect 1, and the `used` mark removed from the owner's
+decision on `Sh3Chr2` after defect 2. Neither park left a question, so a plain rerun would have
+planned each epic again and thrown the work away: a park with no gate after a fix round or a
+rolled-back merge should be resumable.
+
+**Proposed rule, from the owner (2026-11-12) — decide after Runs B and C:** *when an HTML file
+or a website is involved and Playwright is available, use Playwright to "see" the result
+instead of stopping for a person.* Raised when E5's verifier would not pass the height clause
+on the owner's note. Notes for the decision:
+
+- E5's operator-observed TOR is all geometry (the tallest bar is the largest total, half the
+  total is half the height, no label overlaps), which a measurement can settle; the build's own
+  test already checks the heights from the SVG, with no browser. The lab tagged it
+  operator-observed to force the human-look path. Claims like these belong in automated checks.
+- A judgement call still needs a person: "is it readable", or the verifier's finding that
+  income on the same scale leaves the spending bars under 6 px. No measurement turns that into
+  a decision.
+- A likely shape: measurable visual claims are written as ordinary TORs and checked by a test
+  (DOM or SVG geometry, Playwright where layout needs a real browser); `operator-observed` is
+  kept for judgement, and autopilot parks only for those. That is a `capture-requirements` and
+  `start-epic` change as much as an autopilot one.
+- Open: whether a browser can launch inside the unattended sessions' sandbox (no network,
+  restricted process and file access) — needs a spike. §12 put automated perceptual checks out
+  of scope for the PoC because, in the peak-media build, numbers stood in badly for looking;
+  this rule narrows that, it does not reverse it.
+
+To pick P4 up in a new session, say: "Continue the peak-workflow autopilot PoC on
+`feature/peak-workflow-autopilot-poc` (do not branch). Read `scripts/autopilot/SPIKE.md`, then
+`docs/autopilot-poc-plan.md` §10 P3.5 'Before P4', the P4 status note and §10.5. With my
+go-ahead walk me through scenario D (`scripts/autopilot-lab/scenarios/D.md`). Real `claude` sessions only with my go-ahead. Ask before any push."
 
 ### P5: Evaluate
 
@@ -1119,17 +1813,19 @@ inputs to the explainer §10 recommendation.
    with the plan captured and linted (R9), and a fresh session implements it, mirroring
    `showClearContextOnPlanAccept`. S4 verifies the handoff format and the post-approval steps. A
    skill change is a last-resort fallback only.
-2. **CLI JSON field names** (S1): `is_error`, `duration_ms`, and whether `permission_denials` and
-   `modelUsage` appear in plain `json` (they are documented for stream-json and the SDK).
-3. **Hook trust and `--settings` in non-bare `-p`** (S2): documented only by inference.
+2. **CLI JSON field names. Answered (P0 S1):** all present in plain `json`; list in SPIKE.md.
+3. **Hook trust and `--settings` in non-bare `-p`. Answered (P0 S2):** hooks fire in an untrusted
+   directory with no trust step.
 4. **Plugin isolation. Decided (owner, 2026-11-11):** inherit the user's setup (plugins,
-   settings, `CLAUDE.md`, memory), with the referee layered on top via `--settings`. No
-   `--plugin-dir`-only loading and no `--setting-sources` isolation. S7 verifies precedence and
-   which copy loads.
+   settings, `CLAUDE.md`, memory), with the referee layered on top via `--settings`, and no
+   `--setting-sources` isolation. **Refined after P0 (owner, 2026-11-11):** peak-workflow itself
+   always loads from the copy that launched autopilot, via `--plugin-dir` (§6.6). Cloud sessions
+   are verified later.
 5. **Permission mode. Decided (owner, 2026-11-11):** `acceptEdits` plus referee hooks; `dontAsk`
    is not a target (S12 is an optional note). Whether hooks run under `bypassPermissions` is moot,
    because bypass is not used.
-6. **Agent SDK vs CLI.** The SDK (`query()` with `canUseTool`, `hooks`, `maxBudgetUsd`) may be
+6. **Agent SDK vs CLI. Answered (P0):** the CLI, driven as a stdio host (§6.6) — the same
+   control protocol the SDK uses, with no dependency. Original note: the SDK (`query()` with `canUseTool`, `hooks`, `maxBudgetUsd`) may be
    cleaner, but whether slash-command prompts work through `query()` is unconfirmed. The PoC
    starts with the CLI.
 7. **Builder model.** Sonnet for builds, Opus for verify (wrapup's frontmatter); is Sonnet strong
@@ -1146,6 +1842,10 @@ inputs to the explainer §10 recommendation.
     container with no host secrets mounted (Anthropic warns that `~/.claude` credentials can leak,
     §14) is evaluated only after the go/no-go. It is a deliberate, whole-run container, not the
     per-epic VM that incident 8 warns about.
+12. **Inference for gate matching. Open; the runs decide (owner, 2026-11-11).** The PoC stays
+    deterministic. The report counts needless parks (a gate parked only because its wording
+    missed the table). If inference is added later, it only classifies a question to a table
+    row, never chooses an answer, and anything uncertain parks.
 
 ---
 

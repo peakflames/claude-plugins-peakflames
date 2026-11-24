@@ -1,0 +1,103 @@
+{
+  "feature_id": "01",
+  "feature_file": "01-list.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-01-Ad1Bk3m",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Keeping the list in one local file starts with adding a book."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 1,
+            "paraphrase": "add puts the book in shelf.json and says so."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Ad2Dp6n",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "A faithful record does not hold the same book twice."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 1,
+            "paraphrase": "Adding a title already on the list is refused."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Ls3Nm8p",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Seeing the list is part of the first goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 2,
+            "paraphrase": "list shows every book, numbered, with the date beside each finished one."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Fn4Dt2q",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Marking a book finished on a date is part of the first goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 3,
+            "paraphrase": "finish records the date against the numbered book."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-01-Fn5Rg7r",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "Finishing only works on a book that is on the list."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S1",
+            "step": 3,
+            "paraphrase": "A number that is not on the list is reported with what to do."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

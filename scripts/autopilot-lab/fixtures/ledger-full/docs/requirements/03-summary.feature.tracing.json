@@ -1,0 +1,103 @@
+{
+  "feature_id": "03",
+  "feature_file": "03-summary.feature.md",
+  "generator": "haiku-sub-agent via /peak-workflow:capture-requirements",
+  "requirements": [
+    {
+      "id": "TOR-03-Sm1Tb4f",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A monthly summary of spending per category is the third goal."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 2,
+            "paraphrase": "The user asks for a month and sees a total per category."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-03-Mo2Fl7g",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "The summary is monthly: other months must not leak into it."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 2,
+            "paraphrase": "Only the requested month is totalled."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-03-Em3Pt2h",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§3 — Goals",
+            "paraphrase": "A summary must be understandable even when there is nothing to show."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 2,
+            "paraphrase": "A month with no transactions is reported in words."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-03-Bd4Mn5j",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "One date format everywhere, including what the user types."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 2,
+            "paraphrase": "The month is given as YYYY-MM."
+          }
+        ],
+        "claude_md": []
+      }
+    },
+    {
+      "id": "TOR-03-Pf5Tn8k",
+      "traces_to": {
+        "vision": [
+          {
+            "section": "§4 — Principles",
+            "paraphrase": "Ten years of transactions must not make a report slow."
+          }
+        ],
+        "conops": [
+          {
+            "scenario": "S2",
+            "step": 3,
+            "paraphrase": "With every transaction since the user started, the summary still appears without a noticeable wait."
+          }
+        ],
+        "claude_md": []
+      }
+    }
+  ],
+  "coverage_gaps": []
+}

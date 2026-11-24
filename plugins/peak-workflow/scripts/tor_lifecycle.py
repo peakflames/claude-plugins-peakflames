@@ -30,7 +30,7 @@ import os
 import re
 import subprocess
 import tomllib
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import BrokenExecutor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -171,8 +171,14 @@ def parse_files(paths: list[str], full: bool = False) -> list[list]:
     func = _parse_file_full if full else _parse_file
     if len(paths) < POOL_MIN_FILES:
         return [func(p) for p in paths]
-    with ProcessPoolExecutor(max_workers=min(len(paths), os.cpu_count() or 1)) as pool:
-        return list(pool.map(func, paths))
+    try:
+        with ProcessPoolExecutor(max_workers=min(len(paths), os.cpu_count() or 1)) as pool:
+            return list(pool.map(func, paths))
+    except (OSError, ImportError, NotImplementedError, BrokenExecutor):
+        # No process pool here: a sandbox that denies semaphores (macOS Seatbelt raises
+        # PermissionError from os.sysconf), or a platform without them. Parsing in this process
+        # gives the same result, only slower. A DataError from a worker is not caught here.
+        return [func(p) for p in paths]
 
 
 def write_text(path: Path, text: str) -> None:
@@ -350,6 +356,15 @@ def _is_int(value: object) -> bool:
 
 KINDS = ("reword", "supersede", "retire", "pending", "uphold")
 APPROVED_VIA = ("docs-branch", "epic-branch", "wrapup", "quick-fix", "migration")
+# A record nobody approved names no person: an autopilot provisional run took a session's proposed correction and wrote
+# this as its `approved_by`. The owner keeps it with an `uphold` record that names this one, or decides the requirement
+# again. (A fixed approver name, not a new `approved_via` value: every released version reads the record.)
+# Written "autopilot (prototype run)" before 3.1.0; project files keep it, and it means the same.
+UNAPPROVED_BY = ("autopilot (provisional run)", "autopilot (prototype run)")
+
+
+def nobody_approved(data: dict) -> bool:
+    return isinstance(data.get("approved_by"), str) and data["approved_by"].strip().lower() in UNAPPROVED_BY
 EVIDENCE_RESULTS = ("pass", "fail", "historical")
 
 
@@ -522,6 +537,7 @@ class Sidecar:
     verified: dict[str, str] = field(default_factory=dict)          # TOR -> fingerprint
     unverified: dict[str, str] = field(default_factory=dict)        # TOR -> "YYYY-MM-DD reason"
     waived: dict[str, str] = field(default_factory=dict)            # TOR -> successor epic
+    unconfirmed: dict[str, str] = field(default_factory=dict)       # TOR -> "YYYY-MM-DD what a person should still confirm"
     retires: list[str] = field(default_factory=list)                # CR IDs
     reverified: str = "—"
     extra: dict[str, str] = field(default_factory=dict)             # unknown keys, verbatim
@@ -531,6 +547,14 @@ class Sidecar:
 
 SIDECAR_SCALARS = ("status", "owner", "implemented", "completed", "handoff", "reverified")
 SIDECAR_BLOCKS = ("verified", "unverified")
+# An `unverified:` line that records a look nobody gave: "YYYY-MM-DD NOT OBSERVED — <what a person must still do>".
+NOT_OBSERVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\s+NOT OBSERVED\b\s*[—–-]*\s*(.*)$", re.S)
+# What a person should still confirm about a requirement that passed (a reviewer's note): one plain line per
+# requirement, `unconfirmed-TOR-NN-XXXXXXX: YYYY-MM-DD <text>`. A key of its own, so a reader that does not know it keeps
+# it verbatim like any unknown key.
+# `unconfirmed-epic:` holds a note that names no requirement.
+UNCONFIRMED_KEY = re.compile(r"^unconfirmed-(TOR-\d{2}-[A-Za-z0-9]{7}|epic)$")
+WHOLE_EPIC = "epic"
 KEY_LINE = re.compile(r"^([A-Za-z_][\w-]*):\s*(.*?)\s*$")
 BLOCK_LINE = re.compile(r"^\s+(TOR-\d{2}-[A-Za-z0-9]{7}):\s*(.*?)\s*$")
 WAIVED_ITEM = re.compile(r"^(TOR-\d{2}-[A-Za-z0-9]{7})\s*(?:→|->)\s*(\S+)$")
@@ -618,6 +642,9 @@ def parse_sidecar(epic: str, text: str, where: str = "", lenient: bool = False) 
                     sc.waived[wm.group(1)] = wm.group(2)
                 else:
                     problems.append(f"{prefix}line {n}: `waived:` entry {item!r} is not `TOR-… → <epic>`")
+        elif (um := UNCONFIRMED_KEY.match(key)) is not None:
+            if value:
+                sc.unconfirmed[um.group(1)] = value
         else:
             sc.extra[key] = value
     if problems:
@@ -759,6 +786,22 @@ class Project:
             if r.kind in ("supersede", "retire"):
                 for tor in r.tors:
                     self.gone[tor] = r
+        # Corrections nobody approved: the successors of a supersede no person approved, until a person decides the
+        # successor — an uphold that names the record (they keep it), or any later record of theirs about it (a reword,
+        # a dispute, another supersede: they changed or questioned it). tor -> {record, date, replaces}.
+        kept = {(cr, t) for r in self.records if r.kind == "uphold" and not nobody_approved(r.data)
+                for ref in r.data.get("refs", []) if isinstance(ref, str) for cr in CR_ANY.findall(ref) for t in r.tors}
+        self.unapproved: dict[str, dict] = {}
+        for n, r in enumerate(self.records):
+            if r.kind == "supersede" and nobody_approved(r.data):
+                later = {t for x in self.records[n + 1:] if not nobody_approved(x.data) and x.kind != "uphold"
+                         for t in x.tors}
+                for c in r.changes:
+                    for succ in c["successors"]:
+                        if (r.id, succ) not in kept and succ not in later:
+                            entry = self.unapproved.setdefault(
+                                succ, {"record": r.id, "date": r.date.isoformat(), "replaces": []})
+                            entry["replaces"].append(c["tor"])
         self.recorded = {t for r in self.records for t in r.tors} | {
             s for r in self.records if r.kind == "supersede" for c in r.changes for s in c["successors"]}
 
@@ -833,6 +876,11 @@ def requirement_state(project: Project, tor: str) -> dict:
            "safety": req.safety, "epic": None, "epics": [], "dispute": p.dispute_info(tor)}
     owners = p.owners(tor)
     row["epics"] = sorted(s.epic for s in owners)
+    if tor in p.unapproved:
+        row["unapproved_change"] = p.unapproved[tor]
+    noted = [s.unconfirmed[tor] for s in p.sidecars.values() if tor in s.unconfirmed and s.status == "Complete"]
+    if noted:
+        row["unconfirmed"] = " | ".join(noted)
     waivers = [s for s in p.sidecars.values() if tor in s.waived]
     if not owners:
         if waivers:
@@ -843,6 +891,8 @@ def requirement_state(project: Project, tor: str) -> dict:
     else:
         best = max(owners, key=lambda s: STATUS_ORDER.get(s.status, -1))
         row["epic"] = best.epic
+        if waivers:  # an earlier epic left it for this one
+            row["deferred_from"] = sorted(s.epic for s in waivers)
         complete = [s for s in owners if s.status == "Complete"]
         if complete:
             failed = [s for s in complete if tor in s.unverified]
@@ -850,6 +900,10 @@ def requirement_state(project: Project, tor: str) -> dict:
             if failed:
                 state, row["epic"] = "Verification failed", failed[0].epic
                 row["unverified"] = failed[0].unverified[tor]
+                # Recorded as "nobody looked", not as "it is wrong" (a requirement only a person can observe,
+                # merged without the look): there is no code to fix, only a look to give.
+                if (nobody := NOT_OBSERVED_RE.match(row["unverified"])) is not None:
+                    row["not_observed"] = nobody.group(1).strip()
             elif saved is None:
                 state = "Verified (legacy, unfingerprinted)"
             else:
@@ -889,6 +943,13 @@ def derive_states(project: Project) -> dict:
                     "verified_percent": round(100 * verified / len(live_rows), 1) if live_rows else 0.0,
                     "by_state": dict(sorted(counts.items()))},
         "requirements": live_rows + gone_rows,
+        # notes on finished work that name no requirement: epic -> what a person should still confirm
+        # (also a note on a requirement that is no longer live, said so: it has no row of its own)
+        "unconfirmed_epics": {s.epic: " | ".join(
+            (what if t == WHOLE_EPIC else f"(about {t}, since replaced or retired) {what}")
+            for t, what in s.unconfirmed.items() if t == WHOLE_EPIC or t not in project.live)
+            for s in project.sidecars.values() if s.status == "Complete"
+            and any(t == WHOLE_EPIC or t not in project.live for t in s.unconfirmed)},
     }
 
 
@@ -1195,7 +1256,8 @@ def run_seed(project: Project) -> list[dict]:
 
 
 def mark_sidecar(text: str, *, append: list[str], verified: dict[str, str], unverified: dict[str, str],
-                 reverified: str | None) -> str:
+                 reverified: str | None, unconfirmed: dict[str, str] | None = None,
+                 confirmed: list[str] | None = None) -> str:
     """Rewrite a sidecar's `requirements:` (append only), `verified:`, `unverified:`, and
     `reverified:` lines; every other line stays as it was. `verified` maps TOR -> fingerprint (a
     PASS: drops its `unverified:` line); `unverified` maps TOR -> "YYYY-MM-DD reason" (a FAIL:
@@ -1203,6 +1265,7 @@ def mark_sidecar(text: str, *, append: list[str], verified: dict[str, str], unve
     rows = text.rstrip("\n").split("\n")
     out: list[str] = []
     blocks: dict[str, dict[str, str]] = {"verified": {}, "unverified": {}}
+    notes: dict[str, str] = {}  # TOR -> what a person should still confirm
     i = 0
     while i < len(rows):
         line = rows[i]
@@ -1214,6 +1277,11 @@ def mark_sidecar(text: str, *, append: list[str], verified: dict[str, str], unve
                 bm = BLOCK_LINE.match(rows[i])
                 blocks[key][bm.group(1)] = bm.group(2)
                 i += 1
+            continue
+        if key and (um := UNCONFIRMED_KEY.match(key)) is not None:  # lifted out; re-emitted below
+            if m.group(2):
+                notes[um.group(1)] = m.group(2)
+            i += 1
             continue
         if key == "requirements" and append:
             ids = _id_list(m.group(2))
@@ -1237,9 +1305,14 @@ def mark_sidecar(text: str, *, append: list[str], verified: dict[str, str], unve
     for tor, why in unverified.items():
         blocks["unverified"][tor] = why
         blocks["verified"].pop(tor, None)
+    for tor in confirmed or []:
+        notes.pop(tor, None)
+    for tor, what in (unconfirmed or {}).items():
+        notes[tor] = f"{notes[tor]} | {what}" if tor in notes else what
     for key in SIDECAR_BLOCKS:
         if blocks[key]:
             out += [f"{key}:"] + [f"  {tor}: {value}" for tor, value in blocks[key].items()]
+    out += [f"unconfirmed-{tor}: {what}" for tor, what in notes.items()]
     return "\n".join(out) + "\n"
 
 
@@ -2612,6 +2685,11 @@ def validate_record_files(root: Path, paths: list[str]) -> list[tuple[str, list[
             by_id.setdefault(rid, []).append(path.name)
             if other.get("kind") == "pending" and isinstance(other.get("changes"), list):
                 pending_tors[rid] = {c.get("tor") for c in other["changes"] if isinstance(c, dict)}
+            # ... and a correction nobody approved: an uphold of its successor is the owner keeping it
+            if (other.get("kind") == "supersede" and nobody_approved(other)
+                    and isinstance(other.get("changes"), list)):
+                pending_tors[rid] = {t for c in other["changes"] if isinstance(c, dict)
+                                     for t in (c.get("successors") or []) if isinstance(t, str)}
     out = []
     for path in targets:
         rel = _repo_relative(root, str(path))
@@ -2635,7 +2713,8 @@ def validate_record_files(root: Path, paths: list[str]) -> list[tuple[str, list[
             for ch in data["changes"]:
                 if not any(ch["tor"] in pending_tors.get(cr, ()) for cr in named):
                     problems.append(f"{ch['tor']}: no pending record in `refs` names it — an uphold "
-                                    "closes a pending record on the same requirement")
+                                    "closes a pending record on the same requirement (or keeps a "
+                                    "correction a provisional run took for it)")
         out.append((rel, problems))
     return out
 
@@ -2920,9 +2999,17 @@ def cmd_mark(args: argparse.Namespace, root: Path) -> int:
     ids = lambda raw: [i for r in raw for i in _id_list(r)]  # noqa: E731
     append, passes = ids(args.append), ids(args.passes)
     fails = {tor: reason.strip() for tor, reason in args.fail}
-    named = append + passes + list(fails)
-    if not named and not args.reverified:
-        raise DataError("nothing to do: give --append, --pass, --fail, or --reverified")
+    notes: dict[str, str] = {}  # several notes for one requirement in one call are all kept
+    blank = [tor for tor, what in args.unconfirmed if not what.strip()]
+    for tor, what in args.unconfirmed:
+        if what.strip():
+            notes[tor] = f"{notes[tor]} | {' '.join(what.split())}" if tor in notes else " ".join(what.split())
+    confirmed = ids(args.confirmed)
+    # A note may outlive its requirement (superseded or retired since): it can still be confirmed and removed.
+    named = append + passes + list(fails) + [t for t in notes if t != WHOLE_EPIC]
+    anything = named or notes or confirmed or blank
+    if not anything and not args.reverified:
+        raise DataError("nothing to do: give --append, --pass, --fail, --unconfirmed, --confirmed, or --reverified")
     live = live_requirements(root)
     owned = set(sc.requirements) | set(append)
     problems = [f"{t}: not a TOR-NN-XXXXXXX ID" for t in named if not TOR_RE.match(t)]
@@ -2932,12 +3019,18 @@ def cmd_mark(args: argparse.Namespace, root: Path) -> int:
                  for t in passes + list(fails) if t in sc.waived]
     problems += [f"{t}: both --pass and --fail" for t in passes if t in fails]
     problems += [f"{t}: --fail needs a reason" for t, why in fails.items() if not why]
+    problems += [f"{t}: not in epic {epic}'s requirements:" for t in notes if t != WHOLE_EPIC and t not in owned]
+    problems += [f"{t}: --unconfirmed needs what a person should still confirm" for t in blank]
+    problems += [f"{t}: epic {epic} has no unconfirmed note for it" for t in confirmed
+                 if t not in sc.unconfirmed and t not in notes]
     if problems:
         raise DataError(problems)
     today = (_today(args) or dt.date.today()).isoformat()
     new = mark_sidecar(text, append=append, verified={t: live[t].fingerprint for t in passes},
                        unverified={t: f"{today} {why}" for t, why in fails.items()},
-                       reverified=today if args.reverified else None)
+                       reverified=today if args.reverified else None,
+                       unconfirmed={t: " | ".join(f"{today} {w}" for w in what.split(" | "))
+                                    for t, what in notes.items()}, confirmed=confirmed)
     parse_sidecar(epic, new, f"{STATUS_DIR}/epic-{epic}.md")  # never write a sidecar we cannot read
     write_text(path, new)
     for t in append:
@@ -2946,6 +3039,10 @@ def cmd_mark(args: argparse.Namespace, root: Path) -> int:
         print(f"{epic}\tverified\t{t}: {live[t].fingerprint}")
     for t, why in fails.items():
         print(f"{epic}\tunverified\t{t}: {today} {why}")
+    for t, what in notes.items():
+        print(f"{epic}\tunconfirmed\t{t}: {today} {what}")
+    for t in confirmed:
+        print(f"{epic}\tconfirmed\t{t}")
     if args.reverified:
         print(f"{epic}\treverified\t{today}")
     return EXIT_OK
@@ -3027,6 +3124,44 @@ def cmd_search(args: argparse.Namespace, root: Path) -> int:
             print("\t".join([r["record"], r["date"], kind, ", ".join(r["tors"]), r["title"],
                              "matched: " + ", ".join(r["matched"])]))
     return EXIT_FINDINGS if rows else EXIT_OK
+
+
+def cmd_keep(args: argparse.Namespace, root: Path) -> int:
+    """The owner keeps a correction nobody approved (a supersede whose `approved_by` is no person): writes the `uphold`
+    record that names it. `tor` is the requirement as it now reads, or the one it replaced."""
+    if not TOR_RE.match(args.tor):
+        raise DataError(f"{args.tor}: not a TOR-NN-XXXXXXX ID")
+    by = (args.by or "").strip()
+    if not by or by.lower() in UNAPPROVED_BY:
+        raise DataError("--by is required: the name of the person who keeps the correction")
+    p = load_project(root, _today(args))
+    kept = [t for t, u in p.unapproved.items() if t == args.tor or args.tor in u["replaces"]]
+    kept = [t for t in kept if t in p.live]
+    if not kept:
+        print(f"{args.tor}: no correction waits for approval (none was taken by a provisional run, "
+              "or it was already kept or changed).", file=sys.stderr)
+        return EXIT_FINDINGS
+    taken = {r.id[3:] for r in p.records}
+    written = []
+    for cr in sorted({p.unapproved[t]["record"] for t in kept}):
+        tors = sorted(t for t in kept if p.unapproved[t]["record"] == cr)
+        source = next(r for r in p.records if r.id == cr)
+        suffix = _new_suffix(taken)
+        data = {"id": f"CR-{suffix}", "date": p.today, "kind": "uphold",
+                "title": f"Keep the correction to {', '.join(tors)}",
+                "reason": f"{by} read the requirement as {cr} corrected it and kept it as it reads.",
+                "approved_via": args.via, "approved_by": by, "refs": [cr],
+                "keywords": list(source.data.get("keywords") or ["correction"]),
+                "changes": [{"tor": t, "feature_file": p.live[t].feature_file, "fingerprint": p.live[t].fingerprint}
+                            for t in tors]}
+        problems = validate_record(f"{p.today.isoformat()}-{suffix}.toml", data)
+        if problems:
+            raise DataError(problems)
+        rel = f"{CHANGES_DIR}/{p.today.isoformat()}-{suffix}.toml"
+        write_text(root / rel, record_toml(data))
+        written.append(rel)
+    print("\n".join(written))
+    return EXIT_OK
 
 
 def cmd_text(args: argparse.Namespace, root: Path) -> int:
@@ -3276,6 +3411,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="write an unverified: line dated today (drops its verified: line)")
     mk.add_argument("--append", action="extend", nargs="+", default=[], metavar="TOR",
                     help="add a live requirement to requirements: (never removes one)")
+    mk.add_argument("--unconfirmed", action="append", nargs=2, default=[], metavar=("TOR", "WHAT"),
+                    help="note what a person should still confirm about a requirement (its verdict is not changed)")
+    mk.add_argument("--confirmed", action="extend", nargs="+", default=[], metavar="TOR",
+                    help="a person confirmed it: remove the requirement's unconfirmed note")
     mk.add_argument("--reverified", action="store_true", help="set reverified: to today")
     mk.add_argument("--today", help=argparse.SUPPRESS)
     mk.set_defaults(func=cmd_mark)
@@ -3308,6 +3447,14 @@ def build_parser() -> argparse.ArgumentParser:
     sr.add_argument("terms", nargs="+", help="words or phrases (quote a phrase)")
     sr.add_argument("--json", action="store_true")
     sr.set_defaults(func=cmd_search)
+
+    kp = sub.add_parser("keep", help="the owner keeps a correction a provisional run took: write the uphold record "
+                                      "that names it (exit 1 when none waits)")
+    kp.add_argument("tor", help="the requirement as it now reads, or the one it replaced")
+    kp.add_argument("--by", required=True, help="the person who keeps it")
+    kp.add_argument("--via", default="docs-branch", choices=[v for v in APPROVED_VIA if v != "migration"])
+    kp.add_argument("--today", help=argparse.SUPPRESS)
+    kp.set_defaults(func=cmd_keep)
 
     tx = sub.add_parser("text", help="print a requirement's Scenario block verbatim (exit 1 when not found)")
     tx.add_argument("tor")

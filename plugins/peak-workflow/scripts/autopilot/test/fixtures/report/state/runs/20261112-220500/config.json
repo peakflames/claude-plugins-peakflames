@@ -1,0 +1,5 @@
+{
+  "project": "/work/ledger",
+  "runBudgetUsd": 80,
+  "testCommand": "node --test"
+}

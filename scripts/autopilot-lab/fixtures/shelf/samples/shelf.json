@@ -1,0 +1,10 @@
+{
+  "books": [
+    { "title": "The Left Hand of Darkness", "author": "Ursula K. Le Guin", "pages": 300, "finished": "2026-08-19" },
+    { "title": "Middlemarch", "author": "George Eliot", "pages": 880, "finished": null },
+    { "title": "Piranesi", "author": "Susanna Clarke", "pages": 250, "finished": "2026-09-06" },
+    { "title": "The Dispossessed", "author": "Ursula K. Le Guin", "pages": 350, "finished": "2026-09-27" },
+    { "title": "Fish & Chips <A Memoir>", "author": "N. O. Body", "pages": 150, "finished": "2026-10-11" },
+    { "title": "War and Peace", "author": "Leo Tolstoy", "pages": 1225, "finished": null }
+  ]
+}
