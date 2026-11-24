@@ -1,4 +1,4 @@
-# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-22)
+# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-23)
 
 For a fresh session, on any machine. Everything is on `feature/peak-workflow-autopilot-poc`
 (pushed). This file replaces the earlier handoffs kept outside the repository.
@@ -7,14 +7,16 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-23): 250, of which 237
-  pass and 13 are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-23, after the run fixes
+  below, before the quote-aware splitter): 268, of which 254 pass, 1 fails (known, see below) and
+  13 are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13
   passed on 2026-11-21), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
   Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
   base as well (cause not looked for).
-- **Pilot Light** (the second real project) is mid-queue: run `20261123-081039`, a prototype
-  run, merged 3 epics and stopped when the owner's usage limit was reached; 1 epic waits to
-  resume and 6 have not started. What it proved is under Step 12.
+- **Pilot Light** (the second real project) is mid-queue. Run `20261123-140347` (prototype)
+  merged Waiting and Conversation drawer and parked Outstanding on a question; a prototype run
+  started 19:26 on 2026-11-23 plans Outstanding again, then runs Session stream (F5hv9T4).
+  What it proved is under Step 12 and "2026-11-23 session" below.
 - **Not merged to `develop`, not released**, by the owner's decision. Next phase is beta use.
 - **The cockpit mod is deferred** (`autopilot-cockpit-mod-handoff.md`, note at its top): the run
   announces itself in chat instead, because chat is the one display every device has.
@@ -549,6 +551,91 @@ Why this order:
   git commands the referee refuses (#40). Harmless so far.
 - [ ] `skills/autopilot/SKILL.md` is about 1,080 lines; every attending session carries it (#40).
 - [ ] The cockpit mod is deferred (`autopilot-cockpit-mod-handoff.md`).
+
+## 2026-11-23 session — live fixes, what the run proved, and a rename
+
+### Decision pending: rename the "prototype" mode
+
+The owner finds "prototype" untrue: the mode builds and tests to the same standard. What it
+skips is waiting for a person. The AI makes the judgment calls that are the owner's (take a
+session's own recommendation on a correction or a deferral, skip the owner's looks, merge a
+requirement nobody observed as NOT OBSERVED), records them as `approved_by = "autopilot
+(prototype run)"`, and lists every one at the end for the owner to confirm. Requirement IDs,
+traced tests, failing tests, scope and Safety still stop it.
+
+- **The owner's candidate (2026-11-23): "AI-Supervised-Only".** Open question for the final
+  wording: does it tell a non-technical reader that a person still confirms afterward? The
+  name could read as "no human at all".
+- Also discussed: **Provisional** (the result stands, pending confirmation; pairs with
+  Confirmed), **Delegated** (you hand the calls to the AI; pairs with Supervised), **Sign-off
+  later**, **Hands-off**. "Unattended" is taken (it means the owner is away, in any mode).
+- The word is in `driver.mjs`, `hooks/pretool.mjs` (R8), `report.mjs`, `attend.mjs`,
+  `skills/autopilot/SKILL.md`, the launch screen, and the tests. It is also stored in
+  project files (`approved_by = "autopilot (prototype run)"`, for instance Pilot Light's
+  CR-hWfKoMk): the rename must keep reading the old value. Do it as one change, with no
+  run going.
+
+### Fixed this session (all on `feature/peak-workflow-autopilot-poc`)
+
+Live-confirmed in run `20261123-140347`: the usage-limit wait (waited, resumed at the minute,
+same session); the catch-up before a build (log line "brought up to date with develop before
+the build"); the budget wording ("$117.36 left of $250 (the N earlier runs … spent $…)").
+
+- Status banner for epics waiting in autopilot's copy. Usage-limit wait. Cut-off build continued.
+- Referee false alarms, found in the run's `hooks.jsonl` (each a test that failed first):
+  a quoted heredoc's text read as commands (`kind` in a table cell refused as the container
+  tool, `../support/control` in a test import as a workspace path); a resumed session writing
+  to its earlier step's scratch folder; `git worktree remove --force` on its own scratch
+  worktree; a file in the scratch folder passed as a one-command prefix
+  (`CONTROL="$AUTOPILOT_SCRATCH/c.json" cmd`).
+- Verifier: "Seen but not fixed" is a heading in its report; each line reaches the run report
+  ("Verifier saw this wrong and left it") and the project's status notes. Not yet seen in a
+  real run.
+- Small-fix guard: a verify-session fix that skips a test (`it.skip`, `.only`, `xit`,
+  `pytest.mark.skip`, `[Fact(Skip=…)]`), or swaps a precise check for one that passes for nearly
+  any value (`toBeTruthy`, `not.toThrow`, `assert True`), parks for a person (`testWeakening`
+  in `lib.mjs`). Not yet seen in a real run.
+
+### Fixed but not merged
+
+- **The referee cuts a command at `;`, `|`, `&&` and brackets without reading quotes** — the
+  `;` in a quoted sed script made `"../support/samples"` look like a path (refused live,
+  2026-11-24 00:34 UTC). Branch `feature/peak-workflow-quote-aware-split`, commit `f28dfec`:
+  single-quoted text is no longer cut. Merge when no driver runs.
+
+### Known, not fixed
+
+- `attend.test.mjs` "watch and status see inside the step … each said once" fails (expected 2,
+  actual 3), on the base branch too. 2 `test_wrapper.py` failures (pre-existing).
+- **The independent review is short**: 33–49 seconds on large changes (run `20261123-140347`:
+  33 s on Outstanding). Unexamined; first thing to look at is whether the reviewer reads the
+  diff or only the summary.
+- **A voided "Resume"**: the owner's answer to keep Outstanding's finished build was void
+  because its branch no longer merged once Conversation drawer merged (both touch
+  `epic-detail-drawer.tsx` and `.autopilot/test-changes.jsonl`). The epic was planned again;
+  the old branch is kept at `refs/autopilot/superseded/…`. The same item as the Step 3 line
+  "An epic is started over without asking": it says so in the log but spends the money again.
+- **"Resume" after a failed merge check repeats the whole final check** (about $5.85 and 29
+  minutes on Outstanding). Step 3, first item.
+- The build is told to log a reason before it edits an existing test, but a build whose first
+  command was refused for another reason (the false alarms above) tried the edit first and was
+  refused again: a few seconds each, no stop.
+- Only the planner is told the prototype-approver rule, so a build writes a person's name on a
+  taken amendment and costs a repair round. Tell the build too (`BUILD_RULES`).
+- The watch repeats its progress line once per blocked epic, and prints a refusal that has
+  already cleared in words that read as a live blocker.
+- An epic that extends another epic's screen gets no look (`n2g5TvI`).
+- The verifier's how-to for phone checks (`HOST=0.0.0.0`; "`--lan` doesn't exist until
+  yZQYIVE") is not saved in the project.
+- Windows: 36 driver tests fail before any change (#41 B8), and the 2026-11-21 fixes have not
+  run on Windows.
+
+### Before handing a run to the beta tester
+
+Done: the false referee refusals, the usage-limit wait, verifier notes, the stricter test
+guard. Still open: the short review (above); a note for the tester that Windows is unproven and
+what to send back if it breaks (the run report and the run's `hooks.jsonl`); the quote-aware
+splitter merged; the rename decided.
 
 ## Where the detail is
 
