@@ -258,6 +258,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot: a put-off question no longer hides ready work** — `status` lists `ready` epics even
+  while a question waits, and after "Not now" the skill offers them instead of ending.
 - **A person's "Real — fix before verify" after the one repair is spent runs one more repair** —
   before, it failed the epic. Autopilot's own retries and standing answers keep the one-repair limit;
   each further repair takes a person's answer.

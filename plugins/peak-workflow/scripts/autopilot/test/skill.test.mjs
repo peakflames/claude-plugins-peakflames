@@ -335,3 +335,8 @@ test('SKILL.md: the launch asks how careful the run is, writes the answer as `mo
   // The four launch questions fit one popup (AskUserQuestion takes at most four).
   assert.equal((SKILL.match(/asked in the same popup\.\*\*/g) ?? []).length, 3);
 });
+
+test('SKILL.md: a question the owner put off never hides an epic that can run (`ready`; Pilot Light, 2026-11-24)', () => {
+  const flat = SKILL.replace(/\s+/g, ' ');
+  for (const text of ['when `ready` names epics (work no waiting question holds), go to Steps 1–3 for those', 'A question put off never hides `ready` work', 'or offers the `ready` epics through Steps 1–3']) assert.ok(flat.includes(text), text);
+});

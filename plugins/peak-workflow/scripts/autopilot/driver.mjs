@@ -3826,6 +3826,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     }
   }
 
+  // What could run now, whatever \`next\` says: an epic no waiting question holds (a look put off with "Not now"
+  // must not hide independent work, Pilot Light 2026-11-24).
+  out.ready = [...runnable, ...askable].map((e) => e.label);
   if (interrupted) { out.next = 'readiness'; out.why = 'the last run did not finish'; }
   else if (waiting.length) { out.next = 'decide'; out.why = `${waiting.length} gate(s) need the owner`; }
   else if (covered.length) { out.next = 'continue'; out.why = `${covered.length} technical stop(s) the standing answer covers`; }
