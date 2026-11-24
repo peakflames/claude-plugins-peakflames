@@ -515,19 +515,32 @@ test('a reviewer\'s finding is repaired without asking; a paid service never rea
   assert.equal(gateFile(q, E1.id).decided, null);
 });
 
+/** The kept work of a failed merge check with more on top, as if the final check had also done it (issue #35: the re-check judges the kept work). */
+function addToKept(p, edit) {
+  const file = path.join(p.state, 'gates', `${E1.id}-1.json`); const g = readJson(file); const wt = path.join(p.tmp, 'kept');
+  git(p.clone, 'worktree', 'add', '-q', '--detach', wt, g.verifiedTip);
+  edit(wt);
+  git(wt, 'add', '-A'); git(wt, 'commit', '-q', '-m', 'more at the final check');
+  const tip = git(wt, 'rev-parse', 'HEAD');
+  git(p.clone, 'worktree', 'remove', '--force', wt);
+  fs.writeFileSync(file, JSON.stringify({ ...g, verifiedTip: tip }, null, 2));
+}
+const weakenTest = (wt) => { const f = path.join(wt, 'test', `${E1.slug}.test.js`); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').split('\n').filter((l) => !l.includes('is met')).join('\n')); };
+const noteRequirement = (wt) => fs.writeFileSync(path.join(wt, 'docs', 'requirements', 'note.md'), 'changed\n');
+
 test('the final check\'s own product fix is allowed without asking, and listed; a weakened test or a changed requirement in it is still refused', async (t) => {
   const TORQ = `${E1.tors[0]} is FAIL: no test mirrors the Then; the code itself looks right. Recommendation: Fix now — one small test. How to proceed?`;
   const TOROPTS = ['Fix now', 'Defer — depends on a later epic', 'The requirement may be wrong, not the code', 'Stop — epic FAILs'];
-  const fix = (extra = []) => ({ actions: [askTool(TORQ, TOROPTS), { do: 'checkout', name: E1.branch }, { do: 'write', path: 'test/then.test.js', content: "import test from 'node:test';\ntest('the Then holds', () => {});\n" }, { do: 'write', path: 'src/patch.js', content: 'export const patched = 1;\n' }, ...extra, { do: 'commit', message: `test(epic-${E1.id}): the test the requirement lacked` }, ...wrapupScript(E1, { counts: [1, 1, 0, 1, 0, 0] }).actions], result: { result: 'Verdict: PASS' } });
+  const fix = () => ({ actions: [askTool(TORQ, TOROPTS), { do: 'checkout', name: E1.branch }, { do: 'write', path: 'test/then.test.js', content: "import test from 'node:test';\ntest('the Then holds', () => {});\n" }, { do: 'write', path: 'src/patch.js', content: 'export const patched = 1;\n' }, { do: 'commit', message: `test(epic-${E1.id}): the test the requirement lacked` }, ...wrapupScript(E1, { counts: [1, 1, 0, 1, 0, 0] }).actions], result: { result: 'Verdict: PASS' } });
 
   const p = makeProject(t);
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
   await p.go({ run: confirmRun(p, { autoContinue: 2 }) });
-  assert.deepEqual([p.epic(E1.id).state, gateFile(p, E1.id).approvesFix, gateFile(p, E1.id).technical], ['PARKED', true, true]);
+  assert.deepEqual([p.epic(E1.id).state, gateFile(p, E1.id).phase, gateFile(p, E1.id).approvesFix, gateFile(p, E1.id).technical], ['PARKED', 'CHECK_VERIFY', true, true]);
   assert.equal(st(p).next, 'continue');
-  assert.deepEqual(cont(p).json().continued.map((x) => [x.answer, x.did]), [[ANSWERS.resume, 'let the final check make its own fix and ran it again']]);
-  p.scenario({ [`${E1.id}/verify`]: fix() });
-  await relaunch(p);
+  assert.deepEqual(cont(p).json().continued.map((x) => [x.answer, x.did]), [[ANSWERS.resume, 'allowed the final check\'s fix and checked its merge again']]);
+  p.scenario({});
+  assert.deepEqual(await relaunch(p), [], 'no new final check: its kept work is merged and checked');
   const e = p.epic(E1.id);
   assert.equal(e.state, 'MERGED', e.reason);
   assert.deepEqual([e.fixedAtWrapup.files.sort(), e.fixedAtWrapup.approvedBy, !!e.fixedAtWrapup.auto], [['src/patch.js', 'test/then.test.js'], `gates/${E1.id}-1.json`, true]);
@@ -535,39 +548,46 @@ test('the final check\'s own product fix is allowed without asking, and listed; 
   assert.deepEqual(st(p, '--queue', E1.id).fixes.map((f) => [f.label, f.files.sort(), f.auto]), [[LABEL, ['src/patch.js', 'test/then.test.js'], true]]);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Fixed during the final check without asking you, on your standing answer for technical stops \(`gates\/Lg1Csv7-1\.json`\): src\/patch\.js, test\/then\.test\.js\. Only the verifier checked this fix/);
 
-  // The same stop, but the second final check also changes a requirement file and takes the checks out of a test.
+  // The same stop, but the kept work also changes a requirement file and takes the checks out of a test.
   const q = makeProject(t);
   q.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
   await q.go({ run: confirmRun(q, { autoContinue: 2 }) });
+  addToKept(q, (wt) => { noteRequirement(wt); weakenTest(wt); });
   assert.equal(cont(q).status, 0);
-  q.scenario({ [`${E1.id}/verify`]: fix([{ do: 'write', path: 'docs/requirements/note.md', content: 'changed\n' }, { do: 'exec', cmd: `sed -i.bak '/is met/d' test/${E1.slug}.test.js; rm -f test/${E1.slug}.test.js.bak` }]) });
+  q.scenario({});
   await relaunch(q);
   assert.equal(q.epic(E1.id).state, 'PARKED', q.epic(E1.id).reason);
   const evidence = readJson(q.dir(E1.id, 'check-verify-1.json')).checks.find((x) => x.name === 'verdict').evidence.join(' | ');
   assert.match(evidence, /changes a requirement file \(docs\/requirements\/note\.md\)/);
   assert.match(evidence, /removes checks from a test \(test\/csv-import\.test\.js\)/);
   assert.equal(git(q.clone, 'rev-parse', 'develop'), git(q.project, 'rev-parse', 'develop'), 'nothing merged');
+  assert.equal(gateFile(q, E1.id, 2).phase, 'VERIFY', 'what cannot stand is checked again by a final check');
 
   // "Try again" is not "allow whatever the fix is": the owner was never shown that question, so the same refusals hold.
-  const weak = [{ do: 'exec', cmd: `sed -i.bak '/is met/d' test/${E1.slug}.test.js; rm -f test/${E1.slug}.test.js.bak` }];
   const r = makeProject(t);
   r.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
   await r.go({ run: confirmRun(r, { autoContinue: 0 }) });
+  addToKept(r, weakenTest);
   assert.equal(driver('decide', '--workspace', r.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Try again', '--by', 'Pat Owner').status, 0);
-  r.scenario({ [`${E1.id}/verify`]: fix(weak) });
+  r.scenario({});
   await relaunch(r);
   assert.equal(r.epic(E1.id).state, 'PARKED', r.epic(E1.id).reason);
   assert.match(readJson(r.dir(E1.id, 'check-verify-1.json')).checks.find((x) => x.name === 'verdict').evidence.join(' | '), /removes checks from a test/);
 
-  // A re-run that changes only a requirement file, and one that claims more undisclosed deferrals fixed than it was asked about.
-  const only = { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'docs/requirements/note.md', content: 'changed\n' }, { do: 'commit', message: 'docs: a requirement note' }, ...wrapupScript(E1).actions], result: { result: 'Verdict: PASS' } };
-  const many = { actions: [{ do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/patch.js', content: 'export const patched = 2;\n' }, { do: 'commit', message: 'fix: more' }, ...wrapupScript(E1, { counts: [3, 3, 0, 3, 0, 0] }).actions], result: { result: 'Verdict: PASS' } };
-  for (const [script, failed] of [[only, 'verdict'], [many, 'no-waivers']]) {
+  // Kept work that also changes only a requirement file, and one that claims more undisclosed deferrals fixed than it was asked about.
+  const only = (wt) => noteRequirement(wt);
+  const many = (wt) => {
+    fs.writeFileSync(path.join(wt, 'src', 'patch.js'), 'export const patched = 2;\n');
+    const h = path.join(wt, 'docs', 'implementation-plan', 'session-handoffs', `epic-${E1.id}-complete.md`);
+    fs.writeFileSync(h, fs.readFileSync(h, 'utf8').replace(/^Count: .*$/m, 'Count: 3 (undisclosed: 3, waived: 0, fixed at wrapup: 3, amended: 0, pending: 0)'));
+  };
+  for (const [edit, failed] of [[only, 'verdict'], [many, 'no-waivers']]) {
     const x = makeProject(t);
     x.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
     await x.go({ run: confirmRun(x, { autoContinue: 2 }) });
+    addToKept(x, edit);
     assert.equal(cont(x).status, 0);
-    x.scenario({ [`${E1.id}/verify`]: script });
+    x.scenario({});
     await relaunch(x);
     assert.equal(x.epic(E1.id).state, 'PARKED', failed);
     assert.deepEqual(readJson(x.dir(E1.id, 'check-verify-1.json')).checks.filter((c) => !c.pass).map((c) => c.name), [failed]);

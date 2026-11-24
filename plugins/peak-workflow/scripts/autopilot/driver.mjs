@@ -1707,11 +1707,22 @@ class Run {
     this.g('clean', '-fdq'); // untracked leftovers of the undone session; ignored files (dependencies) stay
   }
 
-  /** Merge-gate rollback: integration line back to its pre-verify SHA, epic branch back to its recorded tip. */
-  rollback(e) {
-    const pre = e.preVerify;
+  /**
+   * Merge-gate rollback: integration line back to its pre-verify SHA, epic branch back to its recorded tip.
+   * `keep`: when the integration tip is a merge whose second parent builds on that tip, the final check's own
+   * work (verified lines, Complete, handoff, any fix) is pinned at refs/autopilot/verified/<id>, so a re-check
+   * can merge it again without a new final check (issue #35). Returns that commit, or null.
+   */
+  rollback(e, { keep = false } = {}) {
+    const pre = e.preVerify; let kept = null;
+    if (keep && this.integrationSha() !== pre.developSha) { // nothing was merged: there is no work of the final check's to keep
+      const p2 = gitRun(this.clone, 'rev-parse', '--verify', '--quiet', `${this.state.integration}^2`).out || null;
+      if (p2 && gitOk(this.clone, 'merge-base', '--is-ancestor', pre.branchTip, p2)) { kept = p2; this.g('update-ref', verifiedRef(e.id), p2); e.verifiedKept = verifiedRef(e.id); }
+    }
     this.resetIntegration(e, pre.developSha);
     if (this.branchTip(pre.branch) !== pre.branchTip) this.g('branch', '-f', pre.branch, pre.branchTip);
+    if (kept) this.log(`${e.id}: the final check's work (${kept.slice(0, 9)}) is kept at ${verifiedRef(e.id)}`);
+    return kept;
   }
 
   /**
@@ -2823,17 +2834,21 @@ class Run {
     // resumed from a gate the owner answered "Fix now" (as wrapup-epic allows with a person
     // present). Unattended, policy answers "Stop — epic FAILs" and a separate session repairs,
     // unless the fix is the standing answer's: a small fix, or the test a requirement lacks.
-    const ownerFix = e.resumed?.phase === 'VERIFY' && (/^fix now\b/i.test(e.resumed.answer ?? '') || e.resumed.approvesFix) ? e.resumed.gate : null;
+    // A re-check of the kept work (issue #35) is held to the same rules: its gate's answer approves the fix as a final check's would.
+    const recheck = e.resumed?.phase === 'CHECK_VERIFY';
+    const ownerFix = (e.resumed?.phase === 'VERIFY' || recheck) && (/^fix now\b/i.test(e.resumed.answer ?? '') || e.resumed.approvesFix) ? e.resumed.gate : null;
+    // The verify step whose small fixes are judged: this run's, or (a re-check, no session) the one the gate names.
+    const stepDir = e.lastStep ? path.join(this.epicDir(e), e.lastStep) : recheck && e.resumed.verifyStep ? path.join(this.stateDir, e.resumed.verifyStep) : null;
     // Or on the owner's standing answer for small fixes: the referee answered "Fix now" to what the verifier
     // recommended (listed in the step's directory), and the repair is held to the limits here.
     const limits = smallFixLimits(this.config);
-    const standing = !ownerFix && limits && e.lastStep ? tryJson(path.join(this.epicDir(e), e.lastStep, SMALL_FIX_FILE), []) ?? [] : [];
+    const standing = !ownerFix && limits && stepDir ? tryJson(path.join(stepDir, SMALL_FIX_FILE), []) ?? [] : [];
     const approval = ownerFix ?? (standing.length ? 'the standing answer for small fixes' : null);
     // The gate's own question ("allow that fix?") was never put to the owner: autopilot answered it on the standing answer for
     // technical stops, or they said "Try again". The fix may be product code and any size, but it still may not change a
     // requirement or make a test check less, and it forgives an undisclosed deferral only as a small fix does.
     const autoFix = ownerFix && e.resumed.unasked ? ownerFix : null;
-    const asked = autoFix && limits && e.lastStep ? tryJson(path.join(this.epicDir(e), e.lastStep, SMALL_FIX_FILE), []) ?? [] : standing;
+    const asked = autoFix && limits && stepDir ? tryJson(path.join(stepDir, SMALL_FIX_FILE), []) ?? [] : standing;
     const fixedFiles = [];
 
     const firstParent = this.g('rev-list', '--first-parent', `${pre.developSha}..${dev}`).split('\n').filter(Boolean);
@@ -2935,7 +2950,7 @@ class Run {
 
     const h = this.health(dev);
     add('requirements-health', h.pass, h.evidence);
-    return { pass: checks.every((c) => c.pass), checks };
+    return { pass: checks.every((c) => c.pass), checks, ...(ownerFix ? { fixApprovedBy: ownerFix } : {}) };
   }
 
   doCheckVerify(e) {
@@ -2947,11 +2962,16 @@ class Run {
     e.checks.push({ file: `check-verify-${n}.json`, pass: r.pass, failed });
     this.event('check', e, { name: 'verify', pass: r.pass, failed });
     if (!r.pass) {
-      this.rollback(e);
+      // The merge is undone and the final check's work is kept; every failure asks (issue #35): check the merge
+      // again, or run the final check again where its work cannot stand as it is.
+      const verifiedTip = this.rollback(e, { keep: true });
       const reason = `merge gate failed (${failed.join(', ')}); ${this.state.integration} rolled back`;
-      // Everything passed except the size of a fix made on the standing answer: that fix is the owner's to approve.
-      const fix = fixLimitGate(this.meta(e).label, r, smallFixLimits(this.config));
-      if (fix) this.writeGate(e, { ...fix, reason, artifacts: [this.rel(path.join(this.epicDir(e), `check-verify-${n}.json`))], resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}` });
+      const verifyStep = e.lastStep ? this.rel(path.join(this.epicDir(e), e.lastStep)) : e.resumed?.verifyStep ?? null;
+      const gate = mergeCheckGate(this.meta(e).label, r, smallFixLimits(this.config), { verifiedTip });
+      // The fix this final check made on the owner's answer stays allowed when only the merge is checked again.
+      if (gate.phase === 'CHECK_VERIFY' && r.fixApprovedBy) gate.approvesFix = true;
+      this.writeGate(e, { ...gate, skillStep: 'autopilot driver', reason, artifacts: [this.rel(path.join(this.epicDir(e), `check-verify-${n}.json`))], resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
+        ...(gate.phase === 'CHECK_VERIFY' ? { verifiedTip, verifyStep } : {}) });
       return this.finish(e, 'PARKED', reason);
     }
     gitRun(this.clone, 'config', '--remove-section', `branch.${e.preVerify.branch}`); // stale entry left by the sandboxed `git branch -d`
@@ -2998,6 +3018,7 @@ class Run {
     let phase = entry;
     while (phase) {
       const stop = this.runStop();
+      if (stop && phase === 'RECHECK') return this.parkRecheck(e, `run stopped (${stop}) before the final check's kept work was merged again`);
       if (stop) return this.parkResumable(e, `run stopped (${stop}) before ${phase}`, phase === 'CHECK_BUILD_INTERRUPTED' ? 'CHECK_BUILD' : phase);
       if (phase === 'PLAN') phase = await this.doPlan(e);
       else if (phase === 'BUILD') phase = await this.doBuild(e, false);
@@ -3007,6 +3028,7 @@ class Run {
       else if (phase === 'AUDIT') phase = await this.doAudit(e);
       else if (phase === 'VERIFY') phase = await this.doVerify(e);
       else if (phase === 'CHECK_VERIFY') phase = this.doCheckVerify(e);
+      else if (phase === 'RECHECK') phase = this.remergeVerified(e, readJson(this.gatePath(e.recheck.gate)));
       else throw new Error(`unknown phase ${phase}`);
     }
     return null;
@@ -3068,6 +3090,53 @@ class Run {
   }
 
   /**
+   * A re-check of a failed merge check (issue #35): the final check's kept work (`g.verifiedTip`) is merged
+   * again, --no-ff, onto the integration line as it now is, and CHECK_VERIFY judges that merge. No session runs.
+   * Work that is gone, no longer builds on the branch, or no longer merges parks with a gate to run the final
+   * check again: nothing is merged that the checks have not judged, and nothing is started over unasked.
+   */
+  /** A stop before a re-check: the same question again, so the kept work is still merged and checked next time. */
+  parkRecheck(e, reason) {
+    const g = readJson(this.gatePath(e.recheck.gate));
+    const keep = ['kind', 'skillStep', 'phase', 'technical', 'approvesFix', 'options', 'question', 'why', 'artifacts', 'resume', 'verifiedTip', 'verifyStep'];
+    this.writeGate(e, { ...Object.fromEntries(keep.filter((k) => k in g).map((k) => [k, g[k]])), reason });
+    return this.finish(e, 'PARKED', reason);
+  }
+
+  remergeVerified(e, g) {
+    const m = this.meta(e); const dev = this.state.integration; const tip = g.verifiedTip ?? null;
+    const toVerify = (why) => {
+      const reason = `the final check's kept work could not be merged again: ${why}`;
+      this.writeGate(e, {
+        kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', technical: true, reason,
+        question: `${m.label}: the final check passed earlier, but its work could not be merged again (${why}). Run the final check again?`,
+        options: [ANSWERS.resume, ANSWERS.startOver],
+        why: `nothing is merged that was not checked. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch`,
+        artifacts: g.artifacts ?? [], resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
+      });
+      return this.finish(e, 'PARKED', reason);
+    };
+    if (!tip || !gitOk(this.clone, 'cat-file', '-e', `${tip}^{commit}`)) return toVerify('it is no longer in the private clone');
+    if (!gitOk(this.clone, 'merge-base', '--is-ancestor', g.branchTip, tip)) return toVerify(`it does not build on ${m.branch} as the branch now is`);
+    if (gitOk(this.clone, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD')) gitRun(this.clone, 'merge', '--abort');
+    this.g('checkout', '-q', '-f', dev);
+    this.g('clean', '-fdq');
+    // Saved first: a driver killed from here re-enters CHECK_VERIFY (`recover`), which judges or undoes whatever is on the line.
+    e.preVerify = { developSha: this.integrationSha(), branchTip: g.branchTip, branch: m.branch };
+    e.state = 'CHECK_VERIFY'; this.save();
+    const r = gitRun(this.clone, 'merge', '--no-ff', '-q', '-m', `Merge branch '${m.branch}' into ${dev}`, tip);
+    if (r.code !== 0) {
+      if (gitOk(this.clone, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD')) gitRun(this.clone, 'merge', '--abort');
+      this.g('reset', '-q', '--hard', e.preVerify.developSha);
+      this.g('clean', '-fdq');
+      e.preVerify = null;
+      return toVerify(`it conflicts with ${dev} as it now is`);
+    }
+    this.log(`${e.id}: the final check's kept work (${tip.slice(0, 9)}) merged again onto ${dev} (${e.preVerify.developSha.slice(0, 9)}); checking that merge, no final check is run`);
+    return this.doCheckVerify(e);
+  }
+
+  /**
    * The phase an epic starts at in this run: `PLAN` from scratch, or the phase the owner's decided
    * gate names (the Part 2 table), on the branch the earlier run left. Returns null when the epic
    * already reached a terminal state here.
@@ -3124,7 +3193,7 @@ class Run {
         const report = g.briefFrom ? tryJson(path.join(this.stateDir, g.briefFrom, 'result.json'))?.result : null;
         if (report) this.writeFixBrief(e, 'The independent verifier returned FAIL again, after the repair that followed its first report. Its final report:', [report], 'a further repair, which the owner asked for after the final check');
       }
-      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}), ...(g.decided.standing ? { standing: true } : {}), ...(g.decided.standing || g.decided.asked ? { unasked: g.decided.standing ? 'standing' : g.decided.asked } : {}) }; // `unasked`: the gate's own question was never put to the owner (autopilot answered it, or they said "Try again")
+      e.resumed = { gate: f.gate, kind: f.kind, answer: f.answer, by: f.by, phase, branch: g.branch, branchTip: g.branchTip, fromRun: g.run ?? null, ...(g.approvesFix ? { approvesFix: true } : {}), ...(phase === 'CHECK_VERIFY' ? { verifiedTip: g.verifiedTip ?? null, verifyStep: g.verifyStep ?? null } : {}), ...(g.decided.standing ? { standing: true } : {}), ...(g.decided.standing || g.decided.asked ? { unasked: g.decided.standing ? 'standing' : g.decided.asked } : {}) }; // `unasked`: the gate's own question was never put to the owner (autopilot answered it, or they said "Try again")
       this.supersedeGates(e, f.gate);
       const used = (extra = {}) => this.markGate(f.gate, (x) => ({ ...x, decided: { ...x.decided, used: { run: this.runName, phase, date: now(), ...extra } } }));
       if (entry.approve) { e.plan = g.artifacts?.[0] ?? null; e.planApprovedBy = g.decided.by; e.planStep = g.session ?? null; }
@@ -3162,6 +3231,8 @@ class Run {
       if (!entry.question) used(); // a question gate is marked used by hook R8 when it answers
       e.resumed.behind = f.behind ?? 0;
       this.log(`${e.id}: resuming at ${phase} on ${g.branch} (${String(g.branchTip).slice(0, 9)}${f.behind ? `, ${f.behind} commit(s) behind ${this.state.integration}; it merges cleanly` : ''}): ${g.decided.by} answered "${f.answer}" on ${f.gate}${e.continuing ? ` — ${e.continuing} was cut short, so a session continues it instead of checking a part-built branch` : ''}`);
+      // The kept work is merged and checked in one step (RECHECK), so no stop falls between a merge and its check.
+      if (phase === 'CHECK_VERIFY') { e.recheck = { gate: f.gate }; this.save(); return 'RECHECK'; }
       return phase;
     }
     if (f?.state === 'void') {
@@ -3469,13 +3540,6 @@ export function ensureResumeGates(workspace, { write = true } = {}) {
   return missing.map((m) => m.name);
 }
 /**
- * The gate for a merge check that failed only because a fix made on the standing answer was held
- * back (`check` is the check-verify record). Judged against today's limits: a fix they now allow
- * (an earlier driver refused any changed test line, seen live on a four-file test-race fix) is
- * simply run again; a bigger one is the owner's to approve. Null when anything else failed, or the
- * fix touched a requirement or weakened a test.
- */
-/**
  * The question for a final check that still returns FAIL after its own repair. Before, the epic
  * was FAILED with nothing to answer and was planned and built again (issue #41 B5).
  */
@@ -3487,27 +3551,59 @@ export function verifyFailGate(label, reason, { artifacts = [] } = {}) {
   };
 }
 
-export function fixLimitGate(label, check, limits) {
+/** Where a failed merge check keeps the final check's work (issue #35). */
+export const verifiedRef = (id) => `refs/autopilot/verified/${id}`;
+
+/**
+ * The gate for a failed merge check (`check` is the check-verify record; issue #35). Every failure asks, and the
+ * final check's work is kept. Where that work can stand as it is (the tests or the requirements check failed only
+ * once it was merged, the merge itself was malformed, or a fix it made is the owner's to allow), "Resume" merges
+ * the kept work again and checks it (`phase: CHECK_VERIFY`), with no new final check. Where it cannot (it changed
+ * a requirement, made a test check less, left a requirement without its verified line, or counted a deferral), or
+ * when no work was kept (`verifiedTip` null), "Resume" runs the final check again (`phase: VERIFY`). Either is a
+ * technical stop the standing answer may take; a fix of the owner's to allow is `approvesFix`, as before.
+ */
+export function mergeCheckGate(label, check, limits, { verifiedTip = null } = {}) {
   const failed = (check?.checks ?? []).filter((c) => !c.pass);
-  const problems = failed.length === 1 && failed[0].name === 'verdict' && Array.isArray(failed[0].evidence) ? failed[0].evidence : [];
-  if (!limits || !problems.length || !problems.every((p) => String(p).startsWith(SMALL_FIX_PROBLEM))) return null;
-  if (problems.some((p) => /requirement file|removes checks from a test/.test(p))) return null;
+  const names = new Set(failed.map((c) => c.name));
+  const v = failed.find((c) => c.name === 'verdict');
+  const problems = v ? (Array.isArray(v.evidence) ? v.evidence : [v.evidence ?? 'the merge was not the one autopilot expects']).map(String) : [];
+  const fixP = problems.filter((p) => p.startsWith(SMALL_FIX_PROBLEM));
   const head = label ? `${label}: ` : '';
-  // A missing test was to be added, and the fix changed product code as well: the owner's to allow.
-  const code = (problems.map((p) => p.match(/changes a file that is not a test \(([^)]*)\)/)).find(Boolean) ?? [])[1];
-  if (code) return { kind: 'resume', phase: 'VERIFY', approvesFix: true, technical: true, options: [ANSWERS.resume, ANSWERS.startOver],
-    question: `${head}the final check passed everything, but to meet a requirement it changed the product itself (${code}), where your standing answer covers only adding a missing test. It was not merged. Allow that change for this epic and run the final check again?`,
-    why: `nothing else failed. "${ANSWERS.resume}" runs the final check again and lets it make this fix, in your name; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` };
-  const n = (re) => Number((problems.map((p) => p.match(re)).find(Boolean) ?? [])[1] ?? 0);
+  const options = [ANSWERS.resume, ANSWERS.startOver];
+  const startOver = `"${ANSWERS.startOver}" plans the epic again from scratch`;
+  // What needs a new final check, in the owner's words.
+  const redo = [];
+  if (problems.some((p) => /changes a requirement file/.test(p))) redo.push('it changed a requirement file, which the final check may not do');
+  if (fixP.some((p) => /removes checks from a test|skips a test|pass for nearly any value/.test(p))) redo.push('a fix it made makes a test check less');
+  if (names.has('sidecar-on-integration')) redo.push('the epic\'s status file does not record every requirement as verified');
+  if (names.has('no-waivers')) redo.push('its handoff counts a deferral or a waiver that is not allowed');
+  // What a re-check of the kept work can settle.
+  const code = (fixP.map((p) => p.match(/changes a file that is not a test \(([^)]*)\)/)).find(Boolean) ?? [])[1];
+  const n = (re) => Number((fixP.map((p) => p.match(re)).find(Boolean) ?? [])[1] ?? 0);
   const files = n(/changes (\d+) files/); const lines = n(/changes (\d+) lines/);
-  const over = [...(files > limits.files ? [`${files} files (your limit is ${limits.files})`] : []), ...(lines > limits.lines ? [`${lines} changed lines (your limit is ${limits.lines})`] : [])];
-  return over.length
-    ? { kind: 'resume', phase: 'VERIFY', approvesFix: true, technical: true, options: [ANSWERS.resume, ANSWERS.startOver],
-      question: `${head}the final check passed everything, but the fix it made was bigger than your standing answer for small fixes allows: ${over.join(', ')}. It was not merged. Allow a fix of that size for this epic and run the final check again?`,
-      why: `nothing else failed. "${ANSWERS.resume}" runs the final check again and lets it make this fix, in your name; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` }
-    : { kind: 'resume', phase: 'VERIFY', technical: true, options: [ANSWERS.resume, ANSWERS.startOver],
-      question: `${head}the final check passed everything, and an earlier autopilot held back the small fix it made under a rule that has since been loosened. Run the final check again?`,
-      why: `nothing else failed, and the fix is within your standing answer for small fixes as it is now. "${ANSWERS.resume}" runs the final check again; nothing is rebuilt. "${ANSWERS.startOver}" plans the epic again from scratch` };
+  const over = limits ? [...(files > limits.files ? [`${files} files (your limit is ${limits.files})`] : []), ...(lines > limits.lines ? [`${lines} changed lines (your limit is ${limits.lines})`] : [])] : [];
+  const stray = (problems.map((p) => p.match(/^commits added during verify touch files outside docs\/: (.*)$/)).find(Boolean) ?? [])[1];
+  const recheck = []; let approvesFix = false;
+  if (code) { approvesFix = true; recheck.push(`to meet a requirement it changed the product itself (${code}), where your standing answer covers only adding a missing test`); }
+  if (over.length) { approvesFix = true; recheck.push(`the fix it made was bigger than your standing answer for small fixes allows: ${over.join(', ')}`); }
+  // Nobody allowed it, so nothing checked it for a changed requirement or a weaker test: only a final check can.
+  if (stray) redo.push(`it changed files outside docs/ (${stray}) that nobody allowed`);
+  if (fixP.length && !code && !over.length && !redo.length) recheck.push('an earlier autopilot held back the small fix it made under a rule that has since been loosened');
+  const shape = problems.filter((p) => !p.startsWith(SMALL_FIX_PROBLEM) && !/^commits added during verify/.test(p));
+  if (shape.length) recheck.push(`its merge was not the one merge autopilot expects (${shape.join('; ')})`);
+  if (names.has('tests-green-on-integration')) recheck.push('the tests failed once its work was merged');
+  if (names.has('requirements-health')) recheck.push('the requirements check failed once its work was merged');
+  if (!redo.length && !recheck.length) recheck.push('autopilot\'s checks on its merge did not pass');
+  if (redo.length || !verifiedTip) {
+    const what = [...redo, ...(redo.length ? [] : recheck)];
+    return { kind: 'resume', phase: 'VERIFY', technical: true, options,
+      question: `${head}the final check passed, but ${what.join('; and ')}. It was not merged. Run the final check again?`,
+      why: `the final check's work cannot be merged as it is, so it is checked again. "${ANSWERS.resume}" runs the final check again on the same branch; nothing is rebuilt. ${startOver}` };
+  }
+  return { kind: 'resume', phase: 'CHECK_VERIFY', technical: true, ...(approvesFix ? { approvesFix: true } : {}), options,
+    question: `${head}the final check passed, but ${recheck.join('; and ')}. The merge was undone and its work is kept. ${approvesFix ? 'Allow that change for this epic and check the merge again?' : 'Check the merge again?'}`,
+    why: `nothing is rebuilt and no final check is run again. "${ANSWERS.resume}" merges the kept work again${approvesFix ? ', allowing the change in your name,' : ''} and runs autopilot's checks on that merge; a failure asks again. ${startOver}` };
 }
 
 /**
@@ -3555,21 +3651,31 @@ function missingResumeGates(workspace) {
     // An earlier driver called a verify that recorded no verdicts a FAIL (seen live: the owner had put a sign-in off).
     const verify = rec.state === 'FAILED' && (reason.match(/^(verify-\d+) FAIL after the fix round: /) ?? [])[1];
     const m = rec.state === 'PARKED' && reason.match(/^(CHECK_BUILD)\b|^interrupted: .*(CHECK_BUILD)/);
-    // A merge gate that failed only on the size of a fix made on the standing answer, parked with nothing to answer.
-    const checkFile = rec.state === 'PARKED' && /^merge gate failed \(verdict\)/.test(reason) ? fs.readdirSync(path.join(runDirOf(workspace, rec.run ?? ''), 'epics', id)).filter((f) => /^check-verify-\d+\.json$/.test(f)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).at(-1) : null;
-    const fix = checkFile ? fixLimitGate(null, tryJson(path.join(runDirOf(workspace, rec.run), 'epics', id, checkFile), {}), smallFixLimits({ smallFixes: tryJson(path.join(workspace, 'settings.json'), {})?.smallFixes })) : null;
+    // A failed merge check an earlier driver parked with nothing to answer (issue #35): the gate this driver writes,
+    // with the final check's work taken from the undone merge it kept under refs/autopilot/rejected/.
+    const mergeFailed = rec.state === 'PARKED' && /^merge gate failed \(/.test(reason);
     const tip = gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${rec.branch}`).out;
     const integration = detectIntegration(clone);
-    if (!(m || redo || fix || (verify && (NO_VERDICT.test(reason) || rec.fixBrief))) || !tip || !integration) continue;
+    if (!(m || redo || mergeFailed || (verify && (NO_VERDICT.test(reason) || rec.fixBrief))) || !tip || !integration) continue;
     const st = tryJson(path.join(runDirOf(workspace, rec.run ?? ''), 'state.json'), {});
     const q = (st.queue ?? []).find((x) => x.id === id) ?? {};
     const n = gates.filter((g) => g.epic === id).length + 1;
     const last = (rec.buildSteps ?? []).at(-1);
-    if (fix) {
+    if (mergeFailed) {
+      const epicDir = path.join(runDirOf(workspace, rec.run ?? ''), 'epics', id);
+      const checkFile = exists(epicDir) ? fs.readdirSync(epicDir).filter((f) => /^check-verify-\d+\.json$/.test(f)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).at(-1) : null;
+      // No record of the checks: the names in the reason say what failed.
+      const check = (checkFile && tryJson(path.join(epicDir, checkFile))) || { checks: ((reason.match(/^merge gate failed \(([^)]*)\)/) ?? [])[1] ?? '').split(/,\s*/).filter(Boolean).map((name) => ({ name, pass: false })) };
+      // Only the latest undone merge is the merge check's own: an older one is another session's, undone for another reason.
+      const lastRejected = (q.rejected ?? []).at(-1);
+      const p2 = lastRejected ? gitRun(clone, 'rev-parse', '--verify', '--quiet', `${lastRejected}^2`).out : '';
+      const verifiedTip = p2 && gitOk(clone, 'merge-base', '--is-ancestor', tip, p2) ? p2 : null;
+      const gate = mergeCheckGate(q.label ?? id, check, smallFixLimits({ smallFixes: tryJson(path.join(workspace, 'settings.json'), {})?.smallFixes }), { verifiedTip });
+      const verifyStep = /^verify-\d+$/.test(q.lastStep ?? '') ? `runs/${rec.run}/epics/${id}/${q.lastStep}` : null;
       made.push({ name: `${id}-${n}.json`, gate: {
         epic: id, epicName: q.name ?? id, run: rec.run ?? null, session: null, branch: rec.branch, branchTip: tip, base: gitRun(clone, 'rev-parse', integration).out,
         resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${id}`, decided: null, skillStep: 'autopilot driver', reason,
-        ...fix, question: `${q.label ?? id}: ${fix.question}`, artifacts: [`runs/${rec.run}/epics/${id}/${checkFile}`],
+        ...gate, artifacts: checkFile ? [`runs/${rec.run}/epics/${id}/${checkFile}`] : [], ...(gate.phase === 'CHECK_VERIFY' ? { verifiedTip, verifyStep } : {}),
       } });
       continue;
     }
@@ -3632,6 +3738,7 @@ export const standingCovers = (gate, gates, n) => !!standingAnswer(gate, gates, 
 function standingDid(gate, answer) {
   if (answer === ANSWERS.replan) return 'had it planned again';
   if (answer === ANSWERS.auditReal) return 'had what the reviewer found repaired';
+  if (gate.phase === 'CHECK_VERIFY') return gate.approvesFix ? 'allowed the final check\'s fix and checked its merge again' : 'checked the final check\'s merge again';
   if (gate.approvesFix) return 'let the final check make its own fix and ran it again';
   if (gate.phase === 'FIX_BUILD' && /FAIL after the fix round/.test(gate.reason ?? '')) return 'had it repaired once more';
   if (gate.phase === 'VERIFY') return 'ran the final check again';

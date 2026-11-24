@@ -90,7 +90,7 @@ export function collectReport(runDir) {
     return {
       id: q.id, label: q.label ?? q.id, outcome, reason: q.reason ?? null, evidence, checks, audit, gates: q.gates ?? [],
       costUsd: q.costUsd ?? 0, turns: q.turns ?? 0, wallMs: q.wallMs ?? 0, elapsedMs, sessions: q.sessions ?? [],
-      testChanges: q.testChanges ?? [], unproven: q.unproven ?? [], rejected: q.rejected ?? [], fixRounds: q.fixRounds ?? 0,
+      testChanges: q.testChanges ?? [], unproven: q.unproven ?? [], rejected: q.rejected ?? [], verifiedKept: q.verifiedKept ?? null, fixRounds: q.fixRounds ?? 0,
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
       resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
       // What the closing screen says and this report used to leave out: approved amendments, the verifier's words on the pictures, sign-ins nobody answered.
@@ -384,6 +384,7 @@ export function renderReport(r) {
       for (const t of e.testChanges) L.push(`- \`${t.path}\` — ${t.reason ?? 'NO REASON RECORDED'}`);
     }
     for (const ref2 of e.rejected) L.push('', `A rejected merge is kept in the clone at \`${ref2}\`.`);
+    if (e.verifiedKept) L.push('', `The merge was undone; the final check's work is kept in the clone at \`${e.verifiedKept}\`.`);
   }
   L.push('', '## Words used in this report', ...GLOSSARY.map(([w, d]) => `- **${w}** — ${d}`));
   return L.join('\n') + '\n';
