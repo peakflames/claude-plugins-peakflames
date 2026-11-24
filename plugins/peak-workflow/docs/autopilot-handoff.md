@@ -554,7 +554,7 @@ Why this order:
 
 ## 2026-11-23 session — live fixes, what the run proved, and a rename
 
-### Decision pending: rename the "prototype" mode
+### Decided (2026-11-23): "prototype" becomes **Provisional**; not yet built
 
 The owner finds "prototype" untrue: the mode builds and tests to the same standard. What it
 skips is waiting for a person. The AI makes the judgment calls that are the owner's (take a
@@ -563,17 +563,31 @@ requirement nobody observed as NOT OBSERVED), records them as `approved_by = "au
 (prototype run)"`, and lists every one at the end for the owner to confirm. Requirement IDs,
 traced tests, failing tests, scope and Safety still stop it.
 
-- **The owner's candidate (2026-11-23): "AI-Supervised-Only".** Open question for the final
-  wording: does it tell a non-technical reader that a person still confirms afterward? The
-  name could read as "no human at all".
-- Also discussed: **Provisional** (the result stands, pending confirmation; pairs with
-  Confirmed), **Delegated** (you hand the calls to the AI; pairs with Supervised), **Sign-off
-  later**, **Hands-off**. "Unattended" is taken (it means the owner is away, in any mode).
-- The word is in `driver.mjs`, `hooks/pretool.mjs` (R8), `report.mjs`, `attend.mjs`,
-  `skills/autopilot/SKILL.md`, the launch screen, and the tests. It is also stored in
-  project files (`approved_by = "autopilot (prototype run)"`, for instance Pilot Light's
-  CR-hWfKoMk): the rename must keep reading the old value. Do it as one change, with no
-  run going.
+- **The name is Provisional** (the owner's choice, after weighing "AI-Supervised-Only",
+  Delegated/Supervised, Sign-off later and Hands-off; "Unattended" is taken, it means the owner
+  is away, in any mode). **Full** stays as the other mode.
+- **The description must lead with the idea: "the AI decides now, you confirm later."** Offered
+  to the owner at launch, Provisional says that first, and Full is its opposite: you decide as it
+  goes. Suggested wording (the launch popup, `skills/autopilot/SKILL.md` near line 541):
+  - *Provisional* — "The AI decides now, you confirm later. It keeps building where a Full run
+    would stop and ask: it makes the calls that are yours (a requirement correction, a deferral,
+    a screen to look at) and lists every one at the end for you to review."
+  - *Full* — "You decide as it goes. It stops and asks whenever a requirement, a deferral or a
+    look needs you."
+- **What "confirm later" is, in the code** (checked 2026-11-23): the end-of-run report's
+  "Decided for you in this prototype run" (corrections with old and new wording, deferrals and
+  fixes taken on a recommendation, requirements nobody observed, screens merged without a look
+  with the pictures kept, a changed `CLAUDE.md`); the "not proven" and "should still confirm"
+  notes written into each epic's status file, listed by `status` under Left for Later; and a
+  later Full run, which asks about each correction or deferral on an epic that has not merged
+  yet. It is an invitation, not a gate: nothing stops merged work from standing unreviewed. The
+  records say the AI decided; whether a later confirmation changes `approved_by` was not checked.
+- **Where the word "prototype" is**: `driver.mjs`, `hooks/pretool.mjs` (R8), `report.mjs` (the
+  intro line and the "Decided for you in this prototype run" heading), `attend.mjs`,
+  `skills/autopilot/SKILL.md` (the launch question near lines 541 and 609), the launch screen,
+  the tests. It is also stored in project files (`approved_by = "autopilot (prototype run)"`, for
+  instance Pilot Light's CR-hWfKoMk) and in each run's `config.json` as `mode: "prototype"`: the
+  rename must keep reading both old values. Do it as one change, with no run going.
 
 ### Fixed this session (all on `feature/peak-workflow-autopilot-poc`)
 
@@ -596,12 +610,12 @@ the build"); the budget wording ("$117.36 left of $250 (the N earlier runs … s
   any value (`toBeTruthy`, `not.toThrow`, `assert True`), parks for a person (`testWeakening`
   in `lib.mjs`). Not yet seen in a real run.
 
-### Fixed but not merged
+### Fixed late in the session
 
-- **The referee cuts a command at `;`, `|`, `&&` and brackets without reading quotes** — the
-  `;` in a quoted sed script made `"../support/samples"` look like a path (refused live,
-  2026-11-24 00:34 UTC). Branch `feature/peak-workflow-quote-aware-split`, commit `f28dfec`:
-  single-quoted text is no longer cut. Merge when no driver runs.
+- **The referee cut a command at `;`, `|`, `&&` and brackets without reading quotes**: the `;`
+  in a quoted sed script made `"../support/samples"` look like a path (refused live, 2026-11-24
+  00:34 UTC). Single-quoted text is no longer cut (`splitCommand`, commit `f28dfec`, merged
+  `827ed0b`, live for the running build).
 
 ### Known, not fixed
 
@@ -634,8 +648,8 @@ the build"); the budget wording ("$117.36 left of $250 (the N earlier runs … s
 
 Done: the false referee refusals, the usage-limit wait, verifier notes, the stricter test
 guard. Still open: the short review (above); a note for the tester that Windows is unproven and
-what to send back if it breaks (the run report and the run's `hooks.jsonl`); the quote-aware
-splitter merged; the rename decided.
+what to send back if it breaks (the run report and the run's `hooks.jsonl`); the rename to
+Provisional built.
 
 ## Where the detail is
 
