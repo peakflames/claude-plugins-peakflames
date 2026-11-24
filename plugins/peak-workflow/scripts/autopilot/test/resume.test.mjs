@@ -7,7 +7,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, continueRun, ensureResumeGates, gateFacts, limitDecision, ownerAnswers, usageLimit } from '../driver.mjs';
+import { ANSWERS, continueRun, ensureResumeGates, gateFacts, limitDecision, ownerAnswers, status, usageLimit } from '../driver.mjs';
+import { LEAVE_IT, PROVISIONAL_BY, TRY_AGAIN, prototypeReasked } from '../lib.mjs';
 import { activity, eventLine, pictureLines, plainReason } from '../attend.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
@@ -36,6 +37,8 @@ const roundSpent = (e) => ({
   [`${e.id}/fix`]: { actions: [{ do: 'write', path: `test/${e.slug}.test.js`, content: `import test from 'node:test';\n${e.tors.map((x) => `test('${x} is met', () => {});`).join('\n')}\n` }, { do: 'commit', message: `fix(epic-${e.id}): green` }] },
 });
 const merged = (p, tip) => spawnSync('git', ['merge-base', '--is-ancestor', tip, 'develop'], { cwd: p.clone }).status === 0;
+/** A catch-up session as a real one runs it: merge develop (it stops on the clash), settle the file, commit the merge. */
+const settle = (file, content) => ({ actions: [{ do: 'exec', cmd: 'git merge --no-ff develop -m "Merge develop into the epic branch" || true' }, { do: 'write', path: file, content }, { do: 'commit', message: 'Merge develop into the epic branch' }] });
 const DEFERRAL = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
 
 /** An epic with one operator-observed requirement: preflight marks it human-check. */
@@ -710,34 +713,45 @@ test('a gate an earlier driver wrote ("stopped before CHECK_BUILD" after a build
 
 // ---- void decisions, waiting gates -------------------------------------------------------------
 
-test('void decision: the branch tip moved after the gate was written — reported, re-planned from scratch, old branch kept', async (t) => {
+test('moved: the branch tip moved after the gate was written — not planned again: a technical question, and "Resume" checks the branch as it now is', async (t) => {
   const p = makeProject(t);
   p.scenario({ ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in')]) });
   await p.go();
   decide(p, E1.id, ANSWERS.auditNotReal);
   git(p.clone, 'checkout', '-q', E1.branch);
-  git(p.clone, 'commit', '-q', '--allow-empty', '-m', 'someone committed here by hand');
+  git(p.clone, 'commit', '-q', '--allow-empty', '-m', `docs(epic-${E1.id}): a note added by hand`);
   git(p.clone, 'checkout', '-q', 'develop');
   const moved = git(p.clone, 'rev-parse', E1.branch);
 
   const pre = JSON.parse(cli('preflight', '--project', p.project, '--allow-test-double', '--json').stdout);
-  assert.match(pre.launch.warn.join('\n'), /1 decision\(s\) can no longer be used \(Lg1Csv7: the branch feature\/epic-Lg1Csv7-csv-import moved since the gate was written/);
-  assert.equal(pre.epics[0].eligibility, 'eligible');
+  assert.match(pre.launch.warn.join('\n'), /1 decision\(s\) can no longer be used as given \(Lg1Csv7: the branch feature\/epic-Lg1Csv7-csv-import moved since the gate was written[^)]*\)\); autopilot asks how to go on with those epics/);
+  assert.doesNotMatch(pre.launch.warn.join('\n'), /from scratch/);
 
+  // No status in between: the run itself finds the decision void, writes the question and parks with no session.
   p.scenario(happy(E1));
   const r = await again(p);
-
-  assert.deepEqual(r.steps, ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`), 'not VERIFY: the decision no longer describes this branch');
+  assert.deepEqual(r.steps, [], 'nothing is planned again unasked');
   const e = p.epic(E1.id);
-  assert.equal(e.state, 'MERGED');
-  assert.match(e.voided.why, /moved since the gate was written/);
-  assert.equal(git(p.clone, 'rev-parse', e.superseded[0]), moved);
-  const g = gate(p, E1.id);
-  assert.deepEqual([g.void.run, g.decided.used], [p.runName(), undefined]);
+  assert.equal(e.state, 'PARKED');
+  assert.deepEqual([e.voided.gate, e.voided.asked, e.superseded ?? []], [`gates/${E1.id}-1.json`, `gates/${E1.id}-2.json`, []]);
+  assert.equal(git(p.clone, 'rev-parse', E1.branch), moved, 'the branch is left as it is');
+  const old = gate(p, E1.id);
+  assert.deepEqual([old.void.run, old.void.by, old.decided.used], [p.runName(), `gates/${E1.id}-2.json`, undefined]);
+  const g = gate(p, E1.id, 2);
+  assert.deepEqual([g.kind, g.phase, g.technical, g.branchTip, g.decided, g.options], ['resume', 'CHECK_BUILD', true, moved, null, [ANSWERS.resume, ANSWERS.startOver]]);
+  assert.match(g.question, /its branch was changed after you answered "Not real — verify as built" \(new commits on it\)\. Check it again from where its branch is now\?$/);
   const md = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
-  assert.match(md, /1 decision could not be used and the epic was planned again from scratch \(Lg1Csv7\)/);
-  assert.match(md, /Your decision "Not real — verify as built" on `gates\/Lg1Csv7-1\.json` was void — the branch/);
+  assert.match(md, /1 decision could not be used as given \(Lg1Csv7\)/);
+  assert.match(md, /Your decision "Not real — verify as built" on `gates\/Lg1Csv7-1\.json` could not be used — the branch .* moved since the gate was written .*\. You are asked how to go on: `gates\/Lg1Csv7-2\.json`\./);
+  assert.doesNotMatch(md, /planned again from scratch/);
   assert.equal(cli('decide', '--workspace', p.state, '--gate', `${E1.id}-1.json`, '--answer', ANSWERS.auditReal, '--by', 'Pat').status, 2, 'a void gate cannot be decided again');
+
+  setAutoContinue(p, 1);
+  assert.deepEqual(continueRun(p.state, { by: 'Pat Owner' }).continued.map((x) => [x.enters, x.did]), [['CHECK_BUILD', 'checked it again from where its branch is now']]);
+  const r2 = await again(p);
+  assert.deepEqual(r2.steps, ['audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`), 'checks, review and final check on the branch as it is; no plan, no build');
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  assert.ok(merged(p, moved));
 });
 
 test('another epic merged after the park: the decision still holds, because the parked branch merges cleanly — resumed, not rebuilt', async (t) => {
@@ -809,6 +823,20 @@ test('a branch that stops merging cleanly during the run is parked before its bu
   assert.deepEqual(r.steps.filter((x) => x.startsWith(E1.id)), [], 'no session is spent on a branch that cannot land');
   assert.equal(p.epic(E1.id).state, 'PARKED');
   assert.match(p.epic(E1.id).reason, /does not merge cleanly with develop \(docs\/notes\.md\)/);
+  // The conflict gate, not the old non-technical one: the standing answer may take it, and "Resume" brings the branch up to date.
+  const g = gate(p, E1.id, 2);
+  assert.deepEqual([g.kind, g.phase, g.technical, g.mergeIn, g.conflicts, g.options], ['resume', 'BUILD', true, true, ['docs/notes.md'], [ANSWERS.resume, ANSWERS.startOver]]);
+  assert.match(g.question, /other finished work merged since, and its branch no longer fits on top of it \(both changed docs\/notes\.md\)\. Bring it up to date and go on\?$/);
+  assert.doesNotMatch(`${g.question} ${g.why}`, /\/peak-workflow|BUILD|\.json|git /, 'in the owner\'s words');
+  assert.equal(plainReason(g.reason), 'its work no longer fits on top of the other finished work');
+
+  setAutoContinue(p, 1);
+  assert.deepEqual(continueRun(p.state, { by: 'Pat Owner' }).continued.map((x) => [x.gate, x.did]), [[`gates/${E1.id}-2.json`, 'brought it up to date with the other finished work']]);
+  p.scenario({ [`${E1.id}/catchup`]: settle('docs/notes.md', 'notes by csv\nnotes by config\n'), [`${E1.id}/build`]: buildScript(E1), [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r2 = await again(p, { queue: [E1.id] });
+  assert.deepEqual(r2.steps, ['catchup-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`), 'brought up to date, then the cut-short build is continued; never planned again');
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  assert.equal(git(p.clone, 'show', 'develop:docs/notes.md'), 'notes by csv\nnotes by config');
 });
 
 test('a verifier that first merges develop into the waiting branch is not blamed for the other epic\'s files; a file it writes itself still is', async (t) => {
@@ -834,27 +862,211 @@ test('a verifier that first merges develop into the waiting branch is not blamed
   assert.match(JSON.stringify(q.epic(E1.id).checks.at(-1)), /verdict/);
 });
 
-test('void decision: the parked branch no longer merges cleanly into the integration line — reported with the files, re-planned from scratch', async (t) => {
+// ---- an epic is never started over without asking (handoff Step 3) --------------------------------
+// conflict: a short session brings the branch up to date and the old answer carries; moved: checked again as it is;
+// gone: asked, and a provisional run starts it over itself and lists it. Nothing is planned again unless "Start over".
+
+const clash = (text) => ({ do: 'write', path: 'src/shared.js', content: text });
+const building = (e, text) => ({ actions: [...buildActions(e, { commit: false }), clash(text), { do: 'commit', message: `feat(epic-${e.id}): implement ${e.slug}` }] });
+const CFG = { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' };
+const noPlan = (r) => assert.deepEqual(r.steps.filter((s) => /\/plan-\d+$/.test(s)), [], 'never planned again unasked');
+
+test('conflict between runs: the owner\'s look stands; a technical question, the standing answer takes it, a catch-up session settles the clash, and the final check runs on the old answer', async (t) => {
+  const p = makeProject(t, { config: { humanCheck: { Lg5Chr8: "echo '<svg/>' > chart.html && echo chart written" } } });
+  const e5 = addLookEpic(p);
+  const d = addEpic(p.project, CFG);
+  const look = buildWithManual(e5).actions;
+  p.scenario({ [`${e5.id}/plan`]: planScript(e5), [`${e5.id}/build`]: { actions: [...look.slice(0, -1), clash('export const mode = "chart";\n'), look.at(-1)] }, ...happy(d), [`${d.id}/build`]: building(d, 'export const mode = "config";\n') });
+  const s1 = await p.go({ queue: [e5.id, d.id] });
+  assert.deepEqual(s1.queue.map((q) => [q.id, q.state]), [[e5.id, 'PARKED'], [d.id, 'MERGED']]);
+  const tip = git(p.clone, 'rev-parse', e5.branch);
+  decide(p, e5.id, ANSWERS.looksRight, { note: 'one bar per category, labels readable' });
+
+  // Between runs (status, continue): the void decision becomes one question; it is not acted on silently.
+  assert.deepEqual(ensureResumeGates(p.state), [`${e5.id}-2.json`]);
+  const g = gate(p, e5.id, 2);
+  assert.deepEqual([g.kind, g.phase, g.technical, g.mergeIn, g.then, g.conflicts, g.branchTip, g.decided], ['resume', 'VERIFY', true, true, `gates/${e5.id}-1.json`, ['src/shared.js'], tip, null]);
+  assert.match(g.question, /other finished work merged since, and its branch no longer fits on top of it \(both changed src\/shared\.js\)\. Bring it up to date and go on with your answer "Looks right"\?$/);
+  assert.match(g.why, /a short session merges the other work into this epic's branch and settles the clashing lines; the final check and the merge check then judge everything\. "Start over" plans the epic again from scratch/);
+  const old = gate(p, e5.id);
+  assert.deepEqual([old.restarted?.by, old.void, old.decided.answer], [`gates/${e5.id}-2.json`, undefined, ANSWERS.looksRight], 'the look still stands: it is carried on, not void');
+  assert.equal(gateFacts(p.state, 'develop').get(e5.id).state, 'waiting');
+  assert.deepEqual(ensureResumeGates(p.state), [], 'written once');
+
+  setAutoContinue(p, 1);
+  assert.deepEqual(continueRun(p.state, { by: 'Pat Owner' }).continued.map((x) => [x.gate, x.did]), [[`gates/${e5.id}-2.json`, 'brought it up to date with the other finished work']]);
+  assert.equal(gateFacts(p.state, 'develop').get(e5.id).state, 'resume', 'a gate that brings the branch up to date expects it not to merge cleanly');
+
+  const manual = 'Did you perform any manual verification beyond the automated gates I ran?';
+  p.scenario({ [`${e5.id}/catchup`]: settle('src/shared.js', 'export const mode = "chart";\nexport const also = "config";\n'), [`${e5.id}/verify`]: { actions: [ask(manual, ['Yes — I performed manual verification', 'No — only automated gates were run']), ...wrapupActions(e5)], result: { result: 'Verdict: PASS' } } });
+  const r = await again(p, { queue: [e5.id] });
+  assert.deepEqual(r.steps, ['catchup-1', 'verify-1'].map((s) => `${e5.id}/${s}`), 'no plan, no build, no look again');
+  noPlan(r);
+  const e = p.epic(e5.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.match(r.calls[0].prompt, /src\/shared\.js/);
+  assert.match(r.calls[0].prompt, /git merge --no-ff develop/);
+  assert.deepEqual([e.caughtUp.from, e.caughtUp.session], [tip, 'catchup-1']);
+  assert.equal(readJson(p.dir(e5.id, 'verify-1', 'step.json')).look.gate, `gates/${e5.id}-1.json`, 'the verifier is handed the owner\'s look');
+  assert.equal(fs.readdirSync(path.join(p.state, 'gates')).filter((f) => f.startsWith(e5.id)).length, 2, 'the look is not asked again');
+  assert.equal(git(p.clone, 'show', 'develop:src/shared.js'), 'export const mode = "chart";\nexport const also = "config";');
+  assert.equal(gate(p, e5.id, 2).decided.used.run, p.runName());
+});
+
+test('conflict on a question asked in the build: found when the run starts, it parks with no session; "Resume" catches up, then the build goes on with the owner\'s answer', async (t) => {
   const p = makeProject(t);
-  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
-  const clash = (text) => ({ do: 'write', path: 'src/shared.js', content: text });
-  const building = (e, text) => ({ actions: [...buildActions(e, { commit: false }), clash(text), { do: 'commit', message: `feat(epic-${e.id}): implement ${e.slug}` }] });
+  const d = addEpic(p.project, CFG);
+  const q = `${E1.tors[3]} cannot be fully met: amounts with three decimals. How to proceed?`;
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, clash('export const mode = "a";\n'), ask(q, DEFERRAL)] }, ...happy(d), [`${d.id}/build`]: building(d, 'export const mode = "b";\n') });
+  await p.go({ queue: [E1.id, d.id] });
+  assert.deepEqual([p.epic(E1.id).state, p.epic(d.id).state], ['PARKED', 'MERGED']);
+  decide(p, E1.id, 'Fix now');
+
+  p.scenario({});
+  const r = await again(p, { queue: [E1.id] });
+  assert.deepEqual(r.steps, [], 'no session: the run writes the question and parks');
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  assert.match(p.epic(E1.id).reason, /does not merge cleanly with develop \(src\/shared\.js\)/);
+  const g = gate(p, E1.id, 2);
+  assert.deepEqual([g.mergeIn, g.then, g.phase, g.technical], [true, `gates/${E1.id}-1.json`, 'BUILD', true]);
+  assert.match(g.question, /go on with your answer "Fix now"\?$/);
+  assert.deepEqual([p.epic(E1.id).voided.asked, gate(p, E1.id).restarted.by], [`gates/${E1.id}-2.json`, `gates/${E1.id}-2.json`]);
+
+  decide(p, E1.id, ANSWERS.resume, { n: 2 });
+  p.scenario({ [`${E1.id}/catchup`]: settle('src/shared.js', 'export const mode = "a";\nexport const other = "b";\n'), [`${E1.id}/build`]: { actions: [ask(q, DEFERRAL), ...buildActions(E1)] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r2 = await again(p, { queue: [E1.id] });
+  assert.deepEqual(r2.steps, ['catchup-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  noPlan(r2);
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  // The branch now holds other epics' work, so a new build session takes over; it is told the answer, and R8 gives it again.
+  assert.match(fs.readFileSync(p.dir(E1.id, 'build-1', 'owner-answers.md'), 'utf8'), /Fix now/);
+  assert.deepEqual(Object.values(tools(p, E1.id, 'build-1')[0].hookSpecificOutput.updatedInput.answers), ['Fix now']);
+});
+
+test('a catch-up session that leaves conflict markers: its work is undone and the same question parks again, counted; past the count it is "Try again" / "Leave it for now"', async (t) => {
+  const p = makeProject(t);
+  const d = addEpic(p.project, CFG);
   p.scenario({ ...happy(E1), [`${E1.id}/build`]: building(E1, 'export const mode = "a";\n'), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d), [`${d.id}/build`]: building(d, 'export const mode = "b";\n') });
   await p.go();
+  const tip = git(p.clone, 'rev-parse', E1.branch);
   decide(p, E1.id, ANSWERS.auditNotReal);
-  const before = git(p.clone, 'status', '--porcelain') + git(p.clone, 'rev-parse', 'develop');
-  const f = gateFacts(p.state, 'develop').get(E1.id);
-  assert.equal(f.state, 'void');
-  assert.match(f.why, /no longer merges cleanly into develop \(conflicts in src\/shared\.js\)/);
-  assert.equal(git(p.clone, 'status', '--porcelain') + git(p.clone, 'rev-parse', 'develop'), before, 'the trial merge changes nothing in the clone');
+  setAutoContinue(p, 1);
+  assert.deepEqual(continueRun(p.state, { by: 'Pat Owner' }).continued.map((x) => x.gate), [`gates/${E1.id}-2.json`]);
+
+  p.scenario({ [`${E1.id}/catchup`]: { actions: [{ do: 'exec', cmd: 'git merge --no-ff develop -m "Merge develop" || true' }, { do: 'commit', message: 'Merge develop' }] } });
+  const r = await again(p, { queue: [E1.id] });
+  assert.deepEqual(r.steps, [`${E1.id}/catchup-1`]);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'PARKED');
+  assert.match(e.reason, /catchup-1 did not bring it up to date: conflict markers are left in src\/shared\.js/);
+  assert.equal(git(p.clone, 'rev-parse', E1.branch), tip, 'what the session did is undone; the branch is as the gate says');
+  assert.ok(e.catchUpRejected.at(-1).startsWith(`refs/autopilot/rejected/${E1.id}-catchup-`), 'and kept');
+  const g = gate(p, E1.id, 3);
+  assert.deepEqual([g.mergeIn, g.then, g.technical, g.branchTip], [true, `gates/${E1.id}-1.json`, true, tip]);
+
+  const c = continueRun(p.state, { by: 'Pat Owner' });
+  assert.deepEqual([c.continued, c.left.map((x) => x.gate)], [[], [`gates/${E1.id}-3.json`]], 'the standing answer covered one; it cannot loop');
+  const st = status(p.project, p.state);
+  assert.deepEqual(st.waiting.map((w) => [w.file, w.options]), [[`gates/${E1.id}-3.json`, [TRY_AGAIN, LEAVE_IT]]]);
+  assert.ok(!p.steps().some((s) => s === `${E1.id}/plan-2`), 'never planned again');
+});
+
+test('a catch-up that keeps only its own side (`git merge -s ours`) throws away the other epics\' work: undone, and asked again', async (t) => {
+  const p = makeProject(t);
+  const d = addEpic(p.project, CFG);
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: building(E1, 'export const mode = "a";\n'), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d), [`${d.id}/build`]: building(d, 'export const mode = "b";\n') });
+  await p.go();
+  const tip = git(p.clone, 'rev-parse', E1.branch);
+  decide(p, E1.id, ANSWERS.auditNotReal);
+  ensureResumeGates(p.state);
+  decide(p, E1.id, ANSWERS.resume, { n: 2 });
+  p.scenario({ [`${E1.id}/catchup`]: { actions: [{ do: 'exec', cmd: 'git merge --no-ff -s ours develop -m "Merge develop"' }] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p, { queue: [E1.id] });
+  assert.deepEqual(r.steps, [`${E1.id}/catchup-1`], 'no final check on a branch that dropped the other work');
+  assert.match(p.epic(E1.id).reason, /src\/config\.js.* not what the merge of the two sides makes/);
+  assert.equal(git(p.clone, 'rev-parse', E1.branch), tip);
+  assert.equal(gate(p, E1.id, 3).then, `gates/${E1.id}-1.json`);
+});
+
+test('a catch-up cut off by its own limit: the next run brings the branch up to date again and still goes on with the owner\'s answer', async (t) => {
+  const p = makeProject(t);
+  const d = addEpic(p.project, CFG);
+  const q = `${E1.tors[3]} cannot be fully met: amounts with three decimals. How to proceed?`;
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, clash('export const mode = "a";\n'), ask(q, DEFERRAL)] }, ...happy(d), [`${d.id}/build`]: building(d, 'export const mode = "b";\n') });
+  await p.go({ queue: [E1.id, d.id] });
+  decide(p, E1.id, 'Fix now');
+  ensureResumeGates(p.state);
+  decide(p, E1.id, ANSWERS.resume, { n: 2 });
+  p.scenario({ [`${E1.id}/catchup`]: { actions: [{ do: 'exec', cmd: 'git merge --no-ff develop -m "Merge develop" || true' }], result: { subtype: 'error_max_turns', is_error: true } } });
+  await again(p, { queue: [E1.id] });
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  const g3 = gate(p, E1.id, 3);
+  assert.deepEqual([g3.phase, g3.technical === true || /^budget:/.test(g3.reason)], ['CATCH_UP', true]);
+  assert.equal(git(p.clone, 'status', '--porcelain'), '', 'the half-done merge is not committed as work');
+
+  decide(p, E1.id, ANSWERS.resume, { n: 3 });
+  p.scenario({ [`${E1.id}/catchup`]: settle('src/shared.js', 'export const mode = "a";\nexport const other = "b";\n'), [`${E1.id}/build`]: { actions: [ask(q, DEFERRAL), ...buildActions(E1)] }, [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p, { queue: [E1.id] });
+  assert.deepEqual(r.steps, ['catchup-1', 'build-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`));
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  assert.deepEqual(Object.values(tools(p, E1.id, 'build-1')[0].hookSpecificOutput.updatedInput.answers), ['Fix now'], 'the answer carried through the stop');
+});
+
+test('gone, full run: the branch was deleted — "Start over" or "Leave it for now", never the standing answer; only "Start over" plans it again', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: buildActions(E1, { commit: false }), result: { subtype: 'error_max_turns', is_error: true } } });
+  await p.go();
+  decide(p, E1.id, ANSWERS.resume);
+  git(p.clone, 'checkout', '-q', '-f', 'develop');
+  git(p.clone, 'branch', '-q', '-D', E1.branch);
+
+  assert.deepEqual(ensureResumeGates(p.state), [`${E1.id}-2.json`]);
+  const g = gate(p, E1.id, 2);
+  assert.deepEqual([g.kind, g.restart, g.technical, g.options], ['resume', 'gone', undefined, [ANSWERS.startOver, LEAVE_IT]]);
+  assert.match(g.question, /there is nothing left to continue it from: its branch is gone\. Start it over from scratch\?$/);
+  assert.deepEqual(gate(p, E1.id).void.by, `gates/${E1.id}-2.json`);
+  setAutoContinue(p, 3);
+  const c = continueRun(p.state, { by: 'Pat Owner' });
+  assert.deepEqual([c.continued, c.left.map((x) => x.why)], [[], ['not a technical stop: there is nothing left to continue it from']]);
+  const leave = cli('decide', '--workspace', p.state, '--gate', `gates/${E1.id}-2.json`, '--answer', LEAVE_IT, '--by', 'Pat Owner');
+  assert.equal(JSON.parse(leave.stdout).effect, 'none');
 
   p.scenario(happy(E1));
   const r = await again(p);
+  assert.deepEqual(r.steps, [], 'left for now: nothing runs');
+  assert.equal(p.epic(E1.id).state, 'SKIPPED');
 
-  assert.deepEqual(r.steps, ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  decide(p, E1.id, ANSWERS.startOver, { n: 2 });
+  const r2 = await again(p);
+  assert.deepEqual(r2.steps, ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`), 'planned again: the owner answered "Start over"');
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  assert.match(p.epic(E1.id).voided.why, /conflicts in src\/shared\.js/);
 });
+
+test('gone, provisional run: it starts the epic over itself and lists it under "Decided for you"; a later full run does not ask it again', async (t) => {
+  const setup = async () => {
+    const p = makeProject(t, { config: { mode: 'provisional' } });
+    p.scenario({ ...happy(E1), [`${E1.id}/build`]: { actions: buildActions(E1, { commit: false }), result: { subtype: 'error_max_turns', is_error: true } } });
+    await p.go();
+    decide(p, E1.id, ANSWERS.resume);
+    git(p.clone, 'checkout', '-q', '-f', 'develop');
+    git(p.clone, 'branch', '-q', '-D', E1.branch);
+    p.scenario(happy(E1));
+    return p;
+  };
+  for (const between of [true, false]) { // the question written between runs (status), or found by the run itself
+    const p = await setup();
+    if (between) assert.deepEqual(ensureResumeGates(p.state), [`${E1.id}-2.json`]);
+    const r = await again(p);
+    assert.deepEqual(r.steps, ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`), 'nothing left to continue from: started over');
+    assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+    const g = gate(p, E1.id, 2);
+    assert.deepEqual([g.restart, g.decided.answer, g.decided.by, g.decided.standing, g.decided.prototype, !!g.decided.used], ['gone', ANSWERS.startOver, PROVISIONAL_BY, true, true, true]);
+    const st = status(p.project, p.state);
+    assert.deepEqual(st.decidedForYou.map((x) => [x.gate, x.prototype, x.did]), [[`gates/${E1.id}-2.json`, true, 'started it over from scratch: its branch was gone']]);
+    assert.deepEqual(prototypeReasked(fs.readdirSync(path.join(p.state, 'gates')).map((f) => ({ file: `gates/${f}`, ...readJson(path.join(p.state, 'gates', f)) })), E1.id), [], 'a full run does not ask it again');
+  }
+});
+
 
 // ---- onPark ------------------------------------------------------------------------------------
 

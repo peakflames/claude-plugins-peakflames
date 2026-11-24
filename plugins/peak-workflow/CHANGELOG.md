@@ -258,6 +258,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **An epic is never started over without asking** — a branch that no longer fits is brought
+  up to date by a short session on the standing answer, a changed branch is checked again, and
+  a gone one is asked (a provisional run starts it over and lists it).
 - **A failed merge check keeps the final check's work** — every failure now asks; "Resume"
   re-checks the merge without a new final check where that suffices, and epics an earlier
   driver parked unasked are recovered (#35).

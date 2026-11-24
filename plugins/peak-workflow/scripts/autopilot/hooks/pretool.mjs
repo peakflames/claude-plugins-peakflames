@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Autopilot referee: the PreToolUse hook (autopilot-poc-plan.md §6.7, rules R1–R9).
+// Autopilot referee: the PreToolUse hook (autopilot-poc-plan.md §6.7, rules R1–R10).
 //
 // Reads the hook input on stdin and prints either nothing (no opinion: the normal permission
 // flow decides) or a decision. It only ever denies, answers a gate from policy/gates.json, or
@@ -677,6 +677,22 @@ function ruleR9(ctx) {
   return { rule: 'R9', decision: 'park', reason: `plan lint failed: ${lint.problems.join('; ')}`, gate, stop: 'autopilot: parked at human gate' };
 }
 
+// ---- R10: a catch-up session settles a clash, never a requirement --------------------------------
+
+/**
+ * A catch-up session (`catchup-N`, the driver's `doCatchUp`) merges the integration line into the epic's branch and
+ * settles the clashing lines. A requirement is the owner's: it never writes under docs/requirements/, and asks instead.
+ * The driver checks the result again after the session; this stops the write before it happens.
+ */
+function ruleR10(ctx, targets) {
+  if (!/^catchup-\d+$/.test(path.basename(ctx.step ?? ''))) return null;
+  for (const raw of targets) {
+    const rel = path.relative(ctx.clone, realDeep(path.resolve(ctx.cwd, String(raw)))).split(path.sep).join('/');
+    if (rel === 'docs/requirements' || rel.startsWith('docs/requirements/')) return deny('R10', `a catch-up session never edits a requirement file (${rel}). Run \`git merge --abort\` and ask with AskUserQuestion: name the file and what each side wants`);
+  }
+  return null;
+}
+
 // ---- the decision ------------------------------------------------------------------------------
 
 const deny = (rule, reason, extra = {}) => ({ rule, decision: 'deny', reason, ...extra });
@@ -699,9 +715,9 @@ export function decide(input, env = process.env) {
   if (tool === 'Bash') {
     const command = withoutHeredocBodies(String(ti.command ?? ''));
     const segs = parseBash(command);
-    d = ruleR2Bash(ctx, segs, command) ?? ruleR3(ctx, segs, command) ?? ruleR4(segs) ?? ruleR7(ctx, bashWriteTargets(segs)) ?? ruleR5(ctx);
+    d = ruleR2Bash(ctx, segs, command) ?? ruleR3(ctx, segs, command) ?? ruleR4(segs) ?? ruleR10(ctx, bashWriteTargets(segs)) ?? ruleR7(ctx, bashWriteTargets(segs)) ?? ruleR5(ctx);
   } else if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
-    d = ruleR7(ctx, [String(ti.file_path ?? ti.notebook_path)]) ?? (tool === 'Write' ? ruleR5(ctx) : null);
+    d = ruleR10(ctx, [String(ti.file_path ?? ti.notebook_path)]) ?? ruleR7(ctx, [String(ti.file_path ?? ti.notebook_path)]) ?? (tool === 'Write' ? ruleR5(ctx) : null);
   }
   return d;
 }

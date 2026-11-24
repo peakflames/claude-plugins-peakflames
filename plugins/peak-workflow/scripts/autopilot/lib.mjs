@@ -131,7 +131,7 @@ export function smallFixLimits(config) {
 /** The file in a verify step's directory that lists the questions the standing answer answered "Fix now". */
 export const SMALL_FIX_FILE = 'small-fixes.json';
 
-const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_BUILD', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY' };
+const STEP_PHASE = { plan: 'PLAN', 'plan-fix': 'FIX_BUILD', build: 'BUILD', fix: 'FIX_BUILD', audit: 'AUDIT', verify: 'VERIFY', catchup: 'CATCH_UP' };
 const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
 
 /**
@@ -158,7 +158,8 @@ export function gateEntry(g) {
 
 // ---- the standing answer for technical stops: what autopilot answers itself --------------------
 
-export const gateLive = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared;
+// `restarted`: a decided gate whose branch no longer fit; a newer gate (`restartGate` in driver.mjs) brings it up to date and carries this answer on.
+export const gateLive = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared && !g.restarted;
 /**
  * A stop that is nobody's decision and that running again can cure: an infra error, a step's own
  * time, turn or dollar cap, autopilot's own check on a finished build, an auditor that could not

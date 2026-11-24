@@ -891,3 +891,18 @@ test('R8 the owner\'s own "Defer": answers the same question and the final check
   answered(v.ask(vq(E1.tors[2]), OPTS), vq(E1.tors[2]), 'Stop — epic FAILs');
   answered(v.ask(vq(E1.tors[1], 'Stop — the builder should fix it'), OPTS), vq(E1.tors[1], 'Stop — the builder should fix it'), 'Stop — epic FAILs');
 });
+
+test('R10 a catch-up session merges the integration line into its branch and settles code, never a requirement file; a build session may still write one', (t) => {
+  const r = referee(t);
+  const step = path.join(r.runDir, 'epics', E1.id, 'catchup-1');
+  fs.mkdirSync(path.join(step, 'scratch'), { recursive: true });
+  const env = { AUTOPILOT_STEP: step, AUTOPILOT_SCRATCH: path.join(step, 'scratch') };
+  const req = path.join(r.clone, 'docs', 'requirements', '01-import.feature.md');
+  passes(r.bash('git merge --no-ff develop', env), 'merging the integration line into the epic branch');
+  passes(r.pre('Write', { file_path: path.join(r.clone, 'src', 'shared.js'), content: 'x' }, env), 'settling a clashing code file');
+  denied(r.pre('Edit', { file_path: req, old_string: 'a', new_string: 'b' }, env), 'R10', /never edits a requirement file \(docs\/requirements\/01-import\.feature\.md\)\. Run `git merge --abort` and ask/, 'a requirement file, by Edit');
+  denied(r.bash(`printf x > ${req}`, env), 'R10', /requirement file/, 'a requirement file, by the shell');
+  git(r.clone, 'checkout', '-q', 'develop');
+  denied(r.bash('git merge --no-ff feature/epic-Lg1Csv7-csv-import', env), 'R3', /git merge into develop is denied/, 'never into the integration line');
+  passes(r.pre('Edit', { file_path: req, old_string: 'a', new_string: 'b' }), 'R10 is the catch-up session\'s alone');
+});
