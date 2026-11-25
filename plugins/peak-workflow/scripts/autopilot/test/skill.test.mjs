@@ -270,7 +270,7 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     '**Seen wrong and left as is:** <only when `left` has entries>', 'It is not "not proven"', '(`kind` `defect`;',
     // #40 item 16: a reviewer that barely looked was passed like a careful one.
     '**A `thin-review` gate, in plain words.**', 'The reviewer barely looked', 'the independent reviewer barely looked, twice; the final check ran anyway', '(`kind` `thin-review`;',
-    '**Real money, asked in the same popup.**', '`Yes — when a check needs it (Recommended)`', '`No — never spend`', '"realSpend": true', 'Never write `true` unasked.',
+    '**Real money, asked before the proof spends it.**', '**Real money, only if Step 1 did not ask it.**', '`Yes — when a check needs it (Recommended)`', '`No — never spend`', '"realSpend": true', 'Never write `true` unasked.',
     // Seen live: with the owner away, two sessions each waited five minutes on a browser sign-in, and nobody could say how it ended.
     '**Whether they will be there, asked in the same popup.**', "`No — I'll be away`", "`Yes — I'm here`", '"attended": false', 'that is `false`, whatever was picked',
     '**A question about a requirement, in plain words first.**', 'A gate with four options goes in the popup with its four options and no `Decide later`', '"Close the popup to decide later."',
@@ -336,8 +336,53 @@ test('SKILL.md: the launch asks how careful the run is, writes the answer as `mo
     '**Decided for you in this provisional run:** <only when `mode` is `provisional`, or one of its four sources has an entry>', 'its `check` exactly as given', 'never as verified', 'none folded into a count',
   ]) assert.ok(flat.includes(text), text);
   assert.match(SKILL, /"attended": false,\n\s+"mode": "full"\n\s+\}/, 'the config.json block carries the mode');
-  // The four launch questions fit one popup (AskUserQuestion takes at most four).
-  assert.equal((SKILL.match(/asked in the same popup\.\*\*/g) ?? []).length, 3);
+  // The launch questions fit one popup (AskUserQuestion takes at most four): whether they will be there, how careful,
+  // and the real-money question only when Step 1 did not ask it.
+  assert.equal((SKILL.match(/asked in the same popup\.\*\*/g) ?? []).length, 2);
+  assert.match(SKILL, /\*\*Real money, only if Step 1 did not ask it\.\*\*/);
+});
+
+test('SKILL.md: launch-screen leftovers — real money asked before the launch check spends it, the launch question names the budget and end time, --by on a refusal, Provisional looks, a mid-run settings change', () => {
+  const flat = SKILL.replace(/\s+/g, ' ');
+  // (1) Real money: in Step 1, before `prepare` runs, and the "never spend" gates are left out of the proof and the probe.
+  const step1 = flat.slice(flat.indexOf('## Step 1: Readiness'), flat.indexOf('## Step 2: Confirm'));
+  const money = step1.indexOf('**Real money, asked before the proof spends it.**');
+  assert.ok(money > 0 && money < step1.indexOf('Run `DRIVER prepare --project "<root>"`'), 'the money question comes before item d runs prepare');
+  for (const text of ['ask the real-money question before item d runs', 'in the same `AskUserQuestion` call as a copy question when one is asked',
+    '`Yes — when a check needs it (Recommended)`', '`No — never spend`', 'a Provisional run never answers money for the owner',
+    'items d and e leave out the `--gate` flag of every gate item b found needing a copied file', 'was not tried at launch: you said never spend',
+    'except one that needs a copied file when the owner said `No — never spend`']) assert.ok(step1.includes(text), text);
+  assert.ok(flat.includes('When it was not asked there and `launch.env.copy` is not empty now'), 'Step 2 asks it only as a fallback');
+  // (2) The launch question carries the limits itself.
+  for (const text of ['"Launch autopilot on these <N> epics? It stops at $<budget> spent or at <end time>, whichever comes first.', 'With no end time the sentence reads "It stops at $<budget> spent."', '`launch.config.runBudgetUsd`', '`launch.endByLocal`', 'The limits are the same for a Full and a Provisional run.']) assert.ok(flat.includes(text), text);
+  // (4) decide and continue: ask the owner's name once on the refusal and retry with --by.
+  for (const text of ['else from the newest commit a person made in the project', 'If it refuses with "no name to record", ask the owner once', 'run it again with `--by "<their name>"`', 'on "no name to record", ask the owner\'s name once and add `--by "<name>"`']) assert.ok(flat.includes(text), text);
+  // (6) Provisional: an epic the screen says waits for a look does not wait.
+  assert.ok(flat.includes('The epics the screen above says wait for the owner to look do not wait in a Provisional run'));
+  // (5) A step's model changed while a run goes reaches its next step.
+  assert.ok(flat.includes('A run that is already going picks the change up at its next step; the step running now keeps what it started with.'));
+});
+
+test('readiness: autopilot\'s own settings file is not an uncommitted change; anything else still is', (t) => {
+  const p = makeProject(t);
+  const warnOf = () => preflight(p).launch.warn.filter((w) => /uncommitted change/.test(w));
+  assert.deepEqual(warnOf(), []);
+  const r = driver('configure', '--project', p.project, '--budget', 'build.model=opus');
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(fs.existsSync(path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json')), 'configure wrote the file, in an untracked .claude/ folder');
+  assert.match(git(p.project, 'status', '--porcelain'), /^\?\? \.claude\/$/);
+  assert.deepEqual(warnOf(), [], 'the untracked .claude/ holding only autopilot.json');
+  fs.writeFileSync(path.join(p.project, '.claude', 'notes.md'), 'mine\n');
+  assert.match(warnOf().join('\n'), /^1 uncommitted change\(s\) in the project/);
+  fs.rmSync(path.join(p.project, '.claude', 'notes.md'));
+  fs.writeFileSync(path.join(p.project, 'scratch.txt'), 'x\n');
+  assert.match(warnOf().join('\n'), /^1 uncommitted change\(s\)/);
+  fs.rmSync(path.join(p.project, 'scratch.txt'));
+  // Committed, then changed by `configure`: a modified tracked file (" M", the first line of the status) is not counted either.
+  git(p.project, 'add', '.claude'); git(p.project, 'commit', '-qm', 'chore: autopilot settings');
+  assert.equal(driver('configure', '--project', p.project, '--budget', 'build.model=sonnet').status, 0);
+  assert.match(git(p.project, 'status', '--porcelain'), /M \.claude\/peak-workflow\/autopilot\.json/);
+  assert.deepEqual(warnOf(), []);
 });
 
 test('SKILL.md: a question the owner put off never hides an epic that can run (`ready`; Pilot Light, 2026-11-24)', () => {

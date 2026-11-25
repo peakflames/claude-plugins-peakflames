@@ -235,6 +235,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The launch question names the limits** — it says the run stops at the run budget or the end time, whichever comes first, so the popup no longer hides them.
+- **A step's settings changed mid-run reach the next step** — model, effort and caps are read again before each step and the change is logged; mode, the money answer and the run budget never change mid-run. Each step's log line and `step.json` name its model and effort.
 - **Autopilot catches a thin independent review** — the reviewer reports what it read per
   requirement, and the driver counts the changed files it opened. Too little is reviewed once
   more; still thin, a full run asks "Verify as built" or "Review again", and a provisional run
@@ -268,6 +270,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Real money is asked before the launch check spends it** — the question moves before `prepare`; with "never spend", checks that need the copied keys are not tried at launch.
+- **Autopilot's own settings file no longer warns** — an untracked `.claude/peak-workflow/autopilot.json` is not counted as an uncommitted change.
+- **`decide` and `continue` work without `git config user.name`** — the newest commit by a person names the owner, never an autopilot name; with none, the skill asks once and passes `--by`.
+- **Preflight follows `"look": "after"` and provisional runs** — an epic with only screens is listed for afterwards, not "parks for a human look"; one a person must observe still parks.
 - **A stopped session's cost is counted** — a session stopped or crashed before reporting its cost is booked at an estimate priced from its messages' tokens, not $0.00; the log and report say "estimated" and name any model with no known price.
 - **The test-weakening guard sees more weakenings** — a fix made on the standing answer is no longer merged unasked when it relaxes or fakes a check, puts one where it never runs, skips or deletes a test, or rewrites a fixture a test compares with; Go, Swift and Rust checks count.
 - **An epic is never started over without asking** — a branch that no longer fits is brought

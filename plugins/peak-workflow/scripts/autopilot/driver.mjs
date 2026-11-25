@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
-import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
+import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -913,7 +913,14 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
       if (r.safety || s?.safety) set('skip', `${tor} is a Safety requirement (hardware-in-the-loop)`);
       else if (/operator-observed/.test(r.text)) { humanCheck = true; reasons.push(`${tor} is operator-observed: parks for a person before verify`); }
     }
-    if (ui && e.hasScreens) { humanCheck = true; reasons.push('UI epic: parks for a human look before verify'); }
+    // Screens alone park for the owner's look unless the project looks afterwards or the run is provisional (#41 B3).
+    // A requirement a person must observe keeps its own reason above in every case.
+    const observedHere = e.anchors.some((tor) => /operator-observed/.test(reqs[tor]?.text ?? ''));
+    if (ui && e.hasScreens) {
+      if (!observedHere && isProvisional(config.mode)) reasons.push('UI epic: not stopped for a look (provisional run); listed at the end');
+      else if (!observedHere && config.look === 'after') reasons.push('UI epic: screens listed for you to see after the run ("look": "after"); no stop');
+      else { humanCheck = true; reasons.push('UI epic: parks for a human look before verify'); }
+    }
     e = { ...e, scopeFlags: e.anchors.map((tor) => ({ tor, flags: scopeFlags(reqs[tor]?.text ?? '') })).filter((x) => x.flags.length) };
     // What a person is asked to confirm at the look: each Then / And line of an operator-observed requirement, in its own words.
     e = { ...e, observed: e.anchors.filter((tor) => /operator-observed/.test(reqs[tor]?.text ?? '')).map((tor) => ({ tor, clauses: thenClauses(reqs[tor].text) })) };
@@ -1661,9 +1668,10 @@ async function hostSession(cmd, prompt, { stepDir, killGraceMs = 30000 }) {
 // ---------------------------------------------------------------------------------------------
 
 class Run {
-  constructor({ workspace, runName, config, pluginDir, verbose }) {
+  constructor({ workspace, runName, config, pluginDir, verbose, loadArgs = null }) {
     this.stateDir = workspace; // the workspace: lock, STOP, clone/, gates/ (shared by every run)
     this.config = config; this.pluginDir = pluginDir; this.verbose = verbose;
+    this.loadArgs = loadArgs; // how `config` was loaded: read again before each step for the steps' budgets (`refreshBudgets`)
     this.clone = path.join(workspace, 'clone');
     this.runName = runName; this.runDir = runDirOf(workspace, runName);
     this.stateFile = path.join(this.runDir, 'state.json');
@@ -2270,7 +2278,32 @@ class Run {
    * Launches one host-mode session in its own process group and waits for it.
    * Resolves with how it ended; never throws for a session failure.
    */
+  /**
+   * A step's model, effort and caps as the settings say now: the owner may change them while a run goes (seen live: Opus
+   * asked for the build one minute in). Only `budgets` is taken; what belongs to the run (its mode, the money answer,
+   * whether the owner is there, the end time, the queue, the run budget) is never read again. A running session is
+   * untouched, and a settings file that does not load keeps the values the run has.
+   */
+  refreshBudgets() {
+    if (!this.loadArgs) return;
+    let fresh;
+    try { fresh = loadConfig(this.stateDir, this.loadArgs).budgets; } catch (err) { this.log(`settings not read again (the run keeps its step limits): ${err.message}`); return; }
+    const old = this.config.budgets;
+    const changes = [];
+    for (const step of new Set([...Object.keys(old ?? {}), ...Object.keys(fresh ?? {})])) {
+      const a = old?.[step]; const b = fresh?.[step];
+      if (a && b && typeof a === 'object' && typeof b === 'object') {
+        for (const key of ['model', 'effort', 'wallMin', 'usd', 'turns']) if (a[key] !== b[key]) changes.push(`${step} ${key} now ${b[key] ?? 'default'} (was ${a[key] ?? 'default'})`);
+      } else if (a !== b && JSON.stringify(a) !== JSON.stringify(b)) changes.push(`${step} now ${JSON.stringify(b ?? null)} (was ${JSON.stringify(a ?? null)})`);
+    }
+    if (!changes.length) return;
+    this.config = { ...this.config, budgets: fresh };
+    this.log(`settings changed: ${changes.join('; ')}`);
+    this.event('settings-changed', null, { changes });
+  }
+
   async launch(e, kind, prepare, { noResume = false, afterLimit = null } = {}) {
+    this.refreshBudgets();
     const cfg = this.config; const k = KINDS[kind];
     const n = (e.attempts[kind] = (e.attempts[kind] ?? 0) + 1);
     const name = `${k.prefix}-${n}`;
@@ -2320,14 +2353,15 @@ class Run {
     e.state = k.state; e.lastStep = name;
     e.step = { name, kind, sessionId, pid: null, startedAt: new Date().toISOString() };
     this.save();
-    this.log(`${e.id}: ${name} starting (${k.role}, ${cmd.wallMin} min, session ${sessionId}${resume ? `, resuming session ${resume} (${from.step} of run ${from.run}) ${from.limit ? 'after the usage limit reset' : "with the owner's answer"}` : answers.length ? `, told ${answers.length} answer(s) the owner already gave` : ''})`);
-    this.event('step-start', e, { step: name, kind, capMin: cmd.wallMin, ...((e.continuing && (kind === 'build' || kind === 'fix')) || resume ? { continuing: true } : {}) });
+    const used = cfg.budgets[kind] ?? (kind === 'catchup' ? cfg.budgets.fix : {});
+    this.log(`${e.id}: ${name} starting (${k.role}, ${used.model ?? 'default model'}${effortFor(used) ? `, effort ${effortFor(used)}` : ''}, ${cmd.wallMin} min, session ${sessionId}${resume ? `, resuming session ${resume} (${from.step} of run ${from.run}) ${from.limit ? 'after the usage limit reset' : "with the owner's answer"}` : answers.length ? `, told ${answers.length} answer(s) the owner already gave` : ''})`);
+    this.event('step-start', e, { step: name, kind, capMin: cmd.wallMin, model: used.model ?? null, effort: effortFor(used), ...((e.continuing && (kind === 'build' || kind === 'fix')) || resume ? { continuing: true } : {}) });
 
     const startMb = this.cloneMb();
     const started = Date.now();
     // Read by hook R5 (startMb) and hook R8 (`look`: the owner's recorded look, for wrapup's manual-verification question;
     // `answers`: what the owner already answered for this step, so a reworded question is not put to them twice).
-    writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb, ...(kind === 'verify' && e.look ? { look: e.look } : {}), ...(kind === 'verify' && !e.look && e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(answers.length ? { answers } : {}), ...(resume ? { resumeOf: { sessionId: resume, step: from.step, run: from.run } } : {}) });
+    writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb, model: used.model ?? null, effort: effortFor(used), ...(kind === 'verify' && e.look ? { look: e.look } : {}), ...(kind === 'verify' && !e.look && e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(answers.length ? { answers } : {}), ...(resume ? { resumeOf: { sessionId: resume, step: from.step, run: from.run } } : {}) });
     const isScript = /\.(mjs|cjs|js)$/.test(cmd.bin);
     const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, {
       cwd: cmd.cwd, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'],
@@ -2923,7 +2957,9 @@ class Run {
    */
   humanCheck(e) {
     const m = this.lookMeta(e);
-    if (!m.humanCheck && !e.claudeMd) return false;
+    // An epic with screens comes here even when the launch check said it will not stop (`look: "after"`, a provisional
+    // run): its pictures are kept below for the owner to review afterwards.
+    if (!m.humanCheck && !e.claudeMd && !(m.reasons ?? []).some((r) => /UI epic/.test(r))) return false;
     // The owner chose to look afterwards ("look": "after"): an epic that parks only because it has screens goes on
     // to the final check, where the verifier judges the pictures. What a person must observe is still theirs alone.
     if (this.config.look === 'after' && !(m.observed ?? []).length && !e.claudeMd) {
@@ -3883,7 +3919,8 @@ class Run {
         this.state.testCommand = this.pre.testCommand;
       } else {
         // Epics already in the run keep the eligibility they started with; their sidecars have moved since.
-        for (const q of this.state.queue) { const m = this.metaById.get(q.id); if (m && q.state !== 'QUEUED') { m.eligibility = 'eligible'; m.reasons = []; } }
+        // What the look needs is kept: a resumed epic with screens still keeps its pictures (provisional, "look": "after").
+        for (const q of this.state.queue) { const m = this.metaById.get(q.id); if (m && q.state !== 'QUEUED') { m.eligibility = 'eligible'; m.reasons = lookReasons(m.reasons); } }
       }
       // What sessions may read outside the clone, resolved once per launch: the referee reads it from state.json.
       const badRead = readOnlyProblems(cfg.readOnly, { project: cfg.project, workspace: this.stateDir });
@@ -3988,7 +4025,10 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
   const refuse = []; const warn = [];
   const integration = detectIntegration(project);
   if (!integration) refuse.push(`${project} is not the root of a git repository with a develop, main or master branch`);
-  const dirty = integration ? gitRun(project, 'status', '--porcelain').out.split('\n').filter(Boolean).length : 0;
+  // Every untracked file listed one by one, so autopilot's own settings file (which `configure` writes and the owner may
+  // not have committed yet) is not counted as the owner's uncommitted change.
+  const own = path.relative(project, projectSettingsFile(project)).split(path.sep).join('/');
+  const dirty = integration ? gitRun(project, 'status', '--porcelain', '--untracked-files=all').out.split('\n').filter(Boolean).filter((l) => l.replace(/^\S{1,2}\s+/, '').replace(/^"|"$/g, '') !== own).length : 0; // not by column: `sh` trims the first line's leading space (" M")
   if (dirty) warn.push(`${dirty} uncommitted change(s) in the project are not part of the run: autopilot clones committed work on ${integration}`);
   let freeGb = null;
   try { const f = fs.statfsSync(exists(workspace) ? workspace : path.dirname(workspace)); freeGb = +((f.bavail * f.bsize) / 1024 ** 3).toFixed(1); } catch { /* unknown */ }
@@ -4548,8 +4588,8 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
   }
   const run = gate.run && exists(runDirOf(workspace, gate.run)) ? gate.run : currentRun(workspace);
   const project = tryJson(path.join(workspace, 'settings.json'))?.project ?? (run ? tryJson(path.join(runDirOf(workspace, run), 'config.json'))?.project : null) ?? null;
-  const who = by ?? (project ? sh('git', ['config', 'user.name'], { cwd: project }).out : '') ?? '';
-  if (!who) throw new Error('no name to record: set git config user.name, or pass --by');
+  const who = by || ownerName(project);
+  if (!who) throw new Error('no name to record: this project has no git config user.name and no commit by a person; pass --by "<your name>"');
   gate.decided = { answer: label ?? String(answer).trim(), by: who, date: today(), scope: 'next-run', ...(String(note ?? '').trim() ? { note: String(note).trim() } : {}), ...(obs?.length ? { observations: obs } : {}), ...(standing ? { standing: true } : {}), ...(asked ? { asked } : {}) }; // `asked`: what the owner was offered when it was not the gate's own option. `standing`: the owner's answer given once at launch, applied by `continue`
   writeJson(file, gate);
   if (run && exists(path.join(runDirOf(workspace, run), 'state.json'))) writeReport(runDirOf(workspace, run));
@@ -4561,6 +4601,22 @@ export function decideGate(workspace, gateName, answer, { by, note, observations
     validWhile: entry?.fresh ? null : `${gate.branch} stays at ${String(gate.branchTip).slice(0, 9)}${bringsUpToDate(gate) ? '' : ' and still merges cleanly into the integration line'}; otherwise autopilot asks how to go on`,
     resume: gate.resume ?? null,
   };
+}
+
+/**
+ * Who answers a gate when no `--by` is given: the project's `git config user.name`, else the author of the newest commit
+ * that a person made (seen live: a repository with no user.name whose commits carried a name set elsewhere). Never an
+ * autopilot name: the answer may become the approver of a correction in the project's change record. '' when none.
+ */
+export function ownerName(project) {
+  if (!project || !exists(project)) return '';
+  const set = sh('git', ['config', 'user.name'], { cwd: project }).out.trim();
+  const robot = (n) => !n || /autopilot/i.test(n) || UNAPPROVED_BY.includes(n);
+  if (set && !robot(set)) return set;
+  // The owner's own commits first, when an email is configured: in a shared repository the newest commit may be a teammate's.
+  const email = sh('git', ['config', 'user.email'], { cwd: project }).out.trim().toLowerCase();
+  const authors = sh('git', ['log', '-n', '500', '--format=%ae%x09%an'], { cwd: project }).out.split('\n').map((l) => { const [e, ...n] = l.split('\t'); return { email: e.trim().toLowerCase(), name: n.join('\t').trim() }; }).filter((a) => !robot(a.name));
+  return (email ? authors.find((a) => a.email === email) : null)?.name ?? authors[0]?.name ?? '';
 }
 
 /** Programmatic entry point (the CLI and the tests both use it). `stateDir` is an alias of `workspace`. */
@@ -4577,7 +4633,7 @@ export async function run({ project, workspace, stateDir, run: runName, queue, e
   if (!name) throw new Error(`${ws} holds no run to resume`);
   const config = loadConfig(ws, { project: root, run: name, overrides });
   if (dry) return dryRun({ project: config.project, workspace: ws, config, pluginDir, out });
-  return new Run({ workspace: ws, runName: name, config, pluginDir, verbose }).run({ resume });
+  return new Run({ workspace: ws, runName: name, config, pluginDir, verbose, loadArgs: { project: root, run: name, overrides } }).run({ resume });
 }
 
 // ---------------------------------------------------------------------------------------------
