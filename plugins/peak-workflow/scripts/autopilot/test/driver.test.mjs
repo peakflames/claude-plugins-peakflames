@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR, defaultConfig, localDate, scratchRule, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
+import { estimateCost } from '../lib.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, killFakes, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -340,6 +341,67 @@ test('STOP mid-step kills the session, parks the epic and stops the run', async 
   assert.equal(p.epic(d.id).state, 'QUEUED'); // nothing else starts after STOP
   assert.ok(fs.existsSync(path.join(p.runDir(), 'report.md')));
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
+});
+
+/**
+ * A build that streams assistant messages on `model`, then hangs until STOP. As in a real stream, an assistant line
+ * carries a message's usage as it starts (output near zero); the CLI's transcript has msg_1's finished count, msg_2's
+ * not at all, and a message of an earlier session (a resumed transcript holds it) that is not this session's.
+ */
+async function stoppedBuildWithUsage(t, model) {
+  const p = makeProject(t);
+  const config = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-config-'));
+  const was = process.env.CLAUDE_CONFIG_DIR; process.env.CLAUDE_CONFIG_DIR = config;
+  t.after(() => { if (was === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = was; fs.rmSync(config, { recursive: true, force: true }); });
+  const line = (id, usage) => ({ type: 'assistant', parent_tool_use_id: null, message: { id, model, role: 'assistant', usage } });
+  const m1 = { input_tokens: 3, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 40000, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 40000 } };
+  const m1Final = { ...m1, output_tokens: 900 };
+  const m2 = { input_tokens: 2, output_tokens: 5, cache_read_input_tokens: 40000, cache_creation_input_tokens: 1000, cache_creation: { ephemeral_5m_input_tokens: 1000, ephemeral_1h_input_tokens: 0 } };
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [
+    { do: 'branch', name: E1.branch },
+    { do: 'transcript', line: line('msg_old', { input_tokens: 1e6, output_tokens: 1e6 }) },
+    { do: 'emit', line: line('msg_1', m1) }, { do: 'emit', line: line('msg_1', m1) }, { do: 'emit', line: line('msg_2', m2) },
+    { do: 'transcript', line: line('msg_1', m1Final) },
+    { do: 'write', path: 'src/half.js', content: '// half done\n' }, { do: 'hang' },
+  ] } });
+  const running = go(p);
+  await waitFor(() => fs.existsSync(path.join(p.clone, 'src', 'half.js')));
+  await waitFor(() => (fs.readFileSync(p.dir(E1.id, 'build-1', 'stream.jsonl'), 'utf8').match(/"type":"assistant"/g) ?? []).length === 3);
+  fs.writeFileSync(path.join(p.state, 'STOP'), 'stop\n');
+  const state = await running;
+  return { p, state, usage: { msg_1: { model, usage: m1Final }, msg_2: { model, usage: m2 } } };
+}
+
+test('a session STOP kills before its result line is booked at the cost estimated from its messages', async (t) => {
+  const { p, state, usage } = await stoppedBuildWithUsage(t, 'claude-sonnet-5-5');
+  // Sonnet 5.5: $2 in, $10 out, $0.10 cache read per MTok; a 1-hour write 2× input, a 5-minute write 1.25×.
+  const want = +(((3 * 2 + 900 * 10 + 40000 * 2 * 2) + (2 * 2 + 5 * 10 + 40000 * 0.1 + 1000 * 2 * 1.25)) / 1e6).toFixed(6);
+  assert.equal(estimateCost(usage).usd, want);
+  const e = p.epic(E1.id);
+  const build = e.sessions.find((x) => x.name === 'build-1');
+  assert.equal(build.outcome, 'stopped');
+  assert.equal(build.costEstimated, true);
+  assert.equal(build.costUsd, want);
+  assert.equal(build.unpriced, undefined);
+  const plan = e.sessions.find((x) => x.name === 'plan-1');
+  assert.equal(plan.costEstimated, undefined); // a session with a result line is booked as before
+  assert.equal(e.costUsd, +(plan.costUsd + build.costUsd).toFixed(4));
+  assert.equal(state.spentUsd, e.costUsd);
+  assert.equal(readJson(p.dir(E1.id, 'build-1', 'cost-estimate.json')).total_cost_usd, want); // what a resume of it subtracts
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /build-1 ended — stopped \(STOP file\), \$0\.\d+ \(estimated from 2 messages, 1 of them without their final output count: the session was stopped before it reported its cost\)/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /including \$0\.\d\d estimated for 1 session stopped before it reported its cost/);
+});
+
+test('a stopped session on a model with no known price: tokens recorded, no dollars, the model named', async (t) => {
+  const { p, state } = await stoppedBuildWithUsage(t, 'claude-mystery-9');
+  const e = p.epic(E1.id);
+  const build = e.sessions.find((x) => x.name === 'build-1');
+  assert.equal(build.costEstimated, true);
+  assert.equal(build.costUsd, 0);
+  assert.ok(build.tokens > 80000);
+  assert.deepEqual(build.unpriced, ['claude-mystery-9']);
+  assert.equal(state.spentUsd, e.sessions.find((x) => x.name === 'plan-1').costUsd);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /claude-mystery-9 could not be priced/);
 });
 
 /** Starts the driver as its own process and SIGKILLs it once the verify session is running. */

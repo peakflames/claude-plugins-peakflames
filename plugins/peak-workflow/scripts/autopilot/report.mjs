@@ -122,6 +122,9 @@ export function collectReport(runDir) {
     spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, baseRetried: s.baseRetried ?? [], setupFailed: s.setupFailed ?? null,
     realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, mode: isProvisional(s.mode) ? 'provisional' : 'full', driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, leftovers: s.leftovers ?? [], stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
+  // Sessions stopped before they wrote their result line: their cost is an estimate from the tokens their messages used.
+  const est = epics.flatMap((e) => e.sessions.filter((x) => x.costEstimated));
+  report.estimated = est.length ? { usd: +est.reduce((sum, x) => sum + (x.costUsd ?? 0), 0).toFixed(4), sessions: est.length, unpriced: [...new Set(est.flatMap((x) => x.unpriced ?? []))] } : null;
   // Runs chained by `continues` share one budget: what they spent together, so the report and `status` agree.
   const chain = chainOf(workspace, runName);
   report.chain = chain.runs.length > 1 ? { before: chain.runs.length - 1, spentUsd: +(chain.spentBefore + report.spentUsd).toFixed(2), budgetUsd: chain.runBudgetUsd } : null;
@@ -162,9 +165,17 @@ function tldr(r) {
   else if (r.stoppedOnPark) T.push(r.stoppedOnPark.from === 'project' ? 'The run ended early on purpose: this project is set to stop at the first epic that needs you.' : 'The run ended early on purpose: while you are there to answer it stops at the first epic that needs you, so nothing else is built on a guess.');
   else if (/^usage limit: /.test(r.stoppedBecause ?? '')) T.push(`The run ended early: ${r.stoppedBecause.replace(/^usage limit: /, '')}. Run \`/peak-workflow:autopilot\` once it has reset to carry on.`);
   else if (r.stoppedBecause && !['queue done', 'nothing runnable'].includes(r.stoppedBecause)) T.push(`The run ended early: ${r.stoppedBecause}.`);
-  T.push(`It ran from ${stamp(r.run)} to ${r.ended ? stamp(r.ended) : '(still running)'} and spent ${usd(r.spentUsd)}${r.chain ? ` in this run; with the ${plural(r.chain.before, 'run')} before it, ${usd(r.chain.spentUsd)}${r.chain.budgetUsd == null ? '' : ` of the $${r.chain.budgetUsd} budget`} is spent` : r.budgetUsd == null ? '' : ` of a $${r.budgetUsd} limit`}.`);
+  T.push(`It ran from ${stamp(r.run)} to ${r.ended ? stamp(r.ended) : '(still running)'} and spent ${usd(r.spentUsd)}${estimatedWords(r, { named: true })}${r.chain ? ` in this run; with the ${plural(r.chain.before, 'run')} before it, ${usd(r.chain.spentUsd)}${r.chain.budgetUsd == null ? '' : ` of the $${r.chain.budgetUsd} budget`} is spent` : r.budgetUsd == null ? '' : ` of a $${r.budgetUsd} limit`}.`);
   T.push(r.next.length ? `What to do: follow "Do this next" below, from the top. It has ${plural(r.next.length, 'step')}.` : 'Nothing needs you.');
   return T;
+}
+
+/** The clause after a run's spend when some of it is estimated; `named`: also name, once, a model with no known price. */
+function estimatedWords(r, { named = false } = {}) {
+  const x = r.estimated;
+  if (!x) return '';
+  const unpriced = named && x.unpriced.length ? `; ${x.unpriced.join(', ')} could not be priced, so ${x.unpriced.length === 1 ? 'its' : 'their'} tokens are not in that figure` : '';
+  return ` (including ${usd(x.usd)} estimated for ${plural(x.sessions, 'session')} stopped before ${x.sessions === 1 ? 'it' : 'they'} reported ${x.sessions === 1 ? 'its' : 'their'} cost${unpriced})`;
 }
 
 const lastLine = (text) => String(text ?? '').trim().split('\n').filter(Boolean).at(-1) ?? '';
@@ -300,7 +311,7 @@ export function renderReport(r) {
   L.push('', 'New to this report? "Words used in this report", at the end, explains every term.');
   L.push('', '## Where things are');
   L.push(`Workspace: ${r.workspace} — run ${r.name}. Paths below are relative to the workspace.`);
-  L.push(`Integration line: ${r.integration} in ${r.clone} (not pushed). Spent ${usd(r.spentUsd)}${r.chain ? ` in this run; ${usd(r.chain.spentUsd)}${r.chain.budgetUsd == null ? '' : ` of $${r.chain.budgetUsd}`} across this run and the ${r.chain.before} before it` : r.budgetUsd == null ? '' : ` of $${r.budgetUsd}`}.`);
+  L.push(`Integration line: ${r.integration} in ${r.clone} (not pushed). Spent ${usd(r.spentUsd)}${estimatedWords(r)}${r.chain ? ` in this run; ${usd(r.chain.spentUsd)}${r.chain.budgetUsd == null ? '' : ` of $${r.chain.budgetUsd}`} across this run and the ${r.chain.before} before it` : r.budgetUsd == null ? '' : ` of $${r.budgetUsd}`}.`);
 
   if (r.sync?.state === 'project-ahead') L.push(`At the start the clone's ${r.integration} was fast-forwarded to the project's (${String(r.sync.cloneTip).slice(0, 9)} → ${String(r.sync.projectTip).slice(0, 9)}).`);
   if (r.sync?.state === 'clone-ahead') L.push(`At the start the clone was ahead of the project by work not fetched yet; this run built on top of it: ${r.sync.waiting.join('; ')}.`);
@@ -371,7 +382,7 @@ export function renderReport(r) {
     if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);
     if (e.sessions.length) {
       L.push('', '| Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |', '|---|---|---|---|---|---|');
-      for (const x of e.sessions) L.push(`| ${x.name} | ${cell(x.outcome === 'ok' ? 'ok' : `${x.outcome}: ${x.why}`)} | ${usd(x.costUsd)} | ${x.turns ?? 0} | ${mins(x.wallMs)} | ${x.denials ?? 0} |`);
+      for (const x of e.sessions) L.push(`| ${x.name} | ${cell(x.outcome === 'ok' ? 'ok' : `${x.outcome}: ${x.why}`)} | ${usd(x.costUsd)}${x.costEstimated ? ' (estimated)' : ''} | ${x.turns ?? 0} | ${mins(x.wallMs)} | ${x.denials ?? 0} |`);
     }
     if (e.checks.length) {
       L.push('', '| Driver check | Result | Failed |', '|---|---|---|');

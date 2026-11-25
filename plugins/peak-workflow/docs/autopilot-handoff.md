@@ -135,8 +135,9 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
 2. **An approved amendment reaches every later step** (Step 11: #41 B12, B16). More real under
    provisional, which takes amendments itself. Done together with group 1. *Built with group 1;
    proof pending.*
-3. **What a killed session spent** (next). #36 itself is not to be done (owner, 2026-11-25): a
-   step may finish slightly past the budget (#36, a killed session's cost).
+3. **What a killed session spent.** #36 itself is not to be done (owner, 2026-11-25): a
+   step may finish slightly past the budget. *Done 2026-11-25: such a session is booked at an
+   estimate from its messages' tokens (Step 9).*
 4. **Launch-screen leftovers** (#40 item 5, #41 B3 and I5, own-settings warning, `decide` and
    `user.name`, a setting changed mid-run).
 5. **MCP connectors** (#43).
@@ -512,11 +513,16 @@ files `CLAUDE.md` names.
   *Not to be done (owner, 2026-11-25): a step that runs slightly past the budget may finish;
   stopping a session mid-step is not wanted. #36 closed.*
 
-- [ ] **A session that is killed costs nothing on the books** (*no issue*; Pilot Light,
+- [x] **A session that is killed costs nothing on the books** (*no issue*; Pilot Light,
   2026-11-22, runs `20261122-023444` and `-025133`). Two planners stopped by the STOP file had
   made 20 and 30 model turns; neither has a `result.json` and the run reads $0.00. Cost comes
   only from the session's closing line, which a killed session never writes. The same holds
   for a time limit or a crash. *This is group 3 now (owner, 2026-11-25), on its own.*
+  *Closed on tests (2026-11-25): a session with no result line is booked at an estimate priced
+  from its messages' usage (`estimateCost`, `lib.mjs`): the stream names the messages, the CLI's
+  own transcript gives their final output counts (a stream line carries only the opening count).
+  The log and report say "estimated". Re-priced this way, the two planners above come to $0.55
+  and $0.59.*
 
 ### Step 10 — The launch check and its screen (C2 and C3)
 
