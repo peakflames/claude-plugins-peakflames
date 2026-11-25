@@ -316,10 +316,10 @@ Why this order:
   The same `(?![+-])` leftover in the test-weakening count (`lib.mjs`, `testWeakening`) is
   fixed with the Step 4 guard item: only real diff headers are skipped now.
 
-### Step 5 — Keep the attending session current (C2)
+### Step 5 — Keep the attending session current (moved to Step 14)
 
-- [ ] **An attending session keeps the skill text it loaded** (#37). After a plugin update it
-  works from stale instructions until `/peak-workflow:autopilot` is run again.
+Moved to Step 14 as C4 (owner, 2026-11-25): stale skill text is mostly an artifact of updating
+the plugin during development, and rare in use.
 
 ### Step 6 — Prove it in one real run (C1)
 
@@ -658,6 +658,8 @@ files `CLAUDE.md` names.
   git commands the referee refuses (#40). Harmless so far.
 - [ ] `skills/autopilot/SKILL.md` is about 1,080 lines; every attending session carries it (#40).
 - [ ] The cockpit mod is deferred (`autopilot-cockpit-mod-handoff.md`).
+- [ ] **An attending session keeps the skill text it loaded** (#37). After a plugin update it
+  works from stale instructions until `/peak-workflow:autopilot` is run again. Was Step 5 (C2).
 
 ## 2026-11-23 session — live fixes, what the run proved, and a rename
 
