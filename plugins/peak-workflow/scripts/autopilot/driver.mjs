@@ -26,8 +26,8 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
-import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
-import { ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
+import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
+import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -1104,6 +1104,17 @@ export function thinWords(label, coverage, thin) {
   return `The independent review of ${label} read ${coverage.read} of ${coverage.of} changed code files${secs}${untested}: the reviewer barely looked, twice.`;
 }
 /** Appended to the second try's prompt after a thin first try. */
+/**
+ * Every review is told, by name, the changed code files to open, and that too few opened is run again. Seen live
+ * (Pilot Light, 2026-11-25): with only the prompt's general rule, two first reviews of two read 10 of 21 and 4 of 9.
+ */
+export function filesToOpenLine(files) {
+  if (!files.length) return '';
+  const shown = files.slice(0, 40);
+  const need = Math.min(Math.ceil(files.length * THIN_REVIEW.share), THIN_REVIEW.cap);
+  return `\n## The files to open\n\n\`diff.patch\` changes ${files.length} code file${files.length === 1 ? '' : 's'}. Open each one in the clone before you report: the driver counts the files you open, and a review that opens fewer than ${need} of them is not counted and is run again.\n\n${shown.map((f) => `- \`${f}\``).join('\n')}${files.length > shown.length ? `\n- and ${files.length - shown.length} more, in \`diff.patch\`` : ''}\n`;
+}
+
 export function thinAgainLine({ coverage, thin }) {
   const unread = coverage.unread.slice(0, 15);
   return `\n## Your first try was too thin\n\nA review of this bundle read ${coverage.read} of ${coverage.of} changed code files${thin.untested.length ? ` and named no test for ${thin.untested.join(', ')}` : ''}. Open at least ${thin.need}, and for every anchor its test. Not opened: ${unread.map((f) => `\`${f}\``).join(', ')}${coverage.unread.length > unread.length ? `, and ${coverage.unread.length - unread.length} more` : ''}.`;
@@ -2630,7 +2641,8 @@ class Run {
             clone: this.clone, pluginDir: this.pluginDir, bundleDir: path.join(stepDir, 'bundle'), epic: m, integration: this.state.integration,
             base: last?.tip ?? null, steps: steps.map((x) => ({ name: x.name, dir: path.join(this.stateDir, x.dir) })),
           });
-          return before ? { prompt: `${read(path.join(AUDIT_DIR, 'prompt.md'))}\n${thinAgainLine(before)}\n` } : {};
+          const files = changedCodeFiles(read(path.join(stepDir, 'bundle', 'diff.patch')));
+          return { prompt: `${read(path.join(AUDIT_DIR, 'prompt.md'))}${filesToOpenLine(files)}${before ? `\n${thinAgainLine(before)}\n` : ''}` };
         });
       } catch (err) {
         return this.parkResumable(e, `auditor: the audit could not start (${err.message}); not verified without an audit`, 'AUDIT');

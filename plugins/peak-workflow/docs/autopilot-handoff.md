@@ -359,8 +359,13 @@ The 2026-11-21 changes (#41, I2 and I6):
   lets a fix change a requirement or weaken a test.
 
 The 2026-11-24 changes (Step 4):
-- [ ] A real reviewer's `audit.json` has `coverage` and `checked`, and a thin one runs again
+- [x] A real reviewer's `audit.json` has `coverage` and `checked`, and a thin one runs again
   (#40 item 16). Check the prompt's "What to read" does not push it past 40 turns or $3.
+  *Seen 2026-11-25, Pilot Light run `20261125-112902`: XRSSsTW audit-1 read 10 of 21 (thin),
+  audit-2 read 21 of 21; 21 and 32 turns, $1.22 and $1.45 (`epics/XRSSsTW/audit-{1,2}/audit.json`).
+  6bMNhpy's audit-1 in run `20261125-120140` was thin too (4 of 9).*
+- [ ] **Every review is told the changed code files by name** (built 2026-11-25 after the two thin
+  first reviews above; proof pending: a first review that reads at least half without a retry).
 
 Also to see in a real run: no by-hand command, git line or other skill offered anywhere the
 owner reads; step 1's fixes (B14 a resumed epic put back on its branch — seen, see below; B15
@@ -750,8 +755,9 @@ change-record notes).
 - `attend.test.mjs` "watch and status see inside the step … each said once" fails (expected 2,
   actual 3), on the base branch too. 2 `test_wrapper.py` failures (pre-existing).
 - **The independent review is short**: 33–49 seconds on large changes (run `20261123-140347`:
-  33 s on Outstanding). Unexamined; first thing to look at is whether the reviewer reads the
-  diff or only the summary.
+  33 s on Outstanding). *Answered 2026-11-25: the first try opened under half the changed files
+  (10 of 21, 4 of 9); only the retry, given the files by name, read them all. Every review now
+  gets that list (see Step 4).*
 - **A voided "Resume"**: the owner's answer to keep Outstanding's finished build was void
   because its branch no longer merged once Conversation drawer merged (both touch
   `epic-detail-drawer.tsx` and `.autopilot/test-changes.jsonl`). The epic was planned again;
