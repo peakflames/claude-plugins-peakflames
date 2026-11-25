@@ -366,6 +366,9 @@ test('human-check gate carries an artifact; "Looks right" goes to VERIFY and R8 
   const g = gate(p, e5.id);
   const dir = `${p.rel()}/epics/${e5.id}/artifacts`;
   assert.deepEqual([g.kind, g.options], ['human-check', [ANSWERS.looksRight, ANSWERS.notRight]]);
+  // The owner reads plain words; the driver's own reason stays in `why`.
+  assert.equal(g.question, `${e5.tors[0]} needs a person to check it. Does what was built look right?`);
+  assert.match(g.why, /operator-observed: parks for a person before verify/);
   assert.deepEqual(g.artifacts, [`clone:tests/manual/${e5.tors[0]}.md`, `${dir}/run-output.txt`, `${dir}/files/chart.html`]);
   assert.match(fs.readFileSync(path.join(p.state, dir, 'run-output.txt'), 'utf8'), /^\$ echo '<svg\/>' > chart\.html && echo chart written\n\(exit 0, on feature\/epic-Lg5Chr8-chart at [0-9a-f]{40}\)\n\nchart written/);
   assert.equal(fs.readFileSync(path.join(p.state, dir, 'files', 'chart.html'), 'utf8'), '<svg/>\n');
@@ -426,6 +429,8 @@ test('an epic with screens: the build must leave pictures for the look; the gate
   assert.deepEqual(g.artifacts.slice(0, 2), [`look/${ui.id}/home-narrow.png`, `look/${ui.id}/home.png`]); // then the project's run command output, as before
   assert.deepEqual(g.pictures, [{ path: path.join(p.state, 'look', ui.id, 'home-narrow.png'), shows: 'the home page at 320 px wide — TOR-06-Lg6Scr1' }, { path: path.join(p.state, 'look', ui.id, 'home.png'), shows: 'the home page, signed in, with three figures — TOR-06-Lg6Scr1' }]);
   assert.deepEqual(g.open.slice(0, 2), g.pictures.map((x) => x.path));
+  assert.equal(g.question, 'This epic changed screens; pictures of them are ready. Does what was built look right?');
+  assert.match(g.why, /UI epic: parks for a human look before verify/);
   // Git never saw them: nothing to commit, nothing on the branch.
   assert.equal(git(p.clone, 'status', '--porcelain'), '');
   assert.equal(git(p.clone, 'ls-tree', '-r', '--name-only', ui.branch, '--', '.autopilot/look'), '');

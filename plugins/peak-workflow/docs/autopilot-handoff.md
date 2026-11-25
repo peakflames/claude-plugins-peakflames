@@ -499,7 +499,8 @@ files `CLAUDE.md` names.
 - [ ] **One early stop idles most of an unattended run** (*no issue*; Pilot Light, run
   `20261122-094004`). The second epic of 11 parked in planning after one minute; eight epics
   depended on it, so the run ended in 20 minutes with the owner away. Unexamined: whether
-  launch should warn when most of the queue hangs on one epic. C3.
+  launch should warn when most of the queue hangs on one epic. C3. *Overtaken in part (2026-11-25):
+  a provisional run no longer stops for an amendment or deferral, the usual cause.*
 - [x] **A check that needs another machine parks as if the owner could do it** (*no issue*;
   Pilot Light, gate `yZQYIVE-1`, 2026-11-22). TOR-01-bhQV3eP is operator-observed on Windows
   11; the owner was on a Mac. The skill's "Start it so I can check for real" offer assumes
@@ -604,7 +605,7 @@ files `CLAUDE.md` names.
   ("$41.28 of a $243.62 limit"). Fixed 2026-11-23: the report and the run log now give both
   ("spent $41.28 in this run; with the 2 runs before it, $47.66 of the $250 budget is spent").
 - [ ] **The watch repeats its progress line once per blocked epic** (*no issue*; run
-  `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3.
+  `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3. *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
 - [x] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`).
   Answered by run `20261123-081039`: yes, see above. The
   owner's "Amend" answer for n2g5TvI was given to a resumed plan session that he then
@@ -635,7 +636,7 @@ files `CLAUDE.md` names.
   `CLAUDE.md` names in backticks is readable (step 2). Not seen on Windows. Whether a dev
   server started that way survives the ban on background commands is not checked.
 - [ ] The look question reads "UI epic: parks for a human look before verify. Does what was
-  built look right?": the driver's own reason, not owner's words (*no issue*; Pilot Light).
+  built look right?": the driver's own reason, not owner's words (*no issue*; Pilot Light). *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
 - [ ] The watch said "One command has been running for 3 min" for a tool call that had ended:
   its `PreToolUse` had no `PostToolUse` (a failed command), so it counted as still running
   (*no issue*; Pilot Light, `build-1/hooks.jsonl` line 57).
@@ -643,11 +644,11 @@ files `CLAUDE.md` names.
   set; nothing lists what to check (*no issue*; Pilot Light). Maybe as intended.
 - [ ] The referee refused "$AUTOPILOT_SCRATCH" used in a cut-down form four times in one epic,
   and four cwd-relative paths that resolved into the workspace (*no issue*; Pilot Light). The
-  scratch rule's wording may need an example.
+  scratch rule's wording may need an example. *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
 - [ ] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
   (#40) (15).
 - [ ] The build missed a console error the verifier later found (#40) (38).
-- [ ] Gate answers are dated in UTC (#40) (40).
+- [ ] Gate answers are dated in UTC (#40) (40). *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
 - [ ] The look question for a UI epic with no pictures is asked in chat, not the popup (#40) (41).
 - [ ] The skill text does not cover the sandbox-off case (#41 I4); mostly moot after B1.
 

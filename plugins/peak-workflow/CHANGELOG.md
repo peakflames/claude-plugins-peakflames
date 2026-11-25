@@ -430,6 +430,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Autopilot verifier no longer rejects a look for an unmentioned line** — "Looks right" is the
   owner's answer to the whole requirement; the verifier sends it back only when the record
   contradicts a line or says it was not checked.
+- **Autopilot watch says its progress line once** — epics blocked together no longer repeat the
+  same "Progress" line once each; it is said again only when it reads differently.
+- **The look question is in the owner's words** — "This epic changed screens; pictures of them are
+  ready" or "<TOR> needs a person to check it", then "Does what was built look right?"; the
+  driver's own reason moves to `why`.
+- **Gate dates use the machine's local day** — an answer given in the evening west of UTC is no
+  longer dated the next day; full timestamps stay UTC.
+- **The scratch rule shows an example** — use `"$AUTOPILOT_SCRATCH/…"` as it is; a copy into
+  another variable or a path relative to the current folder is refused or lands in the repository.
 
 ## [3.0.1] — 2026-11-05
 

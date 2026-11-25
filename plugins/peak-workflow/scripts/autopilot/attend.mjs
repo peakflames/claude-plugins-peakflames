@@ -452,7 +452,7 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
   if (after === null) say(snapshotLine(state0, { running: isLive(), ...(state0 ? { spentUsd: chain.spentBefore + (state0.spentUsd ?? 0), runBudgetUsd: chain.runBudgetUsd } : {}) }), { quiet: true });
   // Events already there: said again with `replay`, skipped up to `after`, otherwise taken as known (the first line covers them).
   const skip = replay ? 0 : after === null ? readFrom(eventsFile, 0).rows.length : Number(after) || 0;
-  const outcomes = new Map(); let total = 0; // how each epic of the run ended so far, for the progress line
+  const outcomes = new Map(); let total = 0; let lastProgress = null; // how each epic of the run ended so far, for the progress line
   const events = () => {
     const r = readFrom(eventsFile, offset); offset = r.offset;
     for (const row of r.rows) {
@@ -464,8 +464,9 @@ export async function watch({ workspace, run = null, heartbeatMin = 10, longMin 
       const pos = row.type === 'epic-start' ? chain.queue.indexOf(row.epic) + 1 : 0;
       const line = row.type === 'run-end' ? `RUN ENDED: ${plainEnd(row.why)}. Spent ${spent(row.spentUsd)}.` : eventLine(pos ? { ...row, pos, of: chain.queue.length } : row);
       if (line) say(line);
-      if (ends && chain.queue.length > 1) say(queueLine(chain.states()), { quiet: true });
-      else if (ends && total > 1) say(progressLine(outcomes, total), { quiet: true });
+      // Said again only when it reads differently: epics blocked together end in a burst, and state.json gives them one line.
+      const progress = ends && chain.queue.length > 1 ? queueLine(chain.states()) : ends && total > 1 ? progressLine(outcomes, total) : null;
+      if (progress && progress !== lastProgress) { lastProgress = progress; say(progress, { quiet: true }); }
       if (row.type === 'run-end') ended = true;
     }
   };

@@ -7,7 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, atLimit, ensureResumeGates, gateReason, newRunName, standingAnswer, standingCovers, strayProcesses } from '../driver.mjs';
+import { ANSWERS, atLimit, localDate, ensureResumeGates, gateReason, newRunName, standingAnswer, standingCovers, strayProcesses } from '../driver.mjs';
 import { chainOf, eventLine, leftLines, progressLine, queueLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
@@ -43,6 +43,19 @@ test('watch on a finished run: one line on where it ended, then RUN ENDED, exit 
   fs.rmSync(path.join(p.state, 'runs'), { recursive: true }); fs.rmSync(path.join(p.state, 'current'));
   assert.deepEqual(driver('watch', '--workspace', p.state, '--grace-ms', '0').lines(), ['No autopilot run has started here yet.', 'RUN ENDED: no run to watch.']);
   assert.equal(spawnSync(process.execPath, [DRIVER, 'watch'], { encoding: 'utf8' }).status, 2, 'watch needs --workspace');
+});
+
+test('watch says the progress line once while it reads the same: several blocked epics give one line (Pilot Light, run 20261122-094004)', async (t) => {
+  const p = makeProject(t);
+  const b = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02', deps: [E1.id] });
+  const c = addEpic(p.project, { id: 'Lg3Sum9', slug: 'summary', name: 'Monthly summary', nn: '03', deps: [b.id] });
+  const d = addEpic(p.project, { id: 'Lg4Rpt2', slug: 'report', name: 'Yearly report', nn: '04', deps: [c.id] });
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1, { omit: ['commit'] }) });
+  await p.go();
+  assert.deepEqual(readJson(path.join(p.runDir(), 'state.json')).queue.map((q) => q.state), ['PARKED', 'BLOCKED', 'BLOCKED', 'BLOCKED']);
+
+  const progress = driver('watch', '--workspace', p.state, '--replay').lines().filter((l) => /^Progress/.test(l));
+  assert.deepEqual(progress, ['Progress: 0 of 4 done (0%); 1 waiting for you; 3 not started']);
 });
 
 test('watch on a live run: step lines as they happen, a repeated refusal said once, the tests\' result, and the end', async (t) => {
@@ -240,7 +253,7 @@ test('continue: a budget stop is resumed on the standing answer, twice per epic;
   const c1 = driver('continue', '--workspace', p.state, '--json', '--by', 'Pat Owner');
   assert.equal(c1.status, 0, c1.stderr);
   assert.deepEqual(c1.json(), { autoContinue: 2, continued: [{ gate: `gates/${E1.id}-1.json`, epic: E1.id, label: LABEL, why: 'a step reached its limit', answer: ANSWERS.resume, did: 'continued it from where it stopped', enters: 'BUILD', standingAnswers: 1, of: 2 }], left: [] });
-  assert.deepEqual(gateFile(p, E1.id).decided, { answer: ANSWERS.resume, by: 'Pat Owner', date: new Date().toISOString().slice(0, 10), scope: 'next-run', standing: true });
+  assert.deepEqual(gateFile(p, E1.id).decided, { answer: ANSWERS.resume, by: 'Pat Owner', date: localDate(), scope: 'next-run', standing: true });
 
   // The run that continues it: named by status, with the same queue and what is left of the budget.
   const s2 = st(p);

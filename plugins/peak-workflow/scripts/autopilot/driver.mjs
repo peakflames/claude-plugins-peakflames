@@ -56,7 +56,9 @@ const exists = (p) => fs.existsSync(p);
 const read = (p) => fs.readFileSync(p, 'utf8');
 const readJson = (p) => JSON.parse(read(p));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const today = () => new Date().toISOString().slice(0, 10);
+/** `YYYY-MM-DD` on the machine's own clock: a gate answered at 21:30 in Los Angeles is dated that day, not UTC's next one (#40). Full timestamps stay UTC. */
+export const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const today = () => localDate();
 
 function writeAtomic(file, text) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -1082,7 +1084,18 @@ In a shell command it is \`"$AUTOPILOT_SCRATCH"\`. It is outside the repository,
 committed, and nothing there is part of what you deliver. Do not put such files in the
 repository: an untracked file left there fails the clean-tree check. Other places outside the
 repository, \`/tmp\` included, may be refused.
+
+In a command, use \`"$AUTOPILOT_SCRATCH/out.txt"\` as it is (the file tools take the folder above); copying it into another variable (\`S="$AUTOPILOT_SCRATCH"\`) or a path relative to the current folder (\`./out.txt\`) is refused, or lands in the repository.
 `;
+
+const lookReasons = (reasons) => (reasons ?? []).filter((r) => /operator-observed|UI epic/.test(r));
+/** The look gate's question in the owner's words: "This epic changed screens; pictures of them are ready." and "<TOR> needs a person to check it." */
+export function lookAsk(reasons, pictures) {
+  const rs = lookReasons(reasons);
+  const tors = rs.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]);
+  return [rs.some((r) => /UI epic/.test(r)) ? `This epic changed screens; ${pictures ? 'pictures of them are ready' : 'no pictures of them could be made'}.` : null,
+    tors.length ? `${tors.join(', ')} ${tors.length > 1 ? 'need' : 'needs'} a person to check ${tors.length > 1 ? 'them' : 'it'}.` : null].filter(Boolean).join(' ');
+}
 
 /** In plain words, what a thin review did: for its gate's question and the provisional list. */
 export function thinWords(label, coverage, thin) {
@@ -2730,10 +2743,11 @@ class Run {
     const made = this.produceArtifacts(e);
     this.writeGate(e, {
       kind: 'human-check', skillStep: 'wrapup-epic Step 1.2 item 7',
-      question: `${m.reasons.filter((r) => /operator-observed|UI epic/.test(r)).join('; ') || (e.claudeMd ? 'this epic changed how the project is set up, run or tested' : 'this epic needs a person to look')}.${e.claudeMd ? ` It changed the project's instructions file (CLAUDE.md), in: ${e.claudeMd.sections.join(', ')}; every later session follows that file.` : ''} Does what was built look right?`,
+      // The owner's words; the driver's own reasons ("UI epic: parks for a human look before verify") go in `why`.
+      question: `${lookAsk(m.reasons, made.pictures > 0) || (e.claudeMd ? 'This epic changed how the project is set up, run or tested.' : 'This epic needs a person to look.')}${e.claudeMd ? ` It changed the project's instructions file (CLAUDE.md), in: ${e.claudeMd.sections.join(', ')}; every later session follows that file.` : ''} Does what was built look right?`,
       ...(e.claudeMd ? { claudeMd: e.claudeMd } : {}),
       options: [ANSWERS.looksRight, ANSWERS.notRight],
-      why: `autopilot never self-approves a look${made.artifacts.length ? '' : ` — and it could not produce anything to look at: ${made.notes.join('; ')}`}`,
+      why: `autopilot never self-approves a look${made.artifacts.length ? '' : ` — and it could not produce anything to look at: ${made.notes.join('; ')}`}${lookReasons(m.reasons).length ? ` (${lookReasons(m.reasons).join('; ')})` : ''}`,
       artifacts: made.artifacts, artifactNotes: made.notes, ...this.lookAids(e, made.artifacts),
       resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id}`,
     });
@@ -2810,7 +2824,7 @@ class Run {
       artifacts.push(this.rel(dest));
     }
     this.g('checkout', '-q', '-f', b); this.g('clean', '-fdq');
-    return { artifacts, notes };
+    return { artifacts, notes, pictures: pictures.length };
   }
 
   /**
@@ -3947,7 +3961,7 @@ function missingResumeGates(workspace) {
         kind: 'resume', skillStep: 'autopilot driver', phase: 'VERIFY', lookAfter: true, reason: 'the project is set to "look": "after": its screens are reviewed after the final check, not before',
         question: `${look.epicName ?? id}: go on to the final check without a look at the screens first?`, options: [ANSWERS.resume, ANSWERS.startOver],
         why: 'answered by the project setting "look": "after"; the pictures are listed for review once it has merged',
-        artifacts: look.artifacts ?? [], decided: { answer: ANSWERS.resume, by: '"look": "after" (project setting)', date: new Date().toISOString().slice(0, 10), scope: 'next-run' },
+        artifacts: look.artifacts ?? [], decided: { answer: ANSWERS.resume, by: '"look": "after" (project setting)', date: today(), scope: 'next-run' },
       } });
       continue;
     }
