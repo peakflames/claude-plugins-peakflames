@@ -47,6 +47,7 @@ export function collectReport(runDir) {
       file: `gates/${file}`, epic: g.epic, label: labelOf(g.epic), kind: g.kind, session: g.session ?? null, skillStep: g.skillStep ?? null, question: g.question ?? null, options: g.options ?? [],
       tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], open: g.open ?? [], checks: g.checks ?? [], checklists: g.checklists ?? [], earlier: g.earlier ?? null, asks: g.asks ?? [], branch: g.branch ?? null, branchTip: g.branchTip ?? null, phase: g.phase ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
       run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, void: g.void ?? null, superseded: !!g.superseded, cleared: !!g.cleared,
+      ...(g.kind === 'thin-review' ? { review: { read: g.read ?? null, of: g.of ?? null, seconds: g.seconds ?? null, unread: g.unread ?? [], untested: g.untested ?? [] } } : {}),
       // A technical stop autopilot may not answer itself any more: the one plain question the owner gets in place of the gate's own.
       ask: (() => { const a = atLimitAsk(g, everyGate.map((x) => x.g).filter(Boolean), Number(config.autoContinue) || 0, labelOf(g.epic)); return a ? { question: a.question, options: a.options } : null; })(),
       // Every gate with options resumes its epic in the next run once decided. `resume` stays in report.json as a record; it is never printed for the owner.
@@ -73,7 +74,7 @@ export function collectReport(runDir) {
     const checks = (q.checks ?? []).map((c) => ({ file: `${rel}/${c.file}`, pass: c.pass, failed: c.failed ?? [], items: (readJson(path.join(dir, c.file))?.checks ?? []).map((i) => ({ name: i.name, pass: i.pass })) }));
     const runs = (q.audits ?? []).map((a) => {
       const j = readJson(path.join(dir, a.file), {});
-      return { step: a.step, file: `${rel}/${a.file}`, delta: !!a.delta, base: a.base ?? null, tip: a.tip ?? null, recommend: j.recommend ?? null, summary: j.summary ?? null, findings: j.findings ?? [] };
+      return { step: a.step, file: `${rel}/${a.file}`, delta: !!a.delta, base: a.base ?? null, tip: a.tip ?? null, recommend: j.recommend ?? null, summary: j.summary ?? null, findings: j.findings ?? [], ...(j.coverage ? { coverage: j.coverage } : {}), ...(a.thin ? { thin: true, accepted: a.accepted ?? null } : {}) };
     });
     const audit = runs.length
       ? { findings: runs.flatMap((r) => r.findings.map((f) => ({ ...f, step: r.step }))), recommend: runs.at(-1).recommend, summary: runs.at(-1).summary, runs }
@@ -254,6 +255,15 @@ export function prototypeSection(r) {
     L.push('', '**Fixed in the same build, on the builder\'s recommendation**');
     for (const x of fixed) L.push(`- ${x.tor} (${x.epic.label}; ${state(x.epic)}) — ${cell(x.question)} — \`${x.gate}\``);
   }
+  const thin = took.filter((x) => x.kind === 'thin-review');
+  if (thin.length) {
+    L.push('', '**Reviews that were thin** (the independent reviewer read too little, twice; the final check ran anyway)');
+    for (const x of thin) {
+      const g = (r.gates ?? []).find((y) => y.file === x.gate)?.review ?? {};
+      L.push(`- ${x.epic.label} (${state(x.epic)}) — read ${g.read ?? '?'} of ${g.of ?? '?'} changed code files${g.seconds == null ? '' : ` in ${g.seconds} s`}${(g.untested ?? []).length ? `; no test checked for ${g.untested.join(', ')}` : ''} — \`${x.gate}\``);
+      if ((g.unread ?? []).length) L.push(`  Not opened: ${g.unread.map((f) => `\`${f}\``).join(', ')}`);
+    }
+  }
   const defects = took.filter((x) => x.kind === 'defect');
   if (defects.length) {
     L.push('', '**Defects left as is, on the final check\'s own judgement** (it recommended leaving them, or they were past the count of small fixes or too big for one)');
@@ -362,7 +372,8 @@ export function renderReport(r) {
     }
     if (e.audit?.skipped) L.push('', `Auditor: skipped — ${e.audit.skipped}.`);
     for (const a of e.audit?.runs ?? []) {
-      L.push('', `Auditor ${a.step} (${a.delta ? 'changes since the last audit only' : 'the whole epic diff'}): recommends ${a.recommend ?? '—'} — ${cell(a.summary)} (\`${a.file}\`)`);
+      const read = a.coverage ? ` It read ${a.coverage.read} of ${a.coverage.of} changed code files${a.coverage.seconds == null ? '' : ` in ${a.coverage.seconds} s`}${a.thin ? `: a thin review, ${a.accepted ? `passed on by ${a.accepted}` : 'not counted as the audit'}` : ''}.` : '';
+      L.push('', `Auditor ${a.step} (${a.delta ? 'changes since the last audit only' : 'the whole epic diff'}): recommends ${a.recommend ?? '—'} — ${cell(a.summary)} (\`${a.file}\`)${read ? `.${read}` : ''}`);
       if (a.findings.length) {
         L.push('', '| # | Severity | Category | Parks | Evidence | Explanation |', '|---|---|---|---|---|---|');
         for (const x of a.findings) L.push(`| ${x.id} | ${x.severity} | ${x.category} | ${x.parks ? 'yes' : 'no'} | ${cell(x.evidence)} | ${cell(x.explanation)} |`);

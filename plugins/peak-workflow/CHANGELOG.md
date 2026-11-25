@@ -235,6 +235,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Autopilot catches a thin independent review** — the reviewer reports what it read per
+  requirement, and the driver counts the changed files it opened. Too little is reviewed once
+  more; still thin, a full run asks "Verify as built" or "Review again", and a provisional run
+  lists it under "Decided for you".
 - **Autopilot "prototype" is now "Provisional"** — the launch option, report heading and
   project records say provisional. Runs and change records written as "prototype" still read
   as provisional; stored field names are unchanged.

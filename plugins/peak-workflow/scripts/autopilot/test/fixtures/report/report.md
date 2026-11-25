@@ -80,7 +80,7 @@ Plan: `runs/20261112-220500/epics/Lg1Csv7/plan-1/plan.md` — approved by lint, 
 | `runs/20261112-220500/epics/Lg1Csv7/check-build-1.json` | pass | — |
 | `runs/20261112-220500/epics/Lg1Csv7/check-verify-1.json` | pass | — |
 
-Auditor audit-1 (the whole epic diff): recommends proceed — The import is exercised through the real CLI in every test. One note on scope. (`runs/20261112-220500/epics/Lg1Csv7/audit-1/audit.json`)
+Auditor audit-1 (the whole epic diff): recommends proceed — The import is exercised through the real CLI in every test. One note on scope. (`runs/20261112-220500/epics/Lg1Csv7/audit-1/audit.json`). It read 9 of 11 changed code files in 184 s.
 
 | # | Severity | Category | Parks | Evidence | Explanation |
 |---|---|---|---|---|---|

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { run } from '../driver.mjs';
-import { CATEGORIES, auditOutput, buildDigest, judgeAudit, validateAudit } from '../audit.mjs';
+import { CATEGORIES, auditOutput, buildDigest, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from '../audit.mjs';
 import { cannedBuild } from './audit-canned.mjs';
 import { E1, git, happy, makeProject, planScript, readJson } from './helpers.mjs';
 
@@ -219,4 +219,115 @@ test('the canned builds are what they claim: both pass their tests; only `widene
     assert.equal(/near\(toCents\('1\.15'\), 115\)/.test(diff), variant === 'widened');
     assert.equal(fs.readFileSync(path.join(step, 'bundle', 'test-changes.jsonl'), 'utf8').includes('test/money.test.js'), variant === 'widened');
   }
+});
+
+// ---- a thin review (#40 item 16): what the reviewer opened is counted, and too little is not passed -----------
+
+test('validateAudit with the anchors: a result without a `checked` entry for every anchor is no usable result', () => {
+  const tors = ['TOR-01-Kq7Rm2x', 'TOR-01-Zb4Nw9T'];
+  const entry = (tor) => ({ tor, tests: ['test/a.test.js'], code: ['src/a.js'], whenExercised: true, note: '' });
+  const base = { findings: [], recommend: 'proceed', summary: '' };
+  assert.equal(validateAudit({ ...base, checked: tors.map(entry) }, tors).ok, true);
+  assert.deepEqual(validateAudit({ ...base, checked: [entry(tors[0])] }, tors).problems, [`checked has no entry for ${tors[1]}`]);
+  assert.deepEqual(validateAudit(base, tors).problems, ['checked is not a list']);
+  assert.deepEqual(validateAudit({ ...base, checked: [{ ...entry(tors[0]), tests: 'a' }, entry(tors[1])] }, tors).problems, ['checked[0].tests is not a list of paths']);
+  assert.equal(validateAudit(base).ok, true, 'a caller without the anchors checks the shape only, as before');
+  assert.ok(SCHEMA_REQUIRED().includes('checked'));
+});
+const SCHEMA_REQUIRED = () => readJson(new URL('../audit/schema.json', import.meta.url)).required;
+
+test('reviewCoverage: the changed code files the reviewer read, from its referee log; docs, lockfiles, images and deletions do not count', (t) => {
+  const p = makeProject(t);
+  const step = path.join(p.tmp, 'audit-1'); fs.mkdirSync(path.join(step, 'bundle'), { recursive: true });
+  const file = (rel, extra = '') => `diff --git a/${rel} b/${rel}\n${extra}--- a/${rel}\n+++ b/${rel}\n@@ -1 +1 @@\n-a\n+b\n`;
+  fs.writeFileSync(path.join(step, 'bundle', 'diff.patch'), [
+    file('src/a.js'), file('src/b.js'), file('test/a.test.js'), file('docs/implementation-plan/session-handoffs/epic-X-implemented.md'), file('docs/architecture.md'),
+    file('package-lock.json'), file('web/logo.png'), 'diff --git a/bin/tool b/bin/tool\nBinary files a/bin/tool and b/bin/tool differ\n',
+    'diff --git a/src/old.js b/src/old.js\ndeleted file mode 100644\n--- a/src/old.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-a\n',
+  ].join(''));
+  assert.deepEqual(changedCodeFiles(fs.readFileSync(path.join(step, 'bundle', 'diff.patch'), 'utf8')), ['src/a.js', 'src/b.js', 'test/a.test.js']);
+  const read = (fp, hook = 'PostToolUse', tool = 'Read') => JSON.stringify({ hook, tool_name: tool, tool_input: { file_path: fp } });
+  fs.writeFileSync(path.join(step, 'hooks.jsonl'), [
+    read(path.join(p.clone, 'src/a.js')), read(path.join(p.clone, 'src/a.js')), read(path.join(p.clone, 'test/a.test.js')),
+    read(path.join(p.clone, 'src/b.js'), 'PreToolUse'), read(path.join(p.clone, 'src/b.js'), 'PostToolUseFailure'), read(path.join(p.clone, 'src/b.js'), 'PostToolUse', 'Grep'),
+    read(path.join(step, 'bundle', 'diff.patch')),
+  ].join('\n') + '\n');
+  fs.writeFileSync(path.join(step, 'result.json'), JSON.stringify({ duration_ms: 49400 }));
+  assert.deepEqual(reviewCoverage({ stepDir: step, clone: p.clone }), { read: 2, of: 3, unread: ['src/b.js'], seconds: 49 });
+});
+
+test('thinReview: under half the changed code files read (at most 15 needed), or an anchor with no test named, is thin', () => {
+  const tors = ['TOR-01-Kq7Rm2x', 'TOR-01-Zb4Nw9T'];
+  const value = { checked: tors.map((tor) => ({ tor, tests: ['test/a.test.js'] })) };
+  const cov = (read, of) => ({ read, of, unread: [], seconds: 40 });
+  assert.equal(thinReview({ value, coverage: cov(2, 4), anchors: tors }), null);
+  assert.deepEqual(thinReview({ value, coverage: cov(1, 4), anchors: tors }), { need: 2, short: true, untested: [] });
+  assert.equal(thinReview({ value, coverage: cov(15, 60), anchors: tors }), null, 'the cap keeps a large epic reachable in 40 turns');
+  assert.equal(thinReview({ value, coverage: cov(14, 60), anchors: tors }).need, 15);
+  assert.equal(thinReview({ value, coverage: cov(0, 0), anchors: tors }), null, 'nothing to read');
+  const untested = { checked: [{ tor: tors[0], tests: ['t'] }, { tor: tors[1], tests: [] }] };
+  assert.deepEqual(thinReview({ value: untested, coverage: cov(4, 4), anchors: tors }), { need: 2, short: false, untested: [tors[1]] });
+  assert.equal(thinReview({ value: untested, coverage: cov(4, 4), anchors: tors, delta: true }), null, 'a delta audit may leave a requirement it did not touch');
+});
+
+test('an auditor that leaves out an anchor in `checked` parks the epic: no usable result', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: { result: { structured_output: { checked: [], findings: [], recommend: 'proceed', summary: 's' } } } });
+  await go(p);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'PARKED');
+  assert.match(e.reason, new RegExp(`^auditor: audit-1 returned no usable result \\(checked has no entry for ${E1.tors[0]};`));
+});
+
+test('a careful review records what it read; a thin first try is run once more, told what it left unread, and a careful second goes on', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/audit-1`]: { reads: false, ...auditScript([]) } });
+
+  await go(p);
+
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED');
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'audit-2', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  const first = readJson(dir(p, 'audit-1', 'audit.json'));
+  assert.equal(first.decision, 'thin');
+  assert.deepEqual([first.coverage.read, first.coverage.of, first.coverage.unread], [0, 2, [`src/${E1.slug}.js`, `test/${E1.slug}.test.js`]]);
+  const second = readJson(dir(p, 'audit-2', 'audit.json'));
+  assert.deepEqual([second.decision, second.coverage.read, second.coverage.of], ['proceed', 2, 2]);
+  assert.equal(second.checked.length, E1.tors.length);
+  assert.deepEqual(e.audits.map((a) => [a.step, !!a.thin, a.coverage.read]), [['audit-1', true, 0], ['audit-2', false, 2]]);
+  assert.equal(readJson(dir(p, 'audit-2', 'bundle', 'bundle.json')).delta, false, 'the second try reads the same whole epic');
+  const prompt = p.calls().find((c) => c.step === 'audit-2').prompt;
+  assert.match(prompt, /## Your first try was too thin/);
+  assert.ok(prompt.includes(`\`src/${E1.slug}.js\``));
+  assert.ok(!p.calls().find((c) => c.step === 'audit-1').prompt.includes('too thin'));
+  assert.ok(!fs.existsSync(path.join(p.state, 'gates')) || !fs.readdirSync(path.join(p.state, 'gates')).length, 'no question for the owner');
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Auditor audit-1 .*It read 0 of 2 changed code files in \d+ s: a thin review, not counted as the audit\./);
+});
+
+test('a thin review that also has a parking finding goes to the owner as findings, not as a thin review', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: { reads: false, ...auditScript([finding('stand-in', 'high')]) } });
+  await go(p);
+  assert.equal(p.epic(E1.id).reason, 'auditor: F1 stand-in (audit-1)');
+  assert.deepEqual(p.steps().slice(-1), [`${E1.id}/audit-1`]);
+});
+
+test('changedCodeFiles on a real git diff: a name with a space or accents, a mode-only change, a pure rename, fixtures and snapshots', (t) => {
+  const p = makeProject(t);
+  const r = path.join(p.tmp, 'repo'); fs.mkdirSync(r);
+  const w = (rel, text) => { fs.mkdirSync(path.dirname(path.join(r, rel)), { recursive: true }); fs.writeFileSync(path.join(r, rel), text); };
+  git(r, 'init', '-q'); git(r, 'config', 'user.email', 't@e.st'); git(r, 'config', 'user.name', 'T');
+  w('run.sh', 'echo\n'); w('old.js', 'export const a = 1;\n'); git(r, 'add', '-A'); git(r, 'commit', '-qm', 'base');
+  fs.chmodSync(path.join(r, 'run.sh'), 0o755);
+  git(r, 'mv', 'old.js', 'new.js');
+  w('src/my file.js', 'x\n'); w('src/café.js', 'x\n'); w('test/fixtures/rows.json', '[]\n'); w('test/__snapshots__/a.snap', 'x\n'); w('src/real.js', 'x\n');
+  git(r, 'add', '-A'); git(r, 'commit', '-qm', 'change');
+  assert.deepEqual(changedCodeFiles(git(r, 'diff', 'HEAD~1', 'HEAD') + '\n').sort(), ['src/café.js', 'src/my file.js', 'src/real.js']);
+});
+
+test('the reviewer\'s requirement IDs are read out of whatever it wrote around them', () => {
+  const tor = 'TOR-01-Kq7Rm2x';
+  const value = { findings: [], recommend: 'proceed', summary: '', checked: [{ tor: `[${tor}] Import every row`, tests: ['test/a.test.js'], code: [], whenExercised: true, note: '' }] };
+  assert.equal(validateAudit(value, [tor]).ok, true);
+  assert.equal(thinReview({ value, coverage: { read: 1, of: 1, unread: [], seconds: 1 }, anchors: [tor] }), null);
 });

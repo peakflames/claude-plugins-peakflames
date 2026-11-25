@@ -1,8 +1,23 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["findings", "recommend", "summary"],
+  "required": ["checked", "findings", "recommend", "summary"],
   "properties": {
+    "checked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tor", "tests", "code", "whenExercised", "note"],
+        "properties": {
+          "tor": { "type": "string" },
+          "tests": { "type": "array", "items": { "type": "string" } },
+          "code": { "type": "array", "items": { "type": "string" } },
+          "whenExercised": { "type": "boolean" },
+          "note": { "type": "string" }
+        }
+      }
+    },
     "findings": {
       "type": "array",
       "items": {

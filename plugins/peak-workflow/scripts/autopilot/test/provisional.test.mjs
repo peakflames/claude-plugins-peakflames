@@ -532,3 +532,37 @@ test('a second final check\'s "Seen but not fixed" list replaces the first\'s', 
   assert.equal(s.queue[0].state, 'MERGED', s.queue[0].reason);
   assert.deepEqual(status(p.project, p.state).left.map((x) => x.text), ['a stray "·" at 320 px', 'the header wraps at 320 px']);
 });
+
+test('provisional: a review thin twice does not park; the final check runs, and it is listed under "Decided for you" with what was read', async (t) => {
+  const p = makeProject(t, PROTO);
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: { reads: false, result: { total_cost_usd: 0.5, structured_output: { findings: [], recommend: 'proceed', summary: 'looked fine' } } } });
+
+  const s = await p.go();
+
+  assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[E1.id, 'MERGED']]);
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'audit-2', 'verify-1'].map((x) => `${E1.id}/${x}`));
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.decided.answer, g.decided.by, g.decided.prototype, g.decided.standing], ['thin-review', 'Verify as built', 'autopilot (provisional run)', true, true]);
+  const e = p.epic(E1.id);
+  assert.deepEqual(e.prototype.map((x) => [x.kind, x.answer]), [['thin-review', 'Verify as built']]);
+  assert.equal(e.audits.at(-1).accepted, 'autopilot (provisional run)');
+  const did = 'went on after a thin review: read 0 of 2 changed files';
+  assert.deepEqual(status(p.project, p.state).decidedForYou.map((d) => [d.prototype, d.kind, d.did]), [[true, 'thin-review', did]]);
+  const report = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
+  assert.match(report, /\*\*Reviews that were thin\*\*/);
+  assert.match(report, new RegExp(`read 0 of 2 changed code files in \\d+ s — \`gates/${E1.id}-1\\.json\``));
+  assert.ok(report.includes(`Not opened: \`src/${E1.slug}.js\`, \`test/${E1.slug}.test.js\``));
+  const lines = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => eventLine(JSON.parse(l))).filter(Boolean);
+  assert.ok(lines.some((l) => /^The independent reviewer is reviewing .* again: it read 0 of 2 changed code files$/.test(l)), lines.join('\n'));
+  assert.ok(lines.some((l) => /after a thin independent review .* for you \(provisional run\)$/.test(l)), lines.join('\n'));
+});
+
+test('a requirement a person observes has no test to name: a review that says so is not thin', async (t) => {
+  const p = makeProject(t, PROTO);
+  const e = addLookEpic(p);
+  const checked = e.tors.map((tor) => ({ tor, tests: [], code: [`src/${e.slug}.js`], whenExercised: false, note: 'operator-observed: a person looks' }));
+  p.scenario({ ...happy(E1), [`${e.id}/plan`]: planScript(e), [`${e.id}/build`]: buildWithManual(e), [`${e.id}/audit`]: { result: { structured_output: { checked, findings: [], recommend: 'proceed', summary: 's' } } }, [`${e.id}/verify`]: wrapupMarking(e, `--fail ${e.tors[0]} "NOT OBSERVED — provisional run: open chart.html and look at the bars"`) });
+  await p.go();
+  assert.ok(!p.steps().includes(`${e.id}/audit-2`), p.steps().join(' '));
+  assert.equal(readJson(p.dir(e.id, 'audit-1', 'audit.json')).decision, 'proceed');
+});

@@ -268,6 +268,8 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     '**Not proven for real:** <only when `unproven` has entries>', 'Never soften it, never leave one out, and never fold it into a count.',
     // Seen live: a defect the final check saw sat under "not proven", and the epic merged unasked.
     '**Seen wrong and left as is:** <only when `left` has entries>', 'It is not "not proven"', '(`kind` `defect`;',
+    // #40 item 16: a reviewer that barely looked was passed like a careful one.
+    '**A `thin-review` gate, in plain words.**', 'The reviewer barely looked', 'the independent reviewer barely looked, twice; the final check ran anyway', '(`kind` `thin-review`;',
     '**Real money, asked in the same popup.**', '`Yes — when a check needs it (Recommended)`', '`No — never spend`', '"realSpend": true', 'Never write `true` unasked.',
     // Seen live: with the owner away, two sessions each waited five minutes on a browser sign-in, and nobody could say how it ended.
     '**Whether they will be there, asked in the same popup.**', "`No — I'll be away`", "`Yes — I'm here`", '"attended": false', 'that is `false`, whatever was picked',

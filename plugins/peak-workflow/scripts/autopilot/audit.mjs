@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LOCKFILE, THIN_REVIEW } from './lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const AUDIT_DIR = path.join(HERE, 'audit');
@@ -111,8 +112,11 @@ export function auditOutput(result) {
   try { return JSON.parse(m[0]); } catch { return null; }
 }
 
-/** Checks an auditor result against audit/schema.json by hand (no dependency). */
-export function validateAudit(value) {
+/**
+ * Checks an auditor result against audit/schema.json by hand (no dependency). With `anchors`, every one of them needs
+ * its `checked` entry: a review that does not say what it read is no usable result.
+ */
+export function validateAudit(value, anchors = null) {
   const problems = [];
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { ok: false, problems: ['not a JSON object'] };
   if (!Array.isArray(value.findings)) problems.push('findings is not a list');
@@ -124,7 +128,82 @@ export function validateAudit(value) {
   });
   if (!['proceed', 'park'].includes(value.recommend)) problems.push('recommend is not "proceed" or "park"');
   if (typeof value.summary !== 'string') problems.push('summary is not text');
+  if (anchors) {
+    const checked = Array.isArray(value.checked) ? value.checked : null;
+    if (!checked) problems.push('checked is not a list');
+    else {
+      checked.forEach((c, i) => {
+        if (!c || typeof c !== 'object') { problems.push(`checked[${i}] is not an object`); return; }
+        for (const k of ['tests', 'code']) if (!Array.isArray(c[k]) || c[k].some((x) => typeof x !== 'string')) problems.push(`checked[${i}].${k} is not a list of paths`);
+      });
+      // The ID inside whatever the reviewer wrote ("[TOR-01-Kq7Rm2x] Import rows", "TOR-01-Kq7Rm2x — …").
+      const named = new Set(checked.map((c) => (String(c?.tor ?? '').match(/TOR-\d{2}-[A-Za-z0-9]{7}/) ?? [])[0]));
+      for (const tor of anchors) if (!named.has(tor)) problems.push(`checked has no entry for ${tor}`);
+    }
+  }
   return { ok: problems.length === 0, problems };
+}
+
+/** A name as git quotes it (`\303\251`, `\"`, `\t`), back to its own characters. */
+const unquote = (name) => (/\\/.test(name) ? Buffer.from(name.replace(/\\([0-7]{3})|\\(.)/g, (_, o, c) => (o ? String.fromCharCode(parseInt(o, 8)) : ({ t: '\t', n: '\n' }[c] ?? c))), 'latin1').toString('utf8') : name);
+// Data a reviewer need not open one by one: fixtures, snapshots, vendored or built output.
+const NOT_CODE = /(^|\/)(__snapshots__|fixtures?|testdata|vendor|node_modules|dist|build|coverage)\/|\.(snap|min\.js|map)$/i;
+const IMAGE = /\.(png|jpe?g|gif|svg|ico|webp|bmp|tiff?|pdf|woff2?|ttf|otf|eot|mp[34]|mov|zip|gz)$/i;
+/**
+ * The code files a diff changes that a reviewer is expected to open: not deleted, not binary, not an image, not under
+ * `docs/` (the spec, the requirements, the handoff, the plan), not a lockfile, not autopilot's own record.
+ */
+export function changedCodeFiles(diff) {
+  const files = [];
+  for (const block of String(diff ?? '').split(/^(?=diff --git )/m)) {
+    const head = block.match(/^diff --git "?a\/(.+?)"? "?b\/(.+?)"?$/m);
+    if (!head) continue;
+    // git ends a name with a space in it with a tab on the `+++` line, and quotes one with unusual characters.
+    const rel = unquote(((block.match(/^\+\+\+ "?b\/(.+?)"?\t?$/m) ?? [])[1] ?? head[2]).replace(/\t$/, ''));
+    // Nothing to read: a mode change only, or a rename with the same content (no hunk, not binary).
+    if (!/^@@ /m.test(block) && !/^(Binary files |GIT binary patch)/m.test(block)) continue;
+    if (/^\+\+\+ \/dev\/null$/m.test(block) || /^deleted file mode/m.test(block)) continue;
+    if (/^(Binary files |GIT binary patch)/m.test(block) || IMAGE.test(rel)) continue;
+    if (/^(docs|\.autopilot)\//.test(rel) || LOCKFILE.test(rel) || NOT_CODE.test(rel)) continue;
+    if (!files.includes(rel)) files.push(rel);
+  }
+  return files;
+}
+
+/**
+ * What the reviewer opened, from its step's referee log: of the changed code files in its bundle's `diff.patch`, how
+ * many it read (`Read` calls that finished), which it left unread, and how long it took (its result's `duration_ms`).
+ */
+export function reviewCoverage({ stepDir, clone }) {
+  const diff = fs.existsSync(path.join(stepDir, 'bundle', 'diff.patch')) ? fs.readFileSync(path.join(stepDir, 'bundle', 'diff.patch'), 'utf8') : '';
+  const files = changedCodeFiles(diff);
+  const roots = [...new Set([clone, (() => { try { return fs.realpathSync(clone); } catch { return clone; } })()])];
+  const opened = new Set();
+  for (const e of readLines(path.join(stepDir, 'hooks.jsonl'))) {
+    if (e.hook !== 'PostToolUse' || e.tool_name !== 'Read') continue;
+    const input = typeof e.tool_input === 'string' ? (() => { try { return JSON.parse(e.tool_input); } catch { return {}; } })() : e.tool_input ?? {};
+    const fp = input.file_path; if (typeof fp !== 'string') continue;
+    for (const root of roots) {
+      const rel = path.isAbsolute(fp) ? path.relative(root, fp) : path.normalize(fp);
+      if (!rel.startsWith('..')) opened.add(rel.split(path.sep).join('/'));
+    }
+  }
+  let ms = null;
+  try { ms = JSON.parse(fs.readFileSync(path.join(stepDir, 'result.json'), 'utf8')).duration_ms ?? null; } catch { /* no result line */ }
+  const unread = files.filter((f) => !opened.has(f));
+  return { read: files.length - unread.length, of: files.length, unread, seconds: ms == null ? null : Math.round(ms / 1000) };
+}
+
+/**
+ * Whether a review was thin, and why: it read fewer of the changed code files than `THIN_REVIEW` asks (half, at most
+ * `cap`), or (on a whole-epic audit; a delta audit may leave untouched requirements alone) it named no test for an
+ * anchor. Null when it was not thin.
+ */
+export function thinReview({ value, coverage, anchors = [], delta = false }) {
+  const need = Math.min(Math.ceil(coverage.of * THIN_REVIEW.share), THIN_REVIEW.cap);
+  const short = coverage.read < need;
+  const untested = delta ? [] : anchors.filter((tor) => !(value.checked ?? []).some((c) => String(c?.tor ?? '').includes(tor) && (c.tests ?? []).length));
+  return short || untested.length ? { need, short, untested } : null;
 }
 
 /**

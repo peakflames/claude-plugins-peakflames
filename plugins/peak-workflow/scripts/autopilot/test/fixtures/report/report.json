@@ -131,7 +131,16 @@
                 "explanation": "README.md is not a Key Component of this epic; the edit only documents the new command.",
                 "parks": false
               }
-            ]
+            ],
+            "coverage": {
+              "read": 9,
+              "of": 11,
+              "unread": [
+                "src/format.js",
+                "src/index.js"
+              ],
+              "seconds": 184
+            }
           }
         ]
       },

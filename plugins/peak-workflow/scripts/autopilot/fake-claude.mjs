@@ -9,7 +9,10 @@
 //     "*/<kind>":      script }     kinds: plan, build, verify, fix, audit
 //
 // An audit step with no script is a clean audit: `structured_output` with no findings. A scripted
-// one sets `result.structured_output` to what the auditor would return.
+// one sets `result.structured_output` to what the auditor would return. Either way an auditor first
+// opens every changed code file of its bundle's diff.patch through the referee (PreToolUse, then the
+// PostToolUse log the driver counts), and its result gets a `checked` entry per anchor in bundle.json
+// unless it has its own. `reads: [paths]` (relative to the clone) opens only those; `reads: false` none.
 //
 //   script = { "actions": [ … ], "result": { …overrides… } | false, "exit": 0 }
 //
@@ -49,6 +52,7 @@ import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
+import { changedCodeFiles } from './audit.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf(name); return i === -1 ? null : argv[i + 1]; };
@@ -78,6 +82,7 @@ function fill(v) {
 const denials = [];
 let hookStopped = false;
 let toolCalls = 0;
+let lastUseId = null;
 let lastReason = '';
 const lines = readline.createInterface({ input: process.stdin })[Symbol.asyncIterator]();
 const stdinClosed = new Promise((r) => process.stdin.on('end', r).on('close', r));
@@ -90,16 +95,23 @@ const branchExists = (name) => { try { git('rev-parse', '--verify', '-q', `refs/
  * call. Returns true when the call may go ahead. A deny is recorded in permission_denials;
  * `continue: false` ends the session.
  */
-function referee(tool_name, tool_input = {}) {
+function referee(tool_name, tool_input = {}, { quiet = false } = {}) {
   const hook = settings ? JSON.parse(fs.readFileSync(settings, 'utf8')).hooks?.PreToolUse?.[0]?.hooks?.[0]?.command : null;
   if (!hook) return true; // launched without the referee's settings: nothing to ask
-  const r = spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PreToolUse', permission_mode: flag('--permission-mode'), tool_name, tool_input, tool_use_id: `toolu_${toolCalls++}` }) });
+  const r = spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PreToolUse', permission_mode: flag('--permission-mode'), tool_name, tool_input, tool_use_id: (lastUseId = `toolu_${toolCalls++}`) }) });
   let out = null; try { out = r.stdout ? JSON.parse(r.stdout) : null; } catch { /* not JSON: no decision, as Claude Code reads it */ }
-  fs.appendFileSync(path.join(stepDir, 'fake-tools.jsonl'), JSON.stringify({ tool_name, exit: r.status, out }) + '\n');
+  if (!quiet) fs.appendFileSync(path.join(stepDir, 'fake-tools.jsonl'), JSON.stringify({ tool_name, exit: r.status, out }) + '\n');
   const deny = out?.hookSpecificOutput?.permissionDecision === 'deny';
   if (deny) { denials.push({ tool_name, tool_input }); lastReason = out.hookSpecificOutput.permissionDecisionReason; }
   if (out?.continue === false) hookStopped = true;
   return !deny && !hookStopped;
+}
+
+/** After a tool call went ahead: the session's real PostToolUse hook (the referee's log), as Claude Code runs it. Only the auditor's, whose reads the driver counts. */
+function logged(tool_name, tool_input = {}) {
+  if (kind !== 'audit') return;
+  const hook = settings ? JSON.parse(fs.readFileSync(settings, 'utf8')).hooks?.PostToolUse?.[0]?.hooks?.[0]?.command : null;
+  if (hook) spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PostToolUse', tool_name, tool_input, tool_response: { type: 'text' }, tool_use_id: lastUseId }) }); // the id of the call the referee just allowed, as Claude Code pairs them
 }
 
 /** The tool call a real session would make for a scripted action, or null for an action that makes none. */
@@ -168,7 +180,7 @@ async function act(a) {
       fs.writeFileSync(path.join(stepDir, 'fake-control-response.json'), value ?? 'null');
       break;
     }
-    case 'tool': referee(a.tool_name, a.tool_input ?? {}); break;
+    case 'tool': if (referee(a.tool_name, a.tool_input ?? {})) logged(a.tool_name, a.tool_input ?? {}); break;
     case 'sleep': await sleep(a.ms); break;
     case 'hang': await new Promise(() => setInterval(() => {}, 1 << 30)); break;
     case 'crash': process.exit(a.code ?? 1); break;
@@ -197,7 +209,23 @@ async function main() {
   try { version = JSON.parse(fs.readFileSync(path.join(plugin, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { /* no plugin dir */ }
   if (flag('--output-format') !== 'json') emit({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), model: flag('--model'), permissionMode: flag('--permission-mode'), claude_code_version: 'fake', tools: ['Bash', 'Read', 'Edit', 'Write'], plugins: [{ name: 'peak-workflow', path: plugin, source: 'peak-workflow@inline', version }] });
 
+  // An auditor opens the changed code (the driver counts it) and says, per anchor, what it checked.
+  let bundle = null;
+  if (kind === 'audit') {
+    try { bundle = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'bundle.json'), 'utf8')); } catch { /* not in a bundle */ }
+    const diff = fs.existsSync('diff.patch') ? fs.readFileSync('diff.patch', 'utf8') : '';
+    const reads = script.reads === false ? [] : Array.isArray(script.reads) ? script.reads : changedCodeFiles(diff);
+    for (const rel of reads) {
+      const input = { file_path: path.join(bundle?.clone ?? process.cwd(), rel) };
+      if (referee('Read', input, { quiet: true })) logged('Read', input);
+    }
+  }
+
   for (const a of script.actions ?? []) { await act(a); if (hookStopped) break; }
+  const out = script.result?.structured_output;
+  if (kind === 'audit' && out && typeof out === 'object' && !('checked' in out)) {
+    out.checked = (bundle?.anchors ?? []).map((tor) => ({ tor, tests: [`test/(fake) ${tor}`], code: ['src/(fake)'], whenExercised: true, note: 'fake auditor' }));
+  }
 
   if (script.result === false) process.exit(script.exit ?? 1);
   emit({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: sessionId, num_turns: 3, total_cost_usd: 0.01, duration_ms: Date.now() - started, stop_reason: 'end_turn', terminal_reason: 'completed', usage: {}, modelUsage: {}, ...script.result, permission_denials: denials, ...(hookStopped ? { terminal_reason: 'hook_stopped' } : {}) });
