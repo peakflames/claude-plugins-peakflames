@@ -280,10 +280,18 @@ Why this order:
   existing fixture or expected output. Tested against the fake (`test/weakening.test.mjs`,
   `test/resume.test.mjs`); not seen in a real run. Known, accepted: a changed expected value of the
   same kind (`toBe(3)` → `toBe(4)`) still merges unasked.
-- [ ] **The final check saw a defect and passed it without a word** (*no issue*; Pilot Light,
+- [x] **The final check saw a defect and passed it without a word** (*no issue*; Pilot Light,
   run `20261122-090420`). The verifier noted that the "Page not found" picture carries the
   wrong text, did not fix it and did not park; the epic merged. What the verifier notes and
   leaves should reach the owner (the report, or a question).
+  Fixed in two parts. `552f4e3` (2026-11-23): what it leaves reaches the report and the
+  project's status (seen live in `20261123-192602`, `20261124-031115`, `20261124-083932`).
+  `454e9b2` (2026-11-24; owner's decision: ask, standing answer fixes small ones): a defect in
+  the epic's own work is asked "Seen but not fixed yet: …". Small ones within the count are fixed
+  on the standing answer. Otherwise a full run parks, and a provisional run leaves it as is and
+  lists it under "Decided for you". Left defects get their own list, apart from "Not proven for
+  real", and a second final check's list replaces the first's. Tested against the fake; not
+  seen in a real run.
 - [ ] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change;
   48 seconds on Pilot Light's whole walking skeleton (2026-11-22; it did find the deleted
   lockfile, rated low); 47 seconds on its second epic (run `20261122-094004`, 4 findings, none
