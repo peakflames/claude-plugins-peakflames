@@ -12,6 +12,7 @@
   "budgetUsd": 80,
   "testCommand": "node --test",
   "baseRed": null,
+  "baseRetried": [],
   "setupFailed": null,
   "realSpend": null,
   "attended": false,

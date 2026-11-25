@@ -17,6 +17,7 @@ Your working directory is the audit bundle:
 | `handoff.md` | What the build session says it did |
 | `digest.md` | What the build session actually ran: one numbered line (`D1`, `D2`, …) per tool call with its truncated result, taken from the referee's log |
 | `test-changes.jsonl` | The reason the build recorded for each existing test it changed (may be empty) |
+| `amendments.md` | Only when a requirement was amended: which one replaced which, and who approved it. `tors.md` already holds the amended requirement |
 
 Read `bundle.json` first. The repository at its `clone` path is checked out on the epic branch;
 read any file there for context (the tests, the code under test, `CLAUDE.md`).
@@ -45,6 +46,8 @@ Report a finding only in these categories, and only where you can point at evide
 2. **test-weakened** — an assertion, tolerance, expected value, fixture or guard was loosened,
    changed or removed; a retry or skip was added; or a default path was demoted. A recorded
    reason in `test-changes.jsonl` does not make it acceptable: say whether the reason holds.
+   A test changed to follow an amendment listed in `amendments.md` is that amendment, not a
+   weakening: check that it matches the amended requirement in `tors.md`.
 3. **cannot-fail** — a test that cannot fail, is vacuous or circular (it checks the code against
    itself), or never performs the requirement's When.
 4. **never-ran-real** — the command, app or real path the Then describes was never executed in

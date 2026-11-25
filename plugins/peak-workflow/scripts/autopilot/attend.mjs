@@ -51,6 +51,7 @@ export function plainReason(reason) {
     [/hit wall clock/, 'a step reached its time limit'],
     [/^budget:/, 'a step reached its limit'],
     [/^infra error/, 'a technical error stopped a step'],
+    [/^setup failed/, "autopilot could not get its private copy of your project ready"],
     [/^auditor: .*(could not start|no usable result)/, 'the independent reviewer could not run'],
     [/^auditor:/, 'the independent reviewer found a serious problem'],
     [/deferral/, 'the build left part of a requirement undone'],
@@ -197,6 +198,7 @@ export function eventLine(ev) {
       if (ev.pass) return `${what} passed`;
       return `${what} found a problem: ${(ev.failed ?? []).map((n) => CHECK_WORDS[n] ?? n).join('; ') || 'see the report'}`;
     }
+    case 'base-retried': return "Your project's own tests failed once before the work began and passed when run again: a flaky test. Going on";
     case 'fix-round': return `${who} needs a repair: starting the one repair round`;
     case 'audit': if (ev.thin && !ev.parks) return `The independent reviewer barely looked: it read ${ev.read ?? '?'} of ${ev.of ?? '?'} changed code files`;
       return ev.parks ? `The independent reviewer found ${plural(ev.parks, 'serious problem')}` : ev.findings ? `The independent reviewer found ${plural(ev.findings, 'thing')} to note, none serious` : 'The independent reviewer found nothing';

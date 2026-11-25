@@ -295,8 +295,10 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
         item c) and prove again. One that still fails becomes one line under "Needs you" on
         the Step 2 screen: "<what the check is, in plain words> does not pass in autopilot's
         copy, so each epic's final check will probably stop for you", with the one thing that
-        would fix it. It is a warning, not a refusal. Then run the item 1 preflight again and
-        use its output: the clone now exists.
+        would fix it. A gate in `gatesFlaky` failed once and passed when run again: say
+        "<what the check is> failed once and passed when run again: a flaky check, which may
+        stop an epic now and then", and do not try to fix it. Neither is a refusal. Then run
+        the item 1 preflight again and use its output: the clone now exists.
       - `tests.skipped` is set (with `ok: true`) → the project has no test files yet in its
         declared test directories, so the test command was not run and the probe is skipped.
         Not a failure. Put one line on the Step 2 screen: "This project has no tests yet, so

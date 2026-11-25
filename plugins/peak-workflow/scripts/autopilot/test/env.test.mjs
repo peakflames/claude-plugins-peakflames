@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, REGISTRIES, claudeMdReads } from '../driver.mjs';
+import { PLUGIN_DIR, REGISTRIES, claudeMdReads, sleepWarning } from '../driver.mjs';
+import { writeReport } from '../report.mjs';
 import { DRIVER, E1, git, happy, makeProject, readJson } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, json: () => JSON.parse(r.stdout) }; };
@@ -447,4 +448,101 @@ test('tor-lifecycle: an old python3 first on PATH does not hide a newer one furt
   const found = run(`${old}:${cur}`);
   assert.equal(found.status, 0, found.stderr);
   assert.match(found.stdout, /^ran new: format/);
+});
+
+// ---- an overnight run on a flaky or sleepy machine (#41 B6, B10; #40 item 6) ----------------------
+
+/** A test file on develop that fails the first time it runs and passes from then on (the marker lives outside the clone). */
+function failsOnce(p, name = 'flaky') {
+  const marker = path.join(p.tmp, `${name}-tried`);
+  fs.writeFileSync(path.join(p.project, 'test', `${name}.test.js`), `import test from 'node:test';\nimport fs from 'node:fs';\ntest('${name}', () => { if (!fs.existsSync(${JSON.stringify(marker)})) { fs.writeFileSync(${JSON.stringify(marker)}, 'x'); throw new Error('${name}'); } });\n`);
+  git(p.project, 'add', '-A');
+  git(p.project, 'commit', '-q', '-m', `test: ${name}`);
+}
+
+test('a base check that fails once and passes when run again is not base red: the epic is built and the retry is recorded', async (t) => {
+  const p = makeProject(t);
+  failsOnce(p);
+  p.scenario(happy(E1));
+  const state = await p.go();
+  assert.equal(state.stoppedBecause, 'queue done');
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.equal(state.baseRed, undefined);
+  assert.equal(state.baseRetried.length, 1);
+  assert.equal(state.baseRetried[0].before, E1.id);
+  assert.deepEqual(state.baseRetried[0].tries.map((x) => x.pass), [false, true]);
+  assert.ok(state.baseRetried[0].tries.every((x) => typeof x.ms === 'number' && typeof x.sleptSec === 'number'));
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /base check: `node --test` failed on develop \(exit 1\); running it once more[\s\S]*base check passed when run again/);
+  assert.ok(fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').includes('"type":"base-retried"'));
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Your project's own tests failed once on `develop` before .* and passed when run again: a flaky test/);
+});
+
+test('a base check that fails twice is base red, with both tries recorded; a check the machine slept through says so', async (t) => {
+  const p = makeProject(t);
+  fs.writeFileSync(path.join(p.project, 'test', 'red.test.js'), "import test from 'node:test';\ntest('red', () => { throw new Error('base is red'); });\n");
+  git(p.project, 'add', '-A');
+  git(p.project, 'commit', '-q', '-m', 'test: a failing test on develop');
+  p.scenario(happy(E1));
+  const state = await p.go();
+  assert.equal(state.stoppedBecause, 'base red');
+  assert.deepEqual(p.calls(), []);
+  assert.deepEqual(state.baseRed.tries.map((x) => [x.pass, x.exit]), [[false, 1], [false, 1]]);
+  assert.equal(typeof state.baseRed.sleptSec, 'number');
+  // The machine slept ten minutes through the first try: the report says so.
+  const file = path.join(p.runDir(), 'state.json');
+  const s = readJson(file); s.baseRed.tries[0].sleptSec = 600; fs.writeFileSync(file, JSON.stringify(s));
+  writeReport(p.runDir());
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /the machine slept 10 min during the check/);
+});
+
+test('the launch warns about sleep on macOS and on Windows', () => {
+  assert.match(sleepWarning('darwin'), /lid closed on battery/);
+  assert.match(sleepWarning('win32'), /power plan .*never sleep.*plugged in/i);
+  assert.equal(sleepWarning('linux'), null);
+});
+
+test('prepare --gate runs a failing gate once more: one that passes the second time is flaky, not failed', (t) => {
+  const p = makeProject(t);
+  const marker = path.join(p.tmp, 'gate-tried');
+  const flaky = `if [ -f "${marker}" ]; then exit 0; else touch "${marker}"; echo "e2e: 1 timeout" >&2; exit 1; fi`;
+  const r = driver('prepare', '--project', p.project, '--gate', flaky, '--gate', 'exit 4', '--gate', 'no-such-linter-xyz .', '--gate', 'true');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const out = r.json();
+  assert.deepEqual(out.gates.map((g) => [g.pass, g.tries, !!g.flaky]), [[true, 2, true], [false, 2, false], [false, 1, false], [true, 1, false]]);
+  assert.deepEqual(out.gatesFailed, ['exit 4', 'no-such-linter-xyz .']);
+  assert.deepEqual(out.gatesFlaky, [flaky]);
+  assert.match(out.gates[0].first.tail, /e2e: 1 timeout/);
+});
+
+test('setup runs again on the epic branch when the epic adds a manifest: an epic that creates web/package.json has its dependencies before its checks', async (t) => {
+  const p = makeProject(t);
+  driver('configure', '--project', p.project, '--setup', 'if [ -f web/package.json ]; then mkdir -p node_modules && echo ok > node_modules/ready && echo "" >> web/package.json; fi');
+  const s = happy(E1);
+  const acts = s[`${E1.id}/build`].actions;
+  acts.splice(acts.length - 1, 0,
+    { do: 'write', path: 'web/package.json', content: '{ "name": "ledger-web" }\n' },
+    { do: 'write', path: 'test/deps.test.js', content: "import test from 'node:test';\nimport fs from 'node:fs';\ntest('dependencies are installed', () => { fs.readFileSync('node_modules/ready'); });\n" });
+  p.scenario(s);
+  const state = await p.go();
+  assert.equal(p.epic(E1.id).state, 'MERGED', JSON.stringify(p.epic(E1.id)));
+  assert.equal(readJson(p.dir(E1.id, 'check-build-1.json')).checks.find((c) => c.name === 'tests-green').pass, true);
+  assert.equal(p.epic(E1.id).fixRounds, 0);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /setup changed 1 file\(s\) on .* \(web\/package\.json\); put back as committed/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`${E1.id}: ${E1.branch.replaceAll('/', '\\/')} changed web\\/package\\.json: running setup on it[\\s\\S]*environment: setup .* passed`));
+  assert.equal(state.stoppedBecause, 'queue done');
+});
+
+test('a setup that fails on the epic branch parks the epic resumably, in the words of a failed setup', async (t) => {
+  const p = makeProject(t);
+  driver('configure', '--project', p.project, '--setup', 'if [ -f web/package.json ]; then echo no network >&2; exit 3; fi');
+  const s = happy(E1);
+  const acts = s[`${E1.id}/build`].actions;
+  acts.splice(acts.length - 1, 0, { do: 'write', path: 'web/package.json', content: '{ "name": "ledger-web" }\n' });
+  p.scenario(s);
+  await p.go();
+  const q = p.epic(E1.id);
+  assert.equal(q.state, 'PARKED');
+  assert.match(q.reason, /setup failed on feature\/epic-Lg1Csv7-csv-import \(exit 3\): no network/);
+  assert.ok(!p.steps().includes(`${E1.id}/audit-1`), 'no check or session ran on a branch without its dependencies');
+  assert.equal(readJson(path.join(p.state, 'gates', `${E1.id}-1.json`)).kind, 'resume');
 });

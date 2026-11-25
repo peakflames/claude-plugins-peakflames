@@ -356,7 +356,8 @@ test('watch and status see inside the step: a command marked "Needs you:" is sai
   assert.equal(await w.done, 0);
   await waitFor(() => !alive(run.pid));
   assert.equal(p.epic(E1.id).state, 'MERGED');
-  assert.equal(w.lines().filter((l) => /^NEEDS YOU|^One command/.test(l)).length, 2, 'each said once');
+  // Each is said once. Under load a later command of the wrapup can pass the 0.3 s mark too: that one is said on its own.
+  assert.equal(w.lines().filter((l) => /^NEEDS YOU|^One command has been running .*: "Run the unit tests"$/.test(l)).length, 2, `each said once: ${JSON.stringify(w.lines())}`);
   // How the wait ended is said too: nobody is left looking for a window that is gone.
   assert.deepEqual(w.lines().filter((l) => /^NO LONGER NEEDS YOU/.test(l)), ['NO LONGER NEEDS YOU: done after 0 min — sign in to Okta in the browser window that opens']);
   assert.equal(st(p, '--queue', E1.id).inFlight, null);

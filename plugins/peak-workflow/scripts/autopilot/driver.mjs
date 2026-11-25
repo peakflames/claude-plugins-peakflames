@@ -157,6 +157,8 @@ function nextEndBy(now = new Date()) {
 /** The dependency list each lockfile belongs to: a lockfile that changes together with it is ordinary work. */
 export const MANIFEST_OF = { 'package-lock.json': 'package.json', 'npm-shrinkwrap.json': 'package.json', 'yarn.lock': 'package.json', 'pnpm-lock.yaml': 'package.json', 'bun.lock': 'package.json', 'bun.lockb': 'package.json', 'Cargo.lock': 'Cargo.toml', 'poetry.lock': 'pyproject.toml', 'uv.lock': 'pyproject.toml', 'Pipfile.lock': 'Pipfile', 'Gemfile.lock': 'Gemfile', 'go.sum': 'go.mod', 'composer.lock': 'composer.json' };
 /** The CLAUDE.md sections the first epic of a plan may change: where setup, run and test commands live. */
+/** A file that declares dependencies: a change to it (or to a lockfile, `LOCKFILE`) is what `setup` installs from. */
+export const MANIFEST_FILE = new RegExp(`(^|/)(${[...new Set(Object.values(MANIFEST_OF))].map((m) => m.replaceAll('.', '\\.')).join('|')}|requirements[^/]*\\.txt)$`);
 export const SKELETON_SECTIONS = ['Tech Stack', 'Local Environment', 'Verification & Quality Gates'];
 /** The `## ` sections whose text differs between two versions of a markdown file ("(top of file)" for what precedes the first). */
 export function changedSections(before, after) {
@@ -772,6 +774,8 @@ const cleanNetwork = (list) => [...new Set((Array.isArray(list) ? list : []).fil
 
 /** A shell's "command not found" (127) or "cannot execute" (126): the command never ran, which is not a failing test. */
 export const couldNotRun = (code) => code === 127 || code === 126;
+/** Seconds the machine slept during a command: wall-clock time it took less monotonic time (which stops while asleep). */
+export const sleptSec = (wallMs, monoMs) => Math.max(0, Math.round((wallMs - monoMs) / 1000));
 
 export const BUDGET_STEPS = ['plan', 'build', 'audit', 'verify', 'fix'];
 const BUDGET_KEYS = {
@@ -1276,13 +1280,20 @@ export function catchUpPrompt({ branch, integration, files, testCommand }) {
  * waited five minutes; that was a third of the run and two calls to the owner's phone.
  */
 /**
- * Told to a build or repair session when a provisional run took an amendment of a requirement for this epic: the change
- * record is its to write, and it must say no person approved it. Before, only the planner knew, so the build wrote a
- * person's name and the check (`amendment-record`) sent it into the one repair round (Pilot Light, 2026-11-23).
+ * Told to a build or repair session when a requirement of this epic was amended. A provisional run took it on a
+ * session's own recommendation: the change record is the session's to write, and it must say no person approved it
+ * (before, only the planner knew, so the build wrote a person's name and the check sent it into the one repair round;
+ * Pilot Light, 2026-11-23). The owner approved it: the repair keeps it, instead of restoring the old requirement
+ * (#41 B12). `items` are `amendedPairs` entries, or TOR IDs a provisional run took.
  */
-export function amendmentRule(tors) {
-  if (!tors?.length) return '';
-  return `\n# Requirements amended in this run\n\nThis is a provisional run. ${tors.length === 1 ? 'The requirement' : 'The requirements'} ${tors.join(', ')} ${tors.length === 1 ? 'was' : 'were'} amended on a session's own recommendation, and no person has approved ${tors.length === 1 ? 'it' : 'them'}. The change record you write under \`docs/requirements/changes/\` must say \`approved_by = "${PROVISIONAL_BY}"\`, exactly, and never a person's name. The owner confirms it afterward.\n`;
+export function amendmentRule(items) {
+  const list = (items ?? []).map((x) => (typeof x === 'string' ? { was: x, provisional: true } : x));
+  const tors = list.filter((x) => x.provisional).map((x) => x.was);
+  const owner = list.filter((x) => !x.provisional);
+  let out = '';
+  if (tors.length) out += `\n# Requirements amended in this run\n\nThis is a provisional run. ${tors.length === 1 ? 'The requirement' : 'The requirements'} ${tors.join(', ')} ${tors.length === 1 ? 'was' : 'were'} amended on a session's own recommendation, and no person has approved ${tors.length === 1 ? 'it' : 'them'}. The change record you write under \`docs/requirements/changes/\` must say \`approved_by = "${PROVISIONAL_BY}"\`, exactly, and never a person's name. The owner confirms it afterward.\n`;
+  if (owner.length) out += `\n# Requirements the owner amended\n\n${owner.map((x) => (x.now?.length ? `The owner approved amending ${x.was} → ${x.now.join(', ')}; keep it as amended.` : `The owner approved amending ${x.was}${x.gate ? ` (${x.gate})` : ''}; make the amendment as approved and keep it.`)).join('\n')}\nBuild and test against the requirement as amended. Do not restore the requirement it replaced, in the requirement files or in the tests: a test that follows the amendment is not a weakening.\n`;
+  return out;
 }
 
 export function presenceRule(attended, unanswered = []) {
@@ -1711,6 +1722,35 @@ class Run {
     return [...anchors.filter((t) => !amended.includes(t) || sc.requirements.includes(t)), ...sc.requirements.filter((t) => !anchors.includes(t))];
   }
 
+  /**
+   * The approved amendments of this epic, each as `{ was, now, by, date, gate, provisional }`: the requirement replaced
+   * and what replaced it, read from the change record on the epic branch (its `successors`). Before any record names
+   * one (the build has not written it yet), the requirements the branch's status file lists in its place stand in.
+   * Read with git on the branch, so it holds wherever the clone is checked out.
+   */
+  amendedPairs(e) {
+    const approved = this.approvedAmendments(e);
+    if (!approved.length) return [];
+    const m = this.meta(e); const b = m.branch; const on = !!this.branchTip(b);
+    const records = on ? gitRun(this.clone, 'ls-tree', '-r', '--name-only', b, '--', 'docs/requirements/changes').out.split('\n').filter((f) => f.endsWith('.toml')).map((f) => gitShow(this.clone, b, f) ?? '') : [];
+    const sidecar = on ? gitShow(this.clone, b, m.sidecar) : null;
+    const gained = sidecar ? this.anchorsFor(e, parseSidecar(sidecar)).filter((t) => !m.anchors.includes(t)) : [];
+    const gates = this.amendGates(e); const owner = this.ownerAmendments(e);
+    return approved.map((was) => {
+      let now = null;
+      for (const text of records) {
+        for (const block of text.split(/^\[\[changes\]\]\s*$/m).slice(1)) {
+          if (!new RegExp(`^tor\\s*=\\s*"${was}"`, 'm').test(block)) continue;
+          const ids = (block.match(/^successors\s*=\s*\[([^\]]*)\]/m)?.[1] ?? '').match(/TOR-\d{2}-[A-Za-z0-9]{7}/g);
+          if (ids?.length) now = ids;
+        }
+      }
+      const provisional = !owner.includes(was); // a person's answer wins over a provisional one for the same requirement
+      const g = gates.filter((x) => x.tor === was && !!x.decided?.prototype === provisional).at(-1);
+      return { was, now: now ?? gained, by: g?.decided?.by ?? null, date: g?.decided?.date ?? null, gate: g?.file ?? null, provisional };
+    });
+  }
+
   // ---- lock, STOP, run-level stops -----------------------------------------------------------
 
   acquireLock() {
@@ -1754,7 +1794,36 @@ class Run {
   integrationSha() { return this.g('rev-parse', this.state.integration); }
   branchTip(branch) { const r = gitRun(this.clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`); return r.code === 0 ? r.out : null; }
   currentBranch() { return gitRun(this.clone, 'branch', '--show-current').out; }
-  dirty() { return this.g('status', '--porcelain') !== ''; }
+  dirty() { return this.porcelain().length > 0; }
+  /** `git status --porcelain` lines, and `git clean -fdq`: on the integration line both leave alone what another branch ignores. */
+  porcelain() { return gitRun(this.clone, ...this.branchIgnores(), 'status', '--porcelain').out.split('\n').filter(Boolean); }
+  clean() { this.g(...this.branchIgnores(), 'clean', '-fdq'); }
+  /**
+   * On the integration line, git options that add what the other local branches ignore to its own ignore list. A new
+   * project's first epic adds the .gitignore that covers its build output and dependencies: until it merges, the
+   * integration line sees those files as untracked, and setting them aside stored 22,386 of them. They stay where they
+   * are, as files the integration line will ignore once the work lands. Elsewhere, or with no branch ignoring anything: [].
+   */
+  branchIgnores() {
+    const dev = this.state?.integration ?? detectIntegration(this.clone);
+    if (!dev || this.currentBranch() !== dev) return [];
+    const heads = gitRun(this.clone, 'for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/heads/').out.split('\n').filter(Boolean).map((l) => l.split(' ')).filter(([name]) => name !== dev);
+    const key = heads.map((h) => h.join(' ')).join('\n');
+    if (this.ignoreCache?.key === key) return this.ignoreCache.args;
+    const lists = heads.map(([, sha]) => gitRun(this.clone, 'show', `${sha}:.gitignore`)).filter((r) => r.code === 0 && r.out.trim()).map((r) => r.out);
+    let args = [];
+    if (lists.length) {
+      // core.excludesFile replaces the user's own global ignore file: it is read and kept first.
+      const own = gitRun(this.clone, 'config', '--path', 'core.excludesFile').out.trim() || path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'git', 'ignore');
+      let mine = ''; try { mine = fs.readFileSync(own, 'utf8'); } catch { /* none */ }
+      const file = path.join(this.stateDir, 'branch-ignores');
+      fs.mkdirSync(this.stateDir, { recursive: true });
+      fs.writeFileSync(file, [mine, ...lists].map((x) => `${x.trimEnd()}\n`).join(''));
+      args = ['-c', `core.excludesFile=${file}`];
+    }
+    this.ignoreCache = { key, args };
+    return args;
+  }
 
   /** Commits whatever a parked session left uncommitted on the epic branch. One of the driver's few git writes. */
   wipCommit(e) {
@@ -1795,21 +1864,23 @@ class Run {
    */
   setAside(why) {
     if (!this.dirty()) return true;
+    const ignores = this.branchIgnores();
     const names = (...args) => gitRun(this.clone, ...args).out.split('\n').filter(Boolean);
-    const files = [...new Set([...names('diff', '--name-only', 'HEAD'), ...names('ls-files', '--others', '--exclude-standard')])].sort();
+    const files = [...new Set([...names('diff', '--name-only', 'HEAD'), ...names(...ignores, 'ls-files', '--others', '--exclude-standard')])].sort();
     const branch = this.currentBranch() || 'detached';
     const ref = `refs/autopilot/leftover/${branch}-${Date.now()}`;
     const top = () => gitRun(this.clone, 'rev-parse', '--verify', '--quiet', 'refs/stash').out;
     const before = top(); // a stash a session made itself is never taken for ours
-    const stashed = gitRun(this.clone, 'stash', 'push', '-q', '--include-untracked', '-m', `autopilot: set aside ${why}`);
+    const stashed = gitRun(this.clone, ...ignores, 'stash', 'push', '-q', '--include-untracked', '-m', `autopilot: set aside ${why}`);
     const sha = stashed.code === 0 ? top() : '';
     if (!sha || sha === before) { this.log(`could not set aside ${files.length} file(s) left uncommitted on ${branch}: ${stashed.err || 'git stash kept nothing'}`); return false; }
     const kept = gitRun(this.clone, 'update-ref', ref, sha);
     if (kept.code !== 0) { this.log(`set aside ${files.length} file(s) left uncommitted on ${branch}, but could not name them ${ref} (${kept.err}); they are kept in the clone's stash list instead`); return !this.dirty(); }
     gitRun(this.clone, 'stash', 'drop', '-q');
-    const left = { branch, ref, files, why, date: new Date().toISOString() };
+    // The names are kept for the first 50 only: the ref holds them all, and state.json stays small.
+    const left = { branch, ref, files: files.slice(0, 50), ...(files.length > 50 ? { count: files.length } : {}), why, date: new Date().toISOString() };
     if (this.state) this.state.leftovers = [...(this.state.leftovers ?? []), left]; else this.leftoversAtStart.push(left);
-    this.log(`set aside ${files.length} file(s) left uncommitted on ${branch} (${files.join(', ')}); nothing is lost: they are kept at ${ref} (${why})`);
+    this.log(`set aside ${files.length} file(s) left uncommitted on ${branch} (${left.files.join(', ')}${files.length > 50 ? ` and ${files.length - 50} more` : ''}); nothing is lost: they are kept at ${ref} (${why})`);
     return !this.dirty();
   }
 
@@ -1826,7 +1897,7 @@ class Run {
     }
     this.g('checkout', '-q', '-f', dev);
     this.g('reset', '-q', '--hard', sha);
-    this.g('clean', '-fdq'); // untracked leftovers of the undone session; ignored files (dependencies) stay
+    this.clean(); // untracked leftovers of the undone session; ignored files (dependencies) stay
   }
 
   /**
@@ -1859,22 +1930,56 @@ class Run {
     return gitRun(this.clone, 'ls-files', '--', ...dirs).out.trim() ? null : dirs;
   }
 
+  /**
+   * The project's test command, run in the clone. `sleptSec`: how long the machine slept while it ran (#41 B10). The
+   * monotonic clock does not advance while macOS sleeps and the wall clock does: the difference is time asleep.
+   */
   runTests() {
-    const started = Date.now();
+    const started = Date.now(); const mono = performance.now();
     const r = sh(this.config.testCommand, [], { cwd: this.clone, shell: true, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
+    const ms = Date.now() - started;
     const text = `${r.out}\n${r.err}`;
     const skips = (text.match(/^(?:#|ℹ)\s*skipped\s+(\d+)/m) ?? [])[1];
-    return { pass: r.code === 0 && !r.timedOut, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), skips: skips === undefined ? null : Number(skips), ms: Date.now() - started, tail: text.trim().split('\n').slice(-15).join('\n') };
+    return { pass: r.code === 0 && !r.timedOut, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), skips: skips === undefined ? null : Number(skips), ms, sleptSec: sleptSec(ms, performance.now() - mono), tail: text.trim().split('\n').slice(-15).join('\n') };
+  }
+
+  /**
+   * The base check (#41 B6, B10): a red result is run once more before it ends the run, so one flaky test or a check the
+   * machine slept through does not cost the night. A command that could not run is not retried: nothing would change.
+   */
+  baseCheck(e, integration) {
+    const first = this.runTests();
+    if (first.pass || first.couldNotRun) return { t: first, tries: [first] };
+    this.log(`base check: \`${this.config.testCommand}\` failed on ${integration} (exit ${first.code}${first.timedOut ? ', timed out' : ''}${first.sleptSec >= 30 ? `; the machine slept ${Math.max(1, Math.round(first.sleptSec / 60))} min during it` : ''}); running it once more before calling the base red`);
+    const t = this.runTests();
+    const tries = [first, t].map((x) => ({ pass: x.pass, exit: x.code, timedOut: x.timedOut, ms: x.ms, sleptSec: x.sleptSec }));
+    if (t.pass) {
+      this.state.baseRetried = [...(this.state.baseRetried ?? []), { before: e.id, tries, tail: first.tail }];
+      this.log(`base check passed when run again on ${integration}: a flaky test, or one the machine slept through; going on with ${e.id}`);
+      this.event('base-retried', e, { tries });
+    } else this.log(`base check failed again on ${integration} (exit ${t.code}${t.timedOut ? ', timed out' : ''})`);
+    return { t, tries };
   }
 
   /** One quality-gate command, run like the tests: in the clone, in a plain shell. Whatever it leaves that git would commit is listed and removed. */
   runGate(command) {
     const started = Date.now();
     const r = sh(command, [], { cwd: this.clone, shell: true, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
-    const left = gitRun(this.clone, 'status', '--porcelain').out.split('\n').filter(Boolean);
-    if (left.length) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); }
+    const left = this.porcelain();
+    if (left.length) { this.g('reset', '-q', '--hard'); this.clean(); }
     const pass = r.code === 0 && !r.timedOut;
     return { command, pass, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), ms: Date.now() - started, leftovers: left, tail: pass ? undefined : `${r.out}\n${r.err}`.trim().split('\n').slice(-15).join('\n') };
+  }
+
+  /**
+   * A gate that fails is run once more (#40 item 6): one that passes the second time is `flaky` (it may stop an epic now
+   * and then), not failed. A command that could not run is not tried again.
+   */
+  gateTwice(command) {
+    const first = this.runGate(command);
+    if (first.pass || first.couldNotRun) return { ...first, tries: 1 };
+    const second = this.runGate(command);
+    return { ...second, tries: 2, ...(second.pass ? { flaky: true, first: { code: first.code, timedOut: first.timedOut, ms: first.ms, tail: first.tail } } : {}) };
   }
 
   // ---- the clone's environment ---------------------------------------------------------------
@@ -1920,6 +2025,32 @@ class Run {
   }
 
   /**
+   * `setup` again on the epic branch when the epic changed a manifest or a lockfile since setup last ran: a new
+   * project's first epic creates package.json, which a guarded setup (`if [ -f package.json ]`) skipped on the
+   * integration line. The driver's checks and every session after the build then run with what the epic declares.
+   * Returns why it failed, or null.
+   */
+  envForBranch(e) {
+    if (!this.config.setup) return null;
+    const b = this.meta(e).branch; const tip = this.branchTip(b);
+    if (!tip || tip === this.envSha) return null;
+    const known = this.envSha && gitOk(this.clone, 'cat-file', '-e', `${this.envSha}^{commit}`);
+    // The tree setup last ran on against the tip itself: that tree may be another epic's branch, not an ancestor.
+    const changed = gitRun(this.clone, 'diff', '--name-only', known ? this.envSha : this.integrationSha(), tip).out.split('\n').filter((f) => f && (MANIFEST_FILE.test(f) || LOCKFILE.test(f)));
+    if (!changed.length) return null;
+    if (this.currentBranch() !== b) { if (this.dirty()) return null; this.g('checkout', '-q', b); } // a dirty clone fails the checks on its own
+    this.log(`${e.id}: ${b} changed ${changed.join(', ')}: running setup on it`);
+    const env = this.prepareEnv();
+    // What setup rewrote or left (a lockfile it updated, an egg-info folder) is not the build's: the branch stays as committed.
+    const left = this.porcelain();
+    if (left.length) { this.g('reset', '-q', '--hard'); this.clean(); this.log(`${e.id}: setup changed ${left.length} file(s) on ${b} (${left.slice(0, 10).map((l) => l.replace(/^[ A-Z?!]{1,2} /, '')).join(', ')}${left.length > 10 ? ', …' : ''}); put back as committed`); }
+    if (env.pass) return null;
+    if (env.step === 'copy') return `setup failed on ${b}: ${env.problems.join('; ')}`;
+    const f = env.setup;
+    return `setup failed on ${b} (exit ${f.code}${f.timedOut ? ', timed out' : ''}): ${String(f.tail ?? '').trim().split('\n').at(-1) || 'no output'} — the setup command \`${f.command}\` ran after the epic changed ${changed.join(', ')}`;
+  }
+
+  /**
    * Readiness's proof (`driver.mjs prepare`): the clone is made or brought up to date, given its
    * environment, and the project's test command is run in it, in the shell the run will use.
    * Writes only inside the workspace. Whatever setup or the tests leave that git would commit is
@@ -1936,18 +2067,18 @@ class Run {
       const env = this.prepareEnv();
       const noTests = env.pass && this.config.testCommand ? this.noTestsYet() : null;
       const tests = env.pass ? { command: this.config.testCommand ?? null, ...(noTests ? { pass: true, skipped: `no test files under ${noTests.join(' ')} on ${integration} yet` } : this.config.testCommand ? this.runTests() : { pass: false, code: null, tail: 'CLAUDE.md has no **Tests:** command' }) } : null;
-      const leftovers = gitRun(this.clone, 'status', '--porcelain').out.split('\n').filter(Boolean);
-      if (leftovers.length) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); }
+      const leftovers = this.porcelain();
+      if (leftovers.length) { this.g('reset', '-q', '--hard'); this.clean(); }
       const base = env.pass && !!tests?.pass && !leftovers.length;
       // The project's other quality gates (build, lint, type check), tried in the same plain shell once the tests pass.
       // A gate that fails here is a warning, not a refusal: the verifier runs them, and some need what the copy lacks.
-      const gateResults = base ? gates.map((g) => String(g).trim()).filter(Boolean).map((command) => this.runGate(command)) : [];
+      const gateResults = base ? gates.map((g) => String(g).trim()).filter(Boolean).map((command) => this.gateTwice(command)) : [];
       // The probe is worth its few cents only once the plain shell passes: it answers the one question left, the sandbox.
       const probed = probe ? (noTests ? { ran: false, skipped: 'the project has no tests yet for the probe to run' } : base ? await this.probe(integration) : { ran: false, skipped: 'the proof failed before the probe' }) : null;
       const result = {
         ok: base && !(probed?.ran && !probed.pass), at: new Date().toISOString(), clone: this.clone, cloneMade: made, integration, tip: gitRun(this.clone, 'rev-parse', 'HEAD').out, sync: sync.state,
         failed: !env.pass ? env.step : !tests.pass ? 'tests' : leftovers.length ? 'leftovers' : probed?.ran && !probed.pass ? 'probe' : null,
-        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers, ...(this.leftoversAtStart.length ? { setAside: this.leftoversAtStart } : {}), ...(gates.length ? { gates: gateResults, gatesFailed: gateResults.filter((g) => !g.pass).map((g) => g.command) } : {}), ...(probed ? { probe: probed } : {}),
+        copied: env.copied, problems: env.problems, setup: env.setup, tests, leftovers, ...(this.leftoversAtStart.length ? { setAside: this.leftoversAtStart } : {}), ...(gates.length ? { gates: gateResults, gatesFailed: gateResults.filter((g) => !g.pass).map((g) => g.command), gatesFlaky: gateResults.filter((g) => g.flaky).map((g) => g.command) } : {}), ...(probed ? { probe: probed } : {}),
         // The latest probe that ran, with what it ran against, kept across later proofs: readiness says whether it still stands.
         lastProbe: probed?.ran ? { at: new Date().toISOString(), pass: probed.pass, exit: probed.exit, against: { testCommand: this.config.testCommand ?? null, setup: this.config.setup ?? null, readOnly: this.config.readOnly ?? [], network: cleanNetwork(this.config.network) } } : tryJson(path.join(this.stateDir, 'prepare.json'))?.lastProbe ?? null,
       };
@@ -1983,7 +2114,7 @@ class Run {
     const s = await hostSession(cmd, prompt, { stepDir, killGraceMs: cfg.timing.killGraceMs });
     const file = path.join(this.clone, marker);
     const exit = exists(file) && /^\d+$/.test(read(file).trim()) ? Number(read(file).trim()) : null;
-    if (gitRun(this.clone, 'status', '--porcelain').out) { this.g('reset', '-q', '--hard'); this.g('clean', '-fdq'); } // the marker, and whatever the tests wrote
+    if (this.porcelain().length) { this.g('reset', '-q', '--hard'); this.clean(); } // the marker, and whatever the tests wrote
     const hooks = (exists(path.join(stepDir, 'hooks.jsonl')) ? read(path.join(stepDir, 'hooks.jsonl')).split('\n') : []).map(tryParse).filter(Boolean);
     const denials = hooks.filter((h) => h.hook === 'PreToolUse' && h.decision === 'deny').map((h) => `${h.rule}: ${h.reason}`);
     const ran = hooks.filter((h) => h.tool_name === 'Bash' && /^PostToolUse/.test(h.hook ?? '')).at(-1);
@@ -2301,6 +2432,9 @@ class Run {
       if (off && s) { s.outcome = 'infra'; s.why = off; break; } // on a retry: parked below, after what the first try did is undone
       // Nothing ran, so nothing is judged: a build or a repair that never started is started, not checked.
       if (off) return this.parkResumable(e, `no ${kind} session was started: ${off}`, { build: 'BUILD', fix: 'FIX_BUILD' }[kind] ?? again, { technical: true });
+      // What the epic declares is installed before a session that runs its code (a build installs its own).
+      const unset = !s && ['audit', 'verify', 'fix'].includes(kind) ? this.envForBranch(e) : null;
+      if (unset) return this.parkResumable(e, unset, { fix: 'FIX_BUILD' }[kind] ?? again, { technical: true });
       s = await this.launch(e, kind, prepare, afterLimit ? { afterLimit } : {});
       afterLimit = null;
       // A stopped session that cannot be resumed (its transcript is gone) is not an infra error: a new session takes the step, told the same answers.
@@ -2375,9 +2509,26 @@ class Run {
       this.log(`${q.id}: now also anchors ${gained.join(', ')}, deferred to it by ${e.id}`);
     }
   }
-  /** A requirement's Scenario block as the integration line has it, or null. */
-  requirementText(tor) {
-    const r = gitRun(this.clone, 'grep', '-h', '-A', '30', '-F', `[${tor}]`, this.state.integration, '--', 'docs/requirements');
+  /**
+   * The epic's launch-check facts for a look, after an approved amendment: the operator-observed requirements, their
+   * Then lines and the reasons are those of the requirements as they stand on the branch (#41 B16), so the owner is
+   * never asked to confirm a requirement they already replaced. Without an amendment, the launch check's own.
+   */
+  lookMeta(e) {
+    const m = this.meta(e);
+    if (!this.approvedAmendments(e).length) return m;
+    const sidecar = gitShow(this.clone, m.branch, m.sidecar);
+    if (!sidecar) return m;
+    const anchors = this.anchorsFor(e, parseSidecar(sidecar));
+    const text = Object.fromEntries(anchors.map((t) => [t, this.requirementText(t, m.branch) ?? '']));
+    const observed = anchors.filter((t) => /operator-observed/.test(text[t])).map((tor) => ({ tor, clauses: thenClauses(text[tor]) }));
+    const reasons = [...(m.reasons ?? []).filter((r) => !/ is operator-observed: /.test(r)), ...observed.map((o) => `${o.tor} is operator-observed: parks for a person before verify`)];
+    // The look stays when the launch check asked for it for a reason other than an observed requirement (screens).
+    return { ...m, anchors, observed, reasons, humanCheck: observed.length > 0 || reasons.some((r) => /UI epic/.test(r)) || (!!m.humanCheck && !(m.observed ?? []).length) };
+  }
+  /** A requirement's Scenario block as `ref` (the integration line by default) has it, or null. */
+  requirementText(tor, ref = this.state.integration) {
+    const r = gitRun(this.clone, 'grep', '-h', '-A', '30', '-F', `[${tor}]`, ref, '--', 'docs/requirements');
     if (r.code !== 0) return null;
     const lines = r.out.split('\n'); const out = [];
     for (const [i, l] of lines.entries()) { if (i > 0 && (!l.trim() || /^Scenario:|^--$/.test(l.trim()))) break; out.push(l.trim()); }
@@ -2420,7 +2571,7 @@ class Run {
       (e.buildSteps = e.buildSteps ?? []).push({ name: path.basename(stepDir), dir: this.rel(stepDir), ...(continuing ? { continues: e.continuing } : {}) }); // what the next audit reads, in this run or a later one
       fs.writeFileSync(path.join(stepDir, 'prompt.md'), fix ? (continuing ? CONTINUE_LEAD : '') + fixPrompt(this.meta(e), read(brief)) : buildPrompt(read(path.join(this.stateDir, e.plan)), this.pluginDir, { continuing }));
       if (!fix && !continuing && !(e.answers ?? []).length) fs.rmSync(path.join(this.clone, LOOK_DIR), { recursive: true, force: true }); // a build from the top: no other epic's pictures, no stale ones
-      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + amendmentRule(this.takenAmendments(e)) + (this.hasScreens(e) ? LOOK_RULE : ''));
+      fs.writeFileSync(path.join(stepDir, 'build-rules.md'), (fix ? FIX_RULES : BUILD_RULES) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + amendmentRule(this.amendedPairs(e)) + (this.hasScreens(e) ? LOOK_RULE : ''));
       return { prompt: read(path.join(stepDir, 'prompt.md')), appendFiles: [path.join(stepDir, 'build-rules.md')] };
     });
     if (s) e.continuing = null; // it ended by itself: what follows is judged like any build
@@ -2511,7 +2662,7 @@ class Run {
     const dirs = this.pre.testDirs;
     // An operator-observed requirement is traced by its checklist under tests/manual/ (or tests/hil/),
     // whether or not those are on the Test directories line (wrapup-epic Step 1.2 item 2).
-    const observed = new Set(m.reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]));
+    const observed = new Set(this.lookMeta(e).reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]));
     const amended = this.approvedAmendments(e); const anchors = this.anchorsFor(e, sc);
     const untraced = anchors.filter((tor) => gitRun(this.clone, 'grep', '-l', '-F', tor, b, '--', ...dirs, ...(observed.has(tor) ? ['tests/manual', 'tests/hil'] : [])).code !== 0);
     add('traceability', untraced.length === 0, untraced.length ? { missingFromTests: untraced, testDirs: dirs } : `${anchors.length} anchors found under ${dirs.join(' ')}${amended.length ? ` (after the owner's approved amendment of ${amended.join(', ')})` : ''}`);
@@ -2600,6 +2751,8 @@ class Run {
 
   doCheckBuild(e, { interrupted = false } = {}) {
     e.state = 'CHECK_BUILD'; this.save();
+    const unset = this.envForBranch(e);
+    if (unset) return this.parkResumable(e, unset, 'CHECK_BUILD', { technical: true });
     const n = (e.attempts.checkBuild = (e.attempts.checkBuild ?? 0) + 1);
     const r = this.checkBuild(e);
     writeJson(path.join(this.epicDir(e), `check-build-${n}.json`), r);
@@ -2633,13 +2786,16 @@ class Run {
     const audited = new Set(counted.flatMap((a) => a.dirs ?? []));
     const steps = (e.buildSteps ?? []).filter((x) => !audited.has(x.dir)); // may be sessions of an earlier run
     let before = null; // a first try that was thin: the second is told what it left unread
+    // The requirements as they stand on the branch: after an approved amendment, the one that replaced the old (#41 B12).
+    const sidecar = gitShow(this.clone, m.branch, m.sidecar);
+    const anchors = sidecar ? this.anchorsFor(e, parseSidecar(sidecar)) : m.anchors;
     for (;;) {
       let bundle = null; let s;
       try {
         s = await this.step(e, 'audit', (stepDir) => {
           bundle = buildBundle({
-            clone: this.clone, pluginDir: this.pluginDir, bundleDir: path.join(stepDir, 'bundle'), epic: m, integration: this.state.integration,
-            base: last?.tip ?? null, steps: steps.map((x) => ({ name: x.name, dir: path.join(this.stateDir, x.dir) })),
+            clone: this.clone, pluginDir: this.pluginDir, bundleDir: path.join(stepDir, 'bundle'), epic: { ...m, anchors }, integration: this.state.integration,
+            base: last?.tip ?? null, steps: steps.map((x) => ({ name: x.name, dir: path.join(this.stateDir, x.dir) })), amendments: this.amendedPairs(e),
           });
           const files = changedCodeFiles(read(path.join(stepDir, 'bundle', 'diff.patch')));
           return { prompt: `${read(path.join(AUDIT_DIR, 'prompt.md'))}${filesToOpenLine(files)}${before ? `\n${thinAgainLine(before)}\n` : ''}` };
@@ -2650,7 +2806,7 @@ class Run {
       if (!s) return null;
 
       const value = auditOutput(s.result);
-      const valid = validateAudit(value, m.anchors);
+      const valid = validateAudit(value, anchors);
       if (!valid.ok) {
         writeJson(path.join(s.stepDir, 'audit.json'), { unusable: valid.problems, raw: s.result?.structured_output ?? s.result?.result ?? null });
         // Fail closed (owner decision): nothing is verified without an audit. The `resume` gate lets the next run audit again.
@@ -2660,8 +2816,8 @@ class Run {
       const coverage = reviewCoverage({ stepDir: s.stepDir, clone: this.clone });
       // A finding that parks goes to the owner however much was read; only a review that would pass is held to its coverage.
       // A requirement left for a later epic, or one a person confirms by looking, has no test to name.
-      const noTest = new Set([...this.standingDeferrals(e).all, ...(m.observed ?? []).map((o) => o.tor)]);
-      const thin = judged.parks.length ? null : thinReview({ value, coverage, anchors: m.anchors.filter((t) => !noTest.has(t)), delta: bundle.delta });
+      const noTest = new Set([...this.standingDeferrals(e).all, ...(this.lookMeta(e).observed ?? []).map((o) => o.tor)]);
+      const thin = judged.parks.length ? null : thinReview({ value, coverage, anchors: anchors.filter((t) => !noTest.has(t)), delta: bundle.delta });
       const file = `${s.name}/audit.json`;
       writeJson(path.join(this.epicDir(e), file), { step: s.name, epic: e.id, branch: m.branch, delta: bundle.delta, base: bundle.base, tip: bundle.tip, parkOn: this.config.audit.parkOn, decision: judged.parks.length ? 'park' : thin ? 'thin' : 'proceed', recommend: judged.recommend, summary: judged.summary, coverage, ...(thin ? { thin } : {}), checked: value.checked, findings: judged.findings });
       e.audits.push({ step: s.name, file, delta: bundle.delta, base: bundle.base, tip: bundle.tip, steps: bundle.steps, dirs: steps.map((x) => x.dir), findings: judged.findings.length, parks: judged.parks.map((f) => f.id), recommend: judged.recommend, coverage: { read: coverage.read, of: coverage.of, seconds: coverage.seconds }, ...(thin ? { thin: true } : {}) });
@@ -2725,7 +2881,7 @@ class Run {
    * when the epic parked.
    */
   humanCheck(e) {
-    const m = this.meta(e);
+    const m = this.lookMeta(e);
     if (!m.humanCheck && !e.claudeMd) return false;
     // The owner chose to look afterwards ("look": "after"): an epic that parks only because it has screens goes on
     // to the final check, where the verifier judges the pictures. What a person must observe is still theirs alone.
@@ -2790,7 +2946,7 @@ class Run {
    * (`checks`). `skip` leaves out the lines an earlier look already confirmed.
    */
   lookAids(e, artifacts, skip = []) {
-    const m = this.meta(e);
+    const m = this.lookMeta(e);
     const done = new Set(skip.filter((o) => o.answer === 'yes').map((o) => `${o.tor}\n${o.clause}`));
     const checks = (m.observed ?? []).flatMap((o) => o.clauses.map((clause) => ({ tor: o.tor, clause }))).filter((c) => !done.has(`${c.tor}\n${c.clause}`)).map((c, i) => ({ n: i + 1, ...c }));
     const open = artifacts.filter((a) => !a.startsWith('clone:') && (/\/artifacts\/files\//.test(a) || a.startsWith('look/'))).map((a) => path.join(this.stateDir, a));
@@ -2809,7 +2965,7 @@ class Run {
    * `humanCheck["*"]`, else the **Run:** line of CLAUDE.md) with any file it leaves behind.
    */
   produceArtifacts(e) {
-    const m = this.meta(e); const b = m.branch; const artifacts = []; const notes = [];
+    const m = this.lookMeta(e); const b = m.branch; const artifacts = []; const notes = [];
     const manual = this.g('ls-tree', '-r', '--name-only', b, '--', 'tests/manual').split('\n').filter((f) => m.anchors.some((tor) => f.includes(tor)));
     for (const f of manual) artifacts.push(`clone:${f}`);
     // The pictures the build left for this look, kept outside the clone.
@@ -2835,7 +2991,7 @@ class Run {
       fs.copyFileSync(src, dest);
       artifacts.push(this.rel(dest));
     }
-    this.g('checkout', '-q', '-f', b); this.g('clean', '-fdq');
+    this.g('checkout', '-q', '-f', b); this.clean();
     return { artifacts, notes, pictures: pictures.length };
   }
 
@@ -2891,7 +3047,7 @@ class Run {
       // observation up front, so wrapup Step 1.2 item 7 records it instead of asking a person who is
       // not there. Seen live: without this the session asks "What do you see?" and parks.
       const file = path.join(stepDir, 'owner-look.md');
-      fs.writeFileSync(file, ownerLook(e.look, m, e.caughtUp));
+      fs.writeFileSync(file, ownerLook(e.look, this.lookMeta(e), e.caughtUp));
       return { prompt: `/peak-workflow:wrapup-epic ${e.id}`, appendFiles: [file, rules] };
     });
     if (!s) return null;
@@ -2976,7 +3132,7 @@ class Run {
   /** Operator-observed anchors the verify session reported CANNOT VERIFY, with its reason (from the question policy answered). */
   unsettledLook(e, s) {
     const m = this.meta(e);
-    const observed = new Set(m.reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]));
+    const observed = new Set(this.lookMeta(e).reasons.filter((r) => /operator-observed/.test(r)).map((r) => r.split(' ')[0]));
     const out = [];
     const file = path.join(s.stepDir, 'hooks.jsonl');
     for (const line of exists(file) ? read(file).split('\n').filter(Boolean) : []) {
@@ -3231,7 +3387,7 @@ class Run {
       const tip = this.branchTip(b);
       if (tip && tip !== from) { const ref = `refs/autopilot/rejected/${e.id}-catchup-${Date.now()}`; this.g('update-ref', ref, tip); e.catchUpRejected = [...(e.catchUpRejected ?? []), ref]; }
       if (this.currentBranch() !== b) this.g('checkout', '-q', '-f', b);
-      this.g('reset', '-q', '--hard', from); this.g('clean', '-fdq');
+      this.g('reset', '-q', '--hard', from); this.clean();
       const why = `${s.name} did not bring it up to date: ${problems.join('; ')}`;
       this.log(`${e.id}: ${why}; its work is undone (kept at ${(e.catchUpRejected ?? []).at(-1) ?? 'nothing to keep'}) and ${b} is back at ${from.slice(0, 9)}`);
       this.parkCatchUp(e, why, stuck.conflicts, after ?? 'VERIFY', via?.then ?? null);
@@ -3384,7 +3540,7 @@ class Run {
     if (!gitOk(this.clone, 'merge-base', '--is-ancestor', g.branchTip, tip)) return toVerify(`it does not build on ${m.branch} as the branch now is`);
     if (gitOk(this.clone, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD')) gitRun(this.clone, 'merge', '--abort');
     this.g('checkout', '-q', '-f', dev);
-    this.g('clean', '-fdq');
+    this.clean();
     // Saved first: a driver killed from here re-enters CHECK_VERIFY (`recover`), which judges or undoes whatever is on the line.
     e.preVerify = { developSha: this.integrationSha(), branchTip: g.branchTip, branch: m.branch };
     e.state = 'CHECK_VERIFY'; this.save();
@@ -3392,7 +3548,7 @@ class Run {
     if (r.code !== 0) {
       if (gitOk(this.clone, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD')) gitRun(this.clone, 'merge', '--abort');
       this.g('reset', '-q', '--hard', e.preVerify.developSha);
-      this.g('clean', '-fdq');
+      this.clean();
       e.preVerify = null;
       return toVerify(`it conflicts with ${dev} as it now is`);
     }
@@ -3591,7 +3747,7 @@ class Run {
         // What the catch-up session did is not trusted: the branch goes back to where it was and is brought up to date again.
         const b = this.meta(e).branch;
         if (gitOk(this.clone, 'rev-parse', '-q', '--verify', 'MERGE_HEAD')) gitRun(this.clone, 'merge', '--abort');
-        if (e.catchUpFrom && this.branchTip(b) && this.branchTip(b) !== e.catchUpFrom) { if (this.currentBranch() !== b) this.g('checkout', '-q', '-f', b); this.g('reset', '-q', '--hard', e.catchUpFrom); this.g('clean', '-fdq'); }
+        if (e.catchUpFrom && this.branchTip(b) && this.branchTip(b) !== e.catchUpFrom) { if (this.currentBranch() !== b) this.g('checkout', '-q', '-f', b); this.g('reset', '-q', '--hard', e.catchUpFrom); this.clean(); }
         if (again('CATCH_UP')) { e.mergeIn = { gate: null, then: e.catchUpThen ?? null, fixRounds: e.fixRounds }; entry = e.catchUpAfter ?? 'VERIFY'; }
         else { e.step = null; this.parkCatchUp(e, `interrupted twice while bringing ${b} up to date`, e.catchUpConflicts ?? [], e.catchUpAfter ?? 'VERIFY', e.catchUpThen ?? null); continue; }
       }
@@ -3744,8 +3900,8 @@ class Run {
           // A project with no tests yet has no base to be red: the first epic's own checks run the tests.
           const noTests = this.noTestsYet();
           if (noTests) { this.state.baseEmpty = { before: e.id, testDirs: noTests }; this.log(`no test files under ${noTests.join(' ')} on ${integration} yet: the base test run is skipped; ${e.id}'s own checks run the tests`); }
-          const t = noTests ? { pass: true, skips: null } : this.runTests();
-          if (!t.pass) { this.stopReason = 'base red'; this.state.baseRed = { before: e.id, exit: t.code, timedOut: t.timedOut, couldNotRun: t.couldNotRun, tail: t.tail }; this.log(`base red: \`${cfg.testCommand}\` fails on ${integration} (exit ${t.code}); stopping the run`); break; }
+          const { t, tries } = noTests ? { t: { pass: true, skips: null } } : this.baseCheck(e, integration);
+          if (!t.pass) { this.stopReason = 'base red'; this.state.baseRed = { before: e.id, exit: t.code, timedOut: t.timedOut, couldNotRun: t.couldNotRun, ms: t.ms, sleptSec: t.sleptSec, tries, tail: t.tail }; this.log(`base red: \`${cfg.testCommand}\` fails on ${integration} (exit ${t.code}); stopping the run`); break; }
           this.state.baseSkips = t.skips;
           e.startedAt = new Date().toISOString();
         }
@@ -3773,6 +3929,17 @@ class Run {
       this.releaseLock();
     }
   }
+}
+
+/**
+ * The launch's warning about sleep (#41 B10): a machine that sleeps mid-run fails a check by timeout. macOS runs the
+ * driver under caffeinate, which a closed lid on battery still overrides; Windows has no such wrapper here, so the owner
+ * sets the power plan. Null where nothing is known to help.
+ */
+export function sleepWarning(platform = process.platform) {
+  if (platform === 'darwin') return 'a laptop with the lid closed on battery may still sleep, even under caffeinate: leave it on power';
+  if (platform === 'win32') return 'Windows may put the computer to sleep mid-run, and a check it sleeps through fails: set the power plan to never sleep while plugged in, and leave it plugged in';
+  return null;
 }
 
 /** What the skill needs to know before it offers a launch: read-only facts about the project and its workspace. */
@@ -3820,7 +3987,8 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
   if (sync.state === 'diverged') refuse.push(divergedText(sync, project, clone, integration));
   if (sync.state === 'clone-ahead') warn.push(`autopilot has merged work the project has not fetched yet; the run builds on top of it. Waiting in the clone: ${sync.waiting.join('; ')}. Bring it in with: ${fetchCommand(clone, integration)}`);
   if (sync.state === 'project-ahead') warn.push(`${integration} moved in the project since the last run; the run fast-forwards the clone to it first; a decision on a parked branch still holds if that branch merges cleanly into the new tip`);
-  if (process.platform === 'darwin') warn.push('a laptop with the lid closed on battery may still sleep, even under caffeinate: leave it on power');
+  const sleepy = sleepWarning();
+  if (sleepy) warn.push(sleepy);
   // What the owner confirmed last time, minus what has finished since: offered beside the full queue, never chosen for them.
   const confirmed = lastRun ? tryJson(path.join(lastRun.runDir, 'config.json'))?.queue : null;
   const byId = new Map((epics ?? []).map((e) => [e.id, e]));
