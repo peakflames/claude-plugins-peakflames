@@ -273,7 +273,7 @@ Why this order:
 - [x] **The test-weakening guard is a heuristic** (*no issue*; review of I6a). It is the main
   brake on a fix autopilot allows itself: test-named files in the listed test directories, net
   loss of assert/test lines. A weakening it does not recognise merges unasked.
-  *`checkVerify`, `autoFix`.* Fixed 2026-11-24 (COMMIT_HASH; owner's decision: keep the net count,
+  *`checkVerify`, `autoFix`.* Fixed 2026-11-24 (`9a27210`; owner's decision: keep the net count,
   widen the patterns). Now also parks: a relaxed matcher or a tautology, a check in `if (false)` or
   a swallowing `catch`, Go/Swift/Rust checks removed, Rust/unittest/NUnit skips, a test renamed out
   of the test directories ("deletes a test"), a test-named file outside them, and a rewritten
