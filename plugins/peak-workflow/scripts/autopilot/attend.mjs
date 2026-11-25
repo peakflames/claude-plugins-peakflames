@@ -198,7 +198,8 @@ export function eventLine(ev) {
       return `${what} found a problem: ${(ev.failed ?? []).map((n) => CHECK_WORDS[n] ?? n).join('; ') || 'see the report'}`;
     }
     case 'fix-round': return `${who} needs a repair: starting the one repair round`;
-    case 'audit': return ev.parks ? `The independent reviewer found ${plural(ev.parks, 'serious problem')}` : ev.findings ? `The independent reviewer found ${plural(ev.findings, 'thing')} to note, none serious` : 'The independent reviewer found nothing';
+    case 'audit': if (ev.thin && !ev.parks) return `The independent reviewer barely looked: it read ${ev.read ?? '?'} of ${ev.of ?? '?'} changed code files`;
+      return ev.parks ? `The independent reviewer found ${plural(ev.parks, 'serious problem')}` : ev.findings ? `The independent reviewer found ${plural(ev.findings, 'thing')} to note, none serious` : 'The independent reviewer found nothing';
     case 'merged': return `Finished and merged: ${who} (${took(ev.minutes)}, ${usd(ev.costUsd)})${ev.unproven ? ` — ${plural(ev.unproven, 'thing')} not proven for real` : ''}${ev.left ? ` — ${plural(ev.left, 'thing')} seen wrong and left as is` : ''}${ev.deferred ? ` — ${plural(ev.deferred, 'requirement')} left for a later epic` : ''}`;
     case 'parked':
       if (ev.question && ev.kind !== 'resume') return `Waiting for you: ${who} — ${oneLine(ev.question)}`;
@@ -206,7 +207,9 @@ export function eventLine(ev) {
     case 'failed': return `Did not pass: ${who} — ${plainReason(ev.reason)}`;
     case 'blocked': return `Not started: ${who} — ${plainReason(ev.reason)}`;
     // A provisional run went on where a full run would have asked: said as it happens, and listed again at the end.
+    case 'thin-review': return `The independent reviewer is reviewing ${who} again: it read ${ev.read ?? '?'} of ${ev.of ?? '?'} changed code files`;
     case 'prototype-answer':
+      if (ev.kind === 'thin-review') return `Went on to the final check after a thin independent review of ${who} for you (provisional run)`;
       if (ev.kind === 'amendment') return `Took the planner's correction to ${ev.tor ?? 'a requirement'} for you (provisional run)`;
       return `Took the builder's recommendation for ${ev.tor ?? 'a requirement'} for you: ${/^\W*defer\b/i.test(ev.answer ?? '') ? 'left for a later epic' : 'fix it now'} (provisional run)`;
     case 'prototype-skip': {

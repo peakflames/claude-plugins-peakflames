@@ -26,8 +26,8 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
-import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
+import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
+import { ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -1084,6 +1084,18 @@ repository: an untracked file left there fails the clean-tree check. Other place
 repository, \`/tmp\` included, may be refused.
 `;
 
+/** In plain words, what a thin review did: for its gate's question and the provisional list. */
+export function thinWords(label, coverage, thin) {
+  const secs = coverage.seconds == null ? '' : ` in ${coverage.seconds} s`;
+  const untested = thin.untested?.length ? `, and checked no test for ${thin.untested.join(', ')}` : '';
+  return `The independent review of ${label} read ${coverage.read} of ${coverage.of} changed code files${secs}${untested}: the reviewer barely looked, twice.`;
+}
+/** Appended to the second try's prompt after a thin first try. */
+export function thinAgainLine({ coverage, thin }) {
+  const unread = coverage.unread.slice(0, 15);
+  return `\n## Your first try was too thin\n\nA review of this bundle read ${coverage.read} of ${coverage.of} changed code files${thin.untested.length ? ` and named no test for ${thin.untested.join(', ')}` : ''}. Open at least ${thin.need}, and for every anchor its test. Not opened: ${unread.map((f) => `\`${f}\``).join(', ')}${coverage.unread.length > unread.length ? `, and ${coverage.unread.length - unread.length} more` : ''}.`;
+}
+
 /**
  * The exact command for one step: host mode for plan, build and verify (SPIKE.md "Host mode"),
  * plain `-p` for the auditor (plan §6.6 "Audit"). Pure: used by the dry run too.
@@ -2119,7 +2131,7 @@ class Run {
     }
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind, scratch }));
     this.ignoreLook();
-    const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles, resume });
+    const cmd = sessionCommand(cfg, { kind, epicId: e.id, workspace: this.stateDir, runDir: this.runDir, stepDir, pluginDir: this.pluginDir, sessionId, appendFiles, resume, ...(kind === 'audit' && prompt ? { prompt } : {}) });
 
     // The intended step is on disk before anything is launched (crash-safe resume, §9).
     e.state = k.state; e.lastStep = name;
@@ -2492,7 +2504,7 @@ class Run {
     add('requirements-health', h.pass, h.evidence);
 
     const changed = this.g('diff', '--name-only', `${dev}...${b}`).split('\n').filter(Boolean);
-    const lockfiles = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|go\.sum|composer\.lock)$/;
+    const lockfiles = LOCKFILE;
     const allow = (this.config.scope.allow ?? []).map(globToRegExp);
     const out = [];
     let claudeMd = null;
@@ -2591,56 +2603,95 @@ class Run {
     e.state = 'AUDIT'; this.save();
     const m = this.meta(e);
     e.audits = e.audits ?? [];
-    const last = e.audits.at(-1);
-    const audited = new Set(e.audits.flatMap((a) => a.dirs ?? []));
+    // A thin review nobody accepted covers nothing: the next audit reads the same work again, whole.
+    const counted = e.audits.filter((a) => !a.thin || a.accepted);
+    const last = counted.at(-1);
+    const audited = new Set(counted.flatMap((a) => a.dirs ?? []));
     const steps = (e.buildSteps ?? []).filter((x) => !audited.has(x.dir)); // may be sessions of an earlier run
-    let bundle = null; let s;
-    try {
-      s = await this.step(e, 'audit', (stepDir) => {
-        bundle = buildBundle({
-          clone: this.clone, pluginDir: this.pluginDir, bundleDir: path.join(stepDir, 'bundle'), epic: m, integration: this.state.integration,
-          base: last?.tip ?? null, steps: steps.map((x) => ({ name: x.name, dir: path.join(this.stateDir, x.dir) })),
+    let before = null; // a first try that was thin: the second is told what it left unread
+    for (;;) {
+      let bundle = null; let s;
+      try {
+        s = await this.step(e, 'audit', (stepDir) => {
+          bundle = buildBundle({
+            clone: this.clone, pluginDir: this.pluginDir, bundleDir: path.join(stepDir, 'bundle'), epic: m, integration: this.state.integration,
+            base: last?.tip ?? null, steps: steps.map((x) => ({ name: x.name, dir: path.join(this.stateDir, x.dir) })),
+          });
+          return before ? { prompt: `${read(path.join(AUDIT_DIR, 'prompt.md'))}\n${thinAgainLine(before)}\n` } : {};
         });
-      });
-    } catch (err) {
-      return this.parkResumable(e, `auditor: the audit could not start (${err.message}); not verified without an audit`, 'AUDIT');
-    }
-    if (!s) return null;
+      } catch (err) {
+        return this.parkResumable(e, `auditor: the audit could not start (${err.message}); not verified without an audit`, 'AUDIT');
+      }
+      if (!s) return null;
 
-    const value = auditOutput(s.result);
-    const valid = validateAudit(value);
-    if (!valid.ok) {
-      writeJson(path.join(s.stepDir, 'audit.json'), { unusable: valid.problems, raw: s.result?.structured_output ?? s.result?.result ?? null });
-      // Fail closed (owner decision): nothing is verified without an audit. The `resume` gate lets the next run audit again.
-      return this.parkResumable(e, `auditor: ${s.name} returned no usable result (${valid.problems.join('; ')}); not verified without an audit`, 'AUDIT');
-    }
-    const judged = judgeAudit(value, this.config.audit.parkOn);
-    const file = `${s.name}/audit.json`;
-    writeJson(path.join(this.epicDir(e), file), { step: s.name, epic: e.id, branch: m.branch, delta: bundle.delta, base: bundle.base, tip: bundle.tip, parkOn: this.config.audit.parkOn, decision: judged.parks.length ? 'park' : 'proceed', recommend: judged.recommend, summary: judged.summary, findings: judged.findings });
-    e.audits.push({ step: s.name, file, delta: bundle.delta, base: bundle.base, tip: bundle.tip, steps: bundle.steps, dirs: steps.map((x) => x.dir), findings: judged.findings.length, parks: judged.parks.map((f) => f.id), recommend: judged.recommend });
-    e.audit = { step: s.name, file, findings: judged.findings.length, parks: judged.parks.length, recommend: judged.recommend };
-    this.save();
-    this.log(`${e.id}: ${s.name} — ${judged.findings.length} finding(s), ${judged.parks.length} that park; the auditor recommends ${judged.recommend} (no effect)`);
-    this.event('audit', e, { step: s.name, findings: judged.findings.length, parks: judged.parks.length });
-    // A finding that the work never ran for real is told to the owner whether or not it parks: seen live, a medium
-    // one ("the cost path is tested only against a fake built on the same guess") reached them as "none serious".
-    this.unproven(e, judged.findings.filter((f) => UNPROVEN_CATEGORIES.includes(f.category)).map((f) => ({ source: 'reviewer', step: s.name, id: f.id, severity: f.severity, text: String(f.explanation ?? '').replace(/\s+/g, ' ').trim() })));
+      const value = auditOutput(s.result);
+      const valid = validateAudit(value, m.anchors);
+      if (!valid.ok) {
+        writeJson(path.join(s.stepDir, 'audit.json'), { unusable: valid.problems, raw: s.result?.structured_output ?? s.result?.result ?? null });
+        // Fail closed (owner decision): nothing is verified without an audit. The `resume` gate lets the next run audit again.
+        return this.parkResumable(e, `auditor: ${s.name} returned no usable result (${valid.problems.join('; ')}); not verified without an audit`, 'AUDIT');
+      }
+      const judged = judgeAudit(value, this.config.audit.parkOn);
+      const coverage = reviewCoverage({ stepDir: s.stepDir, clone: this.clone });
+      // A finding that parks goes to the owner however much was read; only a review that would pass is held to its coverage.
+      // A requirement left for a later epic, or one a person confirms by looking, has no test to name.
+      const noTest = new Set([...this.standingDeferrals(e).all, ...(m.observed ?? []).map((o) => o.tor)]);
+      const thin = judged.parks.length ? null : thinReview({ value, coverage, anchors: m.anchors.filter((t) => !noTest.has(t)), delta: bundle.delta });
+      const file = `${s.name}/audit.json`;
+      writeJson(path.join(this.epicDir(e), file), { step: s.name, epic: e.id, branch: m.branch, delta: bundle.delta, base: bundle.base, tip: bundle.tip, parkOn: this.config.audit.parkOn, decision: judged.parks.length ? 'park' : thin ? 'thin' : 'proceed', recommend: judged.recommend, summary: judged.summary, coverage, ...(thin ? { thin } : {}), checked: value.checked, findings: judged.findings });
+      e.audits.push({ step: s.name, file, delta: bundle.delta, base: bundle.base, tip: bundle.tip, steps: bundle.steps, dirs: steps.map((x) => x.dir), findings: judged.findings.length, parks: judged.parks.map((f) => f.id), recommend: judged.recommend, coverage: { read: coverage.read, of: coverage.of, seconds: coverage.seconds }, ...(thin ? { thin: true } : {}) });
+      e.audit = { step: s.name, file, findings: judged.findings.length, parks: judged.parks.length, recommend: judged.recommend };
+      this.save();
+      this.log(`${e.id}: ${s.name} — ${judged.findings.length} finding(s), ${judged.parks.length} that park; the auditor recommends ${judged.recommend} (no effect); read ${coverage.read} of ${coverage.of} changed code file(s)${coverage.seconds == null ? '' : ` in ${coverage.seconds} s`}${thin ? ' — a thin review' : ''}`);
+      this.event('audit', e, { step: s.name, findings: judged.findings.length, parks: judged.parks.length, read: coverage.read, of: coverage.of, ...(thin ? { thin: true } : {}) });
+      // A finding that the work never ran for real is told to the owner whether or not it parks: seen live, a medium
+      // one ("the cost path is tested only against a fake built on the same guess") reached them as "none serious".
+      this.unproven(e, judged.findings.filter((f) => UNPROVEN_CATEGORIES.includes(f.category)).map((f) => ({ source: 'reviewer', step: s.name, id: f.id, severity: f.severity, text: String(f.explanation ?? '').replace(/\s+/g, ' ').trim() })));
 
-    if (judged.parks.length) {
-      const list = judged.parks.map((f) => `${f.id} ${f.category}`).join(', ');
-      this.writeGate(e, {
-        kind: 'audit', skillStep: 'autopilot AUDIT (before wrapup-epic)', session: s.name, reason: `auditor: ${list} (${s.name})`,
-        // What the standing answer reads (`technicalAnswer`): the findings' categories, and whether the one repair is still there.
-        categories: [...new Set(judged.parks.map((f) => f.category))], fixRounds: e.fixRounds ?? 0,
-        question: `The auditor reported ${judged.parks.length} high finding(s) on ${m.label}: ${judged.parks.map((f) => `${f.id} ${f.category} — ${f.explanation}`).join(' | ')}. Are they real?`,
-        options: [ANSWERS.auditReal, ANSWERS.auditNotReal],
-        why: `a high finding in a park category (${this.config.audit.parkOn.join(', ')}); the auditor only advises, so a person judges it`,
+      if (judged.parks.length) {
+        const list = judged.parks.map((f) => `${f.id} ${f.category}`).join(', ');
+        this.writeGate(e, {
+          kind: 'audit', skillStep: 'autopilot AUDIT (before wrapup-epic)', session: s.name, reason: `auditor: ${list} (${s.name})`,
+          // What the standing answer reads (`technicalAnswer`): the findings' categories, and whether the one repair is still there.
+          categories: [...new Set(judged.parks.map((f) => f.category))], fixRounds: e.fixRounds ?? 0,
+          question: `The auditor reported ${judged.parks.length} high finding(s) on ${m.label}: ${judged.parks.map((f) => `${f.id} ${f.category} — ${f.explanation}`).join(' | ')}. Are they real?`,
+          options: [ANSWERS.auditReal, ANSWERS.auditNotReal],
+          why: `a high finding in a park category (${this.config.audit.parkOn.join(', ')}); the auditor only advises, so a person judges it`,
+          artifacts: [this.rel(path.join(this.epicDir(e), file)), this.rel(path.join(s.stepDir, 'bundle', 'diff.patch'))],
+          resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${e.id} to fix it, or /peak-workflow:wrapup-epic ${e.id} to verify it as built`,
+        });
+        return this.park(e, `auditor: ${list} (${s.name})`);
+      }
+      if (!thin) return this.humanCheck(e) ? null : 'VERIFY';
+      if (!before) {
+        // A thin review passes nothing on its first try: the reviewer runs once more, told what it left unread (#40 item 16).
+        before = { coverage, thin };
+        this.event('thin-review', e, { step: s.name, read: coverage.read, of: coverage.of, again: true });
+        continue;
+      }
+      // Still thin: a full run asks the owner; a provisional run goes on and lists it under "Decided for you".
+      const words = thinWords(m.label, coverage, thin);
+      const gate = {
+        kind: 'thin-review', skillStep: 'autopilot AUDIT (before wrapup-epic)', session: s.name, reason: `auditor: ${s.name} was a thin review (read ${coverage.read} of ${coverage.of} changed code files)`,
+        read: coverage.read, of: coverage.of, seconds: coverage.seconds, unread: coverage.unread.slice(0, 10), untested: thin.untested,
+        question: `${words} Verify it as built, or review again?`,
+        options: [ANSWERS.verifyAsBuilt, ANSWERS.reviewAgain],
+        why: `the independent review was run twice and both times read too little to vouch for the work (it needs ${thin.need} of ${coverage.of} changed code files and a test named for each requirement); passing it as it is is a person's call`,
         artifacts: [this.rel(path.join(this.epicDir(e), file)), this.rel(path.join(s.stepDir, 'bundle', 'diff.patch'))],
-        resume: `open a new session in the fetched repo: /peak-workflow:start-epic ${e.id} to fix it, or /peak-workflow:wrapup-epic ${e.id} to verify it as built`,
-      });
-      return this.park(e, `auditor: ${list} (${s.name})`);
+        resume: `open a new session in the fetched repo: /peak-workflow:wrapup-epic ${e.id} to verify it as built`,
+      };
+      if (this.config.mode === 'provisional') {
+        const date = today();
+        const name = this.writeGate(e, { ...gate, decided: { answer: ANSWERS.verifyAsBuilt, by: PROVISIONAL_BY, date, standing: true, prototype: true, run: this.runName, used: { run: this.runName, phase: 'VERIFY', date: new Date().toISOString() } } });
+        e.gates = e.gates.filter((x) => x !== name); // `tookForOwner` lists a gate it has not seen on the epic yet
+        this.tookForOwner(e, [name]);
+        e.audits.at(-1).accepted = PROVISIONAL_BY;
+        this.save();
+        return this.humanCheck(e) ? null : 'VERIFY';
+      }
+      this.writeGate(e, gate);
+      return this.park(e, `auditor: ${s.name} was a thin review (read ${coverage.read} of ${coverage.of} changed code files)`);
     }
-    return this.humanCheck(e) ? null : 'VERIFY';
   }
 
   /**
@@ -3427,6 +3478,8 @@ class Run {
         if (prev?.sessionId && prev.kind && KINDS[prev.kind]?.state === phase) e.resumeSession = { kind: prev.kind, sessionId: prev.sessionId, step: g.session, run: g.run };
       }
       if (f.kind === 'audit' && phase === 'VERIFY') e.auditOverruled = { gate: f.gate, by: g.decided.by };
+      // "Verify as built" after a thin review: that review now counts as the audit of this work; "Review again" leaves it uncounted.
+      if (f.kind === 'thin-review' && phase === 'VERIFY') { const t = (e.audits ?? []).filter((a) => a.thin && !a.accepted).at(-1); if (t) t.accepted = g.decided.by; }
       if (!entry.question) used(); // a question gate is marked used by hook R8 when it answers
       e.resumed.behind = f.behind ?? 0;
       this.log(`${e.id}: resuming at ${phase} on ${g.branch} (${String(g.branchTip).slice(0, 9)}${f.behind ? `, ${f.behind} commit(s) behind ${this.state.integration}; it merges cleanly` : ''}): ${g.decided.by} answered "${f.answer}" on ${f.gate}${e.continuing ? ` — ${e.continuing} was cut short, so a session continues it instead of checking a part-built branch` : ''}`);
@@ -4003,6 +4056,7 @@ export function prototypeDid(gate) {
   const a = gate.decided?.answer ?? ''; const tor = gate.tor ?? 'a requirement';
   if (gate.restart === 'gone') return 'started it over from scratch: its branch was gone';
   if (gate.kind === 'amendment') return `took the proposed correction to ${tor}`;
+  if (gate.kind === 'thin-review') return `went on after a thin review: read ${gate.read ?? '?'} of ${gate.of ?? '?'} changed files`;
   if (/^\W*defer\b/i.test(a)) return `deferred ${tor} to a later epic, as the builder recommended`;
   if (gate.kind === 'defect') return `left a defect as is: ${String(gate.question ?? '').replace(/^\W*Seen but not fixed yet:\s*/, '').replace(/\s*Recommendation:[\s\S]*$/, '').replace(/[\s.]+$/, '') || 'what the final check saw'}`;
   if (/^\W*fix now\b/i.test(a)) return `had ${tor} fixed in the same build, as the builder recommended`;

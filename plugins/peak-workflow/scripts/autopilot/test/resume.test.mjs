@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, continueRun, ensureResumeGates, gateFacts, limitDecision, ownerAnswers, status, usageLimit } from '../driver.mjs';
-import { LEAVE_IT, PROVISIONAL_BY, SMALL_FIX_PROBLEM, TRY_AGAIN, prototypeReasked } from '../lib.mjs';
+import { LEAVE_IT, PROVISIONAL_BY, SMALL_FIX_PROBLEM, TRY_AGAIN, prototypeReasked, technicalAnswer } from '../lib.mjs';
 import { activity, eventLine, pictureLines, plainReason } from '../attend.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
@@ -162,6 +162,53 @@ test('unmatched question (asked in plan): replayable — the next run plans agai
   assert.deepEqual(r.steps, [`${E1.id}/plan-1`]);
   assert.equal(p.epic(E1.id).state, 'PARKED');
   assert.deepEqual([gate(p, E1.id).decided.used.session, gate(p, E1.id, 2).kind, gate(p, E1.id, 2).question], ['plan-1', 'unmatched', 'Which colour should the bars be?']);
+});
+
+// ---- a thin review (#40 item 16) ----------------------------------------------------------------
+
+const thin = { reads: false, result: { total_cost_usd: 0.5, structured_output: { findings: [], recommend: 'proceed', summary: 'looked fine' } } };
+
+test('a review thin twice in a full run parks on a `thin-review` question; "Verify as built" goes on to VERIFY and that review counts', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: thin });
+  await p.go();
+
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'PARKED');
+  assert.equal(e.reason, 'auditor: audit-2 was a thin review (read 0 of 2 changed code files)');
+  assert.deepEqual(p.steps(), ['plan-1', 'build-1', 'audit-1', 'audit-2'].map((s) => `${E1.id}/${s}`));
+  const g = gate(p, E1.id);
+  assert.equal(g.kind, 'thin-review');
+  assert.equal(g.session, 'audit-2');
+  assert.deepEqual(g.options, [ANSWERS.verifyAsBuilt, ANSWERS.reviewAgain]);
+  assert.deepEqual([g.read, g.of, g.unread], [0, 2, [`src/${E1.slug}.js`, `test/${E1.slug}.test.js`]]);
+  assert.match(g.question, /^The independent review of .*CSV import read 0 of 2 changed code files in \d+ s: the reviewer barely looked, twice\. Verify it as built, or review again\?$/);
+  assert.equal(technicalAnswer(g), null, 'the owner\'s question: no standing answer covers it');
+  assert.equal(decide(p, E1.id, ANSWERS.verifyAsBuilt).enters, 'VERIFY');
+
+  const r = await again(p);
+
+  assert.deepEqual(r.steps, [`${E1.id}/verify-1`]);
+  const after = p.epic(E1.id);
+  assert.equal(after.state, 'MERGED');
+  assert.deepEqual(after.audits.map((a) => [a.step, a.thin, a.accepted ?? null]), [['audit-1', true, null], ['audit-2', true, 'Pat Owner']]);
+});
+
+test('"Review again" on a thin review audits the whole epic afresh, not the changes since it', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/audit`]: thin });
+  await p.go();
+  assert.equal(decide(p, E1.id, ANSWERS.reviewAgain).enters, 'AUDIT');
+
+  p.scenario({ [`${E1.id}/verify`]: wrapupScript(E1) }); // the default auditor: it reads everything
+  const r = await again(p);
+
+  assert.deepEqual(r.steps, ['audit-1', 'verify-1'].map((s) => `${E1.id}/${s}`));
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  const b = readJson(p.dir(E1.id, 'audit-1', 'bundle', 'bundle.json'));
+  assert.equal(b.delta, false);
+  assert.deepEqual(b.steps, ['build-1'], 'the build the thin reviews read is read again');
+  assert.equal(readJson(p.dir(E1.id, 'audit-1', 'audit.json')).decision, 'proceed');
 });
 
 // ---- audit -------------------------------------------------------------------------------------

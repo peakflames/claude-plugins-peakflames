@@ -81,7 +81,15 @@ export const ANSWERS = {
   looksRight: 'Looks right', notRight: 'Not right — describe',
   approvePlan: 'Approve this plan', replan: 'Re-plan',
   resume: 'Resume from where it stopped', startOver: 'Start over',
+  verifyAsBuilt: 'Verify as built', reviewAgain: 'Review again',
 };
+/**
+ * A thin independent review (#40 item 16): the reviewer read fewer than `share` of the changed code files, at most `cap`
+ * needed (40 turns must reach it on a large epic), or checked no test for one of the requirements. Run once more, then asked.
+ */
+export const THIN_REVIEW = { share: 0.5, cap: 15 };
+/** Lockfiles: changed with their dependency list, they are ordinary work; the reviewer need not read them. */
+export const LOCKFILE = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|go\.sum|composer\.lock)$/;
 /**
  * An answer that puts a decision off ("Not now — end the session", "Decide later"). It answers the
  * session that asked, once; it is not a decision, so no later session is told it (seen live: a
@@ -202,6 +210,7 @@ export function gateEntry(g) {
   if (g.reask) return a === g.reask.took && g.reask.phase ? { phase: g.reask.phase, question: true } : STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
   if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
   if (g.kind === 'audit') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_BUILD', fix: 'audit' } : null;
+  if (g.kind === 'thin-review') return a === ANSWERS.verifyAsBuilt ? { phase: 'VERIFY' } : a === ANSWERS.reviewAgain ? { phase: 'AUDIT' } : null;
   if (g.kind === 'human-check') return a === ANSWERS.looksRight ? { phase: 'VERIFY', look: true } : a === ANSWERS.notRight ? { phase: 'FIX_BUILD', fix: 'look' } : null;
   if (g.kind === 'plan-lint') {
     const fix = asked === 'plan-fix';

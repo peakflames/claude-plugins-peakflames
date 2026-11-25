@@ -901,6 +901,13 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       to record — the fix is in the project, and it clears when preflight passes: say what to
       fix (its `question`) and move on.
 
+      **A `thin-review` gate, in plain words.** The independent reviewer, run twice, opened
+      too little of the work to vouch for it (its `review`: `read` of `of` changed code files;
+      `unread` names the files it left). Before asking, say in two short lines: "The reviewer barely looked:
+      it opened <read> of <of> changed files." and what each answer does — "Verify as built:
+      the final check runs on the work as it is, without a real review. Review again: a new
+      reviewer reads the whole epic from the start."
+
       **Say what an option asks of the owner.** The run is unattended, and the popup hides
       the chat. When an option can only work with the owner at this computer — it opens a
       browser for a sign-in, needs a device plugged in, wants them to look at something —
@@ -1026,6 +1033,7 @@ Leave out a part that has nothing to say.
 - <requirement, in plain words> — changed as the planner proposed. It read: <was>. Proposed: <proposed>
 - <requirement, in plain words> — left for a later epic, as the builder recommended
 - <epic, short> — a defect the final check saw was left as is (<did>): <the defect, in plain words>
+- <epic, short> — the independent reviewer barely looked, twice; the final check ran anyway (<did>)
 - <requirement, in plain words> — nobody observed it; it is recorded as not verified. Still to see: <clauses>. To check it later: <check>
 - <epic, short> — your look was skipped: <n> pictures, sent now<, and the changed lines of the project's instructions file>
 
@@ -1072,8 +1080,9 @@ Leave out a part that has nothing to say.
   count. It has four sources. The `decidedForYou` entries with `prototype`: a requirement
   changed on a session's proposal (`kind` `amendment`; give `was`, the text as it read, and
   `proposed`, both as written), and a deferral or a fix taken on the builder's
-  recommendation (`did` says which), and a defect the final check saw and left as is (`kind`
-  `defect`; past the count of small fixes, or too big for one). `unobserved`: a requirement only a person can observe,
+  recommendation (`did` says which), a defect the final check saw and left as is (`kind`
+  `defect`; past the count of small fixes, or too big for one), and a review that was thin
+  twice (`kind` `thin-review`; `did` says how much it read). `unobserved`: a requirement only a person can observe,
   merged recorded as not verified, never as verified; give its `clauses` as what is still to
   see, and its `check` exactly as given, as what re-checks it once the work is in the
   project and a person is there. The `unlooked` entries with `prototype`: send each epic's

@@ -23,6 +23,19 @@ read any file there for context (the tests, the code under test, `CLAUDE.md`).
 
 When `delta` is true, audit only what `diff.patch` changes. Earlier work was audited before.
 
+## What to read
+
+A review that did not open the work cannot vouch for it. The driver counts the files you open.
+
+- For each anchor in `tors.md`, open its test or tests and the code they test, in the clone.
+  Say whether the test performs the requirement's When (not only something near it).
+- Open every changed code file in `diff.patch` (not docs, lockfiles or images). If you leave
+  one unopened, say which and why in that anchor's `note`.
+
+Report what you read in `checked`: one entry per anchor, with `tests` and `code` as paths
+relative to the clone, `whenExercised`, and a one-line `note`. An anchor with no test says so
+in its `note`, with `tests` empty — that is itself worth a finding.
+
 ## What to look for
 
 Report a finding only in these categories, and only where you can point at evidence.
@@ -51,6 +64,7 @@ Severity:
 
 Do not report style, naming, refactoring ideas, missing features outside the anchors, or anything
 you cannot tie to a line. A clean build has an empty `findings` list; that is a good answer.
+`checked` is never empty: it is how a clean answer shows it was earned.
 
 ## Evidence
 
@@ -66,6 +80,6 @@ doubt. Name the TOR ID.
 
 ## Output
 
-Return the structured result: `findings` (possibly empty), `recommend` (`park` if you would want
+Return the structured result: `checked` (one entry per anchor), `findings` (possibly empty), `recommend` (`park` if you would want
 a person to look before verification, otherwise `proceed`), and a one-paragraph `summary`. Your
 recommendation is shown to the owner; the driver applies its own fixed rule.

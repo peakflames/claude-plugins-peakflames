@@ -292,10 +292,17 @@ Why this order:
   lists it under "Decided for you". Left defects get their own list, apart from "Not proven for
   real", and a second final check's list replaces the first's. Tested against the fake; not
   seen in a real run.
-- [ ] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change;
+- [x] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change;
   48 seconds on Pilot Light's whole walking skeleton (2026-11-22; it did find the deleted
   lockfile, rated low); 47 seconds on its second epic (run `20261122-094004`, 4 findings, none
-  that park). Unexamined.
+  that park). Fixed 2026-11-24 (`COMMIT_HASH`; owner's decision: effort stays medium, a thin
+  review runs once more, then a full run asks and a provisional run lists it). The reviewer
+  returns `checked` per requirement; the driver counts the changed code files it opened (from
+  the referee log) and calls it thin under half of them (at most 15) or with no test named for
+  a requirement. A requirement left for a later epic or confirmed by a person's look needs no
+  test; fixtures, snapshots, vendored files, mode-only changes and pure renames are not counted.
+  A review with a parking finding goes to the owner as findings. Tested against the fake; not
+  seen in a real run (Step 6).
 
 - [x] **The scope check made the walking skeleton worse** (*no issue*; Pilot Light, run
   `20261122-025513`; owner's decisions of 2026-11-22). It refused the new `bun.lock` and the
@@ -350,6 +357,10 @@ The 2026-11-21 changes (#41, I2 and I6):
   screen lists what it decided.
 - [ ] Past the count: the one question "Try again" / "Leave it for now"; "Try again" never
   lets a fix change a requirement or weaken a test.
+
+The 2026-11-24 changes (Step 4):
+- [ ] A real reviewer's `audit.json` has `coverage` and `checked`, and a thin one runs again
+  (#40 item 16). Check the prompt's "What to read" does not push it past 40 turns or $3.
 
 Also to see in a real run: no by-hand command, git line or other skill offered anywhere the
 owner reads; step 1's fixes (B14 a resumed epic put back on its branch — seen, see below; B15

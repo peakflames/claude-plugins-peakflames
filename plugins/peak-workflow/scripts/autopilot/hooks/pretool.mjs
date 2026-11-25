@@ -570,7 +570,7 @@ function ruleR8(ctx) {
       // A Safety requirement is never amended or deferred by anyone but the owner, whatever a session offers.
       if (!before && tor && anchors(ctx).includes(tor) && isSafety(ctx.clone, tor)) { park = { ...base, why: `${parkRow.why}; ${tor} is a Safety requirement, which a provisional run never decides` }; break; }
       if (before) { answers[q.question] = offered(before.decided.answer); protoAgain += 1; continue; }
-      const p = prototypeAnswer({ kind, question: q.question, labels, tor, anchors: anchors(ctx), taken: [...protoTaken, ...protoNow].filter((x) => x.kind !== 'defect') });
+      const p = prototypeAnswer({ kind, question: q.question, labels, tor, anchors: anchors(ctx), taken: [...protoTaken, ...protoNow].filter((x) => x.kind !== 'defect' && x.kind !== 'thin-review') });
       if (p?.answer) { answers[q.question] = p.answer; protoNow.push({ ...base, why: parkRow.why, answer: p.answer, ...(kind === 'deferral' ? { recommendation: recommended(q.question) } : {}) }); continue; }
       if (p?.why) { park = { ...base, why: `${parkRow.why}; ${p.why}` }; break; }
     }
