@@ -44,6 +44,8 @@
 //                                       AskUserQuestion, a call expected to be refused)
 //   {do:"sleep", ms}   {do:"hang"}   {do:"crash", code?}
 //   {do:"emit", line}                   one raw stream line, as the CLI writes it (a rate_limit_event)
+//   {do:"transcript", line}             one line of the session's own transcript, which the CLI keeps at
+//                                       $CLAUDE_CONFIG_DIR/projects/<cwd slug>/<session id>.jsonl (only when that is set)
 //
 // `result: false` ends without a result line (a CLI crash). A result with
 // `subtype: "error_max_budget_usd"` or `"error_max_turns"` is a budget stop.
@@ -185,6 +187,13 @@ async function act(a) {
     case 'hang': await new Promise(() => setInterval(() => {}, 1 << 30)); break;
     case 'crash': process.exit(a.code ?? 1); break;
     case 'emit': emit({ ...a.line, session_id: sessionId }); break;
+    case 'transcript': {
+      if (!process.env.CLAUDE_CONFIG_DIR) break;
+      const dir = path.join(process.env.CLAUDE_CONFIG_DIR, 'projects', process.cwd().replace(/[^A-Za-z0-9]/g, '-'));
+      fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, `${sessionId}.jsonl`), JSON.stringify({ ...a.line, sessionId }) + '\n');
+      break;
+    }
     default: throw new Error(`fake-claude: unknown action ${a.do}`);
   }
 }

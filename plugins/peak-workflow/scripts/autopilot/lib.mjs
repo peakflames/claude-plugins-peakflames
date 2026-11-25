@@ -340,3 +340,52 @@ export function prototypeAnswer({ kind, question, labels, tor, anchors, taken })
   if (taken.length >= PROTOTYPE_LIMIT) return { why: `the provisional setting covers ${PROTOTYPE_LIMIT} answers per epic, and this is one more` };
   return { answer };
 }
+
+// ---- estimating what a stopped session spent ---------------------------------------------------------------------
+
+/**
+ * Per-million-token prices (USD) of the models a session can run, from the Claude API reference (cached 2026-11-03).
+ * `cacheRead` is listed only where it is not 0.1× input. Longest prefix first: `claude-fable-5` must not take 5.1/5.2.
+ */
+export const PRICES = [
+  ['claude-fable-5-2', { input: 8, output: 40, cacheRead: 0.2 }],
+  ['claude-fable-5-1', { input: 10, output: 50, cacheRead: 0.25 }],
+  ['claude-fable-5', { input: 10, output: 50, cacheRead: 0.25 }],
+  ['claude-opus-5-5', { input: 4, output: 20, cacheRead: 0.2 }],
+  ['claude-opus-5', { input: 5, output: 25 }],
+  ['claude-opus-4-8', { input: 5, output: 25 }],
+  ['claude-opus-4-7', { input: 5, output: 25 }],
+  ['claude-opus-4-6', { input: 5, output: 25 }],
+  ['claude-sonnet-5-5', { input: 2, output: 10, cacheRead: 0.1 }],
+  ['claude-sonnet-5', { input: 2, output: 10 }],
+  ['claude-sonnet-4-6', { input: 3, output: 15 }],
+  ['claude-haiku-5-5', { input: 0.1, output: 0.5 }],
+  ['claude-haiku-4-5', { input: 1, output: 5 }],
+];
+
+/** The price row for a model id; date suffixes and `[1m]` are ignored. A prefix must end at the id or at a `-`. */
+export function priceOf(model) {
+  const id = String(model ?? '').replace(/\[[^\]]*\]$/, '');
+  for (const [prefix, p] of PRICES) if (id === prefix || id.startsWith(`${prefix}-`)) return p;
+  return null;
+}
+
+/**
+ * What a session that never wrote its `result` line spent, from the `usage` of its assistant messages.
+ * `usageByMessage`: message id → { model, usage } (the last line seen for that id: usage only grows while it streams).
+ * A model not in PRICES adds its tokens but no dollars, and is named in `unpriced`.
+ */
+export function estimateCost(usageByMessage) {
+  let usd = 0; let tokens = 0; const unpriced = new Set();
+  for (const { model, usage: u = {} } of usageByMessage instanceof Map ? usageByMessage.values() : Object.values(usageByMessage ?? {})) {
+    const write = u.cache_creation_input_tokens ?? 0;
+    const w1h = u.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+    const w5m = u.cache_creation?.ephemeral_5m_input_tokens ?? Math.max(0, write - w1h);
+    const input = u.input_tokens ?? 0; const read = u.cache_read_input_tokens ?? 0; const output = u.output_tokens ?? 0;
+    tokens += input + read + w5m + w1h + output;
+    const p = priceOf(model);
+    if (!p) { unpriced.add(String(model ?? 'unknown')); continue; }
+    usd += (input * p.input + read * (p.cacheRead ?? p.input * 0.1) + w5m * p.input * 1.25 + w1h * p.input * 2 + output * p.output) / 1e6;
+  }
+  return { usd: +usd.toFixed(6), tokens, unpriced: [...unpriced] };
+}

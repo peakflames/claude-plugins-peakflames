@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
-import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
+import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -1128,6 +1128,32 @@ export function thinAgainLine({ coverage, thin }) {
  * The exact command for one step: host mode for plan, build and verify (SPIKE.md "Host mode"),
  * plain `-p` for the auditor (plan §6.6 "Audit"). Pure: used by the dry run too.
  */
+/**
+ * The final usage of a session's messages, from the transcripts the CLI keeps (`projects/<cwd slug>/<id>.jsonl`, and its
+ * subagents' under `<id>/subagents/`). The stream's assistant lines carry a message's usage as it starts, so their
+ * `output_tokens` are near zero; the transcript has the finished count. Found by session id, whatever the slug. Read-only.
+ */
+export function transcriptUsage(configDir, sessionId) {
+  const usage = new Map();
+  const root = path.join(configDir, 'projects');
+  let slugs = []; try { slugs = fs.readdirSync(root); } catch { return usage; }
+  for (const slug of slugs) {
+    const main = path.join(root, slug, `${sessionId}.jsonl`);
+    if (!exists(main)) continue;
+    const subs = path.join(root, slug, sessionId, 'subagents');
+    let more = []; try { more = fs.readdirSync(subs).filter((f) => f.endsWith('.jsonl')).map((f) => path.join(subs, f)); } catch { /* none */ }
+    for (const file of [main, ...more]) {
+      let text = ''; try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
+      for (const line of text.split('\n')) {
+        let d; try { d = JSON.parse(line); } catch { continue; }
+        if (d?.type === 'assistant' && d.message?.id && d.message.usage) usage.set(d.message.id, { model: d.message.model, usage: d.message.usage });
+      }
+    }
+    break;
+  }
+  return usage;
+}
+
 export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDir, pluginDir = PLUGIN_DIR, sessionId, appendFiles = [], prompt, schema, resume = null }) {
   const b = config.budgets[kind] ?? (kind === 'catchup' ? config.budgets.fix : undefined); // a catch-up session: a repair's limits unless set
   const effort = effortFor(b);
@@ -2270,7 +2296,9 @@ class Run {
       resume = from.sessionId;
       // A resumed session's result line counts the session it continues as well (seen live: its per-model totals were
       // the two sessions' added up), and that session's cost is already in the books.
-      costBefore = tryJson(path.join(runDirOf(this.stateDir, from.run), 'epics', e.id, from.step, 'result.json'))?.total_cost_usd ?? 0;
+      // A session stopped at its question before it reported its cost was booked at an estimate (cost-estimate.json).
+      const fromDir = path.join(runDirOf(this.stateDir, from.run), 'epics', e.id, from.step);
+      costBefore = (tryJson(path.join(fromDir, 'result.json')) ?? tryJson(path.join(fromDir, 'cost-estimate.json')))?.total_cost_usd ?? 0;
       prompt = resumeMessage(answers, { branch: this.meta(e).branch });
       fs.writeFileSync(path.join(stepDir, 'resume-prompt.md'), prompt);
     } else if (answers.length) {
@@ -2310,7 +2338,7 @@ class Run {
     child.stdin.on('error', () => {});
     const send = (o) => { if (child.stdin.writable) child.stdin.write((typeof o === 'string' ? o : JSON.stringify(o)) + '\n'); };
 
-    const s = { name, sessionId, stepDir, kind, result: null, rateLimit: null, init: null, controlRequests: [], killed: null, exitCode: null, signal: null, spawnError: null, resumed: !!resume };
+    const s = { name, sessionId, stepDir, kind, result: null, rateLimit: null, init: null, controlRequests: [], usage: new Map(), killed: null, exitCode: null, signal: null, spawnError: null, resumed: !!resume };
     let graceTimer = null;
     const kill = (why) => {
       if (s.killed) return;
@@ -2332,6 +2360,9 @@ class Run {
         let d; try { d = JSON.parse(line); } catch { return; }
         if (Array.isArray(d)) { s.init = d.find((x) => x?.type === 'system' && x.subtype === 'init') ?? s.init; s.rateLimit = d.findLast((x) => x?.type === 'rate_limit_event')?.rate_limit_info ?? s.rateLimit; d = d.find((x) => x?.type === 'result') ?? {}; }
         if (d.type === 'rate_limit_event') s.rateLimit = d.rate_limit_info ?? null;
+        // Kept per message id (the last line wins: usage grows while a message streams), subagents' too: they are billed.
+        // Used only when the session never writes its result line (stopped, killed, crashed), to estimate what it spent.
+        if (d.type === 'assistant' && d.message?.id && d.message.usage) s.usage.set(d.message.id, { model: d.message.model, usage: d.message.usage });
         if (d.type === 'system' && d.subtype === 'init') s.init = d;
         if (d.type === 'control_request') {
           // The host approves nothing (SPIKE.md): hooks and acceptEdits decide; anything that reaches us is denied and logged.
@@ -2381,19 +2412,29 @@ class Run {
     s.why = s.killed ?? s.stoppedBy ?? (s.outcome === 'ok' ? 'success' : s.outcome === 'limit' ? s.limit.why : apiError ?? sub ?? s.spawnError ?? `exit ${s.exitCode ?? s.signal}, no result line`);
 
     const reported = s.result?.total_cost_usd ?? 0;
-    const cost = resume && reported >= costBefore ? +(reported - costBefore).toFixed(6) : reported;
+    // No result line: the session was stopped before it reported its cost. What its messages used is priced instead.
+    // The stream says which messages were this session's; the CLI's transcript has their finished usage (a resumed
+    // session's transcript also holds the session it continues, which is why only the stream's ids are taken).
+    let est = null;
+    if (!s.result && s.usage.size) {
+      const final = transcriptUsage(childEnv(cmd.env).CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), sessionId);
+      const usage = new Map([...s.usage].map(([id, u]) => [id, final.get(id) ?? u]));
+      est = { ...estimateCost(usage), final: [...s.usage.keys()].filter((id) => final.has(id)).length };
+      writeJson(path.join(stepDir, 'cost-estimate.json'), { total_cost_usd: est.usd, estimated: true, messages: usage.size, fromTranscript: est.final, tokens: est.tokens, unpriced: est.unpriced });
+    }
+    const cost = est ? est.usd : resume && reported >= costBefore ? +(reported - costBefore).toFixed(6) : reported;
     this.state.spentUsd = +(this.state.spentUsd + cost).toFixed(4);
     e.costUsd = +(e.costUsd + cost).toFixed(4); e.turns += s.result?.num_turns ?? 0; e.wallMs += s.wallMs;
-    e.sessions.push({ name, sessionId, outcome: s.outcome, why: s.why, costUsd: cost, turns: s.result?.num_turns ?? 0, wallMs: s.wallMs, terminalReason: s.result?.terminal_reason ?? null, denials: s.result?.permission_denials?.length ?? 0, ...(resume ? { resumed: from.sessionId, ...(cost !== reported ? { reportedCostUsd: reported } : {}) } : {}) });
+    e.sessions.push({ name, sessionId, outcome: s.outcome, why: s.why, costUsd: cost, turns: s.result?.num_turns ?? 0, wallMs: s.wallMs, terminalReason: s.result?.terminal_reason ?? null, denials: s.result?.permission_denials?.length ?? 0, ...(est ? { costEstimated: true, tokens: est.tokens, ...(est.unpriced.length ? { unpriced: est.unpriced } : {}) } : {}), ...(resume ? { resumed: from.sessionId, ...(!est && cost !== reported ? { reportedCostUsd: reported } : {}) } : {}) });
     // What this session asked the owner to come for and never got: later sessions of this epic are told not to try it again.
     const gaveUp = unansweredNeeds(path.join(stepDir, 'hooks.jsonl'));
     if (gaveUp.length) { e.unanswered = [...(e.unanswered ?? []), ...gaveUp.map((u) => ({ ...u, step: name }))]; this.log(`${e.id}: ${name} waited for the owner ${gaveUp.length} time(s) and nobody came: ${gaveUp.map((u) => u.description).join('; ')}`); }
     e.step = null;
     this.save();
-    this.log(`${e.id}: ${name} ended — ${s.outcome} (${s.why}), $${cost}, ${Math.round(s.wallMs / 1000)} s`);
+    this.log(`${e.id}: ${name} ended — ${s.outcome} (${s.why}), $${cost}${est ? ` (estimated from ${s.usage.size} messages${est.final < s.usage.size ? `, ${s.usage.size - est.final} of them without their final output count` : ''}: the session was stopped before it reported its cost${est.unpriced.length ? `; no price known for ${est.unpriced.join(', ')}` : ''})` : ''}, ${Math.round(s.wallMs / 1000)} s`);
     // A session the referee ended at its own question (not a captured plan, not the STOP file) did not finish: it asked.
     const asked = s.outcome === 'ok' && kind !== 'plan' && s.result?.terminal_reason === 'hook_stopped';
-    this.event('step-end', e, { step: name, kind, outcome: s.outcome, why: s.why, minutes: +(s.wallMs / 60000).toFixed(1), costUsd: cost, ...(asked ? { asked: true } : {}) });
+    this.event('step-end', e, { step: name, kind, outcome: s.outcome, why: s.why, minutes: +(s.wallMs / 60000).toFixed(1), costUsd: cost, ...(asked ? { asked: true } : {}), ...(est ? { estimated: true } : {}) });
     return s;
   }
 

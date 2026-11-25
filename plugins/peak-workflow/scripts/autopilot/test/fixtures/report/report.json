@@ -1109,6 +1109,7 @@
       "low": 1
     }
   },
+  "estimated": null,
   "chain": null,
   "workInProject": null,
   "fetch": "git fetch \"<workspace>/clone\" develop:autopilot/develop && git log develop..autopilot/develop",

@@ -183,7 +183,7 @@ export function eventLine(ev) {
     case 'epic-start': { const at = ev.pos && ev.of > 1 ? `${ev.pos} of ${ev.of}: ` : ''; return ev.resumedAt ? `Continuing ${at}${who} from where it stopped` : `Starting ${at}${who}`; }
     case 'step-start': return ev.continuing ? `Picking ${who} back up where it stopped (${doing.toLowerCase()}); nothing is started over` : `${doing} ${who}`;
     case 'step-end': {
-      const cost = ev.costUsd ? ` (${usd(ev.costUsd)})` : '';
+      const cost = ev.costUsd ? ` (${usd(ev.costUsd)}${ev.estimated ? ', estimated' : ''})` : '';
       if (ev.outcome === 'ok' && ev.asked) return `${done} stopped to ask you something after ${took(ev.minutes)}${cost}`;
       if (ev.outcome === 'ok') return `${done} finished in ${took(ev.minutes)}${cost}${NEXT[ev.kind] ? `. Next: ${NEXT[ev.kind]}` : ''}`;
       if (ev.outcome === 'stopped') return `${done} stopped, as you asked, after ${took(ev.minutes)}${cost}`;
