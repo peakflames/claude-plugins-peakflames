@@ -295,7 +295,7 @@ Why this order:
 - [x] **The independent review can be very short** (#40) (16): 49 seconds on a 935-line change;
   48 seconds on Pilot Light's whole walking skeleton (2026-11-22; it did find the deleted
   lockfile, rated low); 47 seconds on its second epic (run `20261122-094004`, 4 findings, none
-  that park). Fixed 2026-11-24 (`COMMIT_HASH`; owner's decision: effort stays medium, a thin
+  that park). Fixed 2026-11-24 (`6c61b6c`; owner's decision: effort stays medium, a thin
   review runs once more, then a full run asks and a provisional run lists it). The reviewer
   returns `checked` per requirement; the driver counts the changed code files it opened (from
   the referee log) and calls it thin under half of them (at most 15) or with no test named for
