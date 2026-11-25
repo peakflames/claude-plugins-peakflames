@@ -27,6 +27,12 @@ function stamp(iso) {
  * `runDir` is `<workspace>/runs/<run>`. The report is per run; gates and the clone belong to the
  * workspace, and every path in the report is relative to the workspace.
  */
+/** "the machine slept N min during the check", when a try of the base check slept 30 s or more (#41 B10); else null. */
+function sleptWords(tries = []) {
+  const sec = Math.max(0, ...(tries ?? []).map((x) => x.sleptSec ?? 0));
+  return sec >= 30 ? `the machine slept ${Math.max(1, Math.round(sec / 60))} min during the check` : null;
+}
+
 export function collectReport(runDir) {
   const s = readJson(path.join(runDir, 'state.json'));
   if (!s) throw new Error(`${path.join(runDir, 'state.json')} is missing or unreadable: no run to report`);
@@ -113,7 +119,7 @@ export function collectReport(runDir) {
 
   const report = {
     run: s.run, name: runName, ended: s.endedAt ?? null, status: s.status, stoppedBecause: s.stoppedBecause ?? null, integration: s.integration, workspace, clone, startSha: s.startSha ?? null,
-    spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, setupFailed: s.setupFailed ?? null,
+    spentUsd: s.spentUsd ?? 0, budgetUsd: s.runBudgetUsd ?? config.runBudgetUsd ?? null, testCommand: s.testCommand ?? config.testCommand ?? null, baseRed: s.baseRed ?? null, baseRetried: s.baseRetried ?? [], setupFailed: s.setupFailed ?? null,
     realSpend: typeof s.realSpend === 'boolean' ? s.realSpend : null, attended: typeof s.attended === 'boolean' ? s.attended : null, mode: isProvisional(s.mode) ? 'provisional' : 'full', driverVersion: s.driverVersion ?? null, sync: s.sync ?? null, leftovers: s.leftovers ?? [], stoppedOnPark: s.stoppedOnPark ?? null, epics, gates, referee,
   };
   // Runs chained by `continues` share one budget: what they spent together, so the report and `status` agree.
@@ -152,7 +158,7 @@ function tldr(r) {
   if (open) T.push(`${plural(open, 'question')} only you can answer ${open === 1 ? 'is' : 'are'} waiting. Run \`/peak-workflow:autopilot report\` and it asks you each one; the work then continues from where it stopped in the next run.`);
   if (r.setupFailed) T.push(`Nothing was built, because autopilot could not get its private copy of your project ready: ${setupWhy(r.setupFailed)}.`);
   else if (r.baseRed?.couldNotRun) T.push(`Nothing was built, because the test command could not be run in autopilot's private copy (\`${r.testCommand}\`: ${lastLine(r.baseRed.tail) || `exit ${r.baseRed.exit}`}). The tests never ran; this is a missing tool or setup step, not a failing test.`);
-  else if (r.baseRed) T.push(`Nothing was built, because your project's own tests were already failing before autopilot started.`);
+  else if (r.baseRed) T.push(`Nothing was built, because your project's own tests were already failing before autopilot started${(r.baseRed.tries ?? []).length > 1 ? ' (they failed twice: autopilot ran them once more)' : ''}.${sleptWords(r.baseRed.tries) ? ` It may not be the code: ${sleptWords(r.baseRed.tries)}. Keep the computer awake and on power, then run \`/peak-workflow:autopilot\` again.` : ''}`);
   else if (r.stoppedOnPark) T.push(r.stoppedOnPark.from === 'project' ? 'The run ended early on purpose: this project is set to stop at the first epic that needs you.' : 'The run ended early on purpose: while you are there to answer it stops at the first epic that needs you, so nothing else is built on a guess.');
   else if (/^usage limit: /.test(r.stoppedBecause ?? '')) T.push(`The run ended early: ${r.stoppedBecause.replace(/^usage limit: /, '')}. Run \`/peak-workflow:autopilot\` once it has reset to carry on.`);
   else if (r.stoppedBecause && !['queue done', 'nothing runnable'].includes(r.stoppedBecause)) T.push(`The run ended early: ${r.stoppedBecause}.`);
@@ -298,8 +304,9 @@ export function renderReport(r) {
 
   if (r.sync?.state === 'project-ahead') L.push(`At the start the clone's ${r.integration} was fast-forwarded to the project's (${String(r.sync.cloneTip).slice(0, 9)} → ${String(r.sync.projectTip).slice(0, 9)}).`);
   if (r.sync?.state === 'clone-ahead') L.push(`At the start the clone was ahead of the project by work not fetched yet; this run built on top of it: ${r.sync.waiting.join('; ')}.`);
-  const setAside = (r.leftovers ?? []).reduce((n, l) => n + l.files.length, 0);
+  const setAside = (r.leftovers ?? []).reduce((n, l) => n + (l.count ?? l.files.length), 0);
   if (setAside) L.push(`Autopilot set aside ${setAside} file(s) an earlier session left behind. Nothing is lost.`);
+  for (const b of r.baseRetried ?? []) L.push(`Your project's own tests failed once on \`${r.integration}\` before ${b.before} and passed when run again: a flaky test${sleptWords(b.tries) ? `, or ${sleptWords(b.tries)}` : ''}. It may stop a later run; whoever maintains the tests can make it steady.`);
 
   L.push(`Real money on outside services: ${r.realSpend === true ? 'you allowed it when a check needs it' : r.realSpend === false ? 'you said not to spend any; what that left unproven is in each verify report under "Not proven for real"' : 'not decided at launch; a session that needs it asks you'}.`);
 

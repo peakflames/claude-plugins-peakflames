@@ -1,6 +1,6 @@
 // Shared fixtures for the driver tests: a throwaway copy of the ledger seed, and fake-claude
 // scripts that do what a real plan, build or wrapup session leaves behind.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,7 +33,7 @@ export const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
  */
 export function makeProject(t, { config = {} } = {}) {
   const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-test-')));
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  t.after(() => { killFakes(tmp); fs.rmSync(tmp, { recursive: true, force: true }); }); // a test that timed out leaves its session running
   const project = path.join(tmp, 'ledger');
   const state = path.join(tmp, 'ledger.autopilot');
   fs.cpSync(SEED, project, { recursive: true });
@@ -67,6 +67,23 @@ export function makeProject(t, { config = {} } = {}) {
   };
   p.go = (opts = {}) => run({ workspace: state, allowTestDouble: true, ...opts });
   return p;
+}
+
+/**
+ * Kills every fake `claude` still working out of `dir` (its working directory inside it): what a test that timed out
+ * mid-session leaves running. Only this test's: test files run side by side, each in its own folder. Returns the pids.
+ */
+export function killFakes(dir) {
+  let root; try { root = fs.realpathSync(dir); } catch { return []; }
+  const fakes = (spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).stdout ?? '').split('\n')
+    .map((l) => l.match(/^\s*(\d+)\s+(.*)$/)).filter((m) => m && m[2].includes(FAKE) && Number(m[1]) !== process.pid).map((m) => Number(m[1]));
+  if (!fakes.length) return [];
+  const killed = []; let pid = null;
+  for (const line of (spawnSync('lsof', ['-a', '-d', 'cwd', '-Fpn', '-p', fakes.join(',')], { encoding: 'utf8' }).stdout ?? '').split('\n')) {
+    if (line[0] === 'p') pid = Number(line.slice(1));
+    else if (line[0] === 'n' && pid && (line.slice(1) === root || line.slice(1).startsWith(root + path.sep))) { try { process.kill(pid, 'SIGKILL'); killed.push(pid); } catch { /* gone */ } }
+  }
+  return killed;
 }
 
 /** Adds one more epic (one requirement in its own feature file) to the project, committed on develop. */

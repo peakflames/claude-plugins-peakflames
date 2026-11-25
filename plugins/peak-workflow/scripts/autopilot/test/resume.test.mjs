@@ -10,6 +10,7 @@ import test from 'node:test';
 import { ANSWERS, continueRun, ensureResumeGates, gateFacts, limitDecision, ownerAnswers, status, usageLimit } from '../driver.mjs';
 import { LEAVE_IT, PROVISIONAL_BY, SMALL_FIX_PROBLEM, TRY_AGAIN, prototypeReasked, technicalAnswer } from '../lib.mjs';
 import { activity, eventLine, pictureLines, plainReason } from '../attend.mjs';
+import { AUDIT_DIR } from '../audit.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
@@ -128,6 +129,93 @@ test('amendment gate, "Amend": the build changes the requirement in the owner\'s
   assert.deepEqual(r.steps, ['build-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`), 'no repair round');
   assert.equal(p.epic(E1.id).state, 'MERGED');
   assert.deepEqual(p.epic(E1.id).amended, [old]);
+});
+
+// ---- an approved amendment reaches every later step (#41 B12, B16) -------------------------------
+
+/**
+ * Run 1: the build asks to amend `e`'s first requirement and parks; the owner answers "Amend". Returns what run 2's build
+ * does as a real one did: the change record, then the swap to `fresh` (its Then reworded by `then`), in the requirement
+ * files, the sidecar and the tests.
+ */
+async function ownerAmends(p, e, fresh, { then = null, build = null } = {}) {
+  const old = e.tors[0];
+  const q = `${old} — The tool shall do it looks wrong: its Then cannot be met. Proposed: same title / Then: "reworded". How to proceed?`;
+  const AMEND = [`Amend ${old} (owner approval)`, 'Implement as written', "Stop — I'll take it from here"];
+  p.scenario({ [`${e.id}/plan`]: planScript(e), [`${e.id}/build`]: { actions: [{ do: 'branch', name: e.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, ask(q, AMEND)] } });
+  await p.go({ queue: [e.id] });
+  assert.equal(gate(p, e.id).kind, 'amendment');
+  decide(p, e.id, AMEND[0]);
+  const ea = { ...e, tors: [fresh, ...e.tors.slice(1)] };
+  const head = ['id = "CR-Am3nd3d"', 'date = 2026-11-13', 'kind = "supersede"', 'title = "Reworded"', 'reason = "The old Then cannot be met."', 'approved_via = "epic-branch"', 'approved_by = "Pat Owner"', `refs = ["epic ${e.id}"]`, 'keywords = ["reworded"]', '', '[[changes]]', `tor = "${old}"`];
+  const record = { do: 'exec', cmd: `mkdir -p docs/requirements/changes && f=$(basename "$(grep -l "${old}" docs/requirements/*.feature.md)") && fp=$(${TL} fingerprint | awk '$1=="${old}"{print $2}') && { printf '%s\\n' ${head.map((l) => `'${l}'`).join(' ')} "feature_file = \\"$f\\"" "fingerprint = \\"$fp\\"" 'successors = ["${fresh}"]' "text = '''"; ${TL} text ${old}; printf '%s\\n' "'''"; } > docs/requirements/changes/2026-11-13-Am3nd3d.toml` };
+  const swap = { do: 'exec', cmd: `grep -rl "${old}" docs/requirements/*.feature.* docs/implementation-plan | xargs sed -i.bak -e "s/${old}/${fresh}/g"${then ? ` -e 's/${then[0]}/${then[1]}/'` : ''} && find docs -name "*.bak" -delete` };
+  const built = build ? build(ea) : buildActions(ea).slice(1);
+  return { old, q, AMEND, ea, actions: [ask(q, AMEND), { do: 'branch', name: e.branch }, record, swap, ...built] };
+}
+
+test('the reviewer judges the amended requirement and is told the owner approved the amendment (#41 B12)', async (t) => {
+  const p = makeProject(t);
+  const fresh = 'TOR-01-Am3nd3d';
+  const { old, ea, actions } = await ownerAmends(p, E1, fresh);
+  // A reviewer that read tors.md says what it checked against the requirement as it now stands.
+  const checked = ea.tors.map((tor) => ({ tor, tests: [`test/${E1.slug}.test.js`], code: [`src/${E1.slug}.js`], whenExercised: true, note: 'read' }));
+  p.scenario({ [`${E1.id}/build`]: { actions }, [`${E1.id}/audit`]: { result: { total_cost_usd: 0.5, structured_output: { findings: [], recommend: 'proceed', summary: 'clean', checked } } }, [`${E1.id}/verify`]: wrapupScript(ea) });
+  await again(p);
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  const bundle = p.dir(E1.id, 'audit-1', 'bundle');
+  const tors = fs.readFileSync(path.join(bundle, 'tors.md'), 'utf8');
+  assert.ok(tors.includes(`[${fresh}]`) && !tors.includes(`[${old}]`), tors);
+  const amendments = fs.readFileSync(path.join(bundle, 'amendments.md'), 'utf8');
+  assert.match(amendments, new RegExp(`The owner approved replacing ${old} with ${fresh} \\(gates/${E1.id}-1\\.json, Pat Owner, \\d{4}-\\d{2}-\\d{2}\\)`));
+  assert.match(amendments, /not a weakening/);
+  assert.deepEqual(readJson(path.join(bundle, 'bundle.json')).anchors, [...E1.tors.slice(1), fresh]); // the replacement where the old one was dropped: last
+  assert.equal(readJson(p.dir(E1.id, 'audit-1', 'audit.json')).decision, 'proceed');
+  assert.match(fs.readFileSync(path.join(AUDIT_DIR, 'prompt.md'), 'utf8'), /`amendments\.md`/);
+});
+
+test('the repair session is told the owner approved the amendment, and to keep it (#41 B12)', async (t) => {
+  const p = makeProject(t);
+  const fresh = 'TOR-01-Am3nd3d';
+  const { old, ea, actions } = await ownerAmends(p, E1, fresh, { build: (x) => buildActions(x, { testBody: " throw new Error('red'); " }).slice(1) });
+  p.scenario({
+    [`${E1.id}/build`]: { actions },
+    [`${E1.id}/fix`]: { actions: [{ do: 'write', path: `test/${E1.slug}.test.js`, content: `import test from 'node:test';\n${ea.tors.map((x) => `test('${x} is met', () => {});`).join('\n')}\n` }, { do: 'commit', message: `fix(epic-${E1.id}): green` }] },
+    [`${E1.id}/verify`]: wrapupScript(ea),
+  });
+  const r = await again(p);
+  assert.deepEqual(r.steps, ['build-1', 'fix-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`));
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  const rules = fs.readFileSync(p.dir(E1.id, 'fix-1', 'build-rules.md'), 'utf8');
+  assert.match(rules, new RegExp(`The owner approved amending ${old} → ${fresh}; keep it as amended`));
+  assert.ok(!/provisional run/.test(rules), 'an owner amendment is not a provisional one');
+});
+
+test('the look gate names the amended requirement and its Then lines, not the one it replaced (#41 B16)', async (t) => {
+  const p = makeProject(t);
+  const e5 = addLookEpic(p);
+  const fresh = 'TOR-05-Am3nd3d';
+  const manual = (x) => [...buildActions(x, { commit: false }).slice(1), { do: 'write', path: `test/${x.slug}.test.js`, content: "import test from 'node:test';\ntest('the chart command exists', () => {});\n" }, { do: 'write', path: `tests/manual/${x.tors[0]}.md`, content: `# Manual check — ${x.tors[0]}\n\n1. Open chart.html\n` }, { do: 'commit', message: `feat(epic-${x.id}): implement ${x.slug}` }];
+  const { old, ea, actions } = await ownerAmends(p, e5, fresh, { then: ['the standard output should contain the string "chart"', 'a bar is drawn for each category'], build: manual });
+  p.scenario({ [`${e5.id}/build`]: { actions } });
+  await again(p, { queue: [e5.id] });
+  const e = p.epic(e5.id);
+  assert.equal(e.reason, 'human check needed before verify');
+  const g = gate(p, e5.id, 2);
+  assert.equal(g.kind, 'human-check');
+  assert.equal(g.question, `${fresh} needs a person to check it. Does what was built look right?`);
+  assert.deepEqual(g.checks.map((c) => [c.tor, c.clause]), [[fresh, 'a bar is drawn for each category'], [fresh, 'the exit code should be 0']]);
+  assert.deepEqual(g.live, [{ tor: fresh, checklist: `tests/manual/${fresh}.md` }]);
+  assert.ok(g.artifacts.includes(`clone:tests/manual/${fresh}.md`), JSON.stringify(g.artifacts));
+  assert.ok(!JSON.stringify([g.question, g.checks, g.live, g.why]).includes(old), 'the replaced requirement is not quoted');
+  // The verifier is handed the owner's look as covering the requirement the owner was shown.
+  decide(p, e5.id, ANSWERS.looksRight, { n: 2, note: 'one bar per category' });
+  p.scenario({ [`${e5.id}/verify`]: wrapupScript(ea) });
+  await again(p, { queue: [e5.id] });
+  const look = fs.readFileSync(p.dir(e5.id, 'verify-1', 'owner-look.md'), 'utf8');
+  assert.match(look, new RegExp(`Operator-observed requirements it covers:\\*\\* ${fresh}\\n`));
+  assert.equal(p.epic(e5.id).state, 'MERGED', p.epic(e5.id).reason);
 });
 
 test('requirement files a session changes without the owner\'s approval are still out of scope', async (t) => {
@@ -2199,6 +2287,46 @@ test('files left in the clone do not stop a launch: they are set aside under ref
   assert.deepEqual(report.leftovers.map((l) => [l.branch, l.ref, l.files]), [['develop', refs[0], ['README.md', 'tmp_playwright/shot.txt']]]);
   assert.ok(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8').includes('Autopilot set aside 2 file(s) an earlier session left behind. Nothing is lost.'));
   assert.equal(r.state.stoppedBecause, 'queue done');
+});
+
+test('files an epic branch ignores are not set aside on the integration line, and a large set-aside keeps 50 names and a count', async (t) => {
+  const p = makeProject(t);
+  // develop does not ignore node_modules yet: the epic's own .gitignore adds it (a new project's first epic).
+  const gi = path.join(p.project, '.gitignore');
+  const full = fs.readFileSync(gi, 'utf8');
+  fs.writeFileSync(gi, full.replace('node_modules/\n', ''));
+  git(p.project, 'commit', '-qam', 'chore: no node_modules yet');
+  const d = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
+  const s = { ...happy(E1), [`${E1.id}/audit`]: audit([finding('stand-in')]), ...happy(d) };
+  s[`${E1.id}/build`].actions.splice(-1, 0, { do: 'write', path: '.gitignore', content: full });
+  p.scenario(s);
+  const s1 = await p.go();
+  assert.deepEqual(s1.queue.map((q) => q.state), ['PARKED', 'MERGED']);
+  assert.equal(git(p.clone, 'branch', '--show-current'), 'develop');
+  // What the build left in the clone: dependencies the branch ignores, and 60 scratch files nobody ignores.
+  fs.mkdirSync(path.join(p.clone, 'node_modules', 'x'), { recursive: true });
+  fs.writeFileSync(path.join(p.clone, 'node_modules', 'x', 'index.js'), '// a dependency\n');
+  // Readiness's proof sees the same: no leftover, and nothing deleted.
+  const proof = JSON.parse(cli('prepare', '--project', p.project).stdout);
+  assert.deepEqual([proof.ok, proof.leftovers], [true, []], JSON.stringify(proof.leftovers));
+  assert.ok(fs.existsSync(path.join(p.clone, 'node_modules', 'x', 'index.js')), 'the proof leaves what the branch ignores');
+  fs.mkdirSync(path.join(p.clone, 'scratch'));
+  for (let i = 0; i < 60; i += 1) fs.writeFileSync(path.join(p.clone, 'scratch', `f${String(i).padStart(2, '0')}.txt`), `${i}\n`);
+  decide(p, E1.id, ANSWERS.auditNotReal);
+  p.scenario({ [`${E1.id}/verify`]: wrapupScript(E1) });
+  const r = await again(p);
+
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.ok(fs.existsSync(path.join(p.clone, 'node_modules', 'x', 'index.js')), 'what the branch ignores stays where it is');
+  const refs = leftoverRefs(p);
+  assert.equal(refs.length, 1);
+  assert.ok(!heldBy(p, refs[0]).some((f) => f.startsWith('node_modules/')), 'node_modules is not set aside');
+  assert.equal(heldBy(p, refs[0]).length, 60);
+  const [left] = r.state.leftovers;
+  assert.deepEqual([left.files.length, left.count, left.files[0], left.files[49]], [50, 60, 'scratch/f00.txt', 'scratch/f49.txt']);
+  const log = fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8');
+  assert.match(log, /set aside 60 file\(s\) left uncommitted on develop \(scratch\/f00\.txt, .*scratch\/f49\.txt and 10 more\)/);
+  assert.ok(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8').includes('Autopilot set aside 60 file(s) an earlier session left behind. Nothing is lost.'));
 });
 
 test('an epic that stops away from its own branch with files left uncommitted does not stop the queue: they are set aside and the next epic runs', async (t) => {

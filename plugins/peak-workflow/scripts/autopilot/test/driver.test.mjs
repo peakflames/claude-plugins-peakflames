@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR, defaultConfig, localDate, scratchRule, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
-import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
+import { DRIVER, E1, FAKE, SEED, addEpic, alive, killFakes, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
 
@@ -810,4 +810,20 @@ test('gate dates are the machine\'s local date: west of UTC near midnight, the d
 test('the scratch rule shows the one form the referee allows: "$AUTOPILOT_SCRATCH/…" as it is, not a copy or a relative path (Pilot Light)', () => {
   const rule = scratchRule('/w/runs/r/epics/x/build-1/scratch');
   assert.match(rule, /In a command, use `"\$AUTOPILOT_SCRATCH\/out\.txt"` as it is \(the file tools take the folder above\); copying it into another variable \(`S="\$AUTOPILOT_SCRATCH"`\) or a path relative to the current folder \(`\.\/out\.txt`\) is refused, or lands in the repository\./);
+});
+
+test('a test that ends mid-session leaves no fake claude behind: only the fakes working in its own folder are killed', async (t) => {
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-fakes-')));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const mine = path.join(tmp, 'mine'); const other = path.join(tmp, 'other');
+  fs.mkdirSync(mine); fs.mkdirSync(other);
+  // Stand-ins for a fake session that hangs: a process whose command line names the fake, working in a folder.
+  const start = (cwd) => spawn(process.execPath, ['-e', 'setInterval(() => {}, 1 << 30)', FAKE], { cwd, stdio: 'ignore' });
+  const a = start(mine); const b = start(other);
+  t.after(() => { for (const c of [a, b]) if (alive(c.pid)) c.kill('SIGKILL'); });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(alive(a.pid) && alive(b.pid));
+  assert.deepEqual(killFakes(mine), [a.pid]);
+  await waitFor(() => !alive(a.pid));
+  assert.equal(alive(b.pid), true, 'a fake in another folder is left alone');
 });

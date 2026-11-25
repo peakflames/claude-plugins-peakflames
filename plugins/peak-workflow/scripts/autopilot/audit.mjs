@@ -76,7 +76,28 @@ export function buildDigest(steps) {
  * Writes the auditor's input bundle into `bundleDir`. `base` is the tip the last audit covered:
  * when given (and still an ancestor of the branch), `diff.patch` holds only the delta since then.
  */
-export function buildBundle({ clone, pluginDir, bundleDir, epic, integration, base = null, steps = [] }) {
+/**
+ * `amendments.md`: each approved amendment of the epic's requirements, so a test change that follows the amended
+ * requirement is read as the amendment it is, not as a weakening (#41 B12). Null when there is none.
+ */
+export function amendmentsText(pairs = []) {
+  if (!pairs.length) return null;
+  const now = (p) => (p.now?.length ? p.now.join(', ') : 'the requirement the status file now lists in its place');
+  const lines = pairs.map((p) => {
+    const at = [p.gate, p.by, p.date && String(p.date).slice(0, 10)].filter(Boolean).join(', ');
+    return p.provisional
+      ? `- This provisional run took a session's proposal to replace ${p.was} with ${now(p)}${at ? ` (${at})` : ''}; no person has approved it yet. A test change that follows ${now(p)} is the amendment, not a weakening; check it matches ${now(p)}, and report anything beyond it.`
+      : `- The owner approved replacing ${p.was} with ${now(p)}${at ? ` (${at})` : ''}. A test change that follows ${now(p)} is the amendment, not a weakening; check it matches ${now(p)}, and report anything beyond it.`;
+  });
+  return `# Amended requirements
+
+These requirements were replaced before or during this build. \`tors.md\` holds the requirement as it now stands.
+
+${lines.join('\n')}
+`;
+}
+
+export function buildBundle({ clone, pluginDir, bundleDir, epic, integration, base = null, steps = [], amendments = [] }) {
   fs.mkdirSync(bundleDir, { recursive: true });
   const tip = run('git', ['rev-parse', epic.branch], clone).out.trim();
   const delta = !!base && base !== tip && run('git', ['merge-base', '--is-ancestor', base, epic.branch], clone).ok;
@@ -97,7 +118,9 @@ export function buildBundle({ clone, pluginDir, bundleDir, epic, integration, ba
     'digest.md': digest.text,
     'test-changes.jsonl': show(clone, epic.branch, '.autopilot/test-changes.jsonl') ?? '',
   };
-  const meta = { epic: epic.id, label: epic.label, branch: epic.branch, integration, clone, delta, base: delta ? base : run('git', ['merge-base', integration, epic.branch], clone).out.trim(), tip, range, steps: steps.map((s) => s.name), digestCalls: digest.calls, anchors: epic.anchors };
+  const amended = amendmentsText(amendments);
+  if (amended) files['amendments.md'] = amended;
+  const meta = { epic: epic.id, label: epic.label, branch: epic.branch, integration, clone, delta, base: delta ? base : run('git', ['merge-base', integration, epic.branch], clone).out.trim(), tip, range, steps: steps.map((s) => s.name), digestCalls: digest.calls, anchors: epic.anchors, ...(amendments.length ? { amendments } : {}) };
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(bundleDir, name), text);
   fs.writeFileSync(path.join(bundleDir, 'bundle.json'), JSON.stringify(meta, null, 2) + '\n');
   return meta;

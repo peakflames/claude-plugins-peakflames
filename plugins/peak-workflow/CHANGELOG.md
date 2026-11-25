@@ -442,6 +442,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   longer dated the next day; full timestamps stay UTC.
 - **The scratch rule shows an example** — use `"$AUTOPILOT_SCRATCH/…"` as it is; a copy into
   another variable or a path relative to the current folder is refused or lands in the repository.
+- **A flaky or slept-through base check no longer ends the run** — a failing base test run is run
+  once more; if it then passes, the epic goes on and the report names the flaky test. The report
+  says when the machine slept during the check.
+- **A gate that fails once is called flaky** — `prepare --gate` runs a failing gate again; one that
+  then passes is listed in `gatesFlaky`, and the launch screen says it may stop an epic now and
+  then, not that every epic will stop.
+- **A Windows launch warns about sleep** — readiness asks for a power plan that never sleeps while
+  plugged in, as macOS launches already warn about a closed lid on battery.
+- **`setup` runs for an epic's new manifest** — when the epic branch changes a manifest or
+  lockfile, `setup` runs on the branch before its checks and later sessions; a failing setup
+  parks the epic, resumable.
+- **Build output an unmerged epic ignores is not set aside** — on the integration line, files
+  another branch's `.gitignore` covers stay where they are; a set-aside records the first 50
+  file names and a count.
+- **An approved amendment reaches the reviewer, the repair and the look** — the reviewer reads the
+  current requirement and an `amendments.md` naming the approval; the repair is told to keep it;
+  the look gate quotes the new requirement and its Then lines.
 
 ## [3.0.1] — 2026-11-05
 

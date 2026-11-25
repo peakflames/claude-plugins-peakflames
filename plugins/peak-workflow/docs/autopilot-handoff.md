@@ -443,19 +443,30 @@ files `CLAUDE.md` names.
   build are untracked on the integration line, whose `.gitignore` does not know them until the
   epic merges, so `setAside` stores them all. The final check still passed; time and safety of
   a set-aside that large are not examined.
+  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a first epic on a new project whose set-aside lists no `node_modules` or build output. On the
+  integration line, what another local branch's `.gitignore` covers is left in place
+  (`branchIgnores`); a set-aside keeps 50 names and a count.*
 - [ ] **`setup` is not run for a new project's first epic** when it is guarded by a file the
   epic creates (`if [ -f package.json ]`): it runs on the integration line before the branch
   is checked out. The first real run of `setup` is the run after the merge. Not examined.
-- [ ] **A test that times out leaves its fake `claude` running** (*no issue*; seen 2026-11-21:
+  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a first epic whose `setup` installs what the epic declared before CHECK_BUILD. Setup now runs on
+  the branch when it changed a manifest or lockfile (`envForBranch`).*
+- [x] **A test that times out leaves its fake `claude` running** (*no issue*; seen 2026-11-21:
   six stray `fake-claude.mjs` processes after timed-out attend tests). Test-only; kill the
-  child when a test ends.
+  child when a test ends. *Fixed 2026-11-25: `makeProject` kills the fakes working in the test's
+  folder when the test ends (`killFakes`, `test/helpers.mjs`).*
 - [ ] **A laptop that sleeps during the base check reads as a red base** (#41 B10; in code).
   Any failing exit ends the run; nothing looks at how long the check took. Treat a check that
   ran far past its usual time as interrupted and run it once more; on Windows hold a
   keep-awake request for the driver's life, or warn at launch (the warning exists for macOS
   only). *`driver.mjs:2769`, `:2844`.*
+  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a run whose log shows a slept-through base check run again. A failing base check runs once more
+  and records the minutes slept (wall clock less monotonic time); a Windows launch warns to set
+  the power plan.*
 - [ ] **The base check has no retry for a flaky test** (#41 B6). One slow test ended two runs.
+  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a real run past a flaky base test. A pass on the second try goes on and is in the report.*
 - [ ] **One flaky gate failure is reported as "every epic will probably stop"** (#40) (6). C3.
+  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a launch screen that says "flaky". `prepare` runs a failing gate once more (`gatesFlaky`).*
 - [ ] **Autopilot cannot repair a red base, a preflight refusal or a merge conflict itself**
   (#42, I6c). Includes "no path for a launch gate that fails on a product bug" (#40) (7).
   *The merge conflict part is done (Step 3, `b7c2d14`): a catch-up session settles it on the
@@ -520,8 +531,12 @@ files `CLAUDE.md` names.
 - [ ] **The reviewer flags an amendment the owner already approved** as `test-weakened`, and the
   repair parks to have it confirmed (#41 B12; not checked). Pass decided amendment gates to the
   reviewer and the fix session, as B9 did for plan and build. C2: it cost a relaunch.
+  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a real review after an approved amendment. The bundle's `tors.md` holds the current requirement,
+  `amendments.md` names the approval, and the repair's rules say to keep it (`amendedPairs`).*
 - [ ] **A person-only check quotes a requirement the owner already replaced** (#41 B16; not
   checked). Gate `checks`, `live` and `question` should name the current requirement.
+  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a real look after an approved amendment. The look gate reads the requirement from the branch
+  (`lookMeta`).*
 
 ### Step 12 — Time and progress (C2 and C3)
 
@@ -795,8 +810,10 @@ change-record notes).
   2026-11-24, Step 4).
 - **A swallowed promise is not seen as a hidden check**: `await run().catch(() => {})` in a test is
   not flagged; the same form is common in cleanup (review of Step 4 box 1).
-- `attend.test.mjs` "watch and status see inside the step … each said once" fails (expected 2,
-  actual 3), on the base branch too. 2 `test_wrapper.py` failures (pre-existing).
+- `attend.test.mjs` "watch and status see inside the step … each said once" failed (expected 2,
+  actual 3), on the base branch too. *Fixed 2026-11-25: under load a later wrapup command also
+  passed the test's 0.3 s mark and was rightly said; the test now counts only its two commands
+  (10 of 10 with ten copies at once).* 2 `test_wrapper.py` failures (pre-existing).
 - **The independent review is short**: 33–49 seconds on large changes (run `20261123-140347`:
   33 s on Outstanding). *Answered 2026-11-25: the first try opened under half the changed files
   (10 of 21, 4 of 9); only the retry, given the files by name, read them all. Every review now
