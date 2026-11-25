@@ -139,7 +139,9 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
    step may finish slightly past the budget. *Done 2026-11-25: such a session is booked at an
    estimate from its messages' tokens (Step 9).*
 4. **Launch-screen leftovers** (#40 item 5, #41 B3 and I5, own-settings warning, `decide` and
-   `user.name`, a setting changed mid-run).
+   `user.name`, a setting changed mid-run). *Done 2026-11-25
+   (`feature/peak-workflow-autopilot-launch-leftovers`). Still open in Step 10: MCP (group 5),
+   the undecided-values check, a stop that leaves a question, the format-guard hint.*
 5. **MCP connectors** (#43).
 6. **Wording** (#40 item 15 "CANNOT VERIFY", "Stopped N times", the scratch-variable refusal).
 7. **Step 6 proofs** (#39): stage only the cheap ones; tick the rest as real runs produce them.
@@ -540,32 +542,34 @@ files `CLAUDE.md` names.
 - [x] **Requirement questions are the main cause of stops** (#41 I3). Ask them once at launch
   (a requirements check over the queued epics), not mid-night. C2. *Answered by provisional mode (owner, 2026-11-25): a provisional run takes
   the session's recommendation and lists it for the owner; a full run is meant to ask.*
-- [ ] **The launch check spends real money before the real-money question** (#40) (5). C2.
-- [ ] **The popup hides the "Ready to run" screen** (#41 I5). The question must carry the queue
+- [x] **The launch check spends real money before the real-money question** (#40) (5). C2.
+  *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on a SKILL.md wording test: the skill asks it with the copy question, before `prepare`; with "never spend" those gates are not tried at launch.*
+- [x] **The popup hides the "Ready to run" screen** (#41 I5). The question must carry the queue
   and limits itself. *Partly fixed (Pilot Light launch, 2026-11-25): the question names the queue and
-  the automatic-continue limits, but not the budget or an end time.*
+  the automatic-continue limits, but not the budget or an end time.* *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on a SKILL.md wording test: the question now says it stops at the budget or the end time, whichever comes first.*
 - [x] **The launch popup lists epics by ID only** (#40) (10). *Seen fixed 2026-11-25: the launch
   question named all three epics (Pilot Light session, run `20261125-112902`).*
 - [x] **No path for a free-text launch answer** such as "just do one epic" (#40) (8). *Seen fixed
   2026-11-25: the launch question offers "Change the queue or limits", and the skill takes free text
   for a changed queue, budget or end time (`SKILL.md`, "Asking the owner").*
-- [ ] **A setting changed during a run does not reach it** (*no issue*; Pilot Light,
+- [x] **A setting changed during a run does not reach it** (*no issue*; Pilot Light,
   2026-11-22). The owner asked for Opus for the build one minute in: `configure` saved it, but
   the driver reads settings once, so it took a stop, a resume question and a relaunch. Ask for
   models on the launch screen, or let the driver read budgets again before each step. C3.
-- [ ] **A run's files do not say which model and effort each step will use** (*no issue*;
-  Pilot Light). Only a fresh `preflight` shows them. C3.
-- [ ] **Autopilot's own settings file sets off its own warning** (*no issue*; Pilot Light).
+  *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: the driver reads the steps' model, effort and caps again before each step and logs the change; the run's own keys (mode, money, end time, queue, run budget) are never read again.*
+- [x] **A run's files do not say which model and effort each step will use** (*no issue*;
+  Pilot Light). Only a fresh `preflight` shows them. C3. *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: each step's `step-start` event, log line and `step.json` name its model and effort.*
+- [x] **Autopilot's own settings file sets off its own warning** (*no issue*; Pilot Light).
   `launch.warn` says "1 uncommitted change(s) in the project" when the only one is the
-  untracked `.claude/peak-workflow/autopilot.json` that `configure` just wrote. C3.
-- [ ] **`decide` refuses when the repository has no `git config user.name`** (*no issue*;
+  untracked `.claude/peak-workflow/autopilot.json` that `configure` just wrote. C3. *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: that file is no longer counted; any other change still warns.*
+- [x] **`decide` refuses when the repository has no `git config user.name`** (*no issue*;
   Pilot Light), although commits there carry a name from elsewhere. The skill text never
-  mentions `--by`. Fall back to the commit author name. C3.
+  mentions `--by`. Fall back to the commit author name. C3. *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: `decide` and `continue` fall back to the newest commit by a person, never an autopilot name; with none, the skill asks once and passes `--by`.*
 - [ ] **A stop the owner asked for leaves a question to answer before the next run**, even
   one minute into planning (*no issue*; Pilot Light). C3.
 - [ ] **A format-guard refusal repeats the whole install hint** in `refuse` (*no issue*). C3.
-- [ ] **Preflight text ignores `"look": "after"`** (#41 B3; in code, `driver.mjs:715`; the
-  reporter saw it again on `93a8b35`).
+- [x] **Preflight text ignores `"look": "after"`** (#41 B3; in code, `driver.mjs:715`; the
+  reporter saw it again on `93a8b35`). *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: an epic with only screens reads "listed for you to see after the run" (or "not stopped for a look" in a provisional run) and does not park; one a person must observe still does.*
 
 ### Step 11 — An approved amendment reaches every later step (C2 and C3)
 

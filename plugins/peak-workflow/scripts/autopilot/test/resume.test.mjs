@@ -3,15 +3,15 @@
 // answer through `driver.mjs decide`, and checks that the next run re-enters at the named phase on
 // the branch the first run left, without running an earlier session again.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ANSWERS, continueRun, ensureResumeGates, gateFacts, limitDecision, ownerAnswers, status, usageLimit } from '../driver.mjs';
+import { ANSWERS, continueRun, ensureResumeGates, gateFacts, limitDecision, loadConfig, ownerAnswers, ownerName, preflight, status, usageLimit } from '../driver.mjs';
 import { LEAVE_IT, PROVISIONAL_BY, SMALL_FIX_PROBLEM, TRY_AGAIN, prototypeReasked, technicalAnswer } from '../lib.mjs';
 import { activity, eventLine, pictureLines, plainReason } from '../attend.mjs';
 import { AUDIT_DIR } from '../audit.mjs';
-import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
+import { DRIVER, E1, TL, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const cli = (...args) => spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' });
 const gate = (p, id, n = 1) => readJson(path.join(p.state, 'gates', `${id}-${n}.json`));
@@ -535,6 +535,69 @@ test('an epic with screens: the build must leave pictures for the look; the gate
   assert.equal(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop', '--', '.autopilot/look'), '', 'the pictures are not in the merged code');
   const status = JSON.parse(cli('status', '--project', p.project, '--json').stdout);
   assert.deepEqual(status.seen.map((x) => [x.epic, x.lines.length]), [[ui.id, 2]]);
+});
+
+test('preflight says what an epic with screens does: parks with "look": "before", is listed afterwards with "after" or in a provisional run; an operator-observed one parks in every case (#41 B3)', (t) => {
+  const p = makeProject(t);
+  const ui = addEpic(p.project, { id: 'Lg6Scr1', slug: 'dashboard', name: 'Dashboard', nn: '06' });
+  const seen = addLookEpic(p);
+  for (const e of [ui, seen]) fs.appendFileSync(path.join(p.project, 'docs', 'implementation-plan', 'phase-1-core', `epic-${e.id}-${e.slug}.md`), '\n## Screens\n\n- S-01 Home\n');
+  const claude = path.join(p.project, 'CLAUDE.md');
+  fs.writeFileSync(claude, fs.readFileSync(claude, 'utf8').replace('**Project type:** CLI tool', '**Project type:** Web app'));
+  git(p.project, 'commit', '-qam', 'docs: two epics have screens');
+  const facts = (overrides) => {
+    const pre = preflight(p.project, loadConfig(p.state, { project: p.project, overrides }));
+    return Object.fromEntries([ui, seen].map((e) => { const x = pre.epics.find((y) => y.id === e.id); return [e.id, { humanCheck: x.humanCheck, ui: x.reasons.filter((r) => /UI epic/.test(r)), observed: x.reasons.some((r) => /operator-observed: parks for a person/.test(r)) }]; }));
+  };
+  const before = facts({});
+  assert.deepEqual(before[ui.id], { humanCheck: true, ui: ['UI epic: parks for a human look before verify'], observed: false });
+  const after = facts({ look: 'after' });
+  assert.deepEqual(after[ui.id], { humanCheck: false, ui: ['UI epic: screens listed for you to see after the run ("look": "after"); no stop'], observed: false });
+  const prov = facts({ mode: 'provisional' });
+  assert.deepEqual(prov[ui.id], { humanCheck: false, ui: ['UI epic: not stopped for a look (provisional run); listed at the end'], observed: false });
+  // A requirement a person must observe keeps its parking reason whatever the setting.
+  for (const f of [before, after, prov]) assert.deepEqual([f[seen.id].humanCheck, f[seen.id].observed], [true, true]);
+});
+
+test('`decide` and `continue` with no `git config user.name`: the newest commit a person made names the owner, never an autopilot name; with none, the refusal names --by', (t) => {
+  const p = makeProject(t); // every commit so far is by "Autopilot Test", and no user.name is set
+  const run = '20261125-090000';
+  fs.mkdirSync(path.join(p.state, 'runs', run), { recursive: true });
+  fs.writeFileSync(path.join(p.state, 'runs', run, 'config.json'), JSON.stringify({ project: p.project, queue: [E1.id], autoContinue: 2 }));
+  fs.writeFileSync(path.join(p.state, 'current'), `${run}\n`);
+  fs.mkdirSync(path.join(p.state, 'gates'), { recursive: true });
+  const gateFile = (n) => { fs.writeFileSync(path.join(p.state, 'gates', `${E1.id}-${n}.json`), JSON.stringify({ epic: E1.id, run, kind: 'plan-lint', question: 'The plan misses a part. Plan again?', options: [ANSWERS.replan], decided: null })); return `${E1.id}-${n}.json`; };
+  const commitAs = (name, file) => { fs.writeFileSync(path.join(p.project, file), `${name}\n`); git(p.project, 'add', file); git(p.project, '-c', `user.name=${name}`, 'commit', '-qm', `by ${name}`, '--author', `${name} <x@example.invalid>`); };
+  assert.equal(git(p.project, 'config', '--default', '', 'user.name'), '');
+
+  // Only autopilot's names in the history: refused, and the message names --by.
+  let r = cli('decide', '--workspace', p.state, '--gate', gateFile(1), '--answer', ANSWERS.replan);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /no name to record: .*pass --by "<your name>"/);
+  assert.throws(() => continueRun(p.state), /no name to record: .*--by/);
+
+  // A person's commit, then a provisional run's: the person's name is recorded.
+  commitAs('Pat Owner', 'pat.txt');
+  commitAs('autopilot (provisional run)', 'prov.txt');
+  assert.equal(ownerName(p.project), 'Pat Owner');
+  r = cli('decide', '--workspace', p.state, '--gate', gateFile(1), '--answer', ANSWERS.replan);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readJson(path.join(p.state, 'gates', `${E1.id}-1.json`)).decided.by, 'Pat Owner');
+  gateFile(2);
+  const c = continueRun(p.state);
+  assert.equal(c.continued.length, 1, JSON.stringify(c));
+  assert.equal(readJson(path.join(p.state, 'gates', `${E1.id}-2.json`)).decided.by, 'Pat Owner');
+
+  // With an email configured, the newest commit by that email wins over a teammate's newer one.
+  git(p.project, 'config', 'user.email', 'pat@example.invalid');
+  fs.writeFileSync(path.join(p.project, 'pat2.txt'), 'x\n'); git(p.project, 'add', 'pat2.txt'); git(p.project, 'commit', '-qm', 'pat', '--author', 'Pat Owner <pat@example.invalid>');
+  commitAs('Kim Teammate', 'kim.txt');
+  assert.equal(ownerName(p.project), 'Pat Owner');
+  // `git config user.name` wins when it is set; --by wins over both.
+  git(p.project, 'config', 'user.name', 'Sam Lead');
+  assert.equal(ownerName(p.project), 'Sam Lead');
+  assert.equal(JSON.parse(cli('decide', '--workspace', p.state, '--gate', gateFile(3), '--answer', ANSWERS.replan, '--by', 'Jo').stdout).gate, `${E1.id}-3.json`);
+  assert.equal(readJson(path.join(p.state, 'gates', `${E1.id}-3.json`)).decided.by, 'Jo');
 });
 
 test('an epic without screens is told nothing about pictures and is not checked for them', async (t) => {
@@ -2211,6 +2274,22 @@ test('with "look": "after", an epic that only has screens goes straight to the f
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Merged without your look \("look": "after"\): 1 picture\(s\) of its screens are kept in /);
   const s = JSON.parse(cli('status', '--project', p.project, '--workspace', p.state, '--json').stdout);
   assert.deepEqual(s.unlooked.map((u) => [u.epic, u.pictures.length]), [[ui.id, 1]]);
+});
+
+test('with "look": "after", a run resumed after the driver was killed mid-review still keeps the screens for the owner', async (t) => {
+  const p = makeProject(t, { config: { look: 'after' } });
+  const { ui, build } = addScreenEpic(p);
+  p.scenario({ [`${ui.id}/plan`]: planScript(ui), [`${ui.id}/build`]: build, [`${ui.id}/audit-1`]: { actions: [{ do: 'hang' }] }, [`${ui.id}/verify`]: wrapupScript(ui) });
+  const child = spawn(process.execPath, [DRIVER, 'run', '--workspace', p.state, '--queue', ui.id, '--allow-test-double'], { stdio: 'ignore' });
+  const exited = new Promise((r) => child.on('exit', r));
+  const sessionPid = await waitFor(() => p.epic(ui.id)?.step?.name === 'audit-1' && p.epic(ui.id).step.pid);
+  child.kill('SIGKILL');
+  await exited;
+  await p.go({ resume: true });
+  assert.equal(alive(sessionPid), false);
+  const e = p.epic(ui.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual(e.unlooked?.pictures.map((x) => path.basename(x)), ['home.png'], 'listed for the owner to see afterwards');
 });
 
 test('`configure --look after` writes the project setting; `before` removes it; anything else is refused', (t) => {

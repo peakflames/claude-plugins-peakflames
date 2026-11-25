@@ -116,7 +116,7 @@ do not:
 |---|---|
 | `attend` | A driver is running. Go to Step 3b |
 | `decide` | A question needs the owner (`waiting`). Go to Step 4. If every gate in `waiting` is one the owner chose `Decide later` on in this session, do not ask again: relaunch when `relaunch` is set (Step 3 item 5); otherwise, when `ready` names epics (work no waiting question holds), go to Steps 1–3 for those, and say in one line that the put-off questions stay waiting; otherwise closing screen. A question put off never hides `ready` work |
-| `continue` | Only technical stops are open, and the owner's standing answer covers them (`autoContinue`). Run `DRIVER continue --workspace "<ws>" --json`, say one line for each entry of `continued` — "<label> stopped for a technical reason (<the entry's `why`>), so autopilot <the entry's `did`>, as you asked." — and come back to Step 0 |
+| `continue` | Only technical stops are open, and the owner's standing answer covers them (`autoContinue`). Run `DRIVER continue --workspace "<ws>" --json` (on "no name to record", ask the owner's name once and add `--by "<name>"`, as in Step 4), say one line for each entry of `continued` — "<label> stopped for a technical reason (<the entry's `why`>), so autopilot <the entry's `did`>, as you asked." — and come back to Step 0 |
 | `readiness` | There is work that can run. If `relaunch` is set **and** you came here from Step 4 or from `continue` in this session, relaunch (Step 3 item 5). Otherwise Steps 1–3 |
 | `fetch` | Everything queued is merged and waits in autopilot's copy. Closing screen |
 | `nothing` | Nothing is left to run. Closing screen |
@@ -282,10 +282,28 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
       read it, and they have network access, so treat any key in it as one the build could
       use." (With `"sandbox": true`: "…they can reach only the package registries.") Recommend "No" instead when only an optional check needs the file.
 
+      **Real money, asked before the proof spends it.** Item d runs the quality gates with the
+      copied files, and a gate may call a paid service with the keys in them. So when `copy`
+      holds a file (saved now or on an earlier launch), ask the real-money question before item d
+      runs — in the same `AskUserQuestion` call as a copy question when one is asked (if the
+      owner then says no to every file, nothing is copied: drop the answer and leave `realSpend`
+      out): "A check
+      may need to call a real outside service that costs money, using your keys (<the copied
+      file names>). Allow that when it is the only way to prove something works?" — options
+      `Yes — when a check needs it (Recommended)`, with the description "Otherwise that part is
+      only proven against a stand-in, and autopilot tells you so", and `No — never spend`. The
+      answer is the run's `realSpend` (Step 2 item 4). It is asked whether the run will be Full
+      or Provisional: a Provisional run never answers money for the owner. With `No — never
+      spend`, items d and e leave out the `--gate` flag of every gate item b found needing a
+      copied file, and the Step 2 screen says, one line per gate under "Needs you": "<what the
+      check is, in plain words> was not tried at launch: you said never spend". Not asked in
+      `dry-run` mode, and not when `copy` is empty.
+
    d. **Prove it** — not in `dry-run` mode, which writes nothing: say the proof is skipped and
       carry on. Run `DRIVER prepare --project "<root>"` with a ten-minute timeout, adding one
       `--gate '<command>'` for each quality gate item b found runnable (not the tests: they
-      always run). It makes the
+      always run), except one that needs a copied file when the owner said `No — never spend`
+      (item c). It makes the
       clone (or brings it up to date), copies the files, runs `setup`, then runs the project's
       test command in the clone, in the same plain shell a run uses, and then each gate. It
       writes only inside the workspace and prints JSON; exit 1 means the proof failed. A gate
@@ -483,12 +501,15 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      in `<ws>/settings.json`, which applies to every run until the owner edits it.
    - The scope review in full (Step 1 item 7), false alarms included.
 
-3. **Ask** with `AskUserQuestion`: "Launch autopilot on these <N> epics? If it stops for a
-   technical reason I'll decide how to carry on and continue it automatically (up to 2 times
-   per epic)." ("on this 1
-   epic?" for one) — options `Launch`,
+3. **Ask** with `AskUserQuestion`: "Launch autopilot on these <N> epics? It stops at
+   $<budget> spent or at <end time>, whichever comes first. If it stops for a technical reason
+   I'll decide how to carry on and continue it automatically (up to 2 times per epic)." ("on
+   this 1 epic?" for one) — options `Launch`,
    `Change the queue or limits`, `Cancel`. In `dry-run` mode the first option is
-   `Show the dry run` instead. The second sentence is the owner's **standing answer**: it is
+   `Show the dry run` instead. `<budget>` is `launch.config.runBudgetUsd` (or the amount the
+   owner chose), the figure the "It stops" line uses; `<end time>` is the end time the owner gave
+   (`launch.endByLocal` or theirs, as a clock time). With no end time the sentence reads "It
+   stops at $<budget> spent." The limits are the same for a Full and a Provisional run. The second sentence is the owner's **standing answer**: it is
    inside the question because the popup hides the chat. A technical reason is an error in the
    tooling, a step reaching its own time or spending cap, one of autopilot's own checks, a
    plan missing a required part, a final check that needs a repair or another run, a fix the
@@ -514,15 +535,12 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    about every fix"): write `"smallFixes": false` into `config.json`. Leave the key out
    otherwise; the limits are the driver's.
 
-   **Real money, asked in the same popup.** When `launch.env.copy` is not empty (sessions
-   will hold the project's real keys), add a second question to this same `AskUserQuestion`
-   call: "A check may need to call a real outside service that costs money, using your keys
-   (<the copied file names>). Allow that when it is the only way to prove something works?" —
-   options `Yes — when a check needs it (Recommended)`, with the description "Otherwise that
-   part is only proven against a stand-in, and autopilot tells you so", and
-   `No — never spend`. The answer is the run's `realSpend`. Without it a session decides
-   nothing by itself: it stops and asks. Skip this question when nothing is copied in (no
-   session has a key to spend with), and in `dry-run` mode.
+   **Real money, only if Step 1 did not ask it.** Step 1 item 5c asks it before the launch
+   check spends anything. When it was not asked there and `launch.env.copy` is not empty now
+   (sessions will hold the project's real keys), add it as a second question to this same
+   `AskUserQuestion` call, worded and answered exactly as in item 5c. The answer is the run's
+   `realSpend`. Without it a session decides nothing by itself: it stops and asks. Skip it
+   when nothing is copied in (no session has a key to spend with), and in `dry-run` mode.
 
    **Whether they will be there, asked in the same popup.** Add one more question to this
    same `AskUserQuestion` call: "Will you be at this computer while it runs? Some checks can
@@ -542,7 +560,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    deferral or a look needs you", and `Provisional`, with the description "The AI decides now,
    you confirm later. It keeps building where a Full run would stop and ask: it makes the
    calls that are yours (a requirement correction, a deferral, a screen to look at) and lists
-   every one at the end for you to review". The answer is the run's `mode`: `"full"` or
+   every one at the end for you to review". The epics the screen above says wait for the owner
+   to look do not wait in a Provisional run: their screens are listed at the end (the mode is
+   picked after the readiness table, so the screen cannot say so yet). The answer is the run's `mode`: `"full"` or
    `"provisional"`. In the lines before the popup say once what Provisional trades: a later
    epic may be built on a correction to a requirement that nobody approved, and a requirement
    only a person can observe is merged as not verified. "Confirm later" is an invitation, not a
@@ -581,7 +601,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      An empty value (`build.model=`) goes back to the default. The command refuses a value out
      of range and prints why. If its output lists `shadowed`, say each line plainly: a value in
      `<ws>/settings.json` still wins, and the owner removes that line there for the change to
-     take effect — you never edit that file. Then run the Step 1 item 1 preflight again and
+     take effect — you never edit that file. A run that is already going picks the change up at
+     its next step; the step running now keeps what it started with. Then run the Step 1 item 1 preflight again and
      show the new caps table. For an end time given as a clock time, compute the next occurrence:
      `node -e 'const d=new Date();d.setHours(H,M,0,0);if(d<=new Date())d.setDate(d.getDate()+1);console.log(d.toISOString(), "=", d.toString())'`.
      Show the block again and ask again.
@@ -964,7 +985,10 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       `<file>` is the gate's `file` value. Add `--note "<their words>"` when the owner explained
       the choice; for a `human-check` gate the note from item b is required unless `--observations` is given with every line a yes. The command writes
       `decided: {answer, by, date, scope: "next-run"}` into the gate file, with `by` taken from
-      `git config user.name`, and re-renders the report. It refuses an answer that is not one of
+      `git config user.name`, else from the newest commit a person made in the project, and
+      re-renders the report. If it refuses with "no name to record", ask the owner once, in
+      plain text, what name to record, and run it again with `--by "<their name>"`; use that
+      name for every later `decide` and `continue` in this session. It refuses an answer that is not one of
       the gate's options; if it refuses, ask again — never substitute a different option.
 
    d. **Say what the answer does, and what the owner will see**, from the command's output:

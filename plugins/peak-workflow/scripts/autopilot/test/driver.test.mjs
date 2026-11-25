@@ -84,6 +84,36 @@ test('happy path: plan captured, build gets prompt.md with ${CLAUDE_PLUGIN_ROOT}
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
 });
 
+test('a step\'s model changed while a run goes reaches the next step; the run\'s own keys are never read again; step.json names model and effort', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/plan`]: { ...planScript(E1), actions: [{ do: 'sleep', ms: 1500 }, ...planScript(E1).actions] } });
+  const running = go(p);
+  await waitFor(() => fs.existsSync(p.dir(E1.id, 'plan-1', 'step.json')));
+  // The owner asks for Opus for the build while the plan runs, and something changes the run's mode by hand.
+  const settings = path.join(p.state, 'settings.json');
+  fs.writeFileSync(settings, JSON.stringify({ ...readJson(settings), budgets: { build: { model: 'opus' } } }));
+  const cfgFile = path.join(p.runDir(), 'config.json');
+  fs.writeFileSync(cfgFile, JSON.stringify({ ...readJson(cfgFile), mode: 'provisional', realSpend: true }));
+  await running;
+
+  assert.deepEqual([readJson(p.dir(E1.id, 'plan-1', 'step.json')).model, readJson(p.dir(E1.id, 'plan-1', 'step.json')).effort], ['sonnet', 'high'], 'the running step keeps what it started with');
+  const build = p.calls().find((c) => c.key === `${E1.id}/build-1`);
+  assert.equal(build.argv[build.argv.indexOf('--model') + 1], 'opus');
+  assert.equal(build.argv[build.argv.indexOf('--effort') + 1], 'medium', 'effort follows the new model when none is set');
+  assert.deepEqual([readJson(p.dir(E1.id, 'build-1', 'step.json')).model, readJson(p.dir(E1.id, 'build-1', 'step.json')).effort], ['opus', 'medium']);
+  const log = fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8');
+  assert.equal((log.match(/settings changed: /g) ?? []).length, 1, 'logged once');
+  assert.match(log, /settings changed: build model now opus \(was sonnet\); build effort now medium \(was high\)\n/);
+  assert.match(log, new RegExp(`${E1.id}: build-1 starting \\(builder, opus, effort medium, `));
+  const starts = fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((e) => e.type === 'step-start');
+  assert.deepEqual(starts.map((e) => [e.step, e.model, e.effort]), [['plan-1', 'sonnet', 'high'], ['build-1', 'opus', 'medium'], ['audit-1', 'opus', 'medium'], ['verify-1', 'opus', 'medium']]);
+  // The run's own keys stay as they were at launch: a run never switches mode or a money answer mid-way.
+  const state = readJson(path.join(p.runDir(), 'state.json'));
+  assert.deepEqual([state.mode, state.realSpend], ['full', null]);
+  assert.doesNotMatch(log, /provisional/);
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+});
+
 test('events: a happy run writes one line per milestone, in order, and each reads as a plain sentence', async (t) => {
   const p = makeProject(t);
   p.scenario(happy(E1));
