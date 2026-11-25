@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
-import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, gateEntry, gateLive, gateReason, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
+import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -2945,7 +2945,11 @@ class Run {
         // that line into it first (seen live). A file that arrives exactly as the integration line
         // has it is another epic's merged work, not something this verify session wrote.
         const blob = (rev, f) => { const r = gitRun(this.clone, 'rev-parse', '-q', '--verify', `${rev}:${f}`); return r.code === 0 ? r.out : ''; };
-        const own = this.g('diff', '--name-only', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && blob(p2, f) !== blob(pre.developSha, f));
+        // A rename is a delete plus an add, so a test moved out of the test directories is judged where it was.
+        // A file the epic made and the session deleted is the session's too: the integration line never had it.
+        const base = this.g('merge-base', pre.branchTip, pre.developSha);
+        const deleted = (f) => !blob(p2, f) && blob(pre.branchTip, f) && !blob(base, f);
+        const own = this.g('diff', '--name-only', '--no-renames', `${pre.branchTip}..${p2}`).split('\n').filter((f) => f && (blob(p2, f) !== blob(pre.developSha, f) || deleted(f)));
         const stray = own.filter((f) => !f.startsWith('docs/') && f !== m.sidecar);
         // Held even when the fix touches nothing else (`stray` leaves docs/ out).
         if (autoFix && !stray.length) { const r = own.filter((f) => f.startsWith('docs/requirements/')); if (r.length) problems.push(`${SMALL_FIX_PROBLEM}changes a requirement file (${r.join(', ')})`); }
@@ -2953,14 +2957,17 @@ class Run {
         else if (stray.length) problems.push(`commits added during verify touch files outside docs/: ${stray.join(', ')}`);
         if (stray.length && (standing.length || autoFix)) {
           // The standing answer is for small fixes only: a bigger one is the owner's to approve.
-          const stat = this.g('diff', '--numstat', `${pre.branchTip}..${p2}`, '--', ...stray).split('\n').filter(Boolean).map((l) => l.split('\t'));
+          const stat = this.g('diff', '--numstat', '--no-renames', `${pre.branchTip}..${p2}`, '--', ...stray).split('\n').filter(Boolean).map((l) => l.split('\t'));
           const lines = stat.reduce((n, [a, d]) => n + (Number(a) || 0) + (Number(d) || 0), 0);
           // A test may be changed (seen live: a race fixed by waiting before a click), never made to check less:
           // it may not lose more checking lines (assertions, test declarations) than it gains.
           const testDirs = (this.pre?.testDirs?.length ? this.pre.testDirs : this.config.testDirs ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
           const named = this.testNamedDirs([pre.developSha, p2], testDirs);
-          const weak = stat.map(([, , f]) => f).filter((f) => isTestPath(f, testDirs, named)).map((f) => ({ f, ...testWeakening(this.g('diff', '-U0', `${pre.branchTip}..${p2}`, '--', f).split('\n')) }));
-          const tests = weak.filter((w) => w.lost).map((w) => w.f);
+          // Judged as a test: what the referee calls one, and any test-named file outside the listed directories.
+          const weak = stat.map(([, , f]) => f).filter((f) => checkedAsTest(f, testDirs, named)).map((f) => ({ f, gone: !blob(p2, f), ...testWeakening(this.g('diff', '-U0', '--no-renames', `${pre.branchTip}..${p2}`, '--', f).split('\n')) }));
+          const tests = weak.filter((w) => w.lost && !w.gone).map((w) => w.f); const gone = weak.filter((w) => w.lost && w.gone).map((w) => w.f);
+          // An expected output, fixture or snapshot the test compares with: a new one is fine, a rewritten one may hide a failure.
+          const expected = stat.map(([, , f]) => f).filter((f) => isExpectedOutput(f, testDirs, named) && blob(pre.branchTip, f));
           const reqs = own.filter((f) => f.startsWith('docs/requirements/'));
           // A fix was "add the test this requirement lacks": anything that is not a test is product code changed by
           // the session that then judges it. With an ordinary small fix beside it the two cannot be told apart, so
@@ -2970,9 +2977,12 @@ class Run {
           if (standing.length && stray.length > limits.files) problems.push(`${SMALL_FIX_PROBLEM}changes ${stray.length} files (the limit is ${limits.files}): ${stray.join(', ')}`);
           if (standing.length && lines > limits.lines) problems.push(`${SMALL_FIX_PROBLEM}changes ${lines} lines (the limit is ${limits.lines})`);
           if (tests.length) problems.push(`${SMALL_FIX_PROBLEM}removes checks from a test (${tests.join(', ')})`);
-          const off = weak.filter((w) => w.off).map((w) => w.f); const loose = weak.filter((w) => w.loosened).map((w) => w.f);
+          if (gone.length) problems.push(`${SMALL_FIX_PROBLEM}deletes a test (${gone.join(', ')})`);
+          const off = weak.filter((w) => w.off).map((w) => w.f); const loose = weak.filter((w) => w.loosened).map((w) => w.f); const wrapped = weak.filter((w) => w.wrapped).map((w) => w.f);
           if (off.length) problems.push(`${SMALL_FIX_PROBLEM}skips a test, or leaves only one running (${off.join(', ')})`);
           if (loose.length) problems.push(`${SMALL_FIX_PROBLEM}makes a check pass for nearly any value (${loose.join(', ')})`);
+          if (wrapped.length) problems.push(`${SMALL_FIX_PROBLEM}puts a check where it never runs (${wrapped.join(', ')})`);
+          if (expected.length) problems.push(`${SMALL_FIX_PROBLEM}rewrites an expected result a test compares with (${expected.join(', ')})`);
           if (reqs.length) problems.push(`${SMALL_FIX_PROBLEM}changes a requirement file (${reqs.join(', ')})`);
         }
         if (gitOk(this.clone, 'merge-base', '--is-ancestor', pre.developSha, p2) && this.g('rev-parse', `${dev}^{tree}`) !== this.g('rev-parse', `${p2}^{tree}`)) problems.push('the merge commit itself changes files');
@@ -3166,9 +3176,10 @@ class Run {
     // A requirement is the owner's: a clash in one is asked, never settled here.
     const reqs = files.filter((x) => x.startsWith('docs/requirements/'));
     if (reqs.length) out.push(`the requirement file ${reqs.join(', ')} clashed: a requirement is never settled by a catch-up`);
-    const dirs = this.pre?.testDirs ?? [];
-    for (const x of files.filter((y) => dirs.some((d) => y.startsWith(d)))) {
-      const weak = [from, dev].map((side) => testWeakening(gitRun(this.clone, 'diff', '-U0', side, tip, '--', x).out.split('\n'))).find((w) => w.lost || w.off || w.loosened);
+    const dirs = (this.pre?.testDirs ?? []).map((d) => `${String(d).replace(/\/+$/, '')}/`);
+    // Everything under a listed directory, as before, and a test-named file anywhere else.
+    for (const x of files.filter((y) => checkedAsTest(y, dirs, new Set()))) {
+      const weak = [from, dev].map((side) => testWeakening(gitRun(this.clone, 'diff', '-U0', side, tip, '--', x).out.split('\n'))).find((w) => w.lost || w.off || w.loosened || w.wrapped);
       if (weak) out.push(`it weakened the test ${x}`);
     }
     return out;
@@ -3793,7 +3804,7 @@ export function mergeCheckGate(label, check, limits, { verifiedTip = null } = {}
   // What needs a new final check, in the owner's words.
   const redo = [];
   if (problems.some((p) => /changes a requirement file/.test(p))) redo.push('it changed a requirement file, which the final check may not do');
-  if (fixP.some((p) => /removes checks from a test|skips a test|pass for nearly any value/.test(p))) redo.push('a fix it made makes a test check less');
+  if (fixP.some((p) => /removes checks from a test|deletes a test|skips a test|pass for nearly any value|where it never runs|rewrites an expected result/.test(p))) redo.push('a fix it made makes a test check less');
   if (names.has('sidecar-on-integration')) redo.push('the epic\'s status file does not record every requirement as verified');
   if (names.has('no-waivers')) redo.push('its handoff counts a deferral or a waiver that is not allowed');
   // What a re-check of the kept work can settle.

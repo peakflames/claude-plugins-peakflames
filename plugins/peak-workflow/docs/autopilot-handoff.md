@@ -270,10 +270,16 @@ Why this order:
 
 ### Step 4 — Strengthen the guards on what merges unasked (C1)
 
-- [ ] **The test-weakening guard is a heuristic** (*no issue*; review of I6a). It is the main
+- [x] **The test-weakening guard is a heuristic** (*no issue*; review of I6a). It is the main
   brake on a fix autopilot allows itself: test-named files in the listed test directories, net
   loss of assert/test lines. A weakening it does not recognise merges unasked.
-  *`checkVerify`, `autoFix`.*
+  *`checkVerify`, `autoFix`.* Fixed 2026-11-24 (COMMIT_HASH; owner's decision: keep the net count,
+  widen the patterns). Now also parks: a relaxed matcher or a tautology, a check in `if (false)` or
+  a swallowing `catch`, Go/Swift/Rust checks removed, Rust/unittest/NUnit skips, a test renamed out
+  of the test directories ("deletes a test"), a test-named file outside them, and a rewritten
+  existing fixture or expected output. Tested against the fake (`test/weakening.test.mjs`,
+  `test/resume.test.mjs`); not seen in a real run. Known, accepted: a changed expected value of the
+  same kind (`toBe(3)` → `toBe(4)`) still merges unasked.
 - [ ] **The final check saw a defect and passed it without a word** (*no issue*; Pilot Light,
   run `20261122-090420`). The verifier noted that the "Page not found" picture carries the
   wrong text, did not fix it and did not park; the epic merged. What the verifier notes and
@@ -292,8 +298,8 @@ Why this order:
   always parks for a look with the changed lines in the gate (`claudeMd`), whatever `look`
   says. Also fixed: the `CLAUDE.md` rule skipped every changed line that began `+-` or `--`
   (any list item). Tested against the fake (`test/scope.test.mjs`); not seen in a real run.
-  Left: the same `(?![+-])` pattern is in the test-weakening count (`driver.mjs`, the
-  `TEST_CHECK_LINE` filter), where it skips a removed line whose own text starts with `-`.
+  The same `(?![+-])` leftover in the test-weakening count (`lib.mjs`, `testWeakening`) is
+  fixed with the Step 4 guard item: only real diff headers are skipped now.
 
 ### Step 5 — Keep the attending session current (C2)
 
@@ -714,6 +720,11 @@ change-record notes).
 
 ### Known, not fixed
 
+- **A changed expected value still merges unasked**: the test-weakening guard counts checks, so a
+  fix on the standing answer that swaps `toBe(3)` for `toBe(4)` is not asked (owner's decision,
+  2026-11-24, Step 4).
+- **A swallowed promise is not seen as a hidden check**: `await run().catch(() => {})` in a test is
+  not flagged; the same form is common in cleanup (review of Step 4 box 1).
 - `attend.test.mjs` "watch and status see inside the step … each said once" fails (expected 2,
   actual 3), on the base branch too. 2 `test_wrapper.py` failures (pre-existing).
 - **The independent review is short**: 33–49 seconds on large changes (run `20261123-140347`:
