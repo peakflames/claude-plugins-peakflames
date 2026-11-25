@@ -111,10 +111,10 @@ them; the state is here. The rule:
 | Issue | What it tracks | Where here | Open / all boxes |
 |---|---|---|---|
 | #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 0 / 2 |
-| #36 | The run budget is not enforced inside a step | Step 9 | 1 / 1 |
+| #36 | The run budget is not enforced inside a step | Step 9 | 0 / 1 (closed, not to be done) |
 | #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
 | #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 11 / 18 |
-| #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 13 / 13 |
+| #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 12 / 13 |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
 | #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 1 / 1 |
@@ -135,7 +135,8 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
 2. **An approved amendment reaches every later step** (Step 11: #41 B12, B16). More real under
    provisional, which takes amendments itself. Done together with group 1. *Built with group 1;
    proof pending.*
-3. **The budget inside a step** (next) (#36, a killed session's cost).
+3. **What a killed session spent** (next). #36 itself is not to be done (owner, 2026-11-25): a
+   step may finish slightly past the budget (#36, a killed session's cost).
 4. **Launch-screen leftovers** (#40 item 5, #41 B3 and I5, own-settings warning, `decide` and
    `user.name`, a setting changed mid-run).
 5. **MCP connectors** (#43).
@@ -150,6 +151,12 @@ Left as they are: #37, the size of `SKILL.md` and of `preflight --json` (C4), Wi
 Work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
 all its boxes are ticked. Order and criticality were agreed with the owner on 2026-11-21 and
 reordered the same day after the Windows owner's real runs (#41 comments, #43).
+
+**The bar for closing a box (owner, 2026-11-25).** A box about the driver's own logic (a retry,
+a file read, a path skipped) closes on its fake-`claude` test: a real run would only run the same
+code. A real run is asked for only where a model's behaviour or the owner's experience is the
+point: how a session, the reviewer or the verifier acts, and how the interaction and
+orchestration read to the owner. Small things are not polished past "good enough".
 
 Criticality: **C1** something wrong could merge · **C2** wastes money or a night · **C3**
 confuses the owner, nothing lost · **C4** housekeeping.
@@ -397,13 +404,15 @@ The 2026-11-24 changes (Step 4):
 - [ ] **Every review is told the changed code files by name** (built 2026-11-25 after the two thin
   first reviews above; proof pending: a first review that reads at least half without a retry).
 
-The 2026-11-25 changes (Steps 8 and 11, `448be29`), to see in a real run:
-- [ ] A base check that fails once runs again; the log says so, and a pass goes on (report:
+The 2026-11-25 changes (Steps 8 and 11, `448be29`), to see in a real run. The first three are
+closed on tests (owner, 2026-11-25); only the last needs a real run, since a real reviewer and a
+real look are model behaviour:
+- [x] A base check that fails once runs again; the log says so, and a pass goes on (report:
   "failed once … and passed when run again").
-- [ ] A new project's first epic: `setup` runs on the branch when the epic adds a manifest
+- [x] A new project's first epic: `setup` runs on the branch when the epic adds a manifest
   ("changed <file>: running setup on it" in the log), and nothing under `node_modules` or build
   output is set aside before the final check.
-- [ ] `prepare --gate` with a gate that fails once: the launch screen says "flaky", not "will
+- [x] `prepare --gate` with a gate that fails once: the launch screen says "flaky", not "will
   probably stop".
 - [ ] After an owner's "Amend": the reviewer's `bundle/tors.md` holds the new requirement and
   `bundle/amendments.md` names the approval; no `test-weakened` finding on the amended test; a
@@ -462,35 +471,35 @@ files `CLAUDE.md` names.
   issue*; found 2026-11-22 on Pilot Light's first launch). macOS's Python 3.9 came first on
   PATH and hid Homebrew's. `scripts/tor-lifecycle` now tries `python3` in every PATH folder,
   then `/opt/homebrew/bin` and `/usr/local/bin`.
-- [ ] **A new project's first epic has 22,386 files set aside before its final check** (*no
+- [x] **A new project's first epic has 22,386 files set aside before its final check** (*no
   issue*; Pilot Light, run `20261122-090420`). Build output and `node_modules` left by the
   build are untracked on the integration line, whose `.gitignore` does not know them until the
   epic merges, so `setAside` stores them all. The final check still passed; time and safety of
   a set-aside that large are not examined.
-  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a first epic on a new project whose set-aside lists no `node_modules` or build output. On the
+  *Closed on tests 2026-11-25 (`448be29`): driver logic the fake-`claude` tests cover, so no real run is asked for. Worth noticing in one: a first epic on a new project whose set-aside lists no `node_modules` or build output. On the
   integration line, what another local branch's `.gitignore` covers is left in place
   (`branchIgnores`); a set-aside keeps 50 names and a count.*
-- [ ] **`setup` is not run for a new project's first epic** when it is guarded by a file the
+- [x] **`setup` is not run for a new project's first epic** when it is guarded by a file the
   epic creates (`if [ -f package.json ]`): it runs on the integration line before the branch
   is checked out. The first real run of `setup` is the run after the merge. Not examined.
-  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a first epic whose `setup` installs what the epic declared before CHECK_BUILD. Setup now runs on
+  *Closed on tests 2026-11-25 (`448be29`): driver logic the fake-`claude` tests cover, so no real run is asked for. Worth noticing in one: a first epic whose `setup` installs what the epic declared before CHECK_BUILD. Setup now runs on
   the branch when it changed a manifest or lockfile (`envForBranch`).*
 - [x] **A test that times out leaves its fake `claude` running** (*no issue*; seen 2026-11-21:
   six stray `fake-claude.mjs` processes after timed-out attend tests). Test-only; kill the
   child when a test ends. *Fixed 2026-11-25: `makeProject` kills the fakes working in the test's
   folder when the test ends (`killFakes`, `test/helpers.mjs`).*
-- [ ] **A laptop that sleeps during the base check reads as a red base** (#41 B10; in code).
+- [x] **A laptop that sleeps during the base check reads as a red base** (#41 B10; in code).
   Any failing exit ends the run; nothing looks at how long the check took. Treat a check that
   ran far past its usual time as interrupted and run it once more; on Windows hold a
   keep-awake request for the driver's life, or warn at launch (the warning exists for macOS
   only). *`driver.mjs:2769`, `:2844`.*
-  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a run whose log shows a slept-through base check run again. A failing base check runs once more
+  *Closed on tests 2026-11-25 (`448be29`): driver logic the fake-`claude` tests cover, so no real run is asked for. Worth noticing in one: a run whose log shows a slept-through base check run again. A failing base check runs once more
   and records the minutes slept (wall clock less monotonic time); a Windows launch warns to set
   the power plan.*
-- [ ] **The base check has no retry for a flaky test** (#41 B6). One slow test ended two runs.
-  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a real run past a flaky base test. A pass on the second try goes on and is in the report.*
-- [ ] **One flaky gate failure is reported as "every epic will probably stop"** (#40) (6). C3.
-  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a launch screen that says "flaky". `prepare` runs a failing gate once more (`gatesFlaky`).*
+- [x] **The base check has no retry for a flaky test** (#41 B6). One slow test ended two runs.
+  *Closed on tests 2026-11-25 (`448be29`): driver logic the fake-`claude` tests cover, so no real run is asked for. Worth noticing in one: a real run past a flaky base test. A pass on the second try goes on and is in the report.*
+- [x] **One flaky gate failure is reported as "every epic will probably stop"** (#40) (6). C3.
+  *Closed on tests 2026-11-25 (`448be29`): driver logic the fake-`claude` tests cover, so no real run is asked for. Worth noticing in one: a launch screen that says "flaky". `prepare` runs a failing gate once more (`gatesFlaky`).*
 - [ ] **Autopilot cannot repair a red base, a preflight refusal or a merge conflict itself**
   (#42, I6c). Includes "no path for a launch gate that fails on a product bug" (#40) (7).
   *The merge conflict part is done (Step 3, `b7c2d14`): a catch-up session settles it on the
@@ -498,14 +507,16 @@ files `CLAUDE.md` names.
 
 ### Step 9 — The budget (C2)
 
-- [ ] **The run budget is not enforced inside a step** (#36). Cost is known only when a step
+- [x] **The run budget is not enforced inside a step** (#36). Cost is known only when a step
   ends; a chain finished at $80.51 of $80. *`driver.mjs` spend accounting (evaluation gap G2).*
+  *Not to be done (owner, 2026-11-25): a step that runs slightly past the budget may finish;
+  stopping a session mid-step is not wanted. #36 closed.*
 
 - [ ] **A session that is killed costs nothing on the books** (*no issue*; Pilot Light,
   2026-11-22, runs `20261122-023444` and `-025133`). Two planners stopped by the STOP file had
   made 20 and 30 model turns; neither has a `result.json` and the run reads $0.00. Cost comes
   only from the session's closing line, which a killed session never writes. The same holds
-  for a time limit or a crash. Belongs with #36.
+  for a time limit or a crash. *This is group 3 now (owner, 2026-11-25), on its own.*
 
 ### Step 10 — The launch check and its screen (C2 and C3)
 
