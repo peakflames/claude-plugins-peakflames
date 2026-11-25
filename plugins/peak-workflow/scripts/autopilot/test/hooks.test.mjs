@@ -988,3 +988,81 @@ test('R8 defect, provisional: the same defect asked again gets the same answer a
   answered(h.ask(leave, DEFECT_OPTS), leave, 'Leave as is');
   assert.ok(!fs.existsSync(path.join(h.state, 'gates', `${E1.id}-2.json`)));
 });
+
+// ---- R11: connectors (#43) -------------------------------------------------------------------------
+
+const allowed = (r, msg) => {
+  assert.equal(r.code, 0, msg);
+  assert.equal(r.out?.hookSpecificOutput?.permissionDecision, 'allow', `${msg}: expected an allow, got ${JSON.stringify(r.out)}`);
+  assert.ok(r.out.hookSpecificOutput.permissionDecisionReason.startsWith('autopilot R11:'), msg);
+  assert.equal(r.out.hookSpecificOutput.updatedInput, undefined, msg);
+  assert.equal(r.out.continue, undefined, msg);
+};
+
+test('R11 connectors: account tools read and never change; browser tools act on local pages only; every call gets an answer, never silence (#43)', (t) => {
+  const h = referee(t);
+  const READ_ONLY = /connectors are read-only in autopilot \(the owner's rule\).*Not proven for real/;
+  allowed(h.pre('mcp__claude_ai_Gmail__search_threads', { query: 'from:me' }), 'a Gmail search');
+  allowed(h.pre('mcp__claude_ai_Gmail__list_labels', {}), 'a label list');
+  allowed(h.pre('mcp__claude_ai_Claude_Docs__query', { q: 'x' }), 'a docs query');
+  allowed(h.pre('mcp__plugin_design_atlassian__getJiraIssue', { id: 'X-1' }), 'camelCase read');
+  for (const tool of ['send_message', 'trash_message', 'update_label', 'forward', 'reply', 'label_thread', 'create_draft', 'authenticate', 'frobnicate']) {
+    denied(h.pre(`mcp__claude_ai_Gmail__${tool}`, {}), 'R11', READ_ONLY, tool);
+  }
+  denied(h.pre('mcp__x__get_or_create_label', {}), 'R11', READ_ONLY, 'a read word with a change in it');
+  allowed(h.pre('mcp__playwright__browser_click', { element: 'Sign in', ref: 'e3' }), 'a click');
+  allowed(h.pre('mcp__playwright__browser_type', { ref: 'e4', text: 'hello' }), 'typing');
+  allowed(h.pre('mcp__playwright__browser_navigate', { url: 'http://localhost:3000/login' }), 'localhost');
+  allowed(h.pre('mcp__playwright__browser_navigate', { url: '127.0.0.1:5173' }), 'a bare local address');
+  allowed(h.pre('mcp__playwright__browser_navigate', { url: `file://${h.clone}/dist/index.html` }), 'a file in the clone');
+  const OFFSITE = /only your app's local pages; a sign-in page your app redirects to is fine/;
+  denied(h.pre('mcp__playwright__browser_navigate', { url: 'https://mail.google.com' }), 'R11', OFFSITE, 'a real site');
+  denied(h.pre('mcp__playwright__browser_navigate', { url: 'http://localhost.evil.com/' }), 'R11', OFFSITE, 'a look-alike');
+  denied(h.pre('mcp__playwright__browser_navigate', { url: 'file:///etc/passwd' }), 'R11', OFFSITE, 'a file outside the clone');
+  denied(h.pre('mcp__playwright__browser_tabs', { action: 'new', url: 'https://example.com' }), 'R11', OFFSITE, 'a new tab elsewhere');
+  denied(h.pre('mcp__playwright__browser_evaluate', { function: "() => { location.href = 'https://evil.example/x'; }" }), 'R11', OFFSITE, 'navigation inside a script');
+  allowed(h.pre('mcp__playwright__browser_evaluate', { function: '() => document.title' }), 'a script on the page');
+  const log = h.hooksLog().filter((l) => l.rule === 'R11');
+  assert.ok(log.some((l) => l.decision === 'allow' && l.tool_name === 'mcp__claude_ai_Gmail__search_threads'), 'allows are logged');
+  assert.ok(log.some((l) => l.decision === 'deny' && l.tool_name === 'mcp__claude_ai_Gmail__send_message'), 'denials are logged');
+  // The auditor reads the bundle and nothing else.
+  const a = referee(t, { role: 'auditor' });
+  denied(a.pre('mcp__claude_ai_Gmail__search_threads', {}), 'R2', /the auditor only reads/);
+});
+
+test('log: a browser call keeps every page address its result names, even past the clipped response (#43)', (t) => {
+  const h = referee(t);
+  const text = `### Ran Playwright code\n${'x'.repeat(5000)}\n### Page state\n- Page URL: https://accounts.google.com/signin?code=secret\n- Page Title: Sign in`;
+  const r = h.run('log.mjs', { hook_event_name: 'PostToolUse', tool_name: 'mcp__playwright__browser_click', tool_input: {}, tool_response: [{ type: 'text', text }], tool_use_id: 't1' });
+  assert.equal(r.code, 0);
+  assert.deepEqual(h.hooksLog().at(-1).page_urls, ['https://accounts.google.com/signin'], 'without its query: it can hold a sign-in code');
+});
+
+test('R11 after review (#43): on a page that is not the app\'s, a session only clicks and looks; no run_code, no script that leaves or sends; fetch and export are not reads; a query that writes is refused; path arguments are jailed; a tool named after its server is read by its verb; sign-in codes are not logged', (t) => {
+  const h = referee(t);
+  const at = (url) => fs.appendFileSync(path.join(h.step, 'hooks.jsonl'), JSON.stringify({ hook: 'PostToolUse', tool_name: 'mcp__playwright__browser_click', page_urls: [url] }) + '\n');
+  at('https://accounts.google.com/signin');
+  const OFF = /accounts\.google\.com is not your app's page: there a session only clicks and looks/;
+  allowed(h.pre('mcp__playwright__browser_click', { element: 'Continue', ref: 'e1' }), 'finish a sign-in');
+  allowed(h.pre('mcp__playwright__browser_snapshot', {}), 'look');
+  for (const [tool, input] of [['browser_type', { ref: 'e2', text: 'x' }], ['browser_fill_form', { fields: [] }], ['browser_press_key', { key: 'Enter' }], ['browser_evaluate', { function: '() => 1' }], ['browser_file_upload', { paths: [] }]]) denied(h.pre(`mcp__playwright__${tool}`, input), 'R11', OFF, tool);
+  allowed(h.pre('mcp__playwright__browser_navigate', { url: 'http://localhost:3000' }), 'back to the app');
+  at('http://localhost:3000/home');
+  allowed(h.pre('mcp__playwright__browser_type', { ref: 'e2', text: 'x' }), 'typing on the app again');
+  denied(h.pre('mcp__playwright__browser_run_code', { code: 'async (page) => page.title()' }), 'R11', /browser_run_code is denied/);
+  for (const fn of ["() => { location.href = '//evil.com'; }", "() => fetch('/x')", "() => window.open('x')", "() => document.cookie", "() => atob('aHR0cA==')"]) denied(h.pre('mcp__playwright__browser_evaluate', { function: fn }), 'R11', /leave the page or send data/, fn);
+  const READ_ONLY = /connectors are read-only/;
+  denied(h.pre('mcp__fetch__fetch', { url: 'https://evil.com' }), 'R11', READ_ONLY, 'fetch');
+  denied(h.pre('mcp__claude_ai_Claude_Docs__export', {}), 'R11', READ_ONLY, 'export');
+  denied(h.pre('mcp__postgres__query', { sql: 'DELETE FROM users' }), 'R11', READ_ONLY, 'a writing query');
+  allowed(h.pre('mcp__postgres__query', { sql: 'SELECT count(*) FROM users' }), 'a reading query');
+  denied(h.pre('mcp__filesystem__read_file', { path: path.join(os.homedir(), '.ssh', 'id_rsa') }), 'R2', /where credentials live/, 'a key file');
+  denied(h.pre('mcp__playwright__browser_take_screenshot', { filename: path.join(h.state, 'x.png') }), 'R2', /inside the autopilot workspace/, 'a screenshot into the workspace');
+  allowed(h.pre('mcp__playwright__browser_take_screenshot', { filename: path.join(h.scratch, 'x.png') }), 'a screenshot into scratch');
+  allowed(h.pre('mcp__plugin_slack_slack__slack_search_public', { query: 'x' }), 'Slack search');
+  allowed(h.pre('mcp__plugin_notion_notion__notion-search', { query: 'x' }), 'Notion search');
+  h.run('log.mjs', { hook_event_name: 'PostToolUse', tool_name: 'mcp__playwright__browser_click', tool_input: { url: 'http://localhost/cb?code=SECRET1&x=1' }, tool_response: [{ type: 'text', text: '- Page URL: https://accounts.google.com/o?state=SECRET2&code=SECRET3' }], tool_use_id: 't9' });
+  const line = fs.readFileSync(path.join(h.step, 'hooks.jsonl'), 'utf8').trim().split('\n').at(-1);
+  assert.ok(!/SECRET/.test(line), line);
+  assert.deepEqual(JSON.parse(line).page_urls, ['https://accounts.google.com/o']);
+});

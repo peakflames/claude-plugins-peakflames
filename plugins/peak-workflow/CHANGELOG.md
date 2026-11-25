@@ -232,6 +232,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `Progress: N merged, N waiting for you, N still to go` after each epic ends.
 - **Autopilot says how a wait for the owner ended** — the watch prints `NO LONGER NEEDS YOU`
   when a `Needs you:` command finishes or gives up, and the skill relays it.
+- **Autopilot sessions use the owner's connectors, read-only** — every connector is reachable
+  through ToolSearch; get, list, search and read pass, any send, change or delete is refused
+  and listed as not proven for real. Same in Full and Provisional.
+- **Autopilot browser tools on the app's local pages** — Playwright click, type and fill work
+  on localhost with the owner's saved sign-ins; on a sign-in page elsewhere only clicks and looks.
+  Opening another site and `browser_run_code` are refused. The report lists off-site pages.
+- **Connectors on the launch screen** — readiness names the owner's connectors (up to five),
+  those needing a sign-in under "Needs you", and a requirement no connector can read back.
 
 ### Changed
 
@@ -270,6 +278,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A connector question no answer could change** (#43) — a session no longer asks the owner
+  for a connector it cannot use; it lists the check under "Not proven for real" instead of
+  relaunching.
 - **Real money is asked before the launch check spends it** — the question moves before `prepare`; with "never spend", checks that need the copied keys are not tried at launch.
 - **Autopilot's own settings file no longer warns** — an untracked `.claude/peak-workflow/autopilot.json` is not counted as an uncommitted change.
 - **`decide` and `continue` work without `git config user.name`** — the newest commit by a person names the owner, never an autopilot name; with none, the skill asks once and passes `--by`.

@@ -919,3 +919,60 @@ test('a test that ends mid-session leaves no fake claude behind: only the fakes 
   await waitFor(() => !alive(a.pid));
   assert.equal(alive(b.pid), true, 'a fake in another folder is left alone');
 });
+
+test('connectors (#43): a session can load them (ToolSearch) and is told the rules; the auditor gets neither', async (t) => {
+  const { sessionCommand, CONNECTOR_RULE } = await import('../driver.mjs');
+  const cfg = defaultConfig(SEED);
+  const ws = path.join(os.tmpdir(), 'autopilot-connector-ws');
+  const step = path.join(ws, 'runs', 'r', 'epics', E1.id, 'build-1');
+  const allowedOf = (args) => args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--disallowedTools'));
+  assert.ok(allowedOf(sessionCommand(cfg, { kind: 'build', epicId: E1.id, workspace: ws, runDir: ws, stepDir: step, sessionId: 's' }).args).includes('ToolSearch'));
+  const audit = sessionCommand(cfg, { kind: 'audit', epicId: E1.id, workspace: ws, runDir: ws, stepDir: step, sessionId: 's' }).args;
+  assert.equal(audit[audit.indexOf('--tools') + 1], 'Read,Grep,Glob');
+  assert.ok(!audit.includes('ToolSearch'));
+  const flat = CONNECTOR_RULE.replace(/\s+/g, ' ');
+  for (const text of ['ToolSearch', 'read only', 'never send, change or delete', 'your app\'s local pages', 'sign-ins carry over', 'Do not ask the owner about it', '"Not proven for real"']) assert.ok(flat.includes(text), text);
+  // Every working session gets it, and the auditor does not.
+  const p = makeProject(t);
+  p.scenario(happy(E1));
+  await p.go();
+  for (const call of p.calls()) {
+    const file = call.argv[call.argv.indexOf('--append-system-prompt-file') + 1];
+    const text = call.step.startsWith('audit') ? '' : fs.readFileSync(file, 'utf8');
+    assert.equal(text.includes(CONNECTOR_RULE.trim()), !call.step.startsWith('audit'), call.step);
+  }
+});
+
+test('connectors end to end (#43): a build reads Gmail and drives the app through a sign-in with no question and no park; a send is refused, listed as not proven, and the epic merges; the report says what was used', async (t) => {
+  const p = makeProject(t);
+  const s = happy(E1);
+  const text = (t2) => [{ type: 'text', text: t2 }];
+  s[`${E1.id}/build`].actions.unshift(
+    { do: 'tool', tool_name: 'mcp__claude_ai_Gmail__search_threads', tool_input: { query: 'subject:receipt' }, tool_response: text('2 threads'), refused: false },
+    { do: 'tool', tool_name: 'mcp__playwright__browser_navigate', tool_input: { url: 'http://localhost:3000' }, tool_response: text('### Page state\n- Page URL: https://accounts.google.com/o/oauth2/auth?code=secret\n'), refused: false },
+    { do: 'tool', tool_name: 'mcp__playwright__browser_click', tool_input: { element: 'Continue', ref: 'e1' }, tool_response: text('- Page URL: http://localhost:3000/home'), refused: false },
+    { do: 'tool', tool_name: 'mcp__claude_ai_Gmail__send_message', tool_input: { to: 'x@example.invalid' }, refused: true },
+  );
+  s[`${E1.id}/verify`] = { ...wrapupScript(E1), result: { result: '## Verdict: PASS\n\n**Not proven for real**\n- The receipt email: sending is refused in autopilot; checked against the template only\n' } };
+  p.scenario(s);
+  await p.go();
+
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual(p.steps(), [`${E1.id}/plan-1`, `${E1.id}/build-1`, `${E1.id}/audit-1`, `${E1.id}/verify-1`], 'no question, no second build');
+  assert.deepEqual(fs.existsSync(path.join(p.state, 'gates')) ? fs.readdirSync(path.join(p.state, 'gates')) : [], []);
+  assert.deepEqual(readJson(p.dir(E1.id, 'build-1', 'result.json')).permission_denials.map((d) => d.tool_name), ['mcp__claude_ai_Gmail__send_message']);
+  assert.ok(e.unproven.some((u) => /receipt email/.test(u.text)));
+  const r = readJson(path.join(p.runDir(), 'report.json'));
+  const use = r.epics[0].connectors;
+  assert.deepEqual(use.calls, [{ tool: 'Gmail search_threads', n: 1 }, { tool: 'playwright browser_navigate', n: 1 }, { tool: 'playwright browser_click', n: 1 }]);
+  assert.deepEqual(use.local, ['localhost']);
+  assert.deepEqual(use.offsite, ['https://accounts.google.com/o/oauth2/auth'], 'kept without its query: it can hold a sign-in code');
+  assert.deepEqual(use.denied.map((d) => d.tool), ['Gmail send_message']);
+  const md = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
+  assert.ok(md.includes('Connector use: Gmail search_threads ×1; browser on localhost and accounts.google.com (off-site); 1 refused'), md);
+  assert.ok(!md.includes('code=secret'));
+  assert.match(md, /R11: mcp__claude_ai_Gmail__send_message is denied: connectors are read-only/);
+  const status = JSON.parse(spawnSync(process.execPath, [DRIVER, 'status', '--project', p.project, '--json'], { encoding: 'utf8' }).stdout);
+  assert.deepEqual(status.connectors, [{ epic: E1.id, label: e.label, line: 'Gmail search_threads ×1; browser on localhost and accounts.google.com (off-site); 1 refused', offsite: ['https://accounts.google.com/o/oauth2/auth'], refused: ['Gmail send_message'] }]);
+});

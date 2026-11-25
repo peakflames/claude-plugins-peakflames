@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { RULES, atLimitAsk, chainOf } from './attend.mjs';
-import { gateEntry, isProvisional } from './lib.mjs';
+import { connectorLine, connectorUse, gateEntry, isProvisional, mergeConnectorUse } from './lib.mjs';
 
 const TERMINAL = new Set(['MERGED', 'PARKED', 'FAILED', 'SKIPPED', 'BLOCKED']);
 
@@ -13,6 +13,13 @@ const readJson = (p, fallback = null) => { try { return JSON.parse(fs.readFileSy
 const readLines = (p) => {
   try { return fs.readFileSync(p, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch { return []; }
 };
+/**
+ * What an epic's sessions did with the owner's connectors (#43): the calls by tool, the refused ones, and the pages a
+ * browser call ended on, local and off-site. `sessions` are the epic's step names.
+ */
+export function epicConnectorUse(epicDir, sessions) {
+  return mergeConnectorUse(sessions.map((name) => connectorUse(readLines(path.join(epicDir, name, 'hooks.jsonl')))));
+}
 const usd = (n) => `$${Number(n ?? 0).toFixed(2)}`;
 const mins = (ms) => `${Math.round((ms ?? 0) / 60000)} m`;
 const cell = (s) => String(s ?? '—').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
@@ -103,6 +110,7 @@ export function collectReport(runDir) {
       // What the closing screen says and this report used to leave out: approved amendments, the verifier's words on the pictures, sign-ins nobody answered.
       amended: q.amended ?? [], amendedUnseen: q.amendedUnseen ?? [], seen: q.seen ?? [], unanswered: q.unanswered ?? [], unlooked: q.unlooked ?? null,
       // A provisional run: the questions it answered with a session's own recommendation, and what nobody observed.
+      connectors: epicConnectorUse(dir, (q.sessions ?? []).map((x) => x.name)),
       prototype: q.prototype ?? [], unobserved: (q.unobserved ?? []).map((u) => ({ ...u, check: `/peak-workflow:wrapup-epic ${q.id} reverify ${u.tor}` })), deferred: q.deferred ?? [],
     };
   });
@@ -379,6 +387,10 @@ export function renderReport(r) {
     if ((e.amendedUnseen ?? []).length) L.push('', `Requirement amended without your approval, on a session's proposal (provisional run): ${e.amendedUnseen.join(', ')}. The checks followed the amended text. See "Decided for you in this provisional run".`);
     if (e.seen.length) L.push('', 'What the verifier saw in the pictures (its own words):', ...e.seen.map((x) => `- ${x}`));
     if (e.unanswered.length) L.push('', 'Waited for you and nobody came:', ...e.unanswered.map((u) => `- ${u.step ? `${u.step}: ` : ''}${u.description}`), 'Run autopilot when you are at the computer and it will take you through them.');
+    const use = connectorLine(e.connectors);
+    if (use) L.push('', `Connector use: ${use}.`);
+    if (e.connectors?.offsite.length) L.push('', 'Off-site pages a browser call ended on (a sign-in your app sent it to, or a link it followed):', ...e.connectors.offsite.map((a) => `- ${a}`));
+    if (e.connectors?.denied.length) L.push('', 'Connector calls refused (connectors are read-only; browser tools stay on your app\'s local pages):', ...e.connectors.denied.map((d) => `- R11: ${cell(d.reason)}`));
     if (e.plan) L.push('', `Plan: \`${e.plan}\` — approved by ${!e.planApprovedBy || e.planApprovedBy === 'lint, not a person' ? 'lint, not by a person' : e.planApprovedBy}.${e.fixRounds ? ' One fix round was used.' : ''}`);
     if (e.sessions.length) {
       L.push('', '| Session | Ended | Cost | Turns | Time | Refused calls (parked questions included) |', '|---|---|---|---|---|---|');

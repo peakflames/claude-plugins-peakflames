@@ -117,7 +117,7 @@ them; the state is here. The rule:
 | #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 12 / 13 |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
-| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 1 / 1 |
+| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 0 / 1 (built 2026-11-25; reply on the issue when the owner asks) |
 
 Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
 2026-11-24. Not autopilot, so not in this file: #44 (port the requirements checker to Node).
@@ -142,7 +142,8 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
    `user.name`, a setting changed mid-run). *Done 2026-11-25
    (`feature/peak-workflow-autopilot-launch-leftovers`). Still open in Step 10: MCP (group 5),
    the undecided-values check, a stop that leaves a question, the format-guard hint.*
-5. **MCP connectors** (#43).
+5. **MCP connectors** (#43). *Done 2026-11-25 (`feature/peak-workflow-autopilot-mcp`): see
+   the Step 10 box, and "Connectors: what is left open" under it.*
 6. **Wording** (#40 item 15 "CANNOT VERIFY", "Stopped N times", the scratch-variable refusal).
 7. **Step 6 proofs** (#39): stage only the cheap ones; tick the rest as real runs produce them.
 
@@ -528,12 +529,38 @@ files `CLAUDE.md` names.
 
 ### Step 10 — The launch check and its screen (C2 and C3)
 
-- [ ] **Sessions cannot use MCP connectors, and nothing says so up front** (#43, B11; in code:
+- [x] **Sessions cannot use MCP connectors, and nothing says so up front** (#43, B11; in code:
   `--allowedTools` is fixed, `driver.mjs:868`). One epic spent four relaunches on a block no
   answer could change. Preflight should flag a requirement that needs an external app or API
   read-back as something a run cannot prove; every session should be told MCP tools are
   unavailable; a question caused by a host denial should park once, with only possible
-  answers. C2.
+  answers. C2. *Done 2026-11-25 (`feature/peak-workflow-autopilot-mcp`), on the owner's
+  decisions of that day: sessions get every connector through `ToolSearch`; referee rule R11
+  allows a read (by the action word of the tool's name) and refuses any send, change or
+  delete; browser tools (`browser_…`) work on the app's local pages only, with the owner's
+  signed-in profile, so a "Sign in with …" the app redirects to completes. Same in Full and
+  Provisional. Every session is told not to ask about a connector it cannot use and to list
+  the check under "Not proven for real". Readiness runs `claude mcp list` and names the
+  connectors; the scope review flags a read-back no connector reaches. The report and the
+  closing screen list connector use, refused calls and off-site pages.*
+
+  **After review (owner, 2026-11-25): off-site, click and look only.** On a page that is not
+  the app's (the last `Page URL` a browser call returned, from the step's log), R11 allows
+  click, snapshot, wait, back, close and tabs; typing, forms, keys, scripts and uploads are
+  refused, so the sign-in still completes and "go to Gmail and send" does not. Also from the
+  review: `browser_run_code` refused; a page script that names location, open, fetch,
+  cookies and the like refused; `fetch` and `export` are not read words; a `query` with a
+  write in it refused; connector path arguments go through the path jail; a first word naming
+  the server is skipped (`slack_search_public`); sign-in codes are scrubbed from `hooks.jsonl`.
+
+  **Connectors: what is left open (residual risk, said to the owner).** On a sign-in page or a
+  page a link led to, a session can still click, with the owner's sign-ins; every such page is
+  listed in the report and on the closing screen. "Read-only" for accounts is judged by the
+  action word in the tool's name; a connector with a misleading name could slip through (an
+  unknown word is refused). The page-script check is a word list. A session could add an MCP
+  server of its own to the clone's `.mcp.json`, and any localhost port counts as the app's:
+  neither gives more than Bash already has. `claude mcp list`'s "Connected" is a health
+  check: a session may still find a connector needs a sign-in.
 - [ ] **The undecided-values check parks every epic** (#41, the reporter's comment of
   2026-11-22; not examined). A `TBD — set by the walking-skeleton epic` value or a
   `**Not decided yet:**` line that lists a layer parks every queued epic (`driver.mjs`, `tbd`).
@@ -710,9 +737,10 @@ files `CLAUDE.md` names.
   stopped after 2 minutes; a new resume gate was written. Check on the next launch whether
   the planner asks again. That stop also added nothing to the spend (see "A session that is
   killed costs nothing on the books").
-- [ ] **A builder was denied a tool its project uses** (*no issue*; same run):
+- [x] **A builder was denied a tool its project uses** (*no issue*; same run):
   `mcp__shadcn__get_item_examples_from_registries`. Harmless there; a project's own MCP tools
-  are not reachable from an autopilot session. Unexamined. C3.
+  are not reachable from an autopilot session. Unexamined. C3. *Done 2026-11-25 with #43: a
+  project's MCP tools are reachable; a read such as this one is allowed by R11.*
 
 ### Step 13 — Wording and small behaviour (C3)
 

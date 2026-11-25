@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Autopilot referee: the PreToolUse hook (autopilot-poc-plan.md §6.7, rules R1–R10).
+// Autopilot referee: the PreToolUse hook (autopilot-poc-plan.md §6.7, rules R1–R11).
 //
 // Reads the hook input on stdin and prints either nothing (no opinion: the normal permission
-// flow decides) or a decision. It only ever denies, answers a gate from policy/gates.json, or
-// ends the session; it never allows a tool call that would otherwise be asked about.
+// flow decides) or a decision. It denies, answers a gate from policy/gates.json, or ends the
+// session; the one thing it allows outright is a connector call R11 accepts (the host would
+// refuse it otherwise: it approves nothing).
 // Every decision is appended to <step>/hooks.jsonl. An internal error denies (fail closed).
 //
 // Environment (set by driver.mjs): AUTOPILOT_STATE (the workspace: clone/, gates/, STOP),
@@ -15,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFECT_Q, LEAVE_AS_IS, SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROVISIONAL_BY, isProvisional, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
+import { DEFECT_Q, LEAVE_AS_IS, SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROVISIONAL_BY, isProvisional, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended, mcpTool, isBrowserAction, isReadAction, isLocalHost, pageAddress } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -721,6 +722,84 @@ function ruleR10(ctx, targets) {
   return null;
 }
 
+// ---- R11: connectors (MCP tools; #43, owner decisions 2026-11-25) --------------------------------
+// Every connector the owner set up may be used, in Full and Provisional alike: an account for reading only, a browser
+// on the app's own local pages (with the owner's saved sign-ins, so a "Sign in with …" the app redirects to completes).
+// Never silence: silence sends the call to the host, which approves nothing.
+
+const allow = (rule, reason) => ({ rule, decision: 'allow', reason });
+/** A page a browser call may open: the app's (local) or a file in the clone or the session's scratch folder. */
+function localPage(raw, ctx) {
+  const u = pageAddress(raw);
+  if (!u) return false;
+  if (u.protocol === 'about:') return u.href === 'about:blank';
+  if (u.protocol === 'file:') {
+    let p; try { p = realDeep(decodeURIComponent(u.pathname)); } catch { return false; }
+    return within(p, ctx.clone) || (!!ctx.scratch && within(p, ctx.scratch));
+  }
+  return ['http:', 'https:', 'ws:', 'wss:'].includes(u.protocol) && isLocalHost(u.hostname);
+}
+/** The addresses a browser call would open: its `url`, and any address written into a script it runs on the page. */
+function browserTargets(ti) {
+  const out = [];
+  if (ti.url !== undefined && ti.url !== null && ti.url !== '') out.push(String(ti.url));
+  for (const k of ['function', 'code', 'script', 'expression']) {
+    if (typeof ti[k] === 'string') out.push(...(ti[k].match(/\b(?:https?|wss?|file):\/\/[^\s'"`<>)\]]+/gi) ?? []));
+  }
+  return out;
+}
+/** A script that could take the page elsewhere, send data out or read the owner's cookies (seen in review: `location.href = '//evil.com'`). */
+const LEAVING_SCRIPT = /location|\bopen\s*\(|fetch|XMLHttpRequest|sendBeacon|WebSocket|EventSource|import\s*\(|atob|href|\.src\b|\baction\b|submit|cookie|\beval\b|Function\s*\(|postMessage|navigator/i;
+/** On a page that is not the app's (a sign-in it was sent to): finish it with a click, look, or leave. Nothing typed, no script. */
+const OFFSITE_OK = new Set(['browser_click', 'browser_snapshot', 'browser_take_screenshot', 'browser_wait_for', 'browser_navigate', 'browser_navigate_back', 'browser_close', 'browser_tabs', 'browser_console_messages', 'browser_network_requests', 'browser_hover', 'browser_resize']);
+/** The page the session's browser is on now: the last address a browser call's result named in this step's log. */
+function currentPage(ctx) {
+  if (!ctx.step) return null;
+  let text = ''; try { text = fs.readFileSync(path.join(ctx.step, 'hooks.jsonl'), 'utf8'); } catch { return null; }
+  const lines = text.split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (!lines[i].includes('page_urls')) continue;
+    let h; try { h = JSON.parse(lines[i]); } catch { continue; }
+    if (Array.isArray(h.page_urls) && h.page_urls.length) return h.page_urls.at(-1);
+  }
+  return null;
+}
+/** A query whose text writes (SQL, GraphQL). */
+const WRITING_QUERY = /\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|merge|replace|upsert|mutation)\b/i;
+/** Path arguments of a connector call go through the same jail as a file tool; a browser file it saves needs a writable place. */
+function connectorPaths(ctx, t, ti) {
+  const saves = /screenshot|pdf|save|download/.test(t.action);
+  for (const k of ['path', 'paths', 'filename', 'file_path', 'filePath', 'directory', 'dir']) {
+    for (const raw of [ti[k]].flat()) {
+      if (typeof raw !== 'string' || !raw) continue;
+      const c = classify(ctx, raw);
+      if (c !== 'rw' && c !== 'ro') return deny('R2', `path jail — ${c}.${saves ? scratchHint(ctx) : ''}`);
+      if (saves && k !== 'paths' && c === 'ro') return deny('R2', `path jail — ${raw} is read-only for this session.${scratchHint(ctx)}`);
+    }
+  }
+  return null;
+}
+function ruleR11(ctx) {
+  const tool = ctx.input.tool_name; const ti = ctx.input.tool_input ?? {};
+  const t = mcpTool(tool);
+  const jailed = connectorPaths(ctx, t, ti);
+  if (jailed) return jailed;
+  if (isBrowserAction(t.action)) {
+    if (t.action === 'browser_run_code') return deny('R11', 'browser_run_code is denied: it reaches past the page (any site, the saved sign-ins). Use the page tools (navigate, click, type, evaluate) on your app\'s local pages');
+    const away = browserTargets(ti).find((u) => !localPage(u, ctx));
+    if (away) return deny('R11', `${t.action} to ${away} is denied: browser tools work on only your app's local pages; a sign-in page your app redirects to is fine`);
+    const page = currentPage(ctx);
+    if (page && !localPage(page, ctx) && !OFFSITE_OK.has(t.action) && !(t.action === 'browser_navigate' && ti.url)) {
+      const host = pageAddress(page)?.hostname || page;
+      return deny('R11', `${t.action} is denied: ${host} is not your app's page: there a session only clicks and looks (to finish a sign-in your app sent it to). Go back to your app's local page first`);
+    }
+    if (typeof (ti.function ?? ti.expression ?? ti.script) === 'string' && LEAVING_SCRIPT.test(ti.function ?? ti.expression ?? ti.script)) return deny('R11', `${t.action} is denied: a script on the page may not leave the page or send data out (location, open, fetch, cookies…). Use browser_navigate to one of your app's local pages, or click`);
+    return allow('R11', `browser tool ${t.action} on the app's local pages`);
+  }
+  if (isReadAction(t.action, t.server) && !(/^query/i.test(t.action) && WRITING_QUERY.test(JSON.stringify(ti)))) return allow('R11', `a read through the ${t.label} connector`);
+  return deny('R11', `${tool} is denied: connectors are read-only in autopilot (the owner's rule). Do not ask about it; list what it would have proven under "Not proven for real" in your report`);
+}
+
 // ---- the decision ------------------------------------------------------------------------------
 
 const deny = (rule, reason, extra = {}) => ({ rule, decision: 'deny', reason, ...extra });
@@ -737,6 +816,7 @@ export function decide(input, env = process.env) {
   // StructuredOutput is how `--json-schema` returns the auditor's findings; it touches no file.
   if (ctx.role === 'auditor' && tool === 'StructuredOutput') return null;
   if (ctx.role === 'auditor' && !['Read', 'Glob', 'Grep'].includes(tool)) return deny('R2', `${tool} is denied: the auditor only reads`);
+  if (mcpTool(tool)) return ruleR11(ctx);
 
   let d = ruleR2Files(ctx);
   if (d) return d;
@@ -755,6 +835,7 @@ export function render(d) {
   if (!d) return null;
   const out = { hookSpecificOutput: { hookEventName: 'PreToolUse' } };
   if (d.decision === 'answer') Object.assign(out.hookSpecificOutput, { permissionDecision: 'allow', permissionDecisionReason: `autopilot ${d.rule}: ${d.reason}`, updatedInput: d.updatedInput });
+  else if (d.decision === 'allow') Object.assign(out.hookSpecificOutput, { permissionDecision: 'allow', permissionDecisionReason: `autopilot ${d.rule}: ${d.reason}` });
   else Object.assign(out.hookSpecificOutput, { permissionDecision: 'deny', permissionDecisionReason: `autopilot ${d.rule}: ${d.reason}` });
   if (d.stop) Object.assign(out, { continue: false, stopReason: d.stop });
   return out;
@@ -772,10 +853,11 @@ function main() {
   if (step) {
     const brief = JSON.stringify(input.tool_input ?? null);
     try {
-      fs.appendFileSync(path.join(step, 'hooks.jsonl'), JSON.stringify({
+      const scrub = (line) => (mcpTool(input.tool_name) ? line.replace(/([?&#](?:code|state|token|access_token|id_token|refresh_token|session|sig|signature|auth)=)[^&#\s"\\]+/gi, '$1…') : line); // a sign-in code in an address
+      fs.appendFileSync(path.join(step, 'hooks.jsonl'), scrub(JSON.stringify({
         t: new Date().toISOString(), hook: 'PreToolUse', tool_name: input.tool_name, rule: d?.rule ?? null, decision: d?.decision ?? 'pass', reason: d?.reason ?? null, gate: d?.gate ?? undefined, prototype: d?.prototype ?? undefined,
         agent_id: input.agent_id, agent_type: input.agent_type, tool_use_id: input.tool_use_id, tool_input: brief && brief.length > 4000 ? brief.slice(0, 4000) + '…' : input.tool_input ?? null,
-      }) + '\n');
+      })) + '\n');
     } catch { /* logging never changes a decision */ }
   }
   const out = render(d);

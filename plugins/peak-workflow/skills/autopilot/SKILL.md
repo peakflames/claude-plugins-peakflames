@@ -390,6 +390,13 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    words, and what will happen ("will stop and wait for you"). Recommend dropping an epic
    only when it cannot succeed tonight. The full review is given when asked.
 
+   **Connectors.** Sessions can use the owner's connectors (`launch.connectors`), read-only, and a
+   browser on the app's local pages with the owner's saved sign-ins. A requirement that reads a
+   result back from an outside service that no connector in `launch.connectors` reaches, or needs a connector to send, change or delete something, cannot be proven tonight
+   and no answer during the run changes that: it is one "Needs you" line — the epic's label,
+   the requirement in plain words, and "will be listed as not proven for real". Judge it
+   yourself from the Scenario with the connector list in hand; the word flags do not say it.
+
 8. **Nothing runnable.** Before stopping, look at the skipped epics. If any is skipped only
    because its status is not `Not Started` or because it belongs to someone else (the two
    reasons Step 2 item 1 allows), list them and ask with `AskUserQuestion` (`multiSelect: true`, one option per
@@ -434,6 +441,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    **Set up for you:** <one line: what item 5 saved, in plain words>. Autopilot's copy of your
    project builds and passes your tests.
 
+   **Connectors:** <only when `launch.connectors.list` is not empty> Sessions can use your connectors, read-only: <names, up to 5, then "and <N> more">. Browser tools work on your app's local pages, with your saved sign-ins.
+
    **Needs you:** <only when there is something: one line each>
 
    Your project is not changed and nothing is pushed. Ask for "details" to see models and
@@ -455,11 +464,19 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
      say "The end time is <time>, which may not be enough for even the first epic" — the
      owner changes it with `Change the queue or limits`); a `claudeBin` other than `claude`
      (sessions will not be real Claude Code sessions); a `workspaceBudgets` value that
-     overrides what the owner asked for. Nothing else.
+     overrides what the owner asked for; connectors that need a sign-in
+     (`launch.connectors.list` entries with status `needs-sign-in`), as one line: "<names> need you to sign in before they can be used; they are skipped otherwise" (names up to 5, then
+     "and <N> more"). Nothing else.
+   - "Connectors" names those with status `connected`, by name, never their tools: an
+     owner may have dozens. When `launch.connectors` is null (they could not be listed), leave
+     the line out; the warning says why.
 
    **Details, only when the owner asks** (any of these, on request, not before):
 
    - The queue with each epic's dependencies, and the full readiness table (Step 1 item 6).
+   - **Connectors**: every entry of `launch.connectors.list`, its name and status in plain
+     words (connected, needs you to sign in, could not be reached). Sessions read through
+     them and never send, change or delete; browser tools open only the app's local pages.
    - **Safety caps** from `launch.caps`, under exactly that heading, with this sentence first:
      "A cap is where autopilot stops a step that has run away. It is a ceiling, not what a step
      usually takes or costs." Then a table with one row per entry — `plan`, `build`, `audit`,
@@ -1066,6 +1083,9 @@ Leave out a part that has nothing to say.
 **Fixed during the final check, without asking:** <only when `fixes` has entries>
 - <epic, short> — <what the verifier asked, in a few plain words> (<files>)
 
+**Connectors used:** <only when `connectors` has an entry with `offsite` or `refused`>
+- <epic, short> — off-site pages: <hosts of `offsite`>; refused: <`refused`>
+
 **Things autopilot got in the way of:** <only when `friction` has entries>
 
 **Do this next:** <exactly one thing>
@@ -1129,6 +1149,11 @@ Leave out a part that has nothing to say.
   say how many more the full report holds. Then one sentence on what the owner can do: run
   autopilot while they are at the computer, so a check that needs a person is done for real,
   or queue work that proves it.
+- **Connectors used** comes from `connectors`: per epic, the pages outside the app a browser
+  call ended on (a sign-in the app sent it to, or a link it followed and then clicked on) and
+  the connector calls refused as writes. Name every off-site host; the owner signed in on that
+  browser, so each is worth a look. An epic whose use stayed on local pages and reads is left
+  out; its `line` is in the report.
 - **Seen wrong and left as is** comes from `left`: what the final check saw wrong in the
   merged work and did not fix (wrong copy, a stray character, a layout broken at one width),
   either because it was not this epic's or because it was left as is. It is not "not proven":

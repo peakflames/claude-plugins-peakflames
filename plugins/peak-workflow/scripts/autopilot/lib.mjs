@@ -389,3 +389,107 @@ export function estimateCost(usageByMessage) {
   }
   return { usd: +usd.toFixed(6), tokens, unpriced: [...unpriced] };
 }
+
+// ---- Connectors (MCP tools; issue #43, owner decisions 2026-11-25) ------------------------------
+// Sessions may use every connector the owner has set up: accounts for reading only, browser tools on the app's local pages.
+
+/** The action words of a read: the first word of a connector tool's action must be one of them. */
+// Not `fetch` (a fetch server is WebFetch again, which sessions are denied) nor `export` (it can write a file or a copy).
+export const READ_WORDS = ['get', 'list', 'search', 'read', 'query', 'find', 'view', 'describe', 'guide', 'lookup', 'show', 'count'];
+/** Words that make any action a change, wherever they stand (`get_or_create_label`). Unknown words fall on the deny side anyway. */
+const CHANGE_WORDS = new Set(['create', 'update', 'upsert', 'delete', 'remove', 'send', 'trash', 'forward', 'reply', 'write', 'modify', 'set', 'add', 'edit', 'insert', 'replace', 'post', 'publish', 'upload', 'submit', 'apply', 'move', 'archive', 'mark', 'share', 'invite', 'approve', 'merge', 'assign', 'execute', 'run']);
+const words = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+/** `mcp__<server>__<action>` → `{ server, action, label }`; `label` is how the owner knows it ("Gmail", "Google Calendar"). Null for any other tool. */
+export function mcpTool(name) {
+  const parts = String(name ?? '').split('__');
+  if (parts[0] !== 'mcp' || parts.length < 3) return null;
+  const server = parts[1]; const action = parts.slice(2).join('__');
+  return { server, action, label: server.replace(/^claude_ai_/, '').replace(/_/g, ' ') };
+}
+/** A browser tool (Playwright MCP's are all `browser_…`): used on the app's own pages, not for reading an account. */
+export const isBrowserAction = (action) => /^browser_/.test(String(action ?? ''));
+/** A connector action that only reads, by its name. A first word that names the server is skipped (`slack_search_public`, `notion-search`). */
+export function isReadAction(action, server = '') {
+  const w = words(action);
+  if (w.length > 1 && words(server).includes(w[0])) w.shift();
+  return w.length > 0 && READ_WORDS.includes(w[0]) && !w.some((x) => CHANGE_WORDS.has(x));
+}
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '0.0.0.0']);
+export const isLocalHost = (h) => LOCAL_HOSTS.has(h) || String(h).endsWith('.localhost') || /^127\.\d+\.\d+\.\d+$/.test(h);
+/** A page address as a browser tool takes it (`localhost:3000` is http), parsed; null when it is not one. */
+export function pageAddress(raw) {
+  let s = String(raw ?? '').trim();
+  if (!s) return null;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && !/^(about|data|javascript|blob|file|chrome|view-source):/i.test(s)) s = `http://${s}`;
+  try { return new URL(s); } catch { return null; }
+}
+/** The page addresses a browser call's result names (`Page URL: …`), from its log line. */
+export function pageUrls(h) {
+  if (Array.isArray(h?.page_urls)) return h.page_urls;
+  const text = typeof h?.tool_response === 'string' ? h.tool_response : JSON.stringify(h?.tool_response ?? '');
+  return [...text.matchAll(/Page URL:\s*([^\s"\\]+)/g)].map((m) => m[1]);
+}
+
+/**
+ * What one step's sessions did with connectors, from its referee log rows: `{ calls: [{tool, n}], denied: [{tool, reason}],
+ * local: [hosts], offsite: [addresses] }`. An off-site page is one a browser call ended on that is not local (an OAuth
+ * sign-in the app redirected to); it is kept without its query, which can hold a sign-in code.
+ */
+export function connectorUse(rows) {
+  const calls = new Map(); const denied = []; const local = new Set(); const offsite = new Set();
+  for (const h of rows ?? []) {
+    const t = mcpTool(h?.tool_name);
+    if (!t) continue;
+    const tool = `${t.label} ${t.action}`;
+    if (h.hook === 'PreToolUse' && h.decision === 'deny') denied.push({ tool, reason: h.reason ?? null });
+    if (h.hook !== 'PostToolUse') continue;
+    calls.set(tool, (calls.get(tool) ?? 0) + 1);
+    if (!isBrowserAction(t.action)) continue;
+    for (const raw of pageUrls(h)) {
+      const u = pageAddress(raw);
+      if (!u || u.protocol === 'about:' || u.protocol === 'file:') continue;
+      if (isLocalHost(u.hostname)) local.add(u.hostname); else offsite.add(`${u.origin}${u.pathname}`);
+    }
+  }
+  return { calls: [...calls].map(([tool, n]) => ({ tool, n })), denied, local: [...local], offsite: [...offsite] };
+}
+/** Several steps' use, added up. */
+export function mergeConnectorUse(list) {
+  const calls = new Map(); const out = { denied: [], local: new Set(), offsite: new Set() };
+  for (const u of list) {
+    for (const c of u.calls) calls.set(c.tool, (calls.get(c.tool) ?? 0) + c.n);
+    out.denied.push(...u.denied); u.local.forEach((x) => out.local.add(x)); u.offsite.forEach((x) => out.offsite.add(x));
+  }
+  return { calls: [...calls].map(([tool, n]) => ({ tool, n })), denied: out.denied, local: [...out.local], offsite: [...out.offsite] };
+}
+/** One line for the report: "Gmail search_threads ×3; browser on localhost and accounts.google.com (sign-in)". Null when nothing was used. */
+export function connectorLine(u) {
+  if (!u || (!u.calls.length && !u.denied.length)) return null;
+  const parts = u.calls.filter((c) => !/ browser_/.test(c.tool)).map((c) => `${c.tool} ×${c.n}`);
+  const hosts = [...u.local, ...[...new Set(u.offsite.map((a) => { try { return new URL(a).hostname; } catch { return a; } }))].map((h) => `${h} (off-site)`)];
+  if (u.calls.some((c) => / browser_/.test(c.tool))) parts.push(`browser${hosts.length ? ` on ${hosts.join(' and ')}` : ''}`);
+  if (u.denied.length) parts.push(`${u.denied.length} refused`);
+  return parts.join('; ');
+}
+
+/**
+ * `claude mcp list` → `[{ name, source, status }]`. Its lines are `<name>: <address or command> - <mark> <status>`;
+ * `source` is `claude.ai` (an account connector), `plugin` or `local`; `status` is `connected`, `needs-sign-in`,
+ * `failed` or `not-configured`. "Connected" there is a health check, not proof a session can use it.
+ */
+export function parseMcpList(text) {
+  const out = [];
+  for (const line of String(text ?? '').split('\n')) {
+    const m = line.match(/^(.+?): (.*) - [^\w\s]+ (.+?)\s*$/); // the mark: ✔ ! ✗ or -
+    if (!m) continue;
+    let name = m[1].trim(); let source = 'local';
+    if (/^claude\.ai /.test(name)) { source = 'claude.ai'; name = name.slice('claude.ai '.length); }
+    else if (/^plugin:/.test(name)) { source = 'plugin'; name = name.split(':').slice(2).join(':') || name; }
+    const s = m[3].toLowerCase();
+    const status = /^connected/.test(s) ? 'connected' : /auth|sign/.test(s) ? 'needs-sign-in' : /not configured/.test(s) ? 'not-configured' : 'failed';
+    out.push({ name, source, status });
+  }
+  return out;
+}

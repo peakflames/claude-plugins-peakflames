@@ -18,7 +18,7 @@ export const E1 = { id: 'Lg1Csv7', slug: 'csv-import', branch: 'feature/epic-Lg1
 const gitHome = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-gitcfg-'));
 fs.writeFileSync(path.join(gitHome, 'gitconfig'), '');
 Object.assign(process.env, {
-  GIT_CONFIG_GLOBAL: path.join(gitHome, 'gitconfig'), GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: path.join(gitHome, 'gitconfig'), GIT_CONFIG_NOSYSTEM: '1', AUTOPILOT_SKIP_MCP_LIST: '1', // a test that names the real `claude` never lists the owner's connectors
   GIT_AUTHOR_NAME: 'Autopilot Test', GIT_AUTHOR_EMAIL: 'test@example.invalid',
   GIT_COMMITTER_NAME: 'Autopilot Test', GIT_COMMITTER_EMAIL: 'test@example.invalid',
 });

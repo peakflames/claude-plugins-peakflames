@@ -56,7 +56,7 @@ export function buildDigest(steps) {
   for (const { name, dir } of steps) {
     out.push(`## ${name}`, '');
     const events = readLines(path.join(dir, 'hooks.jsonl'));
-    const calls = events.filter((e) => (e.hook === 'PostToolUse' || e.hook === 'PostToolUseFailure') || (e.hook === 'PreToolUse' && e.decision && e.decision !== 'pass'));
+    const calls = events.filter((e) => (e.hook === 'PostToolUse' || e.hook === 'PostToolUseFailure') || (e.hook === 'PreToolUse' && e.decision && e.decision !== 'pass' && e.decision !== 'allow')); // an allowed connector call shows as its result line
     if (!calls.length) out.push('(the referee log has no tool call for this session)', '');
     for (const e of calls) {
       n += 1;
