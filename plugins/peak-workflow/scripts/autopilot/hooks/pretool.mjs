@@ -676,8 +676,8 @@ function ruleR8(ctx) {
   // Each answer taken on the provisional setting is a gate file like any other, already decided and already used:
   // the one record the driver's checks, the report and the closing screen read.
   const taken = protoNow.map(({ answer, ...g }) => {
-    const date = new Date().toISOString();
-    return { kind: g.kind, tor: g.tor, answer, gate: writeGate(ctx, { ...g, artifacts: [], decided: { answer, by: PROVISIONAL_BY, date, standing: true, prototype: true, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date } } }) };
+    const at = new Date(); const date = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`; // the local day, as every gate date; `used.date` stays a UTC timestamp
+    return { kind: g.kind, tor: g.tor, answer, gate: writeGate(ctx, { ...g, artifacts: [], decided: { answer, by: PROVISIONAL_BY, date, standing: true, prototype: true, used: { run: ctx.runName, session: path.basename(ctx.step ?? ''), date: at.toISOString() } } }) };
   });
   if (standing.length) { const file = path.join(ctx.step, SMALL_FIX_FILE); fs.writeFileSync(file, JSON.stringify([...readJson(file, []), ...standing], null, 2) + '\n'); }
   if (standing.length === Object.keys(answers).length) return { rule: 'R8', decision: 'answer', owner: standing.length, reason: `answered from the owner's standing answer for small fixes: ${Object.values(answers).join(' | ')}. Keep the fix small: it is checked at the merge against the owner's limits, never touches a requirement file and never removes a line from a test${standing.some((x) => x.testOnly) ? `. For ${standing.filter((x) => x.testOnly).map((x) => x.tor).join(' and ')} the fix is the missing test alone, in a test file: when that test passes against the code as built, the requirement is met; when it fails, the code is wrong, so ask the question again without "Fix now"` : ''}`, updatedInput: { ...ctx.input.tool_input, answers } };

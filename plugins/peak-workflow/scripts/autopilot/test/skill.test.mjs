@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, run } from '../driver.mjs';
+import { PLUGIN_DIR, localDate, run } from '../driver.mjs';
 import { DRIVER, E1, addEpic, alive, buildActions, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const SKILL = fs.readFileSync(path.join(PLUGIN_DIR, 'skills', 'autopilot', 'SKILL.md'), 'utf8');
@@ -181,7 +181,7 @@ test('P3.5 Part 1: one workspace — two runs share one clone and one gates/, ea
   const decided = driver('decide', '--workspace', p.state, '--gate', gate.file, '--answer', 'Fix now', '--by', 'Pat Owner');
   assert.equal(decided.status, 0, decided.stderr);
   assert.deepEqual([decided.json().effect, decided.json().enters], ['resume', 'BUILD']);
-  assert.deepEqual(readJson(path.join(p.state, gate.file)).decided, { answer: 'Fix now', by: 'Pat Owner', date: new Date().toISOString().slice(0, 10), scope: 'next-run' });
+  assert.deepEqual(readJson(path.join(p.state, gate.file)).decided, { answer: 'Fix now', by: 'Pat Owner', date: localDate(), scope: 'next-run' });
 
   // Step 4.6 — the fetch command from the report brings the merged work into the owner's repository.
   const fetch = readJson(path.join(run1, 'report.json')).fetch;
@@ -306,7 +306,7 @@ test('the loop, end to end: launch, a technical stop, status says continue, the 
   assert.deepEqual([s1.next, s1.autoContinue.length, s1.waiting.length], ['continue', 1, 0]);
   const c = driver('continue', '--workspace', s1.workspace, '--json');
   assert.equal(c.status, 0, c.stderr);
-  assert.deepEqual(readJson(path.join(p.state, 'gates', `${E1.id}-1.json`)).decided, { answer: 'Resume from where it stopped', by: 'Todd Schavey', date: new Date().toISOString().slice(0, 10), scope: 'next-run', standing: true });
+  assert.deepEqual(readJson(path.join(p.state, 'gates', `${E1.id}-1.json`)).decided, { answer: 'Resume from where it stopped', by: 'Todd Schavey', date: localDate(), scope: 'next-run', standing: true });
   const s2 = status('--queue', E1.id);
   assert.equal(s2.next, 'readiness');
   assert.deepEqual(s2.relaunch.ask, ['attended'], 'real money was answered at launch; whether the owner is there never was, so it is asked once');

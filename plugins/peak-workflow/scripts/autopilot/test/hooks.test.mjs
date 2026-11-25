@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR } from '../driver.mjs';
+import { PLUGIN_DIR, localDate } from '../driver.mjs';
 import { offeredLabel } from '../hooks/pretool.mjs';
 import { isTestPath, standingAnswer, testNamed, testNamedDirs } from '../lib.mjs';
 import { E1, git, makeProject, planText, readJson } from './helpers.mjs';
@@ -786,6 +786,7 @@ test('R8 provisional: takes "Amend" when offered and the recommended "Fix now" o
   const g = h.gate(1);
   assert.deepEqual([g.kind, g.tor, g.recommendation, g.question, g.session], ['deferral', E1.tors[1], 'Defer', defer, 'build-1']);
   assert.deepEqual([g.decided.answer, g.decided.by, g.decided.standing, g.decided.prototype, g.decided.used.session], [DEF[1], 'autopilot (provisional run)', true, true, 'build-1']);
+  assert.equal(g.decided.date, localDate(), 'the local day, as every gate date (#40)'); assert.match(g.decided.used.date, /T.*Z$/);
   assert.deepEqual(h.hooksLog().at(-1).prototype, [{ kind: 'deferral', tor: E1.tors[1], answer: DEF[1], gate: `${E1.id}-1.json` }]);
   // Asked again by a later session: the same answer, and no second record.
   answered(h.ask(defer, DEF), defer, DEF[1]);

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, defaultConfig, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, localDate, scratchRule, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -796,4 +796,18 @@ test('a first launch names the project on the command line, runs on the confirme
   const log = fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8');
   assert.match(log, new RegExp(`run r1: queue ${E1.id}; integration line develop`));
   assert.match(log, /run r1: limits: run budget \$40; end by no end time; technical stops continued 2 per epic; when an epic parks: continue/);
+});
+
+test('gate dates are the machine\'s local date: west of UTC near midnight, the day is still the one on the owner\'s clock (#40)', () => {
+  const at = '2026-11-25T05:30:00Z'; // 21:30 the evening before in Los Angeles
+  const local = (tz) => spawnSync(process.execPath, ['--input-type=module', '-e', `import { localDate } from ${JSON.stringify(new URL('../driver.mjs', import.meta.url).href)}; console.log(localDate(new Date('${at}')));`], { encoding: 'utf8', env: { ...process.env, TZ: tz } }).stdout.trim();
+  assert.equal(local('America/Los_Angeles'), '2026-11-24');
+  assert.equal(local('UTC'), '2026-11-25');
+  assert.equal(local('Asia/Tokyo'), '2026-11-25');
+  assert.match(localDate(), /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('the scratch rule shows the one form the referee allows: "$AUTOPILOT_SCRATCH/…" as it is, not a copy or a relative path (Pilot Light)', () => {
+  const rule = scratchRule('/w/runs/r/epics/x/build-1/scratch');
+  assert.match(rule, /In a command, use `"\$AUTOPILOT_SCRATCH\/out\.txt"` as it is \(the file tools take the folder above\); copying it into another variable \(`S="\$AUTOPILOT_SCRATCH"`\) or a path relative to the current folder \(`\.\/out\.txt`\) is refused, or lands in the repository\./);
 });
