@@ -109,7 +109,7 @@ them; the state is here. The rule:
 | #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 0 / 2 |
 | #36 | The run budget is not enforced inside a step | Step 9 | 1 / 1 |
 | #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
-| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 13 / 16 |
+| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 11 / 18 |
 | #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 13 / 13 |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
@@ -352,7 +352,9 @@ The 2026-11-21 changes (#41, I2 and I6):
 - [x] "I'll be away": an epic that needs the owner is set aside, independent epics keep
   building, its dependents are blocked (Pilot Light run `20261122-094004`: yZQYIVE and n2g5TvI
   parked, their 8 dependents blocked, JlkOIsy still ran).
-- [ ] With the owner there, the run stops at the first one.
+- [x] With the owner there, the run stops at the first one. *Seen 2026-11-25, Pilot Light run
+  `20261125-112902`: XRSSsTW parked for a look and the run ended there (`autopilot.log`: "stopping
+  the run (the owner did not say they would be away…)").*
 - [ ] Autopilot decides a technical stop itself (new plan, repair, re-run of the final check,
   the final check's own fix, reviewer findings), under the one count per epic, and the closing
   screen lists what it decided.
