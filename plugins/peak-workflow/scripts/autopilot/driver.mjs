@@ -27,8 +27,8 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
-import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
-import { writeReport } from './report.mjs';
+import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening, connectorLine, mergeConnectorUse, parseMcpList } from './lib.mjs';
+import { epicConnectorUse, writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
 
@@ -1099,6 +1099,32 @@ repository, \`/tmp\` included, may be refused.
 In a command, use \`"$AUTOPILOT_SCRATCH/out.txt"\` as it is (the file tools take the folder above); copying it into another variable (\`S="$AUTOPILOT_SCRATCH"\`) or a path relative to the current folder (\`./out.txt\`) is refused, or lands in the repository.
 `;
 
+/**
+ * What every working session is told about the owner's connectors (#43, owner decisions 2026-11-25). Seen live: with
+ * no connector reachable, a session asked the owner four times for something no answer could grant (~$8 of relaunches).
+ * The referee (R11) enforces it; this says it, so the session does not ask.
+ */
+export const CONNECTOR_RULE = `# Connectors (the owner's accounts and browser)
+
+The owner's connectors are available to you: their accounts (Gmail, Drive and the like) and a
+browser. They are not loaded at the start: find one with \`ToolSearch\` (for example
+"gmail search" or "browser navigate") before you call it.
+
+- **Accounts are read only.** Get, list, search and read; never send, change or delete anything
+  through a connector. Such a call is refused.
+- **Browser tools work on your app's local pages.** Open only pages your app serves (localhost,
+  127.0.0.1, or a file in the repository), and click, type and fill freely there. The owner's
+  sign-ins carry over, so a "Sign in with …" page your app redirects to completes with a
+  click. On such a page you may only click and look, then go back to your app; typing, scripts
+  and opening any other site are refused. \`browser_run_code\` is refused; a script on the page
+  may not leave it or send data out.
+- A connector that needs a sign-in, or a check that needs a connector to send, change or delete
+  something, is not something the owner can grant during a run. Do not ask the owner about it:
+  list what it would have proven under the heading "Not proven for real" in your final report,
+  with what you checked instead.
+- A read through a connector is not a paid call; the rule on calls that cost real money is unchanged.
+`;
+
 const lookReasons = (reasons) => (reasons ?? []).filter((r) => /operator-observed|UI epic/.test(r));
 /** The look gate's question in the owner's words: "This epic changed screens; pictures of them are ready." and "<TOR> needs a person to check it." */
 export function lookAsk(reasons, pictures) {
@@ -1199,7 +1225,8 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
     '--plugin-dir', pluginDir,
     '--settings', path.join(stepDir, 'settings.json'),
     '--permission-mode', 'acceptEdits',
-    '--allowedTools', 'Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'Skill', 'Agent', 'TaskCreate', 'TaskUpdate',
+    // ToolSearch: the owner's connectors are deferred tools, loaded through it (#43); the referee's R11 rules each call.
+    '--allowedTools', 'Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'Skill', 'Agent', 'TaskCreate', 'TaskUpdate', 'ToolSearch',
     '--disallowedTools', 'WebFetch', 'WebSearch',
     '--max-turns', String(b.turns), '--max-budget-usd', String(b.usd),
     '--session-id', sessionId, '--model', b.model,
@@ -2344,6 +2371,8 @@ class Run {
       fs.mkdirSync(scratch, { recursive: true });
       fs.writeFileSync(path.join(stepDir, 'scratch-rule.md'), scratchRule(scratch));
       appendFiles.push(path.join(stepDir, 'scratch-rule.md'));
+      fs.writeFileSync(path.join(stepDir, 'connector-rule.md'), CONNECTOR_RULE);
+      appendFiles.push(path.join(stepDir, 'connector-rule.md'));
     }
     writeJson(path.join(stepDir, 'settings.json'), sessionSettings(cfg, { kind, scratch }));
     this.ignoreLook();
@@ -4076,11 +4105,12 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
   const left = Array.isArray(confirmed) && epics ? confirmed.filter((id) => byId.has(id) && byId.get(id).eligibility !== 'complete') : [];
   const lastQueue = left.length ? { run: lastRun.run, ids: left, labels: left.map((id) => byId.get(id).label), finishedSince: confirmed.filter((id) => byId.get(id)?.eligibility === 'complete') } : null;
   const wsBudgets = tryJson(path.join(workspace, 'settings.json'), {})?.budgets;
+  const connectors = connectorFacts(project, config, warn);
   const run = newRunName(workspace);
   return {
     ok: refuse.length === 0, refuse, warn, integration, freeGb, workspace, clone, run, runDir: runDirOf(workspace, run), settingsFileExists: exists(path.join(workspace, 'settings.json')),
     projectSettingsFile: projectSettingsFile(project), projectSettingsFileExists: exists(projectSettingsFile(project)),
-    runs, lastRun, lastQueue, openGates, decidedGates, sync, env,
+    runs, lastRun, lastQueue, openGates, decidedGates, sync, env, connectors,
     // Per-step settings in the workspace's settings.json win over the project's file: named so the confirm screen can say so.
     workspaceBudgets: wsBudgets && typeof wsBudgets === 'object' ? Object.fromEntries(BUDGET_STEPS.filter((k) => wsBudgets[k] && typeof wsBudgets[k] === 'object').map((k) => [k, wsBudgets[k]])) : {}, endByLocal: config.endBy ? new Date(config.endBy).toString() : null,
     // `onPark` is null here unless the project set it: before launch nobody has said whether they will be there, and it follows that answer.
@@ -4088,6 +4118,25 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
     // The per-session safety caps, sized for the confirm screen: ceilings, never estimates.
     caps: ['plan', 'build', 'audit', 'verify', 'fix'].filter((k) => config.budgets[k]).map((k) => ({ session: k, size: capSize(config.budgets[k].wallMin), minutes: config.budgets[k].wallMin, usd: config.budgets[k].usd, model: config.budgets[k].model ?? null, effort: config.budgets[k].effort ?? null })),
   };
+}
+
+/**
+ * The owner's connectors, for the launch screen (#43): `{ list: [{name, source, status}], connected, needsSignIn, failed }`
+ * from `claude mcp list` (about 2 s, no model). Its "Connected" is a health check, not proof a session can use one. Null,
+ * with one warning, when it cannot be listed; sessions can still use them. AUTOPILOT_SKIP_MCP_LIST: a test that names
+ * the real `claude` never lists the owner's real connectors.
+ */
+function connectorFacts(project, config, warn) {
+  if (config.claudeBin === 'claude' && process.env.AUTOPILOT_SKIP_MCP_LIST === '1') return null;
+  const script = /\.(mjs|cjs|js)$/.test(config.claudeBin);
+  const r = sh(script ? process.execPath : config.claudeBin, [...(script ? [config.claudeBin] : []), 'mcp', 'list'], { cwd: exists(project) ? project : undefined, timeout: 30000 });
+  if (r.code !== 0 || r.timedOut) {
+    warn.push(`could not list your connectors (\`claude mcp list\` ${r.timedOut ? 'took over 30 s' : `exited ${r.code}`}); sessions can still use them, but this screen cannot name them`);
+    return null;
+  }
+  const list = parseMcpList(`${r.out}\n${r.err}`).filter((c) => c.status !== 'not-configured');
+  const n = (st) => list.filter((c) => c.status === st).length;
+  return { list, connected: n('connected'), needsSignIn: n('needs-sign-in'), failed: n('failed') };
 }
 
 /**
@@ -4442,6 +4491,15 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   // What a provisional run answered with a session's own recommendation, each with what the owner needs to review it.
   const tookOf = new Map(chain.flatMap((name) => (stateOf(name)?.queue ?? []).flatMap((q) => (q.prototype ?? []).map((x) => [x.gate, x]))));
 
+  // What sessions did with the owner's connectors (#43), per epic over the chain: one line each, the off-site pages a
+  // browser call ended on and the refused calls, for the closing screen. Only epics that used one.
+  const useOf = new Map();
+  for (const name of chain) for (const q of stateOf(name)?.queue ?? []) {
+    const u = epicConnectorUse(path.join(runDirOf(ws, name), 'epics', q.id), (q.sessions ?? []).map((x) => x.name));
+    if (u.calls.length || u.denied.length) useOf.set(q.id, { label: q.label ?? q.id, uses: [...(useOf.get(q.id)?.uses ?? []), u] });
+  }
+  const connectors = [...useOf].map(([epic, { label, uses }]) => { const u = mergeConnectorUse(uses); return { epic, label, line: connectorLine(u), offsite: u.offsite, refused: u.denied.map((d) => d.tool) }; });
+
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
   const toWrite = pid ? [] : missingResumeGates(ws);
   const gates = [...readGates(ws).filter((g) => !toWrite.some((m) => m.replaces === g.file)), ...toWrite.map((m) => ({ file: `gates/${m.name}`, ...m.gate }))];
@@ -4459,7 +4517,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
     epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null, attended: typeof lastCfg.attended === 'boolean' ? lastCfg.attended : null, mode: MODES.includes(lastCfg.mode) ? lastCfg.mode : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
-    waiting: waiting.map(brief), autoContinue: covered.map(brief), decidedForYou, merged: [...merged.values()], unproven, left, seen, unlooked, unobserved, look: (() => { try { return projectSettings(root).look === 'after' ? 'after' : 'before'; } catch { return 'before'; } })(), fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), decidedForYou, merged: [...merged.values()], unproven, left, seen, connectors, unlooked, unobserved, look: (() => { try { return projectSettings(root).look === 'after' ? 'after' : 'before'; } catch { return 'before'; } })(), fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };

@@ -40,8 +40,13 @@
 //   {do:"plan", text}                   what hook R9 does: write <step>/plan.md (never put to the referee)
 //   {do:"gate", gate:{…}}               what hook R8 does on a park: write gates/<epic>-<n>.json (likewise)
 //   {do:"control_request", tool_name, input?}   ask the host for permission; the answer is logged
-//   {do:"tool", tool_name, tool_input}  a tool call that does nothing but ask the referee (an
-//                                       AskUserQuestion, a call expected to be refused)
+//   {do:"tool", tool_name, tool_input, tool_response?}  a tool call that does nothing but ask the referee (an
+//                                       AskUserQuestion, a call expected to be refused, a connector call). With
+//                                       `refused` it is checked like any action; with `tool_response`, an allowed
+//                                       call's PostToolUse log line carries it (a browser call's "Page URL:")
+//
+// `claude mcp list` (what readiness runs to name the owner's connectors) prints the scenario's
+// `"mcp list": { out, exit }`, or that no server is set up.
 //   {do:"sleep", ms}   {do:"hang"}   {do:"crash", code?}
 //   {do:"emit", line}                   one raw stream line, as the CLI writes it (a rate_limit_event)
 //   {do:"transcript", line}             one line of the session's own transcript, which the CLI keeps at
@@ -110,10 +115,10 @@ function referee(tool_name, tool_input = {}, { quiet = false } = {}) {
 }
 
 /** After a tool call went ahead: the session's real PostToolUse hook (the referee's log), as Claude Code runs it. Only the auditor's, whose reads the driver counts. */
-function logged(tool_name, tool_input = {}) {
-  if (kind !== 'audit') return;
+function logged(tool_name, tool_input = {}, tool_response = undefined) {
+  if (kind !== 'audit' && tool_response === undefined) return;
   const hook = settings ? JSON.parse(fs.readFileSync(settings, 'utf8')).hooks?.PostToolUse?.[0]?.hooks?.[0]?.command : null;
-  if (hook) spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PostToolUse', tool_name, tool_input, tool_response: { type: 'text' }, tool_use_id: lastUseId }) }); // the id of the call the referee just allowed, as Claude Code pairs them
+  if (hook) spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PostToolUse', tool_name, tool_input, tool_response: tool_response ?? { type: 'text' }, tool_use_id: lastUseId }) }); // the id of the call the referee just allowed, as Claude Code pairs them
 }
 
 /** The tool call a real session would make for a scripted action, or null for an action that makes none. */
@@ -182,7 +187,13 @@ async function act(a) {
       fs.writeFileSync(path.join(stepDir, 'fake-control-response.json'), value ?? 'null');
       break;
     }
-    case 'tool': if (referee(a.tool_name, a.tool_input ?? {})) logged(a.tool_name, a.tool_input ?? {}); break;
+    case 'tool': {
+      const before = denials.length;
+      const ok = referee(a.tool_name, a.tool_input ?? {});
+      if ('refused' in a && (denials.length > before) !== !!a.refused) throw new Error(`fake-claude: the referee ${denials.length > before ? `refused a ${a.tool_name} call the script does not mark \`refused: true\` — ${lastReason}` : `allowed a ${a.tool_name} call the script marks \`refused\``}`);
+      if (ok) logged(a.tool_name, a.tool_input ?? {}, a.tool_response);
+      break;
+    }
     case 'sleep': await sleep(a.ms); break;
     case 'hang': await new Promise(() => setInterval(() => {}, 1 << 30)); break;
     case 'crash': process.exit(a.code ?? 1); break;
@@ -199,6 +210,11 @@ async function act(a) {
 }
 
 async function main() {
+  if (argv[0] === 'mcp' && argv[1] === 'list') {
+    let s = {}; try { s = JSON.parse(fs.readFileSync(process.env.FAKE_CLAUDE_SCENARIO, 'utf8'))['mcp list'] ?? {}; } catch { /* no scenario */ }
+    process.stdout.write(`${s.out ?? 'No MCP servers configured. Use `claude mcp add` to add a server.'}\n`);
+    process.exit(s.exit ?? 0);
+  }
   let prompt = null;
   if (hostMode) {
     const { value } = await lines.next();

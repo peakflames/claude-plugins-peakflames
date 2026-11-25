@@ -328,6 +328,7 @@ export function snapshotLine(state, { running, spentUsd = state?.spentUsd, runBu
 export const RULES = {
   R0: 'referee error', R1: 'kill switch', R2: 'path jail', R3: 'git rule', R4: 'container, VM or global install', R5: 'disk floor or growth cap',
   R6: 'background task', R7: 'test edit without reason', R8: 'gate policy', R9: 'plan mode',
+  R10: 'catch-up rule', R11: 'connector rule',
 };
 const hookRows = (file) => readFrom(file, 0).rows;
 /**

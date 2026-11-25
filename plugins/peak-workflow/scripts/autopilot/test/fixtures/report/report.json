@@ -243,6 +243,12 @@
         }
       ],
       "unlooked": null,
+      "connectors": {
+        "calls": [],
+        "denied": [],
+        "local": [],
+        "offsite": []
+      },
       "prototype": [],
       "unobserved": [],
       "deferred": []
@@ -429,6 +435,12 @@
       "seen": [],
       "unanswered": [],
       "unlooked": null,
+      "connectors": {
+        "calls": [],
+        "denied": [],
+        "local": [],
+        "offsite": []
+      },
       "prototype": [],
       "unobserved": [],
       "deferred": []
@@ -562,6 +574,12 @@
       "seen": [],
       "unanswered": [],
       "unlooked": null,
+      "connectors": {
+        "calls": [],
+        "denied": [],
+        "local": [],
+        "offsite": []
+      },
       "prototype": [],
       "unobserved": [],
       "deferred": []
@@ -820,6 +838,12 @@
       "seen": [],
       "unanswered": [],
       "unlooked": null,
+      "connectors": {
+        "calls": [],
+        "denied": [],
+        "local": [],
+        "offsite": []
+      },
       "prototype": [],
       "unobserved": [],
       "deferred": []
@@ -871,6 +895,12 @@
       "seen": [],
       "unanswered": [],
       "unlooked": null,
+      "connectors": {
+        "calls": [],
+        "denied": [],
+        "local": [],
+        "offsite": []
+      },
       "prototype": [],
       "unobserved": [],
       "deferred": []
@@ -908,6 +938,12 @@
       "seen": [],
       "unanswered": [],
       "unlooked": null,
+      "connectors": {
+        "calls": [],
+        "denied": [],
+        "local": [],
+        "offsite": []
+      },
       "prototype": [],
       "unobserved": [],
       "deferred": []
@@ -945,6 +981,12 @@
       "seen": [],
       "unanswered": [],
       "unlooked": null,
+      "connectors": {
+        "calls": [],
+        "denied": [],
+        "local": [],
+        "offsite": []
+      },
       "prototype": [],
       "unobserved": [],
       "deferred": []

@@ -389,3 +389,44 @@ test('SKILL.md: a question the owner put off never hides an epic that can run (`
   const flat = SKILL.replace(/\s+/g, ' ');
   for (const text of ['when `ready` names epics (work no waiting question holds), go to Steps 1–3 for those', 'A question put off never hides `ready` work', 'or offers the `ready` epics through Steps 1–3']) assert.ok(flat.includes(text), text);
 });
+
+test('readiness: the connectors a run has, from `claude mcp list` — names, sources, a count; a failed listing is null and one warning (#43)', (t) => {
+  const p = makeProject(t);
+  const list = ['Checking MCP server health…', '',
+    'claude.ai Gmail: https://gmailmcp.googleapis.com/mcp/v1 - ✔ Connected',
+    'claude.ai Google Drive: https://drivemcp.googleapis.com/mcp/v1 - ! Needs authentication',
+    'playwright: npx @playwright/mcp@latest --user-data-dir /x - ✔ Connected',
+    'plugin:design:slack: https://mcp.slack.com/mcp (HTTP) - ! Needs authentication',
+    'broken: node server.js - ✗ Failed to connect',
+    'plugin:design:gmail:  (HTTP) - - Not configured'].join('\n');
+  p.scenario({ 'mcp list': { out: list } });
+  const launch = preflight(p, '--allow-test-double').launch;
+  assert.deepEqual(launch.connectors, {
+    list: [
+      { name: 'Gmail', source: 'claude.ai', status: 'connected' },
+      { name: 'Google Drive', source: 'claude.ai', status: 'needs-sign-in' },
+      { name: 'playwright', source: 'local', status: 'connected' },
+      { name: 'slack', source: 'plugin', status: 'needs-sign-in' },
+      { name: 'broken', source: 'local', status: 'failed' },
+    ],
+    connected: 2, needsSignIn: 2, failed: 1,
+  });
+  p.scenario({ 'mcp list': { out: 'boom', exit: 1 } });
+  const bad = preflight(p, '--allow-test-double').launch;
+  assert.equal(bad.connectors, null);
+  assert.equal(bad.warn.filter((w) => /could not list your connectors/.test(w)).length, 1, bad.warn.join('\n'));
+  p.scenario({});
+  assert.deepEqual(preflight(p, '--allow-test-double').launch.connectors, { list: [], connected: 0, needsSignIn: 0, failed: 0 }, 'none set up');
+});
+
+test('SKILL.md: the launch screen names the connectors, read-only, and those needing a sign-in; the scope review flags a read with no connector or a connector write (#43)', () => {
+  const flat = SKILL.replace(/\s+/g, ' ');
+  for (const text of [
+    'Sessions can use your connectors, read-only: <names, up to 5, then "and <N> more">. Browser tools work on your app\'s local pages, with your saved sign-ins.',
+    '<names> need you to sign in before they can be used; they are skipped otherwise',
+    '`launch.connectors`',
+    'reads a result back from an outside service that no connector in `launch.connectors` reaches, or needs a connector to send, change or delete something',
+    'will be listed as not proven for real',
+    '**Connectors used:**',
+  ]) assert.ok(flat.includes(text), text);
+});
