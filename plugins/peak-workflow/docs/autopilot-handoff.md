@@ -118,6 +118,26 @@ them; the state is here. The rule:
 Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
 2026-11-24. Not autopilot, so not in this file: #44 (port the requirements checker to Node).
 
+## Next work, agreed 2026-11-25
+
+Reviewed against provisional mode (the AI decides now, the owner confirms later), which most
+issues predate. Only two boxes were answered by it (I3, "one early stop"); most of the rest
+matter more under it, since a provisional run is the one nobody watches. Groups, in order:
+
+1. **An overnight run survives a flaky or sleepy machine** (Step 8: #41 B10, B6, #40 item 6,
+   `setup` on a first epic, the 22,386 files set aside). #42 stays its own step after it.
+2. **An approved amendment reaches every later step** (Step 11: #41 B12, B16). More real under
+   provisional, which takes amendments itself. Done together with group 1.
+3. **The budget inside a step** (#36, a killed session's cost).
+4. **Launch-screen leftovers** (#40 item 5, #41 B3 and I5, own-settings warning, `decide` and
+   `user.name`, a setting changed mid-run).
+5. **MCP connectors** (#43).
+6. **Wording** (#40 item 15 "CANNOT VERIFY", "Stopped N times", the scratch-variable refusal).
+7. **Step 6 proofs** (#39): stage only the cheap ones; tick the rest as real runs produce them.
+
+Left as they are: #37, the size of `SKILL.md` and of `preflight --json` (C4), Windows tests
+(#41 B8, needs a Windows machine).
+
 ## To-do list, in working order
 
 Work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
@@ -465,13 +485,18 @@ files `CLAUDE.md` names.
   `**Not decided yet:**` line that lists a layer parks every queued epic (`driver.mjs`, `tbd`).
   He suggests it should apply to the walking-skeleton epic only, since that epic is the one
   that settles those values. C2.
-- [ ] **Requirement questions are the main cause of stops** (#41 I3). Ask them once at launch
-  (a requirements check over the queued epics), not mid-night. C2.
+- [x] **Requirement questions are the main cause of stops** (#41 I3). Ask them once at launch
+  (a requirements check over the queued epics), not mid-night. C2. *Answered by provisional mode (owner, 2026-11-25): a provisional run takes
+  the session's recommendation and lists it for the owner; a full run is meant to ask.*
 - [ ] **The launch check spends real money before the real-money question** (#40) (5). C2.
 - [ ] **The popup hides the "Ready to run" screen** (#41 I5). The question must carry the queue
-  and limits itself.
-- [ ] **The launch popup lists epics by ID only** (#40) (10).
-- [ ] **No path for a free-text launch answer** such as "just do one epic" (#40) (8).
+  and limits itself. *Partly fixed (Pilot Light launch, 2026-11-25): the question names the queue and
+  the automatic-continue limits, but not the budget or an end time.*
+- [x] **The launch popup lists epics by ID only** (#40) (10). *Seen fixed 2026-11-25: the launch
+  question named all three epics (Pilot Light session, run `20261125-112902`).*
+- [x] **No path for a free-text launch answer** such as "just do one epic" (#40) (8). *Seen fixed
+  2026-11-25: the launch question offers "Change the queue or limits", and the skill takes free text
+  for a changed queue, budget or end time (`SKILL.md`, "Asking the owner").*
 - [ ] **A setting changed during a run does not reach it** (*no issue*; Pilot Light,
   2026-11-22). The owner asked for Opus for the build one minute in: `configure` saved it, but
   the driver reads settings once, so it took a stop, a resume question and a relaunch. Ask for
@@ -507,10 +532,10 @@ files `CLAUDE.md` names.
 - [ ] **No hourly progress report** (#41 I1).
 - [x] **The first epic is announced as "5 of 8"** (#41 B7): numbered by phase, not by queue
   position. *Seen fixed 2026-11-25: "Starting 1 of 3" (run `20261125-112902`, `events.jsonl`).*
-- [ ] **One early stop idles most of an unattended run** (*no issue*; Pilot Light, run
+- [x] **One early stop idles most of an unattended run** (*no issue*; Pilot Light, run
   `20261122-094004`). The second epic of 11 parked in planning after one minute; eight epics
   depended on it, so the run ended in 20 minutes with the owner away. Unexamined: whether
-  launch should warn when most of the queue hangs on one epic. C3. *Overtaken in part (2026-11-25):
+  launch should warn when most of the queue hangs on one epic. C3. *Closed 2026-11-25, answered by provisional mode (owner). Overtaken in part (2026-11-25):
   a provisional run no longer stops for an amendment or deferral, the usual cause.*
 - [x] **A check that needs another machine parks as if the owner could do it** (*no issue*;
   Pilot Light, gate `yZQYIVE-1`, 2026-11-22). TOR-01-bhQV3eP is operator-observed on Windows
@@ -672,6 +697,7 @@ files `CLAUDE.md` names.
   2026-11-25 at 12:01 EST, which UTC gives the same day; only an answer after 19:00 EST tells
   the two apart. Shown by the TZ test.*
 - [ ] The look question for a UI epic with no pictures is asked in chat, not the popup (#40) (41).
+  *Not shown 2026-11-25: that run's look had pictures and came as a popup.*
 - [ ] The skill text does not cover the sandbox-off case (#41 I4); mostly moot after B1.
 
 ### Step 14 — Housekeeping (C4)
