@@ -327,10 +327,11 @@ The live-proof checklist (#39). Tick each when a real run shows it, naming the r
 for any that misbehaves. Built and tested against the fake `claude` only until ticked.
 
 The 2026-11-14 changes:
-- [ ] The run announcer: "Starting n of m", "Next: …" after each step, "Progress: n of m done
-  (%)" across relaunches, the ten-minute "still working" line relayed. *Partly seen: the
-  Progress line on Pilot Light, 2026-11-23.*
-- [ ] One spend figure: chain total of the budget, in every line.
+- [x] The run announcer: "Starting n of m", "Next: …" after each step, "Progress: n of m done
+  (%)" across relaunches, the ten-minute "still working" line relayed. *Seen 2026-11-25, Pilot
+  Light runs `20261125-112902` and `20261125-120140`: "Starting 1 of 3", "Next: the build", "still building … 10 min",
+  "Progress: 0 of 3 done (0%); 1 waiting for you; 2 still to go", "Continuing 1 of 3" after the relaunch.*
+- [x] One spend figure: chain total of the budget, in every line. *Seen 2026-11-25: the relaunch `20261125-120140` said "Spent $7.80 of $250" (the chain), and its report gives both ("$18.09 in this run; $25.89 of $250").*
 - [x] $250 default run budget (Pilot Light, every run 2026-11-22 to 24).
 - [ ] `configure --run-budget` raises a chain in progress.
 - [x] "Bring it in for me" at the end of a run, then the tidy-up: temporary
@@ -497,10 +498,13 @@ files `CLAUDE.md` names.
 
 ### Step 12 — Time and progress (C2 and C3)
 
-- [ ] **The full end-to-end suite runs several times per epic** (#41 I7). C2.
+- [x] **The full end-to-end suite runs several times per epic** (#41 I7). C2. *Measured
+  2026-11-25 (`20261125-112902`, `20261125-120140`): once in the build and once in the final check, for each of 3 epics,
+  plus targeted `-g "TOR-…"` runs; the driver's checks run none. Two is the floor: build and
+  independent check each need their own proof.*
 - [ ] **No hourly progress report** (#41 I1).
-- [ ] **The first epic is announced as "5 of 8"** (#41 B7): numbered by phase, not by queue
-  position.
+- [x] **The first epic is announced as "5 of 8"** (#41 B7): numbered by phase, not by queue
+  position. *Seen fixed 2026-11-25: "Starting 1 of 3" (run `20261125-112902`, `events.jsonl`).*
 - [ ] **One early stop idles most of an unattended run** (*no issue*; Pilot Light, run
   `20261122-094004`). The second epic of 11 parked in planning after one minute; eight epics
   depended on it, so the run ended in 20 minutes with the owner away. Unexamined: whether
@@ -610,7 +614,9 @@ files `CLAUDE.md` names.
   ("$41.28 of a $243.62 limit"). Fixed 2026-11-23: the report and the run log now give both
   ("spent $41.28 in this run; with the 2 runs before it, $47.66 of the $250 budget is spent").
 - [ ] **The watch repeats its progress line once per blocked epic** (*no issue*; run
-  `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3. *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
+  `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3. *Built 2026-11-25. Live:
+  said once at the one park in `20261125-112902`; no run yet had several epics end together, so the
+  burst case is shown only by the fake-`claude` test.*
 - [x] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`).
   Answered by run `20261123-081039`: yes, see above. The
   owner's "Amend" answer for n2g5TvI was given to a resumed plan session that he then
@@ -640,20 +646,29 @@ files `CLAUDE.md` names.
   referee refuses (#41: the dev-server tether in `~/.claude/scripts`). Fixed 2026-11-21: a file
   `CLAUDE.md` names in backticks is readable (step 2). Not seen on Windows. Whether a dev
   server started that way survives the ban on background commands is not checked.
-- [ ] The look question reads "UI epic: parks for a human look before verify. Does what was
-  built look right?": the driver's own reason, not owner's words (*no issue*; Pilot Light). *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
+- [x] The look question reads "UI epic: parks for a human look before verify. Does what was
+  built look right?": the driver's own reason, not owner's words (*no issue*; Pilot Light). *Seen
+  fixed 2026-11-25: "This epic changed screens; pictures of them are ready. Does what was built
+  look right?", the reason in `why` (run `20261125-112902`, `gates/XRSSsTW-1.json`).*
 - [ ] The watch said "One command has been running for 3 min" for a tool call that had ended:
   its `PreToolUse` had no `PostToolUse` (a failed command), so it counted as still running
-  (*no issue*; Pilot Light, `build-1/hooks.jsonl` line 57).
+  (*no issue*; Pilot Light, `build-1/hooks.jsonl` line 57). *Not reproduced 2026-11-25: the one
+  such line ("Repeat full suite with probe…", `20261125-120140` KxkwogG verify-1) came 3 min into a command
+  that ended a minute later: correct. The failed-command case is still unseen.*
 - [ ] A look with 25 pictures and no operator-observed requirement is one yes for the whole
   set; nothing lists what to check (*no issue*; Pilot Light). Maybe as intended.
 - [ ] The referee refused "$AUTOPILOT_SCRATCH" used in a cut-down form four times in one epic,
   and four cwd-relative paths that resolved into the workspace (*no issue*; Pilot Light). The
-  scratch rule's wording may need an example. *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
+  scratch rule's wording may need an example. *Built 2026-11-25. Live (`20261125-112902`, `20261125-120140`): 1
+  refusal in 16 sessions, down from 8 in one epic. It was `out="$AUTOPILOT_SCRATCH/step5-….txt"`
+  inside a loop: a file under the scratch folder, not a copy of it. Arguably a false refusal;
+  the referee could allow a variable holding a file path below the folder (KxkwogG build-1).*
 - [ ] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
-  (#40) (15).
+  (#40) (15). *Still so 2026-11-25: all three handoffs of `20261125-120140` say "CANNOT VERIFY".*
 - [ ] The build missed a console error the verifier later found (#40) (38).
-- [ ] Gate answers are dated in UTC (#40) (40). *Built 2026-11-25 on `feature/peak-workflow-autopilot-run-polish`; proof pending in the Pilot Light run.*
+- [ ] Gate answers are dated in UTC (#40) (40). *Built 2026-11-25. Live: `XRSSsTW-1` decided
+  2026-11-25 at 12:01 EST, which UTC gives the same day; only an answer after 19:00 EST tells
+  the two apart. Shown by the TZ test.*
 - [ ] The look question for a UI epic with no pictures is asked in chat, not the popup (#40) (41).
 - [ ] The skill text does not cover the sandbox-off case (#41 I4); mostly moot after B1.
 
