@@ -100,27 +100,75 @@ export const SMALL_FIXES = { perEpic: 2, files: 5, lines: 80 }; // seen live: a 
 /** Every problem the merge gate reports about a fix made on the standing answer starts with this. */
 export const SMALL_FIX_PROBLEM = 'the fix made on the standing answer ';
 /** A line that checks something or declares a test: a fix may change how a test waits, never how much it checks. */
-export const TEST_CHECK_LINE = /\b(assert\w*|expect\w*|should\w*|verify\w*)\b|\[(Fact|Theory|Test|TestMethod|TestCase|InlineData)\b|^\s*(test|it|describe)\s*\(|\bdef test_|\bfunc Test/i;
+export const TEST_CHECK_LINE = /\b(assert\w*|expect\w*|should\w*|verify\w*)\b|\bXCTAssert\w*|\bt\.(Error|Errorf|Fatal|Fatalf|Fail|FailNow)\(|#\[(tokio::)?test\]|\[(Fact|Theory|Test|TestMethod|TestCase|InlineData)\b|^\s*(test|it|describe)\s*\(|\bdef test_|\bfunc Test/i;
 /** A test that no longer runs: skipped, marked as expected to fail, or the one test of its file that runs. */
-const TEST_OFF = /\b(it|test|describe|context|suite|bench)\.(skip|todo|only|fixme|failing)\b|\b(xit|xtest|xdescribe|fit|fdescribe)\s*\(|@(Ignore|Disabled)\b|\[(Fact|Theory|Test|TestMethod)\b[^\]]*\bSkip\s*=|\bpytest\.mark\.(skip|skipif|xfail)\b|\bt\.skip\b|\bt\.Skip\(/;
-/** A check that passes for nearly any value. */
-const LOOSE_CHECK = /\.(toBeTruthy|toBeFalsy|toBeDefined)\(\s*\)|\.not\.(toThrow|toBeNull|toBeUndefined)\(\s*\)|\bassert\s+True\b|\bassertTrue\(\s*True\s*\)|\bassert\.ok\(\s*\)/;
+const TEST_OFF = /\b(it|test|describe|context|suite|bench)\.(skip|todo|only|fixme|failing)\b|\b(xit|xtest|xdescribe|fit|fdescribe)\s*\(|@(Ignore|Disabled)\b|\[(Fact|Theory|Test|TestMethod)\b[^\]]*\bSkip\s*=|^\s*\[([^\]]*[,\s])?Ignore\b|\bpytest\.mark\.(skip|skipif|xfail)\b|\bpytest\.skip\(|\bself\.skipTest\(|@unittest\.(skip\w*|expectedFailure)\b|@skip\b|\bthis\.skip\(\s*\)|#\[ignore\b|\bt\.skip\b|\bt\.Skip\(/;
+/** A literal, for a check that compares a value with itself. */
+const LIT = String.raw`(true|false|True|False|null|None|nil|undefined|-?\d+(?:\.\d+)?|'[^']*'|"[^"]*")`;
+/** A check that passes for any value: a bare truthiness check, or a tautology. */
+const LOOSE_CHECKS = [
+  /\.(toBeTruthy|toBeFalsy|toBeDefined)\(\s*\)|\.not\.(toThrow|toBeNull|toBeUndefined)\(\s*\)|\bassert\s+True\b|\bassertTrue\(\s*True\s*\)|\bassert\.ok\(\s*\)/,
+  new RegExp(String.raw`\bexpect\(\s*${LIT}\s*\)\.(toBe|toEqual|toStrictEqual)\(\s*\1\s*\)`),
+  new RegExp(String.raw`(\bassert(\.\w+|\w*)!?|\bXCTAssert\w*)\(\s*${LIT}\s*,\s*\3\s*[,)]`),
+  /(\bassert(\.ok|True|_true)?!?|\bXCTAssertTrue)\(\s*(true|True|1)\s*[,)]/,
+  new RegExp(String.raw`\bassert\s+${LIT}\s*==\s*\1\s*($|,|#)`),
+];
+const LOOSE_CHECK = { test: (s) => LOOSE_CHECKS.some((re) => re.test(s)) };
+/** A bound nothing misses: an everyday check in a new test, loose only in place of a stricter one the fix removed. */
+const RELAXED_CHECK = /\.toBeGreaterThan\(\s*(0|-1)\s*\)|\.toBeGreaterThanOrEqual\(\s*0\s*\)|\.toBeLessThan(OrEqual)?\(\s*(Infinity|Number\.(POSITIVE_INFINITY|MAX_SAFE_INTEGER|MAX_VALUE))\s*\)|\.toBeInstanceOf\(\s*Object\s*\)|\bassertIsNotNone\(|\bassertIn\([^,]*,\s*range\(|\bassert\s+[\w.]+\s+is\s+not\s+None\b/;
+/** Structure that keeps a check from ever running: a dead branch. */
+const DEAD_BRANCH = /\bif\s*\(\s*(false|0)\s*\)|\bif\s+(False|false|0)\s*[:{]/g;
+/**
+ * A catch that swallows a failure. It hides a check when it wraps lines the fix left alone (its `try` is in another
+ * hunk, or not added at all) or a check in its own `try`; an empty catch around cleanup (`try { rmSync(tmp) } catch {}`) is not.
+ */
+const SWALLOW = /\bcatch\s*(\([^)]*\))?\s*\{\s*\}|\bexcept\b[^:\n]*:\s*pass\b/g;
+/** A real diff header, which only comes before a file's first hunk. */
+const DIFF_HEADER = /^(--- (a\/|\/dev\/null)|\+\+\+ (b\/|\/dev\/null))/;
 
 /**
- * What a fix did to the tests it touched, from the changed lines of one test file's diff (`+…` and `-…`, no headers).
+ * What a fix did to the tests it touched, from one test file's diff (`-U0`, headers allowed) or its bare changed lines.
  * `lost`: it removes more checking lines than it adds. `off`: a test now skipped or the only one run. `loosened`: more
- * checks that pass for nearly anything than before. A heuristic, but it names what it saw, and a person decides.
+ * checks that pass for nearly anything than before. `wrapped`: more structure that keeps a check from running or failing.
+ * A changed expected value of the same kind (`toBe(3)` → `toBe(4)`) is none of these: the owner accepted that.
+ * A heuristic, but it names what it saw, and a person decides.
  */
 export function testWeakening(lines) {
-  const ls = lines.filter((l) => /^[+-](?![+-])/.test(l));
+  const hunked = lines.some((l) => l.startsWith('@@'));
+  let body = !hunked; let hunk = 0; const ls = []; const hunkOf = [];
+  for (const l of lines) {
+    if (l.startsWith('diff --git ')) { body = !hunked; hunk++; }
+    else if (l.startsWith('@@')) { body = true; hunk++; }
+    else if (/^[+-]/.test(l) && body && (hunked || !DIFF_HEADER.test(l))) { ls.push(l); hunkOf.push(hunk); }
+  }
   const checks = ls.filter((l) => TEST_CHECK_LINE.test(l.slice(1)));
   const count = (re, sign) => ls.filter((l) => l[0] === sign && re.test(l.slice(1))).length;
+  const removed = checks.filter((l) => l[0] === '-').length;
+  // Each hunk's lines of one sign, as text, so a construct may span lines.
+  const texts = (sign) => [...new Set(hunkOf)].map((h) => ls.filter((l, i) => hunkOf[i] === h && l[0] === sign).map((l) => l.slice(1)).join('\n'));
+  const hides = (t) => [...t.matchAll(SWALLOW)].filter((m) => {
+    const before = t.slice(0, m.index); const at = before.lastIndexOf('try');
+    return at < 0 || before.slice(at).split('\n').some((l) => TEST_CHECK_LINE.test(l));
+  }).length;
+  const wraps = (sign) => texts(sign).reduce((n, t) => n + [...t.matchAll(DEAD_BRANCH)].length + hides(t), 0);
   return {
-    lost: checks.filter((l) => l[0] === '-').length > checks.filter((l) => l[0] === '+').length,
+    lost: removed > checks.filter((l) => l[0] === '+').length,
     off: count(TEST_OFF, '+') > count(TEST_OFF, '-'),
-    loosened: count(LOOSE_CHECK, '+') > count(LOOSE_CHECK, '-'),
+    loosened: count(LOOSE_CHECK, '+') > count(LOOSE_CHECK, '-') || (removed > 0 && count(RELAXED_CHECK, '+') > count(RELAXED_CHECK, '-')),
+    wrapped: wraps('+') > wraps('-'),
   };
 }
+/**
+ * Whether the merge gate judges `rel` as a test: what the referee calls a test, or any test-named file outside the
+ * listed directories (`src/a.test.ts` with only `test/` listed). The referee keeps `isTestPath`.
+ */
+export const checkedAsTest = (rel, dirs, named) => isTestPath(rel, dirs, named) || (testNamed(rel) && !MANIFEST.test(rel) && !EXPECTED_DATA.test(rel));
+// Outside the listed directories a data file is never a test (`config/test.json`, `specs/openapi.yaml`): only a fixtures folder makes it expected output.
+const EXPECTED_DATA = /\.(json|ya?ml|txt|snap|html?|xml|csv|golden|out|expected)$/i;
+const EXPECTED_FOLDER = /(^|\/)(fixtures?|golden|testdata|expected|__snapshots__)\//i;
+const CONFIG_NAME = /(^|\/)(\.[^/]*|[tj]sconfig[^/]*)$/i;
+/** A data file a test compares with (an expected output, a fixture, a snapshot): rewriting one can make a test pass unseen. */
+export const isExpectedOutput = (rel, dirs, named) => EXPECTED_DATA.test(rel) && !CONFIG_NAME.test(rel) && !MANIFEST.test(rel) && (checkedAsTest(rel, dirs, named) || EXPECTED_FOLDER.test(rel));
 
 export function smallFixLimits(config) {
   const v = config?.smallFixes;

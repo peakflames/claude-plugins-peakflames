@@ -258,6 +258,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The test-weakening guard sees more weakenings** — a fix made on the standing answer is no longer merged unasked when it relaxes or fakes a check, puts one where it never runs, skips or deletes a test, or rewrites a fixture a test compares with; Go, Swift and Rust checks count.
 - **An epic is never started over without asking** — a branch that no longer fits is brought
   up to date by a short session on the standing answer, a changed branch is checked again, and
   a gone one is asked (a provisional run starts it over and lists it).

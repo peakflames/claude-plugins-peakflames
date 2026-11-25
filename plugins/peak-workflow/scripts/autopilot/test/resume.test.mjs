@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, continueRun, ensureResumeGates, gateFacts, limitDecision, ownerAnswers, status, usageLimit } from '../driver.mjs';
-import { LEAVE_IT, PROVISIONAL_BY, TRY_AGAIN, prototypeReasked } from '../lib.mjs';
+import { LEAVE_IT, PROVISIONAL_BY, SMALL_FIX_PROBLEM, TRY_AGAIN, prototypeReasked } from '../lib.mjs';
 import { activity, eventLine, pictureLines, plainReason } from '../attend.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
@@ -1969,6 +1969,38 @@ test('the standing answer never covers a requirement file or a weakened test, an
   p2.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [ask(FIXQ, FIXOPTS), ask(FIXQ.replace('favicon.ico', 'logo.png'), FIXOPTS), ask(third, FIXOPTS)] } });
   await p2.go();
   assert.deepEqual([p2.epic(E1.id).state, gate(p2, E1.id).question], ['PARKED', third]);
+});
+
+// A fix on the standing answer that weakens a test in a way the line count does not show (Step 4 box 1).
+const testFile = `test/${E1.slug}.test.js`;
+const testLines = (body = '') => E1.tors.map((t) => `test('${t} is met', ${body ? 'async ' : ''}() => {${body}});`).join('\n');
+const withFixture = { actions: [...buildActions(E1, { commit: false }), { do: 'write', path: 'test/fixtures/rows.json', content: '[1, 2]\n' }, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }], result: { total_cost_usd: 0.3 } };
+const onStanding = (fix) => ({ actions: [ask(FIXQ, FIXOPTS), { do: 'checkout', name: E1.branch }, ...fix, { do: 'commit', message: `fix(epic-${E1.id}): what the verifier found` }, ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } });
+const evidenceOf = (p) => [].concat(readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'verdict').evidence).join(' | ');
+
+for (const [what, fix, problem] of [
+  ['wraps the checks in `if (false)`', [{ do: 'write', path: testFile, content: `import test from 'node:test';\nif (false) {\n${testLines()}\n}\n` }], `puts a check where it never runs (${testFile})`],
+  ['moves the test out of the test directories', [{ do: 'exec', cmd: `git mv ${testFile} src/${E1.slug}-cases.js` }], `deletes a test (${testFile})`],
+  ['rewrites a fixture the test compares with', [{ do: 'write', path: 'test/fixtures/rows.json', content: '[1, 2, 3]\n' }], 'rewrites an expected result a test compares with (test/fixtures/rows.json)'],
+]) {
+  test(`the standing answer does not merge a fix that ${what}`, async (t) => {
+    const p = makeProject(t);
+    p.scenario({ ...happy(E1), [`${E1.id}/build`]: withFixture, [`${E1.id}/verify`]: onStanding(fix) });
+    await p.go();
+    assert.equal(p.epic(E1.id).state, 'PARKED');
+    assert.ok(evidenceOf(p).includes(`${SMALL_FIX_PROBLEM}${problem}`), evidenceOf(p));
+    assert.match(gate(p, E1.id).question, /a fix it made makes a test check less/);
+  });
+}
+
+test('the standing answer still merges a fix that only waits before a click, with a new fixture beside it', async (t) => {
+  const p = makeProject(t);
+  const fix = [{ do: 'write', path: testFile, content: `import test from 'node:test';\nconst settle = () => new Promise((r) => setImmediate(r));\n${testLines(' await settle(); ')}\n` }, { do: 'write', path: 'test/fixtures/more.json', content: '[3]\n' }];
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: withFixture, [`${E1.id}/verify`]: onStanding(fix) });
+  await p.go();
+  const e = p.epic(E1.id);
+  assert.equal(e.state, 'MERGED', e.reason);
+  assert.deepEqual(e.fixedAtWrapup.files.sort(), [testFile, 'test/fixtures/more.json'].sort());
 });
 
 // ---- requirements are read against each other at planning time -----------------------------------
