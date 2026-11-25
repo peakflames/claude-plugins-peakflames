@@ -1,4 +1,4 @@
-# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-24)
+# Handoff — peak-workflow autopilot (written 2026-11-14, updated 2026-11-25)
 
 For a fresh session, on any machine. Everything is on `feature/peak-workflow-autopilot-poc`
 (pushed). This file replaces the earlier handoffs kept outside the repository.
@@ -7,8 +7,8 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-23, after the run fixes
-  below, before the quote-aware splitter): 268, of which 254 pass, 1 fails (known, see below) and
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-25, after Steps 8 and 11's
+  groups, `448be29`): 334, of which 321 pass, none fails (the flaky attend test is fixed) and
   13 are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13
   passed on 2026-11-21), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
   Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
@@ -81,6 +81,10 @@ evaluation whose other lessons repeat #41. His run logs are on his machine
   driver is running there. `pgrep -f "driver.mjs run"` can match your own shell: check the
   workspace's `lock` file pid instead (`kill -0 <pid>`). A change that touches no referee hook
   and no skill a running session uses is safe mid-run; when unsure, wait.
+- While fixing, run only the new or changed tests (`--test-name-pattern`); both suites once, at
+  the end, after every fix including a review's (owner's rule). The reporter prints `✔`/`✖`
+  lines, not TAP `ok`: a Monitor that counts results must match those. On this Mac, put
+  `/opt/homebrew/bin` first on `PATH` (Python 3.9 comes first otherwise).
 - Both suites before each code merge: `node --test plugins/peak-workflow/scripts/autopilot/test/`
   (about 5 minutes) and `node --test scripts/autopilot-lab/test/`. Run them under
   `caffeinate -i`: a laptop that sleeps mid-suite fails a test by timeout. They need Python 3.11+
@@ -126,9 +130,12 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
 
 1. **An overnight run survives a flaky or sleepy machine** (Step 8: #41 B10, B6, #40 item 6,
    `setup` on a first epic, the 22,386 files set aside). #42 stays its own step after it.
+   *Built 2026-11-25 (`448be29`, merged `1991563`, pushed); proof pending in a real run, see
+   "The 2026-11-25 changes" under Step 6.*
 2. **An approved amendment reaches every later step** (Step 11: #41 B12, B16). More real under
-   provisional, which takes amendments itself. Done together with group 1.
-3. **The budget inside a step** (#36, a killed session's cost).
+   provisional, which takes amendments itself. Done together with group 1. *Built with group 1;
+   proof pending.*
+3. **The budget inside a step** (next) (#36, a killed session's cost).
 4. **Launch-screen leftovers** (#40 item 5, #41 B3 and I5, own-settings warning, `decide` and
    `user.name`, a setting changed mid-run).
 5. **MCP connectors** (#43).
@@ -389,6 +396,23 @@ The 2026-11-24 changes (Step 4):
   6bMNhpy's audit-1 in run `20261125-120140` was thin too (4 of 9).*
 - [ ] **Every review is told the changed code files by name** (built 2026-11-25 after the two thin
   first reviews above; proof pending: a first review that reads at least half without a retry).
+
+The 2026-11-25 changes (Steps 8 and 11, `448be29`), to see in a real run:
+- [ ] A base check that fails once runs again; the log says so, and a pass goes on (report:
+  "failed once … and passed when run again").
+- [ ] A new project's first epic: `setup` runs on the branch when the epic adds a manifest
+  ("changed <file>: running setup on it" in the log), and nothing under `node_modules` or build
+  output is set aside before the final check.
+- [ ] `prepare --gate` with a gate that fails once: the launch screen says "flaky", not "will
+  probably stop".
+- [ ] After an owner's "Amend": the reviewer's `bundle/tors.md` holds the new requirement and
+  `bundle/amendments.md` names the approval; no `test-weakened` finding on the amended test; a
+  look gate quotes the new requirement.
+
+Left from the review of these changes (not fixed, narrow): a checkout onto an epic branch throws
+instead of parking when a file another branch ignores is untracked on the integration line and
+the epic branch tracks that same path; a change record written with single quotes is read from
+the status file instead; `dirty()` runs one or two more git commands per call.
 
 Also to see in a real run: no by-hand command, git line or other skill offered anywhere the
 owner reads; step 1's fixes (B14 a resumed epic put back on its branch — seen, see below; B15
