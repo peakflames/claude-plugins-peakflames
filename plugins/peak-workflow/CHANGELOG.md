@@ -255,6 +255,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   gives one, and the run budget is the ceiling.
 - **Autopilot `report` and `stop`** — now shortcuts into the same loop; the skill no longer ends
   with a `tail -f` line or a command to run next.
+- **A defect the final check sees is asked, not just noted** — small ones are fixed on the
+  standing answer; past the count a full run asks the owner, a provisional run leaves it and
+  lists it under "Decided for you". Left defects get their own report list.
 
 ### Fixed
 

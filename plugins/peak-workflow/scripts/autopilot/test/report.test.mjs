@@ -101,3 +101,24 @@ test('decide records a person\'s answer in the §6.8 shape and re-renders the re
   assert.equal(r.status, 2);
   assert.match(r.stderr, /has no answer to record: the fix is in the project, and the gate clears when preflight passes/);
 });
+
+test('what the final check saw wrong and left has its own list per epic, apart from "Not proven for real", and "Do this next" counts it', (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-report-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  fs.cpSync(STATE, tmp, { recursive: true });
+  const file = path.join(runDir(tmp), 'state.json');
+  const s = readJson(file);
+  s.queue[0].unproven = [
+    { source: 'verifier', step: 'verify-1', text: 'no real request was sent to the bank' },
+    { source: 'verifier', kind: 'left', step: 'verify-1', text: 'a stray "·" at 320 px on the Run Report' },
+    { source: 'verifier', kind: 'left', step: 'verify-1', text: 'the 404 copy says "Lost?"' },
+  ];
+  fs.writeFileSync(file, JSON.stringify(s));
+  const r = collectReport(runDir(tmp));
+  assert.deepEqual([r.epics[0].unproven.length, r.epics[0].left.length], [1, 2]);
+  const md = renderReport(r);
+  const notProven = md.match(/Not proven for real \(said[^\n]*\n((?:- [^\n]*\n)+)/)[1];
+  assert.ok(notProven.includes('no real request') && !notProven.includes('stray'), notProven);
+  assert.match(md, /Seen wrong and left as is \(said by the final check[^\n]*\n- a stray "·" at 320 px on the Run Report\n- the 404 copy says "Lost\?"/);
+  assert.ok(r.next.some((n) => n.startsWith('Read the 2 things the final check saw wrong and left (under "Per epic")')), r.next.join('\n'));
+});

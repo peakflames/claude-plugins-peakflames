@@ -642,6 +642,17 @@ eligibility rule below is met.
 **Only an option the user selects counts.** A free-text reply that does not name one of the
 offered options ("ok", "proceed", "fine") is not consent to defer — re-ask.
 
+**A defect in this epic's own work that no requirement or gate covers is asked too** (wrong copy
+on a screen, a stray character, a broken layout at one width, a console error): never filed as a
+follow-up. Ask `"Seen but not fixed yet: <what, where>. Recommendation: <Fix now | Leave as is> —
+<one clause why>. How to proceed?"` with options `["Fix now", "Leave as is", "Stop — epic FAILs"]`,
+one question per defect, starting with those exact words. On Fix now, fix it, re-run the affected
+gates, and record it in Code Review Findings as `FIXED DURING WRAPUP — <what changed>`. On Leave as
+is, list it in the report's **Seen but not fixed** section. A defect that is not this epic's (the
+machine, an earlier epic, test data) is not asked: list it there with where it comes from. This
+applies to a manual wrapup too. A defect is never a reason to change the epic verdict unless the
+user answers Stop.
+
 - **Fix now** — always offered; the human decides. Apply the fix, remove any
   `Deferred: <TOR-ID>` skip/xfail marking the implementer left on the test, re-run Step 1.3
   for the affected gates, then re-run Step 1.2 for this TOR only and replace its verdict. The TOR's
@@ -782,6 +793,9 @@ Design skills used: <copied from the implementer handoff's Key Decisions line> (
 
 ## Code Review Findings
 - [list any concerns, or "No issues found"]
+
+## Seen but not fixed
+- [each defect left as is or not this epic's, one line with where it is, or "none"]
 
 ## Verdict: PASS / FAIL
 ```
@@ -925,7 +939,8 @@ This section is a record, not a decision point. It may list only:
 - Pending records written here (`TOR-… — recorded as pending in <CR-ID>; resolve with
   /peak-workflow:capture-requirements TOR-…`) and unassigned successors (`TOR-… — plan it with
   /peak-workflow:add`)
-- Non-TOR observations from the Step 1.4 code review (tech debt, refactors)
+- Non-TOR observations from the Step 1.4 code review (tech debt, refactors) — never a defect a
+  user would see in this epic's work, which is a Step 1.4b "Seen but not fixed yet" question
 
 It must not originate a deferral. If a substantive finding first surfaces here, go back to the
 Step 1.4b question for it — do not file it as a follow-up.

@@ -1013,6 +1013,9 @@ Leave out a part that has nothing to say.
 
 **Not proven for real:** <only when `unproven` has entries>
 
+**Seen wrong and left as is:** <only when `left` has entries>
+- <epic, short> — <each line, as written>
+
 **Decided for you:** <only when `decidedForYou` has entries>
 - <epic, short> — <why>, so autopilot <did>
 
@@ -1022,6 +1025,7 @@ Leave out a part that has nothing to say.
 **Decided for you in this provisional run:** <only when `mode` is `provisional`, or one of its four sources has an entry>
 - <requirement, in plain words> — changed as the planner proposed. It read: <was>. Proposed: <proposed>
 - <requirement, in plain words> — left for a later epic, as the builder recommended
+- <epic, short> — a defect the final check saw was left as is (<did>): <the defect, in plain words>
 - <requirement, in plain words> — nobody observed it; it is recorded as not verified. Still to see: <clauses>. To check it later: <check>
 - <epic, short> — your look was skipped: <n> pictures, sent now<, and the changed lines of the project's instructions file>
 
@@ -1068,7 +1072,8 @@ Leave out a part that has nothing to say.
   count. It has four sources. The `decidedForYou` entries with `prototype`: a requirement
   changed on a session's proposal (`kind` `amendment`; give `was`, the text as it read, and
   `proposed`, both as written), and a deferral or a fix taken on the builder's
-  recommendation (`did` says which). `unobserved`: a requirement only a person can observe,
+  recommendation (`did` says which), and a defect the final check saw and left as is (`kind`
+  `defect`; past the count of small fixes, or too big for one). `unobserved`: a requirement only a person can observe,
   merged recorded as not verified, never as verified; give its `clauses` as what is still to
   see, and its `check` exactly as given, as what re-checks it once the work is in the
   project and a person is there. The `unlooked` entries with `prototype`: send each epic's
@@ -1089,9 +1094,14 @@ Leave out a part that has nothing to say.
   say how many more the full report holds. Then one sentence on what the owner can do: run
   autopilot while they are at the computer, so a check that needs a person is done for real,
   or queue work that proves it.
+- **Seen wrong and left as is** comes from `left`: what the final check saw wrong in the
+  merged work and did not fix (wrong copy, a stray character, a layout broken at one width),
+  either because it was not this epic's or because it was left as is. It is not "not proven":
+  each one is a known defect. One line each, by epic, as written; never leave one out and never
+  fold it into a count. Then one sentence: any of them is a `/peak-workflow:quick-fix` away.
 - **What is left for later, and where it is kept.** Whenever this screen showed anything
-  under "Decided for you in this provisional run", "Screens merged without your look" or "Not
-  proven for real", end that part with one plain sentence: "What still needs a person is also
+  under "Decided for you in this provisional run", "Screens merged without your look", "Not
+  proven for real" or "Seen wrong and left as is", end that part with one plain sentence: "What still needs a person is also
   written into your project. Once the work is brought in, run `/peak-workflow:status` there at
   any time: its 'Left for Later' list shows each one with the one thing that clears it, and an
   item drops off the list when it is done." Say it once. What is written there: a correction

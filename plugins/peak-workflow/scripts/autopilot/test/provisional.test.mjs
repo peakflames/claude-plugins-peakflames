@@ -480,3 +480,55 @@ test('provisional: a run launched as "prototype" (the name before 3.1.0) takes t
   assert.equal(check(p, E1.id, 'check-build-1.json').checks.find((c) => c.name === 'amendment-record').pass, true);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /## Decided for you in this provisional run/);
 });
+
+// ---- a defect the final check sees in the epic's own work (handoff Step 4 box 2) -----------------
+
+const DEFECT = ['Fix now', 'Leave as is', 'Stop — epic FAILs'];
+const defectQ = (what) => `Seen but not fixed yet: ${what}. Recommendation: Fix now — one line. How to proceed?`;
+/** A final check that asks about three defects in the epic's own work, then merges and says which it left. */
+const defectWrapup = (e) => {
+  const a = wrapupActions(e);
+  const asks = ['the 404 copy says "Lost?"', 'a stray "·" at 320 px', 'the footer link is underlined twice'].map((w) => ask(defectQ(w), DEFECT));
+  return { actions: [a[0], ...asks, ...a.slice(1)], result: { total_cost_usd: 1.3, result: 'Verdict: PASS\n\n## Seen but not fixed\n- the footer link is underlined twice (footer.css)' } };
+};
+
+test('a defect the final check sees: a provisional run fixes two on the standing answer, leaves the third as is, merges and lists it as decided for the owner', async (t) => {
+  const p = makeProject(t, PROTO);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: defectWrapup(E1) });
+  const s = await p.go();
+  assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[E1.id, 'MERGED']], s.queue[0].reason);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.decided.answer, g.decided.by], ['defect', 'Leave as is', 'autopilot (provisional run)']);
+  const st = status(p.project, p.state);
+  assert.deepEqual(st.decidedForYou.map((x) => [x.kind, x.did]), [['defect', 'left a defect as is: the footer link is underlined twice']]);
+  assert.deepEqual([st.left.map((x) => x.text), st.unproven], [['the footer link is underlined twice (footer.css)'], []]);
+  const md = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
+  assert.match(md, /## Decided for you in this provisional run[\s\S]*\*\*Defects left as is, on the final check's own judgement\*\*[\s\S]*underlined twice/);
+  assert.match(md, /Seen wrong and left as is \(said by the final check[^\n]*\n- the footer link is underlined twice/);
+  assert.ok(!/Not proven for real \(said/.test(md), 'a left defect is not "not proven"');
+  assert.match(md, /## Do this next[\s\S]*Read the 1 thing the final check saw wrong and left/);
+});
+
+test('a defect the final check sees: a full run parks on the one past the standing answer\'s count', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: defectWrapup(E1) });
+  const s = await p.go();
+  assert.equal(s.queue[0].state, 'PARKED');
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.decided, g.question], ['defect', null, defectQ('the footer link is underlined twice')]);
+  assert.match(g.why, /past the count/);
+});
+
+test('a second final check\'s "Seen but not fixed" list replaces the first\'s', async (t) => {
+  const p = makeProject(t);
+  p.scenario({
+    ...happy(E1),
+    [`${E1.id}/verify-1`]: { actions: [], result: { result: 'Verdict: FAIL\nTOR-01-Hd3Yc8L: the description is trimmed\n\n## Seen but not fixed\n- the 404 copy says "Lost?"\n- a stray "·" at 320 px' } },
+    [`${E1.id}/plan-fix`]: planScript(E1),
+    [`${E1.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'export const fixed = true;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): keep the description verbatim` }] },
+    [`${E1.id}/verify-2`]: { actions: wrapupActions(E1), result: { total_cost_usd: 1.3, result: 'Verdict: PASS\n\n## Seen but not fixed\n- a stray "·" at 320 px\n- the header wraps at 320 px' } },
+  });
+  const s = await p.go();
+  assert.equal(s.queue[0].state, 'MERGED', s.queue[0].reason);
+  assert.deepEqual(status(p.project, p.state).left.map((x) => x.text), ['a stray "·" at 320 px', 'the header wraps at 320 px']);
+});

@@ -906,3 +906,84 @@ test('R10 a catch-up session merges the integration line into its branch and set
   denied(r.bash('git merge --no-ff feature/epic-Lg1Csv7-csv-import', env), 'R3', /git merge into develop is denied/, 'never into the integration line');
   passes(r.pre('Edit', { file_path: req, old_string: 'a', new_string: 'b' }), 'R10 is the catch-up session\'s alone');
 });
+
+// ---- R8: a defect the final check saw in the epic's own work (handoff Step 4 box 2) ---------------
+
+const DEFECT_OPTS = ['Fix now', 'Leave as is', 'Stop — epic FAILs'];
+const defectQ = (what, rec = 'Fix now — one line of copy') => `Seen but not fixed yet: ${what}. Recommendation: ${rec}. How to proceed?`;
+
+test('R8 defect: "Fix now" recommended is answered from the standing answer for small fixes; one past the count parks in a full run', (t) => {
+  const h = referee(t, { role: 'verifier' });
+  const a = defectQ('the "Page not found" screen says "Lost?" instead of the copy the spec gives');
+  const b = defectQ('a stray "·" at 320 px on the Run Report');
+  const c = defectQ('the footer link is underlined twice');
+  answered(h.ask(a, DEFECT_OPTS), a, 'Fix now');
+  answered(h.ask(b, DEFECT_OPTS), b, 'Fix now');
+  assert.equal(readJson(path.join(h.step, 'small-fixes.json')).length, 2);
+  parked(h.ask(c, DEFECT_OPTS));
+  const g = h.gate(1);
+  assert.equal(g.kind, 'defect');
+  assert.match(g.why, /the final check saw this wrong in the epic's own work; past the count .*yours to decide/);
+});
+
+test('R8 defect: "Leave as is" recommended parks in a full run; a defect that says "looks wrong" or " failed: " is not an amendment or a failing gate', (t) => {
+  const h = referee(t, { role: 'verifier' });
+  const leave = defectQ('the chart legend overlaps at 320 px', 'Leave as is — it needs a layout change');
+  parked(h.ask(leave, DEFECT_OPTS));
+  assert.equal(h.gate(1).kind, 'defect');
+  assert.match(h.gate(1).why, /it recommends leaving it: yours to decide/);
+  const odd = defectQ('the empty state looks wrong: the icon is cut off. How to proceed? The upload failed: ');
+  answered(h.ask(odd, DEFECT_OPTS), odd, 'Fix now');
+});
+
+test('R8 defect: an owner\'s recorded answer answers that defect alone, matched on its text', (t) => {
+  const h = referee(t, { role: 'verifier' });
+  const leave = defectQ('the chart legend overlaps at 320 px', 'Leave as is — layout');
+  parked(h.ask(leave, DEFECT_OPTS));
+  const file = path.join(h.state, 'gates', `${E1.id}-1.json`);
+  fs.writeFileSync(file, JSON.stringify({ ...readJson(file), decided: { answer: 'Fix now', by: 'Todd', date: '2026-11-24', scope: 'next-run' } }));
+  parked(h.ask(defectQ('the header wraps at 320 px', 'Leave as is — layout'), DEFECT_OPTS)); // another defect, same null TOR: not covered
+  answered(h.ask(leave, DEFECT_OPTS), leave, 'Fix now');
+});
+
+test('R8 defect, provisional: past the count, or "Leave as is" recommended, is answered "Leave as is" and recorded as decided for the owner', (t) => {
+  const h = referee(t, { role: 'verifier', config: { mode: 'provisional' } });
+  const qs = [defectQ('one'), defectQ('two'), defectQ('three')];
+  answered(h.ask(qs[0], DEFECT_OPTS), qs[0], 'Fix now');
+  answered(h.ask(qs[1], DEFECT_OPTS), qs[1], 'Fix now');
+  const r = h.ask(qs[2], DEFECT_OPTS);
+  answered(r, qs[2], 'Leave as is');
+  assert.match(r.out.hookSpecificOutput.permissionDecisionReason, /provisional setting.*"Seen but not fixed"/);
+  const g = h.gate(1);
+  assert.deepEqual([g.kind, g.tor, g.question, g.decided.answer, g.decided.by, g.decided.prototype], ['defect', null, qs[2], 'Leave as is', 'autopilot (provisional run)', true]);
+  const leave = defectQ('four', 'Leave as is — layout');
+  answered(h.ask(leave, DEFECT_OPTS), leave, 'Leave as is');
+  // "Stop" recommended is still the owner's.
+  parked(h.ask(defectQ('five', 'Stop — the screen is unusable'), DEFECT_OPTS));
+  // Defects left as is do not use up the provisional answers for requirements.
+  const DEF = ['Fix now', 'Defer — depends on a later epic', "Stop — I'll take it from here"];
+  const amend = `${E1.tors[0]} — The tool shall import every row looks wrong: banks export a BOM. Proposed: skip the BOM. How to proceed?`;
+  answered(h.ask(amend, [`Amend ${E1.tors[0]} (owner approval)`, 'Implement as written', DEF[2]]), amend, `Amend ${E1.tors[0]} (owner approval)`);
+});
+
+test('R8 defect: the opening is matched whatever its case and punctuation, so a defect that says " failed: " is never a failing gate', (t) => {
+  const h = referee(t, { role: 'verifier' });
+  const q = '**Seen but NOT fixed yet** — the upload failed: the toast is cut off. Recommendation: Fix now — one line. How to proceed?';
+  answered(h.ask(q, DEFECT_OPTS), q, 'Fix now');
+});
+
+test('R8 defect: in a step the owner already answered, a defect worded anew is reminded of their answers once, then parks', (t) => {
+  const h = referee(t, { role: 'verifier' });
+  fs.writeFileSync(path.join(h.step, 'step.json'), JSON.stringify({ answers: [{ gateKind: 'defect', question: defectQ('the legend overlaps', 'Leave as is — layout'), answer: 'Leave as is' }] }));
+  const reworded = defectQ('the chart legend overlaps the bars at 320 px', 'Leave as is — layout');
+  denied(h.ask(reworded, DEFECT_OPTS), 'R8', /not put to the owner yet\. They have already answered 1 question/);
+  parked(h.ask(reworded, DEFECT_OPTS));
+});
+
+test('R8 defect, provisional: the same defect asked again gets the same answer and no second record', (t) => {
+  const h = referee(t, { role: 'verifier', config: { mode: 'provisional' } });
+  const leave = defectQ('four', 'Leave as is — layout');
+  answered(h.ask(leave, DEFECT_OPTS), leave, 'Leave as is');
+  answered(h.ask(leave, DEFECT_OPTS), leave, 'Leave as is');
+  assert.ok(!fs.existsSync(path.join(h.state, 'gates', `${E1.id}-2.json`)));
+});
