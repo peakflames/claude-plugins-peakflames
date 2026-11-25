@@ -262,6 +262,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **A defect the final check sees is asked, not just noted** — small ones are fixed on the
   standing answer; past the count a full run asks the owner, a provisional run leaves it and
   lists it under "Decided for you". Left defects get their own report list.
+- **Every independent review is told which files to open** — the changed code files are listed
+  by name at the end of its prompt, with the minimum it must open, so a first review is not
+  thin and run again.
 
 ### Fixed
 

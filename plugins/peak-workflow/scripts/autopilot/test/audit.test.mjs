@@ -50,7 +50,10 @@ test('the auditor is launched as plain `claude -p`, read-only, in its bundle; th
   const arg = (name) => call.argv[call.argv.indexOf(name) + 1];
   assert.ok(!call.argv.includes('--input-format') && !call.argv.includes('--permission-prompt-tool'), 'not host mode');
   assert.equal(call.argv[0], '-p');
-  assert.equal(call.prompt, fs.readFileSync(new URL('../audit/prompt.md', import.meta.url), 'utf8'));
+  // The prompt, then the changed code files by name: the first try is told what to open, not only the second (Pilot Light, 2026-11-25: two first reviews of two read 10 of 21 and 4 of 9).
+  const base = fs.readFileSync(new URL('../audit/prompt.md', import.meta.url), 'utf8');
+  assert.ok(call.prompt.startsWith(base));
+  assert.equal(call.prompt.slice(base.length), `\n## The files to open\n\n\`diff.patch\` changes 2 code files. Open each one in the clone before you report: the driver counts the files you open, and a review that opens fewer than 1 of them is not counted and is run again.\n\n- \`src/${E1.slug}.js\`\n- \`test/${E1.slug}.test.js\`\n`);
   assert.equal(arg('--tools'), 'Read,Grep,Glob');
   assert.equal(arg('--permission-mode'), 'dontAsk');
   assert.equal(arg('--add-dir'), p.clone);
@@ -300,6 +303,8 @@ test('a careful review records what it read; a thin first try is run once more, 
   assert.match(prompt, /## Your first try was too thin/);
   assert.ok(prompt.includes(`\`src/${E1.slug}.js\``));
   assert.ok(!p.calls().find((c) => c.step === 'audit-1').prompt.includes('too thin'));
+  assert.match(p.calls().find((c) => c.step === 'audit-1').prompt, /## The files to open/);
+  assert.match(prompt, /## The files to open[\s\S]*## Your first try was too thin/);
   assert.ok(!fs.existsSync(path.join(p.state, 'gates')) || !fs.readdirSync(path.join(p.state, 'gates')).length, 'no question for the owner');
   assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /Auditor audit-1 .*It read 0 of 2 changed code files in \d+ s: a thin review, not counted as the audit\./);
 });
