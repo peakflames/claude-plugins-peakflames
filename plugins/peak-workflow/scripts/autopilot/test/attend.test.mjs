@@ -676,6 +676,7 @@ test('leftLines: what the verifier saw wrong and left is read from "Seen but not
     'A console error on the Run screen: `ResizeObserver loop`.',
   ]);
   assert.deepEqual(leftLines('## Seen but not fixed\n- none\n'), [], 'none is no entry');
+  assert.deepEqual(leftLines('Seen but not fixed yet:\n- not a list\n'), [], 'the defect question\'s opening is not the heading');
   assert.deepEqual(leftLines('## Seen but not fixed\n- Nothing\n\n## Other\n- a point'), [], 'nothing, and the next heading ends it');
   assert.deepEqual(leftLines('no such section\n- a point'), []);
 });

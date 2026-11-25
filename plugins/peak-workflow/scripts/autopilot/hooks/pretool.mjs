@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROVISIONAL_BY, isProvisional, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
+import { DEFECT_Q, LEAVE_AS_IS, SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROVISIONAL_BY, isProvisional, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -512,19 +512,32 @@ function ruleR8(ctx) {
   const protoTaken = proto ? prototypeGates(gatesNow(), ctx.epic) : [];
   const protoNow = [];
   let park = questions.length ? null : { kind: 'unmatched', question: '(AskUserQuestion with no questions)', options: [], why: 'nothing to match' };
+  // Once per step: the questions the owner already answered for it, for a session that may be asking one of them in other words.
+  const remindOnce = (q) => {
+    const memo = ctx.step ? path.join(ctx.step, 'answers-reminded.json') : null;
+    if (!earlier.length || !memo || fs.existsSync(memo)) return null;
+    fs.writeFileSync(memo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
+    const list = earlier.map((a, i) => `(${i + 1}) asked "${a.question}" — the owner answered "${a.answer}"${a.note ? ` ("${a.note}")` : ''}`).join('; ');
+    return { rule: 'R8', decision: 'remind', reason: `not put to the owner yet. They have already answered ${earlier.length} question(s) for this step: ${list}. If what you are asking is one of those in other words, do not ask it: act on their answer now. If it is a different decision, ask it again exactly as you just did and it goes to the owner` };
+  };
   for (const q of questions) {
     const labels = (q.options ?? []).map((o) => (typeof o === 'string' ? o : o.label));
     const offered = (want) => offeredLabel(labels, want);
     const tor = (q.question.match(/TOR-\d{2}-[A-Za-z0-9]{7}/) ?? [])[0] ?? null;
-    const parkRow = policy.park.find((r) => rowMatches(r, q.question));
-    const row = parkRow ? null : policy.answer.find((r) => rowMatches(r, q.question));
-    const kind = parkRow?.kind ?? row?.kind ?? 'unmatched';
-    const base = { kind, skillStep: (parkRow ?? row)?.skillStep ?? 'unknown', question: q.question, options: labels, tor };
+    // A defect the final check saw in the epic's own work has its own fixed opening, whatever else its text says
+    // ("looks wrong", " failed: "): no policy row reads it, so it is never parked as an amendment nor answered "Stop".
+    const defect = ctx.role === 'verifier' && DEFECT_Q.test(q.question);
+    const parkRow = defect ? null : policy.park.find((r) => rowMatches(r, q.question));
+    const row = parkRow || defect ? null : policy.answer.find((r) => rowMatches(r, q.question));
+    const kind = defect ? 'defect' : parkRow?.kind ?? row?.kind ?? 'unmatched';
+    const base = { kind, skillStep: defect ? 'wrapup-epic Step 1.4b (seen but not fixed)' : (parkRow ?? row)?.skillStep ?? 'unknown', question: q.question, options: labels, tor };
+    // A question with no requirement of its own is matched on its text, never on its (null) TOR.
+    const byText = kind === 'unmatched' || kind === 'defect';
 
     // A person's recorded answer from `autopilot report` applies to that one gate kind (and TOR), once.
     // A question no policy row knows is matched on its recorded text. A void or superseded gate never answers.
     const dir = path.join(ctx.state, 'gates');
-    const same = (g) => (kind === 'unmatched' ? norm(g.question ?? '') === norm(q.question) : (g.tor ?? null) === tor);
+    const same = (g) => (byText ? norm(g.question ?? '') === norm(q.question) : (g.tor ?? null) === tor);
     // The owner's "Defer" answered a session that recommended deferring. A session that now recommends something else
     // (it found no later epic, it wants to stop) is asking a new question: theirs again.
     const stillFits = (answer) => kind !== 'deferral' || !/^\W*defer\b/i.test(answer ?? '') || [null, 'Defer'].includes(recommended(q.question));
@@ -536,7 +549,7 @@ function ruleR8(ctx) {
     }
     // The same question again after its recorded answer was spent (a later session of the step asks it verbatim):
     // the owner's answer still stands.
-    const again = earlier.find((a) => (a.gateKind ?? 'unmatched') === kind && (kind === 'unmatched' ? norm(a.question ?? '') === norm(q.question) : (a.tor ?? null) === tor) && offered(a.answer) && stillFits(a.answer));
+    const again = earlier.find((a) => (a.gateKind ?? 'unmatched') === kind && (byText ? norm(a.question ?? '') === norm(q.question) : (a.tor ?? null) === tor) && offered(a.answer) && stillFits(a.answer));
     if (again) { answers[q.question] = offered(again.answer); told += 1; continue; }
     // The owner's recorded look at a human-check gate (the driver puts it in step.json for the verify
     // session it resumes): wrapup's manual-verification question is answered with it, not the policy "No".
@@ -557,7 +570,7 @@ function ruleR8(ctx) {
       // A Safety requirement is never amended or deferred by anyone but the owner, whatever a session offers.
       if (!before && tor && anchors(ctx).includes(tor) && isSafety(ctx.clone, tor)) { park = { ...base, why: `${parkRow.why}; ${tor} is a Safety requirement, which a provisional run never decides` }; break; }
       if (before) { answers[q.question] = offered(before.decided.answer); protoAgain += 1; continue; }
-      const p = prototypeAnswer({ kind, question: q.question, labels, tor, anchors: anchors(ctx), taken: [...protoTaken, ...protoNow] });
+      const p = prototypeAnswer({ kind, question: q.question, labels, tor, anchors: anchors(ctx), taken: [...protoTaken, ...protoNow].filter((x) => x.kind !== 'defect') });
       if (p?.answer) { answers[q.question] = p.answer; protoNow.push({ ...base, why: parkRow.why, answer: p.answer, ...(kind === 'deferral' ? { recommendation: recommended(q.question) } : {}) }); continue; }
       if (p?.why) { park = { ...base, why: `${parkRow.why}; ${p.why}` }; break; }
     }
@@ -589,6 +602,25 @@ function ruleR8(ctx) {
     // test on code that worked). The merge gate holds the fix to test files; code that is wrong is still a Stop.
     // CANNOT VERIFY is a requirement nobody could judge (a look the owner has not given): that stays a Stop.
     const testOnly = kind === 'tor-fail';
+    if (kind === 'defect') {
+      // Fix now, recommended and within the count: the standing answer, as for any small fix. Anything else is the
+      // owner's: a full run asks them; a provisional run leaves it as is, goes on, and lists it under "Decided for you".
+      const rec = recommended(q.question);
+      if (limits && rec === 'Fix now' && offered('Fix now') && readJson(path.join(ctx.step, SMALL_FIX_FILE), []).length + standing.length < limits.perEpic) {
+        answers[q.question] = offered('Fix now'); standing.push({ at: new Date().toISOString(), question: q.question, tor: null, defect: true }); continue;
+      }
+      const reason = rec === 'Fix now' ? (limits ? `past the count of ${limits.perEpic} small fixes per final check` : 'there is no standing answer for small fixes') : rec === 'Stop' ? 'it recommends failing the epic' : 'it recommends leaving it';
+      const why = `the final check saw this wrong in the epic's own work; ${reason}: yours to decide`;
+      const leave = offered(LEAVE_AS_IS);
+      // The same defect again (a final check run again after a rollback): the same answer, not a second record.
+      if (proto && rec !== 'Stop' && leave && protoTaken.some((g) => g.kind === 'defect' && norm(g.question ?? '') === norm(q.question))) { answers[q.question] = leave; protoAgain += 1; continue; }
+      if (proto && rec !== 'Stop' && leave) { answers[q.question] = leave; protoNow.push({ ...base, why, answer: leave }); continue; }
+      // The owner already answered questions for this step, and a session that takes it up again may word a defect
+      // differently: reminded once of what they answered, as for any question no policy row knows.
+      const reminder = remindOnce(q);
+      if (reminder) return reminder;
+      park = { ...base, why }; break;
+    }
     if (limits && (!testOnly || (tor && anchors(ctx).includes(tor) && /^\W*TOR-\S+ is FAIL: /.test(q.question))) && /\bRecommendation:\s*\**Fix now\b/i.test(q.question) && offered('Fix now')) {
       const file = path.join(ctx.step, SMALL_FIX_FILE);
       const made = readJson(file, []);
@@ -622,12 +654,8 @@ function ruleR8(ctx) {
         fs.writeFileSync(succMemo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
         return { rule: 'R8', decision: 'remind', reason: `not put to the owner: ${byOwner ? 'they answered "Defer" to the recommendation that named the later epic, and are not asked to name it again' : 'this is a provisional run, and the deferral was taken on your own recommendation'}. The later epic is the one ${ctx.role === 'verifier' ? "the implementer's Deferrals row names as the successor" : 'your recommendation named'}: use it, run the skill's successor check with it and carry on. If no such epic's spec exists, Defer is not available: ask the first question again, recommending Fix now or Stop` };
       }
-      const memo = ctx.step ? path.join(ctx.step, 'answers-reminded.json') : null;
-      if (earlier.length && memo && !fs.existsSync(memo)) {
-        fs.writeFileSync(memo, JSON.stringify({ at: new Date().toISOString(), question: q.question }) + '\n');
-        const list = earlier.map((a, i) => `(${i + 1}) asked "${a.question}" — the owner answered "${a.answer}"${a.note ? ` ("${a.note}")` : ''}`).join('; ');
-        return { rule: 'R8', decision: 'remind', reason: `not put to the owner yet. They have already answered ${earlier.length} question(s) for this step: ${list}. If what you are asking is one of those in other words, do not ask it: act on their answer now. If it is a different decision, ask it again exactly as you just did and it goes to the owner` };
-      }
+      const reminder = remindOnce(q);
+      if (reminder) return reminder;
       park = { ...base, why: 'no policy row matches this question; autopilot never chooses an answer' }; break;
     }
     if (row.roles && !row.roles.includes(ctx.role)) { park = { ...base, why: `policy answers this only in a ${row.roles.join(' or ')} session, not a ${ctx.role} one` }; break; }
@@ -658,7 +686,7 @@ function ruleR8(ctx) {
   const source = [owner + byProto < all ? 'policy' : null, owner ? "the owner's recorded decision" : null, byProto ? "the owner's provisional setting for this run" : null].filter(Boolean).join(' and ');
   const annotations = Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { notes: v }]));
   // What the session is told with a provisional answer: nobody picked it just now, and what the option still asks of it.
-  const how = !byProto ? '' : `. No person picked this just now: the owner chose a provisional run, which takes your own recommendation and shows it to them afterwards. Act on it as their decision and say in your report that autopilot answered it${Object.values(answers).some((a) => /^\W*amend\b/i.test(a)) ? '. Amend: write the change as the skill says, and say in its record that no person approved it: `approved_by = "autopilot (provisional run)"`, exactly that text and never a person\'s name' : ''}${Object.values(answers).some((a) => /^\W*defer\b/i.test(a)) ? ". Defer: do not ask which later epic builds the missing part; it is the one already named (in your recommendation, or in the implementer's Deferrals row). If no such epic's spec exists, Defer is not available: ask again, recommending Fix now or Stop" : ''}`;
+  const how = !byProto ? '' : `. No person picked this just now: the owner chose a provisional run, which takes your own recommendation and shows it to them afterwards. Act on it as their decision and say in your report that autopilot answered it${Object.values(answers).some((a) => /^\W*leave as is\b/i.test(a)) ? '. Leave as is: do not fix it; list it in your final report under "Seen but not fixed", one line, and judge the epic on its requirements and gates' : ''}${Object.values(answers).some((a) => /^\W*amend\b/i.test(a)) ? '. Amend: write the change as the skill says, and say in its record that no person approved it: `approved_by = "autopilot (provisional run)"`, exactly that text and never a person\'s name' : ''}${Object.values(answers).some((a) => /^\W*defer\b/i.test(a)) ? ". Defer: do not ask which later epic builds the missing part; it is the one already named (in your recommendation, or in the implementer's Deferrals row). If no such epic's spec exists, Defer is not available: ask again, recommending Fix now or Stop" : ''}`;
   return { rule: 'R8', decision: 'answer', owner, ...(taken.length ? { prototype: taken } : {}), reason: `answered from ${source}: ${Object.values(answers).join(' | ')}${how}`, updatedInput: { ...ctx.input.tool_input, answers, ...(looked ? { annotations: { ...(ctx.input.tool_input.annotations ?? {}), ...annotations } } : {}) } };
 }
 

@@ -176,6 +176,13 @@ export function smallFixLimits(config) {
   const l = { ...SMALL_FIXES, ...(v && typeof v === 'object' ? v : {}) };
   return Number(l.perEpic) > 0 ? l : null;
 }
+/**
+ * The verifier's question about a defect it saw in this epic's own work that no requirement or gate covers (wrapup-epic
+ * Step 1.4b): `Seen but not fixed yet: <what, where>. Recommendation: <Fix now | Leave as is> — <why>. How to proceed?`
+ */
+export const DEFECT_Q = /^\W*seen but not fixed yet\b\s*[:—–-]/i;
+/** The answer that leaves such a defect for the owner to read about, listed in the report. */
+export const LEAVE_AS_IS = 'Leave as is';
 /** The file in a verify step's directory that lists the questions the standing answer answered "Fix now". */
 export const SMALL_FIX_FILE = 'small-fixes.json';
 

@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
+import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, judgeAudit, validateAudit } from './audit.mjs';
 import { ANSWERS, LEAVE_IT, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, TRY_AGAIN, atLimit, checkedAsTest, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening } from './lib.mjs';
 import { writeReport } from './report.mjs';
@@ -1331,7 +1331,7 @@ it silently, and never decide it yourself.
 }
 
 /** Appended to every verify session: the one operational rule a verifier needs from autopilot. It says nothing about what to verify or how to judge it. */
-export const VERIFY_RULES = `# Autopilot session rules
+export const verifyRules = (limits) => `# Autopilot session rules
 
 - When a command you run waits for the project's owner (a sign-in in a browser, a device to
   plug in), start its Bash \`description\` with \`Needs you:\` and say in a few words what they must
@@ -1344,6 +1344,13 @@ export const VERIFY_RULES = `# Autopilot session rules
 - Whatever you see that is wrong and you leave as it is (wrong text in a picture, a console error,
   a check that fails and is not this epic's) goes in your final report under the heading "Seen but
   not fixed", one line each, or "none". A defect only noticed in passing reaches nobody.
+- A defect in this epic's own work that no requirement or gate covers is asked first, never only
+  listed: \`AskUserQuestion\` with a question that starts with the exact words "Seen but not fixed
+  yet: " (what, where; then "Recommendation: Fix now" or "Recommendation: Leave as is", with why;
+  then "How to proceed?") and the options "Fix now", "Leave as is", "Stop — epic FAILs".
+  ${limits ? `Recommend Fix now only for a small fix: at most ${limits.files} files and ${limits.lines} changed lines, with its test, and no requirement file. Up to ${limits.perEpic} such fixes per final check are made on the owner's standing answer; anything bigger, recommend Leave as is` : 'The owner has no standing answer for small fixes: every such question goes to them'}.
+  A defect that is not this epic's (the machine, an earlier epic, test data) is not asked: list it
+  under "Seen but not fixed" with where it comes from.
 `;
 
 /**
@@ -2025,7 +2032,7 @@ class Run {
       // The question the owner will be asked, when this run wrote one for the epic.
       const name = (e.gates ?? []).at(-1); const g = name ? tryJson(this.gatePath(name)) : null;
       this.event(type, e, { reason, ...(g && !g.decided ? { gate: `gates/${name}`, kind: g.kind ?? null, question: (g.options ?? []).length ? g.question ?? null : null } : {}) });
-    } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0, ...((e.unproven ?? []).length ? { unproven: e.unproven.length } : {}), ...((e.deferred ?? []).length ? { deferred: e.deferred.length } : {}) } : {}) });
+    } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0, ...((e.unproven ?? []).some((u) => u.kind !== 'left') ? { unproven: e.unproven.filter((u) => u.kind !== 'left').length } : {}), ...((e.unproven ?? []).some((u) => u.kind === 'left') ? { left: e.unproven.filter((u) => u.kind === 'left').length } : {}), ...((e.deferred ?? []).length ? { deferred: e.deferred.length } : {}) } : {}) });
     return null;
   }
   park(e, reason) { try { this.wipCommit(e); } catch (err) { this.log(`${e.id}: could not commit uncommitted work: ${err.message}`); } return this.finish(e, 'PARKED', reason); }
@@ -2795,7 +2802,7 @@ class Run {
     const s = await this.step(e, 'verify', (stepDir) => {
       const rules = path.join(stepDir, 'verify-rules.md');
       const pictures = this.hasScreens(e) ? this.restoreLook(e) : [];
-      fs.writeFileSync(rules, VERIFY_RULES + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (pictures.length ? LOOK_VERIFY_RULE : ''));
+      fs.writeFileSync(rules, verifyRules(smallFixLimits(this.config)) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (pictures.length ? LOOK_VERIFY_RULE : ''));
       if (!e.look && e.unobserved?.length) {
         // A provisional run: nobody looked and nobody will. The verifier is told up front, so it neither asks nor records a PASS.
         const file = path.join(stepDir, 'not-observed.md');
@@ -2812,6 +2819,8 @@ class Run {
     });
     if (!s) return null;
     this.unproven(e, unprovenLines(s.result?.result).map((text) => ({ source: 'verifier', step: s.name, text })));
+    // What a final check saw wrong and left: a later final check that says its own list replaces the earlier ones (seen live: a second check repeated the first's lines).
+    if (saysLeft(s.result?.result)) e.unproven = (e.unproven ?? []).filter((u) => u.kind !== 'left');
     this.unproven(e, leftLines(s.result?.result).map((text) => ({ source: 'verifier', kind: 'left', step: s.name, text })));
     // What the verifier says it saw in the pictures, in its own words, for the closing screen.
     if (this.hasScreens(e)) { e.seen = pictureLines(s.result?.result); if (e.seen.length) this.log(`${e.id}: the verifier described ${e.seen.length} picture(s)`); }
@@ -3995,6 +4004,7 @@ export function prototypeDid(gate) {
   if (gate.restart === 'gone') return 'started it over from scratch: its branch was gone';
   if (gate.kind === 'amendment') return `took the proposed correction to ${tor}`;
   if (/^\W*defer\b/i.test(a)) return `deferred ${tor} to a later epic, as the builder recommended`;
+  if (gate.kind === 'defect') return `left a defect as is: ${String(gate.question ?? '').replace(/^\W*Seen but not fixed yet:\s*/, '').replace(/\s*Recommendation:[\s\S]*$/, '').replace(/[\s.]+$/, '') || 'what the final check saw'}`;
   if (/^\W*fix now\b/i.test(a)) return `had ${tor} fixed in the same build, as the builder recommended`;
   return `answered "${a}" about ${tor}`;
 }
@@ -4087,7 +4097,10 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const merged = new Map(chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').map((q) => [q.id, q.label ?? q.id])));
   // What the merged work leaves not proven for real: the reviewer's findings of that kind and the verifier's own "not run" lines.
   const seen = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED' && (q.seen ?? []).length).map((q) => ({ epic: q.id, label: q.label ?? q.id, lines: q.seen })));
-  const unproven = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, text: u.text }))));
+  const unprovenAll = chain.flatMap((name) => (stateOf(name)?.queue ?? []).filter((q) => q.state === 'MERGED').flatMap((q) => (q.unproven ?? []).map((u) => ({ epic: q.id, label: q.label ?? q.id, source: u.source, kind: u.kind ?? null, text: u.text }))));
+  // What the final check saw wrong and left: a known defect, not something unproven, so it has its own list.
+  const left = unprovenAll.filter((u) => u.kind === 'left').map(({ kind, source, ...u }) => u);
+  const unproven = unprovenAll.filter((u) => u.kind !== 'left').map(({ kind, ...u }) => u);
 
   // Small fixes the final check made on the owner's standing answer, for the closing screen: what was asked and what changed.
   // `auto`: a fix autopilot itself allowed on the standing answer for technical stops (product code, or over the small-fix size). Only the verifier judged it.
@@ -4117,7 +4130,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     next: 'nothing', why: null, project: root, workspace: ws, run, runDir, running: pid ? { pid } : null, integration: state?.integration ?? null,
     epics, spentUsd, runBudgetUsd, endBy: lastCfg.endBy ?? null, autoContinueLimit: n, realSpend: typeof lastCfg.realSpend === 'boolean' ? lastCfg.realSpend : null, attended: typeof lastCfg.attended === 'boolean' ? lastCfg.attended : null, mode: MODES.includes(lastCfg.mode) ? lastCfg.mode : null,
     inFlight: inFlight ? { description: inFlight.description, minutes: inFlight.minutes, needsYou: inFlight.needsYou } : null,
-    waiting: waiting.map(brief), autoContinue: covered.map(brief), decidedForYou, merged: [...merged.values()], unproven, seen, unlooked, unobserved, look: (() => { try { return projectSettings(root).look === 'after' ? 'after' : 'before'; } catch { return 'before'; } })(), fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
+    waiting: waiting.map(brief), autoContinue: covered.map(brief), decidedForYou, merged: [...merged.values()], unproven, left, seen, unlooked, unobserved, look: (() => { try { return projectSettings(root).look === 'after' ? 'after' : 'before'; } catch { return 'before'; } })(), fixes, smallFixes: smallFixLimits({ smallFixes: lastCfg.smallFixes ?? tryJson(path.join(ws, 'settings.json'), {})?.smallFixes }), friction: friction(ws, chain), sync: null, refuse: [], relaunch: null, say: [],
   };
   const say = () => {
     const word = { MERGED: 'finished and merged', PARKED: 'stopped, waiting', FAILED: 'did not pass', BLOCKED: 'not started', SKIPPED: 'skipped', QUEUED: pid ? 'waiting its turn' : 'not started' };

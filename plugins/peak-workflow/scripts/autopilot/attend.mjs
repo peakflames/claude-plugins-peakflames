@@ -120,12 +120,15 @@ export function unprovenLines(text) {
  * it noticed (wrong text in a picture, a console error) otherwise reaches nobody (Pilot Light, 2026-11-22: the epic
  * merged with it). Pure; "none" and "nothing" are no entries.
  */
+const LEFT_HEADING = (line) => /^(#+\s*|\*\*)?seen but not fixed\b(?!\s*yet\b)[^\n]{0,6}$/i.test(line.replace(/\*\*\s*$/, ''));
+/** Whether a verify report has the "Seen but not fixed" heading at all (its list may be "none"). */
+export const saysLeft = (text) => String(text ?? '').split(/\r?\n/).some((l) => LEFT_HEADING(l.trim()));
 export function leftLines(text) {
   const out = []; let under = false;
   const clean = (l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\*\*/g, '').trim();
   for (const raw of String(text ?? '').split(/\r?\n/)) {
     const line = raw.trim();
-    if (/^(#+\s*|\*\*)?seen but not fixed\b[^\n]{0,6}$/i.test(line.replace(/\*\*\s*$/, ''))) { under = true; continue; }
+    if (LEFT_HEADING(line)) { under = true; continue; }
     if (!under) continue;
     if (/^(#+\s|\*\*[^*]+\*\*:?\s*$)/.test(line)) { under = false; continue; }
     if (!/^(?:[-*•]|\d+[.)])\s+\S/.test(line)) { if (line && out.length && /^\s/.test(raw)) out[out.length - 1] = `${out.at(-1)} ${clean(line)}`; continue; }
@@ -196,7 +199,7 @@ export function eventLine(ev) {
     }
     case 'fix-round': return `${who} needs a repair: starting the one repair round`;
     case 'audit': return ev.parks ? `The independent reviewer found ${plural(ev.parks, 'serious problem')}` : ev.findings ? `The independent reviewer found ${plural(ev.findings, 'thing')} to note, none serious` : 'The independent reviewer found nothing';
-    case 'merged': return `Finished and merged: ${who} (${took(ev.minutes)}, ${usd(ev.costUsd)})${ev.unproven ? ` — ${plural(ev.unproven, 'thing')} not proven for real` : ''}${ev.deferred ? ` — ${plural(ev.deferred, 'requirement')} left for a later epic` : ''}`;
+    case 'merged': return `Finished and merged: ${who} (${took(ev.minutes)}, ${usd(ev.costUsd)})${ev.unproven ? ` — ${plural(ev.unproven, 'thing')} not proven for real` : ''}${ev.left ? ` — ${plural(ev.left, 'thing')} seen wrong and left as is` : ''}${ev.deferred ? ` — ${plural(ev.deferred, 'requirement')} left for a later epic` : ''}`;
     case 'parked':
       if (ev.question && ev.kind !== 'resume') return `Waiting for you: ${who} — ${oneLine(ev.question)}`;
       return `Stopped: ${who} — ${plainReason(ev.reason)}`;

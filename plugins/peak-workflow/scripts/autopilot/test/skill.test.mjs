@@ -266,6 +266,8 @@ test('SKILL.md: one command, one session — Step 0 follows the driver\'s `next`
     'The session that asked picks up where it was; it does not start the step over.',
     // The owner decides about real money once, at launch; no session decides it silently.
     '**Not proven for real:** <only when `unproven` has entries>', 'Never soften it, never leave one out, and never fold it into a count.',
+    // Seen live: a defect the final check saw sat under "not proven", and the epic merged unasked.
+    '**Seen wrong and left as is:** <only when `left` has entries>', 'It is not "not proven"', '(`kind` `defect`;',
     '**Real money, asked in the same popup.**', '`Yes — when a check needs it (Recommended)`', '`No — never spend`', '"realSpend": true', 'Never write `true` unasked.',
     // Seen live: with the owner away, two sessions each waited five minutes on a browser sign-in, and nobody could say how it ended.
     '**Whether they will be there, asked in the same popup.**', "`No — I'll be away`", "`Yes — I'm here`", '"attended": false', 'that is `false`, whatever was picked',

@@ -90,7 +90,7 @@ export function collectReport(runDir) {
     return {
       id: q.id, label: q.label ?? q.id, outcome, reason: q.reason ?? null, evidence, checks, audit, gates: q.gates ?? [],
       costUsd: q.costUsd ?? 0, turns: q.turns ?? 0, wallMs: q.wallMs ?? 0, elapsedMs, sessions: q.sessions ?? [],
-      testChanges: q.testChanges ?? [], unproven: q.unproven ?? [], rejected: q.rejected ?? [], verifiedKept: q.verifiedKept ?? null, fixRounds: q.fixRounds ?? 0,
+      testChanges: q.testChanges ?? [], unproven: (q.unproven ?? []).filter((u) => u.kind !== 'left'), left: (q.unproven ?? []).filter((u) => u.kind === 'left'), rejected: q.rejected ?? [], verifiedKept: q.verifiedKept ?? null, fixRounds: q.fixRounds ?? 0,
       planApprovedBy: q.planStep || q.plan ? (!q.planApprovedBy || q.planApprovedBy === 'lint' ? 'lint, not a person' : q.planApprovedBy) : null, plan: q.plan ?? (q.planStep ? `${rel}/${q.planStep}/plan.md` : null),
       resumed: q.resumed ?? null, voided: q.voided ?? null, superseded: q.superseded ?? [], auditOverruled: q.auditOverruled ?? null, look: q.look ?? null, fixedAtWrapup: q.fixedAtWrapup ?? null,
       // What the closing screen says and this report used to leave out: approved amendments, the verifier's words on the pictures, sign-ins nobody answered.
@@ -213,6 +213,8 @@ function nextSteps(r) {
   else if (by('MERGED').length) next.push(`Review and bring in the merged work (${ids(by('MERGED'))}${waiting.length ? `, and ${plural(waiting.length, 'commit')} from earlier runs still waiting in the clone` : ''}). ${bring}`);
   else if (waiting.length) next.push(`Bring in the work earlier runs merged, still waiting in the clone (${plural(waiting.length, 'commit')}). ${bring}`);
   if (decided.length) next.push(`Run \`/peak-workflow:autopilot\` again: ${plural(decided.length, 'decided gate')} (${epicsOf(decided)}) ${decided.length === 1 ? 'resumes its epic' : 'resume their epics'} on the branch this run left. A decision holds while that branch is unchanged and still merges cleanly into \`${r.integration}\`.`);
+  const left = r.epics.reduce((n, e) => n + (e.left ?? []).length, 0);
+  if (left) next.push(`Read the ${plural(left, 'thing')} the final check saw wrong and left (under "Per epic"). Any of them is a \`/peak-workflow:quick-fix\` away.`);
   if (r.referee.testChanges.length) next.push(`Read the recorded reason for ${plural(r.referee.testChanges.length, 'changed existing test')} (under "Per epic").`);
   const notStarted = by('NOT STARTED');
   if (r.stoppedOnPark && notStarted.length) next.push(`${plural(notStarted.length, 'epic')} did not start (${ids(notStarted)}): ${r.stoppedOnPark.from === 'project' ? 'this project is set to stop at the first epic that needs you' : 'the run stops at the first epic that needs you while you are there to answer. When you say at launch that you will be away, the epics that do not depend on it keep building'}. They are built in the next run.`);
@@ -251,6 +253,11 @@ export function prototypeSection(r) {
   if (fixed.length) {
     L.push('', '**Fixed in the same build, on the builder\'s recommendation**');
     for (const x of fixed) L.push(`- ${x.tor} (${x.epic.label}; ${state(x.epic)}) — ${cell(x.question)} — \`${x.gate}\``);
+  }
+  const defects = took.filter((x) => x.kind === 'defect');
+  if (defects.length) {
+    L.push('', '**Defects left as is, on the final check\'s own judgement** (it recommended leaving them, or they were past the count of small fixes or too big for one)');
+    for (const x of defects) L.push(`- ${x.epic.label} (${state(x.epic)}) — ${cell(x.question)} — \`${x.gate}\``);
   }
   if (unobserved.length) {
     L.push('', '**Requirements nobody observed** (recorded as not verified in the epic\'s status file, never as verified)');
@@ -377,7 +384,11 @@ export function renderReport(r) {
     }
     if (e.unproven.length) {
       L.push('', 'Not proven for real (said by the reviewer or the verifier; nothing here stopped the epic):');
-      for (const u of e.unproven) L.push(`- ${u.source === 'reviewer' ? `Reviewer${u.id ? ` ${u.id}` : ''}` : u.kind === 'left' ? 'Verifier saw this wrong and left it' : 'Verifier'}: ${cell(u.text)}`);
+      for (const u of e.unproven) L.push(`- ${u.source === 'reviewer' ? `Reviewer${u.id ? ` ${u.id}` : ''}` : 'Verifier'}: ${cell(u.text)}`);
+    }
+    if (e.left.length) {
+      L.push('', 'Seen wrong and left as is (said by the final check; each is a known defect in what merged or in what it stands on):');
+      for (const u of e.left) L.push(`- ${cell(u.text)}`);
     }
     if (e.testChanges.length) {
       L.push('', 'Existing tests changed:');
