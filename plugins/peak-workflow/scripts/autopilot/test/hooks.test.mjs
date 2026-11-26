@@ -984,6 +984,40 @@ test('R8 defect, provisional: past the count, or "Leave as is" recommended, is a
   answered(h.ask(amend, [`Amend ${E1.tors[0]} (owner approval)`, 'Implement as written', DEF[2]]), amend, `Amend ${E1.tors[0]} (owner approval)`);
 });
 
+const PRE_OPTS = ['Accept as pre-existing', 'Fix on this branch', 'Stop — epic FAILs'];
+const preQ = (rec = 'Accept as pre-existing — another epic owns it') => `Tests failed on test/ledger.test.js "totals add up", which this epic did not change, and they fail the same way on develop: 1 failing, expected 10 got 9. Recommendation: ${rec}. How to proceed?`;
+
+test('R8 pre-existing: a check this epic did not change, failing the same way on the base, is its own kind; a full run parks it with its three options (#46 item 2)', (t) => {
+  const h = referee(t, { role: 'verifier' });
+  parked(h.ask(preQ(), PRE_OPTS));
+  const g = h.gate(1);
+  assert.deepEqual([g.kind, g.skillStep, g.tor, g.options, g.decided], ['pre-existing', 'wrapup-epic Step 1.4b (a failing check this epic did not change, failing the same way on the base)', null, PRE_OPTS, null]);
+  // The owner's answer answers that question alone, matched on its text.
+  const file = path.join(h.state, 'gates', `${E1.id}-1.json`);
+  fs.writeFileSync(file, JSON.stringify({ ...readJson(file), decided: { answer: PRE_OPTS[0], by: 'Todd', date: '2026-11-26', scope: 'next-run' } }));
+  answered(h.ask(preQ(), PRE_OPTS), preQ(), PRE_OPTS[0]);
+  // Worded otherwise, it is the failing-gate question: answered Stop, as before.
+  const plain = 'Tests failed: test/ledger.test.js "totals add up": expected 10 got 9. Recommendation: Stop — not this epic\'s. How to proceed?';
+  answered(h.ask(plain, ['Fix now', 'Stop — epic FAILs']), plain, 'Stop — epic FAILs');
+  // Neither form: unmatched, and it parks.
+  const other = 'Tests are red on develop too. What now?';
+  parked(h.ask(other, PRE_OPTS));
+  assert.equal(h.gate(2).kind, 'unmatched');
+});
+
+test('R8 pre-existing, provisional: the session\'s recommendation is taken and recorded as decided for the owner; Stop, or no recommendation, is theirs', (t) => {
+  const h = referee(t, { role: 'verifier', config: { mode: 'provisional' } });
+  answered(h.ask(preQ(), PRE_OPTS), preQ(), PRE_OPTS[0]);
+  const g = h.gate(1);
+  assert.deepEqual([g.kind, g.question, g.decided.answer, g.decided.by, g.decided.prototype], ['pre-existing', preQ(), PRE_OPTS[0], 'autopilot (provisional run)', true]);
+  answered(h.ask(preQ(), PRE_OPTS), preQ(), PRE_OPTS[0]); // asked again: the same answer, no second record
+  assert.ok(!fs.existsSync(path.join(h.state, 'gates', `${E1.id}-2.json`)));
+  const fix = preQ('Fix on this branch — a one-line fix');
+  answered(h.ask(fix, PRE_OPTS), fix, PRE_OPTS[1]);
+  parked(h.ask(preQ('Stop — the base is broken'), PRE_OPTS));
+  parked(h.ask(preQ('none given'), PRE_OPTS));
+});
+
 test('R8 defect: the opening is matched whatever its case and punctuation, so a defect that says " failed: " is never a failing gate', (t) => {
   const h = referee(t, { role: 'verifier' });
   const q = '**Seen but NOT fixed yet** — the upload failed: the toast is cut off. Recommendation: Fix now — one line. How to proceed?';

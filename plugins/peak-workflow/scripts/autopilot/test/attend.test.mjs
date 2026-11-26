@@ -296,6 +296,55 @@ test('continue: a budget stop is resumed on the standing answer, twice per epic;
   assert.equal(fs.readFileSync(path.join(p.runDir(), 'events.jsonl'), 'utf8').split('\n').map((l) => l && JSON.parse(l)).find((e) => e.type === 'epic-start').resumedAt, 'BUILD');
 });
 
+test('a stopped epic the owner then finishes by hand: its gate stops counting, continue decides nothing, the next run starts no session (#46 item 6)', async (t) => {
+  for (const mode of ['full', 'provisional']) {
+    const p = makeProject(t);
+    p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: overBudget(E1) });
+    await p.go({ run: confirmRun(p, { autoContinue: 2, mode }) });
+    assert.equal(p.epic(E1.id).state, 'PARKED', mode);
+    assert.deepEqual(st(p).autoContinue.map((g) => g.file), [`gates/${E1.id}-1.json`], `${mode}: a technical stop the standing answer covers`);
+
+    // The owner finishes it by hand in the project and commits its status file as Complete on develop.
+    const sidecar = path.join(p.project, 'docs', 'implementation-plan', 'status', `epic-${E1.id}.md`);
+    fs.writeFileSync(sidecar, fs.readFileSync(sidecar, 'utf8').replace(/^status: .*$/m, 'status: Complete'));
+    git(p.project, 'commit', '-qam', `chore(epic-${E1.id}): finished by hand`);
+
+    const s = st(p);
+    assert.deepEqual([s.autoContinue, s.waiting, s.next], [[], [], 'nothing'], `${mode}: ${s.why}`);
+    const c = cont(p);
+    assert.equal(c.status, 1, `${mode}: nothing is continued`);
+    assert.deepEqual([c.json().continued, c.json().left], [[], []], mode);
+    assert.deepEqual(c.json().retired.map((x) => [x.gate, x.why]), [[`gates/${E1.id}-1.json`, 'the epic is Complete']], mode);
+    const g = gateFile(p, E1.id);
+    assert.deepEqual([g.decided, g.cleared?.why], [null, 'the epic is Complete'], mode);
+    assert.equal(fs.readdirSync(path.join(p.state, 'gates')).length, 1, `${mode}: no new gate is written for it`);
+
+    const before = p.calls().length;
+    await p.go({ run: confirmRun(p, { autoContinue: 2, mode }) });
+    assert.deepEqual(p.steps().slice(before), [], `${mode}: no session for a Complete epic`);
+    assert.equal(p.epic(E1.id).state, 'SKIPPED', mode);
+  }
+});
+
+test('the run start clears the live gates of an epic finished by hand since it stopped, and says so once', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: overBudget(E1) });
+  await p.go({ run: confirmRun(p, { autoContinue: 2 }) });
+  const sidecar = path.join(p.project, 'docs', 'implementation-plan', 'status', `epic-${E1.id}.md`);
+  // Complete only on a branch not merged yet (team mode, a pull request open): not finished, the gate still counts.
+  git(p.project, 'checkout', '-qb', `feature/epic-${E1.id}-by-hand`);
+  fs.writeFileSync(sidecar, fs.readFileSync(sidecar, 'utf8').replace(/^status: .*$/m, 'status: Complete'));
+  git(p.project, 'commit', '-qam', `chore(epic-${E1.id}): finished by hand`);
+  assert.deepEqual(st(p).autoContinue.map((g) => g.file), [`gates/${E1.id}-1.json`], 'a branch not merged is not Complete');
+  git(p.project, 'checkout', '-q', 'develop');
+  git(p.project, 'merge', '-q', '--no-ff', '-m', 'merge by hand', `feature/epic-${E1.id}-by-hand`);
+  await p.go({ run: confirmRun(p, { autoContinue: 2 }) });
+  assert.equal(gateFile(p, E1.id).cleared?.why, 'the epic is Complete');
+  assert.equal(gateFile(p, E1.id).decided, null, 'never decided');
+  const log = fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8');
+  assert.equal(log.match(/gate\(s\) no longer count, their epic is Complete/g)?.length, 1, log);
+});
+
 test('status reports the gate a dead-end park still needs without writing it; continue writes and answers it', async (t) => {
   const p = makeProject(t);
   // A finished build that autopilot's own check stopped, with no question left behind (as an earlier driver left it).

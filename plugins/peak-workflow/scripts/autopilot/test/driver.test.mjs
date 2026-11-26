@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR, defaultConfig, localDate, scratchRule, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
-import { estimateCost } from '../lib.mjs';
+import { estimateCost, failingTests } from '../lib.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, killFakes, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
@@ -367,7 +367,20 @@ test('base red stops the run before any session', async (t) => {
   assert.equal(p.epic(E1.id).state, 'QUEUED');
   assert.deepEqual(p.calls(), []);
   assert.equal(readJson(path.join(p.runDir(), 'report.json')).epics[0].outcome, 'NOT STARTED');
-  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /your project's own tests were already failing on `develop` before autopilot started\. Autopilot cannot repair this itself yet; it needs someone who maintains the code\./);
+  // It says which test fails, in the runner's own words (#42, for beta).
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8'), /your project's own tests were already failing on `develop` before autopilot started \(`✖ red`\)\. Autopilot cannot repair this itself yet; it needs someone who maintains the code\./);
+  const st = JSON.parse(spawnSync(process.execPath, [DRIVER, 'status', '--project', p.project, '--json'], { encoding: 'utf8' }).stdout);
+  assert.match(st.why, /the last run stopped because these tests failed on develop: ✖ red$/);
+});
+
+test('failingTests: the failing tests in the runner\'s own words, never its summary lines', () => {
+  const node = '✔ green (1ms)\n✖ red (0.5ms)\nℹ fail 1\n✖ failing tests:\n\n✖ red (0.5ms)';
+  assert.deepEqual(failingTests(node), ['✖ red']);
+  assert.deepEqual(failingTests('FAILED tests/test_x.py::test_sum - AssertionError\nFAILED (failures=1)'), ['FAILED tests/test_x.py::test_sum - AssertionError']);
+  assert.deepEqual(failingTests('--- FAIL: TestSum (0.00s)\nFAIL\nFAIL\tgithub.com/a/b\t0.012s'), ['--- FAIL: TestSum']);
+  assert.deepEqual(failingTests('FAIL src/x.test.js\n  ✕ adds (3 ms)\n✕ 2 tests failed\n✖ 1 of 3 tests failed'), ['FAIL src/x.test.js', '✕ adds']);
+  assert.deepEqual(failingTests('not ok 1 - sums\nnot ok 2 - later # TODO\nnot ok 3 - skipped # SKIP no db'), ['not ok 1 - sums']);
+  assert.deepEqual(failingTests(''), []);
 });
 
 test('STOP mid-step kills the session, parks the epic and stops the run', async (t) => {

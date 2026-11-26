@@ -454,3 +454,16 @@ test('SKILL.md: the launch screen names the connectors, read-only, and those nee
     '**Connectors used:**',
   ]) assert.ok(flat.includes(text), text);
 });
+
+test('wrapup-epic Step 1.4b asks a failure the epic did not cause in the words the gate policy knows, with the options autopilot can carry out (#46 item 2)', () => {
+  const wrapup = fs.readFileSync(path.join(PLUGIN_DIR, 'skills', 'wrapup-epic', 'SKILL.md'), 'utf8');
+  const step = wrapup.slice(wrapup.indexOf('### Step 1.4b'));
+  const template = (step.match(/`"<gate> failed on <tests>[^`]*"`/) ?? [])[0];
+  assert.ok(template, 'the question is pinned in Step 1.4b');
+  const row = readJson(path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'policy', 'gates.json')).park.find((r) => r.kind === 'pre-existing');
+  for (const f of row.fragments) assert.ok(template.includes(f), `the policy fragment "${f}" is in the skill's question`);
+  assert.ok(step.includes('`["Accept as pre-existing", "Fix on this branch", "Stop — epic FAILs"]`'));
+  assert.match(step, /run just the failing tests on the base, in a\s+scratch worktree/);
+  assert.match(step, /\*\*Accept as pre-existing\*\* is not a FAIL/);
+  assert.match(step, /This applies to an interactive wrapup too/);
+});

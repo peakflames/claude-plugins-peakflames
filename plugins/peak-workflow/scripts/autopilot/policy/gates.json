@@ -16,6 +16,7 @@
     { "kind": "amendment-how", "skillStep": "wrapup-epic Step 1.4b (requirement may be wrong)", "fragments": ["How should TOR-", "change?"], "why": "a requirement changes only with the owner's approval" },
     { "kind": "anchor-superseded", "skillStep": "start-epic Step 1 item 6", "fragments": ["Update this epic's anchors?"], "why": "a requirements decision" },
     { "kind": "test-directories", "skillStep": "start-epic Step 1 item 4b / wrapup-epic Step 1.2 item 2", "fragments": ["Which directories hold tests?"], "why": "preflight requires the Test directories line; this should not be asked" },
+    { "kind": "pre-existing", "skillStep": "wrapup-epic Step 1.4b (a failing check this epic did not change, failing the same way on the base)", "fragments": ["fail the same way on", "How to proceed?"], "why": "whether to accept a failure the epic did not cause is the owner's decision" },
     { "kind": "meaning-unchanged", "skillStep": "wrapup-epic Step 1.1 (changed requirement)", "fragments": ["Meaning unchanged"], "why": "a requirements decision" }
   ]
 }

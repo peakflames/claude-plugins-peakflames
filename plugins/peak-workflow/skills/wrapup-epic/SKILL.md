@@ -615,7 +615,8 @@ Review the implementation for:
 "pass with exceptions". The epic verdict is **PASS** if and only if every TOR is PASS (including
 TORs fixed or amended during this wrapup) or every remaining non-PASS TOR carries a **human
 waiver** or a **pending record** written here, AND every quality gate from Step 1.3 passes
-(including any `GATE DISCREPANCY` and the Removal gate), AND Step 1.1 item 3a left no blocking
+(including any `GATE DISCREPANCY` and the Removal gate; a failure the user accepted as pre-existing,
+below, counts as passing), AND Step 1.1 item 3a left no blocking
 finding or unresolved overdue Disputed requirement. Otherwise the epic verdict is **FAIL**.
 
 **Failing quality gates first.** For each gate that failed in Step 1.3, ask
@@ -623,6 +624,19 @@ finding or unresolved overdue Disputed requirement. Otherwise the epic verdict i
 with options `["Fix now", "Stop — epic FAILs"]` only — a gate cannot be deferred. On Fix
 now, apply the fix and re-run that gate; if it still fails, the epic verdict is FAIL. Record the
 outcome in Code Review Findings (`fixed at wrapup` or `unfixed — epic FAILs`).
+
+**A failing check this epic did not cause.** Before asking about a failing gate or test, check
+whether this epic's change touches it (`git diff --name-only <base>...HEAD` against the failing
+tests and the code they exercise). If it does not, run just the failing tests on the base, in a
+scratch worktree (`git worktree add <scratch> <base>`; remove it after). If they fail the same way
+there, ask exactly
+`"<gate> failed on <tests>, which this epic did not change, and they fail the same way on <base>: <evidence>. Recommendation: <Accept as pre-existing | Fix on this branch> — <one clause why>. How to proceed?"`
+with options `["Accept as pre-existing", "Fix on this branch", "Stop — epic FAILs"]`, in place of
+the question above. **Accept as pre-existing** is not a FAIL: the gate counts as passing for the
+verdict rule, and the failure is listed under the report's **Seen but not fixed** section with the
+base evidence (`<tests> — fail the same way on <base> (<base sha>): <evidence>`). **Fix on this
+branch** fixes it as Fix now does. If they pass on the base, or this epic's change touches them, it
+is this epic's failure: ask the question above. This applies to an interactive wrapup too.
 
 A substantive finding is never filed as a follow-up by default — it is put to the user as a
 decision, at the moment it is cheapest to act on. For each TOR whose verdict is FAIL or CANNOT

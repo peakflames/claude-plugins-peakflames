@@ -12,8 +12,8 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
   pushed for $6.91. Live proofs from it are ticked under Step 6 and Step 13.
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-25, after the undecided-values change,
-  `feature/peak-workflow-autopilot-undecided`): 365, of which 351 pass, none fails and 14
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-26, after the beta fixes,
+  `feature/peak-workflow-autopilot-beta-fixes`): 373, of which 359 pass, none fails and 14
   are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
   Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
   base as well (cause not looked for).
@@ -120,9 +120,9 @@ them; the state is here. The rule:
 | #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | closed 2026-11-26; the one box left (a real reviewer after an "Amend") is #41 B12 |
 | #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 5 open: items 38, 40, 41, 23 and the SKILL.md size (2026-11-26) |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
-| #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
+| #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1; after beta (owner, 2026-11-26). For beta the base-red stop only names the failing tests |
 | #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | closed 2026-11-26: connectors named at readiness, a `shadcn` read in Pilot Light `20261125-202319`, a Gmail send refused in a real session |
-| #46 | Windows field report: a 5-epic chain, $179.80, 11 items | not yet | not triaged: the owner set it aside on 2026-11-25 ("enough to deal with") |
+| #46 | Windows field report: a 5-epic chain, $179.80, 11 items | beta fixes | items 2 and 6 fixed 2026-11-26 (`feature/peak-workflow-autopilot-beta-fixes`); the rest not triaged |
 
 Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
 2026-11-24. Not autopilot, so not in this file: #44 (port the requirements checker to Node).
@@ -165,6 +165,15 @@ Set aside: #46, the Windows field report (owner, 2026-11-25). Read once: item 1 
 voided and the epic rebuilt) predates `b7c2d14` and the catch-up session; item 10's browser
 refusal predates #43; item 6 (a gate of an epic made Complete by hand is still continued) looks
 live in `openGates`. Nothing else was checked.
+
+**Beta fixes, 2026-11-26** (`feature/peak-workflow-autopilot-beta-fixes`, goal: beta for ~80 users):
+- [x] #46 item 6: a gate of an epic made Complete (by hand, or merged in the clone) is left out of
+  `status` and launch, never decided by `continue` (listed under `retired`), and cleared at run start.
+- [x] #46 item 2: a failing test the epic did not change, failing the same way on the base, is one
+  recognised question (kind `pre-existing`): Full parks it, Provisional takes the recommendation.
+- [x] #42 for beta only: the base-red stop quotes the failing test lines. The repair itself is after beta.
+  Note: the base check before each epic already stops a run whose test command is red on the base,
+  so the `pre-existing` question mostly meets other gates (lint, types) and flaky tests.
 
 Left as they are: #37, the size of `SKILL.md` and of `preflight --json` (C4), Windows tests
 (#41 B8, needs a Windows machine).
