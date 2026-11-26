@@ -53,13 +53,13 @@ did not give to the gate's own question is `resumed.unasked` and never counts as
 
 The review of I6a left six problems unfixed, and #41 still has B3, B6–B8, I1, I3–I5, I7 and
 I6c open (I6c is **#42**: only the wording changed, "it needs someone who maintains the
-code"). All of them are in the to-do list below.
+code"). What is still open is the beta backlog above; the rest was cut (owner, 2026-11-26).
 
 **The reporter's follow-up (2026-11-21, #41 comments and #43).** New items B10–B16 and I8, B3
 seen again, and two Windows fixes he carries locally that this branch lacks; his patches were
 asked for on #41. #43 tracks B11 only (sessions cannot use MCP connectors); its body is a pasted
 evaluation whose other lessons repeat #41. His run logs are on his machine
-(`Wayframe.autopilot/runs/20261121-130134/`). All of it is in the to-do list below.
+(`Wayframe.autopilot/runs/20261121-130134/`).
 
 ## How to work with the owner
 
@@ -108,17 +108,16 @@ them; the state is here. The rule:
 3. A new problem gets a box here first; an issue only when someone outside this repository
    needs to follow it.
 
-| Issue | What it tracks | Where here | Open / all boxes |
-|---|---|---|---|
-| #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 0 / 2 |
-| #36 | The run budget is not enforced inside a step | Step 9 | 0 / 1 (closed, not to be done) |
-| #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
-| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | closed 2026-11-26; the one box left (a real reviewer after an "Amend") is #41 B12 |
-| #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 5 open: items 38, 40, 41, 23 and the SKILL.md size (2026-11-26) |
-| #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
-| #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1; after beta (owner, 2026-11-26). For beta the base-red stop only names the failing tests |
-| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | closed 2026-11-26: connectors named at readiness, a `shadcn` read in Pilot Light `20261125-202319`, a Gmail send refused in a real session |
-| #46 | Windows field report: a 5-epic chain, $179.80, 11 items | beta fixes | items 2 and 6 fixed 2026-11-26 (`feature/peak-workflow-autopilot-beta-fixes`); the rest not triaged |
+| Issue | What it tracks | State (2026-11-26) |
+|---|---|---|
+| #41 | The Windows alpha owner's feedback | **Open, Windows run results only** (beta backlog) |
+| #42 | Autopilot repairs a red base or a preflight refusal itself | Open, after beta |
+| #46 | Windows field report, 5-epic chain | Closed: items 2, 6 fixed; 1 likely fixed by `b7c2d14`; 11 answered; 9 checked in the beta backlog; rest monitored |
+| #40 | Smaller findings from the first real queue | Closed: rest monitored |
+| #37 | An attending session keeps stale skill text | Closed: monitored |
+| #35, #36, #38, #39, #43 | | Closed earlier |
+
+A closed issue reopens only if its behaviour comes up again (owner, 2026-11-26).
 
 ### Settled by the owner: not backlog, do not raise again
 
@@ -173,11 +172,6 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
 9. **A real run with an amendment** (#41 B12 and B16): the last thing Step 6 cannot close on
    tests. An epic is being drafted for it (2026-11-26). #39 and #43 are closed.
 
-Set aside: #46, the Windows field report (owner, 2026-11-25). Read once: item 1 (a decision
-voided and the epic rebuilt) predates `b7c2d14` and the catch-up session; item 10's browser
-refusal predates #43; item 6 (a gate of an epic made Complete by hand is still continued) looks
-live in `openGates`. Nothing else was checked.
-
 **Beta fixes, 2026-11-26** (`feature/peak-workflow-autopilot-beta-fixes`, goal: beta for ~80 users):
 - [x] #46 item 6: a gate of an epic made Complete (by hand, or merged in the clone) is left out of
   `status` and launch, never decided by `continue` (listed under `retired`), and cleared at run start.
@@ -187,12 +181,27 @@ live in `openGates`. Nothing else was checked.
   Note: the base check before each epic already stops a run whose test command is red on the base,
   so the `pre-existing` question mostly meets other gates (lint, types) and flaky tests.
 
-Left as they are: #37, the size of `SKILL.md` and of `preflight --json` (C4), Windows tests
-(#41 B8, needs a Windows machine).
+**Beta backlog (owner, 2026-11-26): the whole open list.** Everything else once open here was cut
+on the owner's word: nits and corner cases from issue posts and code reviews. Do not re-add one
+unless it could corrupt data or merge something wrong, and ask the owner first.
+- [ ] **Check: a stash left in the clone** (#46 item 9). A park left `stash@{0}` on the clone's
+  integration line for days. Find whether the B15 set-aside (`setAside`) made this impossible;
+  if not, uncommitted build work can be stranded.
+- [ ] **Check: a session writing into the workspace** through a path it builds (`D=$PWD/..`,
+  `$(dirname "$AUTOPILOT_SCRATCH/x")`). The Bash path check is best effort; a write there could
+  overwrite run state (gates, status).
+- [ ] **The credential check compares names by case**: `cat ~/.SSH/id_rsa` passes with the sandbox
+  off on macOS.
+- [ ] **Windows**: tell beta testers plainly that Windows is unproven, and what to send back (the
+  run report and the run's `hooks.jsonl`). Keep tracking the Windows run results on #41 (36
+  driver tests fail there before any change, #41 B8).
 
-## To-do list, in working order
+After beta: #42, autopilot repairs a red base or a preflight refusal itself (the merge-conflict
+part is done, Step 3).
 
-Work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
+## Done work, by step (history)
+
+Every box below is ticked; the open list is the beta backlog above. Was: work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
 all its boxes are ticked. Order and criticality were agreed with the owner on 2026-11-21 and
 reordered the same day after the Windows owner's real runs (#41 comments, #43).
 
@@ -293,15 +302,7 @@ Why this order:
   credentials and `~/.claude`. Both refusals reported on #41 fit that. **The tally of real
   refusals was not made:** the PeakMedia run logs are on another machine. Tested against the
   fake and by three live rule checks on macOS (a real session used its scratch folder without
-  being refused first). Not seen on Windows; the reporter is asked to confirm on #41. Left:
-  - The scratch folders are never emptied, and their size is not counted by the growth cap.
-  - `CLAUDE.md` is a file sessions edit and merge, so the list of readable files can grow
-    without the owner typing it. It is shown at every launch; nothing asks him to confirm it.
-  - The referee's own credential checks compare names by case (`cat ~/.SSH/id_rsa` passes
-    with the sandbox off on macOS). Old behaviour, found by the review; belongs to step 4.
-  - A command can still reach the workspace through a variable it builds itself (`D=$PWD/..`).
-    Old behaviour: the Bash check is best effort. The scratch folder's own name is refused in
-    any form but `$AUTOPILOT_SCRATCH`.
+  being refused first). Not seen on Windows; the reporter is asked to confirm on #41.
 
 ### Step 3 — No stop that can only be started over (C2)
 
@@ -388,11 +389,6 @@ Why this order:
   The same `(?![+-])` leftover in the test-weakening count (`lib.mjs`, `testWeakening`) is
   fixed with the Step 4 guard item: only real diff headers are skipped now.
 
-### Step 5 — Keep the attending session current (moved to Step 14)
-
-Moved to Step 14 as C4 (owner, 2026-11-25): stale skill text is mostly an artifact of updating
-the plugin during development, and rare in use.
-
 ### Step 6 — Prove it in one real run (C1)
 
 The live-proof checklist (#39). Tick each when a real run shows it, naming the run; open a bug
@@ -461,14 +457,6 @@ real look are model behaviour:
   output is set aside before the final check.
 - [x] `prepare --gate` with a gate that fails once: the launch screen says "flaky", not "will
   probably stop".
-- [ ] After an owner's "Amend": the reviewer's `bundle/tors.md` holds the new requirement and
-  `bundle/amendments.md` names the approval; no `test-weakened` finding on the amended test; a
-  look gate quotes the new requirement.
-
-Left from the review of these changes (not fixed, narrow): a checkout onto an epic branch throws
-instead of parking when a file another branch ignores is untracked on the integration line and
-the epic branch tracks that same path; a change record written with single quotes is read from
-the status file instead; `dirty()` runs one or two more git commands per call.
 
 Also to see in a real run: no by-hand command, git line or other skill offered anywhere the
 owner reads; step 1's fixes (B14 a resumed epic put back on its branch — seen, see below; B15
@@ -476,14 +464,6 @@ leftover files set aside; `Not decided yet: none — <a reason>`), the scratch f
 files `CLAUDE.md` names. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `skill.test.mjs`, "SKILL.md and a
 rendered report offer the owner no by-hand path"; `resume.test.mjs`, "files left in the clone do
 not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says none is the all-clear…".*
-
-**For the next real run** (model behaviour; one Pilot Light run covers them all):
-- After an owner's "Amend": no `test-weakened` finding from the real reviewer (box above; the
-  driver's part is tested in `resume.test.mjs`, "the reviewer judges the amended requirement…"
-  and "the look gate names the amended requirement…").
-- B12 and B16 (Step 11), seen for real.
-- The #43 connector check: a session finds a connector with `ToolSearch`, reads, and a send is
-  refused.
 
   **The test project from 2026-11-22 is Pilot Light** (`~/github/peakflames/pilot-light`,
   github.com/peakflames/pilot-light, private): a dashboard for peak-workflow and autopilot,
@@ -512,10 +492,6 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   contradiction line, `"look": "after"`. On Windows, 2026-11-21 (the reporter's run
   `20261121-130134`): B1, B4, and I2 with the owner away (the run continued past a park and
   blocked the dependent). I2 with the owner there is not yet seen.
-
-### Step 7 — Windows tests (C2)
-
-- [ ] **36 driver tests fail on Windows before any change** (#41 B8).
 
 ### Step 8 — A project that is broken, flaky or asleep before or during a run (C2)
 
@@ -557,10 +533,6 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   *Closed on tests 2026-11-25 (`448be29`): driver logic the fake-`claude` tests cover, so no real run is asked for. Worth noticing in one: a real run past a flaky base test. A pass on the second try goes on and is in the report.*
 - [x] **One flaky gate failure is reported as "every epic will probably stop"** (#40) (6). C3.
   *Closed on tests 2026-11-25 (`448be29`): driver logic the fake-`claude` tests cover, so no real run is asked for. Worth noticing in one: a launch screen that says "flaky". `prepare` runs a failing gate once more (`gatesFlaky`).*
-- [ ] **Autopilot cannot repair a red base, a preflight refusal or a merge conflict itself**
-  (#42, I6c). Includes "no path for a launch gate that fails on a product bug" (#40) (7).
-  *The merge conflict part is done (Step 3, `b7c2d14`): a catch-up session settles it on the
-  standing answer. Open: a red base and a preflight refusal.*
 
 ### Step 9 — The budget (C2)
 
@@ -662,25 +634,12 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
 - [x] **Preflight text ignores `"look": "after"`** (#41 B3; in code, `driver.mjs:715`; the
   reporter saw it again on `93a8b35`). *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: an epic with only screens reads "listed for you to see after the run" (or "not stopped for a look" in a provisional run) and does not park; one a person must observe still does.*
 
-### Step 11 — An approved amendment reaches every later step (C2 and C3)
-
-- [ ] **The reviewer flags an amendment the owner already approved** as `test-weakened`, and the
-  repair parks to have it confirmed (#41 B12; not checked). Pass decided amendment gates to the
-  reviewer and the fix session, as B9 did for plan and build. C2: it cost a relaunch.
-  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a real review after an approved amendment. The bundle's `tors.md` holds the current requirement,
-  `amendments.md` names the approval, and the repair's rules say to keep it (`amendedPairs`).*
-- [ ] **A person-only check quotes a requirement the owner already replaced** (#41 B16; not
-  checked). Gate `checks`, `live` and `question` should name the current requirement.
-  *Built 2026-11-25 (`feature/peak-workflow-autopilot-overnight`); proof pending: a real look after an approved amendment. The look gate reads the requirement from the branch
-  (`lookMeta`).*
-
 ### Step 12 — Time and progress (C2 and C3)
 
 - [x] **The full end-to-end suite runs several times per epic** (#41 I7). C2. *Measured
   2026-11-25 (`20261125-112902`, `20261125-120140`): once in the build and once in the final check, for each of 3 epics,
   plus targeted `-g "TOR-…"` runs; the driver's checks run none. Two is the floor: build and
   independent check each need their own proof.*
-- [ ] **No hourly progress report** (#41 I1).
 - [x] **The first epic is announced as "5 of 8"** (#41 B7): numbered by phase, not by queue
   position. *Seen fixed 2026-11-25: "Starting 1 of 3" (run `20261125-112902`, `events.jsonl`).*
 - [x] **One early stop idles most of an unattended run** (*no issue*; Pilot Light, run
@@ -781,20 +740,12 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   CHECK_BUILD, because its error result still says `success`, so the half-done branch went to
   the checks and a fix session (`Vbz68Ea` fix-1 in run `20261123-100729`). Not proven on a
   real limit yet.
-- [ ] **An epic that extends a screen another epic owns gets no look** (*no issue*; same run,
-  `n2g5TvI`). Its spec has no Screens table ("S-01 is owned by the skeleton; this epic
-  extends it"), so it is not a "UI epic" and never stops for a look, in a full run either.
-  Unexamined. C3.
 - [x] **`status` gave the run budget as $250; the run's `config.json` says $243.62**
   (*no issue*; same run). Not a wrong number: runs chained by `continues` share one budget
   ($250); each run's `config.json` holds what was left of it when that run started ($250 less
   the $6.38 spent before). `status` showed the chain ("$47.85 of $250"), the report the run
   ("$41.28 of a $243.62 limit"). Fixed 2026-11-23: the report and the run log now give both
   ("spent $41.28 in this run; with the 2 runs before it, $47.66 of the $250 budget is spent").
-- [ ] **The watch repeats its progress line once per blocked epic** (*no issue*; run
-  `20261122-094004`): "Progress: 0 of 11 done" eight times in a row. C3. *Built 2026-11-25. Live:
-  said once at the one park in `20261125-112902`; no run yet had several epics end together, so the
-  burst case is shown only by the fake-`claude` test.*
 - [x] **Unknown: does an approved amendment survive a stop?** (run `20261122-100728`).
   Answered by run `20261123-081039`: yes, see above. The
   owner's "Amend" answer for n2g5TvI was given to a resumed plan session that he then
@@ -808,19 +759,11 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
 
 ### Step 13 — Wording and small behaviour (C3)
 
-- [ ] One of the epic's automatic tries can be wasted: a final check with no verdict because
-  the owner put a check off is re-run on the standing answer and asks again (*no issue*).
 - [x] "Stopped N times" counts autopilot's own answers plus this stop, not the stops the owner
   answered (*no issue*). *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), closed on tests (`attend.test.mjs`,
   "standingAnswer: which answer…" and "a final check that still fails after its repair…"): the
   count takes every technical stop of the epic and says who answered ("autopilot answered 1, you
   answered 1"); a provisional run's own answers stay out. The limit itself is unchanged.*
-- [ ] The report reads `autoContinue` from its own run's config, `status` from the current
-  run's, so the two can differ (*no issue*).
-- [ ] `launch.warn` lines for a clone that is ahead or diverged still carry a `git fetch`
-  command; the skill paraphrases them (*no issue*).
-- [ ] No gate kind for a value the owner types, such as a document ID; it travels in `--note`
-  (#41 I8).
 - [x] Sessions write scratch files in the clone, because the referee's path rule refuses
   `/tmp` (#41 B15). Fixed 2026-11-21 with the scratch folder (step 2, "The referee's guards").
   A session can still leave a file in the clone; step 1's B15 fix sets it aside.
@@ -832,18 +775,6 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   built look right?": the driver's own reason, not owner's words (*no issue*; Pilot Light). *Seen
   fixed 2026-11-25: "This epic changed screens; pictures of them are ready. Does what was built
   look right?", the reason in `why` (run `20261125-112902`, `gates/XRSSsTW-1.json`).*
-- [ ] The watch said "One command has been running for 3 min" for a tool call that had ended:
-  its `PreToolUse` had no `PostToolUse` (a failed command), so it counted as still running
-  (*no issue*; Pilot Light, `build-1/hooks.jsonl` line 57). *Not reproduced 2026-11-25: the one
-  such line ("Repeat full suite with probe…", `20261125-120140` KxkwogG verify-1) came 3 min into a command
-  that ended a minute later: correct. The failed-command case is still unseen.*
-- [ ] The final check is told the owner's look named `runs/<run>/epics/<id>/artifacts/…` (the
-  look gate's `artifacts`), a path inside the workspace that the referee refuses; seen once
-  (Pilot Light run `20261125-233511`, 4lF6gDZ verify-1, `ls` of that folder refused). It cost
-  nothing. Either leave workspace paths out of `ownerLook`'s "What they looked at" or copy the
-  files where the verifier may read them (*no issue*). C3.
-- [ ] A look with 25 pictures and no operator-observed requirement is one yes for the whole
-  set; nothing lists what to check (*no issue*; Pilot Light). Maybe as intended.
 - [x] The referee refused "$AUTOPILOT_SCRATCH" used in a cut-down form four times in one epic,
   and four cwd-relative paths that resolved into the workspace (*no issue*; Pilot Light). The
   scratch rule's wording may need an example. *Built 2026-11-25. Live (`20261125-112902`, `20261125-120140`): 1
@@ -867,23 +798,6 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   real" section of three items, each with what it was checked against; the relaunch's final
   check (`20261125-233511`) carried the two it did not prove itself into its report, and both
   reached the owner's closing screen.*
-- [ ] The build missed a console error the verifier later found (#40) (38).
-- [ ] Gate answers are dated in UTC (#40) (40). *Built 2026-11-25. Live: `XRSSsTW-1` decided
-  2026-11-25 at 12:01 EST, which UTC gives the same day; only an answer after 19:00 EST tells
-  the two apart. Shown by the TZ test.*
-- [ ] The look question for a UI epic with no pictures is asked in chat, not the popup (#40) (41).
-  *Not shown 2026-11-25: that run's look had pictures and came as a popup.*
-- [ ] The skill text does not cover the sandbox-off case (#41 I4); mostly moot after B1.
-
-### Step 14 — Housekeeping (C4)
-
-- [ ] `preflight --json` is 31 KB (#40) (23).
-- [ ] The verifier makes scratch git worktrees under `/tmp`, outside the clone, and tries forced
-  git commands the referee refuses (#40). Harmless so far.
-- [ ] `skills/autopilot/SKILL.md` is about 1,080 lines; every attending session carries it (#40).
-- [ ] The cockpit mod is deferred (`autopilot-cockpit-mod-handoff.md`).
-- [ ] **An attending session keeps the skill text it loaded** (#37). After a plugin update it
-  works from stale instructions until `/peak-workflow:autopilot` is run again. Was Step 5 (C2).
 
 ## 2026-11-23 session — live fixes, what the run proved, and a rename
 
@@ -963,42 +877,10 @@ a real recorded stream (gate `F5hv9T4-2`, the owner's to answer). The verifier's
 fixed" section worked live on Outstanding (3 lines; one is an absolute path not stripped from
 change-record notes).
 
-### Known, not fixed
-
-- **A swallowed promise is not seen as a hidden check**: `await run().catch(() => {})` in a test is
-  not flagged; the same form is common in cleanup (review of Step 4 box 1).
-- `attend.test.mjs` "watch and status see inside the step … each said once" failed (expected 2,
-  actual 3), on the base branch too. *Fixed 2026-11-25: under load a later wrapup command also
-  passed the test's 0.3 s mark and was rightly said; the test now counts only its two commands
-  (10 of 10 with ten copies at once).* 2 `test_wrapper.py` failures (pre-existing).
-- **The independent review is short**: 33–49 seconds on large changes (run `20261123-140347`:
-  33 s on Outstanding). *Answered 2026-11-25: the first try opened under half the changed files
-  (10 of 21, 4 of 9); only the retry, given the files by name, read them all. Every review now
-  gets that list (see Step 4).*
-- **A voided "Resume"**: the owner's answer to keep Outstanding's finished build was void
-  because its branch no longer merged once Conversation drawer merged (both touch
-  `epic-detail-drawer.tsx` and `.autopilot/test-changes.jsonl`). The epic was planned again;
-  the old branch is kept at `refs/autopilot/superseded/…`. The same item as the Step 3 line
-  "An epic is started over without asking": it says so in the log but spends the money again.
-  Fixed 2026-11-24 (Step 3): now a catch-up session settles the clash; not yet seen live.
-- ~~**"Resume" after a failed merge check repeats the whole final check** (about $5.85 and 29
-  minutes on Outstanding). Step 3, first item.~~ Fixed 2026-11-24 (#35); not yet seen live.
-- The build is told to log a reason before it edits an existing test, but a build whose first
-  command was refused for another reason (the false alarms above) tried the edit first and was
-  refused again: a few seconds each, no stop.
-- The watch repeats its progress line once per blocked epic, and prints a refusal that has
-  already cleared in words that read as a live blocker.
-- An epic that extends another epic's screen gets no look (`n2g5TvI`).
-- The verifier's how-to for phone checks (`HOST=0.0.0.0`; "`--lan` doesn't exist until
-  yZQYIVE") is not saved in the project.
-- Windows: 36 driver tests fail before any change (#41 B8), and the 2026-11-21 fixes have not
-  run on Windows.
-
 ### Before handing a run to the beta tester
 
 Done: the false referee refusals, the usage-limit wait, verifier notes, the stricter test
-guard. Still open: the short review (above); a note for the tester that Windows is unproven and
-what to send back if it breaks (the run report and the run's `hooks.jsonl`). The rename to
+guard; the short review (Step 4). The Windows note is in the beta backlog. The rename to
 Provisional is built (2026-11-24, `c166b80`): new runs write `mode: "provisional"` and
 `approved_by = "autopilot (provisional run)"`; the old `"prototype"` values in configs, events and
 project change records still read as provisional. Stored field names (`decided.prototype`,
