@@ -243,6 +243,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The look opens its pictures in the picture viewer** — autopilot opens all of a look's screenshots in one Preview window (or the system viewer), every time; sending them into the chat is now an extra, for another device.
 - **Values still to decide park nothing** (#41) — a `TBD` or a "Not decided yet" line in `CLAUDE.md` no longer parks every epic. The walking skeleton runs and settles them, in any section; other epics run meanwhile. Choices that cost money are still asked.
 - **"Not proven for real" in build and repair handoffs** — what a session did not check against the real thing is listed under that heading too, with what it was checked against; "CANNOT VERIFY" stays. The verifier carries such items into its report.
 - **The launch question names the limits** — it says the run stops at the run budget or the end time, whichever comes first, so the popup no longer hides them.

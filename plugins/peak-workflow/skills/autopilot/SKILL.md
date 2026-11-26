@@ -879,10 +879,14 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
 
       **Pictures of the screens.** The gate's `pictures` list holds the screenshots the build
       took for this look, each with `path` and `shows` (the build's own caption). They are what
-      the owner judges, so put them in front of the owner before asking anything: when the
-      `SendUserFile` tool exists, send them all in one call with the captions; otherwise open
-      each with the system's opener. Then list them, one line each: "<n>. <shows>". Say that
-      the final check will look at the same pictures and report what it sees.
+      the owner judges, so put them in front of the owner before asking anything: open them all
+      in the system's picture viewer with one command, so they can be paged through and zoomed —
+      macOS `open -a Preview "<path>" "<path>" …` (one Preview window), Windows
+      `cmd.exe /c start "" "<path>"` for each, Linux `xdg-open "<path>"` for each — and say "I've
+      opened the <n> pictures in <Preview / your picture viewer>." When the `SendUserFile` tool
+      exists, also send them in one call with the captions, for an owner on another device. Then
+      list them, one line each: "<n>. <shows>". Say that the final check will look at the same
+      pictures and report what it sees.
 
       If the question says "UI epic" and `pictures` is empty, the build left nothing to judge
       (a build from before pictures were required, or one that failed to take them). Say so in
