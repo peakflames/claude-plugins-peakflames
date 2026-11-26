@@ -136,18 +136,35 @@ test('R2 scratch folder: printing its name, an option or quoted code is not a co
   passes(h.bash('PORT=3917 NODE_ENV=test CONTROL="$AUTOPILOT_SCRATCH/control.json" bun apps/api/src/index.ts'), 'a prefix with a file');
   passes(h.bash('ls; (CONTROL="${AUTOPILOT_SCRATCH}/control.json" node a.js)'), 'a prefix, braces, in a group');
   passes(h.bash('X=1 CONTROL=\'$AUTOPILOT_SCRATCH/c.json\' node a.js && echo ok'), 'single quotes');
+  // A name that holds a file (or folder) below the scratch folder, on its own, is no copy either (2026-11-25, refused live in a loop).
+  for (const c of [
+    'F="$AUTOPILOT_SCRATCH/fresh" && mkdir -p "$F"',
+    'ls; (CONTROL="${AUTOPILOT_SCRATCH}/control.json"; node a.js)',
+    'CONTROL="$AUTOPILOT_SCRATCH/control.json"; node a.js',
+    'A=1 CONTROL="$AUTOPILOT_SCRATCH/c.json" && node a.js',
+    'for f in a b; do\n  out="$AUTOPILOT_SCRATCH/step5-foo.txt"\n  node --test "test/$f.test.js" > "$out" 2>&1\n  tail -3 "$out"\ndone',
+    'for f in a b; do out="$AUTOPILOT_SCRATCH/step5-foo.txt"; node --test "test/$f.test.js" > "${out}" 2>&1; tail -3 $out; done',
+  ]) passes(h.bash(c), c);
+  // Such a name is read as its value: where it leads is judged like any path.
+  denied(h.bash('out="$AUTOPILOT_SCRATCH/a.txt"; cat "$out/../../step.json"'), 'R2', /autopilot workspace/);
+  denied(h.bash('for f in a; do out="$AUTOPILOT_SCRATCH/a.txt"; echo x > "$out/../../step.json"; done'), 'R2', /autopilot workspace/);
   // Copies into a variable, which a later command could cut down: still refused, at the start of any command.
   for (const c of [
     'S="$AUTOPILOT_SCRATCH" && cat "$S/run-head.ts"',
-    'F="$AUTOPILOT_SCRATCH/fresh" && mkdir -p "$F"',
     'export S=$AUTOPILOT_SCRATCH',
     'OUT="$AUTOPILOT_SCRATCH" node tools/shot.js',
-    'ls; (CONTROL="${AUTOPILOT_SCRATCH}/control.json"; node a.js)',
-    'CONTROL="$AUTOPILOT_SCRATCH/control.json"; node a.js',
     'CONTROL="$AUTOPILOT_SCRATCH/../x.json" node a.js',
-    'A=1 CONTROL="$AUTOPILOT_SCRATCH/c.json" && node a.js',
     'CONTROL="$AUTOPILOT_SCRATCH/$NAME" node a.js',
     'x=$(S=$AUTOPILOT_SCRATCH; echo $S)',
+    'for f in a b; do S="$AUTOPILOT_SCRATCH"; cat "$S/x"; done', // after `do` on the same line: an assignment all the same
+    'if true; then S=$AUTOPILOT_SCRATCH; fi',
+    'out="$AUTOPILOT_SCRATCH/a/b.txt"; cat "${out%/a/b.txt}/../step.json"', // cut down
+    'out="$AUTOPILOT_SCRATCH/a.txt"; echo ${!out}',
+    'out="$AUTOPILOT_SCRATCH/a.txt"; out="$out/../.."; ls "$out"', // given a second value
+    'out="$AUTOPILOT_SCRATCH/x"; b=$out; cd "$AUTOPILOT_SCRATCH/a/b" && cat "$b/../../step.json"', // copied into another name
+    'out="$AUTOPILOT_SCRATCH/x"; read -r out < p; cat "$out/step.json"',
+    'out="$AUTOPILOT_SCRATCH/x"; for out in /a /b; do cat "$out"; done',
+    'out="$AUTOPILOT_SCRATCH/x"; printf -v out %s "$HOME"; cat "$out"',
   ]) denied(h.bash(c), 'R2', /as it is: do not copy it into a variable/, c);
 });
 

@@ -7,10 +7,9 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-25, after Steps 8 and 11's
-  groups, `448be29`): 334, of which 321 pass, none fails (the flaky attend test is fixed) and
-  13 are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`; all 13
-  passed on 2026-11-21), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-25, after groups 6 and 7,
+  `feature/peak-workflow-autopilot-wording-proofs`): 362, of which 348 pass, none fails and 14
+  are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
   Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
   base as well (cause not looked for).
 - **Pilot Light** (the second real project) finished its queue on 2026-11-24 (see "2026-11-24"
@@ -113,7 +112,7 @@ them; the state is here. The rule:
 | #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 0 / 2 |
 | #36 | The run budget is not enforced inside a step | Step 9 | 0 / 1 (closed, not to be done) |
 | #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
-| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 11 / 18 |
+| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 0 of the 2026-11-14 and 2026-11-21 boxes (closed on tests 2026-11-25); Step 6's two later boxes need a real run |
 | #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 12 / 13 |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
@@ -141,11 +140,19 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
 4. **Launch-screen leftovers** (#40 item 5, #41 B3 and I5, own-settings warning, `decide` and
    `user.name`, a setting changed mid-run). *Done 2026-11-25
    (`feature/peak-workflow-autopilot-launch-leftovers`). Still open in Step 10: MCP (group 5),
-   the undecided-values check, a stop that leaves a question, the format-guard hint.*
+   the undecided-values check, a stop that leaves a question, the format-guard hint (the last
+   two done with group 6).*
 5. **MCP connectors** (#43). *Done 2026-11-25 (`feature/peak-workflow-autopilot-mcp`): see
    the Step 10 box, and "Connectors: what is left open" under it.*
 6. **Wording** (#40 item 15 "CANNOT VERIFY", "Stopped N times", the scratch-variable refusal).
+   *Done 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), with two Step 10 leftovers (a stop in planning, the format-guard
+   hint).*
 7. **Step 6 proofs** (#39): stage only the cheap ones; tick the rest as real runs produce them.
+   *Done 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`): every box that is driver logic closed on its test, one real bug
+   fixed (a raised budget did not relaunch). What is left needs a real run: see "For the next
+   real run" under Step 6.*
+8. Still open from Step 10: **the undecided-values check** (#41), which changes what parks and
+   needs the owner's decision first.
 
 Left as they are: #37, the size of `SKILL.md` and of `preflight --json` (C4), Windows tests
 (#41 B8, needs a Windows machine).
@@ -371,20 +378,23 @@ The 2026-11-14 changes:
   "Progress: 0 of 3 done (0%); 1 waiting for you; 2 still to go", "Continuing 1 of 3" after the relaunch.*
 - [x] One spend figure: chain total of the budget, in every line. *Seen 2026-11-25: the relaunch `20261125-120140` said "Spent $7.80 of $250" (the chain), and its report gives both ("$18.09 in this run; $25.89 of $250").*
 - [x] $250 default run budget (Pilot Light, every run 2026-11-22 to 24).
-- [ ] `configure --run-budget` raises a chain in progress.
+- [x] `configure --run-budget` raises a chain in progress. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): it did not: a run stopped at its budget never relaunched, even after a raise. Fixed: a budget stop waits only while nothing is left (`attend.test.mjs`, "a chain stopped at its run budget relaunches once the owner raises it", Full and Provisional).*
 - [x] "Bring it in for me" at the end of a run, then the tidy-up: temporary
   `autopilot/<integration>` branch deleted, offer to commit `autopilot.json` (Pilot Light: the
   walking skeleton 2026-11-22 with "Commit it for me" answered; F5hv9T4 2026-11-24).
-- [ ] "Combine them for me" on a diverged project, with abort on conflict.
-- [ ] The relaunch questions (`relaunch.ask`: at the computer, real money).
-- [ ] "Start it so I can check for real" at the look; a yes from pictures alone refused (`how`).
-- [ ] A look kept across a repair that changes no screen file.
-- [ ] Small-fix limit of 80 changed lines.
-- [ ] A failed merge check keeps the final check's work, and "Resume" re-checks the merge with
-  no new final check (#35).
-- [ ] A decision whose branch no longer fits is not planned again: a catch-up session settles
+- [x] "Combine them for me" on a diverged project, with abort on conflict. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): the driver's refusal on a diverged project (`sync.test.mjs`, "sync, diverged: readiness and the driver both refuse…") and the skill's wording (`skill.test.mjs`, "SKILL.md: one command, one session…"). The merge itself is the attending skill's.*
+- [x] The relaunch questions (`relaunch.ask`: at the computer, real money). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `skill.test.mjs`, "the loop, end to end…" (at the computer) and "a relaunch asks about real money once…" (new); the mode, `provisional.test.mjs`, "mode: a relaunch carries the run's mode…".*
+- [x] "Start it so I can check for real" at the look; a yes from pictures alone refused (`how`). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "the look says what must be seen for real…". Full only: a provisional run takes no look (`provisional.test.mjs`, "provisional: a requirement a person must observe does not park…").*
+- [x] A look kept across a repair that changes no screen file. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "a repair that changes no screen file keeps the owner's look…" and "a repair that changes a screen file still parks for a new look". Full only, as above.*
+- [x] Small-fix limit of 80 changed lines. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "the small-fix limit is 80 changed lines…" (new; 81 also in Provisional).*
+- [x] A failed merge check keeps the final check's work, and "Resume" re-checks the merge with
+  no new final check (#35). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "tests red only
+  once the final check's work is merged…" and "a provisional run: tests red once…" (new).*
+- [x] A decision whose branch no longer fits is not planned again: a catch-up session settles
   the clash on the standing answer and the epic goes on with the old answer; a changed branch is
   checked again; a gone one is asked, or started over and listed in a provisional run (Step 3).
+  *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): the catch-up tests in `resume.test.mjs`, "a branch that stops
+  merging cleanly during the run…" through "gone, provisional run: it starts the epic over itself…".*
 
 The 2026-11-21 changes (#41, I2 and I6):
 - [x] "I'll be away": an epic that needs the owner is set aside, independent epics keep
@@ -393,11 +403,15 @@ The 2026-11-21 changes (#41, I2 and I6):
 - [x] With the owner there, the run stops at the first one. *Seen 2026-11-25, Pilot Light run
   `20261125-112902`: XRSSsTW parked for a look and the run ended there (`autopilot.log`: "stopping
   the run (the owner did not say they would be away…)").*
-- [ ] Autopilot decides a technical stop itself (new plan, repair, re-run of the final check,
+- [x] Autopilot decides a technical stop itself (new plan, repair, re-run of the final check,
   the final check's own fix, reviewer findings), under the one count per epic, and the closing
-  screen lists what it decided.
-- [ ] Past the count: the one question "Try again" / "Leave it for now"; "Try again" never
-  lets a fix change a requirement or weaken a test.
+  screen lists what it decided. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `attend.test.mjs`, "a plan that
+  fails lint is planned again on the standing answer…" (new) and the standing-answer tests beside it.*
+- [x] Past the count: the one question "Try again" / "Leave it for now"; "Try again" never
+  lets a fix change a requirement or weaken a test. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`):
+  `attend.test.mjs`, "at the limit the owner gets one plain question…" and "the final check's own
+  product fix is allowed without asking…" (a requirement file now too; the same question in a
+  provisional run).*
 
 The 2026-11-24 changes (Step 4):
 - [x] A real reviewer's `audit.json` has `coverage` and `checked`, and a thin one runs again
@@ -430,7 +444,19 @@ the status file instead; `dirty()` runs one or two more git commands per call.
 Also to see in a real run: no by-hand command, git line or other skill offered anywhere the
 owner reads; step 1's fixes (B14 a resumed epic put back on its branch — seen, see below; B15
 leftover files set aside; `Not decided yet: none — <a reason>`), the scratch folder and the
-files `CLAUDE.md` names.
+files `CLAUDE.md` names. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `skill.test.mjs`, "SKILL.md and a
+rendered report offer the owner no by-hand path"; `resume.test.mjs`, "files left in the clone do
+not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says none is the all-clear…".*
+
+**For the next real run** (model behaviour; one Pilot Light run covers them all):
+- Every review is told the changed code files by name: a first review reads at least half
+  without a retry (box above).
+- After an owner's "Amend": no `test-weakened` finding from the real reviewer (box above; the
+  driver's part is tested in `resume.test.mjs`, "the reviewer judges the amended requirement…"
+  and "the look gate names the amended requirement…").
+- B12 and B16 (Step 11), seen for real.
+- The #43 connector check: a session finds a connector with `ToolSearch`, reads, and a send is
+  refused.
 
   **The test project from 2026-11-22 is Pilot Light** (`~/github/peakflames/pilot-light`,
   github.com/peakflames/pilot-light, private): a dashboard for peak-workflow and autopilot,
@@ -592,9 +618,15 @@ files `CLAUDE.md` names.
 - [x] **`decide` refuses when the repository has no `git config user.name`** (*no issue*;
   Pilot Light), although commits there carry a name from elsewhere. The skill text never
   mentions `--by`. Fall back to the commit author name. C3. *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: `decide` and `continue` fall back to the newest commit by a person, never an autopilot name; with none, the skill asks once and passes `--by`.*
-- [ ] **A stop the owner asked for leaves a question to answer before the next run**, even
-  one minute into planning (*no issue*; Pilot Light). C3.
-- [ ] **A format-guard refusal repeats the whole install hint** in `refuse` (*no issue*). C3.
+- [x] **A stop the owner asked for leaves a question to answer before the next run**, even
+  one minute into planning (*no issue*; Pilot Light). C3. *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), closed on
+  fake-`claude` tests (`driver.test.mjs`, "STOP while the plan is still being made…", Full and
+  Provisional): a STOP in planning with nothing on the branch puts the epic back in the queue
+  with no question, and the log says so; with work on the branch it is still asked.*
+- [x] **A format-guard refusal repeats the whole install hint** in `refuse` (*no issue*). C3.
+  *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), closed on a test (`env.test.mjs`, "preflight: with no Python 3.11
+  the format guard refuses in one line…"): one line with where to get Python, not the whole
+  install hint.*
 - [x] **Preflight text ignores `"look": "after"`** (#41 B3; in code, `driver.mjs:715`; the
   reporter saw it again on `93a8b35`). *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-launch-leftovers`), closed on fake-`claude` tests: an epic with only screens reads "listed for you to see after the run" (or "not stopped for a look" in a provisional run) and does not park; one a person must observe still does.*
 
@@ -746,8 +778,11 @@ files `CLAUDE.md` names.
 
 - [ ] One of the epic's automatic tries can be wasted: a final check with no verdict because
   the owner put a check off is re-run on the standing answer and asks again (*no issue*).
-- [ ] "Stopped N times" counts autopilot's own answers plus this stop, not the stops the owner
-  answered (*no issue*).
+- [x] "Stopped N times" counts autopilot's own answers plus this stop, not the stops the owner
+  answered (*no issue*). *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), closed on tests (`attend.test.mjs`,
+  "standingAnswer: which answer…" and "a final check that still fails after its repair…"): the
+  count takes every technical stop of the epic and says who answered ("autopilot answered 1, you
+  answered 1"); a provisional run's own answers stay out. The limit itself is unchanged.*
 - [ ] The report reads `autoContinue` from its own run's config, `status` from the current
   run's, so the two can differ (*no issue*).
 - [ ] `launch.warn` lines for a clone that is ahead or diverged still carry a `git fetch`
@@ -772,14 +807,25 @@ files `CLAUDE.md` names.
   that ended a minute later: correct. The failed-command case is still unseen.*
 - [ ] A look with 25 pictures and no operator-observed requirement is one yes for the whole
   set; nothing lists what to check (*no issue*; Pilot Light). Maybe as intended.
-- [ ] The referee refused "$AUTOPILOT_SCRATCH" used in a cut-down form four times in one epic,
+- [x] The referee refused "$AUTOPILOT_SCRATCH" used in a cut-down form four times in one epic,
   and four cwd-relative paths that resolved into the workspace (*no issue*; Pilot Light). The
   scratch rule's wording may need an example. *Built 2026-11-25. Live (`20261125-112902`, `20261125-120140`): 1
   refusal in 16 sessions, down from 8 in one epic. It was `out="$AUTOPILOT_SCRATCH/step5-….txt"`
   inside a loop: a file under the scratch folder, not a copy of it. Arguably a false refusal;
   the referee could allow a variable holding a file path below the folder (KxkwogG build-1).*
-- [ ] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
+  *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), closed on tests (`hooks.test.mjs`, "R2 scratch folder: printing its
+  name…"): a variable may hold a file below the folder; its uses are judged as that path, and a
+  copy of the folder, a cut-down use, a copy into another name or a second value (`read`, `for`,
+  `printf -v` included) is still refused. The parser now also reads an assignment after `do`,
+  `then` or `else` on the same line. Left open, narrow: two safe values for one name are refused
+  all the same; a way out through `$(dirname "$AUTOPILOT_SCRATCH/x")` or an array is still not
+  caught (an older gap, not made by this change).*
+- [x] The builder's handoff says "CANNOT VERIFY" where the report says "not proven for real"
   (#40) (15). *Still so 2026-11-25: all three handoffs of `20261125-120140` say "CANNOT VERIFY".*
+  *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), closed on a test (`driver.test.mjs`, '"Not proven for real": the
+  build, repair and verify sessions are told the heading…', Full and Provisional): "CANNOT
+  VERIFY" stays (other skills parse it); build and repair sessions also list such things under
+  "Not proven for real", and the verifier carries over what it did not prove itself.*
 - [ ] The build missed a console error the verifier later found (#40) (38).
 - [ ] Gate answers are dated in UTC (#40) (40). *Built 2026-11-25. Live: `XRSSsTW-1` decided
   2026-11-25 at 12:01 EST, which UTC gives the same day; only an answer after 19:00 EST tells

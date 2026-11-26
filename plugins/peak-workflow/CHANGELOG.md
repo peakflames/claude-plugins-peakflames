@@ -243,6 +243,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **"Not proven for real" in build and repair handoffs** — what a session did not check against the real thing is listed under that heading too, with what it was checked against; "CANNOT VERIFY" stays. The verifier carries such items into its report.
 - **The launch question names the limits** — it says the run stops at the run budget or the end time, whichever comes first, so the popup no longer hides them.
 - **A step's settings changed mid-run reach the next step** — model, effort and caps are read again before each step and the change is logged; mode, the money answer and the run budget never change mid-run. Each step's log line and `step.json` name its model and effort.
 - **Autopilot catches a thin independent review** — the reviewer reports what it read per
@@ -278,6 +279,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A run stopped at its budget relaunches after a raise** — once `configure --run-budget` leaves money, `status` offers the relaunch with what is left; before, a budget stop blocked it for good.
+- **A stop during planning asks nothing** — a STOP before anything was built puts the epic back in the queue with no question; it is planned from the start next time.
+- **"Stopped N times" counts every technical stop** — the at-limit question counts the stops the owner answered too and says who answered each; the limit is unchanged.
+- **A variable may hold a scratch file** — `out="$AUTOPILOT_SCRATCH/a.txt"` is no longer refused; its uses are judged as that path. A copy of the folder is still refused.
+- **The format-guard refusal is one line** — with no Python 3.11, readiness says so once, with where to get Python, instead of the whole multi-line install hint.
 - **A connector question no answer could change** (#43) — a session no longer asks the owner
   for a connector it cannot use; it lists the check under "Not proven for real" instead of
   relaunching.

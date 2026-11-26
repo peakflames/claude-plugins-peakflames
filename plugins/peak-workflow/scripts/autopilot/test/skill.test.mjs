@@ -325,6 +325,30 @@ test('the loop, end to end: launch, a technical stop, status says continue, the 
   assert.equal(git(p.project, 'status', '--porcelain'), '', 'the project is never written by the loop');
 });
 
+test('a relaunch asks about real money once when the chain never answered it and a key file is now copied in; never when the copy is empty', async (t) => {
+  const p = makeProject(t);
+  git(p.project, 'config', 'user.name', 'Todd Schavey'); // who `continue` records
+  const status = () => driver('status', '--project', p.project, '--json', '--queue', E1.id).json();
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: buildActions(E1, { commit: false }), result: { subtype: 'error_max_turns', is_error: true } } });
+  const pre = preflight(p, '--allow-test-double');
+  confirm(pre.launch, p.project, [E1.id], { allowTestDouble: true, autoContinue: 2, attended: true, mode: 'full' }); // money never asked: nothing was copied in
+  await p.go({ run: pre.launch.run });
+  assert.equal(driver('continue', '--workspace', p.state, '--json').status, 0);
+  assert.deepEqual(status().relaunch.ask, [], 'no key file in the copy: nothing to ask');
+  fs.writeFileSync(path.join(p.project, '.env'), 'KEY=1\n');
+  assert.equal(driver('configure', '--project', p.project, '--copy', '.env').status, 0);
+  const s = status();
+  assert.deepEqual([s.relaunch.ask, 'realSpend' in s.relaunch.config], [['realSpend'], false], 'a key file is copied in now: asked once');
+  // Answered: the relaunch carries it and asks nothing again.
+  fs.mkdirSync(s.relaunch.runDir, { recursive: true });
+  fs.writeFileSync(path.join(s.relaunch.runDir, 'config.json'), JSON.stringify({ ...s.relaunch.config, realSpend: false }, null, 2));
+  p.scenario({ [`${E1.id}/build`]: { actions: buildActions(E1, { commit: false }), result: { subtype: 'error_max_turns', is_error: true } } });
+  await p.go({ run: s.relaunch.run });
+  assert.equal(driver('continue', '--workspace', p.state, '--json').status, 0);
+  const again = status();
+  assert.deepEqual([again.relaunch.ask, again.relaunch.config.realSpend], [[], false]);
+});
+
 test('SKILL.md: the launch asks how careful the run is, writes the answer as `mode`, asks it on a relaunch that never had it, and reads out what a provisional run decided', () => {
   const flat = SKILL.replace(/\s+/g, ' ');
   for (const text of [
