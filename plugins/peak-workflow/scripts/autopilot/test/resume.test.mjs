@@ -2488,7 +2488,7 @@ test('an epic that stops away from its own branch with files left uncommitted do
   assert.equal(refs.length, 1);
   assert.ok(refs[0].startsWith('refs/autopilot/leftover/spike/try-it-'), refs[0]);
   assert.equal(git(p.clone, 'show', `${refs[0]}^3:tmp_playwright/shot.txt`), 'a session left this');
-  assert.deepEqual(s.leftovers.map((l) => [l.branch, l.files, l.why]), [['spike/try-it', ['tmp_playwright/shot.txt'], `before ${d.id} started`]]);
+  assert.deepEqual(s.leftovers.map((l) => [l.branch, l.files, l.why]), [['spike/try-it', ['tmp_playwright/shot.txt'], `when ${E1.id} parked off its branch`]]);
 });
 
 test('a resumed epic is put on its branch by the driver: a session that does not switch branches itself still commits to the epic branch (issue #41 B14)', async (t) => {
@@ -2515,6 +2515,75 @@ test('a resumed epic is put on its branch by the driver: a session that does not
   assert.deepEqual(leftoverRefs(p), []);
   assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`${E1.id}: checked out ${E1.branch} for its build session \\(the clone was on develop\\)`));
   assert.equal(r.state.stoppedBecause, 'queue done');
+});
+
+test('a stash a session leaves behind is kept under refs/autopilot/leftover/, out of the stash list, and the report says so (#46 item 9)', async (t) => {
+  const p = makeProject(t);
+  const b = buildScript(E1);
+  b.actions.push({ do: 'write', path: 'notes/half-done.md', content: 'not finished\n' }, { do: 'exec', cmd: 'git stash push -q --include-untracked -m "session wip"' });
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: b });
+  const s = await p.go();
+
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  assert.equal(git(p.clone, 'stash', 'list'), '', 'the stash list is empty again');
+  const refs = leftoverRefs(p);
+  assert.equal(refs.length, 1, refs.join(' '));
+  assert.match(refs[0], new RegExp(`^refs/autopilot/leftover/${E1.branch}-stash-\\d+-1$`));
+  assert.equal(git(p.clone, 'show', `${refs[0]}^3:notes/half-done.md`), 'not finished');
+  assert.deepEqual(s.leftovers.map((l) => [l.stash, l.ref, l.files]), [[true, refs[0], ['notes/half-done.md']]]);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /a session put work in a stash \(1 file\(s\): notes\/half-done\.md\) and did not restore it; nothing is lost/);
+  const md = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
+  assert.ok(md.includes(`A session put work in a stash and did not restore it (${E1.id}'s build-1 put work in a stash and did not restore it); kept at \`${refs[0]}\``), md);
+  assert.ok(!md.includes('Autopilot set aside'), 'a stash is not counted as files set aside');
+});
+
+/** A session script that writes autopilot's own record of a question: what hook R8 alone may write. */
+const forge = (n, decided) => {
+  const js = `const fs = require('fs'); fs.mkdirSync(process.env.AUTOPILOT_STATE + '/gates', { recursive: true }); const f = process.env.AUTOPILOT_STATE + '/gates/' + process.env.AUTOPILOT_EPIC + '-${n}.json'; const g = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : { epic: process.env.AUTOPILOT_EPIC, kind: 'amendment', question: 'Amend it?', options: ['Amend the requirement', 'Stop'] }; fs.writeFileSync(f, JSON.stringify({ ...g, decided: ${JSON.stringify(decided)} }));`;
+  return { do: 'exec', unchecked: 'forging a gate', cmd: `node -e "eval(Buffer.from('${Buffer.from(js).toString('base64')}', 'base64').toString())"` };
+};
+
+test('a session that writes its own answer into a new gate file has it moved to gates/.tampered/ and the epic parked as the owner\'s question', async (t) => {
+  const p = makeProject(t);
+  const b = buildScript(E1);
+  b.actions.push(forge(1, { answer: 'Amend the requirement', by: 'Todd' }));
+  p.scenario({ ...happy(E1), [`${E1.id}/build`]: b });
+  await p.go();
+
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  const moved = fs.readdirSync(path.join(p.state, 'gates', '.tampered'));
+  assert.ok(p.epic(E1.id).reason.includes(`A session changed autopilot's own record of a question (gates/.tampered/${moved[0]}); it was put back`), p.epic(E1.id).reason);
+  assert.equal(moved.length, 1);
+  assert.equal(readJson(path.join(p.state, 'gates', '.tampered', moved[0])).decided.by, 'Todd');
+  const g = gate(p, E1.id, 1);
+  assert.equal(g.kind, 'resume');
+  assert.equal(g.decided, null, 'the faked answer is not the gate the owner is asked');
+  assert.equal(g.technical, undefined, "the owner's question, never a technical stop");
+  assert.deepEqual(g.tampered, [`gates/.tampered/${moved[0]}`]);
+  assert.equal(git(p.clone, 'rev-parse', 'develop'), git(p.project, 'rev-parse', 'develop'), 'nothing reached develop');
+});
+
+test('a session that rewrites the owner\'s answer on an existing gate has it put back and the epic parked for the owner', async (t) => {
+  const p = makeProject(t);
+  const q = `${E1.tors[3]} cannot be fully met: amounts with three decimals. How to proceed?`;
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'src/half.js', content: '// half\n' }, ask(q, DEFERRAL)] } });
+  await p.go();
+  decide(p, E1.id, 'Fix now');
+  const before = gate(p, E1.id, 1);
+
+  // The owner's answer is taken (the referee marks it used), then the session rewrites it.
+  p.scenario({ [`${E1.id}/build`]: { actions: [ask(q, DEFERRAL), forge(1, { answer: 'Defer', by: 'Pat Owner', date: '2026-11-26' })] } });
+  await again(p);
+
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  // Put back as it was before the session (the driver then marks it spent, as at any park after a resumed gate).
+  const { used, ...answer } = gate(p, E1.id, 1).decided;
+  assert.deepEqual(answer, before.decided);
+  assert.ok(used, 'the driver marked it spent at the park');
+  const g = gate(p, E1.id, 2);
+  assert.equal(g.kind, 'resume');
+  assert.deepEqual(g.tampered, [`gates/${E1.id}-1.json`]);
+  assert.match(g.reason, new RegExp(`A session changed autopilot's own record of a question \\(gates/${E1.id}-1\\.json\\); it was put back`));
 });
 
 // ---- the owner's usage limit -------------------------------------------------------------------

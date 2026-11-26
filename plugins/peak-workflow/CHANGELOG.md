@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Windows launch note** — on Windows the launch screen says autopilot is not yet proven there, and to send the run's report and `hooks.jsonl` to the maintainer (#41) when a run breaks.
 - **Autopilot run announcer** — chat lines now say which epic of how many is starting, what
   comes next after each step, and "n of m done (%)" over the confirmed queue across relaunches;
   the ten-minute "still working" line is relayed. One spend figure: chain total of the budget.
@@ -282,6 +283,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A stash a session leaves is kept, never hidden** (#46) — it moves to `refs/autopilot/leftover/` and the report names it; sessions may not `git stash drop` or `clear`. Work left uncommitted off the epic branch at a park is set aside, not left on the integration line.
+- **A session cannot fake the owner's answer** — any change a session makes to its epic's gate files, beyond the referee's own writes, is put back (new files go to `gates/.tampered/`), the step is undone, and the epic parks as the owner's question.
+- **The credential check ignores case on macOS and Windows** — `~/.SSH/id_rsa` and `~/.CLAUDE` are refused like their lower-case names.
 - **A Complete epic's stop no longer counts** (#46) — a gate of an epic later finished by hand is left out of `status`, never decided by `continue` (listed as `retired`), and cleared at the next run start; no new question is written for it.
 - **A test that already fails on the base gets a question autopilot can carry out** (#46) — the final check proves it on the base and asks "Accept as pre-existing", "Fix on this branch" or Stop. A full run parks; a provisional run takes the recommendation and lists it.
 - **A run stopped at its budget relaunches after a raise** — once `configure --run-budget` leaves money, `status` offers the relaunch with what is left; before, a budget stop blocked it for good.

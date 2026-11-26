@@ -184,15 +184,15 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
 **Beta backlog (owner, 2026-11-26): the whole open list.** Everything else once open here was cut
 on the owner's word: nits and corner cases from issue posts and code reviews. Do not re-add one
 unless it could corrupt data or merge something wrong, and ask the owner first.
-- [ ] **Check: a stash left in the clone** (#46 item 9). A park left `stash@{0}` on the clone's
+- [x] **Check: a stash left in the clone** (#46 item 9). Fixed in `470576f` (`feature/peak-workflow-autopilot-beta-guards`): our set-aside never leaves one, so a session made it; a session's stash now moves to `refs/autopilot/leftover/`, `git stash drop`/`clear` are refused, and a park off the epic branch sets files aside. A park left `stash@{0}` on the clone's
   integration line for days. Find whether the B15 set-aside (`setAside`) made this impossible;
   if not, uncommitted build work can be stranded.
-- [ ] **Check: a session writing into the workspace** through a path it builds (`D=$PWD/..`,
+- [x] **Check: a session writing into the workspace** — gates guarded in `470576f`: any session change to its epic's gate files beyond the referee's own is put back and parks the epic for the owner. Other run-state files (`state.json`, `epics.json`) are not checked. through a path it builds (`D=$PWD/..`,
   `$(dirname "$AUTOPILOT_SCRATCH/x")`). The Bash path check is best effort; a write there could
   overwrite run state (gates, status).
-- [ ] **The credential check compares names by case**: `cat ~/.SSH/id_rsa` passes with the sandbox
+- [x] **The credential check compares names by case** — fixed in `470576f` (`within()` folds case on macOS and Windows).: `cat ~/.SSH/id_rsa` passes with the sandbox
   off on macOS.
-- [ ] **Windows**: tell beta testers plainly that Windows is unproven, and what to send back (the
+- [x] **Windows** (note in `470576f`, `windowsWarning`): tell beta testers plainly that Windows is unproven, and what to send back (the
   run report and the run's `hooks.jsonl`). Keep tracking the Windows run results on #41 (36
   driver tests fail there before any change, #41 B8).
 

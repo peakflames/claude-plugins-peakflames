@@ -328,8 +328,9 @@ export function renderReport(r) {
 
   if (r.sync?.state === 'project-ahead') L.push(`At the start the clone's ${r.integration} was fast-forwarded to the project's (${String(r.sync.cloneTip).slice(0, 9)} → ${String(r.sync.projectTip).slice(0, 9)}).`);
   if (r.sync?.state === 'clone-ahead') L.push(`At the start the clone was ahead of the project by work not fetched yet; this run built on top of it: ${r.sync.waiting.join('; ')}.`);
-  const setAside = (r.leftovers ?? []).reduce((n, l) => n + (l.count ?? l.files.length), 0);
+  const setAside = (r.leftovers ?? []).filter((l) => !l.stash).reduce((n, l) => n + (l.count ?? l.files.length), 0);
   if (setAside) L.push(`Autopilot set aside ${setAside} file(s) an earlier session left behind. Nothing is lost.`);
+  for (const l of (r.leftovers ?? []).filter((x) => x.stash)) L.push(`A session put work in a stash and did not restore it (${l.why}); kept at \`${l.ref}\`. Nothing is lost.`);
   for (const b of r.baseRetried ?? []) L.push(`Your project's own tests failed once on \`${r.integration}\` before ${b.before} and passed when run again: a flaky test${sleptWords(b.tries) ? `, or ${sleptWords(b.tries)}` : ''}. It may stop a later run; whoever maintains the tests can make it steady.`);
 
   L.push(`Real money on outside services: ${r.realSpend === true ? 'you allowed it when a check needs it' : r.realSpend === false ? 'you said not to spend any; what that left unproven is in each verify report under "Not proven for real"' : 'not decided at launch; a session that needs it asks you'}.`);

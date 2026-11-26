@@ -1992,6 +1992,67 @@ class Run {
     return !this.dirty();
   }
 
+  /** The clone's stash list, newest first, as commit SHAs. */
+  stashList() { return gitRun(this.clone, 'stash', 'list', '--format=%H').out.split('\n').filter(Boolean); }
+  /**
+   * A session may run `git stash` (to check the base, say). One that never restores what it stashed hides that work
+   * from the next session, and a later `git stash drop` would lose it. Each stash the session added (above `before`,
+   * the top of the list when it started) is moved to refs/autopilot/leftover/, out of the stash list, and listed.
+   */
+  keepSessionStashes(e, before, name) {
+    const list = this.stashList();
+    const at = before ? list.indexOf(before) : -1;
+    const added = at < 0 ? list : list.slice(0, at);
+    const branch = this.currentBranch() || 'detached';
+    for (const [n, sha] of added.entries()) {
+      const ref = `refs/autopilot/leftover/${branch}-stash-${Date.now()}-${n + 1}`;
+      const kept = gitRun(this.clone, 'update-ref', ref, sha);
+      if (kept.code !== 0) { this.log(`${e.id}: ${name} left work in the clone's stash; it could not be named ${ref} (${kept.err}), so it stays in the stash list`); return; }
+      if (this.stashList()[0] === sha) gitRun(this.clone, 'stash', 'drop', '-q');
+      const names = (...args) => gitRun(this.clone, ...args).out.split('\n').filter(Boolean);
+      const files = [...new Set([...names('diff', '--name-only', `${sha}^1`, sha), ...names('ls-tree', '-r', '--name-only', `${sha}^3`)])].sort();
+      const left = { branch, ref, files: files.slice(0, 50), ...(files.length > 50 ? { count: files.length } : {}), stash: true, why: `${e.id}'s ${name} put work in a stash and did not restore it`, date: new Date().toISOString() };
+      this.state.leftovers = [...(this.state.leftovers ?? []), left];
+      this.log(`${e.id}: a session put work in a stash (${files.length} file(s)${files.length ? `: ${left.files.join(', ')}` : ''}) and did not restore it; nothing is lost: kept at ${ref}`);
+    }
+  }
+
+  /** The content of this epic's gate files, by name: what a session finds before it starts. */
+  gateSnapshot(e) { return new Map(this.gateFiles().filter((f) => f.startsWith(`${e.id}-`)).map((f) => [f, read(this.gatePath(f))])); }
+  /**
+   * Autopilot's own record of a question is written by the referee and by `decide`, never by a session. The referee
+   * makes two writes during a session: it marks an existing decided gate `decided.used`, and it writes a new gate with
+   * no answer (or, in a provisional run, one answered by PROVISIONAL_BY). Anything else to this epic's gates is put
+   * back: a changed or removed file gets its old content, a new one is moved to gates/.tampered/. Returns where each
+   * such record now is, relative to the workspace, or [].
+   */
+  undoGateTampering(e, before) {
+    const bad = [];
+    const parse = (t) => { try { return JSON.parse(t); } catch { return null; } };
+    const plain = (g) => { const { used, ...rest } = g.decided ?? {}; return JSON.stringify({ ...g, decided: g.decided ? rest : g.decided }); };
+    for (const [f, was] of before) {
+      const p = this.gatePath(f);
+      const now = exists(p) ? read(p) : null;
+      if (now === was) continue;
+      const a = parse(was); const b = now === null ? null : parse(now);
+      // The referee spent the owner's answer: `used` added, nothing else changed.
+      if (a && b && a.decided && !a.decided.used && b.decided?.used && plain(b) === plain(a)) continue;
+      fs.writeFileSync(p, was);
+      bad.push(`gates/${f}`);
+    }
+    const provisional = this.config.mode === 'provisional';
+    for (const f of this.gateFiles().filter((x) => x.startsWith(`${e.id}-`) && !before.has(x))) {
+      const g = parse(read(this.gatePath(f)));
+      if (g && (g.decided === null || (provisional && g.decided?.by === PROVISIONAL_BY && g.decided.prototype))) continue;
+      const dir = path.join(this.stateDir, 'gates', '.tampered');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.renameSync(this.gatePath(f), path.join(dir, `${this.runName}-${f}`));
+      bad.push(`gates/.tampered/${this.runName}-${f}`);
+    }
+    if (bad.length) this.log(`${e.id}: a session changed autopilot's own record of a question (${bad.join(', ')}); it was put back`);
+    return bad;
+  }
+
   /** Puts the integration line back at `sha`; a discarded tip stays reachable under refs/autopilot/rejected/. */
   resetIntegration(e, sha) {
     const dev = this.state.integration;
@@ -2310,7 +2371,14 @@ class Run {
     } else if (type) this.event(type, e, { reason, ...(type === 'merged' ? { minutes: Math.round((e.wallMs ?? 0) / 60000), costUsd: e.costUsd ?? 0, ...((e.unproven ?? []).some((u) => u.kind !== 'left') ? { unproven: e.unproven.filter((u) => u.kind !== 'left').length } : {}), ...((e.unproven ?? []).some((u) => u.kind === 'left') ? { left: e.unproven.filter((u) => u.kind === 'left').length } : {}), ...((e.deferred ?? []).length ? { deferred: e.deferred.length } : {}) } : {}) });
     return null;
   }
-  park(e, reason) { try { this.wipCommit(e); } catch (err) { this.log(`${e.id}: could not commit uncommitted work: ${err.message}`); } return this.finish(e, 'PARKED', reason); }
+  park(e, reason) {
+    try {
+      // Off the epic's branch (a session left the clone on the integration line), nothing is committed there: what is
+      // uncommitted is set aside instead, so the next session neither finds it nor builds on it.
+      if (!this.wipCommit(e) && this.currentBranch() !== this.meta(e).branch && this.dirty()) this.setAside(`when ${e.id} parked off its branch`);
+    } catch (err) { this.log(`${e.id}: could not keep uncommitted work: ${err.message}`); }
+    return this.finish(e, 'PARKED', reason);
+  }
   /**
    * The owner's STOP while the epic was still being planned, with nothing built: its branch is missing or has no
    * commit beyond the integration line, and the clone holds nothing uncommitted. A question would offer two answers
@@ -2336,9 +2404,9 @@ class Run {
    * A park that is nobody's question (budget, infra, STOP, an auditor outage) gets a `resume` gate,
    * so the next run continues at `phase` instead of rebuilding the epic.
    */
-  parkResumable(e, reason, phase, { technical = false } = {}) {
+  parkResumable(e, reason, phase, { technical = false, extra = {} } = {}) {
     this.writeGate(e, {
-      kind: 'resume', skillStep: 'autopilot driver', phase, reason, ...(technical ? { technical: true } : {}),
+      kind: 'resume', skillStep: 'autopilot driver', phase, reason, ...(technical ? { technical: true } : {}), ...extra,
       question: `${this.meta(e).label} stopped: ${reason}. Continue it in the next run?`,
       options: [ANSWERS.resume, ANSWERS.startOver],
       why: `nothing was decided for you: the run stopped the epic before ${phase}. "${ANSWERS.resume}" re-enters at ${phase} on the same branch${phase === 'CHECK_BUILD' ? ' (or, when the build session was cut short, a new session continues the build from what is committed there)' : ''}; "${ANSWERS.startOver}" plans it again from scratch`,
@@ -2595,6 +2663,8 @@ class Run {
    */
   async step(e, kind, prepare) {
     const gatesBefore = new Set(this.gateFiles());
+    const gateRecords = this.gateSnapshot(e);
+    const stashBefore = this.stashList()[0] ?? null;
     const devBefore = this.integrationSha();
     const again = { plan: 'PLAN', build: 'CHECK_BUILD', fix: 'CHECK_BUILD', audit: 'AUDIT', verify: 'VERIFY', catchup: 'CATCH_UP' }[kind];
     let s; let afterLimit = null; let limitWaits = 0;
@@ -2629,12 +2699,20 @@ class Run {
       for (let waited = 0; waited < this.config.timing.infraRetryMs && !this.stopRequested(); waited += 1000) await sleep(Math.min(1000, this.config.timing.infraRetryMs - waited));
       if (this.stopRequested()) { s.outcome = 'stopped'; s.why = 'STOP file'; break; }
     }
+    try { this.keepSessionStashes(e, stashBefore, s.name ?? `${kind} session`); } catch (err) { this.log(`${e.id}: could not check the stash list after ${s.name}: ${err.message}`); }
+    const tampered = this.undoGateTampering(e, gateRecords);
     // Questions this session asked that a provisional run answered itself (hook R8): recorded, never a park.
     const took = this.gateFiles().filter((f) => !gatesBefore.has(f) && tryJson(this.gatePath(f))?.decided?.prototype);
     if (took.length) this.tookForOwner(e, took);
     this.save();
     const moved = this.integrationSha() !== devBefore;
     const undo = () => { if (kind === 'verify') this.rollback(e); else if (moved) this.resetIntegration(e, devBefore); };
+    // A faked record could pass for the owner's answer: the step is undone, and it is the owner's question, never a technical stop.
+    if (tampered.length) {
+      if (s.outcome === 'stopped') this.stopReason = 'STOP file';
+      undo();
+      return this.parkResumable(e, `A session changed autopilot's own record of a question (${tampered.join(', ')}); it was put back`, again, { extra: { tampered } });
+    }
 
     // Re-entry after a park that is nobody's question: a parked build is judged from its WIP commit; any other step is run again once.
     if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return again === 'PLAN' && this.requeueUnbuilt(e, s.name) ? null : this.parkResumable(e, `stopped by the STOP file during ${s.name}`, again); }
@@ -4129,6 +4207,10 @@ export function sleepWarning(platform = process.platform) {
   if (platform === 'win32') return 'Windows may put the computer to sleep mid-run, and a check it sleeps through fails: set the power plan to never sleep while plugged in, and leave it plugged in';
   return null;
 }
+/** Windows is new for autopilot: its testers are told so at launch, and what to send when a run breaks. */
+export function windowsWarning(platform = process.platform) {
+  return platform === 'win32' ? "Windows is new for autopilot and not yet proven. If a run breaks, send the run's report and its hooks.jsonl to the maintainer (issue #41)" : null;
+}
 
 /** What the skill needs to know before it offers a launch: read-only facts about the project and its workspace. */
 export function launchFacts(project, workspace, config, { epics = null } = {}) {
@@ -4181,6 +4263,8 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
   if (sync.state === 'project-ahead') warn.push(`${integration} moved in the project since the last run; the run fast-forwards the clone to it first; a decision on a parked branch still holds if that branch merges cleanly into the new tip`);
   const sleepy = sleepWarning();
   if (sleepy) warn.push(sleepy);
+  const windows = windowsWarning();
+  if (windows) warn.push(windows);
   // What the owner confirmed last time, minus what has finished since: offered beside the full queue, never chosen for them.
   const confirmed = lastRun ? tryJson(path.join(lastRun.runDir, 'config.json'))?.queue : null;
   const byId = new Map((epics ?? []).map((e) => [e.id, e]));

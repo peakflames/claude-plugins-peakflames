@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, REGISTRIES, claudeMdReads, loadConfig, preflight, sleepWarning } from '../driver.mjs';
+import { PLUGIN_DIR, REGISTRIES, claudeMdReads, loadConfig, preflight, sleepWarning, windowsWarning } from '../driver.mjs';
 import { writeReport } from '../report.mjs';
 import { DRIVER, E1, git, happy, makeProject, readJson } from './helpers.mjs';
 
@@ -515,6 +515,10 @@ test('the launch warns about sleep on macOS and on Windows', () => {
   assert.match(sleepWarning('darwin'), /lid closed on battery/);
   assert.match(sleepWarning('win32'), /power plan .*never sleep.*plugged in/i);
   assert.equal(sleepWarning('linux'), null);
+  // Windows testers are told it is unproven, and what to send; no by-hand command.
+  assert.equal(windowsWarning('win32'), "Windows is new for autopilot and not yet proven. If a run breaks, send the run's report and its hooks.jsonl to the maintainer (issue #41)");
+  assert.equal(windowsWarning('darwin'), null);
+  assert.equal(windowsWarning('linux'), null);
 });
 
 test('prepare --gate runs a failing gate once more: one that passes the second time is flaky, not failed', (t) => {

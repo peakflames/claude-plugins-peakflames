@@ -38,7 +38,9 @@ function realDeep(p) {
     tail.unshift(path.basename(cur)); cur = up;
   }
 }
-const within = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
+// macOS and Windows file systems ignore case, so `~/.SSH` is `~/.ssh` there: compared folded, as the driver's `foldCase`.
+const foldCase = (p) => (process.platform === 'darwin' || process.platform === 'win32' ? String(p).toLowerCase() : String(p));
+const within = (p, root) => { const a = foldCase(p); const r = foldCase(root); return a === r || a.startsWith(r.endsWith(path.sep) ? r : r + path.sep); };
 
 function context(input, env) {
   const state = realDeep(env.AUTOPILOT_STATE);
@@ -107,7 +109,7 @@ function classify(ctx, raw, { bash = false } = {}) {
   if (bash && (p === '/' || SYSTEM_READ.some((d) => within(p, d)))) return 'ro';
   if (ctx.strict || ctx.role === 'auditor') return `${raw} is outside the private clone`;
   // Not strict: a session may read anywhere on the machine except where credentials and Claude Code's own files live.
-  if (within(p, claude) || p === path.join(ctx.home, '.claude.json')) return `${raw} is Claude Code's own data`;
+  if (within(p, claude) || foldCase(p) === foldCase(path.join(ctx.home, '.claude.json'))) return `${raw} is Claude Code's own data`;
   if (PRIVATE.some((d) => within(p, path.join(ctx.home, d)))) return `${raw} is where credentials live`;
   return 'ro';
 }
@@ -368,6 +370,8 @@ function ruleR3(ctx, segs, command) {
     if (args.some((a) => /^--force/.test(a)) && !scratchWorktree) return deny('R3', 'git --force is denied');
     if (['branch', 'tag', 'switch', 'checkout'].includes(sub) && args.some((a) => /^-[a-zA-Z]*f/.test(a))) return deny('R3', `git ${sub} -f is denied`);
     if (sub === 'reset' && has('--hard')) return deny('R3', 'git reset --hard is denied');
+    // A session's stash is kept by the driver after it ends (refs/autopilot/leftover/); dropping one loses it for good.
+    if (sub === 'stash' && ['drop', 'clear'].includes(names[0])) return deny('R3', `git stash ${names[0]} is denied: a stash is kept; commit work in progress on the epic branch`);
     if (['update-ref', 'filter-branch', 'filter-repo', 'replace', 'symbolic-ref'].includes(sub) && names.length) return deny('R3', `git ${sub} is denied`);
     if (sub === 'fetch' && names.some((n) => n.includes(':'))) return deny('R3', 'git fetch with a refspec is denied');
     if (sub === 'tag' && args.some((a) => !/^(-l|--list|-n\d*|--sort=.*|--contains|--points-at)$/.test(a)) && names.length) return deny('R3', 'git tag is denied; releases are tagged by a person');

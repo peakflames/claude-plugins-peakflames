@@ -371,6 +371,19 @@ test('R3 git: a worktree made in the scratch folder may be removed with --force;
   denied(h.bash('git checkout --force develop'), 'R3', /--force/, 'checkout');
 });
 
+test('R3 git: a stash is never dropped or cleared; pushing, popping, listing and showing one stay allowed (#46 item 9)', (t) => {
+  const h = referee(t);
+  for (const c of ['git stash drop', 'git stash drop stash@{0}', 'git stash clear', 'git status && git stash drop -q']) denied(h.bash(c), 'R3', /a stash is kept; commit work in progress on the epic branch/, c);
+  for (const c of ['git stash', 'git stash push -m wip', 'git stash pop', 'git stash list', 'git stash show -p stash@{0}']) passes(h.bash(c), c);
+});
+
+test('R2: a credential folder written in other case is still refused where the file system ignores case', { skip: !['darwin', 'win32'].includes(process.platform) && 'case-sensitive file system' }, (t) => {
+  const h = referee(t);
+  denied(h.bash('cat ~/.SSH/id_rsa'), 'R2', /credentials/, '~/.SSH');
+  denied(h.pre('Read', { file_path: path.join(os.homedir(), '.Ssh', 'id_rsa') }), 'R2', /credentials/, 'Read ~/.Ssh');
+  denied(h.pre('Read', { file_path: path.join(os.homedir(), '.CLAUDE', 'settings.json') }), 'R2', /Claude Code's own data/, '~/.CLAUDE');
+});
+
 test('R3 git: push, remote writes, force, hard reset, branch -D, release line and tags are denied', (t) => {
   const h = referee(t);
   // `git stash push` keeps work on this machine: it is not a push. A push after it in the same command still is.
