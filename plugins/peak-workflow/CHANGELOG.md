@@ -243,6 +243,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Values still to decide park nothing** (#41) — a `TBD` or a "Not decided yet" line in `CLAUDE.md` no longer parks every epic. The walking skeleton runs and settles them, in any section; other epics run meanwhile. Choices that cost money are still asked.
 - **"Not proven for real" in build and repair handoffs** — what a session did not check against the real thing is listed under that heading too, with what it was checked against; "CANNOT VERIFY" stays. The verifier carries such items into its report.
 - **The launch question names the limits** — it says the run stops at the run budget or the end time, whichever comes first, so the popup no longer hides them.
 - **A step's settings changed mid-run reach the next step** — model, effort and caps are read again before each step and the change is logged; mode, the money answer and the run budget never change mid-run. Each step's log line and `step.json` name its model and effort.

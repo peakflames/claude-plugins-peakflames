@@ -176,24 +176,41 @@ test('sync, diverged: readiness and the driver both refuse and print both tips; 
   assert.deepEqual([s.sync.state, s.queue[0].state, s.startSha], ['project-ahead', 'MERGED', tip(p.project)]);
 });
 
-test('a "Not decided yet" line that says none is the all-clear; one that lists a layer still parks', async (t) => {
+test('values still to decide park nothing: the walking skeleton is told it settles them, the other epics run meanwhile; "none" is the all-clear (owner, 2026-11-25)', async (t) => {
   const p = makeProject(t);
+  const dep = addEpic(p.project, { id: 'Lg2Cat4', slug: 'categorize', name: 'Categorization rules', nn: '02', deps: [E1.id] });
+  const free = addEpic(p.project, { id: 'Lg6Cfg3', slug: 'config', name: 'Config validation', nn: '06' });
   const md = path.join(p.project, 'CLAUDE.md');
   const original = fs.readFileSync(md, 'utf8');
-  const eligibility = (line) => {
+  const read = (line) => {
     fs.writeFileSync(md, `${original}\n${line}\n`);
-    return preflight(p).epics.find((e) => e.id === E1.id).eligibility;
+    return preflight(p).epics.filter((e) => [E1.id, dep.id, free.id].includes(e.id)).map((e) => [e.id, e.eligibility, e.reasons.filter((r) => /values to decide/.test(r))]);
   };
-  for (const clear of ['**Not decided yet:** none', '**Not decided yet:** None.', '**Not decided yet:** nothing', '**Not decided yet:** n/a', '**Not decided yet:** —', '**Not decided yet:**', '**Not decided yet:** none — CI, database, and auth are all already decided and shipped', '**Not decided yet:** None: everything is chosen.', '**Not decided yet:** n/a - nothing left']) assert.equal(eligibility(clear), 'eligible', clear);
-  for (const open of ['**Not decided yet:** database (default SQLite), CI', '**Not decided yet:** none of the hosting options', '**Not decided yet:** - database', '**Not decided yet:** nothing but the database', '**Hosting:** TBD — set by the walking-skeleton epic']) assert.equal(eligibility(open), 'park', open);
+  for (const clear of ['**Not decided yet:** none', '**Not decided yet:** None.', '**Not decided yet:** nothing', '**Not decided yet:** n/a', '**Not decided yet:** —', '**Not decided yet:**', '**Not decided yet:** none — CI, database, and auth are all already decided and shipped', '**Not decided yet:** None: everything is chosen.', '**Not decided yet:** n/a - nothing left']) {
+    assert.deepEqual(read(clear), [[E1.id, 'eligible', []], [dep.id, 'eligible', []], [free.id, 'eligible', []]], clear);
+  }
+  const skeleton = 'CLAUDE.md still has values to decide (TBD / Not decided yet): this epic, the walking skeleton, settles them; any that costs money or depends on your accounts is asked';
+  const meanwhile = 'CLAUDE.md still has values to decide (TBD / Not decided yet): the walking skeleton settles them; this epic runs meanwhile and may not change them';
+  for (const open of ['**Not decided yet:** database (default SQLite), CI', '**Not decided yet:** none of the hosting options', '**Not decided yet:** - database', '**Not decided yet:** nothing but the database', '**Hosting:** TBD — set by the walking-skeleton epic']) {
+    assert.deepEqual(read(open), [[E1.id, 'eligible', [skeleton]], [dep.id, 'eligible', [meanwhile]], [free.id, 'eligible', [meanwhile]]], open);
+  }
+  // An epic that parks or is skipped for its own reason is not told it runs.
+  const sc = path.join(p.project, 'docs', 'implementation-plan', 'status', `epic-${free.id}.md`);
+  fs.writeFileSync(sc, fs.readFileSync(sc, 'utf8').replace(/^requirements: (.*)$/m, 'requirements: $1, TOR-01-Zz9Zz9Z'));
+  assert.deepEqual(read('**Not decided yet:** CI').find(([id]) => id === free.id), [free.id, 'park', []]);
+  // A skeleton already Complete left them: nobody is said to settle them.
+  const s1 = path.join(p.project, 'docs', 'implementation-plan', 'status', `epic-${E1.id}.md`);
+  fs.writeFileSync(s1, fs.readFileSync(s1, 'utf8').replace(/^status: .*$/m, 'status: Complete'));
+  assert.deepEqual(read('**Not decided yet:** CI').find(([id]) => id === dep.id)[2], ['CLAUDE.md still has values to decide (TBD / Not decided yet): no epic in the plan is left to settle them, so a person must; this epic runs meanwhile and may not change them']);
 });
 
 test('preflight gate: not resumable — nothing to answer; it clears when the fix reaches the clone and preflight passes', async (t) => {
   const p = makeProject(t);
-  const md = path.join(p.project, 'CLAUDE.md');
+  // A requirements decision only the owner can make: the epic names a requirement that does not exist.
+  const md = path.join(p.project, 'docs', 'implementation-plan', 'status', `epic-${E1.id}.md`);
   const original = fs.readFileSync(md, 'utf8');
-  fs.writeFileSync(md, original + '\n**Hosting:** TBD — set by the walking-skeleton epic\n');
-  git(p.project, 'commit', '-qam', 'docs: hosting is undecided');
+  fs.writeFileSync(md, original.replace(/^requirements: (.*)$/m, 'requirements: $1, TOR-01-Zz9Zz9Z'));
+  git(p.project, 'commit', '-qam', 'docs: an unknown requirement');
   p.scenario(happy(E1));
   await p.go();
 
@@ -210,7 +227,7 @@ test('preflight gate: not resumable — nothing to answer; it clears when the fi
   await p.go();
   assert.equal(p.epic(E1.id).state, 'PARKED');
   fs.writeFileSync(md, original);
-  git(p.project, 'commit', '-qam', 'docs: hosting decided');
+  git(p.project, 'commit', '-qam', 'docs: the requirement fixed');
   const s = await p.go();
 
   assert.deepEqual([s.sync.state, p.epic(E1.id).state], ['project-ahead', 'MERGED']);

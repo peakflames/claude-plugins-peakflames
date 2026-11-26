@@ -7,8 +7,8 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-25, after groups 6 and 7,
-  `feature/peak-workflow-autopilot-wording-proofs`): 362, of which 348 pass, none fails and 14
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-25, after the undecided-values change,
+  `feature/peak-workflow-autopilot-undecided`): 365, of which 351 pass, none fails and 14
   are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
   Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
   base as well (cause not looked for).
@@ -151,8 +151,7 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
    *Done 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`): every box that is driver logic closed on its test, one real bug
    fixed (a raised budget did not relaunch). What is left needs a real run: see "For the next
    real run" under Step 6.*
-8. Still open from Step 10: **the undecided-values check** (#41), which changes what parks and
-   needs the owner's decision first.
+8. **The undecided-values check** (#41). *Done 2026-11-25 (`feature/peak-workflow-autopilot-undecided`): see the Step 10 box.*
 
 Left as they are: #37, the size of `SKILL.md` and of `preflight --json` (C4), Windows tests
 (#41 B8, needs a Windows machine).
@@ -587,11 +586,20 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   server of its own to the clone's `.mcp.json`, and any localhost port counts as the app's:
   neither gives more than Bash already has. `claude mcp list`'s "Connected" is a health
   check: a session may still find a connector needs a sign-in.
-- [ ] **The undecided-values check parks every epic** (#41, the reporter's comment of
+- [x] **The undecided-values check parks every epic** (#41, the reporter's comment of
   2026-11-22; not examined). A `TBD — set by the walking-skeleton epic` value or a
   `**Not decided yet:**` line that lists a layer parks every queued epic (`driver.mjs`, `tbd`).
   He suggests it should apply to the walking-skeleton epic only, since that epic is the one
-  that settles those values. C2.
+  that settles those values. C2. *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-undecided`), on the owner's decision of that day
+  ("the skeleton runs, and the others run too"); closed on fake-`claude` tests (`sync.test.mjs`,
+  "values still to decide park nothing…"; `scope.test.mjs`, "values still to decide: the walking
+  skeleton runs…", Full and Provisional). Undecided values park nothing; every epic's readiness
+  says who settles them. The skeleton (the plan's first epic, with no dependencies) may change a
+  `CLAUDE.md` line that held one in any section (each such line replaced by one, nothing else),
+  and the owner sees the change before it merges, as before (a provisional run keeps and lists
+  it). A choice that costs money or depends on the owner's accounts is still `start-epic`'s
+  question: a provisional run answers only amendments and deferrals itself, so it reaches the
+  owner in both modes.*
 - [x] **Requirement questions are the main cause of stops** (#41 I3). Ask them once at launch
   (a requirements check over the queued epics), not mid-night. C2. *Answered by provisional mode (owner, 2026-11-25): a provisional run takes
   the session's recommendation and lists it for the owner; a full run is meant to ask.*

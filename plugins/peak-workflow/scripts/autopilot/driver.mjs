@@ -156,10 +156,32 @@ function nextEndBy(now = new Date()) {
 
 /** The dependency list each lockfile belongs to: a lockfile that changes together with it is ordinary work. */
 export const MANIFEST_OF = { 'package-lock.json': 'package.json', 'npm-shrinkwrap.json': 'package.json', 'yarn.lock': 'package.json', 'pnpm-lock.yaml': 'package.json', 'bun.lock': 'package.json', 'bun.lockb': 'package.json', 'Cargo.lock': 'Cargo.toml', 'poetry.lock': 'pyproject.toml', 'uv.lock': 'pyproject.toml', 'Pipfile.lock': 'Pipfile', 'Gemfile.lock': 'Gemfile', 'go.sum': 'go.mod', 'composer.lock': 'composer.json' };
-/** The CLAUDE.md sections the first epic of a plan may change: where setup, run and test commands live. */
 /** A file that declares dependencies: a change to it (or to a lockfile, `LOCKFILE`) is what `setup` installs from. */
 export const MANIFEST_FILE = new RegExp(`(^|/)(${[...new Set(Object.values(MANIFEST_OF))].map((m) => m.replaceAll('.', '\\.')).join('|')}|requirements[^/]*\\.txt)$`);
+/** The CLAUDE.md sections the first epic of a plan may change: where setup, run and test commands live. */
 export const SKELETON_SECTIONS = ['Tech Stack', 'Local Environment', 'Verification & Quality Gates'];
+/** A CLAUDE.md line that holds a value still to decide: a `TBD` the walking skeleton sets, or a `**Not decided yet:**` line that lists something. */
+export const UNDECIDED_LINE = (line) => /TBD — set by the walking-skeleton epic/.test(line)
+  || (/\*\*Not decided yet:\*\*/.test(line) && !/^((none|nothing|n\/a)(\s*[-–—:]\s.*)?|[-–—])?$/i.test(line.replace(/^[\s\S]*?\*\*Not decided yet:\*\*/, '').trim().replace(/\.$/, '')));
+/** The note preflight adds to an epic that runs while CLAUDE.md has values to decide; it is information, never a reason not to run. */
+export const UNDECIDED_NOTE = /^CLAUDE\.md still has values to decide /;
+/**
+ * Whether the change to one CLAUDE.md section only settles values still to decide: every other line stays as it was,
+ * in its place, and each line that held a value still to decide (`UNDECIDED_LINE`) is kept, replaced in place by one
+ * line, or dropped. At least one is settled. A reordered, duplicated or dropped line of anything else is not settling.
+ */
+export function settlesUndecided(before, after, section) {
+  const part = (text) => { const out = []; let name = '(top of file)'; for (const line of String(text).split('\n')) { const h = line.match(/^## +(.+?)\s*$/); if (h) { name = h[1]; continue; } if (name === section) out.push(line); } return out; };
+  const a = part(before); const b = part(after);
+  let j = 0; let settled = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (!UNDECIDED_LINE(a[i])) { if (b[j] !== a[i]) return false; j++; continue; }
+    if (b[j] === a[i]) { j++; continue; } // left as it was
+    settled++;
+    if (j < b.length && b[j] !== a[i + 1]) j++; // replaced by one line; otherwise dropped
+  }
+  return settled > 0 && j === b.length;
+}
 /** The `## ` sections whose text differs between two versions of a markdown file ("(top of file)" for what precedes the first). */
 export function changedSections(before, after) {
   const split = (text) => { const m = new Map(); let name = '(top of file)'; for (const line of String(text).split('\n')) { const h = line.match(/^## +(.+?)\s*$/); if (h) name = h[1]; m.set(name, `${m.get(name) ?? ''}${h ? '' : `${line}\n`}`); } return m; };
@@ -879,9 +901,9 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
   if (!(config.testCommand ?? facts.testCommand)) refuse.push('CLAUDE.md has no **Tests:** command');
 
   // A "Not decided yet" line that names nothing ("none", "n/a", a dash, empty) is the all-clear, not a value to decide;
-  // so is one of those words followed by a dash or colon and a reason ("none — all decided and shipped").
-  const tbd = /TBD — set by the walking-skeleton epic/.test(facts.claudeMd)
-    || [...facts.claudeMd.matchAll(/\*\*Not decided yet:\*\*(.*)/g)].some((m) => !/^((none|nothing|n\/a)(\s*[-–—:]\s.*)?|[-–—])?$/i.test(m[1].trim().replace(/\.$/, '')));
+  // so is one of those words followed by a dash or colon and a reason ("none — all decided and shipped"). Values still to decide park nothing (owner, 2026-11-25): the walking skeleton (the plan's first epic, with no
+  // dependencies) is the epic that settles them, and the others go on; each is told so (`reasons`).
+  const tbd = facts.claudeMd.split('\n').some(UNDECIDED_LINE);
   const embedded = /embedded/i.test(facts.projectType ?? '');
   const ui = /web app|desktop app|hybrid/i.test(facts.projectType ?? '');
   const me = sh('git', ['config', 'user.name'], { cwd: root }).out.toLowerCase();
@@ -891,7 +913,10 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
   try { for (const r of JSON.parse(st.out).requirements ?? []) states[r.tor] = r; } catch { /* reported per anchor below */ }
   const explicit = new Set(config.explicit ?? []);
 
-  const epics = readEpics(root, { sidecarText }).map((epic) => {
+  const read0 = readEpics(root, { sidecarText });
+  const skeletonId = read0[0] && !read0[0].deps.length ? read0[0].id : null; // as the scope check reads it: the plan's first epic, with no dependencies
+  const skeletonLeft = skeletonId && read0[0].status !== 'Complete'; // a Complete one left them: no epic will settle them now
+  const epics = read0.map((epic) => {
     let e = epic;
     const reasons = []; let eligibility = 'eligible'; let humanCheck = false;
     const set = (level, why) => { reasons.push(why); if (eligibility !== 'skip' && eligibility !== 'complete') eligibility = level; };
@@ -926,7 +951,9 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
     e = { ...e, scopeFlags: e.anchors.map((tor) => ({ tor, flags: scopeFlags(reqs[tor]?.text ?? '') })).filter((x) => x.flags.length) };
     // What a person is asked to confirm at the look: each Then / And line of an operator-observed requirement, in its own words.
     e = { ...e, observed: e.anchors.filter((tor) => /operator-observed/.test(reqs[tor]?.text ?? '')).map((tor) => ({ tor, clauses: thenClauses(reqs[tor].text) })) };
-    if (tbd) set('park', 'CLAUDE.md still has values to decide (TBD / Not decided yet)');
+    // Said only of an epic that runs: a park or a skip has its own reason.
+    if (tbd && eligibility === 'eligible') reasons.push(e.id === skeletonId ? 'CLAUDE.md still has values to decide (TBD / Not decided yet): this epic, the walking skeleton, settles them; any that costs money or depends on your accounts is asked'
+      : `CLAUDE.md still has values to decide (TBD / Not decided yet): ${skeletonLeft ? 'the walking skeleton settles them' : 'no epic in the plan is left to settle them, so a person must'}; this epic runs meanwhile and may not change them`);
     return { ...e, eligibility, humanCheck, reasons };
   });
   return { ok: refuse.length === 0, refuse, testCommand: config.testCommand ?? facts.testCommand, testDirs: config.testDirs?.length ? config.testDirs : facts.testDirs, epics };
@@ -2837,9 +2864,11 @@ class Run {
         // and tested, so it may write that down. The owner is shown the change before anything merges (`humanCheck`).
         const first = this.pre.epics[0];
         if (beyond.length && first?.id === e.id && !first.deps.length) {
-          const sections = changedSections(gitRun(this.clone, 'show', `${dev}:CLAUDE.md`).out, gitRun(this.clone, 'show', `${b}:CLAUDE.md`).out);
-          const outside = sections.filter((x) => !SKELETON_SECTIONS.includes(x));
-          if (outside.length) out.push(`CLAUDE.md: changed in ${outside.join(', ')}; the first epic may change only ${SKELETON_SECTIONS.join(', ')}`);
+          const before = gitRun(this.clone, 'show', `${dev}:CLAUDE.md`).out; const after = gitRun(this.clone, 'show', `${b}:CLAUDE.md`).out;
+          const sections = changedSections(before, after);
+          // Elsewhere it may only settle a value still to decide (a `TBD` in the Security Baseline, a "Not decided yet" line).
+          const outside = sections.filter((x) => !SKELETON_SECTIONS.includes(x) && !settlesUndecided(before, after, x));
+          if (outside.length) out.push(`CLAUDE.md: changed in ${outside.join(', ')}; the first epic may change only ${SKELETON_SECTIONS.join(', ')}, and elsewhere only a value still to decide`);
           else claudeMd = { sections, lines: beyond.slice(0, 40), ...(beyond.length > 40 ? { more: beyond.length - 40 } : {}) };
         } else if (beyond.length) out.push('CLAUDE.md: changed beyond the Test directories line');
       } else if (lockfiles.test(f) && !(this.config.scope.lockfiles ?? []).includes(f) && !changed.some((c) => path.posix.basename(c) === MANIFEST_OF[path.posix.basename(f)])) out.push(`${f}: lockfile changed but no ${MANIFEST_OF[path.posix.basename(f)]} changed with it, and it is not named in config`);
@@ -4594,7 +4623,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const held = new Set(open.map((g) => g.epic));
   const runnable = (pre?.epics ?? []).filter((e) => e.eligibility === 'eligible' && !held.has(e.id) && (!queue || queue.includes(e.id)));
   // Skipped only because it is paused or someone else's: readiness may offer it to be queued explicitly. Never once a queue is confirmed.
-  const askable = queue ? [] : (pre?.epics ?? []).filter((e) => e.eligibility === 'skip' && !held.has(e.id) && e.reasons.length > 0 && e.reasons.every((r) => /queue it explicitly/.test(r)));
+  const askable = queue ? [] : (pre?.epics ?? []).filter((e) => e.eligibility === 'skip' && !held.has(e.id) && e.reasons.filter((r) => !UNDECIDED_NOTE.test(r)).length > 0 && e.reasons.filter((r) => !UNDECIDED_NOTE.test(r)).every((r) => /queue it explicitly/.test(r)));
 
   // A decided gate waits to be used: the run that continues the last one, exactly as the owner confirmed it.
   if (pre && launch && state && !interrupted && !out.refuse.length) {
