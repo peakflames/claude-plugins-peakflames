@@ -5,6 +5,11 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 ## Where things stand
 
+- **2026-11-25 evening, Pilot Light.** Issues #10 and #12 there went through triage, discover,
+  capture and plan into one epic, 4lF6gDZ (outstanding-paths-and-replaced), approved by proxy
+  while the owner was out. Autopilot built it (run `20261125-202319`), the owner looked (with
+  the pictures in Preview), the final check passed (`20261125-233511`); merged, brought in and
+  pushed for $6.91. Live proofs from it are ticked under Step 6 and Step 13.
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
 - **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-25, after the undecided-values change,
@@ -116,7 +121,8 @@ them; the state is here. The rule:
 | #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 12 / 13 |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
-| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 0 / 1 (built 2026-11-25; reply on the issue when the owner asks) |
+| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 0 / 1 (built 2026-11-25; waits for the reporter's re-run of the Wayframe epic) |
+| #46 | Windows field report: a 5-epic chain, $179.80, 11 items | not yet | not triaged: the owner set it aside on 2026-11-25 ("enough to deal with") |
 
 Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
 2026-11-24. Not autopilot, so not in this file: #44 (port the requirements checker to Node).
@@ -152,6 +158,13 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
    fixed (a raised budget did not relaunch). What is left needs a real run: see "For the next
    real run" under Step 6.*
 8. **The undecided-values check** (#41). *Done 2026-11-25 (`feature/peak-workflow-autopilot-undecided`): see the Step 10 box.*
+9. **A real run with an amendment and a connector** (#39, #41 B12 and B16, #43): the last
+   things Step 6 cannot close on tests. An epic is being drafted for it (2026-11-25).
+
+Set aside: #46, the Windows field report (owner, 2026-11-25). Read once: item 1 (a decision
+voided and the epic rebuilt) predates `b7c2d14` and the catch-up session; item 10's browser
+refusal predates #43; item 6 (a gate of an epic made Complete by hand is still continued) looks
+live in `openGates`. Nothing else was checked.
 
 Left as they are: #37, the size of `SKILL.md` and of `preflight --json` (C4), Windows tests
 (#41 B8, needs a Windows machine).
