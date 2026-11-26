@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { RULES, atLimitAsk, chainOf } from './attend.mjs';
-import { connectorLine, connectorUse, gateEntry, isProvisional, mergeConnectorUse } from './lib.mjs';
+import { connectorLine, connectorUse, failingTests, gateEntry, isProvisional, mergeConnectorUse } from './lib.mjs';
 
 const TERMINAL = new Set(['MERGED', 'PARKED', 'FAILED', 'SKIPPED', 'BLOCKED']);
 
@@ -218,7 +218,7 @@ function nextSteps(r) {
   const by = (o) => r.epics.filter((e) => e.outcome === o);
   if (r.setupFailed) next.push(`Nothing was built: autopilot could not get its private copy of your project ready (${setupWhy(r.setupFailed)}). Run \`/peak-workflow:autopilot\` again: it checks this before it launches and sets up what it can. If it still cannot: ${NEEDS_MAINTAINER}`);
   else if (r.baseRed?.couldNotRun) next.push(`Nothing was built: the test command (\`${r.testCommand}\`) could not be run in autopilot's private copy. Run \`/peak-workflow:autopilot\` again: it lists what the copy is missing and sets up what it can. If it still cannot: ${NEEDS_MAINTAINER}`);
-  else if (r.baseRed) next.push(`Nothing was built: your project's own tests were already failing on \`${r.integration}\` before autopilot started. ${NEEDS_MAINTAINER} Once the tests pass, run \`/peak-workflow:autopilot\` again.`);
+  else if (r.baseRed) next.push(`Nothing was built: your project's own tests were already failing on \`${r.integration}\` before autopilot started${failingTests(r.baseRed.tail).length ? ` (${failingTests(r.baseRed.tail).map((x) => `\`${x}\``).join('; ')})` : ''}. ${NEEDS_MAINTAINER} Once the tests pass, run \`/peak-workflow:autopilot\` again.`);
   if (/^preflight:/.test(r.stoppedBecause ?? '')) next.push(`Autopilot refused to start: ${r.stoppedBecause.replace(/^preflight:\s*/, '')}. ${NEEDS_MAINTAINER}`);
   const parked = by('PARKED');
   const liveGate = (g) => !g.decided?.used && !g.void && !g.superseded && !g.cleared && !g.restarted;
@@ -293,6 +293,11 @@ export function prototypeSection(r) {
   if (defects.length) {
     L.push('', '**Defects left as is, on the final check\'s own judgement** (it recommended leaving them, or they were past the count of small fixes or too big for one)');
     for (const x of defects) L.push(`- ${x.epic.label} (${state(x.epic)}) — ${cell(x.question)} — \`${x.gate}\``);
+  }
+  const pre = took.filter((x) => x.kind === 'pre-existing');
+  if (pre.length) {
+    L.push('', '**Failing checks this epic did not change, already failing the same way on the base** (the final check\'s recommendation was taken)');
+    for (const x of pre) L.push(`- ${x.epic.label} (${state(x.epic)}) — "${x.answer}": ${cell(x.question)} — \`${x.gate}\``);
   }
   if (unobserved.length) {
     L.push('', '**Requirements nobody observed** (recorded as not verified in the epic\'s status file, never as verified)');

@@ -243,6 +243,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The base-red stop names the failing tests** — the report's "Do this next" and `status` quote the failing test lines from the run, so the owner sees what to fix without opening the log.
 - **The look opens its pictures in the picture viewer** — autopilot opens all of a look's screenshots in one Preview window (or the system viewer), every time; sending them into the chat is now an extra, for another device.
 - **Values still to decide park nothing** (#41) — a `TBD` or a "Not decided yet" line in `CLAUDE.md` no longer parks every epic. The walking skeleton runs and settles them, in any section; other epics run meanwhile. Choices that cost money are still asked.
 - **"Not proven for real" in build and repair handoffs** — what a session did not check against the real thing is listed under that heading too, with what it was checked against; "CANNOT VERIFY" stays. The verifier carries such items into its report.
@@ -281,6 +282,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A Complete epic's stop no longer counts** (#46) — a gate of an epic later finished by hand is left out of `status`, never decided by `continue` (listed as `retired`), and cleared at the next run start; no new question is written for it.
+- **A test that already fails on the base gets a question autopilot can carry out** (#46) — the final check proves it on the base and asks "Accept as pre-existing", "Fix on this branch" or Stop. A full run parks; a provisional run takes the recommendation and lists it.
 - **A run stopped at its budget relaunches after a raise** — once `configure --run-budget` leaves money, `status` offers the relaunch with what is left; before, a budget stop blocked it for good.
 - **A stop during planning asks nothing** — a STOP before anything was built puts the epic back in the queue with no question; it is planned from the start next time.
 - **"Stopped N times" counts every technical stop** — the at-limit question counts the stops the owner answered too and says who answered each; the limit is unchanged.

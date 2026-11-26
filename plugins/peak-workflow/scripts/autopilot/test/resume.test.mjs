@@ -1850,6 +1850,29 @@ test('a redo question an earlier driver let through is replaced by "run the fina
 
 // ---- the standing answer for small fixes the verifier recommends (UAT issue 37) -------------------
 
+const PRE_OPTS = ['Accept as pre-existing', 'Fix on this branch', 'Stop — epic FAILs'];
+const PRE_Q = 'Tests failed on test/ledger.test.js "totals add up", which this epic did not change, and they fail the same way on develop: 1 failing, expected 10 got 9. Recommendation: Accept as pre-existing — the ledger epic owns it. How to proceed?';
+/** A final check that meets a test another epic owns, already failing on develop: asks the one question, then merges and lists it. */
+const preExistingWrapup = (e) => {
+  const a = wrapupActions(e);
+  return { actions: [a[0], ask(PRE_Q, PRE_OPTS), ...a.slice(1)], result: { total_cost_usd: 1.3, result: 'Verdict: PASS\n\n## Seen but not fixed\n- test/ledger.test.js "totals add up" — fails the same way on develop: expected 10 got 9' } };
+};
+
+test('a test that already fails on develop at the final check: a full run parks with the three options; "Accept as pre-existing" goes back to the final check, which merges (#46 item 2)', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: preExistingWrapup(E1) });
+  const s = await p.go();
+  assert.equal(s.queue[0].state, 'PARKED');
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.options, g.decided, g.session], ['pre-existing', PRE_OPTS, null, 'verify-1']);
+  assert.equal(decide(p, E1.id, 'Accept as pre-existing').enters, 'VERIFY');
+  const r = await again(p);
+  assert.deepEqual(r.steps, [`${E1.id}/verify-1`], 'nothing is planned or built again');
+  assert.equal(r.state.queue[0].state, 'MERGED', r.state.queue[0].reason);
+  assert.equal(gate(p, E1.id).decided.used.session, 'verify-1');
+  assert.deepEqual(status(p.project, p.state).decidedForYou, [], 'the owner decided it');
+});
+
 const FIXQ = 'Console error on the home page: 404 for /favicon.ico. Recommendation: Fix now — a one-line link tag. How to proceed?';
 const FIXOPTS = ['Fix now (Recommended)', 'Leave as is', 'Stop — epic FAILs'];
 const smallFix = (files) => [{ do: 'checkout', name: E1.branch }, ...files.map((f) => ({ do: 'write', path: f, content: 'export const fixed = 1;\n' })), { do: 'commit', message: `fix(epic-${E1.id}): what the verifier found` }];

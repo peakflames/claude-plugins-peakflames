@@ -332,14 +332,45 @@ export function recommended(question) {
   return m ? { 'fix now': 'Fix now', defer: 'Defer', stop: 'Stop' }[m[1].toLowerCase()] : null;
 }
 /**
+ * The failing tests a test run's last lines name, in the runner's own words: node's `✖`, TAP's `not ok`, pytest's
+ * `FAILED`, jest's `✕` (and its `FAIL <file>`, a file rather than a test), go's `--- FAIL:`. At most `max`, each once.
+ * Summary lines are not tests: "✖ failing tests:", go's bare `FAIL` and `FAIL <package> <time>`, unittest's
+ * `FAILED (failures=1)`, "✕ 2 tests failed", and a TAP `not ok` marked TODO or SKIP.
+ */
+export function failingTests(tail, max = 5) {
+  const out = [];
+  for (const raw of String(tail ?? '').split('\n')) {
+    const l = raw.trim();
+    if (!/^(✖|✕|×|not ok\b|FAILED\b|FAIL\b|--- FAIL:)/.test(l)) continue;
+    if (/^✖\s*failing tests:?$/i.test(l) || /^FAIL$/.test(l) || /^FAIL\s+\S+\s+[\d.]+s$/.test(l) || /^FAILED\s*\(/.test(l) || /^[✖✕×]\s*\d+\s+(of\s+\d+\s+)?tests?\s+failed/i.test(l) || /^not ok\b.*#\s*(TODO|SKIP)\b/i.test(l)) continue;
+    const name = l.replace(/\s*\(\d[\d.]*\s*m?s\)\s*$/, '');
+    if (!out.includes(name)) out.push(name);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** The two options a test that already fails on the base is asked with (wrapup-epic Step 1.4b), besides Stop. */
+export const PRE_EXISTING = ['Accept as pre-existing', 'Fix on this branch'];
+const sameText = (a, b) => String(a ?? '').replace(/\s+/g, ' ').trim().toLowerCase() === String(b ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+/**
  * The answer a provisional run gives to a question that parks a full run, or `{why}` when it goes
  * to the owner after all, or null when the kind is not one a provisional run answers. Pure.
- *   amendment → the "Amend TOR-…" option, when the session offers it (it never does for Safety)
- *   deferral  → what the session recommends, when that is "Fix now" or "Defer"
- * Only for one of the epic's own requirements, once per requirement, `PROTOTYPE_LIMIT` per epic.
- * `taken` is what was already answered this way for the epic: `[{kind, tor}]`.
+ *   amendment    → the "Amend TOR-…" option, when the session offers it (it never does for Safety)
+ *   deferral     → what the session recommends, when that is "Fix now" or "Defer"
+ *   pre-existing → what the session recommends, when that is "Accept as pre-existing" or "Fix on this branch"
+ * Only for one of the epic's own requirements (a pre-existing failure names none: once per question), once per
+ * requirement, `PROTOTYPE_LIMIT` per epic. `taken` is what was already answered this way for the epic: `[{kind, tor, question}]`.
  */
 export function prototypeAnswer({ kind, question, labels, tor, anchors, taken }) {
+  if (kind === 'pre-existing') {
+    const rec = PRE_EXISTING.find((l) => new RegExp(`\\bRecommendation:\\s*\\**\\s*${l}\\b`, 'i').test(String(question ?? '')));
+    const answer = rec ? labels.find((l) => sameText(l, rec)) ?? null : null;
+    if (!answer) return null; // "Stop" recommended, or no recommendation to read: the owner's
+    if (taken.some((x) => x.kind === 'pre-existing' && sameText(x.question, question))) return { why: 'the provisional setting covers one answer per question, and this one already had one in this epic' };
+    if (taken.length >= PROTOTYPE_LIMIT) return { why: `the provisional setting covers ${PROTOTYPE_LIMIT} answers per epic, and this is one more` };
+    return { answer };
+  }
   if (kind !== 'amendment' && kind !== 'deferral') return null;
   let answer = null;
   if (kind === 'amendment') answer = labels.find((l) => new RegExp(`^\\W*Amend\\s+${tor ?? 'TOR-\\S+'}\\b`, 'i').test(l)) ?? null;

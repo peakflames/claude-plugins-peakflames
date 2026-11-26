@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
-import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening, connectorLine, mergeConnectorUse, parseMcpList } from './lib.mjs';
+import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, failingTests, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening, connectorLine, mergeConnectorUse, parseMcpList } from './lib.mjs';
 import { epicConnectorUse, writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -1496,7 +1496,12 @@ export const verifyRules = (limits) => `# Autopilot session rules
   then "How to proceed?") and the options "Fix now", "Leave as is", "Stop — epic FAILs".
   ${limits ? `Recommend Fix now only for a small fix: at most ${limits.files} files and ${limits.lines} changed lines, with its test, and no requirement file. Up to ${limits.perEpic} such fixes per final check are made on the owner's standing answer; anything bigger, recommend Leave as is` : 'The owner has no standing answer for small fixes: every such question goes to them'}.
   A defect that is not this epic's (the machine, an earlier epic, test data) is not asked: list it
-  under "Seen but not fixed" with where it comes from.
+  under "Seen but not fixed" with where it comes from. The one exception is the next rule.
+- A failing gate or test this epic's change does not touch is never only listed, even when an
+  earlier epic broke it: run just those
+  tests on the base in a scratch worktree, and when they fail the same way there, ask the question
+  wrapup-epic Step 1.4b gives for it ("… fail the same way on <base>: …", options "Accept as
+  pre-existing", "Fix on this branch", "Stop — epic FAILs").
 - The build's handoff may list things under the heading "Not proven for real". Each one you do not
   prove for real yourself goes, one line each, under the same heading in your final report, with
   what it was checked against instead.
@@ -3663,6 +3668,14 @@ class Run {
 
   // ---- entering an epic: from scratch, or from the owner's decision on its gate (P3.5 Part 2) ----
 
+  /** Live gates of an epic already Complete (finished by hand since it parked) stop counting: nothing is asked or resumed for it. */
+  retireCompleteGates() {
+    const done = new Set(this.pre.epics.filter((p) => p.eligibility === 'complete').map((p) => p.id));
+    const stale = readGates(this.stateDir).filter((g) => gateLive(g) && done.has(g.epic));
+    if (!stale.length) return;
+    for (const g of stale) { this.markGate(g.file, { cleared: { why: CLEARED_COMPLETE, run: this.runName, date: new Date().toISOString() } }); this.gates.delete(g.epic); delete this.state.gateFacts?.[g.epic]; }
+    this.log(`gates: ${stale.length} gate(s) no longer count, their epic is Complete (${[...new Set(stale.map((g) => g.epic))].join(', ')})`);
+  }
   /** Other live gates of this epic stop counting once it is entered again. */
   supersedeGates(e, keep) {
     const now = { run: this.runName, date: new Date().toISOString() };
@@ -3889,7 +3902,8 @@ class Run {
    */
   startOverGone() {
     const queue = this.config.queue;
-    const live = readGates(this.stateDir).filter((g) => gateLive(g) && g.kind !== 'preflight');
+    const done = completeEpics(this.config.project, this.stateDir); // its gates are cleared next, never started over
+    const live = readGates(this.stateDir).filter((g) => gateLive(g) && g.kind !== 'preflight' && !done.has(g.epic));
     for (const id of new Set(live.map((g) => g.epic))) {
       const g = live.filter((x) => x.epic === id).at(-1);
       if (g.restart !== 'gone' || g.decided || (queue && !queue.includes(id))) continue;
@@ -4008,6 +4022,7 @@ class Run {
       this.pre = preflight(this.clone, cfg, { pluginDir: this.pluginDir, gates: this.gates });
       this.pre.epics = this.pre.epics.map((p) => ({ ...p }));
       this.metaById = new Map(this.pre.epics.map((p) => [p.id, p]));
+      if (!resuming) this.retireCompleteGates();
       if (!resuming) {
         this.state.queue = buildQueue(this.pre, cfg).map((m) => ({ id: m.id, name: m.name, label: m.label, state: 'QUEUED', reason: null, attempts: {}, fixRounds: 0, verifyFixRounds: 0, costUsd: 0, turns: 0, wallMs: 0, sessions: [], gates: [], checks: [], planStep: null, preVerify: null, step: null }));
         writeJson(path.join(this.runDir, 'preflight.json'), this.pre);
@@ -4149,7 +4164,8 @@ export function launchFacts(project, workspace, config, { epics = null } = {}) {
 
   const clone = path.join(workspace, 'clone');
   const sync = syncFacts(project, workspace, integration);
-  const gates = readGates(workspace).filter(gateLive);
+  const done = completeEpics(project, workspace);
+  const gates = readGates(workspace).filter((g) => gateLive(g) && !done.has(g.epic));
   const facts = gateFacts(workspace, integration, { integrationTip: sync.state === 'project-ahead' ? sync.projectTip : null });
   const brief = (g) => ({ file: g.file, epic: g.epic, kind: g.kind, run: g.run ?? null, question: g.question ?? null, answer: g.decided?.answer ?? null, ...(facts.get(g.epic)?.gate === g.file ? { state: facts.get(g.epic).state, enters: facts.get(g.epic).enters ?? null, why: facts.get(g.epic).why ?? null } : {}) });
   const openGates = gates.filter((g) => !g.decided && (g.options ?? []).length).map(brief);
@@ -4306,14 +4322,15 @@ function redoneCheck(workspace, gates, id) {
 function missingResumeGates(workspace) {
   const clone = path.join(workspace, 'clone'); const made = [];
   const records = tryJson(path.join(workspace, 'epics.json'), {}) ?? {};
-  const last = currentRun(workspace); const project = last ? tryJson(path.join(runDirOf(workspace, last), 'config.json'))?.project : null;
+  const project = lastProject(workspace);
+  const done = completeEpics(project, workspace); // a Complete epic gets no new question
   let lookAfter = false; try { lookAfter = !!project && projectSettings(project).look === 'after'; } catch { /* an unreadable settings file is reported at launch */ }
   const gates = readGates(workspace);
   // A decision that can no longer be used as given becomes one question (`restartGate`), never a silent start over.
   // Without the clone nothing can be judged here: the run that recreates it finds the void decision itself (`enter`).
   const integrationNow = exists(clone) ? detectIntegration(clone) : null;
   for (const [id, f] of integrationNow ? gateFacts(workspace, integrationNow) : []) {
-    if (f.state !== 'void') continue;
+    if (f.state !== 'void' || done.has(id)) continue;
     const old = gates.find((g) => g.file === f.gate);
     const tipNow = integrationNow && old.branch ? gitRun(clone, 'rev-parse', '--verify', '--quiet', `refs/heads/${old.branch}`).out || null : null;
     made.push({ name: `${id}-${gates.filter((g) => g.epic === id).length + 1}.json`, replaces: old.file, restart: f.voidKind, why: f.why, gate: {
@@ -4323,7 +4340,7 @@ function missingResumeGates(workspace) {
     } });
   }
   for (const [id, rec] of Object.entries(records)) {
-    if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch) continue;
+    if (!['PARKED', 'FAILED'].includes(rec.state) || !rec.branch || done.has(id)) continue;
     if (made.some((x) => x.gate.epic === id)) continue;
     const redo = rec.state === 'PARKED' ? redoneCheck(workspace, gates, id) : null;
     // The project says "look": "after", and this epic waits only for a look at its screens (asked before the setting,
@@ -4448,15 +4465,40 @@ export function prototypeDid(gate) {
   if (gate.kind === 'amendment') return `took the proposed correction to ${tor}`;
   if (gate.kind === 'thin-review') return `went on after a thin review: read ${gate.read ?? '?'} of ${gate.of ?? '?'} changed files`;
   if (/^\W*defer\b/i.test(a)) return `deferred ${tor} to a later epic, as the builder recommended`;
+  if (gate.kind === 'pre-existing') {
+    const m = String(gate.question ?? '').match(/failed on (.+?), which this epic did not change, and they fail the same way on ([^:]+):/);
+    const [tests, base] = m ? [m[1], m[2].trim()] : ['a failing check', 'the base'];
+    return /^\W*fix\b/i.test(a) ? `had ${tests}, already failing on ${base}, fixed on the epic's branch` : `accepted ${tests} as already failing on ${base}`;
+  }
   if (gate.kind === 'defect') return `left a defect as is: ${String(gate.question ?? '').replace(/^\W*Seen but not fixed yet:\s*/, '').replace(/\s*Recommendation:[\s\S]*$/, '').replace(/[\s.]+$/, '') || 'what the final check saw'}`;
   if (/^\W*fix now\b/i.test(a)) return `had ${tor} fixed in the same build, as the builder recommended`;
   return `answered "${a}" about ${tor}`;
 }
 /** What re-checks one requirement of a finished epic with a person there: the command for the owner (or whoever helps them) to run in the project. */
 export const reverifyCommand = (epicId, tor) => `/peak-workflow:wrapup-epic ${epicId} reverify ${tor}`;
-/** Per epic, its latest live gate when that gate still needs an answer (the one `gateFacts` would call `waiting`). */
-function openGates(gates) {
-  const live = gates.filter((g) => gateLive(g) && g.kind !== 'preflight');
+/**
+ * The epics whose status file says Complete: in the project, or on the clone's integration line (merged by autopilot,
+ * not fetched yet). A gate of such an epic no longer counts: it was finished, by hand or by a run (#46 item 6).
+ */
+export function completeEpics(root, workspace) {
+  const done = new Set();
+  // Read from each repository's integration line, never its working tree: a status file made Complete on a branch not
+  // merged yet (team mode, a pull request open) is not finished, and a run on the clone would build the epic again.
+  const fromLine = (repo) => {
+    const integration = repo && exists(repo) ? detectIntegration(repo) : null;
+    if (integration) for (const e of readEpics(repo, { sidecarText: (rel) => gitShow(repo, integration, rel) ?? '' })) if (e.status === 'Complete') done.add(e.id);
+  };
+  try { fromLine(root); } catch { /* an unreadable plan is reported at launch */ }
+  try { fromLine(path.join(workspace, 'clone')); } catch { /* the clone is judged at run start */ }
+  return done;
+}
+const CLEARED_COMPLETE = 'the epic is Complete';
+/** The project the workspace's latest run was confirmed for. */
+const lastProject = (workspace) => { const last = currentRun(workspace); return last ? tryJson(path.join(runDirOf(workspace, last), 'config.json'))?.project ?? null : null; };
+
+/** Per epic, its latest live gate when that gate still needs an answer (the one `gateFacts` would call `waiting`). `done`: Complete epics, left out. */
+function openGates(gates, done = new Set()) {
+  const live = gates.filter((g) => gateLive(g) && g.kind !== 'preflight' && !done.has(g.epic));
   return [...new Set(live.map((g) => g.epic))].map((id) => live.filter((g) => g.epic === id).at(-1)).filter((g) => !g.decided?.answer && (g.options ?? []).length);
 }
 /** An epic's label as the latest run that queued it named it. */
@@ -4480,8 +4522,15 @@ export function continueRun(workspace, { by } = {}) {
   if (pid) throw new Error(`autopilot is running here (pid ${pid}): a stop is continued after the run has ended`);
   ensureResumeGates(ws);
   const n = standingLimit(ws, currentRun(ws));
-  const continued = []; const left = [];
-  for (const g of openGates(readGates(ws))) {
+  const continued = []; const left = []; const retired = [];
+  // A gate of an epic since finished (by hand, or merged) is never decided: it stops counting, and is listed.
+  const done = completeEpics(lastProject(ws), ws);
+  for (const g of readGates(ws).filter((x) => gateLive(x) && done.has(x.epic))) {
+    const f = path.join(ws, g.file);
+    writeJson(f, { ...readJson(f), cleared: { why: CLEARED_COMPLETE, date: new Date().toISOString() } });
+    retired.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, why: CLEARED_COMPLETE });
+  }
+  for (const g of openGates(readGates(ws), done)) {
     const gates = readGates(ws);
     const had = gates.filter((x) => x.epic === g.epic && x.decided?.standing && !x.decided.prototype).length;
     const answer = standingAnswer(g, gates, n);
@@ -4493,7 +4542,7 @@ export function continueRun(workspace, { by } = {}) {
     const d = decideGate(ws, g.file, answer, { by, standing: true });
     continued.push({ gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), why: plainReason(gateReason(g)), answer, did: standingDid(g, answer), enters: d.enters, standingAnswers: had + 1, of: n });
   }
-  return { autoContinue: n, continued, left };
+  return { autoContinue: n, continued, left, ...(retired.length ? { retired } : {}) };
 }
 
 // ---- where things stand: the one answer an attending session asks for --------------------------
@@ -4569,13 +4618,14 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   // Gates as they are, plus the ones `report` or `continue` would write for a dead-end park (reported, not written).
   const toWrite = pid ? [] : missingResumeGates(ws);
   const gates = [...readGates(ws).filter((g) => !toWrite.some((m) => m.replaces === g.file)), ...toWrite.map((m) => ({ file: `gates/${m.name}`, ...m.gate }))];
-  const open = openGates(gates); // while a driver runs these are the questions already asked; they can be answered now and are used by the next run
+  const done = completeEpics(root, ws); // a gate of an epic finished since (by hand, or merged) waits for nothing
+  const open = openGates(gates, done); // while a driver runs these are the questions already asked; they can be answered now and are used by the next run
   // A technical stop autopilot may not answer itself any more is put to the owner as one plain question, in place of the gate's own.
   const brief = (g) => { const lim = atLimitAsk(g, gates, n, labelOf(ws, g.epic)); return { file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: lim?.question ?? g.question ?? null, ...(lim ? { options: lim.options, atLimit: { stops: lim.stops } } : {}), ...(g.kind === 'resume' || technicalAnswer(g) ? { why: plainReason(gateReason(g)) } : {}) }; };
   const covered = open.filter((g) => standingCovers(g, gates, n));
   const waiting = open.filter((g) => !covered.includes(g));
   // What autopilot decided in the owner's name in this chain of runs, for the closing screen.
-  const decidedForYou = gates.filter((g) => g.decided?.standing && chain.includes(g.decided.run ?? g.run)).map((g) => (g.decided.prototype
+  const decidedForYou = gates.filter((g) => g.decided?.standing && !g.cleared && chain.includes(g.decided.run ?? g.run)).map((g) => (g.decided.prototype
     ? { gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), prototype: true, kind: g.kind, tor: g.tor ?? null, answer: g.decided.answer, did: prototypeDid(g), question: g.question ?? null, ...(tookOf.get(g.file)?.was ? { was: tookOf.get(g.file).was } : {}), ...(tookOf.get(g.file)?.proposed ? { proposed: tookOf.get(g.file).proposed } : {}), ...(g.void || g.superseded ? { dropped: true } : {}) }
     : { gate: g.file, epic: g.epic, label: labelOf(ws, g.epic), did: standingDid(g, g.decided.answer), why: plainReason(gateReason(g)) }));
 
@@ -4657,6 +4707,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   else if (askable.length) { out.next = 'readiness'; out.why = `${askable.length} epic(s) can be queued explicitly`; }
   else if (out.sync?.state === 'clone-ahead') { out.next = 'fetch'; out.why = 'merged work waits in the clone'; }
   else out.why = out.refuse.length ? 'nothing can run' : 'nothing is left to run';
+  // The last run stopped because the project's tests already failed: which ones, in the runner's words.
+  const red = state?.stoppedBecause === 'base red' && state.baseRed && !state.baseRed.couldNotRun ? failingTests(state.baseRed.tail) : [];
+  if (red.length) out.why += `; the last run stopped because these tests failed on ${state.integration ?? 'the integration line'}: ${red.join('; ')}`;
   return say();
 }
 
@@ -4835,7 +4888,7 @@ async function main(argv) {
   const ws = path.resolve(wsArg ?? '.');
   if (cmd === 'continue') {
     const r = continueRun(ws, { by: o.by });
-    console.log(o.json ? JSON.stringify(r, null, 2) : [...r.continued.map((c) => `decided for the owner, ${c.label}: ${c.why}, so autopilot ${c.did} (${c.standingAnswers} of ${c.of})`), ...r.left.map((l) => `left for the owner ${l.label}: ${l.why}`)].join('\n') || 'nothing to continue');
+    console.log(o.json ? JSON.stringify(r, null, 2) : [...r.continued.map((c) => `decided for the owner, ${c.label}: ${c.why}, so autopilot ${c.did} (${c.standingAnswers} of ${c.of})`), ...r.left.map((l) => `left for the owner ${l.label}: ${l.why}`), ...(r.retired ?? []).map((x) => `no longer counts, ${x.label}: ${x.why} (${x.gate})`)].join('\n') || 'nothing to continue');
     return r.continued.length ? 0 : 1;
   }
   if (cmd === 'watch') {

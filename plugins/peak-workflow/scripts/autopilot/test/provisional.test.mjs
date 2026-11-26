@@ -519,6 +519,28 @@ test('a defect the final check sees: a full run parks on the one past the standi
   assert.match(g.why, /past the count/);
 });
 
+const PRE_OPTS = ['Accept as pre-existing', 'Fix on this branch', 'Stop — epic FAILs'];
+const PRE_Q = 'Tests failed on test/ledger.test.js "totals add up", which this epic did not change, and they fail the same way on develop: 1 failing, expected 10 got 9. Recommendation: Accept as pre-existing — the ledger epic owns it. How to proceed?';
+/** A final check that meets a test another epic owns, already failing on develop: asks the one question, then merges and lists it. */
+const preExistingWrapup = (e) => {
+  const a = wrapupActions(e);
+  return { actions: [a[0], ask(PRE_Q, PRE_OPTS), ...a.slice(1)], result: { total_cost_usd: 1.3, result: 'Verdict: PASS\n\n## Seen but not fixed\n- test/ledger.test.js "totals add up" — fails the same way on develop: expected 10 got 9' } };
+};
+
+test('a test that already fails on develop at the final check: a provisional run accepts it as pre-existing, merges, and lists it as decided for the owner (#46 item 2)', async (t) => {
+  const p = makeProject(t, PROTO);
+  p.scenario({ ...happy(E1), [`${E1.id}/verify`]: preExistingWrapup(E1) });
+  const s = await p.go();
+  assert.deepEqual(s.queue.map((q) => [q.id, q.state]), [[E1.id, 'MERGED']], s.queue[0].reason);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.decided.answer, g.decided.by, g.decided.prototype], ['pre-existing', 'Accept as pre-existing', 'autopilot (provisional run)', true]);
+  const st = status(p.project, p.state);
+  assert.deepEqual(st.decidedForYou.map((x) => [x.kind, x.did]), [['pre-existing', 'accepted test/ledger.test.js "totals add up" as already failing on develop']]);
+  assert.deepEqual(st.left.map((x) => x.text), ['test/ledger.test.js "totals add up" — fails the same way on develop: expected 10 got 9']);
+  const md = fs.readFileSync(path.join(p.runDir(), 'report.md'), 'utf8');
+  assert.match(md, /## Decided for you in this provisional run[\s\S]*\*\*Failing checks this epic did not change, already failing the same way on the base\*\*[\s\S]*"Accept as pre-existing": Tests failed on test\/ledger\.test\.js/);
+});
+
 test('a second final check\'s "Seen but not fixed" list replaces the first\'s', async (t) => {
   const p = makeProject(t);
   p.scenario({

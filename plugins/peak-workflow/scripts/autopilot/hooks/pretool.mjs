@@ -564,7 +564,7 @@ function ruleR8(ctx) {
     const kind = defect ? 'defect' : parkRow?.kind ?? row?.kind ?? 'unmatched';
     const base = { kind, skillStep: defect ? 'wrapup-epic Step 1.4b (seen but not fixed)' : (parkRow ?? row)?.skillStep ?? 'unknown', question: q.question, options: labels, tor };
     // A question with no requirement of its own is matched on its text, never on its (null) TOR.
-    const byText = kind === 'unmatched' || kind === 'defect';
+    const byText = kind === 'unmatched' || kind === 'defect' || kind === 'pre-existing';
 
     // A person's recorded answer from `autopilot report` applies to that one gate kind (and TOR), once.
     // A question no policy row knows is matched on its recorded text. A void or superseded gate never answers.
