@@ -442,6 +442,27 @@ test('the run budget: $250 by default, the project may set its own, and a higher
   assert.equal(readJson(file).runBudgetUsd, undefined);
 });
 
+test('a chain stopped at its run budget relaunches once the owner raises it, in a full run and a provisional one (Step 6)', async (t) => {
+  for (const mode of ['full', 'provisional']) {
+    const p = makeProject(t);
+    p.scenario(happy(E1));
+    await p.go({ run: confirmRun(p, { runBudgetUsd: 0.5, mode }) });
+    assert.equal(readJson(path.join(p.runDir(), 'state.json')).stoppedBecause, 'run budget', mode);
+    assert.equal(p.epic(E1.id).state, 'PARKED', mode);
+    assert.equal(driver('decide', '--workspace', p.state, '--gate', `gates/${E1.id}-1.json`, '--answer', ANSWERS.resume, '--by', 'Pat Owner').status, 0);
+    const s1 = st(p);
+    assert.deepEqual([s1.relaunch, s1.spentUsd >= 0.5, s1.runBudgetUsd], [null, true, 0.5], `${mode}: nothing left, nothing to relaunch`);
+    assert.equal(driver('configure', '--project', p.project, '--run-budget', '10').status, 0);
+    const s2 = st(p);
+    assert.ok(s2.relaunch, `${mode}: ${s2.next} (${s2.why})`);
+    assert.deepEqual([s2.relaunch.config.runBudgetUsd, s2.relaunch.config.mode, s2.relaunch.config.queue], [+(10 - s1.spentUsd).toFixed(2), mode, [E1.id]], mode);
+    const steps = await relaunch(p);
+    assert.ok(steps.length && !steps.some((x) => /\/(plan|build)-/.test(x)), `${mode}: goes on from where it stopped: ${steps}`);
+    assert.equal(p.epic(E1.id).state, 'MERGED', mode);
+    assert.equal(readJson(path.join(p.runDir(), 'config.json')).mode, mode);
+  }
+});
+
 test('the queue line counts over the confirmed queue: done, percent, waiting, still to go', () => {
   assert.equal(queueLine(new Map([['a', 'MERGED'], ['b', 'PARKED'], ['c', 'QUEUED'], ['d', 'QUEUED']])), 'Progress: 1 of 4 done (25%); 1 waiting for you; 2 still to go');
   assert.equal(queueLine(new Map([['a', 'MERGED'], ['b', 'MERGED']])), 'Progress: 2 of 2 done (100%)');
@@ -489,9 +510,21 @@ test('standingAnswer: which answer autopilot gives a technical stop, one count p
   assert.equal(standingAnswer(lint, [two[0]], 2), ANSWERS.replan);
 
   // At the limit (or with no standing answer) the owner gets one plain question; a gate that is theirs anyway does not.
-  assert.deepEqual(atLimit(lint, two, 2), { answer: ANSWERS.replan, stops: 3 });
-  assert.deepEqual(atLimit(resume({ technical: true }), [], 0), { answer: ANSWERS.resume, stops: 1 });
-  assert.deepEqual(atLimit(review(['stand-in'], 1), [], 2), { answer: ANSWERS.startOver, stops: 1 }, 'the repair is spent: trying again means starting over');
+  assert.deepEqual(atLimit(lint, two, 2), { answer: ANSWERS.replan, stops: 3, standing: 2, owner: 0 });
+  assert.deepEqual(atLimit(resume({ technical: true }), [], 0), { answer: ANSWERS.resume, stops: 1, standing: 0, owner: 0 });
+  assert.deepEqual(atLimit(review(['stand-in'], 1), [], 2), { answer: ANSWERS.startOver, stops: 1, standing: 0, owner: 0 }, 'the repair is spent: trying again means starting over');
+  // The count is every technical stop of the epic, whoever answered it: the owner's "Try again" and their own answer to such a gate count too.
+  const owners = [
+    { ...resume({ technical: true }), file: 'gates/a-1.json', decided: { answer: ANSWERS.resume, asked: 'Try again', used: { run: 'r' } } },
+    { ...lint, file: 'gates/a-2.json', decided: { answer: ANSWERS.replan, used: { run: 'r' } } },
+    { ...resume({ reason: 'stopped by the STOP file during build-1' }), file: 'gates/a-3.json', decided: { answer: ANSWERS.resume } }, // the owner's own stop: not technical
+    { ...base, kind: 'deferral', file: 'gates/a-4.json', decided: { answer: 'Defer' } }, // a question that was the owner's
+    { epic: 'b', kind: 'plan-lint', options: [ANSWERS.replan], decided: { answer: ANSWERS.replan } }, // another epic's
+  ];
+  assert.deepEqual(atLimit(lint, [two[0], ...owners], 1), { answer: ANSWERS.replan, stops: 4, standing: 1, owner: 2 });
+  // In a provisional run the questions it answered itself have their own count: they are no technical stop of either kind.
+  const proto = [{ ...base, kind: 'question', file: 'gates/a-5.json', decided: { answer: 'Fix now', standing: true, prototype: true } }, { ...lint, file: 'gates/a-6.json', decided: { answer: ANSWERS.replan, standing: true, prototype: true } }];
+  assert.deepEqual(atLimit(lint, [two[0], ...owners, ...proto], 1), { answer: ANSWERS.replan, stops: 4, standing: 1, owner: 2 }, 'provisional answers change nothing');
   assert.equal(atLimit(lint, [], 2), null, 'within the count nothing is asked');
   assert.equal(atLimit(review(['never-ran-real']), two, 2), null);
   assert.equal(atLimit(resume({ reason: 'stopped by the STOP file during build-1' }), two, 2), null);
@@ -587,6 +620,23 @@ test('the final check\'s own product fix is allowed without asking, and listed; 
   await relaunch(r);
   assert.equal(r.epic(E1.id).state, 'PARKED', r.epic(E1.id).reason);
   assert.match(readJson(r.dir(E1.id, 'check-verify-1.json')).checks.find((x) => x.name === 'verdict').evidence.join(' | '), /removes checks from a test/);
+  // Nor a changed requirement file (Step 6), in a full run and a provisional one; both are asked the same at-limit question.
+  const asked = [];
+  for (const mode of ['full', 'provisional']) {
+    const y = makeProject(t);
+    y.scenario({ ...happy(E1), [`${E1.id}/verify`]: fix() });
+    await y.go({ run: confirmRun(y, { autoContinue: 0, mode }) });
+    asked.push(st(y).waiting.map((g) => [g.file, g.question, g.options]));
+    addToKept(y, noteRequirement);
+    assert.equal(driver('decide', '--workspace', y.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Try again', '--by', 'Pat Owner').status, 0);
+    y.scenario({});
+    await relaunch(y);
+    assert.equal(y.epic(E1.id).state, 'PARKED', `${mode}: ${y.epic(E1.id).reason}`);
+    assert.match(readJson(y.dir(E1.id, 'check-verify-1.json')).checks.find((x) => x.name === 'verdict').evidence.join(' | '), /changes a requirement file \(docs\/requirements\/note\.md\)/, mode);
+    assert.equal(git(y.clone, 'rev-parse', 'develop'), git(y.project, 'rev-parse', 'develop'), `${mode}: nothing merged`);
+  }
+  assert.deepEqual(asked[1], asked[0], 'the same question in a provisional run');
+  assert.deepEqual(asked[0].map(([, , o]) => o), [TRY]);
 
   // Kept work that also changes only a requirement file, and one that claims more undisclosed deferrals fixed than it was asked about.
   const only = (wt) => noteRequirement(wt);
@@ -606,6 +656,22 @@ test('the final check\'s own product fix is allowed without asking, and listed; 
     assert.equal(x.epic(E1.id).state, 'PARKED', failed);
     assert.deepEqual(readJson(x.dir(E1.id, 'check-verify-1.json')).checks.filter((c) => !c.pass).map((c) => c.name), [failed]);
   }
+});
+
+test('a plan that fails lint is planned again on the standing answer, and the closing screen lists it under what autopilot decided for you (Step 6)', async (t) => {
+  const p = makeProject(t);
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1, { omit: ['mark'] }) });
+  await p.go({ run: confirmRun(p, { autoContinue: 2 }) });
+  assert.equal(gateFile(p, E1.id).kind, 'plan-lint');
+  const s = st(p);
+  assert.deepEqual([s.next, s.waiting, s.autoContinue.map((g) => [g.file, g.kind])], ['continue', [], [[`gates/${E1.id}-1.json`, 'plan-lint']]]);
+  const c = cont(p);
+  assert.equal(c.status, 0, c.stderr);
+  assert.deepEqual(c.json().continued.map((x) => [x.answer, x.did, x.enters]), [[ANSWERS.replan, 'had it planned again', 'PLAN']]);
+  p.scenario(happy(E1));
+  assert.deepEqual(await relaunch(p), ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`));
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  assert.deepEqual(st(p, '--queue', E1.id).decidedForYou.map((d) => [d.gate, d.label, d.did, d.why]), [[`gates/${E1.id}-1.json`, LABEL, 'had it planned again', 'its plan is missing a required part']]);
 });
 
 test('at the limit the owner gets one plain question: "Try again" records the technical answer as theirs, "Leave it for now" records nothing', async (t) => {
@@ -671,8 +737,16 @@ test('a final check that still fails after its repair is repaired once more with
 
   const s = st(p);
   assert.deepEqual([s.next, s.waiting.map((g) => [g.file, g.options])], ['decide', [[`gates/${E1.id}-2.json`, TRY]]]);
-  assert.match(s.waiting[0].question, /has stopped 2 times for technical reasons \(it did not pass its independent check, even after the one repair\)\. Try again, which costs more, or leave it for now\?$/);
+  assert.match(s.waiting[0].question, /has stopped 2 times for technical reasons \(autopilot answered 1\)\. This time: it did not pass its independent check, even after the one repair\. Try again, which costs more, or leave it for now\?$/);
   assert.equal(cont(p).status, 1);
+
+  // The owner tries again, and it stops the same way: the count names both answers, theirs included.
+  assert.equal(driver('decide', '--workspace', p.state, '--gate', `gates/${E1.id}-2.json`, '--answer', 'Try again', '--by', 'Pat Owner').status, 0);
+  p.scenario({ [`${E1.id}/plan-fix`]: planScript(E1), [`${E1.id}/fix`]: repair(3), [`${E1.id}/verify`]: fail('trimmed again') });
+  await relaunch(p);
+  const s2 = st(p);
+  assert.deepEqual(s2.waiting.map((g) => [g.file, g.options, g.atLimit]), [[`gates/${E1.id}-3.json`, TRY, { stops: 3 }]]);
+  assert.match(s2.waiting[0].question, /has stopped 3 times for technical reasons \(autopilot answered 1, you answered 1\)\. This time: /);
 });
 
 test('leftLines: what the verifier saw wrong and left is read from "Seen but not fixed"; none, other sections and a sub-point are handled (Pilot Light, 2026-11-22)', () => {

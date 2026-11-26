@@ -1894,6 +1894,26 @@ test('a fix bigger than the standing answer allows is not merged: rolled back, t
   assert.deepEqual([e.fixedAtWrapup.files.length, e.fixedAtWrapup.approvedBy], [6, `gates/${E1.id}-1.json`]);
 });
 
+test('the small-fix limit is 80 changed lines: 80 merges on the standing answer, 81 is over it, in a full run and a provisional one (Step 6)', async (t) => {
+  const fixOf = (n) => ({ actions: [ask(FIXQ, FIXOPTS), { do: 'checkout', name: E1.branch }, { do: 'write', path: 'src/fix.js', content: Array.from({ length: n }, (_, i) => `export const line${i} = ${i};`).join('\n') + '\n' }, { do: 'commit', message: `fix(epic-${E1.id}): what the verifier found` }, ...wrapupActions(E1, { counts: [1, 0, 0, 1, 0, 0] })], result: { result: 'Verdict: PASS' } });
+  for (const [n, mode] of [[80, 'full'], [81, 'full'], [81, 'provisional']]) {
+    const p = makeProject(t, { config: { mode } });
+    p.scenario({ ...happy(E1), [`${E1.id}/verify`]: fixOf(n) });
+    await p.go();
+    const e = p.epic(E1.id);
+    if (n === 80) {
+      assert.equal(e.state, 'MERGED', e.reason);
+      assert.deepEqual([e.fixedAtWrapup.files, e.fixedAtWrapup.approvedBy], [['src/fix.js'], 'the standing answer for small fixes']);
+      continue;
+    }
+    assert.deepEqual([e.state, e.reason], ['PARKED', 'merge gate failed (verdict); develop rolled back'], mode);
+    assert.match(readJson(p.dir(E1.id, 'check-verify-1.json')).checks.find((c) => c.name === 'verdict').evidence.join(' | '), /the fix made on the standing answer changes 81 lines \(the limit is 80\)/, mode);
+    const g = gate(p, E1.id);
+    assert.deepEqual([g.kind, g.approvesFix, g.decided ?? null], ['resume', true, null], `${mode}: the owner is asked to allow it`);
+    assert.match(g.question, /bigger than your standing answer for small fixes allows: 81 changed lines \(your limit is 80\)/, mode);
+  }
+});
+
 /** As an earlier driver left a failed merge check: rolled back, parked, and no gate written. */
 function asLegacy(p, id) {
   for (const f of fs.readdirSync(path.join(p.state, 'gates')).filter((f) => f.startsWith(`${id}-`))) fs.rmSync(path.join(p.state, 'gates', f));
@@ -1982,8 +2002,8 @@ test('"add the missing test" that also changes the product is not merged: the ow
 // ---- a failed merge check keeps the final check's work and always asks (issue #35) -----------------
 
 /** A final check that passes, and a test command that fails while ledger.json (git-ignored) is in the clone. */
-function redAfterMerge(t) {
-  const p = makeProject(t, { config: { testCommand: 'test ! -e ledger.json' } });
+function redAfterMerge(t, mode = 'full') {
+  const p = makeProject(t, { config: { testCommand: 'test ! -e ledger.json', mode } });
   p.scenario({ ...happy(E1), [`${E1.id}/verify`]: { actions: [{ do: 'exec', cmd: 'touch ledger.json' }, ...wrapupActions(E1)], result: { result: 'Verdict: PASS' } } });
   return p;
 }
@@ -2015,6 +2035,25 @@ test('tests red only once the final check\'s work is merged: a technical gate; t
   assert.equal(e.state, 'MERGED', e.reason);
   assert.equal(git(p.clone, 'rev-parse', 'develop^2'), g.verifiedTip);
   assert.equal(git(p.clone, 'log', '-1', '--format=%s', 'develop'), `Merge branch '${E1.branch}' into develop`);
+});
+
+test('a provisional run: tests red once the final check\'s work is merged keep that work and ask the same way; nothing is taken on the run\'s own say (Step 6)', async (t) => {
+  const p = redAfterMerge(t, 'provisional');
+  await p.go();
+  assert.equal(readJson(path.join(p.runDir(), 'state.json')).mode, 'provisional');
+  const e1 = p.epic(E1.id);
+  assert.deepEqual([e1.state, e1.reason, e1.verifiedKept], ['PARKED', 'merge gate failed (tests-green-on-integration); develop rolled back', `refs/autopilot/verified/${E1.id}`]);
+  const g = gate(p, E1.id);
+  assert.deepEqual([g.kind, g.phase, g.technical, g.decided ?? null], ['resume', 'CHECK_VERIFY', true, null], 'a technical stop: the provisional run does not answer it');
+  assert.match(g.question, /The merge was undone and its work is kept\. Check the merge again\?$/);
+  assert.equal(merged(p, g.verifiedTip), false);
+  fs.rmSync(path.join(p.clone, 'ledger.json'));
+  decide(p, E1.id, ANSWERS.resume);
+  p.scenario({});
+  const r = await again(p);
+  assert.deepEqual(r.steps, [], 'no session');
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
+  assert.equal(git(p.clone, 'rev-parse', 'develop^2'), g.verifiedTip);
 });
 
 test('the integration line moved before the re-check: the kept work merges onto the new tip', async (t) => {

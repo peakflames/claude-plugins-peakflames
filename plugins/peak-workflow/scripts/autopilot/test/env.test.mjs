@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, REGISTRIES, claudeMdReads, sleepWarning } from '../driver.mjs';
+import { PLUGIN_DIR, REGISTRIES, claudeMdReads, loadConfig, preflight, sleepWarning } from '../driver.mjs';
 import { writeReport } from '../report.mjs';
 import { DRIVER, E1, git, happy, makeProject, readJson } from './helpers.mjs';
 
@@ -448,6 +448,22 @@ test('tor-lifecycle: an old python3 first on PATH does not hide a newer one furt
   const found = run(`${old}:${cur}`);
   assert.equal(found.status, 0, found.stderr);
   assert.match(found.stdout, /^ran new: format/);
+});
+
+test('preflight: with no Python 3.11 the format guard refuses in one line, not the whole install hint of the guard (Step 10)', (t) => {
+  const p = makeProject(t);
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-nopy-')));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  // The real guard, with every interpreter it probes answering "too old" or "not here".
+  const guard = fs.readFileSync(path.join(PLUGIN_DIR, 'scripts', 'tor-lifecycle'), 'utf8');
+  const blind = guard.replace(/^probe\(\) \{\n[^\n]*\n\}/m, 'probe() { return 1; }');
+  assert.notEqual(blind, guard);
+  fs.mkdirSync(path.join(tmp, 'scripts'));
+  fs.writeFileSync(path.join(tmp, 'scripts', 'tor-lifecycle'), blind);
+  assert.equal(spawnSync('sh', [path.join(tmp, 'scripts', 'tor-lifecycle'), 'format'], { encoding: 'utf8' }).status, 3, 'the guard finds no Python');
+  const pre = preflight(p.project, loadConfig(p.state, { project: p.project }), { pluginDir: tmp });
+  const lines = pre.refuse.filter((r) => /format guard|Python|Install|brew|winget/i.test(r));
+  assert.deepEqual(lines, ['format guard: needs Python 3.11 or newer, and none was found — install a current Python (https://www.python.org/downloads/), then try again']);
 });
 
 // ---- an overnight run on a flaky or sleepy machine (#41 B6, B10; #40 item 6) ----------------------

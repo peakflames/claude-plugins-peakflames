@@ -275,13 +275,27 @@ export function standingAnswer(gate, gates, n) {
 }
 /**
  * A technical stop autopilot may not answer itself any more (the count is used up, there is no
- * standing answer, or the only way on is to start over): `{answer, stops}`, where `answer` is what
- * "Try again" records and `stops` counts this stop and the ones autopilot already answered. Null
+ * standing answer, or the only way on is to start over): `{answer, stops, standing, owner}`, where `answer` is what
+ * "Try again" records and `stops` counts this stop and the epic's earlier technical stops, whoever answered them
+ * (`technicalStops`). Null
  * for a gate autopilot answers, and for one that is the owner's own question.
  */
 export function atLimit(gate, gates, n) {
   const answer = technicalAnswer(gate);
-  return answer && !standingAnswer(gate, gates, n) ? { answer, stops: standingUsed(gate, gates) + 1 } : null;
+  if (!answer || standingAnswer(gate, gates, n)) return null;
+  const { standing, owner } = technicalStops(gate, gates);
+  return { answer, stops: standing + owner + 1, standing, owner };
+}
+/** Whether a gate was a technical stop, whatever became of it: the shape `technicalAnswer` judges, without its "still undecided" check. */
+const wasTechnical = (g) => Boolean(technicalAnswer({ ...g, decided: null, void: false, superseded: false, cleared: false, restarted: false }));
+/**
+ * This epic's technical stops that were already answered, by who answered: `standing` (autopilot, on the owner's standing
+ * answer; the count `standingAnswer` keeps) and `owner` (a "Try again", or the owner's own answer to such a gate). A
+ * question a provisional run answered is in neither: it has its own count (`PROTOTYPE_LIMIT`).
+ */
+export function technicalStops(gate, gates) {
+  const mine = gates.filter((g) => g.epic === gate.epic && g.decided && !g.decided.prototype) // the gate asked about is undecided, so never among them;
+  return { standing: mine.filter((g) => g.decided.standing).length, owner: mine.filter((g) => !g.decided.standing && wasTechnical(g)).length };
 }
 
 // ---- a provisional run: the session's own recommendation is taken, and listed for the owner ------

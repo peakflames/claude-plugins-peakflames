@@ -872,7 +872,9 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
   const facts = readProjectFacts(root);
   const refuse = [];
   const fmt = torLifecycle(pluginDir, root, 'format');
-  if (fmt.code !== 0) refuse.push(`format guard: ${fmt.out.split('\n')[0] || fmt.err || `tor-lifecycle format exited ${fmt.code}`}`);
+  // No Python 3.11: one line, not the guard's whole install hint (seen live: shown twice beside the skill's own).
+  if (fmt.code === 3) refuse.push('format guard: needs Python 3.11 or newer, and none was found — install a current Python (https://www.python.org/downloads/), then try again');
+  else if (fmt.code !== 0) refuse.push(`format guard: ${(fmt.out || fmt.err).split('\n').find((l) => l.trim()) || `tor-lifecycle format exited ${fmt.code}`}`);
   if (!facts.testDirs.length) refuse.push('CLAUDE.md has no **Test directories:** line');
   if (!(config.testCommand ?? facts.testCommand)) refuse.push('CLAUDE.md has no **Tests:** command');
 
@@ -1096,7 +1098,9 @@ committed, and nothing there is part of what you deliver. Do not put such files 
 repository: an untracked file left there fails the clean-tree check. Other places outside the
 repository, \`/tmp\` included, may be refused.
 
-In a command, use \`"$AUTOPILOT_SCRATCH/out.txt"\` as it is (the file tools take the folder above); copying it into another variable (\`S="$AUTOPILOT_SCRATCH"\`) or a path relative to the current folder (\`./out.txt\`) is refused, or lands in the repository.
+In a command, use \`"$AUTOPILOT_SCRATCH/out.txt"\` as it is (the file tools take the folder above). A variable may hold a file
+below it (\`out="$AUTOPILOT_SCRATCH/out.txt"\`); copying the folder itself into another variable (\`S="$AUTOPILOT_SCRATCH"\`),
+cutting it down, or a path relative to the current folder (\`./out.txt\`) is refused, or lands in the repository.
 `;
 
 /**
@@ -1293,6 +1297,10 @@ execution script for this session.
 - Do not start a command that waits for the project's owner (a sign-in in a browser, a device
   to plug in). A build does the part that needs no person; the final check is where a person is
   asked to come, once. Say in your handoff what you left for it and the exact command.
+- Anything you did not exercise against the real thing (a requirement you marked CANNOT VERIFY,
+  a stand-in for a service, a check you left for the final check) is also listed, one line each,
+  under the heading "Not proven for real" in your handoff and in your final message, with what it
+  was checked against instead. Keep "CANNOT VERIFY" wherever the skill asks for it.
 `;
 
 export const FIX_RULES = `# Autopilot repair rules
@@ -1306,6 +1314,10 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
 - Do not start a command that waits for the project's owner (a sign-in in a browser, a device
   to plug in). A repair does the part that needs no person; the final check is where a person is
   asked to come, once. Say in your handoff what you left for it and the exact command.
+- Anything you did not exercise against the real thing (a requirement you marked CANNOT VERIFY,
+  a stand-in for a service, a check you left for the final check) is also listed, one line each,
+  under the heading "Not proven for real" in your handoff and in your final message, with what it
+  was checked against instead. Keep "CANNOT VERIFY" wherever the skill asks for it.
 `;
 
 export const CATCHUP_RULES = `# Autopilot catch-up rules
@@ -1458,6 +1470,9 @@ export const verifyRules = (limits) => `# Autopilot session rules
   ${limits ? `Recommend Fix now only for a small fix: at most ${limits.files} files and ${limits.lines} changed lines, with its test, and no requirement file. Up to ${limits.perEpic} such fixes per final check are made on the owner's standing answer; anything bigger, recommend Leave as is` : 'The owner has no standing answer for small fixes: every such question goes to them'}.
   A defect that is not this epic's (the machine, an earlier epic, test data) is not asked: list it
   under "Seen but not fixed" with where it comes from.
+- The build's handoff may list things under the heading "Not proven for real". Each one you do not
+  prove for real yourself goes, one line each, under the same heading in your final report, with
+  what it was checked against instead.
 `;
 
 /**
@@ -2265,6 +2280,27 @@ class Run {
   }
   park(e, reason) { try { this.wipCommit(e); } catch (err) { this.log(`${e.id}: could not commit uncommitted work: ${err.message}`); } return this.finish(e, 'PARKED', reason); }
   /**
+   * The owner's STOP while the epic was still being planned, with nothing built: its branch is missing or has no
+   * commit beyond the integration line, and the clone holds nothing uncommitted. A question would offer two answers
+   * that do the same thing, so the epic goes back to the queue with none, and it is planned from the start next
+   * time. An empty branch is removed so that plan starts as a first one does. False (ask, as before) otherwise,
+   * and for an epic entered on a decided gate.
+   */
+  requeueUnbuilt(e, during) {
+    // Entered on a decided gate: that answer and its record belong to the question, which stays.
+    if (e.resumed) return false;
+    const branch = this.meta(e).branch; const tip = this.branchTip(branch);
+    if (this.dirty() || (tip && this.g('rev-list', '--count', `${this.state.integration}..${branch}`) !== '0')) return false;
+    if (tip) {
+      if (this.currentBranch() === branch) this.g('checkout', '-q', this.state.integration);
+      this.g('branch', '-D', branch);
+    }
+    e.state = 'QUEUED'; e.step = null; e.reason = null;
+    this.save();
+    this.log(`${e.id}: stopped by you during ${during}, before anything was built; no question is left, and it starts from the plan next time`);
+    return true;
+  }
+  /**
    * A park that is nobody's question (budget, infra, STOP, an auditor outage) gets a `resume` gate,
    * so the next run continues at `phase` instead of rebuilding the epic.
    */
@@ -2569,7 +2605,7 @@ class Run {
     const undo = () => { if (kind === 'verify') this.rollback(e); else if (moved) this.resetIntegration(e, devBefore); };
 
     // Re-entry after a park that is nobody's question: a parked build is judged from its WIP commit; any other step is run again once.
-    if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return this.parkResumable(e, `stopped by the STOP file during ${s.name}`, again); }
+    if (s.outcome === 'stopped') { this.stopReason = 'STOP file'; undo(); return again === 'PLAN' && this.requeueUnbuilt(e, s.name) ? null : this.parkResumable(e, `stopped by the STOP file during ${s.name}`, again); }
     if (s.outcome === 'infra') { undo(); return this.parkResumable(e, `infra error during ${s.name}: ${s.why}`, again); }
     // Not worth waiting for (a weekly limit, past the end time): nothing else can run either, so the run stops too. Not a
     // technical stop: running again before the reset cannot cure it, so the standing answer does not relaunch it.
@@ -3545,6 +3581,7 @@ class Run {
     while (phase) {
       const stop = this.runStop();
       if (stop && phase === 'RECHECK') return this.parkRecheck(e, `run stopped (${stop}) before the final check's kept work was merged again`);
+      if (stop === 'STOP file' && phase === 'PLAN' && this.requeueUnbuilt(e, 'the wait before its plan')) return null;
       if (stop) return this.parkResumable(e, `run stopped (${stop}) before ${phase}`, phase === 'CHECK_BUILD_INTERRUPTED' ? 'CHECK_BUILD' : phase);
       if (phase === 'PLAN') phase = await this.doPlan(e);
       else if (phase === 'BUILD') phase = await this.doBuild(e, false);
@@ -4567,7 +4604,9 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
     const before = confirmed ?? (state.queue ?? []).map((q) => q.id);
     const ids = before.filter((id) => byId.get(id)?.eligibility === 'eligible' && !held.has(id));
     const left = runBudgetUsd == null ? null : +(runBudgetUsd - spentUsd).toFixed(2);
-    const limit = ['end time', 'run budget'].includes(state.stoppedBecause) ? state.stoppedBecause : left !== null && left <= 0 ? 'run budget' : null;
+    // A run that stopped at its budget waits only while nothing is left: once the owner raises the budget
+    // (`configure --run-budget`), the chain goes on with what the raise left.
+    const limit = state.stoppedBecause === 'end time' ? 'end time' : left !== null && left <= 0 ? 'run budget' : null;
     if (ids.some((id) => ['resume', 'fresh'].includes(byId.get(id).gate?.state)) && !limit) {
       // Launch questions this chain never put to the owner (seen live: a chain started before the question existed ran
       // on with `attended` unset). Asked once: the answer goes into the config and every later relaunch carries it.

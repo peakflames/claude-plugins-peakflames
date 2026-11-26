@@ -240,6 +240,25 @@ test('verify FAIL, one fix round, verify PASS: MERGED', async (t) => {
   assert.ok(git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('src/fix.js'));
 });
 
+test('"Not proven for real": the build, repair and verify sessions are told the heading, in a full run and in a provisional one', async (t) => {
+  for (const mode of ['full', 'provisional']) {
+    const p = makeProject(t, { config: { mode } });
+    p.scenario({
+      ...happy(E1),
+      [`${E1.id}/verify-1`]: { actions: [], result: { result: 'Verdict: FAIL\nTOR-01-Hd3Yc8L: the description is trimmed' } },
+      [`${E1.id}/fix`]: { actions: [{ do: 'write', path: 'src/fix.js', content: 'export const fixed = true;\n' }, { do: 'commit', message: `fix(epic-${E1.id}): keep the description verbatim` }] },
+    });
+    await go(p);
+    assert.equal(p.epic(E1.id).state, 'MERGED', mode);
+    const appended = (step) => fs.readFileSync(p.dir(E1.id, step, 'system-append.md'), 'utf8').replace(/\s+/g, ' ');
+    for (const step of ['build-1', 'fix-1']) {
+      assert.match(appended(step), /a requirement you marked CANNOT VERIFY, a stand-in for a service, a check you left for the final check\) is also listed, one line each, under the heading "Not proven for real" in your handoff and in your final message, with what it was checked against instead/, `${mode} ${step}`);
+      assert.match(appended(step), /Keep "CANNOT VERIFY" wherever the skill asks for it/, `${mode} ${step}`);
+    }
+    for (const step of ['verify-1', 'verify-2']) assert.match(appended(step), /The build's handoff may list things under the heading "Not proven for real"\. Each one you do not prove for real yourself goes, one line each, under the same heading in your final report/, `${mode} ${step}`);
+  }
+});
+
 test('verified but not merged: the epic parks with a resume gate and is never called FAILED, even after a fix round', async (t) => {
   const unmerged = { actions: wrapupActions(E1).slice(0, 5), result: { result: 'Epic passed verification, 4/4, and is marked Complete on its feature branch. It is not merged into develop yet.' } };
   const p = makeProject(t);
@@ -371,6 +390,51 @@ test('STOP mid-step kills the session, parks the epic and stops the run', async 
   assert.equal(p.epic(d.id).state, 'QUEUED'); // nothing else starts after STOP
   assert.ok(fs.existsSync(path.join(p.runDir(), 'report.md')));
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
+});
+
+test('STOP while the plan is still being made, nothing built: no question, the epic goes back to the queue and is planned next time, in a full run and a provisional one (Step 10)', async (t) => {
+  for (const mode of ['full', 'provisional']) {
+    const p = makeProject(t, { config: { mode } });
+    p.scenario({ [`${E1.id}/plan`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'hang' }] } });
+    const running = go(p);
+    await waitFor(() => p.epic(E1.id)?.step?.name === 'plan-1' && p.epic(E1.id).step.pid);
+    await waitFor(() => git(p.clone, 'branch', '--show-current') === E1.branch);
+    fs.writeFileSync(path.join(p.state, 'STOP'), 'stop\n');
+    const state = await running;
+    assert.deepEqual([state.status, state.stoppedBecause, p.epic(E1.id).state], ['STOPPED', 'STOP file', 'QUEUED'], mode);
+    assert.ok(!fs.existsSync(path.join(p.state, 'gates')) || fs.readdirSync(path.join(p.state, 'gates')).length === 0, `${mode}: no question`);
+    assert.equal(git(p.clone, 'branch', '--list', E1.branch), '', `${mode}: the empty branch is gone`);
+    assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`${E1.id}: stopped by you during plan-1, before anything was built; no question is left, and it starts from the plan next time`));
+    // The next run plans it from the start.
+    p.scenario(happy(E1));
+    const before = p.calls().length;
+    await go(p);
+    assert.deepEqual(p.steps().slice(before), ['plan-1', 'build-1', 'audit-1', 'verify-1'].map((x) => `${E1.id}/${x}`), mode);
+    assert.equal(p.epic(E1.id).state, 'MERGED', mode);
+  }
+  // Planned again on the owner's decided answer: that answer belongs to its question, which stays.
+  const r = makeProject(t);
+  r.scenario({ [`${E1.id}/plan`]: planScript(E1, { omit: ['mark'] }) });
+  await go(r);
+  assert.equal(readJson(path.join(r.state, 'gates', `${E1.id}-1.json`)).kind, 'plan-lint');
+  assert.equal(spawnSync(process.execPath, [DRIVER, 'decide', '--workspace', r.state, '--gate', `gates/${E1.id}-1.json`, '--answer', 'Re-plan', '--by', 'Pat Owner'], { encoding: 'utf8' }).status, 0);
+  r.scenario({ [`${E1.id}/plan`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'hang' }] } });
+  const again = go(r);
+  await waitFor(() => r.epic(E1.id)?.step?.name === 'plan-1' && r.epic(E1.id).step.pid);
+  fs.writeFileSync(path.join(r.state, 'STOP'), 'stop\n');
+  await again;
+  assert.equal(r.epic(E1.id).state, 'PARKED', r.epic(E1.id).reason);
+  assert.deepEqual([readJson(path.join(r.state, 'gates', `${E1.id}-2.json`)).kind, readJson(path.join(r.state, 'gates', `${E1.id}-2.json`)).phase], ['resume', 'PLAN']);
+  // A plan session that committed on its branch has left work: the question stays.
+  const q = makeProject(t);
+  const earlier = 'stands for work an earlier session left on the branch; a planner may not write';
+  q.scenario({ [`${E1.id}/plan`]: { actions: [{ do: 'branch', name: E1.branch }, { do: 'write', path: 'notes.md', content: 'x\n', unchecked: earlier }, { do: 'commit', message: 'wip', unchecked: earlier }, { do: 'hang' }] } });
+  const running = go(q);
+  await waitFor(() => q.epic(E1.id)?.step?.name === 'plan-1' && git(q.clone, 'log', '-1', '--format=%s') === 'wip');
+  fs.writeFileSync(path.join(q.state, 'STOP'), 'stop\n');
+  await running;
+  assert.equal(q.epic(E1.id).state, 'PARKED');
+  assert.deepEqual([readJson(path.join(q.state, 'gates', `${E1.id}-1.json`)).kind, readJson(path.join(q.state, 'gates', `${E1.id}-1.json`)).phase], ['resume', 'PLAN']);
 });
 
 /**
@@ -899,9 +963,9 @@ test('gate dates are the machine\'s local date: west of UTC near midnight, the d
   assert.match(localDate(), /^\d{4}-\d{2}-\d{2}$/);
 });
 
-test('the scratch rule shows the one form the referee allows: "$AUTOPILOT_SCRATCH/…" as it is, not a copy or a relative path (Pilot Light)', () => {
+test('the scratch rule shows the forms the referee allows: "$AUTOPILOT_SCRATCH/…" as it is or a variable holding a file below it, not a copy or a relative path (Pilot Light)', () => {
   const rule = scratchRule('/w/runs/r/epics/x/build-1/scratch');
-  assert.match(rule, /In a command, use `"\$AUTOPILOT_SCRATCH\/out\.txt"` as it is \(the file tools take the folder above\); copying it into another variable \(`S="\$AUTOPILOT_SCRATCH"`\) or a path relative to the current folder \(`\.\/out\.txt`\) is refused, or lands in the repository\./);
+  assert.match(rule.replace(/\s+/g, ' '), /In a command, use `"\$AUTOPILOT_SCRATCH\/out\.txt"` as it is \(the file tools take the folder above\)\. A variable may hold a file below it \(`out="\$AUTOPILOT_SCRATCH\/out\.txt"`\); copying the folder itself into another variable \(`S="\$AUTOPILOT_SCRATCH"`\), cutting it down, or a path relative to the current folder \(`\.\/out\.txt`\) is refused, or lands in the repository\./);
 });
 
 test('a test that ends mid-session leaves no fake claude behind: only the fakes working in its own folder are killed', async (t) => {

@@ -214,9 +214,10 @@ function visibleWrites(s, ctx = null) {
  * nothing. Best effort, like the rest of this parsing: a heredoc's body is read as commands.
  */
 /**
- * A file below the scratch folder as the value of a one-command prefix (`CONTROL="$AUTOPILOT_SCRATCH/control.json" node a.js`):
- * the name lives for that command only, so nothing after it can cut it down. Seen live (Pilot Light, 2026-11-23). The folder
- * itself, a variable inside the value and a `..` still count as a copy.
+ * A file below the scratch folder as an assignment's value: as a one-command prefix (`CONTROL="$AUTOPILOT_SCRATCH/control.json"
+ * node a.js`, Pilot Light 2026-11-23) or on its own (`out="$AUTOPILOT_SCRATCH/step5-foo.txt"` in a loop, 2026-11-25). The
+ * folder itself, a variable inside the value and a `..` still count as a copy. A name that holds such a file is read as
+ * its value wherever the command uses it (`scratchNames`), so what it leads to is judged; a cut-down use is refused.
  */
 const FILE_IN_SCRATCH = /^(["']?)\$(?:\{AUTOPILOT_SCRATCH\}|AUTOPILOT_SCRATCH)\/(?!.*\.\.)[\w.@%+=,\/-]+\1$/;
 
@@ -240,19 +241,49 @@ export function shellAssignments(command) {
     if (/\s/.test(ch)) { i++; continue; }
     const m = atStart ? /^(?:(?:export|local|declare|readonly|typeset)(?:\s+-\w+)*\s+)?([A-Za-z_]\w*)=/.exec(command.slice(i)) : null;
     if (m) { const from = i + m[0].length; i = skipWord(from); const a = { name: m[1], value: command.slice(from, i), prefix: false }; out.push(a); run.push(a); continue; } // more may follow
+    const end = skipWord(i);
+    // A reserved word that opens a command list (`do`, `then`, `else`): what follows it on the line starts a command.
+    if (run.length === 0 && /^(do|then|else|elif|if|while|until|!|\{)$/.test(command.slice(i, end))) { i = end; continue; }
     for (const a of run) a.prefix = true; // a command word follows: they set the environment of that one command and nothing after it
     run = [];
-    i = skipWord(i);
+    i = end;
     atStart = false;
   }
   return out;
+}
+
+/**
+ * The command with each name that holds a file below the scratch folder (`out="$AUTOPILOT_SCRATCH/a.txt"`, on its own)
+ * read as that value where it is used (`$out`, `${out}`), so `"$out/../step.json"` is judged as the path it is. `cut` is
+ * set when such a name is used cut down or indirectly (`${out%/*}`, `${!out}`), copied into another name, or given a second
+ * value (an assignment, `read`, `for`, `printf -v`), which could lead anywhere.
+ */
+export function scratchNames(command) {
+  const all = shellAssignments(command);
+  const held = all.filter((a) => !a.prefix && FILE_IN_SCRATCH.test(a.value)); // a prefix's name ends with its one command
+  // Given another value in the same command, the name could lead anywhere after it: that counts as a copy.
+  let out = command; let cut = held.some((a) => all.filter((b) => b.name === a.name).length > 1);
+  for (const a of held) {
+    const use = `\\$(?:\\{[#!]?)?${a.name}(?!\\w)`;
+    // Copied into another name (`b=$out`), whose uses would then go unjudged: a copy.
+    if (all.some((b) => b !== a && new RegExp(use).test(b.value))) cut = true;
+    // Given a value some other way (`read out`, `for out in`, `printf -v out`, `mapfile out`): it could then hold anything.
+    if (new RegExp(`(?:\\bread\\b[^;&|\\n]*|\\bfor\\s+|\\bprintf\\s+-v\\s*|\\b(?:mapfile|readarray)\\b[^;&|\\n]*\\s)${a.name}(?!\\w)`).test(command)) cut = true;
+    if (new RegExp(`\\$\\{[#!]?${a.name}(?!\\w)(?!\\})`).test(out) || new RegExp(`\\$\\{[#!]${a.name}\\}`).test(out)) cut = true;
+    const value = a.value.replace(/^(["'])([\s\S]*)\1$/, '$2');
+    out = out.replace(new RegExp(`\\$\\{${a.name}\\}|\\$${a.name}(?!\\w)`, 'g'), () => value);
+  }
+  return { command: out, cut };
 }
 
 function ruleR2Bash(base, segs, command) {
   if (/\$\{?AUTOPILOT_(STATE|RUN|STEP|HOOKS)\b/.test(command)) return deny('R2', 'path jail — a command may not name the autopilot workspace');
   // The scratch folder is inside the workspace: its name is used as it is, never cut down (`${AUTOPILOT_SCRATCH%/scratch}`) or copied into another name, which would lead back into the workspace unseen.
   // Seen live: 11 of 18 refusals were the name printed (`echo "scratch=$AUTOPILOT_SCRATCH"`), an option or quoted code; only a real assignment is a copy.
-  if (/\$\{[#!]?AUTOPILOT_SCRATCH[^}]/.test(command) || shellAssignments(command).some((a) => /\$\{?AUTOPILOT_SCRATCH\b/.test(a.value) && !(a.prefix && FILE_IN_SCRATCH.test(a.value)))) return deny('R2', 'path jail — use "$AUTOPILOT_SCRATCH" as it is: do not copy it into a variable (`S=…`) or cut it down; write "$AUTOPILOT_SCRATCH/<file>" wherever you need it');
+  // A name holding a file below the folder is no copy: it is read as its value below, so every path it makes is judged.
+  const named = scratchNames(command);
+  if (named.command !== command) { command = named.command; segs = parseBash(command); }
+  if (named.cut || /\$\{[#!]?AUTOPILOT_SCRATCH[^}]/.test(command) || shellAssignments(command).some((a) => /\$\{?AUTOPILOT_SCRATCH\b/.test(a.value) && !FILE_IN_SCRATCH.test(a.value))) return deny('R2', 'path jail — use "$AUTOPILOT_SCRATCH" as it is: do not copy it into a variable (`S=…`) or cut it down; write "$AUTOPILOT_SCRATCH/<file>" wherever you need it');
   // The directory follows each `cd` through the command, so a later relative path (`cd tests/a/b && … ; cd ../../..`) is
   // judged from where the command then is, not from where it started (seen live: a way back to the clone root was refused).
   let ctx = base;
