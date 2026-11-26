@@ -418,8 +418,10 @@ The 2026-11-24 changes (Step 4):
   *Seen 2026-11-25, Pilot Light run `20261125-112902`: XRSSsTW audit-1 read 10 of 21 (thin),
   audit-2 read 21 of 21; 21 and 32 turns, $1.22 and $1.45 (`epics/XRSSsTW/audit-{1,2}/audit.json`).
   6bMNhpy's audit-1 in run `20261125-120140` was thin too (4 of 9).*
-- [ ] **Every review is told the changed code files by name** (built 2026-11-25 after the two thin
+- [x] **Every review is told the changed code files by name** (built 2026-11-25 after the two thin
   first reviews above; proof pending: a first review that reads at least half without a retry).
+  *Seen 2026-11-25, Pilot Light run `20261125-202319` (4lF6gDZ): audit-1 read 8 of 8 changed code
+  files in 40 s, no retry, $1.08 (`epics/4lF6gDZ/audit-1/audit.json`).*
 
 The 2026-11-25 changes (Steps 8 and 11, `448be29`), to see in a real run. The first three are
 closed on tests (owner, 2026-11-25); only the last needs a real run, since a real reviewer and a
@@ -448,8 +450,6 @@ rendered report offer the owner no by-hand path"; `resume.test.mjs`, "files left
 not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says none is the all-clear…".*
 
 **For the next real run** (model behaviour; one Pilot Light run covers them all):
-- Every review is told the changed code files by name: a first review reads at least half
-  without a retry (box above).
 - After an owner's "Amend": no `test-weakened` finding from the real reviewer (box above; the
   driver's part is tested in `resume.test.mjs`, "the reviewer judges the amended requirement…"
   and "the look gate names the amended requirement…").
@@ -833,7 +833,9 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   *Fixed 2026-11-25 (`feature/peak-workflow-autopilot-wording-proofs`), closed on a test (`driver.test.mjs`, '"Not proven for real": the
   build, repair and verify sessions are told the heading…', Full and Provisional): "CANNOT
   VERIFY" stays (other skills parse it); build and repair sessions also list such things under
-  "Not proven for real", and the verifier carries over what it did not prove itself.*
+  "Not proven for real", and the verifier carries over what it did not prove itself.* *Seen live
+  2026-11-25, Pilot Light run `20261125-202319`: the 4lF6gDZ build handoff has a "Not proven for
+  real" section of three items, each with what it was checked against.*
 - [ ] The build missed a console error the verifier later found (#40) (38).
 - [ ] Gate answers are dated in UTC (#40) (40). *Built 2026-11-25. Live: `XRSSsTW-1` decided
   2026-11-25 at 12:01 EST, which UTC gives the same day; only an answer after 19:00 EST tells
