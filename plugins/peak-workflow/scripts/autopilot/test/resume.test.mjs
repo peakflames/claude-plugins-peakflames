@@ -2514,7 +2514,8 @@ test('usageLimit reads the limit from what the session sent; anything else is no
   assert.equal(usageLimit({ subtype: 'success', is_error: true, api_error_status: 529, api_error: 'overloaded_error' }, null), null, 'an overloaded service is a technical error, not the owner\'s limit');
   assert.equal(usageLimit(null, null), null);
   // While the driver waits, `status` says so instead of naming the step it was on.
-  assert.match(activity({ limitWait: { until: new Date(Date.now() + 3600000).toISOString() }, queue: [{ id: 'x', state: 'BUILD', step: null }] }), /^waiting for your usage limit to reset \(it carries on at \d{1,2}:\d{2} [AP]M\)$/);
+  // An hour from now can be tomorrow (run near midnight): then the day is named too.
+  assert.match(activity({ limitWait: { until: new Date(Date.now() + 3600000).toISOString() }, queue: [{ id: 'x', state: 'BUILD', step: null }] }), /^waiting for your usage limit to reset \(it carries on at (?:[A-Z][a-z]+day )?\d{1,2}:\d{2} [AP]M\)$/);
 });
 
 test('limitDecision: wait until the reset, or stop when it is too far off, after the end time, or reached again too often', () => {

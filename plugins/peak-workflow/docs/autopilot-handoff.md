@@ -813,6 +813,11 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   (*no issue*; Pilot Light, `build-1/hooks.jsonl` line 57). *Not reproduced 2026-11-25: the one
   such line ("Repeat full suite with probe…", `20261125-120140` KxkwogG verify-1) came 3 min into a command
   that ended a minute later: correct. The failed-command case is still unseen.*
+- [ ] The final check is told the owner's look named `runs/<run>/epics/<id>/artifacts/…` (the
+  look gate's `artifacts`), a path inside the workspace that the referee refuses; seen once
+  (Pilot Light run `20261125-233511`, 4lF6gDZ verify-1, `ls` of that folder refused). It cost
+  nothing. Either leave workspace paths out of `ownerLook`'s "What they looked at" or copy the
+  files where the verifier may read them (*no issue*). C3.
 - [ ] A look with 25 pictures and no operator-observed requirement is one yes for the whole
   set; nothing lists what to check (*no issue*; Pilot Light). Maybe as intended.
 - [x] The referee refused "$AUTOPILOT_SCRATCH" used in a cut-down form four times in one epic,
@@ -835,7 +840,9 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   VERIFY" stays (other skills parse it); build and repair sessions also list such things under
   "Not proven for real", and the verifier carries over what it did not prove itself.* *Seen live
   2026-11-25, Pilot Light run `20261125-202319`: the 4lF6gDZ build handoff has a "Not proven for
-  real" section of three items, each with what it was checked against.*
+  real" section of three items, each with what it was checked against; the relaunch's final
+  check (`20261125-233511`) carried the two it did not prove itself into its report, and both
+  reached the owner's closing screen.*
 - [ ] The build missed a console error the verifier later found (#40) (38).
 - [ ] Gate answers are dated in UTC (#40) (40). *Built 2026-11-25. Live: `XRSSsTW-1` decided
   2026-11-25 at 12:01 EST, which UTC gives the same day; only an answer after 19:00 EST tells
