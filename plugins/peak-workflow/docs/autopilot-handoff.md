@@ -12,8 +12,8 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
   pushed for $6.91. Live proofs from it are ticked under Step 6 and Step 13.
 - **The first real queue finished.** On the PeakMedia project all queued epics are merged and
   fetched into the owner's local `develop` (not pushed there). No autopilot run is going.
-- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-26, after the beta fixes,
-  `feature/peak-workflow-autopilot-beta-fixes`): 373, of which 359 pass, none fails and 14
+- **The plugin** is at `[3.1.0] — UNDER DEVELOPMENT`. Tests (2026-11-26, after the beta guards,
+  `feature/peak-workflow-autopilot-beta-guards`): 378, of which 364 pass, none fails and 14
   are skipped (the skipped ones need the real `claude`: `AUTOPILOT_LIVE=1`), lab suite 10 pass. The helper's tests (`tests/peak-workflow/`,
   Python 3.11+): 269, 2 fail in `test_wrapper.py` on the owner's machine on the unchanged
   base as well (cause not looked for).
@@ -53,7 +53,7 @@ did not give to the gate's own question is `resumed.unasked` and never counts as
 
 The review of I6a left six problems unfixed, and #41 still has B3, B6–B8, I1, I3–I5, I7 and
 I6c open (I6c is **#42**: only the wording changed, "it needs someone who maintains the
-code"). What is still open is the beta backlog above; the rest was cut (owner, 2026-11-26).
+code"). The beta backlog above is done; the rest was cut (owner, 2026-11-26).
 
 **The reporter's follow-up (2026-11-21, #41 comments and #43).** New items B10–B16 and I8, B3
 seen again, and two Windows fixes he carries locally that this branch lacks; his patches were
@@ -110,9 +110,9 @@ them; the state is here. The rule:
 
 | Issue | What it tracks | State (2026-11-26) |
 |---|---|---|
-| #41 | The Windows alpha owner's feedback | **Open, Windows run results only** (beta backlog) |
+| #41 | The Windows alpha owner's feedback | **Open, Windows run results only** (the launch note is in) |
 | #42 | Autopilot repairs a red base or a preflight refusal itself | Open, after beta |
-| #46 | Windows field report, 5-epic chain | Closed: items 2, 6 fixed; 1 likely fixed by `b7c2d14`; 11 answered; 9 checked in the beta backlog; rest monitored |
+| #46 | Windows field report, 5-epic chain | Closed: items 2, 6 fixed; 1 likely fixed by `b7c2d14`; 11 answered; 9 fixed (`470576f`); rest monitored |
 | #40 | Smaller findings from the first real queue | Closed: rest monitored |
 | #37 | An attending session keeps stale skill text | Closed: monitored |
 | #35, #36, #38, #39, #43 | | Closed earlier |
@@ -181,27 +181,28 @@ matter more under it, since a provisional run is the one nobody watches. Groups,
   Note: the base check before each epic already stops a run whose test command is red on the base,
   so the `pre-existing` question mostly meets other gates (lint, types) and flaky tests.
 
-**Beta backlog (owner, 2026-11-26): the whole open list.** Everything else once open here was cut
+**Beta backlog (owner, 2026-11-26): done 2026-11-26** (`feature/peak-workflow-autopilot-beta-guards`,
+`470576f`, merged into the PoC branch). Nothing else is open for beta. Everything once open here was cut
 on the owner's word: nits and corner cases from issue posts and code reviews. Do not re-add one
 unless it could corrupt data or merge something wrong, and ask the owner first.
-- [x] **Check: a stash left in the clone** (#46 item 9). Fixed in `470576f` (`feature/peak-workflow-autopilot-beta-guards`): our set-aside never leaves one, so a session made it; a session's stash now moves to `refs/autopilot/leftover/`, `git stash drop`/`clear` are refused, and a park off the epic branch sets files aside. A park left `stash@{0}` on the clone's
-  integration line for days. Find whether the B15 set-aside (`setAside`) made this impossible;
-  if not, uncommitted build work can be stranded.
-- [x] **Check: a session writing into the workspace** — gates guarded in `470576f`: any session change to its epic's gate files beyond the referee's own is put back and parks the epic for the owner. Other run-state files (`state.json`, `epics.json`) are not checked. through a path it builds (`D=$PWD/..`,
-  `$(dirname "$AUTOPILOT_SCRATCH/x")`). The Bash path check is best effort; a write there could
-  overwrite run state (gates, status).
-- [x] **The credential check compares names by case** — fixed in `470576f` (`within()` folds case on macOS and Windows).: `cat ~/.SSH/id_rsa` passes with the sandbox
-  off on macOS.
-- [x] **Windows** (note in `470576f`, `windowsWarning`): tell beta testers plainly that Windows is unproven, and what to send back (the
-  run report and the run's `hooks.jsonl`). Keep tracking the Windows run results on #41 (36
-  driver tests fail there before any change, #41 B8).
+- [x] **A stash left in the clone** (#46 item 9). Our set-aside never leaves one, so a session made it.
+  A session's stash now moves to `refs/autopilot/leftover/` and the report names it; `git stash
+  drop`/`clear` are refused; a park off the epic branch sets uncommitted files aside.
+- [x] **A session writing into the workspace.** Any session change to its own epic's gate files,
+  beyond the referee's two writes, is put back (new files to `gates/.tampered/`), the step undone,
+  and the epic parked as the owner's question. Not checked: `state.json`, `epics.json`.
+- [x] **The credential check compares names by case.** `within()` in the hook folds case on macOS
+  and Windows; `cat ~/.SSH/id_rsa` is refused.
+- [x] **Windows.** The launch screen says Windows is unproven and to send the run report and
+  `hooks.jsonl` (`windowsWarning`). Keep tracking the Windows run results on #41 (36 driver tests
+  fail there before any change, #41 B8).
 
 After beta: #42, autopilot repairs a red base or a preflight refusal itself (the merge-conflict
 part is done, Step 3).
 
 ## Done work, by step (history)
 
-Every box below is ticked; the open list is the beta backlog above. Was: work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
+Every box below is ticked, and so is the beta backlog above. Was: work the steps top to bottom. Tick a box when the item is fixed and tested; a step is done when
 all its boxes are ticked. Order and criticality were agreed with the owner on 2026-11-21 and
 reordered the same day after the Windows owner's real runs (#41 comments, #43).
 
@@ -880,7 +881,7 @@ change-record notes).
 ### Before handing a run to the beta tester
 
 Done: the false referee refusals, the usage-limit wait, verifier notes, the stricter test
-guard; the short review (Step 4). The Windows note is in the beta backlog. The rename to
+guard; the short review (Step 4). The Windows note is in (`470576f`). The rename to
 Provisional is built (2026-11-24, `c166b80`): new runs write `mode: "provisional"` and
 `approved_by = "autopilot (provisional run)"`; the old `"prototype"` values in configs, events and
 project change records still read as provisional. Stored field names (`decided.prototype`,
