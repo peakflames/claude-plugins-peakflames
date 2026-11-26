@@ -117,11 +117,11 @@ them; the state is here. The rule:
 | #35 | A failed merge check throws away the verifier's work, or parks with no question | Step 3 | 0 / 2 |
 | #36 | The run budget is not enforced inside a step | Step 9 | 0 / 1 (closed, not to be done) |
 | #37 | An attending session keeps stale skill text | Step 5 | 1 / 1 |
-| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | 0 of the 2026-11-14 and 2026-11-21 boxes (closed on tests 2026-11-25); Step 6's two later boxes need a real run |
-| #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 12 / 13 |
+| #39 | Prove the 2026-11-14 and 2026-11-21 changes in a real run | Step 6 | closed 2026-11-26; the one box left (a real reviewer after an "Amend") is #41 B12 |
+| #40 | Smaller findings from the first real queue | Steps 8, 10, 12, 13, 14 | 5 open: items 38, 40, 41, 23 and the SKILL.md size (2026-11-26) |
 | #41 | The Windows alpha owner's feedback (B and I numbers) | "Alpha feedback", steps 1–13 | see the boxes naming #41 |
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1 |
-| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 0 / 1 (built 2026-11-25; waits for the reporter's re-run of the Wayframe epic) |
+| #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | 0 / 1 (built 2026-11-25; a real run used one: `shadcn` read in Pilot Light `20261125-202319`; closes on the reporter's Wayframe re-run, #41 item 3) |
 | #46 | Windows field report: a 5-epic chain, $179.80, 11 items | not yet | not triaged: the owner set it aside on 2026-11-25 ("enough to deal with") |
 
 Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
