@@ -46,14 +46,10 @@ the fake `claude`. The reporter confirmed B1, B4 and I2 (owner away) in a real r
 | I6a | Autopilot answers technical stops itself: one rule, `standingAnswer` (`lib.mjs`), one count per epic (`autoContinue`). Covers `resume` gates marked `technical`, `plan-lint` (re-plan) and `audit` findings (repaired; never `never-ran-real`). Past the count: `atLimitAsk`, "Try again" / "Leave it for now" |
 | I6b | No by-hand path in anything the owner reads: the report, gate `why` text, `SKILL.md`. A gate's `resume` line and `report.json`'s `fetch` stay as records |
 
-**Risk the owner accepted with I6a (decision 4, 2026-11-21).** A fix the final check makes to
-the product itself, or one over the small-fix size, now merges on autopilot's own answer:
-nobody but that same final check judges it. Two refusals still hold and have tests: a change
-to a requirement file, and a test that loses checks (`checkVerify`, `autoFix`). The second is
-a heuristic: test-named files in the listed test directories, net loss of assert/test lines.
-Every such fix is listed for the owner (`status.fixes` with `auto`, and the report); keep
-that list complete. An answer the owner did not give to the gate's own question (autopilot's,
-or "Try again") is `resumed.unasked` and never counts as their approval of a fix.
+I6a's design rules: a fix to a requirement file and a test that loses checks are still refused
+(`checkVerify`, `autoFix`); every fix autopilot allows itself is listed for the owner
+(`status.fixes` with `auto`, and the report), so keep that list complete; an answer the owner
+did not give to the gate's own question is `resumed.unasked` and never counts as their approval.
 
 The review of I6a left six problems unfixed, and #41 still has B3, B6–B8, I1, I3–I5, I7 and
 I6c open (I6c is **#42**: only the wording changed, "it needs someone who maintains the
@@ -123,6 +119,22 @@ them; the state is here. The rule:
 | #42 | Autopilot repairs a red base, a refusal or a conflict itself | Step 8 | 1 / 1; after beta (owner, 2026-11-26). For beta the base-red stop only names the failing tests |
 | #43 | Sessions cannot use MCP connectors, and nothing says so | Step 10 | closed 2026-11-26: connectors named at readiness, a `shadcn` read in Pilot Light `20261125-202319`, a Gmail send refused in a real session |
 | #46 | Windows field report: a 5-epic chain, $179.80, 11 items | beta fixes | items 2 and 6 fixed 2026-11-26 (`feature/peak-workflow-autopilot-beta-fixes`); the rest not triaged |
+
+### Settled by the owner: not backlog, do not raise again
+
+The owner accepted these risks. They are not open items, not beta blockers, and not to be listed
+in a backlog or risk review again; reopen one only if the owner asks.
+
+- A fix the final check makes to the product, or one over the small-fix size, merges on
+  autopilot's own answer (I6a, decision 4, 2026-11-21).
+- A changed expected value of the same kind (`toBe(3)` → `toBe(4)`) merges unasked: the
+  test-weakening guard counts checks (2026-11-24).
+- Connectors: a session can click, with the owner's sign-ins, on a sign-in page or a page a link
+  led to (listed in the report); "read-only" is judged by the tool name's action word, and the
+  page-script check is a word list (2026-11-25).
+- The fake `claude`'s remaining differences from the real one are fixed only when a live test
+  shows them (2026-11-21).
+- A step may finish slightly past the run budget (#36, 2026-11-25).
 
 Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
 2026-11-24. Not autopilot, so not in this file: #44 (port the requirements checker to Node).
@@ -263,11 +275,6 @@ Why this order:
     workspace, 3 did on purpose what the referee refuses, to test the driver's check behind
     it, and 2 edited an existing test before recording the reason. The suite takes about 6.5
     minutes instead of 5.
-  - **Open: differences the fake still has** (owner's decision: fix only what the live tests
-    show). It accepts any flag, a flag given twice, and `--resume` of a session that never
-    existed. It enforces no turn or money limit. A resumed session's cost is not the two
-    sessions added up. The shared build script switches to the epic branch itself, which hid
-    B14. Its `Edit` and `Write` calls carry no real `old_string`.
 - [x] **The referee's guards** (*no issue*; owner's decisions of 2026-11-21). The referee has
   two jobs: plumbing autopilot cannot run without (questions R8, the plan R9, the STOP file R1)
   and guards. The guards were reviewed because two refused ordinary work.
@@ -344,8 +351,7 @@ Why this order:
   a swallowing `catch`, Go/Swift/Rust checks removed, Rust/unittest/NUnit skips, a test renamed out
   of the test directories ("deletes a test"), a test-named file outside them, and a rewritten
   existing fixture or expected output. Tested against the fake (`test/weakening.test.mjs`,
-  `test/resume.test.mjs`); not seen in a real run. Known, accepted: a changed expected value of the
-  same kind (`toBe(3)` → `toBe(4)`) still merges unasked.
+  `test/resume.test.mjs`); not seen in a real run.
 - [x] **The final check saw a defect and passed it without a word** (*no issue*; Pilot Light,
   run `20261122-090420`). The verifier noted that the "Page not found" picture carries the
   wrong text, did not fix it and did not park; the epic merged. What the verifier notes and
@@ -600,14 +606,10 @@ not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says no
   write in it refused; connector path arguments go through the path jail; a first word naming
   the server is skipped (`slack_search_public`); sign-in codes are scrubbed from `hooks.jsonl`.
 
-  **Connectors: what is left open (residual risk, said to the owner).** On a sign-in page or a
-  page a link led to, a session can still click, with the owner's sign-ins; every such page is
-  listed in the report and on the closing screen. "Read-only" for accounts is judged by the
-  action word in the tool's name; a connector with a misleading name could slip through (an
-  unknown word is refused). The page-script check is a word list. A session could add an MCP
-  server of its own to the clone's `.mcp.json`, and any localhost port counts as the app's:
-  neither gives more than Bash already has. `claude mcp list`'s "Connected" is a health
-  check: a session may still find a connector needs a sign-in.
+  The connector risks the owner accepted are under "Settled by the owner". Not risks: a
+  session's own MCP server in the clone's `.mcp.json`, or a localhost port counted as the app's,
+  gives no more than Bash already has; `claude mcp list`'s "Connected" is a health check, so a
+  session may still find a connector needs a sign-in.
 - [x] **The undecided-values check parks every epic** (#41, the reporter's comment of
   2026-11-22; not examined). A `TBD — set by the walking-skeleton epic` value or a
   `**Not decided yet:**` line that lists a layer parks every queued epic (`driver.mjs`, `tbd`).
@@ -963,9 +965,6 @@ change-record notes).
 
 ### Known, not fixed
 
-- **A changed expected value still merges unasked**: the test-weakening guard counts checks, so a
-  fix on the standing answer that swaps `toBe(3)` for `toBe(4)` is not asked (owner's decision,
-  2026-11-24, Step 4).
 - **A swallowed promise is not seen as a hidden check**: `await run().catch(() => {})` in a test is
   not flagged; the same form is common in cleanup (review of Step 4 box 1).
 - `attend.test.mjs` "watch and status see inside the step … each said once" failed (expected 2,
