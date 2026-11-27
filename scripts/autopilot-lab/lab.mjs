@@ -201,7 +201,8 @@ function runOracle(ctx, merged) {
   try {
     const tar = spawnSync('git', ['archive', ctx.report.integration], { cwd: ctx.clone, maxBuffer: 256 * 1024 * 1024 });
     if (tar.status !== 0) throw new Error(`git archive failed: ${tar.stderr}`);
-    const x = spawnSync('tar', ['-x', '-C', tmp], { input: tar.stdout });
+    // Run in the folder rather than `-C <folder>`: GNU tar (Git Bash on Windows) reads `C:\…` as a remote host.
+    const x = spawnSync('tar', ['-x'], { cwd: tmp, input: tar.stdout });
     if (x.status !== 0) throw new Error(`tar failed: ${x.stderr}`);
     return files.map((file) => {
       const epic = file.split('.')[0];

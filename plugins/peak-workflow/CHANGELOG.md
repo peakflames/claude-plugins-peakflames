@@ -283,6 +283,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **No console-window flood on Windows** (#41) — sessions are no longer started detached there: a detached process has no console, so every command it ran opened a window of its own (hundreds in one test run). Every spawn also hides its window.
+- **A session is really stopped on Windows** — a timed-out, over-budget or leftover session is stopped with its whole process tree (`taskkill /T`); the process-group kill used elsewhere did nothing there.
+- **Project commands run by `sh` on Windows** — the tests, build and `setup` ran under `cmd.exe`; they now run in Git Bash, as on macOS, so `;`, `>&2` and `$VAR` work and a missing command reads as "could not run".
+- **The referee reads Git Bash paths on Windows** (#41) — `/c/…` is judged as `C:\…` and `/tmp/…` as the temp folder (a write to `/tmp` was refused), and a drive path in a command, `C:/…/.ssh` included, is checked like any other.
+- **Short and long Windows paths match** (#41 B8) — `C:\Users\TODDSC~1` and `C:\Users\Todd Schavey` are one folder: path checks use the native real path, so a project or temp folder under a user name with a space is recognised.
+- **Leftover processes are found on Windows** — `ps -o` and `lsof` do not exist there; a process whose program or command line names the clone is stopped. One started by a relative path only is not seen.
+- **`CLAUDE.md` file names on Windows** — a quoted path, a backtick span that is one path (spaces allowed) and a Git Bash path (`/c/…`) are recognised.
+- **Plugin files stay LF on Windows** — `.gitattributes` pins LF for peak-workflow and its tests, so a checkout with `core.autocrlf=true` (Git for Windows' default) reads skill text and fixtures as macOS does.
+- **`tor-lifecycle` reads a CRLF blob like the file** — text read from git history gets the same newlines as the working file.
+- **The test suites run on Windows** (#41 B8) — driver 381 tests, lab 10, helper 277; the wrapper's shell-script interpreters are skipped there. A Windows-only test covers stray processes by command line.
 - **A stash a session leaves is kept, never hidden** (#46) — it moves to `refs/autopilot/leftover/` and the report names it; sessions may not `git stash drop` or `clear`. Work left uncommitted off the epic branch at a park is set aside, not left on the integration line.
 - **A session cannot fake the owner's answer** — any change a session makes to its epic's gate files, beyond the referee's own writes, is put back (new files go to `gates/.tampered/`), the step is undone, and the epic parks as the owner's question.
 - **The credential check ignores case on macOS and Windows** — `~/.SSH/id_rsa` and `~/.CLAUDE` are refused like their lower-case names.

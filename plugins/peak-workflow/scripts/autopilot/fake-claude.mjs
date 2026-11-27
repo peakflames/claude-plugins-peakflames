@@ -76,7 +76,7 @@ const sessionId = flag('--session-id') ?? 'fake-session';
 const started = Date.now();
 
 const emit = (o) => process.stdout.write(JSON.stringify(o) + '\n');
-const git = (...args) => execFileSync('git', args, { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }).trim();
+const git = (...args) => execFileSync('git', args, { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', windowsHide: true }).trim();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function fill(v) {
@@ -105,7 +105,7 @@ const branchExists = (name) => { try { git('rev-parse', '--verify', '-q', `refs/
 function referee(tool_name, tool_input = {}, { quiet = false } = {}) {
   const hook = settings ? JSON.parse(fs.readFileSync(settings, 'utf8')).hooks?.PreToolUse?.[0]?.hooks?.[0]?.command : null;
   if (!hook) return true; // launched without the referee's settings: nothing to ask
-  const r = spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PreToolUse', permission_mode: flag('--permission-mode'), tool_name, tool_input, tool_use_id: (lastUseId = `toolu_${toolCalls++}`) }) });
+  const r = spawnSync('sh', ['-c', hook], { encoding: 'utf8', windowsHide: true, input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PreToolUse', permission_mode: flag('--permission-mode'), tool_name, tool_input, tool_use_id: (lastUseId = `toolu_${toolCalls++}`) }) });
   let out = null; try { out = r.stdout ? JSON.parse(r.stdout) : null; } catch { /* not JSON: no decision, as Claude Code reads it */ }
   if (!quiet) fs.appendFileSync(path.join(stepDir, 'fake-tools.jsonl'), JSON.stringify({ tool_name, exit: r.status, out }) + '\n');
   const deny = out?.hookSpecificOutput?.permissionDecision === 'deny';
@@ -118,7 +118,7 @@ function referee(tool_name, tool_input = {}, { quiet = false } = {}) {
 function logged(tool_name, tool_input = {}, tool_response = undefined) {
   if (kind !== 'audit' && tool_response === undefined) return;
   const hook = settings ? JSON.parse(fs.readFileSync(settings, 'utf8')).hooks?.PostToolUse?.[0]?.hooks?.[0]?.command : null;
-  if (hook) spawnSync('sh', ['-c', hook], { encoding: 'utf8', input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PostToolUse', tool_name, tool_input, tool_response: tool_response ?? { type: 'text' }, tool_use_id: lastUseId }) }); // the id of the call the referee just allowed, as Claude Code pairs them
+  if (hook) spawnSync('sh', ['-c', hook], { encoding: 'utf8', windowsHide: true, input: JSON.stringify({ session_id: sessionId, cwd: process.cwd(), hook_event_name: 'PostToolUse', tool_name, tool_input, tool_response: tool_response ?? { type: 'text' }, tool_use_id: lastUseId }) }); // the id of the call the referee just allowed, as Claude Code pairs them
 }
 
 /** The tool call a real session would make for a scripted action, or null for an action that makes none. */
@@ -172,7 +172,7 @@ async function act(a) {
     }
     case 'commit': git('add', '-A'); git('commit', '-q', '--allow-empty', '-m', a.message); break;
     case 'merge': git('merge', '-q', '--no-ff', a.branch, '-m', a.message ?? `Merge branch '${a.branch}'`); break;
-    case 'exec': execSync(a.cmd, { stdio: ['ignore', 'ignore', 'inherit'] }); break;
+    case 'exec': execSync(a.cmd, { stdio: ['ignore', 'ignore', 'inherit'], windowsHide: true, ...(process.platform === 'win32' ? { shell: 'sh' } : {}) }); break;
     case 'plan': fs.writeFileSync(path.join(stepDir, 'plan.md'), a.text); break;
     case 'gate': {
       const dir = path.join(state, 'gates');

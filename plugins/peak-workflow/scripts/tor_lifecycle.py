@@ -306,7 +306,9 @@ def read_blobs(root: Path, specs: list[str]) -> list[str | None]:
             pos += int(header[2]) + 1
             continue
         size = int(header[2])
-        out.append(data[pos:pos + size].decode("utf-8", "replace"))
+        # Newlines as a file read from disk gives them (universal newlines): a blob committed with CRLF, from Windows,
+        # reads the same as the working file.
+        out.append(data[pos:pos + size].decode("utf-8", "replace").replace("\r\n", "\n"))
         pos += size + 1
     return out
 

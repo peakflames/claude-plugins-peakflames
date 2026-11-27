@@ -8,7 +8,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR, defaultConfig, localDate, scratchRule, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
 import { estimateCost, failingTests } from '../lib.mjs';
-import { DRIVER, E1, FAKE, SEED, addEpic, alive, killFakes, buildActions, buildScript, git, happy, makeProject, planScript, planText, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
+import { DRIVER, E1, FAKE, SEED, addEpic, alive, killFakes, buildActions, buildScript, git, happy, makeProject, planScript, planText, quick, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
 const go = (p, opts = {}) => p.go(opts);
 
@@ -127,7 +127,7 @@ test('events: a happy run writes one line per milestone, in order, and each read
   const label = `${E1.id} (${E1.slug}) — CSV import`;
   assert.deepEqual(events.filter((e) => e.epic).map((e) => [e.epic, e.label]).at(0), [E1.id, label]);
   assert.deepEqual([events.at(-1).why, events.at(-1).spentUsd], ['queue done', 2.01]);
-  const lines = events.map(eventLine);
+  const lines = events.map(eventLine).map(quick);
   assert.deepEqual(lines.filter((l) => !/finished in/.test(l)), [
     'Autopilot started: 1 epic queued.', `Starting ${E1.id} — CSV import`, `Planning ${E1.id} — CSV import`, `Building ${E1.id} — CSV import`,
     "Autopilot's checks on the build passed", `Reviewing ${E1.id} — CSV import`, 'The independent reviewer found nothing', `Verifying ${E1.id} — CSV import`,
@@ -526,7 +526,11 @@ test('kill -9 of the driver mid-VERIFY, then --resume: leftovers killed, verify 
   await waitFor(() => fs.existsSync(path.join(p.clone, 'docs', 'half-written.md')));
   child.kill('SIGKILL');
   await exited;
-  assert.equal(alive(sessionPid), true, 'the session outlives the driver (own process group)');
+  // macOS and Linux: the session is in its own process group and outlives the driver; resume kills it. Windows: Node
+  // keeps a child that is not detached in a job that ends with the driver, so the session goes with it.
+  const WIN = process.platform === 'win32';
+  if (!WIN) assert.equal(alive(sessionPid), true, 'the session outlives the driver (own process group)');
+  else await waitFor(() => !alive(sessionPid), { timeoutMs: 5000 });
   assert.equal(p.epic(E1.id).state, 'VERIFY');
 
   await assert.rejects(go(p), /did not finish .*pass --resume/);
@@ -537,7 +541,7 @@ test('kill -9 of the driver mid-VERIFY, then --resume: leftovers killed, verify 
   assert.equal(p.epic(E1.id).state, 'MERGED');
   assert.deepEqual(p.steps().slice(3), [`${E1.id}/verify-1`, `${E1.id}/verify-2`]);
   assert.ok(!git(p.clone, 'ls-tree', '-r', '--name-only', 'develop').includes('half-written.md'));
-  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /stale lock taken over[\s\S]*killed leftover session verify-1[\s\S]*re-entering at VERIFY/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), WIN ? /stale lock taken over[\s\S]*re-entering at VERIFY/ : /stale lock taken over[\s\S]*killed leftover session verify-1[\s\S]*re-entering at VERIFY/);
 });
 
 test('kill -9 mid-VERIFY after the merge landed, then --resume: the merge gate decides, no second verify', async (t) => {
@@ -583,7 +587,9 @@ test('dry run prints the queue, commands, settings and policy, and invokes and w
 
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /1\. Lg1Csv7 \(csv-import\) — CSV import {3}deps: — {3}branch: feature\/epic-Lg1Csv7-csv-import {3}\[eligible\]/);
-  assert.ok(r.stdout.includes(`$ ${FAKE} -p --input-format stream-json --output-format stream-json --verbose --permission-prompt-tool stdio --include-hook-events --plugin-dir ${PLUGIN_DIR} --settings '${p.state}/runs/<run>/epics/Lg1Csv7/plan-1/settings.json' --permission-mode acceptEdits`));
+  // Quoted and joined as the driver prints it on this system (on Windows: backslashes, so every path is quoted).
+  const q = (s) => (/^[A-Za-z0-9_\-.,/:=@%+]+$/.test(s) ? s : `'${s}'`);
+  assert.ok(r.stdout.includes(`$ ${q(FAKE)} -p --input-format stream-json --output-format stream-json --verbose --permission-prompt-tool stdio --include-hook-events --plugin-dir ${q(PLUGIN_DIR)} --settings '${path.join(p.state, 'runs', '<run>', 'epics', 'Lg1Csv7', 'plan-1', 'settings.json')}' --permission-mode acceptEdits`));
   assert.ok(r.stdout.includes('"text":"/peak-workflow:start-epic Lg1Csv7"'));
   assert.ok(r.stdout.includes('"text":"/peak-workflow:wrapup-epic Lg1Csv7"'));
   assert.match(r.stdout, /--max-turns 150 --max-budget-usd 10 --session-id '<uuid>' --model opus --effort medium/);
@@ -982,14 +988,17 @@ test('the scratch rule shows the forms the referee allows: "$AUTOPILOT_SCRATCH/�
 });
 
 test('a test that ends mid-session leaves no fake claude behind: only the fakes working in its own folder are killed', async (t) => {
-  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-fakes-')));
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-fakes-')));
   const mine = path.join(tmp, 'mine'); const other = path.join(tmp, 'other');
   fs.mkdirSync(mine); fs.mkdirSync(other);
   // Stand-ins for a fake session that hangs: a process whose command line names the fake, working in a folder.
-  const start = (cwd) => spawn(process.execPath, ['-e', 'setInterval(() => {}, 1 << 30)', FAKE], { cwd, stdio: 'ignore' });
+  // The folder is named on the command line too: Windows tells a fake's folder only from there (killFakes).
+  const start = (cwd) => spawn(process.execPath, ['-e', 'setInterval(() => {}, 1 << 30)', FAKE, cwd], { cwd, stdio: 'ignore' });
   const a = start(mine); const b = start(other);
+  // Killed before the folder goes: Windows will not remove a folder a running process works in, and a throwing
+  // first hook would leave both running, holding this test file open for good.
   t.after(() => { for (const c of [a, b]) if (alive(c.pid)) c.kill('SIGKILL'); });
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10 }));
   await new Promise((r) => setTimeout(r, 300));
   assert.ok(alive(a.pid) && alive(b.pid));
   assert.deepEqual(killFakes(mine), [a.pid]);

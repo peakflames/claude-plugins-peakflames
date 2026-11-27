@@ -8,11 +8,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR, localDate } from '../driver.mjs';
 import { offeredLabel } from '../hooks/pretool.mjs';
-import { isTestPath, standingAnswer, testNamed, testNamedDirs } from '../lib.mjs';
+import { fromBash, isTestPath, standingAnswer, testNamed, testNamedDirs } from '../lib.mjs';
 import { E1, git, makeProject, planText, readJson } from './helpers.mjs';
 
 const HOOKS = path.join(PLUGIN_DIR, 'scripts', 'autopilot', 'hooks');
-const UID = process.getuid();
+const UID = typeof process.getuid === 'function' ? process.getuid() : 0; // Windows has no uid: the referee uses 0 too
 const Q_START = `Start Epic ${E1.id} (${E1.slug}) — CSV import? Phase 1 — Core, planned by Todd Schavey on 2026-11-11`;
 const START_OPTS = ['Start it', 'Show me the ready epics instead', 'Stop'];
 
@@ -40,6 +40,9 @@ function referee(t, { role = 'builder', branch = E1.branch, config = {}, sandbox
   return { ...p, runDir, step, scratch, run, pre, bash, ask, hooksLog, gate: (n) => readJson(path.join(p.state, 'gates', `${E1.id}-${n}.json`)) };
 }
 
+// A path written into a Bash command the way a session writes it: on Windows in Git Bash's form (/c/Users/…), and
+// quoted, because a temp path there can hold a space. Unchanged elsewhere, apart from the quotes.
+const bp = (p) => (process.platform === 'win32' ? p.replace(/^([A-Za-z]):/, (_, d) => '/' + d.toLowerCase()).split('\\').join('/') : p);
 const passes = (r, msg) => { assert.equal(r.code, 0, msg); assert.equal(r.out, null, `${msg}: expected no opinion, got ${JSON.stringify(r.out)}`); };
 function denied(r, rule, re, msg) {
   assert.equal(r.code, 0, msg);
@@ -97,7 +100,7 @@ test('R2 scratch folder: a session writes temporary files in its step\'s scratch
     passes(h.pre('Write', { file_path: path.join(h.scratch, 'chk.json'), content: '{}' }), `write, sandbox ${sandbox}`);
     passes(h.pre('Read', { file_path: path.join(h.scratch, 'chk.json') }), 'read');
     passes(h.bash('node --test > "$AUTOPILOT_SCRATCH/out.txt" 2>&1'), 'redirect by name');
-    passes(h.bash(`mkdir -p ${h.scratch}/probe && cp src/index.js ${h.scratch}/probe/`), 'absolute path');
+    passes(h.bash(`mkdir -p "${bp(h.scratch)}/probe" && cp src/index.js "${bp(h.scratch)}/probe/"`), 'absolute path');
     passes(h.bash('cd "$AUTOPILOT_SCRATCH" && ls'), 'cd');
     // Nothing else in the workspace opens with it, by name or by climbing out.
     denied(h.pre('Write', { file_path: path.join(h.step, 'hooks.jsonl'), content: 'x' }), 'R2', /autopilot workspace/);
@@ -192,7 +195,7 @@ test('R2 scratch folder: a resumed session may keep using the scratch folder of 
   fs.mkdirSync(earlier, { recursive: true });
   passes(h.pre('Write', { file_path: path.join(earlier, 'zz-look.spec.ts'), content: 'x' }), 'write in an earlier step\'s scratch');
   passes(h.pre('Read', { file_path: path.join(earlier, 'zz-look.spec.ts') }), 'read there');
-  passes(h.bash(`echo x > ${earlier}/out.txt`), 'a redirect there');
+  passes(h.bash(`echo x > "${bp(earlier)}/out.txt"`), 'a redirect there');
   // Still closed: the earlier step's own files, another epic's scratch, the run's files, a link out of it.
   denied(h.pre('Write', { file_path: path.join(path.dirname(earlier), 'hooks.jsonl'), content: 'x' }), 'R2', /autopilot workspace/);
   denied(h.pre('Write', { file_path: path.join(h.runDir, 'epics', 'OTHER', 'build-1', 'scratch', 'x'), content: 'x' }), 'R2', /autopilot workspace/);
@@ -223,7 +226,7 @@ test('Bash: single-quoted text is not cut at ; | && or brackets, and runs nothin
 test('R2 files CLAUDE.md names: a listed file outside the clone is read and run, never written; its neighbours stay closed', (t) => {
   for (const sandbox of [false, true]) {
     const h = referee(t, { sandbox });
-    const home = path.join(h.tmp, 'home'); const HOME = { HOME: home, TMPDIR: path.join(h.tmp, 'tmp') }; // the fake home must not count as a temp directory
+    const home = path.join(h.tmp, 'home'); const HOME = { HOME: home, USERPROFILE: home, TMPDIR: path.join(h.tmp, 'tmp'), TEMP: path.join(h.tmp, 'tmp'), TMP: path.join(h.tmp, 'tmp') }; // the fake home must not count as a temp directory
     fs.mkdirSync(path.join(home, '.claude', 'scripts'), { recursive: true });
     const tether = path.join(home, '.claude', 'scripts', 'tethered.mjs'); const other = path.join(home, '.claude', 'scripts', 'other.mjs');
     for (const f of [tether, other, path.join(home, '.claude', 'settings.json')]) fs.writeFileSync(f, 'x');
@@ -256,18 +259,18 @@ test('sandbox on — R2 path jail: Bash absolute paths, cd targets and git -C ar
   passes(h.bash('node --test && ls -la src'), 'plain command');
   passes(h.bash('ls /usr/bin | head -3 && cat /dev/null'), 'system paths');
   passes(h.bash("grep -E '/foo/' src/index.js"), 'a regex is not a path');
-  passes(h.bash(`cd ${h.clone}/src && ls`), 'cd inside clone');
+  passes(h.bash(`cd "${bp(h.clone)}/src" && ls`), 'cd inside clone');
   passes(h.bash(`cd /tmp/claude-${UID} && ls`), 'cd to sandbox temp');
   passes(h.bash('curl -s https://example.com/x'), 'a URL is not a path');
   denied(h.bash('cd /tmp && ls'), 'R2', /cd target/);
   denied(h.bash('git -C ../x commit -m y'), 'R2', /git target/);
   denied(h.bash('cat ../settings.json'), 'R2', /autopilot workspace/);
-  denied(h.bash(`cat ${h.runDir}/config.json`), 'R2');
+  denied(h.bash(`cat "${bp(h.runDir)}/config.json"`), 'R2');
   denied(h.bash('ls ~/Documents'), 'R2');
   denied(h.bash('cat "$HOME/.ssh/id_rsa"'), 'R2');
   denied(h.bash('ls "$AUTOPILOT_STATE/gates"'), 'R2', /may not name/);
   denied(h.bash('cat "$AUTOPILOT_RUN/state.json"'), 'R2', /may not name/);
-  denied(h.bash(`echo hi > ${h.project}/x.txt`), 'R2');
+  denied(h.bash(`echo hi > "${bp(h.project)}/x.txt"`), 'R2');
 });
 
 test('R2 declared read-only directories: Read, Grep and Bash may read them, nothing writes them, and an undeclared directory stays denied', (t) => {
@@ -280,12 +283,12 @@ test('R2 declared read-only directories: Read, Grep and Bash may read them, noth
   passes(h.pre('Read', { file_path: path.join(cache, 'pkg', 'lib.txt') }), 'read');
   passes(h.pre('Grep', { pattern: 'x', path: cache }), 'grep');
   passes(h.pre('Glob', { pattern: '**/*', path: cache }), 'glob');
-  passes(h.bash(`ls ${cache}/pkg && cat ${cache}/pkg/lib.txt`), 'bash read');
+  passes(h.bash(`ls "${bp(cache)}/pkg" && cat "${bp(cache)}/pkg/lib.txt"`), 'bash read');
   denied(h.pre('Write', { file_path: path.join(cache, 'pkg', 'new.txt'), content: 'x' }), 'R2', /read-only/);
   denied(h.pre('Edit', { file_path: path.join(cache, 'pkg', 'lib.txt'), old_string: 'x', new_string: 'y' }), 'R2', /read-only/);
-  denied(h.bash(`echo hi > ${cache}/pkg/new.txt`), 'R2', /read-only/);
+  denied(h.bash(`echo hi > "${bp(cache)}/pkg/new.txt"`), 'R2', /read-only/);
   denied(h.pre('Read', { file_path: path.join(other, 'pkg', 'lib.txt') }), 'R2', /outside the private clone/);
-  denied(h.bash(`cat ${other}/pkg/lib.txt`), 'R2');
+  denied(h.bash(`cat "${bp(other)}/pkg/lib.txt"`), 'R2');
   // A link inside a declared directory that leads out of it is resolved first.
   fs.symlinkSync(other, path.join(cache, 'link'));
   denied(h.pre('Read', { file_path: path.join(cache, 'link', 'pkg', 'lib.txt') }), 'R2', /outside the private clone/);
@@ -308,9 +311,9 @@ test('R2 with the sandbox off (the default): a session reads anywhere but privat
   denied(h.pre('Read', { file_path: path.join(home, '.claude', 'projects', 'x', 'transcript.jsonl') }), 'R2');
   passes(h.pre('Read', { file_path: path.join(home, '.claude', 'projects', 'x', 'memory', 'MEMORY.md') }), 'memory stays readable');
   passes(h.pre('Read', { file_path: path.join(home, '.claude', 'projects', 'x', 'abc', 'tool-results', 'b1.txt') }), 'a long tool output saved by Claude Code');
-  passes(h.bash(`tail -15 ${home}/.claude/projects/x/abc/tool-results/b1.txt`), 'and by Bash');
+  passes(h.bash(`tail -15 "${bp(home)}/.claude/projects/x/abc/tool-results/b1.txt"`), 'and by Bash');
   denied(h.pre('Read', { file_path: path.join(h.runDir, 'state.json') }), 'R2', /autopilot workspace/);
-  denied(h.bash(`cat ${h.runDir}/config.json`), 'R2', /autopilot workspace/);
+  denied(h.bash(`cat "${bp(h.runDir)}/config.json"`), 'R2', /autopilot workspace/);
   // Writes: the clone and temp.
   passes(h.pre('Write', { file_path: path.join(h.clone, 'src', 'new.js'), content: 'x' }), 'clone');
   passes(h.pre('Write', { file_path: path.join(os.tmpdir(), 'scratch.txt'), content: 'x' }), 'temp');
@@ -322,24 +325,24 @@ test('R2 with the sandbox off (the default): a session reads anywhere but privat
   denied(h.pre('Edit', { file_path: path.join(h.clone, '.git', 'config'), old_string: 'a', new_string: 'b' }), 'R2', /\.git/);
   // Bash: what a command visibly writes must be writable; where it goes, its writes follow.
   denied(h.bash('echo hi > ~/notes.txt'), 'R2', /writes only inside it/);
-  denied(h.bash(`echo hi > ${h.project}/x.txt`), 'R2', /writes only inside it/);
+  denied(h.bash(`echo hi > "${bp(h.project)}/x.txt"`), 'R2', /writes only inside it/);
   denied(h.bash('rm -rf ~/Documents/old'), 'R2', /writes only inside it/);
   denied(h.bash('cp src/index.js ~/Desktop/'), 'R2', /writes only inside it/);
   denied(h.bash('mkdir -p ~/scratch && touch ~/scratch/a'), 'R2', /writes only inside it/);
   denied(h.bash('sed -i "" s/a/b/ /etc/hosts'), 'R2', /writes only inside it/);
   passes(h.bash("f=src/index.js && sed -i '' -e 's/public sealed class A(HttpClient http)/x/' -e '/global using MsLogging/d' $f"), 'a sed script is not a path (seen live)');
   passes(h.bash("sed -i '' -e '/^import/d' src/index.js && perl -pi -e 's/a/b/' src/index.js"), 'in-place edits inside the clone');
-  denied(h.bash(`sed -i '' -e '/x/d' ${h.project}/README.md`), 'R2', /writes only inside it/);
+  denied(h.bash(`sed -i '' -e '/x/d' "${bp(h.project)}/README.md"`), 'R2', /writes only inside it/);
   denied(h.bash('cd ~/Documents && rm -rf old'), 'R2', /cd target/);
   passes(h.bash("cd ~/.nuget/packages/x/lib && ls; f=$(ls */X.xml | tail -1); grep -o 'T:X[^\"]*' $f | head 2>/dev/null"), 'cd somewhere readable only to look (seen live)');
   denied(h.bash('cd ~/Documents && echo hi > note.txt'), 'R2', /cd target/);
   // The directory follows each cd: a relative path is judged from where the command then is.
-  passes(h.bash(`cd ${h.clone}/src && cat > New.js <<'EOF'\nexport const a = 1;\nEOF\ncd .. && node --test`), 'cd down, write, cd back up (seen live)');
+  passes(h.bash(`cd "${bp(h.clone)}/src" && cat > New.js <<'EOF'\nexport const a = 1;\nEOF\ncd .. && node --test`), 'cd down, write, cd back up (seen live)');
   passes(h.bash('cd src && ls ../README.md && cd .. && ls'), 'relative climbs that stay in the clone');
   denied(h.bash('cd src && cd ../.. && ls'), 'R2', /cd target|autopilot workspace/);
   denied(h.bash('cd /tmp && echo x > ../etc/hosts'), 'R2');
   denied(h.bash('cd ~/.ssh && ls'), 'R2', /credentials/);
-  denied(h.bash(`git -C ${h.project} commit -m y`), 'R2', /git target/);
+  denied(h.bash(`git -C "${bp(h.project)}" commit -m y`), 'R2', /git target/);
   denied(h.bash('ls "$AUTOPILOT_STATE/gates"'), 'R2', /may not name/);
   // A link out of the clone is still seen for what it is.
   fs.symlinkSync(home, path.join(h.clone, 'link'));
@@ -361,9 +364,9 @@ test('R2 auditor: reads the bundle and the clone, and nothing else is allowed', 
 test('R3 git: a worktree made in the scratch folder may be removed with --force; no other forced command, and no other worktree (Pilot Light, 2026-11-23)', (t) => {
   const h = referee(t);
   passes(h.bash('git worktree remove --force "$AUTOPILOT_SCRATCH/wt-develop"'), 'by name');
-  passes(h.bash(`git worktree remove --force ${h.scratch}/base`), 'absolute path');
+  passes(h.bash(`git worktree remove --force "${bp(h.scratch)}/base"`), 'absolute path');
   passes(h.bash('git worktree add -q --detach "$AUTOPILOT_SCRATCH/base" develop && git worktree remove --force "$AUTOPILOT_SCRATCH/base"'), 'add then remove');
-  denied(h.bash(`git worktree remove --force ${h.clone}`), 'R3', /--force/, 'the clone itself');
+  denied(h.bash(`git worktree remove --force "${bp(h.clone)}"`), 'R3', /--force/, 'the clone itself');
   denied(h.bash('git worktree remove --force /tmp/other'), 'R3', /--force/, 'a worktree elsewhere');
   denied(h.bash('git worktree remove --force "$AUTOPILOT_SCRATCH/a" /tmp/other'), 'R3', /--force/, 'two paths');
   denied(h.bash('git worktree remove --force "$AUTOPILOT_SCRATCH/../.."'), 'R2', /autopilot workspace/, 'climbing out');
@@ -688,7 +691,7 @@ test('workspace layout: the jail covers everything but clone/, in this run and e
   for (const f of [path.join(older, 'report.md'), path.join(older, 'epics', E1.id, 'build-1', 'stream.jsonl'), path.join(h.runDir, 'autopilot.log'), path.join(h.step, 'plan.md'), path.join(h.state, 'current'), path.join(h.state, 'lock'), path.join(h.state, 'gates', `${E1.id}-1.json`)]) {
     denied(h.pre('Read', { file_path: f }), 'R2', /autopilot workspace/, f);
     denied(h.pre('Write', { file_path: f, content: 'x' }), 'R2', /autopilot workspace/, f);
-    denied(h.bash(`cat ${f}`), 'R2', undefined, f);
+    denied(h.bash(`cat "${bp(f)}"`), 'R2', undefined, f);
   }
   denied(h.pre('Glob', { pattern: '**/*.json', path: path.join(h.state, 'runs') }), 'R2');
   denied(h.bash('ls ../runs ../gates'), 'R2');
@@ -932,7 +935,7 @@ test('R10 a catch-up session merges the integration line into its branch and set
   passes(r.bash('git merge --no-ff develop', env), 'merging the integration line into the epic branch');
   passes(r.pre('Write', { file_path: path.join(r.clone, 'src', 'shared.js'), content: 'x' }, env), 'settling a clashing code file');
   denied(r.pre('Edit', { file_path: req, old_string: 'a', new_string: 'b' }, env), 'R10', /never edits a requirement file \(docs\/requirements\/01-import\.feature\.md\)\. Run `git merge --abort` and ask/, 'a requirement file, by Edit');
-  denied(r.bash(`printf x > ${req}`, env), 'R10', /requirement file/, 'a requirement file, by the shell');
+  denied(r.bash(`printf x > "${bp(req)}"`, env), 'R10', /requirement file/, 'a requirement file, by the shell');
   git(r.clone, 'checkout', '-q', 'develop');
   denied(r.bash('git merge --no-ff feature/epic-Lg1Csv7-csv-import', env), 'R3', /git merge into develop is denied/, 'never into the integration line');
   passes(r.pre('Edit', { file_path: req, old_string: 'a', new_string: 'b' }), 'R10 is the catch-up session\'s alone');
@@ -1129,4 +1132,30 @@ test('R11 after review (#43): on a page that is not the app\'s, a session only c
   const line = fs.readFileSync(path.join(h.step, 'hooks.jsonl'), 'utf8').trim().split('\n').at(-1);
   assert.ok(!/SECRET/.test(line), line);
   assert.deepEqual(JSON.parse(line).page_urls, ['https://accounts.google.com/o']);
+});
+
+test('fromBash: Git Bash paths become Windows paths on Windows (/c/… is C:\\…, /tmp is the temp folder); unchanged elsewhere', () => {
+  assert.equal(fromBash('/c/Users/Pat Lee/x.txt', 'win32'), 'C:\\Users\\Pat Lee\\x.txt');
+  assert.equal(fromBash('/D', 'win32'), 'D:\\');
+  assert.equal(fromBash('/tmp/a.json', 'win32'), path.join(os.tmpdir(), '/a.json'));
+  assert.equal(fromBash('/tmpfiles/a', 'win32'), '/tmpfiles/a', 'only /tmp itself is the temp folder');
+  assert.equal(fromBash('/usr/bin/env', 'win32'), '/usr/bin/env', "Git's own folders are left to the system-path rule");
+  assert.equal(fromBash('C:\\x', 'win32'), 'C:\\x');
+  assert.equal(fromBash('/c/Users/x', 'darwin'), '/c/Users/x');
+});
+
+test('Windows: a command names paths as Git Bash does or as drive paths, and the jail judges both', { skip: process.platform !== 'win32' && 'Windows paths' }, (t) => {
+  const h = referee(t);
+  const home = os.homedir();
+  const bash = (p) => p.replace(/^([A-Za-z]):/, (_, d) => '/' + d.toLowerCase()).split('\\').join('/');
+  const fwd = (p) => p.split('\\').join('/');
+  // A drive path is a path: credentials stay closed whichever way they are written.
+  denied(h.bash(`cat "${fwd(path.join(home, '.ssh', 'id_rsa'))}"`), 'R2', /credentials/);
+  denied(h.bash(`cat "${bash(path.join(home, '.ssh', 'id_rsa'))}"`), 'R2', /credentials/);
+  denied(h.bash(`cat "${fwd(path.join(h.runDir, 'state.json'))}"`), 'R2', /autopilot workspace/);
+  // Git Bash's /tmp is the temp folder, and the clone named as /c/… is the clone.
+  passes(h.bash('echo x > /tmp/chk.json'), '/tmp is writable (seen on Windows: refused before)');
+  passes(h.bash(`cd "${bash(h.clone)}" && ls`), 'cd into the clone by its Git Bash path');
+  passes(h.bash('cat /dev/null && ls /usr/bin | head -1'), "Git's own system folders are read");
+  denied(h.bash(`echo x > "${bash(path.join(home, 'notes.txt'))}"`), 'R2', /writes only inside it/);
 });

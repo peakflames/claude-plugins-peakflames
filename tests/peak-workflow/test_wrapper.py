@@ -18,6 +18,9 @@ echo "ran-by {name} $*"
 """
 
 
+# Shell-script interpreters on a bare PATH and /bin/sh: a Unix setup. On Windows the wrapper was checked against the real
+# py launcher instead (env.test.mjs runs it with a backslash path).
+@unittest.skipIf(sys.platform == "win32", "fake interpreters are shell scripts on a bare PATH, which Windows cannot run")
 class WrapperTests(unittest.TestCase):
     def setUp(self):
         self.bin = Path(tempfile.mkdtemp(prefix="pw-shims-"))

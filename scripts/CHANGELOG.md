@@ -29,6 +29,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`autopilot-lab/oracle-shelf/` and `reference-shelf/`.** Hidden tests and a reference
   implementation for the `shelf` project; `evaluate --run D` judges the first launch.
 
+### Fixed
+
+- **`lab.mjs evaluate` on Windows.** The merged work is unpacked by running `tar` in its folder;
+  Git Bash's GNU tar read a `C:\…` folder given with `-C` as a remote host and stopped.
+
 ## [0.1.1] — 2026-11-04
 
 ### Fixed

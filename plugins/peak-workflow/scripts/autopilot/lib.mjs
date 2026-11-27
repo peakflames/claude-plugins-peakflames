@@ -1,4 +1,21 @@
 // Shared by the driver and the referee hooks: one implementation of each parse and lint.
+import os from 'node:os';
+import path from 'node:path';
+
+/**
+ * A path as a Bash command (or a CLAUDE.md line) names it, as Windows names it. Claude Code runs commands in Git Bash
+ * there, where a drive is `/c/…` and `/tmp` is the user's temp directory; Node and the file tools say `C:\…`. Elsewhere
+ * the path is unchanged.
+ */
+export function fromBash(p, platform = process.platform) {
+  const s = String(p);
+  if (platform !== 'win32') return s;
+  let m = s.match(/^\/([A-Za-z])(\/.*)?$/);
+  if (m) return `${m[1].toUpperCase()}:${(m[2] ?? '/').replace(/\//g, '\\')}`;
+  m = s.match(/^\/tmp(\/.*)?$/);
+  if (m) return path.join(os.tmpdir(), m[1] ?? '');
+  return s;
+}
 
 /** A status sidecar: `key: value` lines, plus indented `TOR: fingerprint` lines under `verified:`. */
 export function parseSidecar(text) {

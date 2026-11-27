@@ -32,8 +32,8 @@ export const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
  * settings.json names the test double. `p.state` is the workspace; `p.runDir()` the latest run.
  */
 export function makeProject(t, { config = {} } = {}) {
-  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-test-')));
-  t.after(() => { killFakes(tmp); fs.rmSync(tmp, { recursive: true, force: true }); }); // a test that timed out leaves its session running
+  const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-test-')));
+  t.after(() => { killFakes(tmp); fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10 }); }); // a test that timed out leaves its session running
   const project = path.join(tmp, 'ledger');
   const state = path.join(tmp, 'ledger.autopilot');
   fs.cpSync(SEED, project, { recursive: true });
@@ -74,7 +74,8 @@ export function makeProject(t, { config = {} } = {}) {
  * mid-session leaves running. Only this test's: test files run side by side, each in its own folder. Returns the pids.
  */
 export function killFakes(dir) {
-  let root; try { root = fs.realpathSync(dir); } catch { return []; }
+  let root; try { root = fs.realpathSync.native(dir); } catch { return []; }
+  if (process.platform === 'win32') return killFakesWindows(root);
   const fakes = (spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).stdout ?? '').split('\n')
     .map((l) => l.match(/^\s*(\d+)\s+(.*)$/)).filter((m) => m && m[2].includes(FAKE) && Number(m[1]) !== process.pid).map((m) => Number(m[1]));
   if (!fakes.length) return [];
@@ -82,6 +83,23 @@ export function killFakes(dir) {
   for (const line of (spawnSync('lsof', ['-a', '-d', 'cwd', '-Fpn', '-p', fakes.join(',')], { encoding: 'utf8' }).stdout ?? '').split('\n')) {
     if (line[0] === 'p') pid = Number(line.slice(1));
     else if (line[0] === 'n' && pid && (line.slice(1) === root || line.slice(1).startsWith(root + path.sep))) { try { process.kill(pid, 'SIGKILL'); killed.push(pid); } catch { /* gone */ } }
+  }
+  return killed;
+}
+
+/**
+ * Windows cannot tell another process's working folder: there a fake counts as this test's when its command line names
+ * the folder (a session's --settings file lives in the test's workspace). Killed as a tree.
+ */
+function killFakesWindows(root) {
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress'], { encoding: 'utf8', windowsHide: true });
+  let rows; try { rows = JSON.parse(r.stdout || '[]'); } catch { return []; }
+  const fold = (s) => String(s ?? '').toLowerCase().replace(/\//g, '\\');
+  const killed = [];
+  for (const x of Array.isArray(rows) ? rows : [rows]) {
+    const c = fold(x?.CommandLine);
+    if (!x?.ProcessId || x.ProcessId === process.pid || !c.includes(fold(FAKE)) || !c.includes(fold(root))) continue;
+    if (spawnSync('taskkill', ['/T', '/F', '/PID', String(x.ProcessId)], { windowsHide: true, stdio: 'ignore' }).status === 0) killed.push(x.ProcessId);
   }
   return killed;
 }
@@ -202,7 +220,12 @@ export const wrapupScript = (e, opts) => ({ actions: wrapupActions(e, opts), res
 /** Scripts for one epic that goes straight to MERGED. */
 export const happy = (e) => ({ [`${e.id}/plan`]: planScript(e), [`${e.id}/build`]: buildScript(e), [`${e.id}/verify`]: wrapupScript(e) });
 
-export async function waitFor(fn, { timeoutMs = 20000, everyMs = 25 } = {}) {
+// Windows starts a process in 100 ms or more (macOS: a few), so a wait that is ample there can run out here under a
+// parallel suite: it waits longer. A check that really fails still fails, only later.
+export const WAIT_MS = process.platform === 'win32' ? 60000 : 20000;
+/** A line's durations read as a quick run's: a fake run can pass a minute on a slow, busy machine (an i3 under the full suite does). */
+export const quick = (l) => l.replace(/\d+ min/g, (m) => (m === '0 min' ? m : 'under a minute')).replace(/running for under a minute/g, 'running for 0 min');
+export async function waitFor(fn, { timeoutMs = WAIT_MS, everyMs = 25 } = {}) {
   const until = Date.now() + timeoutMs;
   for (;;) {
     try { const v = fn(); if (v) return v; } catch { /* not there yet */ }

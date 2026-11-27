@@ -15,7 +15,7 @@ export const SEVERITIES = SCHEMA.properties.findings.items.properties.severity.e
 
 const PLAN_DIR = 'docs/implementation-plan';
 const run = (cmd, args, cwd) => {
-  const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true });
   return { ok: r.status === 0, out: r.stdout ?? '', err: (r.stderr ?? '').trim() };
 };
 const show = (clone, ref, file) => { const r = run('git', ['show', `${ref}:${file}`], clone); return r.ok ? r.out : null; };
@@ -200,7 +200,7 @@ export function changedCodeFiles(diff) {
 export function reviewCoverage({ stepDir, clone }) {
   const diff = fs.existsSync(path.join(stepDir, 'bundle', 'diff.patch')) ? fs.readFileSync(path.join(stepDir, 'bundle', 'diff.patch'), 'utf8') : '';
   const files = changedCodeFiles(diff);
-  const roots = [...new Set([clone, (() => { try { return fs.realpathSync(clone); } catch { return clone; } })()])];
+  const roots = [...new Set([clone, (() => { try { return fs.realpathSync.native(clone); } catch { return clone; } })()])];
   const opened = new Set();
   for (const e of readLines(path.join(stepDir, 'hooks.jsonl'))) {
     if (e.hook !== 'PostToolUse' || e.tool_name !== 'Read') continue;

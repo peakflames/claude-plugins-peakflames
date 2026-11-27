@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
-import { THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, failingTests, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening, connectorLine, mergeConnectorUse, parseMcpList } from './lib.mjs';
+import { fromBash, THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, failingTests, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening, connectorLine, mergeConnectorUse, parseMcpList } from './lib.mjs';
 import { epicConnectorUse, writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -76,7 +76,7 @@ function childEnv(extra = {}) {
 }
 
 function sh(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', env: childEnv(), maxBuffer: 64 * 1024 * 1024, ...opts });
+  const r = spawnSync(cmd, args, { encoding: 'utf8', env: childEnv(), maxBuffer: 64 * 1024 * 1024, windowsHide: true, ...opts });
   return { code: r.status ?? (r.signal ? 128 : 1), out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim(), timedOut: r.error?.code === 'ETIMEDOUT' };
 }
 const gitRun = (cwd, ...args) => sh('git', args, { cwd });
@@ -94,7 +94,18 @@ const gitShow = (cwd, ref, file) => {
 function pidAlive(pid) {
   try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
 }
+// Windows has no process groups: a detached child there gets no console, and every console program it starts opens a
+// window of its own (hundreds in one suite run). Sessions share the driver's console instead, and are stopped as a tree.
+const WINDOWS = process.platform === 'win32';
+const SESSION_SPAWN = { detached: !WINDOWS, windowsHide: true };
+// A project command (its tests, build, setup) is run as on macOS: by sh, which on Windows is Git Bash (Claude Code needs it
+// there too). `shell: true` would mean cmd.exe: no `;`, `>&2` or `$VAR`, and a missing command exits 1, not 127.
+const PROJECT_SHELL = WINDOWS ? "sh" : true;
 function killGroup(pid, signal) {
+  if (WINDOWS) {
+    if (signal === 0) return pidAlive(pid);
+    return spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true, stdio: 'ignore' }).status === 0;
+  }
   try { process.kill(-pid, signal); return true; } catch { return false; }
 }
 
@@ -104,25 +115,47 @@ function killGroup(pid, signal) {
  * or a watch reading the clone), and git itself (the owner fetching from the clone). Read-only.
  */
 export function strayProcesses(dir) {
-  let root; try { root = fs.realpathSync(dir); } catch { return []; }
-  const inside = (p) => !!p && (p === root || p.startsWith(root + path.sep));
-  const procs = new Map();
-  for (const line of sh('ps', ['-axo', 'pid=,ppid=,command=']).out.split('\n')) {
-    const m = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
-    if (m) procs.set(Number(m[1]), { pid: Number(m[1]), ppid: Number(m[2]), command: m[3] });
+  let root; try { root = fs.realpathSync.native(dir); } catch { return []; }
+  const fold = (p) => (WINDOWS ? p.toLowerCase() : p);
+  const inside = (p) => !!p && (fold(p) === fold(root) || fold(p).startsWith(fold(root) + path.sep));
+  const procs = new Map(processTable().map((p) => [p.pid, p]));
+  const mine = (p) => { for (let x = p, hops = 0; x && hops < 64; x = procs.get(x.ppid), hops++) if (x.pid === process.pid || /(^|[\s/\\])driver\.mjs("?)(\s|$)/.test(x.command)) return true; return false; };
+  // macOS and Linux: a process working in the folder (lsof). Windows cannot tell another process's working folder, so
+  // there it is one whose program or command line names the folder: a server started by a relative path is not seen.
+  const cwds = new Map();
+  const named = (p) => { const c = fold(p.command).replace(/\//g, '\\'); return c.includes(fold(root) + '\\') || c.includes(fold(root) + '"') || c.endsWith(fold(root)); };
+  if (!WINDOWS) {
+    let pid = null;
+    const uid = typeof process.getuid === 'function' ? ['-u', String(process.getuid())] : [];
+    for (const line of sh('lsof', ['-a', '-d', 'cwd', '-Fpn', ...uid]).out.split('\n')) {
+      if (line[0] === 'p') pid = Number(line.slice(1)); else if (line[0] === 'n' && pid) cwds.set(pid, line.slice(1));
+    }
   }
-  const cwds = new Map(); let pid = null;
-  const uid = typeof process.getuid === 'function' ? ['-u', String(process.getuid())] : [];
-  for (const line of sh('lsof', ['-a', '-d', 'cwd', '-Fpn', ...uid]).out.split('\n')) {
-    if (line[0] === 'p') pid = Number(line.slice(1)); else if (line[0] === 'n' && pid) cwds.set(pid, line.slice(1));
-  }
-  const mine = (p) => { for (let x = p, hops = 0; x && hops < 64; x = procs.get(x.ppid), hops++) if (x.pid === process.pid || /(^|[\s/])driver\.mjs(\s|$)/.test(x.command)) return true; return false; };
   const out = [];
   for (const p of procs.values()) {
-    const argv0 = p.command.split(/\s+/)[0];
-    if (!(inside(cwds.get(p.pid)) || inside(argv0))) continue;
-    if (mine(p) || /^git(-|$)/.test(path.basename(argv0))) continue;
-    out.push(p);
+    const argv0 = p.exe || p.command.split(/\s+/)[0];
+    if (!(inside(cwds.get(p.pid)) || inside(argv0) || (WINDOWS && named(p)))) continue;
+    if (mine(p) || /^git(-|\.exe$|$)/i.test(path.basename(argv0))) continue;
+    out.push({ pid: p.pid, ppid: p.ppid, command: p.command });
+  }
+  return out;
+}
+
+/**
+ * Every process: its id, its parent's, its command line and (Windows only) its program. Read-only. macOS and Linux read
+ * ps; Windows has none that lists command lines (Git Bash's ps takes no -o), so there it is one CIM query.
+ */
+export function processTable() {
+  if (WINDOWS) {
+    const r = sh('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress']);
+    let rows; try { rows = JSON.parse(r.out || '[]'); } catch { return []; }
+    return (Array.isArray(rows) ? rows : [rows]).filter((x) => x && x.ProcessId)
+      .map((x) => ({ pid: x.ProcessId, ppid: x.ParentProcessId, command: x.CommandLine ?? x.ExecutablePath ?? '', exe: x.ExecutablePath ?? '' }));
+  }
+  const out = [];
+  for (const line of sh('ps', ['-axo', 'pid=,ppid=,command=']).out.split('\n')) {
+    const m = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+    if (m) out.push({ pid: Number(m[1]), ppid: Number(m[2]), command: m[3], exe: '' });
   }
   return out;
 }
@@ -654,7 +687,7 @@ function syncReport(project, workspace, integration, { running = false } = {}) {
 const noSlash = (p) => String(p).replace(/\/+$/, '');
 /** Files and directories that exist in `root` and git ignores: exactly what a clone of it will not have. */
 export function ignoredPaths(root) {
-  const r = spawnSync('git', ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'], { cwd: root, encoding: 'utf8', env: childEnv(), maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync('git', ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'], { cwd: root, encoding: 'utf8', env: childEnv(), maxBuffer: 64 * 1024 * 1024, windowsHide: true });
   return r.status === 0 ? (r.stdout ?? '').split('\0').filter(Boolean).sort() : [];
 }
 /** Why a `copy` list cannot be used. An entry must be a git-ignored path inside the project: anything else could end up in a commit. */
@@ -688,7 +721,7 @@ export function envFacts(project, workspace, config) {
   return { setup: config.setup ?? null, copy, readOnly: Array.isArray(config.readOnly) ? config.readOnly : [], readFiles: named.files, readRefused: named.refused, sandbox: config.sandbox === true, network: cleanNetwork(config.network), registries: REGISTRIES, problems: [...copyProblems(project, config.copy), ...readOnlyProblems(config.readOnly, { project, workspace }), ...networkProblems(config.network)], ignored, ignoredTotal: all.length, cloneExists: exists(clone), prepared: tryJson(path.join(workspace, 'prepare.json')) };
 }
 /** `~`-expanded, absolute, symlinks resolved where the path exists. */
-const expandHome = (p) => { const x = path.resolve(String(p).trim().replace(/^~(?=\/|$)/, os.homedir())); try { return fs.realpathSync(x); } catch { return x; } };
+const expandHome = (p) => { const x = path.resolve(fromBash(String(p).trim().replace(/^~(?=\/|$)/, os.homedir()))); try { return fs.realpathSync.native(x); } catch { return x; } };
 const insideOrSame = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
 /** Where a session must never read, whatever a project lists: credentials, and Claude Code's own files. */
 const NEVER_READ = ['.ssh', '.aws', '.gnupg', '.azure', '.kube', '.docker', '.netrc', '.npmrc', '.pypirc', '.git-credentials', '.config', '.claude', 'Library'];
@@ -733,7 +766,11 @@ export function claudeMdReads(text, { project = null, workspace = null } = {}) {
   const home = expandHome('~'); const claude = path.join(home, '.claude');
   const files = []; const refused = []; const seen = new Set();
   for (const m of String(text ?? '').matchAll(/```[\s\S]*?```|`[^`\n]+`/g)) {
-    for (const word of m[0].replace(/^`+|`+$/g, '').split(/[\s"'=<>|;&(),]+/)) {
+    // A quoted path is one word, spaces and all (`node "C:\Users\Pat Lee\tools\x.mjs"`); the rest splits on spaces and shell punctuation.
+    const inner = m[0].replace(/^`+|`+$/g, '');
+    const quoted = [...inner.matchAll(/"([^"]+)"|'([^']+)'/g)].map((x) => x[1] ?? x[2]);
+    // So is a span that is one path and nothing else (`C:\Users\Pat Lee\tools\lint.sh`): kept only if it is a file.
+    for (const word of [inner.trim(), ...quoted, ...inner.replace(/"[^"]*"|'[^']*'/g, ' ').split(/[\s"'=<>|;&(),]+/)]) {
       const raw = word.replace(/^\$\{?HOME\}?(?=[\\/])/, '~').replace(/^~\\/, '~/').replace(/[.:]+$/, '');
       if (!(raw.startsWith('~/') || path.isAbsolute(raw)) || /[*?{}$]/.test(raw)) continue;
       const p = expandHome(raw);
@@ -1059,7 +1096,7 @@ export function buildQueue(pre, config) {
 /** The integration line of the repository rooted exactly at `root` (never a parent repository's). */
 function detectIntegration(root) {
   const top = gitRun(root, 'rev-parse', '--show-toplevel');
-  if (top.code !== 0 || fs.realpathSync(top.out) !== fs.realpathSync(root)) return null;
+  if (top.code !== 0 || fs.realpathSync.native(top.out) !== fs.realpathSync.native(root)) return null;
   for (const b of ['develop', 'main', 'master']) if (gitOk(root, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`)) return b;
   return null;
 }
@@ -1708,7 +1745,7 @@ async function hostSession(cmd, prompt, { stepDir, killGraceMs = 30000 }) {
   const isScript = /\.(mjs|cjs|js)$/.test(cmd.bin);
   const started = Date.now();
   const s = { result: null, killed: null, exitCode: null, signal: null, spawnError: null };
-  const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, { cwd: cmd.cwd, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, { cwd: cmd.cwd, env: childEnv(cmd.env), ...SESSION_SPAWN, stdio: ['pipe', 'pipe', 'pipe'] });
   const stream = fs.createWriteStream(path.join(stepDir, 'stream.jsonl'));
   child.stderr.pipe(fs.createWriteStream(path.join(stepDir, 'stderr.log')));
   child.stdin.on('error', () => {});
@@ -2105,7 +2142,7 @@ class Run {
    */
   runTests() {
     const started = Date.now(); const mono = performance.now();
-    const r = sh(this.config.testCommand, [], { cwd: this.clone, shell: true, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
+    const r = sh(this.config.testCommand, [], { cwd: this.clone, shell: PROJECT_SHELL, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
     const ms = Date.now() - started;
     const text = `${r.out}\n${r.err}`;
     const skips = (text.match(/^(?:#|ℹ)\s*skipped\s+(\d+)/m) ?? [])[1];
@@ -2133,7 +2170,7 @@ class Run {
   /** One quality-gate command, run like the tests: in the clone, in a plain shell. Whatever it leaves that git would commit is listed and removed. */
   runGate(command) {
     const started = Date.now();
-    const r = sh(command, [], { cwd: this.clone, shell: true, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
+    const r = sh(command, [], { cwd: this.clone, shell: PROJECT_SHELL, timeout: this.config.budgets.testRunMin * 60000, killSignal: 'SIGKILL' });
     const left = this.porcelain();
     if (left.length) { this.g('reset', '-q', '--hard'); this.clean(); }
     const pass = r.code === 0 && !r.timedOut;
@@ -2184,7 +2221,7 @@ class Run {
     if (out.copied.length) this.log(`environment: copied ${out.copied.join(', ')} from the project`);
     if (cfg.setup) {
       const started = Date.now();
-      const r = sh(cfg.setup, [], { cwd: this.clone, shell: true, timeout: (cfg.budgets.setupMin ?? 20) * 60000, killSignal: 'SIGKILL' });
+      const r = sh(cfg.setup, [], { cwd: this.clone, shell: PROJECT_SHELL, timeout: (cfg.budgets.setupMin ?? 20) * 60000, killSignal: 'SIGKILL' });
       out.setup = { ran: true, command: cfg.setup, pass: r.code === 0 && !r.timedOut, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), ms: Date.now() - started, tail: `${r.out}\n${r.err}`.trim().split('\n').slice(-15).join('\n') };
       this.log(`environment: setup \`${cfg.setup}\` ${out.setup.pass ? 'passed' : `failed (exit ${r.code}${r.timedOut ? ', timed out' : ''})`} in ${Math.round(out.setup.ms / 1000)}s`);
       if (!out.setup.pass) return { ...out, pass: false, step: 'setup' };
@@ -2529,7 +2566,7 @@ class Run {
     writeJson(path.join(stepDir, 'step.json'), { name, kind, role: k.role, epic: e.id, sessionId, startedAt: e.step.startedAt, startMb, model: used.model ?? null, effort: effortFor(used), ...(kind === 'verify' && e.look ? { look: e.look } : {}), ...(kind === 'verify' && !e.look && e.unobserved?.length ? { unobserved: e.unobserved } : {}), ...(answers.length ? { answers } : {}), ...(resume ? { resumeOf: { sessionId: resume, step: from.step, run: from.run } } : {}) });
     const isScript = /\.(mjs|cjs|js)$/.test(cmd.bin);
     const child = spawn(isScript ? process.execPath : cmd.bin, isScript ? [cmd.bin, ...cmd.args] : cmd.args, {
-      cwd: cmd.cwd, env: childEnv(cmd.env), detached: true, stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: cmd.cwd, env: childEnv(cmd.env), ...SESSION_SPAWN, stdio: ['pipe', 'pipe', 'pipe'],
     });
     const stream = fs.createWriteStream(path.join(stepDir, 'stream.jsonl'));
     const stderr = fs.createWriteStream(path.join(stepDir, 'stderr.log'));
@@ -3232,7 +3269,7 @@ class Run {
     if (this.currentBranch() !== b) { if (this.dirty()) { notes.push('the clone has uncommitted changes, so the run command was not run'); return { artifacts, notes }; } this.g('checkout', '-q', b); }
     const dir = path.join(this.epicDir(e), 'artifacts');
     fs.mkdirSync(dir, { recursive: true });
-    const r = sh(cmd, [], { cwd: this.clone, shell: true, timeout: Math.min(this.config.budgets.testRunMin, 2) * 60000, killSignal: 'SIGKILL' });
+    const r = sh(cmd, [], { cwd: this.clone, shell: PROJECT_SHELL, timeout: Math.min(this.config.budgets.testRunMin, 2) * 60000, killSignal: 'SIGKILL' });
     fs.writeFileSync(path.join(dir, 'run-output.txt'), `$ ${cmd}\n(exit ${r.code}${r.timedOut ? ', killed at the time limit' : ''}, on ${b} at ${this.branchTip(b)})\n\n${r.out}\n${r.err ? `\n--- stderr ---\n${r.err}\n` : ''}`);
     artifacts.push(this.rel(path.join(dir, 'run-output.txt')));
     // Files the command left in the clone (a built page, a chart) are kept as artifacts; the clone goes back to the commit.
@@ -3997,7 +4034,7 @@ class Run {
       if (TERMINAL.has(e.state) || e.state === 'QUEUED') continue;
       const st = e.step;
       if (st?.pid && pidAlive(st.pid)) {
-        const cmdline = sh('ps', ['-p', String(st.pid), '-o', 'command=']).out;
+        const cmdline = processTable().find((p) => p.pid === st.pid)?.command ?? '';
         if (cmdline.includes(st.sessionId)) { killGroup(st.pid, 'SIGKILL'); this.log(`${e.id}: killed leftover session ${st.name} (pid ${st.pid})`); }
       }
       e.resumes = e.resumes ?? {};

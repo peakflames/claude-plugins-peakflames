@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFECT_Q, LEAVE_AS_IS, SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROVISIONAL_BY, isProvisional, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended, mcpTool, isBrowserAction, isReadAction, isLocalHost, pageAddress } from '../lib.mjs';
+import { fromBash, DEFECT_Q, LEAVE_AS_IS, SMALL_FIX_FILE, isTestPath, lintPlan, parseSidecar, parseTestDirs, smallFixLimits, testNamedDirs, NOT_OBSERVED, PROVISIONAL_BY, isProvisional, ownerDeferred, prototypeAnswer, prototypeDeferred, prototypeGates, recommended, mcpTool, isBrowserAction, isReadAction, isLocalHost, pageAddress } from '../lib.mjs';
 
 const PLUGIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SYSTEM_READ = ['/usr', '/bin', '/sbin', '/opt', '/dev', '/etc', '/Library', '/System', '/Applications', '/lib', '/lib64', '/proc', '/sys', '/nix', '/snap', '/private/etc'];
@@ -32,7 +32,7 @@ const norm = (s) => String(s).normalize('NFKC').replace(/[‐-―−-]+/g, '-').
 function realDeep(p) {
   let cur = path.resolve(p); const tail = [];
   for (;;) {
-    try { return path.join(fs.realpathSync(cur), ...tail); } catch { /* climb */ }
+    try { return path.join(fs.realpathSync.native(cur), ...tail); } catch { /* climb */ }
     const up = path.dirname(cur);
     if (up === cur) return path.resolve(p);
     tail.unshift(path.basename(cur)); cur = up;
@@ -41,6 +41,9 @@ function realDeep(p) {
 // macOS and Windows file systems ignore case, so `~/.SSH` is `~/.ssh` there: compared folded, as the driver's `foldCase`.
 const foldCase = (p) => (process.platform === 'darwin' || process.platform === 'win32' ? String(p).toLowerCase() : String(p));
 const within = (p, root) => { const a = foldCase(p); const r = foldCase(root); return a === r || a.startsWith(r.endsWith(path.sep) ? r : r + path.sep); };
+const WINDOWS = process.platform === 'win32';
+/** A Bash system directory named as such (`/usr/bin`, `/dev/null`): on Windows it is Git's own, not a drive path. */
+const systemNamed = (raw) => WINDOWS && SYSTEM_READ.some((d) => raw === d || raw.startsWith(d + '/'));
 
 function context(input, env) {
   const state = realDeep(env.AUTOPILOT_STATE);
@@ -66,12 +69,13 @@ function context(input, env) {
     // Otherwise sessions read freely and write in the clone and the machine's temp directories.
     strict: run.sandbox === true,
     project: config.project ? realDeep(config.project) : null,
-    temp: [`/tmp/claude-${uid}`, `/private/tmp/claude-${uid}`, ...(input.scratchpad_dir ? [realDeep(input.scratchpad_dir)] : []), ...(run.sandbox === true ? [] : [realDeep(os.tmpdir()), '/tmp', '/private/tmp'])],
+    temp: [`/tmp/claude-${uid}`, `/private/tmp/claude-${uid}`, ...(input.scratchpad_dir ? [realDeep(input.scratchpad_dir)] : []), ...(run.sandbox === true ? [] : [realDeep(os.tmpdir()), '/tmp', '/private/tmp'])]
+      .map((t) => (WINDOWS && t.startsWith('/') ? realDeep(fromBash(t)) : t)),
   };
 }
 
 function git(cwd, ...args) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true });
   return { ok: r.status === 0, out: (r.stdout ?? '').trim() };
 }
 
@@ -79,14 +83,15 @@ function git(cwd, ...args) {
 
 /** 'rw', 'ro' or a denial reason for one path. `bash` adds the system directories a command may name. */
 function classify(ctx, raw, { bash = false } = {}) {
+  if (bash && systemNamed(raw)) return 'ro';
   let p = raw.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home);
   if (ctx.scratch) p = p.replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch);
-  p = realDeep(path.resolve(ctx.cwd, p));
+  p = realDeep(path.resolve(ctx.cwd, fromBash(p)));
   if (ctx.scratch && within(p, ctx.scratch)) return 'rw';
   // A session the driver resumes (after a usage-limit wait, or to continue a build) remembers the scratch folder of the
   // step it began in; seen live (Pilot Light, 2026-11-23): build-2 wrote to build-1's and was refused. The earlier steps'
   // scratch folders of the same epic are the same kind of place: private, and in this run.
-  if (ctx.scratch && ctx.epic && /^\/[^/]+\/scratch(\/|$)/.test(p.startsWith(path.join(ctx.runDir, 'epics', ctx.epic)) ? p.slice(path.join(ctx.runDir, 'epics', ctx.epic).length) : '')) return 'rw';
+  if (ctx.scratch && ctx.epic && /^[\\/][^\\/]+[\\/]scratch([\\/]|$)/.test(p.startsWith(path.join(ctx.runDir, 'epics', ctx.epic)) ? p.slice(path.join(ctx.runDir, 'epics', ctx.epic).length) : '')) return 'rw';
   if (ctx.role === 'auditor') {
     if (ctx.step && within(p, path.join(ctx.step, 'bundle'))) return 'ro';
     if (within(p, ctx.clone)) return 'ro';
@@ -103,9 +108,9 @@ function classify(ctx, raw, { bash = false } = {}) {
   if (within(p, PLUGIN_DIR)) return 'ro';
   const claude = path.join(ctx.home, '.claude');
   if (USER_READ.some((d) => within(p, path.join(claude, d)))) return 'ro';
-  if (within(p, path.join(claude, 'projects')) && /\/memory(\/|$)/.test(p.slice(claude.length))) return 'ro';
+  if (within(p, path.join(claude, 'projects')) && /[\\/]memory([\\/]|$)/.test(p.slice(claude.length))) return 'ro';
   // Where Claude Code saves a tool's output when it is too long to show: the session is told to read it there (seen live: a probe could not read its own test output).
-  if (within(p, path.join(claude, 'projects')) && /\/tool-results\//.test(p.slice(claude.length))) return 'ro';
+  if (within(p, path.join(claude, 'projects')) && /[\\/]tool-results[\\/]/.test(p.slice(claude.length))) return 'ro';
   if (bash && (p === '/' || SYSTEM_READ.some((d) => within(p, d)))) return 'ro';
   if (ctx.strict || ctx.role === 'auditor') return `${raw} is outside the private clone`;
   // Not strict: a session may read anywhere on the machine except where credentials and Claude Code's own files live.
@@ -202,7 +207,8 @@ function visibleWrites(s, ctx = null) {
   // An in-place editor's arguments are its script and the files it edits. It edits only files that exist, and a script
   // (`/pattern/d`, `s/a/b/`) is not one: seen live, `sed -i '' -e '/global using X/d' file` was refused for its script.
   if (['sed', 'gsed', 'perl', 'ruby'].includes(s.cmd)) {
-    const real = (t) => { try { return fs.existsSync(path.resolve(ctx?.cwd ?? '.', t.replace(/^~(?=\/|$)/, ctx?.home ?? os.homedir()))); } catch { return false; } };
+    // A Bash system path (/etc/hosts) is Git's own file on Windows, not C:\etc\hosts: it counts as one that exists.
+    const real = (t) => { try { return systemNamed(t) || fs.existsSync(path.resolve(ctx?.cwd ?? '.', fromBash(t.replace(/^~(?=\/|$)/, ctx?.home ?? os.homedir())))); } catch { return false; } };
     return [...s.redirects, ...bashWriteTargets([{ ...s, redirects: [] }]).filter(real)].filter((t) => t && !t.includes('://') && !t.startsWith('/dev/') && !t.startsWith('&'));
   }
   const more = ['touch', 'mkdir', 'rmdir', 'ln', 'chmod', 'chown', 'rsync'].includes(s.cmd) ? (s.cmd === 'rsync' || s.cmd === 'ln' ? a.slice(-1) : a) : [];
@@ -303,17 +309,18 @@ function ruleR2Bash(base, segs, command) {
         // Going somewhere readable only to look (cd into a package cache, then ls and grep) is fine; going there in a command that also writes is not.
         const looking = c === 'ro' && !ctx.strict && s.cmd !== 'git' && !segs.some((x) => visibleWrites(x, ctx).length);
         if (c !== 'rw' && !looking) return deny('R2', `path jail — ${s.cmd} target: ${c === 'ro' ? `${t} is outside the private clone` : c}`);
-        if (s.cmd !== 'git') ctx = { ...ctx, cwd: realDeep(path.resolve(ctx.cwd, t.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home).replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch ?? '$AUTOPILOT_SCRATCH'))) };
+        if (s.cmd !== 'git') ctx = { ...ctx, cwd: realDeep(path.resolve(ctx.cwd, fromBash(t.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home).replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch ?? '$AUTOPILOT_SCRATCH')))) };
         continue;
       }
       const p = t.replace(/^-{1,2}[A-Za-z][\w-]*=/, '').replace(/^\d*&?>>?/, '');
       if (!p || p.includes('://')) continue;
-      const absolute = /^(~|\$\{?HOME\}?|\$\{?AUTOPILOT_SCRATCH\}?)?\//.test(p);
-      const climbs = p.split('/').includes('..');
+      // A drive path (C:\… or C:/…) is as absolute as /…: on Windows a command may name one.
+      const absolute = /^(~|\$\{?HOME\}?|\$\{?AUTOPILOT_SCRATCH\}?)?\//.test(p) || (WINDOWS && /^[A-Za-z]:[\\/]/.test(p));
+      const climbs = p.split(/[\\/]/).includes('..');
       if (!absolute && !climbs) continue;
-      if (absolute && p.startsWith('/')) {
+      if (absolute && p.startsWith('/') && !systemNamed(p)) {
         // A token like '/foo/' in a regex is not a path: nothing can be read where the first component does not exist.
-        const first = '/' + p.split('/')[1];
+        const first = fromBash('/' + p.split('/')[1]);
         if (first !== '/' && !fs.existsSync(first)) continue;
       }
       const d = check(p, 'path in command'); if (d) return d;
@@ -328,7 +335,7 @@ function ruleR2Bash(base, segs, command) {
     }
     // A declared read-only directory is read by commands and never written: a redirect into it is refused here (the sandbox refuses the rest).
     for (const r of s.redirects) {
-      const p = realDeep(path.resolve(ctx.cwd, r.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home)));
+      const p = realDeep(path.resolve(ctx.cwd, fromBash(r.replace(/^~(?=\/|$)/, ctx.home).replace(/\$\{?HOME\}?/g, ctx.home))));
       if ((ctx.run.readOnly ?? []).some((d) => typeof d === 'string' && d && within(p, d)) || (ctx.run.readFiles ?? []).includes(p)) return deny('R2', `path jail — ${r} is read-only for this session`);
     }
   }
@@ -352,7 +359,7 @@ function ruleR3(ctx, segs, command) {
     let i = 1; let dir = ctx.cwd;
     for (; i < s.argv.length && s.argv[i].startsWith('-'); i++) {
       const o = s.argv[i];
-      if (o === '-C') { dir = path.resolve(dir, s.argv[++i] ?? '.'); continue; }
+      if (o === '-C') { dir = path.resolve(dir, fromBash(s.argv[++i] ?? '.')); continue; }
       if (o === '-c') { if (/^(alias\.|core\.(hookspath|sshcommand|fsmonitor|editor|pager))/i.test(s.argv[++i] ?? '')) return deny('R3', 'git -c may not set aliases or commands'); continue; }
       if (/^--(git-dir|work-tree|exec-path)/.test(o)) return deny('R3', `git ${o.split('=')[0]} is denied`);
     }
@@ -366,7 +373,7 @@ function ruleR3(ctx, segs, command) {
     // A worktree the session made in its scratch folder is removed with --force when it has files in it (seen live, three
     // times, Pilot Light 2026-11-23). That is the one forced command that can only touch the session's own scratch folder.
     const scratchWorktree = sub === 'worktree' && names[0] === 'remove' && names.length === 2 && ctx.scratch
-      && classify(ctx, plain(names[1])) === 'rw' && /(^|\/)scratch(\/|$)/.test(realDeep(path.resolve(dir, String(plain(names[1])).replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch))));
+      && classify(ctx, plain(names[1])) === 'rw' && /(^|[\\/])scratch([\\/]|$)/.test(realDeep(path.resolve(dir, fromBash(String(plain(names[1])).replace(/\$\{AUTOPILOT_SCRATCH\}|\$AUTOPILOT_SCRATCH\b/g, ctx.scratch)))));
     if (args.some((a) => /^--force/.test(a)) && !scratchWorktree) return deny('R3', 'git --force is denied');
     if (['branch', 'tag', 'switch', 'checkout'].includes(sub) && args.some((a) => /^-[a-zA-Z]*f/.test(a))) return deny('R3', `git ${sub} -f is denied`);
     if (sub === 'reset' && has('--hard')) return deny('R3', 'git reset --hard is denied');
@@ -436,7 +443,7 @@ function ruleR5(ctx) {
   const cacheFile = path.join(ctx.step, 'du.json');
   let cache = readJson(cacheFile);
   if (!cache || Date.now() - cache.at > 30000) { // du is slow on a big tree: measure at most every 30 s
-    const r = spawnSync('du', ['-sk', ctx.clone], { encoding: 'utf8' });
+    const r = spawnSync('du', ['-sk', ctx.clone], { encoding: 'utf8', windowsHide: true });
     cache = { at: Date.now(), mb: parseInt(r.stdout, 10) / 1024 };
     try { fs.writeFileSync(cacheFile, JSON.stringify(cache)); } catch { /* next call measures again */ }
   }
@@ -455,7 +462,7 @@ function ruleR7(ctx, targets) {
   const dirs = testDirs(ctx);
   let reasons = null; let named = null;
   for (const raw of targets) {
-    const rel = path.relative(ctx.clone, realDeep(path.resolve(ctx.cwd, raw))).split(path.sep).join('/');
+    const rel = path.relative(ctx.clone, realDeep(path.resolve(ctx.cwd, fromBash(raw)))).split(path.sep).join('/');
     if (rel.startsWith('..') || rel === '.autopilot/test-changes.jsonl') continue;
     if (!dirs.some((d) => rel.startsWith(d))) continue;
     if (!git(ctx.clone, 'cat-file', '-e', `${ctx.integration}:${rel}`).ok) continue; // new in this epic: free to change
@@ -737,7 +744,7 @@ function ruleR9(ctx) {
   const lint = plan.trim() ? lintPlan(plan, anchors(ctx)) : { pass: false, problems: ['ExitPlanMode carried no plan text'], anchors: anchors(ctx), checkedAt: new Date().toISOString() };
   if (ctx.step) fs.writeFileSync(path.join(ctx.step, 'plan-lint.json'), JSON.stringify(lint, null, 2) + '\n');
   if (lint.pass) return { rule: 'R9', decision: 'capture', reason: 'plan captured and approved by lint, not by a person', stop: 'autopilot: plan captured' };
-  const gate = writeGate(ctx, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: `The captured plan failed plan lint (${lint.problems.join('; ')}). Approve it as it is, or have it planned again?`, options: ['Approve this plan', 'Re-plan'], why: lint.problems.join('; '), artifacts: ctx.step ? [path.relative(ctx.state, path.join(ctx.step, 'plan.md'))] : [] });
+  const gate = writeGate(ctx, { kind: 'plan-lint', skillStep: 'start-epic Step 4 (plan approval)', question: `The captured plan failed plan lint (${lint.problems.join('; ')}). Approve it as it is, or have it planned again?`, options: ['Approve this plan', 'Re-plan'], why: lint.problems.join('; '), artifacts: ctx.step ? [path.relative(ctx.state, path.join(ctx.step, 'plan.md')).split(path.sep).join('/')] : [] });
   return { rule: 'R9', decision: 'park', reason: `plan lint failed: ${lint.problems.join('; ')}`, gate, stop: 'autopilot: parked at human gate' };
 }
 
@@ -751,7 +758,7 @@ function ruleR9(ctx) {
 function ruleR10(ctx, targets) {
   if (!/^catchup-\d+$/.test(path.basename(ctx.step ?? ''))) return null;
   for (const raw of targets) {
-    const rel = path.relative(ctx.clone, realDeep(path.resolve(ctx.cwd, String(raw)))).split(path.sep).join('/');
+    const rel = path.relative(ctx.clone, realDeep(path.resolve(ctx.cwd, fromBash(String(raw))))).split(path.sep).join('/');
     if (rel === 'docs/requirements' || rel.startsWith('docs/requirements/')) return deny('R10', `a catch-up session never edits a requirement file (${rel}). Run \`git merge --abort\` and ask with AskUserQuestion: name the file and what each side wants`);
   }
   return null;
@@ -769,7 +776,7 @@ function localPage(raw, ctx) {
   if (!u) return false;
   if (u.protocol === 'about:') return u.href === 'about:blank';
   if (u.protocol === 'file:') {
-    let p; try { p = realDeep(decodeURIComponent(u.pathname)); } catch { return false; }
+    let p; try { p = realDeep(fileURLToPath(u)); } catch { return false; }
     return within(p, ctx.clone) || (!!ctx.scratch && within(p, ctx.scratch));
   }
   return ['http:', 'https:', 'ws:', 'wss:'].includes(u.protocol) && isLocalHost(u.hostname);

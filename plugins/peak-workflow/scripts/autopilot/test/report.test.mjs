@@ -17,7 +17,11 @@ const FIXTURE = path.join(HERE, 'fixtures', 'report');
 const STATE = path.join(FIXTURE, 'state'); // the workspace
 const RUN = '20261112-220500';
 const runDir = (ws = STATE) => path.join(ws, 'runs', RUN);
-const scrub = (text, dir = STATE) => text.replaceAll(dir, '<workspace>');
+// The workspace path is scrubbed; the separator after it is `/` on every system, so one golden file serves all.
+// report.json holds the path JSON-escaped (on Windows every backslash doubled): both forms are scrubbed.
+const esc = (x) => JSON.stringify(x).slice(1, -1);
+const scrub = (text, dir = STATE) => [[esc(dir) + esc(path.sep), esc(dir)], [dir + path.sep, dir]]
+  .reduce((t, [withSep, bare]) => t.replaceAll(withSep, '<workspace>/').replaceAll(bare, '<workspace>'), text);
 
 function golden(name, actual) {
   const file = path.join(FIXTURE, name);
@@ -46,7 +50,7 @@ test('report data: outcomes, evidence, referee counts and next steps come from f
   for (const k of ['id', 'outcome', 'reason', 'checks', 'audit', 'gates', 'costUsd', 'turns', 'wallMs', 'sessions']) assert.ok(k in r.epics[0], k);
   assert.match(r.next[0], /Answer 2 waiting questions: `\/peak-workflow:autopilot report` \(Lg4Fx2q, Lg6Bud2\)/);
   // The command that brings the work in is kept as a record for the skill, which runs it for the owner; the owner is never handed it.
-  assert.equal(r.fetch, `git fetch "${STATE}/clone" develop:autopilot/develop && git log develop..autopilot/develop`);
+  assert.equal(r.fetch, `git fetch "${path.join(STATE, 'clone')}" develop:autopilot/develop && git log develop..autopilot/develop`);
   assert.ok(!r.next.some((n) => /\bgit \w|start-epic|wrapup-epic|by hand/i.test(n)), r.next.join('\n'));
   assert.ok(r.next.some((n) => n.includes('Run `/peak-workflow:autopilot`: it shows you what is new and brings it into your project for you, after asking.')), r.next.join('\n'));
 });

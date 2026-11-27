@@ -9,7 +9,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, atLimit, localDate, ensureResumeGates, gateReason, newRunName, standingAnswer, standingCovers, strayProcesses } from '../driver.mjs';
 import { chainOf, eventLine, leftLines, progressLine, queueLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
-import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
+import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, quick, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, lines: () => r.stdout.trim().split('\n'), json: () => JSON.parse(r.stdout) }; };
 const NAME = `${E1.id} — CSV import`;
@@ -32,10 +32,10 @@ test('watch on a finished run: one line on where it ended, then RUN ENDED, exit 
   assert.deepEqual(r.lines(), ['The last autopilot run has ended: 1 finished and merged. Spent $2.01 of $250.', 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.']);
 
   // --replay says the whole run again, from its first event; --once --after picks up where a caller left off.
-  const replay = driver('watch', '--workspace', p.state, '--replay').lines();
+  const replay = driver('watch', '--workspace', p.state, '--replay').lines().map(quick);
   assert.deepEqual([replay[1], replay[2], replay.at(-2), replay.at(-1)], ['Autopilot started: 1 epic queued.', `Starting ${NAME}`, `Finished and merged: ${NAME} (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.']);
   assert.equal(replay.filter((l) => /^RUN ENDED/.test(l)).length, 1);
-  assert.deepEqual(driver('watch', '--workspace', p.state, '--once', '--after', '13').lines(), [`Finished and merged: ${NAME} (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.']);
+  assert.deepEqual(driver('watch', '--workspace', p.state, '--once', '--after', '13').lines().map(quick), [`Finished and merged: ${NAME} (under a minute, $2.01)`, 'RUN ENDED: everything queued was worked through. Spent $2.01 of $250.']);
 
   // A run from before events existed is still read from its state; a workspace with no run says so.
   fs.rmSync(path.join(p.runDir(), 'events.jsonl'));
@@ -388,7 +388,7 @@ test('watch and status see inside the step: a command marked "Needs you:" is sai
 
   // An ordinary command that has been open a while is said once, with the session's own description of it.
   await waitFor(() => w.lines().some((l) => /^One command has been running/.test(l)));
-  assert.deepEqual(w.lines().filter((l) => /^One command/.test(l)), ['One command has been running for 0 min: "Run the unit tests"']);
+  assert.deepEqual(w.lines().filter((l) => /^One command/.test(l)).map(quick), ['One command has been running for 0 min: "Run the unit tests"']);
   const s1 = st(p);
   assert.deepEqual([s1.next, s1.inFlight.description, s1.inFlight.needsYou], ['attend', 'Run the unit tests', false]);
   assert.match(s1.say[2], /^Nothing needs you right now: it is verifying/);
@@ -457,7 +457,7 @@ test('the progress line counts how each epic of the run ended, and what is still
   assert.equal(progressLine(new Map(), 2), 'Progress: 2 still to go (2 epics in this run)');
 });
 
-test('a process a session leaves running out of the clone is stopped when the session ends, and the log says so', async (t) => {
+test('a process a session leaves running out of the clone is stopped when the session ends, and the log says so', { skip: process.platform === 'win32' && 'Windows cannot tell a process working in the clone by a relative path; see the next test' }, async (t) => {
   const p = makeProject(t);
   // As seen live: a server started detached from the session (its own daemon mode, or nohup) keeps running after it.
   const daemon = { do: 'exec', cmd: `node -e "const c=require('child_process').spawn('sleep',['300'],{detached:true,stdio:'ignore'});require('fs').writeFileSync(process.argv[1],String(c.pid));c.unref()" "{{state}}/stray.pid"` };
@@ -473,6 +473,22 @@ test('a process a session leaves running out of the clone is stopped when the se
   assert.deepEqual(strayProcesses(p.clone), []);
   // A status or a watch reading the clone, and this test, are never swept.
   assert.equal(st(p, '--queue', E1.id).next, 'fetch');
+});
+
+test('Windows: a process a session leaves running that names the clone on its command line is stopped when the session ends', { skip: process.platform !== 'win32' && 'the test above covers macOS and Linux' }, async (t) => {
+  const p = makeProject(t);
+  // A dev server as Node tools start one: its script is a path in the clone.
+  const daemon = { do: 'exec', cmd: `node -e "require('fs').mkdirSync('node_modules',{recursive:true});require('fs').writeFileSync('node_modules/serve.js','setInterval(()=>{},1<<30)');const c=require('child_process').spawn(process.execPath,[require('path').resolve('node_modules/serve.js')],{detached:true,stdio:'ignore'});require('fs').writeFileSync(process.argv[1],String(c.pid));c.unref()" "{{state}}/stray.pid"` };
+  const scripts = happy(E1);
+  scripts[`${E1.id}/verify`].actions.unshift(daemon);
+  p.scenario(scripts);
+  await p.go();
+  const pid = Number(fs.readFileSync(path.join(p.state, 'stray.pid'), 'utf8'));
+  t.after(() => { try { process.kill(pid, 'SIGKILL'); } catch { /* gone, as it should be */ } });
+  assert.equal(p.epic(E1.id).state, 'MERGED');
+  await waitFor(() => !alive(pid), { timeoutMs: 5000 });
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), new RegExp(`verify-1 left 1 process\\(es\\) running in the clone; stopped: ${pid} `));
+  assert.deepEqual(strayProcesses(p.clone), []);
 });
 
 test('the run budget: $250 by default, the project may set its own, and a higher one raises a chain in progress', async (t) => {

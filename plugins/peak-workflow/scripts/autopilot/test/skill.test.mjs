@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { PLUGIN_DIR, localDate, run } from '../driver.mjs';
-import { DRIVER, E1, addEpic, alive, buildActions, git, happy, makeProject, planScript, readJson, waitFor, wrapupScript } from './helpers.mjs';
+import { DRIVER, E1, addEpic, alive, buildActions, git, happy, makeProject, planScript, readJson, WAIT_MS, waitFor, wrapupScript } from './helpers.mjs';
 
 const SKILL = fs.readFileSync(path.join(PLUGIN_DIR, 'skills', 'autopilot', 'SKILL.md'), 'utf8');
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, json: () => JSON.parse(r.stdout) }; };
@@ -28,7 +28,7 @@ async function launchAndWait(launch) {
   assert.equal(r.status, 0);
   const lock = path.join(launch.workspace, 'lock');
   const pid = await waitFor(() => readJson(lock).pid);
-  await waitFor(() => !fs.existsSync(lock) && fs.existsSync(path.join(launch.runDir, 'report.md')), { timeoutMs: 60000 });
+  await waitFor(() => !fs.existsSync(lock) && fs.existsSync(path.join(launch.runDir, 'report.md')), { timeoutMs: 3 * WAIT_MS });
   await waitFor(() => !alive(pid));
 }
 /** SKILL.md Step 2 item 4: the run's config.json, and nothing else. */

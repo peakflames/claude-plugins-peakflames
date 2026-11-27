@@ -265,7 +265,7 @@ test('configure --budget sets a step\'s model, effort and caps without hand-edit
   assert.deepEqual([caps.verify.model, caps.verify.effort, caps.plan.model, caps.fix.model], ['opus', 'high', 'sonnet', 'sonnet']); // each step has its own model
   const dry = driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout;
   assert.match(dry, /build-1 — role builder, wall clock 120 min/);
-  assert.match(dry.split('\n').find((l) => l.includes('/build-1/settings.json') && l.includes('--model')), /--max-budget-usd 25 .*--model opus --effort medium/);
+  assert.match(dry.split('\n').find((l) => l.includes(`${path.sep}build-1${path.sep}settings.json`) && l.includes('--model')), /--max-budget-usd 25 .*--model opus --effort medium/);
 
   // The workspace's settings.json is read after the project's file: say so instead of saving silently.
   const ws = path.join(p.state, 'settings.json');
@@ -304,8 +304,9 @@ test('prepare --gate tries the other quality gates in the clone after the tests:
 
 test('files CLAUDE.md names outside the project: single existing files in backticks, never credentials, settings, history or transcripts', (t) => {
   const p = makeProject(t);
-  const home = path.join(p.tmp, 'home'); const old = process.env.HOME;
-  process.env.HOME = home; t.after(() => { process.env.HOME = old; });
+  const home = path.join(p.tmp, 'home'); const old = process.env.HOME; const oldProfile = process.env.USERPROFILE;
+  process.env.HOME = home; process.env.USERPROFILE = home; // Windows reads the home folder from USERPROFILE
+  t.after(() => { process.env.HOME = old; if (oldProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = oldProfile; });
   const mk = (rel, link = null) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); if (link) fs.symlinkSync(path.join(home, link), f); else fs.writeFileSync(f, 'x'); return f; };
   const tether = mk('.claude/scripts/tethered.mjs'); const tool = mk('tools/lint.sh'); const fenced = mk('tools/fenced.sh');
   for (const f of ['.claude/.credentials.json', '.claude/settings.json', '.claude/projects/x/t.jsonl', '.claude/state/x.json', '.claude.json', '.ssh/config', '.zsh_history', 'work/other/.env', '.claude/scripts/unnamed.mjs']) mk(f);
@@ -319,7 +320,7 @@ test('files CLAUDE.md names outside the project: single existing files in backti
     '```sh', 'sh $HOME/tools/fenced.sh --fix', '```',
   ].join('\n');
   const r = claudeMdReads(md, { project: p.project, workspace: p.state });
-  assert.deepEqual(r.files, [tether, tool, fenced].map((f) => fs.realpathSync(f)));
+  assert.deepEqual(r.files, [tether, tool, fenced].map((f) => fs.realpathSync.native(f)));
   assert.deepEqual(r.refused.map((x) => x.path), ['~/.claude/.credentials.json', '~/.claude/settings.json', '~/.claude/projects/x/t.jsonl', '~/.claude/state/x.json', '~/.claude.json', '~/.ssh/config', '~/.zsh_history', '~/work/other/.env', '~/.claude/scripts/link.mjs']);
   assert.ok(r.refused.every((x) => /credentials|sign-in/.test(x.why)));
   // macOS and Windows ignore case in file names: a path spelled in capitals is the same private place.
@@ -330,12 +331,13 @@ test('files CLAUDE.md names outside the project: single existing files in backti
 test('a run hands the files CLAUDE.md names to the referee and says so at launch', async (t) => {
   const p = makeProject(t, { config: { sandbox: true } });
   const script = path.join(p.tmp, 'tools', 'tether.mjs'); fs.mkdirSync(path.dirname(script)); fs.writeFileSync(script, '// starts a dev server\n');
-  fs.appendFileSync(path.join(p.project, 'CLAUDE.md'), `\nStart dev servers with \`node ${script} start\`.\n`);
+  // Quoted: on Windows the temp path can hold a space (C:\Users\Todd Schavey), as a user's own path may.
+  fs.appendFileSync(path.join(p.project, 'CLAUDE.md'), `\nStart dev servers with \`node "${script}" start\`.\n`);
   git(p.project, 'commit', '-qam', 'docs: name the dev-server script');
   assert.deepEqual(driver('preflight', '--project', p.project, '--json', '--allow-test-double').json().launch.env.readFiles, [script]);
   assert.ok(driver('run', '--project', p.project, '--workspace', p.state, '--dry-run').stdout.includes(`files CLAUDE.md names outside the project: ${script}`));
   const s = happy(E1);
-  s[`${E1.id}/build`].actions.unshift({ do: 'tool', tool_name: 'Bash', tool_input: { command: `node ${script} start` } }, { do: 'tool', tool_name: 'Read', tool_input: { file_path: path.join(p.tmp, 'tools', 'other.mjs') } });
+  s[`${E1.id}/build`].actions.unshift({ do: 'tool', tool_name: 'Bash', tool_input: { command: `node "${script}" start` } }, { do: 'tool', tool_name: 'Read', tool_input: { file_path: path.join(p.tmp, 'tools', 'other.mjs') } });
   p.scenario(s);
   const state = await p.go();
   assert.deepEqual(state.readFiles, [script]);
@@ -432,8 +434,8 @@ test('prepare on a project with no tests yet: the proof passes and says the test
 // ---- the Python guard (scripts/tor-lifecycle) ----------------------------------------------
 
 test('tor-lifecycle: an old python3 first on PATH does not hide a newer one further along', { skip: process.platform === 'win32' }, (t) => {
-  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-py-')));
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-py-')));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10 }));
   // Two stand-in interpreters: each answers the version probe; the newer one says what it was asked to run.
   const fake = (dir, version, ok) => {
     fs.mkdirSync(path.join(tmp, dir));
@@ -452,8 +454,8 @@ test('tor-lifecycle: an old python3 first on PATH does not hide a newer one furt
 
 test('preflight: with no Python 3.11 the format guard refuses in one line, not the whole install hint of the guard (Step 10)', (t) => {
   const p = makeProject(t);
-  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-nopy-')));
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-nopy-')));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10 }));
   // The real guard, with every interpreter it probes answering "too old" or "not here".
   const guard = fs.readFileSync(path.join(PLUGIN_DIR, 'scripts', 'tor-lifecycle'), 'utf8');
   const blind = guard.replace(/^probe\(\) \{\n[^\n]*\n\}/m, 'probe() { return 1; }');

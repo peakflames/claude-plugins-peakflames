@@ -5,6 +5,10 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 ## Where things stand
 
+- **2026-11-27, first suites on Windows** (owner's Windows 11 PC, i3-10100, Git Bash, Node 26,
+  Python 3.15 via `py -3`). The driver suite flooded the machine with console windows and hung;
+  the causes and fixes are in "Windows, 2026-11-27" below. All three suites run there now. No
+  real autopilot run on Windows yet: that is next (Pilot Light, #41).
 - **2026-11-25 evening, Pilot Light.** Issues #10 and #12 there went through triage, discover,
   capture and plan into one epic, 4lF6gDZ (outstanding-paths-and-replaced), approved by proxy
   while the owner was out. Autopilot built it (run `20261125-202319`), the owner looked (with
@@ -60,6 +64,33 @@ seen again, and two Windows fixes he carries locally that this branch lacks; his
 asked for on #41. #43 tracks B11 only (sessions cannot use MCP connectors); its body is a pasted
 evaluation whose other lessons repeat #41. His run logs are on his machine
 (`Wayframe.autopilot/runs/20261121-130134/`).
+
+## Windows, 2026-11-27
+
+What the first Windows suite runs found (#41 B8, the "36 failing tests"), all fixed on this
+branch and tested on Windows only by the suites (not yet in a real run):
+
+| Cause | Effect | Fix |
+|---|---|---|
+| `detached: true` on Windows is a process with no console | every `sh`, `git`, hook a session ran opened a window (hundreds) | `SESSION_SPAWN`: not detached on Windows; `windowsHide` on every spawn |
+| `process.kill(-pid)` is Unix-only | a session was never really stopped | `killGroup`: `taskkill /T /F` on Windows |
+| `shell: true` is `cmd.exe` | project commands lost `;`, `>&2`, `$VAR`; missing command exit 1, not 127 | `PROJECT_SHELL`: `sh` (Git Bash) on Windows |
+| `fs.realpathSync` keeps 8.3 names (`TODDSC~1`) | the project "is not a git root"; jail compares failed | `realpathSync.native` everywhere but the main-module checks |
+| Git Bash paths (`/c/…`, `/tmp`) read as `C:\c\…`, `C:\tmp` | the jail refused the clone and `/tmp` (Arun's `/tmp/chk.json`) | `fromBash` in `lib.mjs`, used by the referee and `expandHome` |
+| `ps -axo`, `lsof` do not exist | strays never found; a test hung for good | `processTable()` (CIM on Windows); strays by program or command line |
+| `core.autocrlf=true` | plugin text CRLF, text tests failed | `.gitattributes`: LF for peak-workflow, its tests and the lab |
+
+Platform facts the code now relies on:
+- **A non-detached child on Windows dies with the driver** (libuv puts it in a kill-on-close
+  job). A `kill -9` of the driver ends its session too; resume starts the step again.
+- **Strays on Windows are found by command line only.** One started by a relative path
+  (`bun apps/api/src/index.ts`) is not seen; it ends when the driver exits (same job). Open item.
+- **The suites are slow there:** a process start is 100–200 ms (macOS: a few). Driver suite
+  about 80 minutes (381 tests: 358 pass, 16 skipped, 7 failed on timing alone and pass after the fix, re-run by name, 2026-11-27); `waitFor` waits 60 s there, and a duration in a fake run's line is read with `quick()`. Run single files or `--test-name-pattern` while
+  fixing.
+- **Projects stay CRLF on Windows** (Pilot Light: 541 files). `preflight` on that CRLF checkout
+  read the test command, the four test folders and all 18 epics correctly and wrote nothing
+  (2026-11-27). A real run is the rest of the check.
 
 ## How to work with the owner
 
