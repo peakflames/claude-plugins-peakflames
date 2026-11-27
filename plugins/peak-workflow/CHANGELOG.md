@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`setup` pins line endings to LF** — a missing `* text=auto eol=lf` rule is listed in the confirmation and added to `.gitattributes`, so a Windows checkout no longer fails its formatter or lint on CRLF (#41, seen on Pilot Light: 194 Biome errors).
 - **Windows launch note** — on Windows the launch screen says autopilot is not yet proven there, and to send the run's report and `hooks.jsonl` to the maintainer (#41) when a run breaks.
 - **Autopilot run announcer** — chat lines now say which epic of how many is starting, what
   comes next after each step, and "n of m done (%)" over the confirmed queue across relaunches;

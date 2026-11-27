@@ -1032,7 +1032,7 @@ The summary also carries the housekeeping that used to be separate questions: re
 will be created (README, CHANGELOG, the docs stubs, and on a new project the format stamp
 `docs/.peak-workflow.toml` — listed as *"skipped until Python 3.11+ is installed"* when Step 1
 found none, with the install hint), `.gitignore` entries that will be appended (existing
-repositories), recommended add-on skills not yet installed (Step 8), the shadcn helper on shadcn
+repositories), the LF line-ending rule when `.gitattributes` lacks one (Step 7.4b), recommended add-on skills not yet installed (Step 8), the shadcn helper on shadcn
 stacks when it is not already present (Step 9.0 — *"I'll add the shadcn/ui helper for Claude — a
 skill and a component-lookup server — so it builds screens with the right components"*), the
 Playwright browser download on web and static SPA stacks (*"I'll download the test browser"* when
@@ -1415,6 +1415,33 @@ Check whether `.gitignore` exists at the repo root.
   bare `.claude/` line) — Step 9.0 commits them. List a fix in the confirmation that narrows such a
   pattern to `.claude/settings.local.json`, which stays ignored.
 
+### 7.4b: Line endings (.gitattributes)
+
+Run with 7.4, before the Step 3 confirmation. Git for Windows checks text out with CRLF by
+default, and formatters (Biome, Prettier, Ruff), linters and peak-workflow's own scripts expect
+LF, so a Windows checkout without an LF rule fails its lint for no real reason. Every project type
+gets the rule, because a teammate or a later machine may be on Windows.
+
+Check the repo-root `.gitattributes` for a line that sets `eol=lf` on `*` (e.g. `* text=auto eol=lf`).
+
+- **Present:** `[PASS] .gitattributes — line endings pinned to LF`.
+- **Missing** (no file, or no such line): `[MISS] .gitattributes — line endings not pinned`. List
+  in the Step 3 confirmation *"I'll pin line endings to LF so the project checks out the same on
+  Windows"*, and on a confirmed setup add these lines to `.gitattributes` (creating it when
+  absent, keeping any existing lines):
+
+  ```
+  # Same line endings on every machine (Git for Windows checks text out as CRLF by default).
+  * text=auto eol=lf
+  *.bat text eol=crlf
+  *.cmd text eol=crlf
+  ```
+
+  Then `git add --renormalize .`, so the setup commit also carries any file that was committed
+  with CRLF. After the setup commit, on a Windows checkout of existing code, refresh the working
+  tree to LF: `git rm -rq --cached . && git reset -q --hard` (safe only on the clean tree right
+  after that commit; never with uncommitted changes).
+
 ### 7.5: CI Configuration
 
 Check whether any of these exist:
@@ -1487,6 +1514,7 @@ Print a final checklist:
 [PASS / MISS / WEAK] CHANGELOG.md
 [PASS / MISS]        LICENSE
 [PASS / MISS / WEAK / N/A] .gitignore
+[PASS / MISS]        .gitattributes (LF)
 [PASS / MISS / N/A]  CI configuration
 [PASS / MISS / N/A]  Lockfile ({stack-specific filename})
 ```
