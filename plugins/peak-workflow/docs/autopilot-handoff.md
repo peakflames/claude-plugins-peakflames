@@ -7,8 +7,8 @@ For a fresh session, on any machine. Everything is on `feature/peak-workflow-aut
 
 - **2026-11-27, first suites on Windows** (owner's Windows 11 PC, i3-10100, Git Bash, Node 26,
   Python 3.15 via `py -3`). The driver suite flooded the machine with console windows and hung;
-  the causes and fixes are in "Windows, 2026-11-27" below. All three suites run there now. No
-  real autopilot run on Windows yet: that is next (Pilot Light, #41).
+  the causes and fixes are in "Windows, 2026-11-27" below. All three suites run there now. The
+  **first real run on Windows merged** the same day: see "First real run on Windows" below.
 - **2026-11-25 evening, Pilot Light.** Issues #10 and #12 there went through triage, discover,
   capture and plan into one epic, 4lF6gDZ (outstanding-paths-and-replaced), approved by proxy
   while the owner was out. Autopilot built it (run `20261125-202319`), the owner looked (with
@@ -90,7 +90,37 @@ Platform facts the code now relies on:
   fixing.
 - **Projects stay CRLF on Windows** (Pilot Light: 541 files). `preflight` on that CRLF checkout
   read the test command, the four test folders and all 18 epics correctly and wrote nothing
-  (2026-11-27). A real run is the rest of the check.
+  (2026-11-27). The real run below confirmed it.
+
+### First real run on Windows (2026-11-27, Pilot Light, MERGED)
+
+Epic yZQYIVE (startup-options-and-network), taken over from In Progress. Mode full, attended,
+sandbox off. Three launches (`20261127-091723`, `-095414`, `-103513`), $6.65 of $25. Driven
+by the plugin-repo session as the owner's proxy (his words, that session only), including the
+look, which was done live in Edge through playwright-cli. The work was brought in by fast-forward
+to Pilot Light develop `158d2df` (not pushed). Pilot Light #1 is closed, and the results are on #41.
+
+- **Held:** no console windows (a per-minute visible-window check never fired), no referee
+  refusals, no strays, no path trouble. `nohup … &`, the lock, `watch`, `decide` and both
+  resumes ("nothing is started over") all worked. Each epic branch was checked out on resume.
+- **Cost is wall-clock time:** a full e2e suite is about 9 minutes there. The verifier ran it two
+  to three times (39 min) to show that 2 failures were pre-existing timing flakes, and then parked
+  a `pre-existing` gate.
+- **Pilot Light needed 4 fixes first** on a Windows checkout (LF, start-up log checks with `/`
+  paths, an `act()` warning, an e2e race). `setup` Step 7.4b (`d24ac98`) now writes
+  `* text=auto eol=lf` for new projects.
+
+Open items this run found (C3, none blocked the run):
+- [ ] **A flaky readiness gate loses its first failure.** `prepare` keeps only the retry's
+  results, so the name of the test that failed first is gone. Keep the first attempt's failures.
+- [ ] **`live` is missing from `status` and `report.json`.** It is only in the gate file, and
+  an attending session that read the report treated a live look as pictures-only. Carry it
+  wherever a gate is shown.
+- [ ] **`decide` cannot attach a picture to a look.** The evidence lives only in `--note`.
+- [ ] **A proxy's answer is recorded under the git user.** `by` is `git config user.name`;
+  the proxy appears only in the note.
+- [ ] **The look gate had no useful evidence.** The build's `run-output.txt` was `bun run dev`
+  with no project folder (Pilot Light needs one), so it refused to start.
 
 ## How to work with the owner
 
@@ -126,7 +156,7 @@ Platform facts the code now relies on:
 - Shell heredocs that embed Python or JavaScript may be blocked: write a patch script to a temp
   file and run it. Make patch scripts all-or-nothing (check every anchor before writing).
 - Changelog bullets ≤ 50 words under `[3.1.0] — UNDER DEVELOPMENT`; commits
-  `<type>(peak-workflow): … (v3.1.0)`; no attribution lines.
+  `<type>(peak-workflow): … (v3.1.0)`, with the attribution lines (the owner asked for them, 2026-11-27).
 
 ## This file is the master list
 
@@ -141,7 +171,7 @@ them; the state is here. The rule:
 
 | Issue | What it tracks | State (2026-11-26) |
 |---|---|---|
-| #41 | The Windows alpha owner's feedback | **Open, Windows run results only** (the launch note is in) |
+| #41 | The Windows alpha owner's feedback | **Open:** the first real Windows run merged (2026-11-27). Waiting on Arun's confirmation, and on a real run with an amendment (B12, B16) |
 | #42 | Autopilot repairs a red base or a preflight refusal itself | Open, after beta |
 | #46 | Windows field report, 5-epic chain | Closed: items 2, 6 fixed; 1 likely fixed by `b7c2d14`; 11 answered; 9 fixed (`470576f`); rest monitored |
 | #40 | Smaller findings from the first real queue | Closed: rest monitored |
@@ -165,6 +195,9 @@ in a backlog or risk review again; reopen one only if the owner asks.
 - The fake `claude`'s remaining differences from the real one are fixed only when a live test
   shows them (2026-11-21).
 - A step may finish slightly past the run budget (#36, 2026-11-25).
+- Every connector the owner is signed into is available to sessions, read-only, and the launch
+  screen says so. Choosing connectors per epic or per run was considered and dropped as too
+  complex (2026-11-27).
 
 Closed: #38 (the fake `claude`, Step 2) and #20 (requirements lifecycle, shipped in 3.0.0), both
 2026-11-24. Not autopilot, so not in this file: #44 (port the requirements checker to Node).
