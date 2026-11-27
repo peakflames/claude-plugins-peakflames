@@ -58,7 +58,7 @@ export function collectReport(runDir) {
   const gates = everyGate.filter(({ g }) => g && ((g.run ?? runName) === runName || g.decided?.used?.run === runName || g.void?.run === runName || (queued.has(g.epic) && live(g) && g.kind !== 'preflight')))
     .map(({ file, g }) => ({
       file: `gates/${file}`, epic: g.epic, label: labelOf(g.epic), kind: g.kind, session: g.session ?? null, skillStep: g.skillStep ?? null, question: g.question ?? null, options: g.options ?? [],
-      tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], open: g.open ?? [], checks: g.checks ?? [], checklists: g.checklists ?? [], earlier: g.earlier ?? null, asks: g.asks ?? [], branch: g.branch ?? null, branchTip: g.branchTip ?? null, phase: g.phase ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
+      tor: g.tor ?? null, why: g.why ?? null, artifacts: g.artifacts ?? [], open: g.open ?? [], checks: g.checks ?? [], checklists: g.checklists ?? [], live: (g.live ?? []).map((l) => l.tor), earlier: g.earlier ?? null, asks: g.asks ?? [], branch: g.branch ?? null, branchTip: g.branchTip ?? null, phase: g.phase ?? null, resume: g.resume ?? null, decided: g.decided ?? null,
       run: g.run ?? runName, fromEarlierRun: (g.run ?? runName) !== runName, void: g.void ?? null, superseded: !!g.superseded, cleared: !!g.cleared,
       ...(g.kind === 'thin-review' ? { review: { read: g.read ?? null, of: g.of ?? null, seconds: g.seconds ?? null, unread: g.unread ?? [], untested: g.untested ?? [] } } : {}),
       // A technical stop autopilot may not answer itself any more: the one plain question the owner gets in place of the gate's own.

@@ -205,6 +205,9 @@ test('status.next: decide for a gate only the owner answers (a look, a finding t
   const s = st(p);
   assert.deepEqual([s.next, s.autoContinue, s.relaunch], ['decide', [], null]);
   assert.deepEqual(s.waiting.map((g) => [g.epic, g.kind]), [[E1.id, 'audit'], [e5.id, 'human-check']]);
+  // A look that only counts when seen for real says so here too, not only in the gate file (Pilot Light, 2026-11-27:
+  // an attending session read status and report.json, missed it, and nearly answered from pictures).
+  assert.deepEqual(s.waiting.map((g) => g.live ?? null), [null, [e5.tors[0]]]);
   assert.equal(s.say[2], '2 question(s) wait for you.');
   // An epic that depends on neither parked one can still run while their questions wait (Pilot Light, 2026-11-24:
   // a look put off with "Not now" hid gECJh6C, which was ready). `next` stays `decide`; `ready` names what can run.

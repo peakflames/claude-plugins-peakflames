@@ -119,17 +119,21 @@ variable (R2). **"Decided for you" was empty:** no session question needed a pro
 so the provisional decision paths are still unproven in a real run. Brought in by fast-forward to
 Pilot Light develop `d3772ad` (not pushed).
 
-Open items this run found (C3, none blocked the run):
-- [ ] **A flaky readiness gate loses its first failure.** `prepare` keeps only the retry's
-  results, so the name of the test that failed first is gone. Keep the first attempt's failures.
-- [ ] **`live` is missing from `status` and `report.json`.** It is only in the gate file, and
-  an attending session that read the report treated a live look as pictures-only. Carry it
-  wherever a gate is shown.
-- [ ] **`decide` cannot attach a picture to a look.** The evidence lives only in `--note`.
-- [ ] **A proxy's answer is recorded under the git user.** `by` is `git config user.name`;
-  the proxy appears only in the note.
-- [ ] **The look gate had no useful evidence.** The build's `run-output.txt` was `bun run dev`
-  with no project folder (Pilot Light needs one), so it refused to start.
+What these two runs found (C3, none blocked a run). Fixed 2026-11-27, tested on Windows by name
+(the full suite once at the end):
+- [x] **A flaky readiness gate lost its first failure.** `runGate` keeps `failing` (the test
+  names, from `failingTests`, which now also reads Bun's `(fail)` and Playwright's numbered
+  lines). A flaky gate's `first.failing` says which test failed, and the skill names it.
+- [x] **`live` was missing from `status` and `report.json`.** `status` `waiting` and the
+  report's gates now carry `live` as the requirement IDs. The skill still reads the checklist
+  from the gate file.
+- [x] **The look gate had no useful evidence.** A run command that fails to start (non-zero exit
+  that isn't the time limit, or `error:` / `exited with code` in its output) adds an
+  `artifactNotes` line. The line says the output may show nothing and how to set
+  `humanCheck["*"]`.
+
+Dropped by the owner (2026-11-27), not to be tracked: `decide` attaching a picture; a proxy's
+answer recorded under the git user; #41 I8 (a gate kind for a typed value).
 
 ## How to work with the owner
 

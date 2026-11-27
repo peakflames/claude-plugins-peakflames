@@ -458,6 +458,7 @@ test('human-check gate carries an artifact; "Looks right" goes to VERIFY and R8 
   assert.equal(g.question, `${e5.tors[0]} needs a person to check it. Does what was built look right?`);
   assert.match(g.why, /operator-observed: parks for a person before verify/);
   assert.deepEqual(g.artifacts, [`clone:tests/manual/${e5.tors[0]}.md`, `${dir}/run-output.txt`, `${dir}/files/chart.html`]);
+  assert.ok(!(g.artifactNotes ?? []).some((n) => /did not start cleanly/.test(n)), 'a run command that worked is not flagged');
   assert.match(fs.readFileSync(path.join(p.state, dir, 'run-output.txt'), 'utf8'), /^\$ echo '<svg\/>' > chart\.html && echo chart written\n\(exit 0, on feature\/epic-Lg5Chr8-chart at [0-9a-f]{40}\)\n\nchart written/);
   assert.equal(fs.readFileSync(path.join(p.state, dir, 'files', 'chart.html'), 'utf8'), '<svg/>\n');
   assert.equal(git(p.clone, 'status', '--porcelain'), '', 'the clone is left as committed');

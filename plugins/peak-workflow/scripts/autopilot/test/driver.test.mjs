@@ -380,6 +380,9 @@ test('failingTests: the failing tests in the runner\'s own words, never its summ
   assert.deepEqual(failingTests('--- FAIL: TestSum (0.00s)\nFAIL\nFAIL\tgithub.com/a/b\t0.012s'), ['--- FAIL: TestSum']);
   assert.deepEqual(failingTests('FAIL src/x.test.js\n  ✕ adds (3 ms)\n✕ 2 tests failed\n✖ 1 of 3 tests failed'), ['FAIL src/x.test.js', '✕ adds']);
   assert.deepEqual(failingTests('not ok 1 - sums\nnot ok 2 - later # TODO\nnot ok 3 - skipped # SKIP no db'), ['not ok 1 - sums']);
+  // Bun and Playwright (seen live on Pilot Light: a flaky e2e gate whose first failure was lost).
+  assert.deepEqual(failingTests('(pass) ok [1.00ms]\n(fail) drawer > jumps [12.50ms]'), ['(fail) drawer > jumps']);
+  assert.deepEqual(failingTests('  1 failed\n  1) [chromium] › tests/e2e/progress.spec.ts:48:3 › TOR-01-Ygv51rD progress\n  2 passed (9.0m)'), ['[chromium] › tests/e2e/progress.spec.ts:48:3 › TOR-01-Ygv51rD progress']);
   assert.deepEqual(failingTests(''), []);
 });
 

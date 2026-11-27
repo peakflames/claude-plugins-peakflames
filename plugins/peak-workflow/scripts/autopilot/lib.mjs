@@ -350,7 +350,8 @@ export function recommended(question) {
 }
 /**
  * The failing tests a test run's last lines name, in the runner's own words: node's `✖`, TAP's `not ok`, pytest's
- * `FAILED`, jest's `✕` (and its `FAIL <file>`, a file rather than a test), go's `--- FAIL:`. At most `max`, each once.
+ * `FAILED`, jest's `✕` (and its `FAIL <file>`, a file rather than a test), go's `--- FAIL:`, Bun's `(fail)`, and
+ * Playwright's numbered `1) [chromium] › file:line › title`. At most `max`, each once.
  * Summary lines are not tests: "✖ failing tests:", go's bare `FAIL` and `FAIL <package> <time>`, unittest's
  * `FAILED (failures=1)`, "✕ 2 tests failed", and a TAP `not ok` marked TODO or SKIP.
  */
@@ -358,9 +359,9 @@ export function failingTests(tail, max = 5) {
   const out = [];
   for (const raw of String(tail ?? '').split('\n')) {
     const l = raw.trim();
-    if (!/^(✖|✕|×|not ok\b|FAILED\b|FAIL\b|--- FAIL:)/.test(l)) continue;
+    if (!/^(✖|✕|×|not ok\b|FAILED\b|FAIL\b|--- FAIL:|\(fail\)\s|\d+\)\s+\[[^\]]+\]\s+›)/.test(l)) continue;
     if (/^✖\s*failing tests:?$/i.test(l) || /^FAIL$/.test(l) || /^FAIL\s+\S+\s+[\d.]+s$/.test(l) || /^FAILED\s*\(/.test(l) || /^[✖✕×]\s*\d+\s+(of\s+\d+\s+)?tests?\s+failed/i.test(l) || /^not ok\b.*#\s*(TODO|SKIP)\b/i.test(l)) continue;
-    const name = l.replace(/\s*\(\d[\d.]*\s*m?s\)\s*$/, '');
+    const name = l.replace(/^\d+\)\s+/, '').replace(/\s*[([]\d[\d.]*\s*m?s[)\]]\s*$/, '');
     if (!out.includes(name)) out.push(name);
     if (out.length >= max) break;
   }

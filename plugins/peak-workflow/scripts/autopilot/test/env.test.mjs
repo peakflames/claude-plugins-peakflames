@@ -526,7 +526,7 @@ test('the launch warns about sleep on macOS and on Windows', () => {
 test('prepare --gate runs a failing gate once more: one that passes the second time is flaky, not failed', (t) => {
   const p = makeProject(t);
   const marker = path.join(p.tmp, 'gate-tried');
-  const flaky = `if [ -f "${marker}" ]; then exit 0; else touch "${marker}"; echo "e2e: 1 timeout" >&2; exit 1; fi`;
+  const flaky = `if [ -f "${marker}" ]; then exit 0; else touch "${marker}"; echo "  1) [chromium] › e2e/progress.spec.ts:48:3 › progress" >&2; echo "e2e: 1 timeout" >&2; exit 1; fi`;
   const r = driver('prepare', '--project', p.project, '--gate', flaky, '--gate', 'exit 4', '--gate', 'no-such-linter-xyz .', '--gate', 'true');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const out = r.json();
@@ -534,6 +534,8 @@ test('prepare --gate runs a failing gate once more: one that passes the second t
   assert.deepEqual(out.gatesFailed, ['exit 4', 'no-such-linter-xyz .']);
   assert.deepEqual(out.gatesFlaky, [flaky]);
   assert.match(out.gates[0].first.tail, /e2e: 1 timeout/);
+  // Which test failed the first time is kept by name (Pilot Light, 2026-11-27: only "test:e2e was flaky" survived).
+  assert.deepEqual(out.gates[0].first.failing, ['[chromium] › e2e/progress.spec.ts:48:3 › progress']);
 });
 
 test('setup runs again on the epic branch when the epic adds a manifest: an epic that creates web/package.json has its dependencies before its checks', async (t) => {

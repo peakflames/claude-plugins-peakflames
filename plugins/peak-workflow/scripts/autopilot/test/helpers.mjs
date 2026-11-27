@@ -224,7 +224,7 @@ export const happy = (e) => ({ [`${e.id}/plan`]: planScript(e), [`${e.id}/build`
 // parallel suite: it waits longer. A check that really fails still fails, only later.
 export const WAIT_MS = process.platform === 'win32' ? 60000 : 20000;
 /** A line's durations read as a quick run's: a fake run can pass a minute on a slow, busy machine (an i3 under the full suite does). */
-export const quick = (l) => l.replace(/\d+ min/g, (m) => (m === '0 min' ? m : 'under a minute')).replace(/running for under a minute/g, 'running for 0 min');
+export const quick = (l) => l.replace(/\b\d+ min\b/g, (m) => (m === '0 min' ? m : 'under a minute')).replace(/running for under a minute/g, 'running for 0 min');
 export async function waitFor(fn, { timeoutMs = WAIT_MS, everyMs = 25 } = {}) {
   const until = Date.now() + timeoutMs;
   for (;;) {

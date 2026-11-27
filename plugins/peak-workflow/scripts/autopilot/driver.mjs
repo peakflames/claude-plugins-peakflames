@@ -2174,7 +2174,7 @@ class Run {
     const left = this.porcelain();
     if (left.length) { this.g('reset', '-q', '--hard'); this.clean(); }
     const pass = r.code === 0 && !r.timedOut;
-    return { command, pass, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), ms: Date.now() - started, leftovers: left, tail: pass ? undefined : `${r.out}\n${r.err}`.trim().split('\n').slice(-15).join('\n') };
+    return { command, pass, code: r.code, timedOut: r.timedOut, couldNotRun: couldNotRun(r.code), ms: Date.now() - started, leftovers: left, ...(pass ? {} : { failing: failingTests(`${r.out}\n${r.err}`), tail: `${r.out}\n${r.err}`.trim().split('\n').slice(-15).join('\n') }) };
   }
 
   /**
@@ -2185,7 +2185,7 @@ class Run {
     const first = this.runGate(command);
     if (first.pass || first.couldNotRun) return { ...first, tries: 1 };
     const second = this.runGate(command);
-    return { ...second, tries: 2, ...(second.pass ? { flaky: true, first: { code: first.code, timedOut: first.timedOut, ms: first.ms, tail: first.tail } } : {}) };
+    return { ...second, tries: 2, ...(second.pass ? { flaky: true, first: { code: first.code, timedOut: first.timedOut, ms: first.ms, failing: first.failing, tail: first.tail } } : {}) };
   }
 
   // ---- the clone's environment ---------------------------------------------------------------
@@ -3272,6 +3272,9 @@ class Run {
     const r = sh(cmd, [], { cwd: this.clone, shell: PROJECT_SHELL, timeout: Math.min(this.config.budgets.testRunMin, 2) * 60000, killSignal: 'SIGKILL' });
     fs.writeFileSync(path.join(dir, 'run-output.txt'), `$ ${cmd}\n(exit ${r.code}${r.timedOut ? ', killed at the time limit' : ''}, on ${b} at ${this.branchTip(b)})\n\n${r.out}\n${r.err ? `\n--- stderr ---\n${r.err}\n` : ''}`);
     artifacts.push(this.rel(path.join(dir, 'run-output.txt')));
+    // A run command that fails to start shows nothing of the requirement (seen live: `bun run dev` with no project folder).
+    if ((r.code !== 0 && !r.timedOut) || /exited with code [1-9]|\berror:/i.test(`${r.out}
+${r.err}`)) notes.push(`the run command (${cmd}) did not start cleanly${r.timedOut ? '' : ` (exit ${r.code})`}, so its output may show nothing of this requirement: set settings.json humanCheck["*"] to the command that starts the app for a person`);
     // Files the command left in the clone (a built page, a chart) are kept as artifacts; the clone goes back to the commit.
     for (const line of this.g('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean)) {
       const f = line.slice(3);
@@ -4742,7 +4745,7 @@ export function status(project, workspace = null, { queue = null, pluginDir = PL
   const done = completeEpics(root, ws); // a gate of an epic finished since (by hand, or merged) waits for nothing
   const open = openGates(gates, done); // while a driver runs these are the questions already asked; they can be answered now and are used by the next run
   // A technical stop autopilot may not answer itself any more is put to the owner as one plain question, in place of the gate's own.
-  const brief = (g) => { const lim = atLimitAsk(g, gates, n, labelOf(ws, g.epic)); return { file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: lim?.question ?? g.question ?? null, ...(lim ? { options: lim.options, atLimit: { stops: lim.stops } } : {}), ...(g.kind === 'resume' || technicalAnswer(g) ? { why: plainReason(gateReason(g)) } : {}) }; };
+  const brief = (g) => { const lim = atLimitAsk(g, gates, n, labelOf(ws, g.epic)); return { file: g.file, epic: g.epic, label: labelOf(ws, g.epic), kind: g.kind, question: lim?.question ?? g.question ?? null, ...(lim ? { options: lim.options, atLimit: { stops: lim.stops } } : {}), ...(g.kind === 'resume' || technicalAnswer(g) ? { why: plainReason(gateReason(g)) } : {}), ...(g.live?.length ? { live: g.live.map((l) => l.tor) } : {}) }; };
   const covered = open.filter((g) => standingCovers(g, gates, n));
   const waiting = open.filter((g) => !covered.includes(g));
   // What autopilot decided in the owner's name in this chain of runs, for the closing screen.

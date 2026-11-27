@@ -315,7 +315,8 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
         copy, so each epic's final check will probably stop for you", with the one thing that
         would fix it. A gate in `gatesFlaky` failed once and passed when run again: say
         "<what the check is> failed once and passed when run again: a flaky check, which may
-        stop an epic now and then", and do not try to fix it. Neither is a refusal. Then run
+        stop an epic now and then", naming the tests in its `first.failing` when there are any,
+        and do not try to fix it. Neither is a refusal. Then run
         the item 1 preflight again and use its output: the clone now exists.
       - `tests.skipped` is set (with `ok: true`) → the project has no test files yet in its
         declared test directories, so the test command was not run and the probe is skipped.
@@ -897,7 +898,8 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       Taking them reads and runs autopilot's copy; it never changes a file there or in the
       project, and never needs a sign-in from the owner.
 
-      **What must be seen for real.** When the gate has `live`, each entry names a requirement
+      **What must be seen for real.** Read `live` from the gate file itself; `status` (`waiting`)
+      and `report.json` carry it only as a list of requirement IDs. When the gate has `live`, each entry names a requirement
       (`tor`) that only counts when the owner sees it on the running build, the way its
       checklist (`checklist`, printed above under "How to check it") says: a real sign-in, a
       real device, the real service. A picture does not count for it: the pictures were taken
