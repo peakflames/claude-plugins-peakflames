@@ -110,6 +110,15 @@ to Pilot Light develop `158d2df` (not pushed). Pilot Light #1 is closed, and the
   paths, an `act()` warning, an e2e race). `setup` Step 7.4b (`d24ac98`) now writes
   `* text=auto eol=lf` for new projects.
 
+**Second run, provisional (2026-11-27, Pilot Light epic YorqPLf, MERGED).** A new requirement
+(TOR-10-fgCFTDD, "Jump to the end", from Pilot Light #8) was planned by proxy and run unattended,
+in provisional mode. It took 114 min and $12.13 of $25: plan 5 min, build 39, one repair round 40
+(an `act()` warning in the new component test), review 1, verify 29 (e2e twice). The referee
+blocked 2 calls, both correctly: `gh auth status` (R4), and `$AUTOPILOT_SCRATCH` copied into a
+variable (R2). **"Decided for you" was empty:** no session question needed a provisional answer,
+so the provisional decision paths are still unproven in a real run. Brought in by fast-forward to
+Pilot Light develop `d3772ad` (not pushed).
+
 Open items this run found (C3, none blocked the run):
 - [ ] **A flaky readiness gate loses its first failure.** `prepare` keeps only the retry's
   results, so the name of the test that failed first is gone. Keep the first attempt's failures.
