@@ -3,3 +3,8 @@
 plugins/peak-media/** text=auto eol=lf
 # build evidence is a record: leave its bytes exactly as captured
 plugins/peak-media/docs/build/evidence/** -text
+# peak-workflow's driver, referee, skills and their tests compare text with \n (skill text, golden reports,
+# seed projects): keep LF on every OS, so a Windows install (core.autocrlf=true) reads what macOS does.
+plugins/peak-workflow/** text=auto eol=lf
+tests/peak-workflow/** text=auto eol=lf
+scripts/autopilot-lab/** text=auto eol=lf
