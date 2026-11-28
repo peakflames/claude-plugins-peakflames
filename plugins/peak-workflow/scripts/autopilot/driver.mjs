@@ -2494,8 +2494,13 @@ class Run {
     return this.park(e, reason);
   }
 
-  /** Stops every process a session left running out of the clone. Returns what it stopped, as `pid command` lines. */
+  /**
+   * Stops every process a session left running out of the clone. Returns what it stopped, as `pid command` lines.
+   * AUTOPILOT_SKIP_SWEEP: the test suite's fakes leave nothing behind, and the process scan is slow on Windows; it is
+   * honoured only in a run against a test double, so a real run always sweeps.
+   */
   async sweep(e, name) {
+    if (process.env.AUTOPILOT_SKIP_SWEEP === '1' && this.config.allowTestDouble) return [];
     let left = [];
     try {
       left = strayProcesses(this.clone);

@@ -9,7 +9,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { ANSWERS, atLimit, localDate, ensureResumeGates, gateReason, newRunName, standingAnswer, standingCovers, strayProcesses } from '../driver.mjs';
 import { chainOf, eventLine, leftLines, progressLine, queueLine, snapshotLine, testsOutcomeKnown, unansweredNeeds } from '../attend.mjs';
-import { DRIVER, E1, addEpic, alive, buildActions, buildScript, git, happy, makeProject, planScript, quick, readJson, waitFor, wrapupScript } from './helpers.mjs';
+import { DRIVER, E1, addEpic, alive, withSweep, buildActions, buildScript, git, happy, makeProject, planScript, quick, readJson, waitFor, wrapupScript } from './helpers.mjs';
 
 const driver = (...args) => { const r = spawnSync(process.execPath, [DRIVER, ...args], { encoding: 'utf8' }); return { ...r, lines: () => r.stdout.trim().split('\n'), json: () => JSON.parse(r.stdout) }; };
 const NAME = `${E1.id} — CSV import`;
@@ -464,6 +464,7 @@ test('the progress line counts how each epic of the run ended, and what is still
 
 test('a process a session leaves running out of the clone is stopped when the session ends, and the log says so', { skip: process.platform === 'win32' && 'Windows cannot tell a process working in the clone by a relative path; see the next test' }, async (t) => {
   const p = makeProject(t);
+  withSweep(t);
   // As seen live: a server started detached from the session (its own daemon mode, or nohup) keeps running after it.
   const daemon = { do: 'exec', cmd: `node -e "const c=require('child_process').spawn('sleep',['300'],{detached:true,stdio:'ignore'});require('fs').writeFileSync(process.argv[1],String(c.pid));c.unref()" "{{state}}/stray.pid"` };
   const scripts = happy(E1);
@@ -482,6 +483,7 @@ test('a process a session leaves running out of the clone is stopped when the se
 
 test('Windows: a process a session leaves running that names the clone on its command line is stopped when the session ends', { skip: process.platform !== 'win32' && 'the test above covers macOS and Linux' }, async (t) => {
   const p = makeProject(t);
+  withSweep(t);
   // A dev server as Node tools start one: its script is a path in the clone.
   const daemon = { do: 'exec', cmd: `node -e "require('fs').mkdirSync('node_modules',{recursive:true});require('fs').writeFileSync('node_modules/serve.js','setInterval(()=>{},1<<30)');const c=require('child_process').spawn(process.execPath,[require('path').resolve('node_modules/serve.js')],{detached:true,stdio:'ignore'});require('fs').writeFileSync(process.argv[1],String(c.pid));c.unref()" "{{state}}/stray.pid"` };
   const scripts = happy(E1);

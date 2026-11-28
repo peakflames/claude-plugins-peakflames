@@ -19,6 +19,7 @@ const gitHome = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-gitcfg-'));
 fs.writeFileSync(path.join(gitHome, 'gitconfig'), '');
 Object.assign(process.env, {
   GIT_CONFIG_GLOBAL: path.join(gitHome, 'gitconfig'), GIT_CONFIG_NOSYSTEM: '1', AUTOPILOT_SKIP_MCP_LIST: '1', // a test that names the real `claude` never lists the owner's connectors
+  AUTOPILOT_SKIP_SWEEP: '1', // no per-session stray sweep (a slow process scan) unless a test asks for it: withSweep(t)
   GIT_AUTHOR_NAME: 'Autopilot Test', GIT_AUTHOR_EMAIL: 'test@example.invalid',
   GIT_COMMITTER_NAME: 'Autopilot Test', GIT_COMMITTER_EMAIL: 'test@example.invalid',
 });
@@ -235,4 +236,11 @@ export async function waitFor(fn, { timeoutMs = WAIT_MS, everyMs = 25 } = {}) {
     await new Promise((r) => setTimeout(r, everyMs));
   }
 }
+/** Turns the per-session stray sweep back on for one test (tests within a file run one after another). */
+export function withSweep(t) {
+  const was = process.env.AUTOPILOT_SKIP_SWEEP;
+  delete process.env.AUTOPILOT_SKIP_SWEEP;
+  t.after(() => { if (was === undefined) delete process.env.AUTOPILOT_SKIP_SWEEP; else process.env.AUTOPILOT_SKIP_SWEEP = was; });
+}
+
 export const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
