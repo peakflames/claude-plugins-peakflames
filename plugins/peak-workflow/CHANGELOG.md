@@ -245,6 +245,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Autopilot's final check reuses the build's slow suite run** — build and repair run an end-to-end suite through a recorder; when the code is unchanged, verify reads that output instead of running the suite again (10–20 min an epic on Pilot Light).
+
 - **Autopilot build and repair briefs** tell sessions to change test files only with Edit or Write, never through a script; repair briefs also carry the reason-line rule for existing tests.
 
 - **The base-red stop names the failing tests** — the report's "Do this next" and `status` quote the failing test lines from the run, so the owner sees what to fix without opening the log.

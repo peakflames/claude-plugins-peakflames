@@ -168,11 +168,15 @@ Open (C3, none blocks a run):
   fix rules now also carry the reason-line rule. CHECK_BUILD remains the catch.*
 - [ ] **"Seen but not fixed" items park one at a time.** U8pEKNP's verify parked three times
   for three Leave-as-is items (each a stop, an answer and a relaunch). Ask them in one gate.
-- [ ] **The sessions run the full e2e suite 4–5 times per epic** (counted from hooks.jsonl,
+- [x] **The sessions run the full e2e suite 4–5 times per epic** (counted from hooks.jsonl,
   2026-11-28), about 9–11 min each: 37–54 min of each epic. The driver's own checks run only the
   fast suite. Build runs it 1–2 times (again after its own fixes), fix once, verify twice (the
   second to show a failure is pre-existing on the base). Consider one full run per session, and
   verify reading the build's result instead of rerunning.
+  *Partly fixed 2026-11-28: build and fix run slow suites through `record-suite.mjs`
+  (`$AUTOPILOT_RECORD`); a clean run on the branch's current tree is copied to the verifier with
+  "do not run them again in full" (`suitesRun`, `test/suites.test.mjs`). Saves about 10–20 min an
+  epic; the build's own repeats are left to the project (Pilot Light test review).*
 - [ ] **start-epic's "work started" issue comment** always lands in "Not proven for real" (no `gh`,
   no remote). Autopilot sessions should skip it, or the closing screen should post it.
 - Operational: the proxy session ran the plugin suite while the run built and starved it (fast

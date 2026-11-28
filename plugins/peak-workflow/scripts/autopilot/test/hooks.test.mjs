@@ -1159,3 +1159,8 @@ test('Windows: a command names paths as Git Bash does or as drive paths, and the
   passes(h.bash('cat /dev/null && ls /usr/bin | head -1'), "Git's own system folders are read");
   denied(h.bash(`echo x > "${bash(path.join(home, 'notes.txt'))}"`), 'R2', /writes only inside it/);
 });
+
+test('R2: a build runs a slow suite through the recorder, as its rules say, and is not refused', (t) => {
+  const h = referee(t);
+  for (const cmd of ['node "$AUTOPILOT_RECORD" bun run test:e2e', 'node "$AUTOPILOT_RECORD" bun run test:e2e 2>&1 | tail -20', 'node "$AUTOPILOT_RECORD" bunx playwright test > "$AUTOPILOT_SCRATCH/e2e.txt" 2>&1']) passes(h.bash(cmd), cmd);
+});

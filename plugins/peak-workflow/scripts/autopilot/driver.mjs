@@ -1188,6 +1188,48 @@ export function sessionSettings(config = {}, { kind = null, scratch = null } = {
 
 /** A session's scratch folder: in its step directory, so outside the clone. Nothing in it can be committed or left in the clone for the next run to trip on. */
 export const scratchDir = (stepDir) => path.join(stepDir, 'scratch');
+const RECORD_SUITE = path.join(HERE, 'record-suite.mjs');
+/** Where a build or repair keeps its slow suites' runs (record-suite.mjs), per epic and across runs. */
+export const evidenceDir = (workspace, epicId) => path.join(workspace, 'evidence', epicId);
+
+/** The rule build and repair sessions get for the project's slow suites. */
+const RECORD_RULE = `- Run the project's slow suites (an end-to-end or browser suite \`CLAUDE.md\` lists besides its test
+  command) through the recorder: \`node "$AUTOPILOT_RECORD" <the suite's command>\`. It prints the output
+  as usual and keeps it for the final check, which then does not run the suite again on the same code.
+  Only a run after your last commit, on a clean tree, is kept for it: make your final full run that one.
+`;
+
+/**
+ * What the final check is told about the slow suites the build or repair already ran on exactly the code it checks:
+ * each saved run whose tree is the branch's tree now, that ran on a clean tree and was not changed while it ran. Its
+ * output is copied into the verifier's scratch folder. Seen live (Pilot Light, 2026-11-27): the verifier reran a
+ * 9-11 minute end-to-end suite once or twice per epic on the code the build had just run it on.
+ */
+export function suitesRun(workspace, epicId, tree, scratch) {
+  let names = []; try { names = fs.readdirSync(evidenceDir(workspace, epicId)).filter((f) => f.endsWith('.json')).sort(); } catch { return null; }
+  const runs = [];
+  for (const f of names) {
+    const r = tryJson(path.join(evidenceDir(workspace, epicId), f));
+    if (!r || !tree || r.tree !== tree || r.dirty || r.changedDuringRun || typeof r.command !== 'string') continue;
+    const from = path.join(evidenceDir(workspace, epicId), path.basename(String(r.output ?? '')));
+    if (!fs.existsSync(from)) continue;
+    fs.mkdirSync(scratch, { recursive: true });
+    const to = path.join(scratch, `build-${path.basename(from)}`);
+    fs.copyFileSync(from, to);
+    runs.push({ ...r, copy: to });
+  }
+  if (!runs.length) return null;
+  const lines = runs.map((r) => `- \`${r.command}\`: exit ${r.exit}, ${Math.max(1, Math.round(r.ms / 60000))} min, ${r.at}. Output: \`${r.copy}\``);
+  return `# Suites the build already ran on this code
+
+The build or repair ran these on exactly the code you are checking (its last commit, a clean tree). Read
+their saved output; do not run them again in full, which costs minutes and shows nothing new. Run again
+only the tests that failed (and, for a failure, those tests on the base, as the rules say), or a single
+test you must see for yourself. Name the saved run as your evidence in the report.
+
+${lines.join('\n')}
+`;
+}
 /**
  * What every working session is told about temporary files. Seen live: a session refused `/tmp`
  * left its scratch files in the clone, and the next launch stopped on a dirty clone.
@@ -1314,6 +1356,7 @@ export function sessionCommand(config, { kind, epicId, workspace, runDir, stepDi
     CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '60000',
   };
   if (kind !== 'audit') env.AUTOPILOT_SCRATCH = scratchDir(stepDir); // where the session keeps temporary files; the auditor only reads
+  if (kind === 'build' || kind === 'fix') { env.AUTOPILOT_RECORD = RECORD_SUITE; env.AUTOPILOT_EVIDENCE = evidenceDir(workspace, epicId); } // a slow suite's run, kept for the final check (`suitesRun`)
   if (kind === 'audit') {
     // The auditor needs no gate tools, so it stays on plain `-p` (SPIKE.md correction 1): read-only
     // tools, the bundle as its working directory, the clone readable through --add-dir.
@@ -1403,7 +1446,7 @@ execution script for this session.
   out of sight stops the epic.
 - Commit everything you leave behind. \`.autopilot/test-changes.jsonl\` is part of your work:
   stage it with your final commit. \`git status\` must be clean when you finish.
-- Do not start a command that waits for the project's owner (a sign-in in a browser, a device
+${RECORD_RULE}- Do not start a command that waits for the project's owner (a sign-in in a browser, a device
   to plug in). A build does the part that needs no person; the final check is where a person is
   asked to come, once. Say in your handoff what you left for it and the exact command.
 - Anything you did not exercise against the real thing (a requirement you marked CANNOT VERIFY,
@@ -1425,7 +1468,7 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
   interpreter (\`python\`, \`node -e\`, a heredoc). Autopilot's checks see every change to a test;
   one made out of sight stops the epic.
 - Commit everything you leave behind, \`.autopilot/test-changes.jsonl\` included. \`git status\` must be clean when you finish.
-- Do not start a command that waits for the project's owner (a sign-in in a browser, a device
+${RECORD_RULE}- Do not start a command that waits for the project's owner (a sign-in in a browser, a device
   to plug in). A repair does the part that needs no person; the final check is where a person is
   asked to come, once. Say in your handoff what you left for it and the exact command.
 - Anything you did not exercise against the real thing (a requirement you marked CANNOT VERIFY,
@@ -3400,7 +3443,9 @@ ${r.err}`)) notes.push(`the run command (${cmd}) did not start cleanly${r.timedO
     const s = await this.step(e, 'verify', (stepDir) => {
       const rules = path.join(stepDir, 'verify-rules.md');
       const pictures = this.hasScreens(e) ? this.restoreLook(e) : [];
-      fs.writeFileSync(rules, verifyRules(smallFixLimits(this.config)) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (pictures.length ? LOOK_VERIFY_RULE : ''));
+      const suites = suitesRun(this.stateDir, e.id, gitRun(this.clone, 'rev-parse', `${m.branch}^{tree}`).out.trim() || null, scratchDir(stepDir));
+      fs.writeFileSync(rules, verifyRules(smallFixLimits(this.config)) + spendRule(this.config.realSpend) + presenceRule(this.config.attended, e.unanswered) + (pictures.length ? LOOK_VERIFY_RULE : '') + (suites ? `\n${suites}` : ''));
+      if (suites) this.log(`${e.id}: verify is given the build's run of ${(suites.match(/^- /gm) ?? []).length} slow suite(s) on this code`);
       if (!e.look && e.unobserved?.length) {
         // A provisional run: nobody looked and nobody will. The verifier is told up front, so it neither asks nor records a PASS.
         const file = path.join(stepDir, 'not-observed.md');
