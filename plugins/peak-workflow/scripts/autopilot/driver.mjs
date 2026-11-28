@@ -3230,7 +3230,10 @@ class Run {
       this.event('audit', e, { step: s.name, findings: judged.findings.length, parks: judged.parks.length, read: coverage.read, of: coverage.of, ...(thin ? { thin: true } : {}) });
       // A finding that the work never ran for real is told to the owner whether or not it parks: seen live, a medium
       // one ("the cost path is tested only against a fake built on the same guess") reached them as "none serious".
-      this.unproven(e, judged.findings.filter((f) => UNPROVEN_CATEGORIES.includes(f.category)).map((f) => ({ source: 'reviewer', step: s.name, id: f.id, severity: f.severity, text: String(f.explanation ?? '').replace(/\s+/g, ' ').trim() })));
+      // A low finding stays in the epic's report only: the build's handoff and the final check say what was not run for
+      // real in their own words, and every line here is also written into the project's status file for good. Seen live
+      // (Pilot Light xI5RS4q, 2026-11-28): a low "the real dialog never ran" repeated what the handoff already disclosed.
+      this.unproven(e, judged.findings.filter((f) => UNPROVEN_CATEGORIES.includes(f.category) && f.severity !== 'low').map((f) => ({ source: 'reviewer', step: s.name, id: f.id, severity: f.severity, text: String(f.explanation ?? '').replace(/\s+/g, ' ').trim() })));
 
       if (judged.parks.length) {
         const list = judged.parks.map((f) => `${f.id} ${f.category}`).join(', ');

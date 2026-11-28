@@ -895,6 +895,8 @@ test('not proven for real: a reviewer finding that never parks and the verifier\
   const findings = [
     { category: 'never-ran-real', severity: 'medium', evidence: 'src/cost.js:10', explanation: 'The cost path is tested only against a fake written from the same guess; no real request was sent.' },
     { category: 'claim-without-evidence', severity: 'low', evidence: 'handoff', explanation: 'The handoff counts 113 tests; the last run shows 112.' },
+    // A low one stays in the report only: it reaches neither the owner's list nor the project's status file.
+    { category: 'never-ran-real', severity: 'low', evidence: 'src/open.js:3', explanation: 'The real file picker never ran; the spec allows the seam and the handoff says so.' },
   ];
   const verdict = '## Verdict: PASS\n\n- **Live gateway:** signed in, tools listed.\n- **Not run:** a real synthesis, to avoid spending the shared credit.\n\n**Not proven for real**\n- The cost lookup: checked against the fake only\n- None of the rest\n\n**What changed**\n- docs only\n';
   p.scenario({ ...happy(E1), [`${E1.id}/audit`]: { result: { structured_output: { findings, recommend: 'proceed', summary: 'canned' } } }, [`${E1.id}/verify`]: { ...wrapupScript(E1), result: { total_cost_usd: 1.3, result: verdict } } });

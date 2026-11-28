@@ -66,7 +66,10 @@ Severity:
 - **low** — worth a person's glance; no effect on whether the requirement is met.
 
 Do not report style, naming, refactoring ideas, missing features outside the anchors, or anything
-you cannot tie to a line. A clean build has an empty `findings` list; that is a good answer.
+you cannot tie to a line. Do not report what `handoff.md` already discloses and the spec allows (a
+seam the spec names, a recorded deferral, a "Not proven for real" line, a test change with a reason
+that holds): that is known, not found. Report a low finding only when a person would change or
+check something because of it. A clean build has an empty `findings` list; that is a good answer.
 `checked` is never empty: it is how a clean answer shows it was earned.
 
 ## Evidence

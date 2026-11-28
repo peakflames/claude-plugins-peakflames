@@ -245,6 +245,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Autopilot's reviewer reports less noise** — it no longer reports what the build's handoff already discloses and the spec allows, and a low finding stays in the epic's report instead of the "Not proven for real" list and the project's status file.
+
 - **Autopilot's final check reuses the build's slow suite run** — build and repair run an end-to-end suite through a recorder; when the code is unchanged, verify reads that output instead of running the suite again (10–20 min an epic on Pilot Light).
 
 - **Autopilot build and repair briefs** tell sessions to change test files only with Edit or Write, never through a script; repair briefs also carry the reason-line rule for existing tests.
