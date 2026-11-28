@@ -290,6 +290,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **An owner-approved deferral no longer parks the build** — the deferral check reads only the TOR ID column of the Deferrals table, so a successor's requirement named in a row's "Why" is not counted as a second deferral.
+
 - **Autopilot runs removal epics** — an epic with `retires: CR-…` and no requirement of its own is eligible; the build check and the merge gate fail while any test or source still cites a retired requirement.
 - **A brownfield change of stack has its own walking skeleton** — `plan-project` marks it `**Walking skeleton:** yes`, and autopilot lets that epic write the new stack into `CLAUDE.md`; other epics' specs no longer ask for `CLAUDE.md` edits.
 - **A build still failing a check that re-running cannot cure is asked, not continued** — after its repair, a failure other than the tests alone (test integrity, scope, traceability) goes to the owner; their "Resume" runs one more repair, briefed with the failing checks.

@@ -1124,6 +1124,20 @@ export function deferralsSection(handoff) {
   return next < 0 ? from : from.slice(0, next + 3);
 }
 
+/**
+ * The requirements the Deferrals section defers: in its table, the ID in each row's first cell (`TOR ID`); another ID a
+ * row only mentions (its Why naming the successor's requirement) is not deferred. Seen live (Pilot Light RFJWWNV,
+ * 2026-11-28): "…is Epic Ty3uWzV's (TOR-11-VPAbOxu)" in a Why made an owner-approved deferral look like two and parked
+ * the epic, with no answer that could pass. A section with no table falls back to every ID it names.
+ */
+export function deferralRows(section) {
+  const ID = /TOR-\d{2}-[A-Za-z0-9]{7}/;
+  const cells = String(section ?? '').split('\n').filter((l) => /^\s*\|/.test(l)).map((l) => l.trim().replace(/^\|/, '').split('|')[0].trim());
+  const first = cells.map((c) => c.match(ID)?.[0]).filter(Boolean);
+  if (first.length) return [...new Set(first)];
+  return [...new Set(String(section ?? '').match(new RegExp(ID.source, 'g')) ?? [])];
+}
+
 /** The run queue: `config.queue`, or every epic that is not Complete, in phase/index order. */
 export function buildQueue(pre, config) {
   const byId = new Map(pre.epics.map((e) => [e.id, e]));
@@ -3058,7 +3072,7 @@ class Run {
     // naming one of those requirements, are the owner's setting at work. One more is a deferral nobody agreed to.
     const { owner: ownerDefer, all: deferred } = this.standingDeferrals(e, sc);
     const section = deferralsSection(handoff) ?? '';
-    const rows = [...new Set(section.match(/TOR-\d{2}-[A-Za-z0-9]{7}/g) ?? [])];
+    const rows = deferralRows(section);
     const deferOk = Number(count) > 0 && Number(count) <= deferred.length && rows.length === Number(count) && rows.every((t) => deferred.includes(t));
     if (!add('handoff', count === '0' || deferOk, handoff === null ? 'handoff file missing on the branch' : count === undefined ? 'no "## Deferrals" section with a Count: line' : `Deferrals Count: ${count}${deferOk ? ` (${rows.join(', ')}: ${[rows.filter((t) => ownerDefer.includes(t)), rows.filter((t) => !ownerDefer.includes(t))].map((x, i) => (x.length ? `${rows.length === x.length ? '' : `${x.join(', ')} `}${i ? "deferred on the builder's recommendation in this provisional run" : "deferred with the owner's approval"}` : null)).filter(Boolean).join('; ')})` : deferred.length ? `; a deferral stands only for ${deferred.join(', ')}, and the rows name ${rows.join(', ') || 'no requirement'}` : ''}`) && Number(count) > 0) parkOnly = parkOnly ?? `the handoff records ${count} deferral(s): a human decision`;
     // The later epics those rows hand the unmet part to: the skill adds the requirement to each one's spec and status file.

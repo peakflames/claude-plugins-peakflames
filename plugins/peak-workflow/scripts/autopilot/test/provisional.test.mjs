@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { loadConfig, parseSidecar, status } from '../driver.mjs';
+import { loadConfig, parseSidecar, status, deferralRows } from '../driver.mjs';
 import { eventLine } from '../attend.mjs';
 import { PROTOTYPE_LIMIT } from '../lib.mjs';
 import { DRIVER, E1, TL, addEpic, buildActions, buildScript, git, happy, makeProject, planScript, readJson, wrapupActions, wrapupScript } from './helpers.mjs';
@@ -42,7 +42,7 @@ const wrapupMarking = (e, mark, opts = {}) => {
   return { actions: a, result: { total_cost_usd: 1.3, result: `Verdict: PASS\n\n## Not proven for real\n- ${e.tors[0]}: nobody opened the chart` } };
 };
 /** The implemented handoff of a build that deferred `tors`, each to epic `succ`. */
-const handoffDeferring = (tors, succ) => `# Epic handoff\n\n## Deferrals\n\nCount: ${tors.length}\n\n| TOR ID | Unmet | Why | Decision | Successor epic |\n|---|---|---|---|---|\n${tors.map((t) => `| ${t} | the export | needs the export screen | Defer | ${succ} |`).join('\n')}\n\n## Key Files\n\n- src\n`;
+const handoffDeferring = (tors, succ) => `# Epic handoff\n\n## Deferrals\n\nCount: ${tors.length}\n\n| TOR ID | Unmet | Why | Decision | Successor epic |\n|---|---|---|---|---|\n${tors.map((t) => `| ${t} | the export | needs the export screen, which is ${succ}'s (TOR-02-Zz9Yy8X) | Defer | ${succ} |`).join('\n')}\n\n## Key Files\n\n- src\n`;
 /** A build that asks the deferral question(s), then leaves what the skill leaves after "Defer": the row, and the skipped test. */
 function deferringBuild(e, questions, deferredTors, succ) {
   const a = buildActions(e, { commit: false });
@@ -587,4 +587,12 @@ test('a requirement a person observes has no test to name: a review that says so
   await p.go();
   assert.ok(!p.steps().includes(`${e.id}/audit-2`), p.steps().join(' '));
   assert.equal(readJson(p.dir(e.id, 'audit-1', 'audit.json')).decision, 'proceed');
+});
+
+
+test('deferralRows: the TOR ID column is what is deferred; an ID a row only mentions is not', () => {
+  const table = ['## Deferrals', '', 'Count: 1', '', '| TOR ID | Unmet | Why | Decision | Successor epic |', '|---|---|---|---|---|', "| TOR-11-bGN2PTk | window state | Saving bounds is Epic Ty3uWzV's (TOR-11-VPAbOxu) | Defer | Ty3uWzV |", ''].join('\n');
+  assert.deepEqual(deferralRows(table), ['TOR-11-bGN2PTk']);
+  assert.deepEqual(deferralRows(['## Deferrals', '', 'Count: 1', '', '- TOR-01-Aaaaaaa: later', ''].join('\n')), ['TOR-01-Aaaaaaa'], 'no table: every ID it names');
+  assert.deepEqual(deferralRows('## Deferrals\n\nCount: 0\n'), []);
 });
