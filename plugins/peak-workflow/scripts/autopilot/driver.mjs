@@ -284,7 +284,7 @@ export function defaultConfig(project) {
     },
     audit: { parkOn: ['stand-in', 'test-weakened', 'cannot-fail', 'never-ran-real'] },
     scope: { allow: [], lockfiles: [] },
-    timing: { pollMs: 30000, killGraceMs: 30000, infraRetryMs: 300000, ...LIMIT_TIMING },
+    timing: { pollMs: 30000, sizeEveryMs: 30000, killGraceMs: 30000, infraRetryMs: 300000, ...LIMIT_TIMING }, // sizeEveryMs: `du` is slow on a big tree, so the clone is measured at most this often while a session runs
   };
 }
 
@@ -2653,10 +2653,11 @@ class Run {
       });
     }
     const wall = setTimeout(() => kill('wall clock'), cmd.wallMin * 60000);
+    let sizedAt = Date.now();
     const poll = setInterval(() => {
       if (this.stopRequested()) kill('STOP file');
       else if (this.freeGb() < cfg.diskFloorGb) kill('disk floor');
-      else if (this.cloneMb() - startMb > cfg.growthCapMb) kill('growth cap');
+      else if (Date.now() - sizedAt >= (cfg.timing.sizeEveryMs ?? 30000)) { sizedAt = Date.now(); if (this.cloneMb() - startMb > cfg.growthCapMb) kill('growth cap'); }
     }, cfg.timing.pollMs);
     await done;
     clearTimeout(wall); clearInterval(poll); clearTimeout(graceTimer);

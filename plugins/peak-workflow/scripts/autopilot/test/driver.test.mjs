@@ -408,6 +408,21 @@ test('STOP mid-step kills the session, parks the epic and stops the run', async 
   assert.ok(!fs.existsSync(path.join(p.state, 'lock')));
 });
 
+test('a session that grows the clone past the growth cap is killed and the epic parks on it', async (t) => {
+  const p = makeProject(t, { config: { growthCapMb: 1, timing: { pollMs: 100, sizeEveryMs: 0, killGraceMs: 300, infraRetryMs: 0 } } });
+  const why = "the growth cap under test is the driver's; the referee's own R5 has its test";
+  p.scenario({ [`${E1.id}/plan`]: planScript(E1), [`${E1.id}/build`]: { actions: [{ do: 'branch', name: E1.branch, unchecked: why }, { do: 'write', path: 'src/big.bin', content: 'x'.repeat(2 * 1024 * 1024), unchecked: why }, { do: 'hang' }] } });
+
+  const running = go(p);
+  const pid = await waitFor(() => p.epic(E1.id).step?.name === 'build-1' && p.epic(E1.id).step.pid);
+  await running;
+
+  assert.equal(p.epic(E1.id).state, 'PARKED');
+  assert.match(p.epic(E1.id).reason, /budget: build-1 hit growth cap/);
+  assert.match(fs.readFileSync(path.join(p.runDir(), 'autopilot.log'), 'utf8'), /build-1 killed — growth cap/);
+  assert.equal(alive(pid), false);
+});
+
 test('STOP while the plan is still being made, nothing built: no question, the epic goes back to the queue and is planned next time, in a full run and a provisional one (Step 10)', async (t) => {
   for (const mode of ['full', 'provisional']) {
     const p = makeProject(t, { config: { mode } });
