@@ -33,7 +33,9 @@ export const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
  */
 export function makeProject(t, { config = {} } = {}) {
   const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-test-')));
-  t.after(() => { killFakes(tmp); fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10 }); }); // a test that timed out leaves its session running
+  // A test that timed out leaves its session running. The process scan is slow (PowerShell on Windows), so it runs only
+  // when a fake this test started is still alive; every fake logs its pid on start.
+  t.after(() => { if (p.calls().some((c) => c.pid && alive(c.pid))) killFakes(tmp); fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10 }); });
   const project = path.join(tmp, 'ledger');
   const state = path.join(tmp, 'ledger.autopilot');
   fs.cpSync(SEED, project, { recursive: true });
