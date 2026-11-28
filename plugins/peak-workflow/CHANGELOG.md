@@ -290,6 +290,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot plans skip the GitHub announce** — `start-epic`'s plan template writes `GitHub announce: SKIP — autopilot run`, so builds no longer try a `gh` call the referee refuses.
+- **The final check does not re-ask what the owner's look accepted** — something the owner's recorded words already accept is listed under "Seen but not fixed", not asked; anything new is still asked.
 - **An owner-approved deferral no longer parks the build** — the deferral check reads only the TOR ID column of the Deferrals table, so a successor's requirement named in a row's "Why" is not counted as a second deferral.
 
 - **Autopilot runs removal epics** — an epic with `retires: CR-…` and no requirement of its own is eligible; the build check and the merge gate fail while any test or source still cites a retired requirement.

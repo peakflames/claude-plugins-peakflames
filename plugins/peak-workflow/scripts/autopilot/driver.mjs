@@ -1074,7 +1074,12 @@ observation against the Then and record the evidence as
 Give CANNOT VERIFY only where the record contradicts a Then or says it was not checked; never
 because their words leave a line unmentioned. Never add an observation of your own.
 
-This changes item 7 only. Ask every other question the skill tells you to ask, with
+Something their words already name and accept (a gap, a placement, a wording they called fine) is
+not a defect to ask about: do not ask "Seen but not fixed yet" for it. List it under "Seen but not
+fixed" with "(accepted at the owner's look)". Anything their words do not name, or that differs from
+what they describe, is asked as usual.
+
+These change item 7 and that one question only. Ask every other question the skill tells you to ask, with
 \`AskUserQuestion\` and in the skill's own words (Step 1.5, Step 2.0, the ship mode, any failure):
 they are answered for you. Never skip one or choose its answer yourself.
 `;

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { PLUGIN_DIR, defaultConfig, localDate, scratchRule, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
+import { PLUGIN_DIR, defaultConfig, localDate, ownerLook, scratchRule, effortFor, eventLine, loadConfig, noteSubject, presenceRule, spendRule, unprovenLines, lintPlan, networkProblems, REGISTRIES, scopeFlags, sessionSettings } from '../driver.mjs';
 import { estimateCost, failingTests } from '../lib.mjs';
 import { DRIVER, E1, FAKE, SEED, addEpic, alive, killFakes, buildActions, buildScript, git, happy, makeProject, planScript, planText, quick, readJson, waitFor, wrapupActions, wrapupScript } from './helpers.mjs';
 
@@ -1081,4 +1081,12 @@ test('connectors end to end (#43): a build reads Gmail and drives the app throug
   assert.match(md, /R11: mcp__claude_ai_Gmail__send_message is denied: connectors are read-only/);
   const status = JSON.parse(spawnSync(process.execPath, [DRIVER, 'status', '--project', p.project, '--json'], { encoding: 'utf8' }).stdout);
   assert.deepEqual(status.connectors, [{ epic: E1.id, label: e.label, line: 'Gmail search_threads ×1; browser on localhost and accounts.google.com (off-site); 1 refused', offsite: ['https://accounts.google.com/o/oauth2/auth'], refused: ['Gmail send_message'] }]);
+});
+
+test('ownerLook: what the owner\'s words already accepted is listed, not asked again; anything else is still asked (Pilot Light RFJWWNV, 2026-11-28)', () => {
+  const text = ownerLook({ by: 'owner', date: '2026-11-28', branchTip: 'abc1234', note: 'the empty card around "Open folder…" is fine' }, { reasons: [] });
+  assert.match(text, /already name and accept[\s\S]*do not ask "Seen but not fixed yet" for it/);
+  assert.match(text, /\(accepted at the owner's look\)/);
+  assert.match(text, /Anything their words do not name, or that differs from\s+what they describe, is asked as usual/);
+  assert.match(text, /These change item 7 and that one question only/);
 });

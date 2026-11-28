@@ -71,7 +71,9 @@ paragraph verbatim…"); keep every rule.
    make the same swap or removal. Touch no other epic's files.
 
 3. **Announce work-started on GitHub** — if Step 1 captured no source issue, replace this plan
-   item with: `GitHub announce: SKIP — no source issue`. Otherwise, run only if (a) this is a
+   item with: `GitHub announce: SKIP — no source issue`. If this is an autopilot run (the session
+   was given rules headed "Autopilot"), replace it with:
+   `GitHub announce: SKIP — autopilot run (gh is off limits unattended)`. Otherwise, run only if (a) this is a
    fresh transition (not a resumption) and (b) `gh auth status` succeeds:
    ```bash
    gh issue comment <N> --body "Epic <id> work has started on branch \`feature/epic-<id>-<short-name>\`. I'll follow up here when the PR opens."
