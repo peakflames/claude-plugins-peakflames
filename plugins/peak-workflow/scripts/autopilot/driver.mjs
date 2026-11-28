@@ -1632,6 +1632,10 @@ export const verifyRules = (limits) => `# Autopilot session rules
   tests on the base in a scratch worktree, and when they fail the same way there, ask the question
   wrapup-epic Step 1.4b gives for it ("… fail the same way on <base>: …", options "Accept as
   pre-existing", "Fix on this branch", "Stop — epic FAILs").
+- Change test files only with Edit or Write, never through a script or an interpreter (\`python\`,
+  \`node -e\`, a heredoc). Before you change a test file that already exists on the integration line,
+  append \`{"path":"<the file>","reason":"<why this change is right>"}\` to
+  \`.autopilot/test-changes.jsonl\` and commit it with the change.
 - The build's handoff may list things under the heading "Not proven for real". Each one you do not
   prove for real yourself goes, one line each, under the same heading in your final report, with
   what it was checked against instead.
