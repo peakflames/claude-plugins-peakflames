@@ -212,7 +212,7 @@ the verifier never invokes design skills. Playwright's Chromium is installed onl
   run event, `watch`, the friction count). Node 22+, no dependencies. The `autopilot` skill only
   talks to the user and calls `driver.mjs`; what may run unattended, what parks, what the standing
   answer covers and what comes next (`status`) is decided by the driver and the hooks, never by a
-  prompt. Tests: `node --test scripts/autopilot/test/`
+  prompt. Tests: `node --test scripts/autopilot/test/` (about 5 minutes on macOS, about 32 on Windows)
 - `skills/upgrade/steps/NNNN-<name>.md` are upgrade steps executed by the `upgrade` runner, not
   templates. They are **forward-only and append-only**: a shipped step is never edited; a
   correction is a new step. Each step starts with a detect check (so re-running is harmless) and

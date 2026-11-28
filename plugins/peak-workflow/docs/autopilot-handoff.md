@@ -86,7 +86,9 @@ Platform facts the code now relies on:
 - **Strays on Windows are found by command line only.** One started by a relative path
   (`bun apps/api/src/index.ts`) is not seen; it ends when the driver exits (same job). Open item.
 - **The suites are slow there:** a process start is 100–200 ms (macOS: a few). Driver suite
-  about 80 minutes (381 tests: 358 pass, 16 skipped, 7 failed on timing alone and pass after the fix, re-run by name, 2026-11-27); `waitFor` waits 60 s there, and a duration in a fake run's line is read with `quick()`. Run single files or `--test-name-pattern` while
+  about 32 minutes (386 tests: 370 pass, 16 skipped, 2026-11-27; it was about 80 before the tests stopped scanning
+  for processes after every session and at every teardown, and stopped measuring the clone on every 100 ms poll).
+  It is CPU-bound: what is left is the shell, git and node starts each fake run makes; `waitFor` waits 60 s there, and a duration in a fake run's line is read with `quick()`. Run single files or `--test-name-pattern` while
   fixing.
 - **Projects stay CRLF on Windows** (Pilot Light: 541 files). `preflight` on that CRLF checkout
   read the test command, the four test folders and all 18 epics correctly and wrote nothing
@@ -197,7 +199,7 @@ Open (C3, none blocks a run):
   lines, not TAP `ok`: a Monitor that counts results must match those. On this Mac, put
   `/opt/homebrew/bin` first on `PATH` (Python 3.9 comes first otherwise).
 - Both suites before each code merge: `node --test plugins/peak-workflow/scripts/autopilot/test/`
-  (about 5 minutes) and `node --test scripts/autopilot-lab/test/`. Run them under
+  (about 5 minutes on macOS, about 32 on Windows) and `node --test scripts/autopilot-lab/test/`. Run them under
   `caffeinate -i`: a laptop that sleeps mid-suite fails a test by timeout. They need Python 3.11+
   first on `PATH` (`tor-lifecycle` probes `python3`); with an older one every driver test stops
   at the format guard and fails with a null reason. Do not edit files in a
