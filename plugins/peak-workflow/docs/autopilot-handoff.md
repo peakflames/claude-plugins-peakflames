@@ -427,7 +427,7 @@ Why this order:
   now is and checks that merge, with no new final check, where the failure allows (tests or
   the requirements check red once merged, a malformed merge, a fix the owner must allow). A
   conflict, or work that is gone, asks to run the final check again. Tested
-  (`test/resume.test.mjs`, `test/attend.test.mjs`); not yet seen live.* Was: `rollback()`
+  (`test/resume-*.test.mjs`, `test/attend.test.mjs`); not yet seen live.* Was: `rollback()`
   reset the integration line and the epic branch, so a rerun repeated the whole final check
   (twice on 2026-11-14: about $4.50 and $3; $5.85 on Outstanding, 2026-11-23).
 - [x] **A merge check that fails for any reason other than a small-fix limit parks with no
@@ -439,7 +439,7 @@ Why this order:
 - [x] **"Real — fix before verify" after the repair is used goes straight to FAILED** (#41 B13;
   in code). *Fixed 2026-11-23 (`fc329da`, the owner's choice "B"): a person's "Real" after the
   one repair runs one more repair; an answer nobody gave still fails. Tested
-  (`test/resume.test.mjs`); not yet seen live.* Was: The reviewer gate offers the answer although `fixRounds` is already 1; the owner
+  (`test/resume-*.test.mjs`); not yet seen live.* Was: The reviewer gate offers the answer although `fixRounds` is already 1; the owner
   cannot then change to "verify as built". Offer only answers that are possible, or write a
   resume gate into VERIFY. *`driver.mjs:2562`, `missingResumeGates`.*
 - [x] **An epic is started over without asking** (*no issue*; review of I6a; #35's second
@@ -452,7 +452,7 @@ Why this order:
   branch: a technical gate into autopilot's checks, the review and the final check. A gone
   branch: "Start over" / "Leave it for now"; a provisional run starts it over itself and lists
   it. A clash found mid-run writes the same conflict gate. The referee refuses a catch-up
-  session's write to a requirement file (R10). Tested (`test/resume.test.mjs`,
+  session's write to a requirement file (R10). Tested (`test/resume-*.test.mjs`,
   `test/hooks.test.mjs`); not yet seen live (Step 6).* Was: a standing answer whose branch had
   moved or no longer merged was void, and the epic was planned again from scratch without a
   question.
@@ -467,7 +467,7 @@ Why this order:
   a swallowing `catch`, Go/Swift/Rust checks removed, Rust/unittest/NUnit skips, a test renamed out
   of the test directories ("deletes a test"), a test-named file outside them, and a rewritten
   existing fixture or expected output. Tested against the fake (`test/weakening.test.mjs`,
-  `test/resume.test.mjs`); not seen in a real run.
+  `test/resume-*.test.mjs`); not seen in a real run.
 - [x] **The final check saw a defect and passed it without a word** (*no issue*; Pilot Light,
   run `20261122-090420`). The verifier noted that the "Page not found" picture carries the
   wrong text, did not fix it and did not park; the epic merged. What the verifier notes and
@@ -522,16 +522,16 @@ The 2026-11-14 changes:
   walking skeleton 2026-11-22 with "Commit it for me" answered; F5hv9T4 2026-11-24).
 - [x] "Combine them for me" on a diverged project, with abort on conflict. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): the driver's refusal on a diverged project (`sync.test.mjs`, "sync, diverged: readiness and the driver both refuse…") and the skill's wording (`skill.test.mjs`, "SKILL.md: one command, one session…"). The merge itself is the attending skill's.*
 - [x] The relaunch questions (`relaunch.ask`: at the computer, real money). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `skill.test.mjs`, "the loop, end to end…" (at the computer) and "a relaunch asks about real money once…" (new); the mode, `provisional.test.mjs`, "mode: a relaunch carries the run's mode…".*
-- [x] "Start it so I can check for real" at the look; a yes from pictures alone refused (`how`). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "the look says what must be seen for real…". Full only: a provisional run takes no look (`provisional.test.mjs`, "provisional: a requirement a person must observe does not park…").*
-- [x] A look kept across a repair that changes no screen file. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "a repair that changes no screen file keeps the owner's look…" and "a repair that changes a screen file still parks for a new look". Full only, as above.*
-- [x] Small-fix limit of 80 changed lines. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "the small-fix limit is 80 changed lines…" (new; 81 also in Provisional).*
+- [x] "Start it so I can check for real" at the look; a yes from pictures alone refused (`how`). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume-*.test.mjs`, "the look says what must be seen for real…". Full only: a provisional run takes no look (`provisional.test.mjs`, "provisional: a requirement a person must observe does not park…").*
+- [x] A look kept across a repair that changes no screen file. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume-*.test.mjs`, "a repair that changes no screen file keeps the owner's look…" and "a repair that changes a screen file still parks for a new look". Full only, as above.*
+- [x] Small-fix limit of 80 changed lines. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume-*.test.mjs`, "the small-fix limit is 80 changed lines…" (new; 81 also in Provisional).*
 - [x] A failed merge check keeps the final check's work, and "Resume" re-checks the merge with
-  no new final check (#35). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume.test.mjs`, "tests red only
+  no new final check (#35). *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `resume-*.test.mjs`, "tests red only
   once the final check's work is merged…" and "a provisional run: tests red once…" (new).*
 - [x] A decision whose branch no longer fits is not planned again: a catch-up session settles
   the clash on the standing answer and the epic goes on with the old answer; a changed branch is
   checked again; a gone one is asked, or started over and listed in a provisional run (Step 3).
-  *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): the catch-up tests in `resume.test.mjs`, "a branch that stops
+  *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): the catch-up tests in `resume-*.test.mjs`, "a branch that stops
   merging cleanly during the run…" through "gone, provisional run: it starts the epic over itself…".*
 
 The 2026-11-21 changes (#41, I2 and I6):
@@ -577,7 +577,7 @@ Also to see in a real run: no by-hand command, git line or other skill offered a
 owner reads; step 1's fixes (B14 a resumed epic put back on its branch — seen, see below; B15
 leftover files set aside; `Not decided yet: none — <a reason>`), the scratch folder and the
 files `CLAUDE.md` names. *Closed 2026-11-25 on tests (`feature/peak-workflow-autopilot-wording-proofs`): `skill.test.mjs`, "SKILL.md and a
-rendered report offer the owner no by-hand path"; `resume.test.mjs`, "files left in the clone do
+rendered report offer the owner no by-hand path"; `resume-*.test.mjs`, "files left in the clone do
 not stop a launch…"; `sync.test.mjs`, "a \"Not decided yet\" line that says none is the all-clear…".*
 
   **The test project from 2026-11-22 is Pilot Light** (`~/github/peakflames/pilot-light`,
@@ -1030,7 +1030,7 @@ behavior there (triage: HEAVY).
 ## Suggested skills
 
 - `mattpocock-skills:diagnosing-bugs` and `mattpocock-skills:tdd` — steps 1, 3 and 9 (write the
-  fake-`claude` scenario first; patterns in `test/resume.test.mjs`).
+  fake-`claude` scenario first; patterns in `test/resume-*.test.mjs`).
 - `mattpocock-skills:writing-for-agents` — any edit to `SKILL.md` or the rule texts sessions
   are given (`PLAN_RULES`, `BUILD_RULES`, `VERIFY_RULES`).
 - `code-review` (low or medium) — before merging a driver change.

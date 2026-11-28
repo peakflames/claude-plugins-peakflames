@@ -26,7 +26,7 @@ const deferQ = (tor, rec = 'Defer — the export screen is built by a later epic
 const amendQ = (tor) => `${tor} — The tool shall import every row looks wrong: the sample data has a header row. Proposed: same title / Then: "rows after the header are imported". How to proceed?`;
 const AMEND = (tor) => [`Amend ${tor} (owner approval)`, 'Implement as written', "Stop — I'll take it from here"];
 
-/** An epic with one operator-observed requirement (as resume.test.mjs builds it). */
+/** An epic with one operator-observed requirement (as resume-helpers.mjs builds it). */
 function addLookEpic(p, spec = { id: 'Lg5Chr8', slug: 'chart', name: 'Spending chart', nn: '05' }) {
   const e = addEpic(p.project, spec);
   const file = path.join(p.project, 'docs', 'requirements', `${spec.nn}-${spec.slug}.feature.md`);

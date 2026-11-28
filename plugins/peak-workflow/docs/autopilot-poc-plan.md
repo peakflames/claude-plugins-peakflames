@@ -1235,7 +1235,7 @@ above with the owner's go-ahead.
 the branch the first run left, with no session of the first run repeated; the suite is green.
 
 **Status: done 2026-11-11 — exit met against `fake-claude.mjs`.** Suite: 99 tests, 89 pass, 10 live
-skipped (`test/resume.test.mjs` has one test per row of the Part 2 table, the void and
+skipped (`test/resume-*.test.mjs` has one test per row of the Part 2 table, the void and
 waiting cases and the exit test; `test/sync.test.mjs` one per row of the Part 3 table). §6.2, §6.3,
 §6.8 and §9 are updated. Deviations and additions:
 
