@@ -463,6 +463,18 @@ ConOps scenario. Appending rows to a phase index is always allowed; existing row
 
 **Assign IDs** using the same generation command as Step 3A.3 — a fresh 7-character random alphanumeric ID per new epic, unique across the batch and the existing plan. Existing epic IDs are opaque strings: never renumber, reuse, or interpret them.
 
+**A change of stack gets its own walking skeleton.** When the delta changes how the project is
+built, run or tested (the changelog's Product Shape Change table, for example a web app becoming
+a desktop app), the first epic of the new phase is a walking skeleton: it depends on no Not
+Started epic, its spec carries `**Walking skeleton:** yes`, and it alone updates `CLAUDE.md`'s
+Tech Stack, Local Environment, and Verification & Quality Gates sections for the new stack.
+
+**`CLAUDE.md` belongs to the skeleton and the owner.** No other epic spec asks for a `CLAUDE.md`
+edit beyond the `**Test directories:**` line — `/peak-workflow:autopilot` refuses one, and a
+person reviews the file every later session follows. A command or note another epic establishes
+goes in `docs/architecture.md`; a `CLAUDE.md` change it implies is listed in the Step 8 summary
+as a follow-up for the owner.
+
 Proceed to Step 3C.
 
 ## Step 3C: Removal Epics (Both Modes)
@@ -582,6 +594,7 @@ For each epic, write the spec file following the exact format below (the same fo
 **Planned by:** {planner}
 **Planned:** {YYYY-MM-DD}
 **Plan branch:** {plan-branch}
+**Walking skeleton:** yes
 **Source:** Issue #{N}
 
 > **Design:** UI epic — `/peak-workflow:start-epic` runs a Design pass with the design skills installed at that time (brand kit, `frontend-design`, shadcn) for {relevant UI elements}.
@@ -633,6 +646,7 @@ skeleton's app shell and design system — no new component library, no new toke
 
 - Include the **Design** note only if the epic involves UI work. Omit it entirely otherwise.
 - Always include the three provenance lines, filled at write time — never leave a placeholder: `{planner}` is `git config user.name`, `{YYYY-MM-DD}` is today, and `{plan-branch}` is `git branch --show-current` (the `docs/` branch). `/peak-workflow:status` and `/peak-workflow:start-epic` show them so a teammate can tell who planned an epic.
+- Include the `**Walking skeleton:** yes` line only on a walking-skeleton epic: the greenfield Foundation epic (3A.1), or the first epic of a brownfield change of stack (3B.3). Omit it entirely otherwise. `/peak-workflow:autopilot` reads it to let that epic, and no other, write the new stack into `CLAUDE.md`.
 - Include the `**Source:** Issue #{N}` line only when the epic was spawned from a specific GitHub issue — rare from `/plan-project`, more common from `/add` after `/triage`. Omit it entirely otherwise.
 - Include the `## Removal` section only for a removal epic (Step 3C). Omit it entirely otherwise. A removal epic with no guard requirements keeps the Requirements Anchors heading with the line `None — a removal epic; see Removal.` in place of the table.
 - Include the `## Screens` section only for a UI epic when `screens_present = true` (Step 1 item 6). Omit it entirely otherwise. A screen appears in **exactly one** epic's Screens table — the skeleton owns every `S-NN` the `# Note: reference screen` line names (the list screen and, when listed, its form screen); a slice owns the other screens its TORs name, and a slice that extends a skeleton-owned screen does not re-list it as owner. Brownfield: a slice that extends an existing screen may list it with `extends — <what changes>` in the States column (Step 4); that row is not ownership. Copy the name verbatim from `ux/screens.md`, and the wireframe path verbatim from its `Wireframe` column, resolved under `docs/product-vision-planning/ux/`; a screen marked `n/a — not data-bearing` lists `populated` only. The Application menu and Window rows (desktop apps) carry `—` in that column and write `—` here — `mockup` draws no wireframe for them; their contract is the `ux/screens.md` row and the Desktop conventions TORs. `/peak-workflow:start-epic` reads the wireframes as the layout contract and `/peak-workflow:wrapup-epic` checks fidelity against them.

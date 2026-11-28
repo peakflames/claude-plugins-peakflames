@@ -135,6 +135,43 @@ What these two runs found (C3, none blocked a run). Fixed 2026-11-27, tested on 
 Dropped by the owner (2026-11-27), not to be tracked: `decide` attaching a picture; a proxy's
 answer recorded under the git user; #41 I8 (a gate kind for a typed value).
 
+### Desktop migration run (2026-11-27, Pilot Light issue #16, paused mid-phase)
+
+Brownfield `discover` → `mockup` → `capture-requirements` → `plan-project` (web app → Electron
+desktop app), then autopilot on phase 7 in full mode, attended by the plugin session as the
+owner's proxy. U8pEKNP (Electron walking skeleton) MERGED in the clone ($13.38). xI5RS4q parked on
+the bug below; paused there by the owner so the plugin could be fixed. xpyZToJ and RFJWWNV not
+started, mNEAPHQ (removal) and phase 8 left for later. Electron test windows open and close
+within ~20 s; none orphaned, no console windows.
+
+Found and fixed (2026-11-27, targeted tests pass; full suite pending):
+- [x] **Removal epics could not run.** plan-project writes them with no guard requirement, and
+  preflight skipped every no-anchor epic. Preflight now takes an epic with `retires: CR-…`;
+  CHECK_BUILD and the merge gate run `tor-lifecycle sweep` on the retired IDs (`.autopilot/`
+  lines ignored). `test/removal.test.mjs`.
+- [x] **A brownfield change of stack could not write CLAUDE.md.** The scope check took the plan's
+  first epic as the skeleton. plan-project now marks `**Walking skeleton:** yes` (3B.3) and keeps
+  other specs off CLAUDE.md; the driver treats a marked epic as a skeleton (`isSkeleton`).
+- [x] **The look's run command was stale with no way to fix it.** `configure --human-check`.
+- [x] **"CHECK_BUILD still fails after the fix round" was continued on the standing answer.**
+  Re-running the same check on the same branch cannot pass: both standing answers and any "Try
+  again" were wasted (xI5RS4q, test-integrity). `stuckAfterFix`: a failure other than the tests
+  alone is the owner's question, and their "Resume" runs one more repair briefed with the checks.
+
+Open (C3, none blocks a run):
+- [ ] **The referee cannot see an interpreter's writes.** The xI5RS4q repair edited an existing
+  test through `python - <<EOF … open(p,'w')` with no reason line; R7 passed it and only the
+  driver's test-integrity check caught it. Either flag interpreter heredocs that name a file
+  under the test directories, or tell build and fix sessions to edit tests with Edit/Write only.
+- [ ] **"Seen but not fixed" items park one at a time.** U8pEKNP's verify parked three times
+  for three Leave-as-is items (each a stop, an answer and a relaunch). Ask them in one gate.
+- [ ] **The e2e suite runs four or more times per epic** (build, CHECK_BUILD, verify, merge gate),
+  about 9 min each on this PC. Consider the fast suite at CHECK_BUILD and the full suite once.
+- [ ] **start-epic's "work started" issue comment** always lands in "Not proven for real" (no `gh`,
+  no remote). Autopilot sessions should skip it, or the closing screen should post it.
+- Operational: the proxy session ran the plugin suite while the run built and starved it (fast
+  suite 51 s → 455 s, a repair spent). Never run heavy jobs beside a run.
+
 ## How to work with the owner
 
 - Short, plain messages. Lead with the result; say what he must do now, or "nothing".

@@ -284,9 +284,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Autopilot runs removal epics** — an epic with `retires: CR-…` and no requirement of its own is eligible; the build check and the merge gate fail while any test or source still cites a retired requirement.
+- **A brownfield change of stack has its own walking skeleton** — `plan-project` marks it `**Walking skeleton:** yes`, and autopilot lets that epic write the new stack into `CLAUDE.md`; other epics' specs no longer ask for `CLAUDE.md` edits.
+- **A build still failing a check that re-running cannot cure is asked, not continued** — after its repair, a failure other than the tests alone (test integrity, scope, traceability) goes to the owner; their "Resume" runs one more repair, briefed with the failing checks.
+- **The look's run command can be updated** — `driver.mjs configure --human-check "<command>"` (or `<epic>=<command>`) sets it, and the autopilot skill offers it when a look's app did not start.
 - **A flaky readiness gate names the test that failed** — the first try's failing tests are kept (`first.failing`), now including Bun's and Playwright's output, and the launch screen names them.
 - **A live look is visible outside the gate file** — `status` (`waiting`) and `report.json` list the requirements a person must see for real, so an attending session no longer treats the look as pictures-only.
-- **A look's run output that failed to start is flagged** — the gate notes that the run command did not start cleanly and how to set `humanCheck`, instead of offering its error as evidence.
+- **A look's run output that failed to start is flagged** — the gate notes that the run command did not start cleanly and how to set it (`configure --human-check`), instead of offering its error as evidence.
 - **No console-window flood on Windows** (#41) — sessions are no longer started detached there: a detached process has no console, so every command it ran opened a window of its own (hundreds in one test run). Every spawn also hides its window.
 - **A session is really stopped on Windows** — a timed-out, over-budget or leftover session is stopped with its whole process tree (`taskkill /T`); the process-group kill used elsewhere did nothing there.
 - **Project commands run by `sh` on Windows** — the tests, build and `setup` ran under `cmd.exe`; they now run in Git Bash, as on macOS, so `;`, `>&2` and `$VAR` work and a missing command reads as "could not run".

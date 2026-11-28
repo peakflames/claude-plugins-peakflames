@@ -2355,12 +2355,21 @@ test('with "look": "after", a run resumed after the driver was killed mid-review
   assert.deepEqual(e.unlooked?.pictures.map((x) => path.basename(x)), ['home.png'], 'listed for the owner to see afterwards');
 });
 
-test('`configure --look after` writes the project setting; `before` removes it; anything else is refused', (t) => {
+test("`configure --look after` writes the project setting; `before` removes it; anything else is refused; `--human-check` sets the look's run command", (t) => {
   const p = makeProject(t);
   const file = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
   assert.equal(cli('configure', '--project', p.project, '--look', 'after').status, 0);
   assert.equal(readJson(file).look, 'after');
   assert.match(cli('configure', '--project', p.project, '--look', 'never').stderr, /look is "before" or "after"/);
+  // The look's run command: for every epic, for one, and removed again; other keys stay.
+  const settingsFile = path.join(p.project, '.claude', 'peak-workflow', 'autopilot.json');
+  assert.equal(cli('configure', '--project', p.project, '--human-check', 'bun run desktop -- samples/ledger').status, 0);
+  assert.equal(cli('configure', '--project', p.project, '--human-check', 'Lg5Chr8=node bin/ledger.js chart').status, 0);
+  assert.deepEqual(readJson(settingsFile).humanCheck, { '*': 'bun run desktop -- samples/ledger', Lg5Chr8: 'node bin/ledger.js chart' });
+  assert.equal(readJson(settingsFile).look, 'after');
+  assert.equal(cli('configure', '--project', p.project, '--human-check', 'Lg5Chr8=').status, 0);
+  assert.equal(cli('configure', '--project', p.project, '--human-check', '').status, 0);
+  assert.equal(readJson(settingsFile).humanCheck, undefined);
   assert.equal(cli('configure', '--project', p.project, '--look', 'before').status, 0);
   assert.equal(readJson(file).look, undefined);
 });
@@ -2674,4 +2683,34 @@ test('a usage limit that resets too late stops the run: the epic parks with a qu
   const r = await again(p, { queue: [E1.id] });
   assert.equal(r.steps[0], `${E1.id}/build-1`);
   assert.equal(p.epic(E1.id).state, 'MERGED');
+});
+
+test('checks that still fail after the repair on something running again cannot cure (scope): asked, not continued; the owner\'s "Resume" runs one more repair, briefed with them, and the epic merges (Pilot Light, 2026-11-27)', async (t) => {
+  const p = makeProject(t, { config: { autoContinue: 2 } });
+  const stray = { do: 'write', path: 'package-lock.json', content: '{ "lockfileVersion": 3 }\n' }; // a lockfile with no package.json change: out of scope
+  p.scenario({
+    [`${E1.id}/plan`]: planScript(E1),
+    [`${E1.id}/build`]: { actions: [...buildActions(E1, { commit: false }), stray, { do: 'commit', message: `feat(epic-${E1.id}): implement ${E1.slug}` }], result: { total_cost_usd: 0.3 } },
+    [`${E1.id}/fix-1`]: { actions: [{ do: 'commit', message: `fix(epic-${E1.id}): try again` }] }, // leaves the stray file: the check fails the same way
+    [`${E1.id}/verify`]: wrapupScript(E1),
+  });
+  await p.go();
+  assert.match(p.epic(E1.id).reason, /^CHECK_BUILD still fails after the fix round \(scope\)/);
+  // Running the same checks on the same branch fails the same way: the standing answer does not take it.
+  const st = status(p.project, p.state);
+  assert.equal(st.next, 'decide', JSON.stringify(st.autoContinue));
+  assert.equal(continueRun(p.state, { by: 'Pat Owner' }).continued.length, 0); // writes the resume gate, answers nothing
+  assert.equal(gate(p, E1.id).decided, null);
+  assert.match(gate(p, E1.id).why, /"Resume from where it stopped" runs one more repair, told which checks fail/);
+
+  decide(p, E1.id, ANSWERS.resume);
+  // The next run's repair (its own fix-1) takes the stray file out.
+  p.scenario({
+    [`${E1.id}/fix-1`]: { actions: [{ do: 'rm', path: 'package-lock.json' }, { do: 'commit', message: `fix(epic-${E1.id}): drop the stray lockfile` }] },
+    [`${E1.id}/verify`]: wrapupScript(E1),
+  });
+  const { steps } = await again(p);
+  assert.deepEqual(steps.slice(0, 1), [`${E1.id}/fix-1`]);
+  assert.match(fs.readFileSync(p.dir(E1.id, 'fix-brief.md'), 'utf8'), /still failed after the repair, and the owner \(Pat Owner\) asked for one more[\s\S]*\*\*scope\*\*.*package-lock\.json/);
+  assert.equal(p.epic(E1.id).state, 'MERGED', p.epic(E1.id).reason);
 });

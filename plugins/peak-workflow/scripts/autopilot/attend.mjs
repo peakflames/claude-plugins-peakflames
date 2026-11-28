@@ -36,6 +36,7 @@ const CHECK_WORDS = {
   'test-integrity': 'an existing test was changed without a recorded reason',
   verdict: 'the merge was not made the expected way', 'sidecar-on-integration': 'the epic was not marked complete',
   'no-waivers': 'a requirement was waived or put off', 'tests-green-on-integration': 'the tests do not pass after the merge',
+  removal: 'a test or source file still names a requirement this epic retires', 'removal-on-integration': 'a test or source file still names a retired requirement after the merge',
 };
 
 /** Why an epic stopped, without phase names, step names or file names. */

@@ -149,6 +149,8 @@ test('standingCovers: only an undecided resume gate for a technical stop, and on
   // The owner's own stop, a run limit, the disk, a branch that no longer fits, a verified epic nobody merged: all asked.
   const asked = ['stopped by the STOP file during build-1', 'run stopped (STOP file) before VERIFY', 'run stopped (end time) before BUILD', 'run stopped (run budget) before AUDIT', 'run stopped (disk floor) before PLAN', 'budget: build-1 hit disk floor', 'budget: build-1 hit growth cap', 'feature/x does not merge cleanly with develop (a.js): merge develop into the branch by hand, then resume', 'verify-1 verified every requirement and marked the epic Complete on feature/x, but did not merge it into develop', 'CHECK_BUILD: the handoff records 2 deferral(s): a human decision (failed: handoff)', ''];
   for (const r of asked) assert.equal(standingCovers(g(r), [], 2), false, r);
+  // Checks that running again cannot cure, still failing after the repair: the owner's (Pilot Light, 2026-11-27). Only the tests alone may be re-run.
+  for (const r of ['CHECK_BUILD still fails after the fix round (test-integrity)', 'CHECK_BUILD still fails after the fix round (tests-green, scope)', 'CHECK_BUILD still fails after the fix round (traceability)']) assert.equal(standingCovers(g(r), [], 2), false, r);
   const ok = covered[1];
   assert.equal(standingCovers(g(undefined, { question: `a (x) — X stopped: ${ok}. Continue it in the next run?` }), [], 2), true, 'a gate from an earlier driver: the reason is read from its question');
   assert.equal(gateReason(g(undefined, { question: `a (x) — X stopped: ${ok}. Continue it in the next run?` })), ok);

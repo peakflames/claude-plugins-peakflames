@@ -412,7 +412,9 @@ Python install). Steps 0, 3b, 4 and 5 read only the workspace, so they skip the 
    for your decision" is not offered: its question is answered first (Step 4). An epic the owner asks to add although preflight skips
    it is allowed only for two reasons — its status is not `Not Started` (for example, paused by
    `/peak-workflow:pause`), or it belongs to someone else — and goes into `explicit` as well as
-   `queue`. Safety, hardware and no-anchor epics are never added. An epic that resumes or starts
+   `queue`. Safety, hardware and no-anchor epics are never added. A removal epic (its sidecar
+   has `retires: CR-…`) is not a no-anchor epic: preflight makes it eligible, and the driver
+   checks that nothing still cites what its record retired. An epic that resumes or starts
    over from a decided gate needs no `explicit` entry.
 
    **The queue from last time.** `launch.lastQueue` is the queue the owner confirmed for the
@@ -877,6 +879,15 @@ Reached from Step 0 on `decide`, from Step 3b when a question arises mid-run, an
       Then print each entry of `checklists` (the steps the build wrote for looking at it) as a
       short numbered list under "How to check it", in plain words. Never ask the owner to find
       or open a file themselves.
+
+      **The app did not start for the look.** When a gate's `artifactNotes` says the run command
+      did not start cleanly, the command autopilot uses to start the app for a person is stale
+      (an epic changed how the app starts). Say so in one line, and offer the start command the
+      epic's handoff or `docs/architecture.md` gives, through `AskUserQuestion`: "Use
+      `<command>` to start the app for the next looks?" (Yes / Not now). On Yes run
+      `DRIVER configure --project "<root>" --human-check "<command>"` (`<epic id>=<command>`
+      sets it for one epic; an empty value removes it). Never set it unasked; the gate's own
+      question is still answered on the pictures.
 
       **Pictures of the screens.** The gate's `pictures` list holds the screenshots the build
       took for this look, each with `path` and `shows` (the build's own caption). They are what

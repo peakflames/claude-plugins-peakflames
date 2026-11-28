@@ -46,7 +46,7 @@ test('the first epic may not change CLAUDE.md anywhere else', async (t) => {
   const p = makeProject(t);
   p.scenario(scenario(E1, { 'CLAUDE.md': claudeMd(p).replace('needs no\nbank password', 'needs any\nbank password') }));
   await p.go();
-  assert.deepEqual(scopeOf(p, E1.id).evidence, ['CLAUDE.md: changed in Project Overview; the first epic may change only Tech Stack, Local Environment, Verification & Quality Gates, and elsewhere only a value still to decide']);
+  assert.deepEqual(scopeOf(p, E1.id).evidence, ['CLAUDE.md: changed in Project Overview; a walking skeleton may change only Tech Stack, Local Environment, Verification & Quality Gates, and elsewhere only a value still to decide']);
 });
 
 /** The project with a value still to decide in its Security Baseline, where setup writes one. */
@@ -84,7 +84,7 @@ test('the walking skeleton may only settle a value there: another line in that s
   const more = claudeMd(p).replace('- **Secrets store:** TBD — set by the walking-skeleton epic', '- **Secrets store:** the `.env` file\n- **Also:** anything goes');
   p.scenario(scenario(E1, { 'CLAUDE.md': more }));
   await p.go();
-  assert.deepEqual(scopeOf(p, E1.id).evidence, ['CLAUDE.md: changed in Security Baseline; the first epic may change only Tech Stack, Local Environment, Verification & Quality Gates, and elsewhere only a value still to decide']);
+  assert.deepEqual(scopeOf(p, E1.id).evidence, ['CLAUDE.md: changed in Security Baseline; a walking skeleton may change only Tech Stack, Local Environment, Verification & Quality Gates, and elsewhere only a value still to decide']);
 });
 
 test('settlesUndecided: each undecided line kept, replaced in place by one line, or dropped; anything else moved, doubled or added is not settling', () => {
@@ -111,5 +111,19 @@ test('a later epic may change only the Test directories line of CLAUDE.md', asyn
   addEpic(p.project, { id: E2.id, slug: E2.slug, name: 'Summary', nn: '02' });
   p.scenario({ [`${E2.id}/plan`]: planScript(E2), [`${E2.id}/build`]: buildWith(E2, { 'CLAUDE.md': claudeMd(p).replace('- **Tests:** `node --test`', '- **Setup:** `npm ci`\n- **Tests:** `node --test`') }), [`${E2.id}/verify`]: wrapupScript(E2) });
   await p.go();
-  assert.deepEqual(scopeOf(p, E2.id).evidence, ['CLAUDE.md: changed beyond the Test directories line']);
+  assert.deepEqual(scopeOf(p, E2.id).evidence, ["CLAUDE.md: changed beyond the Test directories line (only a walking skeleton may change more: the plan's first epic, or one whose spec says **Walking skeleton:** yes)"]);
+});
+
+test('a later epic plan-project marked "Walking skeleton: yes" (a brownfield change of stack) may write the new stack into CLAUDE.md; the owner is shown it (Pilot Light, 2026-11-27)', async (t) => {
+  const p = makeProject(t, { config: { queue: ['Lg2Sum8'] } });
+  const E2 = { id: 'Lg2Sum8', slug: 'summary', branch: 'feature/epic-Lg2Sum8-summary', tors: ['TOR-02-Lg2Sum8'] };
+  addEpic(p.project, { id: E2.id, slug: E2.slug, name: 'Summary', nn: '02' });
+  const spec = path.join(p.project, 'docs', 'implementation-plan', 'phase-1-core', `epic-${E2.id}-${E2.slug}.md`);
+  fs.writeFileSync(spec, fs.readFileSync(spec, 'utf8').replace('**Plan branch:** docs/ledger-baseline\n', '**Plan branch:** docs/ledger-baseline\n**Walking skeleton:** yes\n'));
+  git(p.project, 'commit', '-qam', 'docs: the summary epic is the new stack\'s walking skeleton');
+  p.scenario({ [`${E2.id}/plan`]: planScript(E2), [`${E2.id}/build`]: buildWith(E2, { 'CLAUDE.md': claudeMd(p).replace('- **Tests:** `node --test`', '- **Setup:** `npm ci`\n- **Tests:** `node --test`') }), [`${E2.id}/verify`]: wrapupScript(E2) });
+  await p.go();
+  assert.equal(scopeOf(p, E2.id).pass, true, JSON.stringify(scopeOf(p, E2.id).evidence));
+  assert.equal(p.epic(E2.id).state, 'PARKED');
+  assert.deepEqual(readJson(path.join(p.state, 'gates', `${E2.id}-1.json`)).claudeMd.sections, ['Local Environment']);
 });

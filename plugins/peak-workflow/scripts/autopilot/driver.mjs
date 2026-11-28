@@ -27,7 +27,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { UNPROVEN_CATEGORIES, activity, atLimitAsk, chainOf, driverPid, eventLine, friction, leftLines, openCommand, saysLeft, plainReason, shortLabel, pictureLines, snapshotLine, unansweredNeeds, unprovenLines, watch } from './attend.mjs';
 import { AUDIT_DIR, SCHEMA, auditOutput, buildBundle, changedCodeFiles, judgeAudit, reviewCoverage, thinReview, validateAudit } from './audit.mjs';
-import { fromBash, THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, failingTests, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, technicalAnswer, testNamedDirs, testWeakening, connectorLine, mergeConnectorUse, parseMcpList } from './lib.mjs';
+import { fromBash, THIN_REVIEW, ANSWERS, LEAVE_IT, LOCKFILE, NO_VERDICT, SMALL_FIX_FILE, SMALL_FIX_PROBLEM, PROVISIONAL_BY, UNAPPROVED_BY, TEST_CHECK_LINE, isProvisional, TRY_AGAIN, atLimit, checkedAsTest, estimateCost, failingTests, gateEntry, gateLive, gateReason, isExpectedOutput, isTestPath, lintPlan, parseSidecar, parseTestDirs, postpones, ownerDeferred, prototypeDeferred, prototypeReasked, smallFixLimits, standingAnswer, stuckAfterFix, technicalAnswer, testNamedDirs, testWeakening, connectorLine, mergeConnectorUse, parseMcpList } from './lib.mjs';
 import { epicConnectorUse, writeReport } from './report.mjs';
 
 export { ANSWERS, atLimit, eventLine, gateEntry, gateLive, gateReason, lintPlan, parseSidecar, standingAnswer, unprovenLines, watch };
@@ -417,8 +417,34 @@ export function readEpics(root, { sidecarText = null } = {}) {
       plannedBy: (spec.match(/\*\*Planned by:\*\*\s*(.+)/) ?? [])[1]?.trim() ?? '—',
       anchors: sidecar.requirements,
       hasScreens: /^## Screens\b/m.test(spec),
+      // plan-project marks a walking skeleton: the plan's first epic, or the first of a brownfield change of stack.
+      skeleton: /^\*\*Walking skeleton:\*\*\s*yes\b/im.test(spec),
+      // A removal epic: the Change Records whose retired behavior it takes out of the code.
+      retires: (sidecar.fields.retires ?? '').match(/CR-[A-Za-z0-9]{7}/g) ?? [],
     };
   });
+}
+
+/**
+ * The walking-skeleton epics of a plan: its first epic when that has no dependencies (greenfield), and every epic
+ * whose spec says `**Walking skeleton:** yes` (plan-project, a brownfield change of stack). Each may write the stack
+ * it settles into CLAUDE.md's skeleton sections; the owner is shown the change before the final check.
+ */
+export function isSkeleton(epics) {
+  return epics.filter((x, i) => (i === 0 && !x.deps.length) || x.skeleton);
+}
+
+/** The requirements the given Change Records retired or superseded (each record's `[[changes]] tor = "…"` lines). */
+export function retiredTors(root, records) {
+  const dir = path.join(root, 'docs', 'requirements', 'changes');
+  if (!exists(dir)) return [];
+  const names = fs.readdirSync(dir);
+  const out = [];
+  for (const cr of records) {
+    const suffix = String(cr).replace(/^CR-/, '');
+    for (const f of names.filter((n) => n.endsWith(`-${suffix}.toml`))) for (const x of read(path.join(dir, f)).matchAll(/^tor\s*=\s*"(TOR-\d{2}-[A-Za-z0-9]{7})"/gm)) out.push(x[1]);
+  }
+  return [...new Set(out)];
 }
 
 /** The Scenario block of each requirement, keyed by TOR ID, with whether it sits under `# Safety`. */
@@ -864,12 +890,21 @@ export function parseBudgets(specs) {
   return out;
 }
 
-/** Writes `setup`, `copy`, `readOnly`, `network` and per-step `budgets` into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
-export function configureProject(project, { setup, copy, readOnly, network, budgets, look, runBudget, workspace = `${project}.autopilot` } = {}) {
+/** Writes `setup`, `copy`, `readOnly`, `network`, per-step `budgets` and the look's run command (`humanCheck`) into the project's own autopilot settings file, keeping its other keys. The one project file autopilot writes, and only on the owner's say. */
+export function configureProject(project, { setup, copy, readOnly, network, budgets, look, runBudget, humanCheck, workspace = `${project}.autopilot` } = {}) {
   const file = projectSettingsFile(project);
   let j = {}; let lookChanged = false;
   if (exists(file)) { try { j = readJson(file); } catch (err) { throw new Error(`${file} is not valid JSON: ${err.message}`); } }
   if (setup !== undefined) { if (String(setup).trim()) j.setup = String(setup).trim(); else delete j.setup; }
+  // The command that starts the app for a person's look: `<cmd>` for every epic, `<epic id>=<cmd>` for one. Empty removes it.
+  if (humanCheck !== undefined) {
+    const v = String(humanCheck).trim();
+    const one = v.match(/^([A-Za-z0-9]{7})=(.*)$/s);
+    const key = one ? one[1] : '*'; const cmd = (one ? one[2] : v).trim();
+    const map = j.humanCheck && typeof j.humanCheck === 'object' ? j.humanCheck : {};
+    if (cmd) map[key] = cmd; else delete map[key];
+    if (Object.keys(map).length) j.humanCheck = map; else delete j.humanCheck;
+  }
   if (runBudget !== undefined) {
     const v = String(runBudget).trim();
     if (v && !(Number(v) > 0)) throw new Error(`run budget is a dollar amount above 0, not ${JSON.stringify(runBudget)}`);
@@ -951,8 +986,11 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
   const explicit = new Set(config.explicit ?? []);
 
   const read0 = readEpics(root, { sidecarText });
-  const skeletonId = read0[0] && !read0[0].deps.length ? read0[0].id : null; // as the scope check reads it: the plan's first epic, with no dependencies
-  const skeletonLeft = skeletonId && read0[0].status !== 'Complete'; // a Complete one left them: no epic will settle them now
+  // As the scope check reads it: the plan's first epic, with no dependencies — or, once that is done, a later one
+  // plan-project marked `**Walking skeleton:** yes` (a brownfield change of stack).
+  const skeleton = isSkeleton(read0);
+  const skeletonId = skeleton.find((x) => x.status !== 'Complete')?.id ?? skeleton[0]?.id ?? null;
+  const skeletonLeft = skeleton.some((x) => x.status !== 'Complete'); // a Complete one left them: no epic will settle them now
   const epics = read0.map((epic) => {
     let e = epic;
     const reasons = []; let eligibility = 'eligible'; let humanCheck = false;
@@ -966,7 +1004,11 @@ export function preflight(root, config, { pluginDir = PLUGIN_DIR, gates = new Ma
     else if (gate?.state === 'fresh') reasons.push(`starts over: you answered "${gate.answer}" on ${gate.gate}`);
     else if (gate?.state === 'void') reasons.push(`your decision on ${gate.gate} can no longer be used as given (${gate.why}): autopilot asks how to go on`);
     if (e.status !== 'Not Started' && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) set('skip', `status is ${e.status}: someone is part-way through it; queue it explicitly to have autopilot take it over`);
-    if (!e.anchors.length) set('skip', 'no Requirements Anchors');
+    // A removal epic (plan-project 3C) may have no requirement of its own: its done-when is mechanical. The build
+    // check and the merge gate run `tor-lifecycle sweep` on what its records retired; the verifier runs the Removal gate.
+    if (!e.anchors.length && !e.retires.length) set('skip', 'no Requirements Anchors');
+    else if (!e.anchors.length && !retiredTors(root, e.retires).length) set('skip', `a removal epic whose record (${e.retires.join(', ')}) names no retired requirement`);
+    else if (e.retires.length) reasons.push(`a removal epic (retires ${e.retires.join(', ')}): done when nothing cites the retired requirements and their code is gone${e.anchors.length ? ', and its guard requirements pass' : ''}`);
     if (embedded) set('skip', 'hardware project: never unattended');
     for (const who of [e.owner, e.plannedBy]) {
       if (me && who && who !== '—' && who.toLowerCase() !== me && !explicit.has(e.id) && !['resume', 'fresh', 'void'].includes(gate?.state)) { set('skip', `belongs to ${who}; queue it explicitly to take it`); break; }
@@ -2897,6 +2939,21 @@ class Run {
   }
 
   /** CHECK_BUILD (§6.5): every check is a file or a command. */
+  /**
+   * A removal epic's mechanical part of done (wrapup-epic's Removal gate, "No citations left"): no test or source in the
+   * checked-out tree still cites a requirement its Change Records retired. The verifier checks the rest (code gone).
+   */
+  removalCheck(retires) {
+    const tors = retiredTors(this.clone, retires);
+    if (!tors.length) return { pass: false, evidence: `no retired requirement found in ${retires.join(', ')} (docs/requirements/changes/)` };
+    const r = torLifecycle(this.pluginDir, this.clone, 'sweep', ...tors);
+    if (r.code !== 0 && r.code !== 1) return { pass: false, evidence: `tor-lifecycle sweep exited ${r.code}: ${(r.err || r.out).split('\n')[0]}` };
+    // The referee's own record of why a test changed (`.autopilot/`) names the requirement on purpose: not a citation.
+    const hits = r.out.split('\n').filter((l) => l.trim() && !/\t\.autopilot\//.test(l));
+    if (!hits.length) return { pass: true, evidence: `${tors.length} retired requirement(s) cited nowhere: ${tors.join(', ')}` };
+    return { pass: false, evidence: { stillCited: [...new Set(hits.map((l) => l.split('\t')[0]))], sweep: hits.slice(0, 30) } };
+  }
+
   checkBuild(e) {
     const m = this.meta(e); const dev = this.state.integration; const b = m.branch;
     const checks = []; let parkOnly = null;
@@ -2960,6 +3017,7 @@ class Run {
       // A deferred requirement keeps its test, skipped with the reason `Deferred: <TOR>` (start-epic's rule): those skips, and no others, are allowed.
       const deferSkips = deferOk ? rows.reduce((n, tor) => n + gitRun(this.clone, 'grep', '-h', '-F', `Deferred: ${tor}`, b, '--', ...dirs).out.split('\n').filter((l) => l.trim() && !/^\s*(\/\/|#|\*|\/\*|--)/.test(l)).length, 0) : 0; // the marker in a skip reason, not in a comment beside it
       add('tests-green', t.pass && (t.skips === null || base == null || t.skips <= base + deferSkips), { exit: t.code, timedOut: t.timedOut, skips: t.skips, baseSkips: base ?? null, ...(deferSkips ? { skipsAllowedForDeferrals: deferSkips } : {}), tail: t.pass ? undefined : t.tail });
+      if (m.retires?.length) { const r = this.removalCheck(m.retires); add('removal', r.pass, r.evidence); }
     } else add('tests-green', false, 'not run: the working tree is not a clean checkout of the branch');
 
     const h = this.health(dev);
@@ -2982,15 +3040,14 @@ class Run {
         const beyond = lines.filter((l) => !l.includes('**Test directories:**'));
         // The first epic of the plan (the walking skeleton) is the one that settles how the project is set up, run
         // and tested, so it may write that down. The owner is shown the change before anything merges (`humanCheck`).
-        const first = this.pre.epics[0];
-        if (beyond.length && first?.id === e.id && !first.deps.length) {
+        if (beyond.length && isSkeleton(this.pre.epics).some((x) => x.id === e.id)) {
           const before = gitRun(this.clone, 'show', `${dev}:CLAUDE.md`).out; const after = gitRun(this.clone, 'show', `${b}:CLAUDE.md`).out;
           const sections = changedSections(before, after);
           // Elsewhere it may only settle a value still to decide (a `TBD` in the Security Baseline, a "Not decided yet" line).
           const outside = sections.filter((x) => !SKELETON_SECTIONS.includes(x) && !settlesUndecided(before, after, x));
-          if (outside.length) out.push(`CLAUDE.md: changed in ${outside.join(', ')}; the first epic may change only ${SKELETON_SECTIONS.join(', ')}, and elsewhere only a value still to decide`);
+          if (outside.length) out.push(`CLAUDE.md: changed in ${outside.join(', ')}; a walking skeleton may change only ${SKELETON_SECTIONS.join(', ')}, and elsewhere only a value still to decide`);
           else claudeMd = { sections, lines: beyond.slice(0, 40), ...(beyond.length > 40 ? { more: beyond.length - 40 } : {}) };
-        } else if (beyond.length) out.push('CLAUDE.md: changed beyond the Test directories line');
+        } else if (beyond.length) out.push('CLAUDE.md: changed beyond the Test directories line (only a walking skeleton may change more: the plan\'s first epic, or one whose spec says **Walking skeleton:** yes)');
       } else if (lockfiles.test(f) && !(this.config.scope.lockfiles ?? []).includes(f) && !changed.some((c) => path.posix.basename(c) === MANIFEST_OF[path.posix.basename(f)])) out.push(`${f}: lockfile changed but no ${MANIFEST_OF[path.posix.basename(f)]} changed with it, and it is not named in config`);
       else if (allow.length && !allow.some((re) => re.test(f))) out.push(`${f}: outside the allowed paths`);
       else if (Number(gitRun(this.clone, 'cat-file', '-s', `${b}:${f}`).out || 0) > 5 * 1024 * 1024) out.push(`${f}: larger than 5 MB`);
@@ -3274,7 +3331,7 @@ class Run {
     artifacts.push(this.rel(path.join(dir, 'run-output.txt')));
     // A run command that fails to start shows nothing of the requirement (seen live: `bun run dev` with no project folder).
     if ((r.code !== 0 && !r.timedOut) || /exited with code [1-9]|\berror:/i.test(`${r.out}
-${r.err}`)) notes.push(`the run command (${cmd}) did not start cleanly${r.timedOut ? '' : ` (exit ${r.code})`}, so its output may show nothing of this requirement: set settings.json humanCheck["*"] to the command that starts the app for a person`);
+${r.err}`)) notes.push(`the run command (${cmd}) did not start cleanly${r.timedOut ? '' : ` (exit ${r.code})`}, so its output may show nothing of this requirement: with the owner's word, set the command that starts the app for a person with \`driver.mjs configure --project <project> --human-check "<command>"\``);
     // Files the command left in the clone (a built page, a chart) are kept as artifacts; the clone goes back to the commit.
     for (const line of this.g('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean)) {
       const f = line.slice(3);
@@ -3571,6 +3628,7 @@ ${r.err}`)) notes.push(`the run command (${cmd}) did not start cleanly${r.timedO
     if (this.currentBranch() === dev && !this.dirty()) {
       const t = this.runTests();
       add('tests-green-on-integration', t.pass, { exit: t.code, timedOut: t.timedOut, skips: t.skips, tail: t.pass ? undefined : t.tail });
+      if (m.retires?.length) { const r = this.removalCheck(m.retires); add('removal-on-integration', r.pass, r.evidence); }
       if (t.pass && t.skips !== null) this.state.baseSkips = t.skips;
     } else add('tests-green-on-integration', false, `not run: the clone is not a clean checkout of ${dev}`);
 
@@ -3942,7 +4000,13 @@ ${r.err}`)) notes.push(`the run command (${cmd}) did not start cleanly${r.timedO
         if (e.fixRounds >= 1) this.log(`${e.id}: the one fix round was used; ${f.by} asked on ${f.gate} for another, so one more runs`);
         e.fixRounds = 1;
         this.event('fix-round', e, { why: e.resumed.unasked ? 'standing' : 'owner' });
-        if (entry.fix === 'audit') {
+        if (entry.fix === 'checks') {
+          // The checks that failed after the repair, from the last build check the gate's run wrote.
+          const dir = path.join(runDirOf(this.stateDir, g.run ?? this.runName), 'epics', e.id);
+          const last = exists(dir) ? fs.readdirSync(dir).filter((n) => /^check-build-\d+\.json$/.test(n)).sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0])).at(-1) : null;
+          const failed = (last ? tryJson(path.join(dir, last), {}).checks ?? [] : []).filter((c) => !c.pass);
+          this.writeFixBrief(e, `The driver's done-ness checks still failed after the repair, and the owner (${g.decided.by}) asked for one more:`, [...(failed.length ? failed.map((c) => `- **${c.name}** — ${typeof c.evidence === 'string' ? c.evidence : JSON.stringify(c.evidence)}`) : ['(the failing checks could not be read: run the checks named in the gate\'s reason)']), ...(g.decided.note ? ['', `The owner's note: ${g.decided.note}`] : [])], 'one more repair, which the owner asked for');
+        } else if (entry.fix === 'audit') {
           const audit = tryJson(path.join(this.stateDir, g.artifacts?.[0] ?? '-'), {});
           const parks = (audit.findings ?? []).filter((x) => x.parks);
           this.writeFixBrief(e, e.resumed.unasked ? `The auditor reported these high findings. They are treated as real ${g.decided.standing ? 'on the owner\'s standing answer' : 'because the owner asked autopilot to try again'}; nobody judged them:` : `The auditor reported these high findings and the owner (${g.decided.by}) confirmed they are real:`, [...parks.map((x) => `- **${x.id} ${x.category}** — ${x.explanation} (evidence: ${x.evidence})`), ...(g.decided.note ? ['', `The owner's note: ${g.decided.note}`] : [])]);
@@ -4556,7 +4620,9 @@ function missingResumeGates(workspace) {
       kind: 'resume', skillStep: 'autopilot driver', phase: 'CHECK_BUILD', reason: rec.reason,
       question: `${q.label ?? id} stopped: ${rec.reason}. Continue it in the next run?`,
       options: [ANSWERS.resume, ANSWERS.startOver],
-      why: `nothing was decided for you: the build finished and autopilot's own checks stopped it. "${ANSWERS.resume}" runs those checks again on the same branch, with the current driver; "${ANSWERS.startOver}" plans it again from scratch`,
+      why: stuckAfterFix(rec.reason)
+        ? `nothing was decided for you: the build was repaired once and autopilot's own checks still fail, so running them again would fail the same way. "${ANSWERS.resume}" runs one more repair, told which checks fail; "${ANSWERS.startOver}" plans it again from scratch`
+        : `nothing was decided for you: the build finished and autopilot's own checks stopped it. "${ANSWERS.resume}" runs those checks again on the same branch, with the current driver; "${ANSWERS.startOver}" plans it again from scratch`,
       artifacts: last ? [last.dir] : [],
     } });
   }
@@ -4992,9 +5058,9 @@ async function main(argv) {
   if (cmd === 'configure') {
     if (!o.project) throw new Error('configure needs --project');
     const list = (v) => (v === undefined ? undefined : String(v).split(','));
-    if ([o.setup, o.copy, o.readOnly, o.network, o.budget, o.look, o.runBudget].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only, --network, --budget, --run-budget or --look (an empty value removes the entry)');
+    if ([o.setup, o.copy, o.readOnly, o.network, o.budget, o.look, o.runBudget, o.humanCheck].every((v) => v === undefined)) throw new Error('configure needs --setup, --copy, --read-only, --network, --budget, --run-budget, --look or --human-check (an empty value removes the entry)');
     const root = path.resolve(o.project);
-    console.log(JSON.stringify(configureProject(root, { setup: o.setup, look: o.look, runBudget: o.runBudget, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network), budgets: o.all.budget?.flatMap((b) => b.split(',')), workspace: path.resolve(wsArg ?? `${root}.autopilot`) }), null, 2));
+    console.log(JSON.stringify(configureProject(root, { setup: o.setup, look: o.look, runBudget: o.runBudget, humanCheck: o.humanCheck, copy: list(o.copy), readOnly: list(o.readOnly), network: list(o.network), budgets: o.all.budget?.flatMap((b) => b.split(',')), workspace: path.resolve(wsArg ?? `${root}.autopilot`) }), null, 2));
     return 0;
   }
   if (cmd === 'run') {

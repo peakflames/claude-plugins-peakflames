@@ -218,6 +218,17 @@ const stepKind = (session) => String(session ?? '').replace(/-\d+$/, '');
  * Where a decided gate re-enters the epic (the Part 2 table). Returns `{phase}` plus what that
  * phase needs, `{fresh: true}` for a start from scratch, or null when the gate cannot be resumed.
  */
+/**
+ * A build whose checks still fail after its repair, on a check that running again cannot cure: anything but the
+ * tests themselves (a flaky or starved test run can pass next time; a test changed with no reason, a file out of
+ * scope or a requirement no test names fails the same way on the same branch). Seen live: Pilot Light,
+ * 2026-11-27, two standing answers spent re-running test-integrity. Such a stop is the owner's, and their
+ * "Resume" runs one more repair (`gateEntry`).
+ */
+export function stuckAfterFix(reason) {
+  const m = String(reason ?? '').match(/^CHECK_BUILD still fails after the fix round \(([^)]*)\)/);
+  return !!m && m[1].split(/,\s*/).some((n) => n.trim() && n.trim() !== 'tests-green');
+}
 export function gateEntry(g) {
   const a = g.decided?.answer; const asked = stepKind(g.session);
   if (!a) return null;
@@ -225,6 +236,8 @@ export function gateEntry(g) {
   // A full run asking the owner what a provisional run took (`reask`): the answer the provisional run gave makes it theirs and
   // the epic goes on from where it stood; any other answer goes back to the kind of session that asked.
   if (g.reask) return a === g.reask.took && g.reask.phase ? { phase: g.reask.phase, question: true } : STEP_PHASE[asked] ? { phase: STEP_PHASE[asked], question: true } : null;
+  // Resuming a build whose checks still fail after its repair is one more repair, briefed with those checks: a person's answer only.
+  if (g.kind === 'resume' && a === ANSWERS.resume && g.phase === 'CHECK_BUILD' && stuckAfterFix(gateReason(g))) return { phase: 'FIX_BUILD', fix: 'checks' };
   if (g.kind === 'resume') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.resume && g.phase ? { phase: g.phase } : null;
   if (g.kind === 'audit') return a === ANSWERS.startOver ? { fresh: true } : a === ANSWERS.auditNotReal ? { phase: 'VERIFY' } : a === ANSWERS.auditReal ? { phase: 'FIX_BUILD', fix: 'audit' } : null;
   if (g.kind === 'thin-review') return a === ANSWERS.verifyAsBuilt ? { phase: 'VERIFY' } : a === ANSWERS.reviewAgain ? { phase: 'AUDIT' } : null;
@@ -269,7 +282,7 @@ export const LEAVE_IT = 'Leave it for now';
 export function technicalAnswer(gate) {
   if (!gate || gate.decided || !gateLive(gate)) return null;
   const options = gate.options ?? [];
-  if (gate.kind === 'resume') return gate.phase && options.includes(ANSWERS.resume) && (gate.technical === true || TECHNICAL_STOP.some((re) => re.test(gateReason(gate)))) ? ANSWERS.resume : null;
+  if (gate.kind === 'resume') return gate.phase && options.includes(ANSWERS.resume) && !stuckAfterFix(gateReason(gate)) && (gate.technical === true || TECHNICAL_STOP.some((re) => re.test(gateReason(gate)))) ? ANSWERS.resume : null;
   if (gate.kind === 'plan-lint') return options.includes(ANSWERS.replan) ? ANSWERS.replan : null;
   if (gate.kind === 'audit') {
     const c = gate.categories;
