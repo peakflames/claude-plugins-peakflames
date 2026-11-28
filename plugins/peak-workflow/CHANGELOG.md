@@ -245,6 +245,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Autopilot build and repair briefs** tell sessions to change test files only with Edit or Write, never through a script; repair briefs also carry the reason-line rule for existing tests.
+
 - **The base-red stop names the failing tests** — the report's "Do this next" and `status` quote the failing test lines from the run, so the owner sees what to fix without opening the log.
 - **The look opens its pictures in the picture viewer** — autopilot opens all of a look's screenshots in one Preview window (or the system viewer), every time; sending them into the chat is now an extra, for another device.
 - **Values still to decide park nothing** (#41) — a `TBD` or a "Not decided yet" line in `CLAUDE.md` no longer parks every epic. The walking skeleton runs and settles them, in any section; other epics run meanwhile. Choices that cost money are still asked.

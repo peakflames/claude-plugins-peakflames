@@ -1398,6 +1398,9 @@ execution script for this session.
   append one line to \`.autopilot/test-changes.jsonl\`: \`{"path":"<the file>","reason":"<why this
   change is right>"}\`. Without it the change is refused. New test files need no line. A person
   reads every reason.
+- Change test files only with Edit or Write, never through a script or an interpreter
+  (\`python\`, \`node -e\`, a heredoc). Autopilot's checks see every change to a test; one made
+  out of sight stops the epic.
 - Commit everything you leave behind. \`.autopilot/test-changes.jsonl\` is part of your work:
   stage it with your final commit. \`git status\` must be clean when you finish.
 - Do not start a command that waits for the project's owner (a sign-in in a browser, a device
@@ -1416,6 +1419,11 @@ You are repairing an already-built epic, unattended. The list in your prompt is 
 - Do not enter plan mode: \`EnterPlanMode\` and \`ExitPlanMode\` are denied. Do not run \`/peak-workflow:start-epic\`.
 - Do not change the epic's status, and do not merge or push.
 - Where you must ask, ask with \`AskUserQuestion\`. Never answer such a question yourself and never work around it.
+- Before you change, move or delete a test file that already exists on the integration line,
+  append one line to \`.autopilot/test-changes.jsonl\`: \`{"path":"<the file>","reason":"<why this
+  change is right>"}\`. Change test files only with Edit or Write, never through a script or an
+  interpreter (\`python\`, \`node -e\`, a heredoc). Autopilot's checks see every change to a test;
+  one made out of sight stops the epic.
 - Commit everything you leave behind, \`.autopilot/test-changes.jsonl\` included. \`git status\` must be clean when you finish.
 - Do not start a command that waits for the project's owner (a sign-in in a browser, a device
   to plug in). A repair does the part that needs no person; the final check is where a person is

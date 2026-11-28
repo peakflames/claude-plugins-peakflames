@@ -161,14 +161,18 @@ Found and fixed (2026-11-27, targeted tests pass; full suite pending):
   alone is the owner's question, and their "Resume" runs one more repair briefed with the checks.
 
 Open (C3, none blocks a run):
-- [ ] **The referee cannot see an interpreter's writes.** The xI5RS4q repair edited an existing
+- [x] **The referee cannot see an interpreter's writes.** The xI5RS4q repair edited an existing
   test through `python - <<EOF … open(p,'w')` with no reason line; R7 passed it and only the
-  driver's test-integrity check caught it. Either flag interpreter heredocs that name a file
-  under the test directories, or tell build and fix sessions to edit tests with Edit/Write only.
+  driver's test-integrity check caught it. *Fixed 2026-11-28 in the briefs only (owner: the
+  referee is picky enough): build and fix rules say to change tests with Edit or Write only; the
+  fix rules now also carry the reason-line rule. CHECK_BUILD remains the catch.*
 - [ ] **"Seen but not fixed" items park one at a time.** U8pEKNP's verify parked three times
   for three Leave-as-is items (each a stop, an answer and a relaunch). Ask them in one gate.
-- [ ] **The e2e suite runs four or more times per epic** (build, CHECK_BUILD, verify, merge gate),
-  about 9 min each on this PC. Consider the fast suite at CHECK_BUILD and the full suite once.
+- [ ] **The sessions run the full e2e suite 4–5 times per epic** (counted from hooks.jsonl,
+  2026-11-28), about 9–11 min each: 37–54 min of each epic. The driver's own checks run only the
+  fast suite. Build runs it 1–2 times (again after its own fixes), fix once, verify twice (the
+  second to show a failure is pre-existing on the base). Consider one full run per session, and
+  verify reading the build's result instead of rerunning.
 - [ ] **start-epic's "work started" issue comment** always lands in "Not proven for real" (no `gh`,
   no remote). Autopilot sessions should skip it, or the closing screen should post it.
 - Operational: the proxy session ran the plugin suite while the run built and starved it (fast
